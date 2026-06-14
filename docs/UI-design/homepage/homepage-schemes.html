@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>云策教务 - 首页设计方案 1/2</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{font-family:'PingFang SC','SF Pro Display','Helvetica Neue','Microsoft YaHei',sans-serif;background:#0a0a1a;min-height:100vh;overflow-x:hidden}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(10,10,26,0.92);backdrop-filter:blur(30px);border-bottom:1px solid rgba(255,255,255,0.05);padding:14px 24px;display:flex;align-items:center;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.topbar::-webkit-scrollbar{display:none}
+.topbar .logo{font-size:13px;color:rgba(255,255,255,0.3);white-space:nowrap;font-weight:600;letter-spacing:1px;flex-shrink:0}
+.tab{padding:7px 18px;border-radius:20px;background:transparent;color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;transition:all .3s;font-family:inherit;white-space:nowrap;border:1px solid transparent}
+.tab:hover{color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.04)}
+.tab.on{color:#fff;font-weight:600;border-color:rgba(255,255,255,0.15)}
+.info{max-width:700px;margin:72px auto 0;padding:24px 32px 12px;text-align:center}
+.info h2{font-size:18px;color:#fff;font-weight:700;margin-bottom:6px}
+.info p{font-size:12px;color:rgba(255,255,255,0.25);line-height:1.6}
+.phone{width:375px;height:812px;border-radius:44px;overflow:hidden;margin:16px auto 40px;position:relative;box-shadow:0 0 0 11px #1a1a2e,0 0 0 12px rgba(255,255,255,0.04),0 40px 120px rgba(0,0,0,0.7);flex-shrink:0}
+.phone .scr{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative}
+.phone .scr::-webkit-scrollbar{width:0;display:none}
+.pn{display:none}.pn.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.pn.on .phone{animation:fadeUp .4s ease-out}
+
+/* ============================================================
+   方案1: 仪表盘数据驱动式
+   布局特征: 顶部数据横条 → 环形进度 → 横滑功能芯片 → 紧凑时间线
+   ============================================================ */
+.d1{background:#F0F2F5;font-family:'PingFang SC',sans-serif}
+.d1 .sb{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:#fff;font-size:12px;position:relative;z-index:5}
+.d1 .sb .t{font-size:14px;font-weight:700}
+.d1 .nav{background:#1A1A2E;padding:0 20px 28px;position:relative}
+.d1 .nav-top{display:flex;justify-content:space-between;align-items:center;padding:8px 0 16px}
+.d1 .nav-greet{color:rgba(255,255,255,0.5);font-size:12px}
+.d1 .nav-name{color:#fff;font-size:20px;font-weight:700;margin-top:2px}
+.d1 .nav-av{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#6C5CE7,#A29BFE);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700}
+/* 数据横条 */
+.d1 .data-bar{display:flex;gap:1px;background:rgba(255,255,255,0.06);border-radius:12px;overflow:hidden}
+.d1 .data-cell{flex:1;background:rgba(255,255,255,0.08);padding:12px 8px;text-align:center}
+.d1 .data-cell:first-child{border-radius:12px 0 0 12px}
+.d1 .data-cell:last-child{border-radius:0 12px 12px 0}
+.d1 .dv{color:#fff;font-size:22px;font-weight:800;line-height:1}
+.d1 .du{color:rgba(255,255,255,0.4);font-size:10px;margin-top:4px}
+/* 环形进度 */
+.d1 .ring-section{margin:16px 16px 0;background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.d1 .ring-row{display:flex;align-items:center;gap:20px}
+.d1 .ring-svg{width:100px;height:100px;flex-shrink:0}
+.d1 .ring-info{flex:1}
+.d1 .ring-title{font-size:15px;font-weight:700;color:#1A1A2E}
+.d1 .ring-desc{font-size:12px;color:#8E8E93;margin-top:4px;line-height:1.5}
+.d1 .ring-tags{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.d1 .ring-tag{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:600}
+/* 横滑功能芯片 */
+.d1 .chip-section{margin:16px 0 0;padding:0 16px}
+.d1 .chip-label{font-size:13px;font-weight:600;color:#1A1A2E;margin-bottom:10px}
+.d1 .chip-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.d1 .chip-scroll::-webkit-scrollbar{display:none}
+.d1 .chip{flex-shrink:0;width:72px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.d1 .chip-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;position:relative}
+.d1 .chip-icon svg{width:22px;height:22px;fill:#fff}
+.d1 .chip-icon .badge{position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;border-radius:8px;background:#FF3B30;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.d1 .chip-txt{font-size:11px;color:#3A3A3C;font-weight:500;text-align:center}
+/* 紧凑时间线 */
+.d1 .tl-section{margin:16px 16px 0;background:#fff;border-radius:16px;padding:16px 20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.d1 .tl-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.d1 .tl-title{font-size:15px;font-weight:700;color:#1A1A2E}
+.d1 .tl-more{font-size:12px;color:#6C5CE7;font-weight:500;cursor:pointer}
+.d1 .tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #F0F2F5}
+.d1 .tl-item:last-child{border-bottom:none}
+.d1 .tl-time{font-size:11px;color:#8E8E93;font-weight:600;min-width:36px;padding-top:2px}
+.d1 .tl-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.d1 .tl-body{flex:1}
+.d1 .tl-name{font-size:14px;font-weight:600;color:#1A1A2E}
+.d1 .tl-sub{font-size:11px;color:#8E8E93;margin-top:2px}
+.d1 .tl-st{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:600;display:inline-block;margin-top:4px}
+/* TabBar */
+.d1 .tbar{position:sticky;bottom:0;left:0;right:0;height:82px;background:#fff;border-top:1px solid #F0F2F5;display:flex;align-items:flex-start;padding-top:8px;z-index:10}
+.d1 .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.d1 .tb svg{width:22px;height:22px}
+.d1 .tb span{font-size:10px;font-weight:500}
+.d1 .tb.on svg{fill:#6C5CE7}
+.d1 .tb.on span{color:#6C5CE7}
+.d1 .tb:not(.on) svg{fill:#C7C7CC}
+.d1 .tb:not(.on) span{color:#C7C7CC}
+.d1 .hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#1A1A2E;opacity:.15}
+
+/* ============================================================
+   方案2: 大卡片杂志式
+   布局特征: 大图欢迎卡 → 2x2大功能卡 → 横滑课程卡 → 极简记录
+   ============================================================ */
+.d2{background:#FAFAF8;font-family:'PingFang SC',sans-serif}
+.d2 .sb{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:#1A1A1A;font-size:12px}
+.d2 .sb .t{font-size:14px;font-weight:700}
+/* 大图欢迎卡 */
+.d2 .hero{margin:0 16px 20px;border-radius:24px;background:linear-gradient(135deg,#2D3436,#636E72 60%,#B2BEC3);padding:28px 24px;position:relative;overflow:hidden;min-height:180px;display:flex;flex-direction:column;justify-content:flex-end}
+.d2 .hero::before{content:'';position:absolute;top:-30px;right:-30px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.06)}
+.d2 .hero::after{content:'';position:absolute;bottom:-20px;left:20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.04)}
+.d2 .hero-date{color:rgba(255,255,255,0.5);font-size:12px;font-weight:500;position:relative;z-index:2}
+.d2 .hero-title{color:#fff;font-size:24px;font-weight:800;margin-top:4px;line-height:1.3;position:relative;z-index:2}
+.d2 .hero-sub{color:rgba(255,255,255,0.6);font-size:13px;margin-top:8px;position:relative;z-index:2}
+.d2 .hero-stats{display:flex;gap:16px;margin-top:16px;position:relative;z-index:2}
+.d2 .hs-item{display:flex;align-items:baseline;gap:4px}
+.d2 .hs-val{color:#fff;font-size:20px;font-weight:800}
+.d2 .hs-lbl{color:rgba(255,255,255,0.5);font-size:11px}
+/* 2x2大功能卡 */
+.d2 .func-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px}
+.d2 .func-card{border-radius:20px;padding:20px;cursor:pointer;transition:transform .15s;position:relative;overflow:hidden}
+.d2 .func-card:active{transform:scale(.97)}
+.d2 .func-card .fc-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.d2 .func-card .fc-icon svg{width:20px;height:20px;fill:#fff}
+.d2 .func-card .fc-name{font-size:15px;font-weight:700;color:#fff}
+.d2 .func-card .fc-desc{font-size:11px;color:rgba(255,255,255,0.6);margin-top:3px}
+.d2 .func-card .fc-num{position:absolute;top:16px;right:16px;font-size:28px;font-weight:900;color:rgba(255,255,255,0.12)}
+/* 横滑课程卡 */
+.d2 .course-section{margin-top:20px;padding:0 16px}
+.d2 .course-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.d2 .course-title{font-size:16px;font-weight:700;color:#1A1A1A}
+.d2 .course-more{font-size:12px;color:#636E72;font-weight:500}
+.d2 .course-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+.d2 .course-scroll::-webkit-scrollbar{display:none}
+.d2 .course-card{flex-shrink:0;width:200px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.d2 .cc-top{height:8px}
+.d2 .cc-body{padding:14px 16px}
+.d2 .cc-name{font-size:14px;font-weight:700;color:#1A1A1A}
+.d2 .cc-info{font-size:11px;color:#8E8E93;margin-top:4px}
+.d2 .cc-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.d2 .cc-count{font-size:11px;color:#636E72}
+.d2 .cc-status{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600}
+/* 极简记录 */
+.d2 .rec-section{margin:20px 16px 0}
+.d2 .rec-head{font-size:16px;font-weight:700;color:#1A1A1A;margin-bottom:12px}
+.d2 .rec-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #F0F0ED}
+.d2 .rec-item:last-child{border-bottom:none}
+.d2 .rec-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.d2 .rec-info{flex:1}
+.d2 .rec-name{font-size:13px;font-weight:600;color:#1A1A1A}
+.d2 .rec-detail{font-size:11px;color:#8E8E93;margin-top:1px}
+.d2 .rec-val{font-size:13px;font-weight:700}
+/* TabBar */
+.d2 .tbar{position:sticky;bottom:0;left:0;right:0;height:82px;background:#FAFAF8;border-top:1px solid #E8E8E5;display:flex;align-items:flex-start;padding-top:8px;z-index:10}
+.d2 .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.d2 .tb svg{width:22px;height:22px}
+.d2 .tb span{font-size:10px;font-weight:500}
+.d2 .tb.on svg{fill:#2D3436}
+.d2 .tb.on span{color:#2D3436;font-weight:700}
+.d2 .tb:not(.on) svg{fill:#B2BEC3}
+.d2 .tb:not(.on) span{color:#B2BEC3}
+.d2 .hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#1A1A1A;opacity:.12}
+
+/* ============================================================
+   方案3: 左右分栏式
+   布局特征: 左侧窄栏(头像+导航) → 右侧主内容 → 横向统计条 → 卡片列表
+   ============================================================ */
+.d3{background:#F8F9FA;font-family:'PingFang SC',sans-serif}
+.d3 .sb{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:#fff;font-size:12px}
+.d3 .sb .t{font-size:14px;font-weight:700}
+.d3 .main-wrap{display:flex;min-height:calc(100% - 44px)}
+/* 左侧窄栏 */
+.d3 .sidebar{width:68px;background:#1B2838;padding:20px 0;display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
+.d3 .side-av{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#FF6B35,#FF9F1C);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:800;margin-bottom:12px}
+.d3 .side-item{width:48px;height:48px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:background .2s}
+.d3 .side-item:active{background:rgba(255,255,255,0.08)}
+.d3 .side-item svg{width:18px;height:18px;fill:rgba(255,255,255,0.4)}
+.d3 .side-item span{font-size:8px;color:rgba(255,255,255,0.4);font-weight:500}
+.d3 .side-item.on svg{fill:#FF6B35}
+.d3 .side-item.on span{color:#FF6B35}
+.d3 .side-item.on{background:rgba(255,107,53,0.12)}
+/* 右侧主内容 */
+.d3 .content{flex:1;overflow-y:auto;padding:16px 14px}
+.d3 .cnt-greet{font-size:12px;color:#8E8E93}
+.d3 .cnt-name{font-size:22px;font-weight:800;color:#1B2838;margin-top:2px}
+/* 横向统计条 */
+.d3 .stat-strip{display:flex;gap:8px;margin-top:16px}
+.d3 .ss-item{flex:1;background:#fff;border-radius:12px;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+.d3 .ss-val{font-size:20px;font-weight:800;color:#1B2838}
+.d3 .ss-lbl{font-size:10px;color:#8E8E93;margin-top:2px}
+/* 功能2列 */
+.d3 .func-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.d3 .fr-item{background:#fff;border-radius:14px;padding:14px;display:flex;align-items:center;gap:10px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.04);transition:transform .15s}
+.d3 .fr-item:active{transform:scale(.97)}
+.d3 .fr-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.d3 .fr-icon svg{width:18px;height:18px;fill:#fff}
+.d3 .fr-txt{font-size:12px;font-weight:600;color:#1B2838}
+/* 课程列表 */
+.d3 .cls-section{margin-top:14px}
+.d3 .cls-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.d3 .cls-title{font-size:15px;font-weight:700;color:#1B2838}
+.d3 .cls-more{font-size:11px;color:#FF6B35;font-weight:500}
+.d3 .cls-card{background:#fff;border-radius:14px;padding:14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px}
+.d3 .cls-bar{width:4px;height:40px;border-radius:2px;flex-shrink:0}
+.d3 .cls-info{flex:1}
+.d3 .cls-name{font-size:13px;font-weight:600;color:#1B2838}
+.d3 .cls-time{font-size:11px;color:#8E8E93;margin-top:2px}
+.d3 .cls-st{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600}
+/* TabBar */
+.d3 .tbar{position:sticky;bottom:0;left:0;right:0;height:82px;background:#fff;border-top:1px solid #F0F0F0;display:flex;align-items:flex-start;padding-top:8px;z-index:10}
+.d3 .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.d3 .tb svg{width:22px;height:22px}
+.d3 .tb span{font-size:10px;font-weight:500}
+.d3 .tb.on svg{fill:#FF6B35}
+.d3 .tb.on span{color:#FF6B35}
+.d3 .tb:not(.on) svg{fill:#C7C7CC}
+.d3 .tb:not(.on) span{color:#C7C7CC}
+.d3 .hi{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#1B2838;opacity:.12}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo">YUNCE · 1/2</span>
+  <button class="tab on" onclick="sw('1')" id="t1">仪表盘式</button>
+  <button class="tab" onclick="sw('2')" id="t2">杂志卡片式</button>
+  <button class="tab" onclick="sw('3')" id="t3">左右分栏式</button>
+  <a href="homepage-schemes-2.html" style="margin-left:auto;padding:7px 14px;border-radius:16px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);font-size:11px;text-decoration:none;white-space:nowrap">方案4-5 ›</a>
+</div>
+
+<div class="info">
+  <h2>首页设计方案 · 上</h2>
+  <p>三种完全不同的排版布局，不仅是配色差异</p>
+</div>
+
+<!-- ===== 方案1: 仪表盘数据驱动式 ===== -->
+<div class="pn on" id="p1">
+<div class="phone"><div class="scr d1">
+  <div class="nav">
+    <div class="sb"><span class="t">9:41</span><span>📶 🔋</span></div>
+    <div class="nav-top">
+      <div><div class="nav-greet">周三, 6月12日</div><div class="nav-name">张老师，早上好</div></div>
+      <div class="nav-av">张</div>
+    </div>
+    <div class="data-bar">
+      <div class="data-cell"><div class="dv">128</div><div class="du">今日消课</div></div>
+      <div class="data-cell"><div class="dv">56</div><div class="du">在读学员</div></div>
+      <div class="data-cell"><div class="dv">8</div><div class="du">今日排课</div></div>
+      <div class="data-cell"><div class="dv">3</div><div class="du">待处理</div></div>
+    </div>
+  </div>
+  <div class="ring-section">
+    <div class="ring-row">
+      <svg class="ring-svg" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#F0F2F5" stroke-width="8"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#6C5CE7" stroke-width="8" stroke-dasharray="175.9 251.3" stroke-linecap="round" transform="rotate(-90 50 50)"/>
+        <text x="50" y="46" text-anchor="middle" font-size="22" font-weight="800" fill="#1A1A2E">70%</text>
+        <text x="50" y="62" text-anchor="middle" font-size="9" fill="#8E8E93">消课完成率</text>
+      </svg>
+      <div class="ring-info">
+        <div class="ring-title">本周消课进度</div>
+        <div class="ring-desc">已完成 90/128 课时，还剩 38 课时待消</div>
+        <div class="ring-tags">
+          <span class="ring-tag" style="background:#6C5CE718;color:#6C5CE7">钢琴 32</span>
+          <span class="ring-tag" style="background:#00B89418;color:#00B894">舞蹈 28</span>
+          <span class="ring-tag" style="background:#FDCB6E18;color:#F39C12">美术 30</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chip-section">
+    <div class="chip-label">快捷功能</div>
+    <div class="chip-scroll">
+      <div class="chip"><div class="chip-icon" style="background:#6C5CE7"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span class="badge">3</span></div><span class="chip-txt">消课</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#00B894"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div><span class="chip-txt">学生</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#0984E3"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg></div><span class="chip-txt">班级</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#E17055"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 12H8v-2h8v2z"/></svg></div><span class="chip-txt">课包</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#FDCB6E"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg></div><span class="chip-txt">排课</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#A29BFE"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 14H8v-2h8v2zm0-4H8v-2h8v2z"/></svg></div><span class="chip-txt">记录</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#55EFC4"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg></div><span class="chip-txt">统计</span></div>
+      <div class="chip"><div class="chip-icon" style="background:#74B9FF"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div><span class="chip-txt">请假</span></div>
+    </div>
+  </div>
+  <div class="tl-section">
+    <div class="tl-head"><span class="tl-title">今日课程</span><span class="tl-more">全部 ›</span></div>
+    <div class="tl-item"><span class="tl-time">09:00</span><div class="tl-dot" style="background:#6C5CE7"></div><div class="tl-body"><div class="tl-name">钢琴启蒙A班</div><div class="tl-sub">8人 · 教室1 · 王老师</div><span class="tl-st" style="background:#6C5CE718;color:#6C5CE7">进行中</span></div></div>
+    <div class="tl-item"><span class="tl-time">10:30</span><div class="tl-dot" style="background:#00B894"></div><div class="tl-body"><div class="tl-name">舞蹈基础班</div><div class="tl-sub">12人 · 舞蹈室 · 李老师</div><span class="tl-st" style="background:#00B89418;color:#00B894">待上课</span></div></div>
+    <div class="tl-item"><span class="tl-time">14:00</span><div class="tl-dot" style="background:#FDCB6E"></div><div class="tl-body"><div class="tl-name">美术创意班</div><div class="tl-sub">10人 · 画室 · 陈老师</div><span class="tl-st" style="background:#FDCB6E18;color:#D4A017">待上课</span></div></div>
+  </div>
+  <div style="height:16px"></div>
+  <div class="tbar">
+    <div class="tb on"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>首页</span></div>
+    <div class="tb"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg><span>统计</span></div>
+    <div class="tb"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>我的</span></div>
+    <div class="hi"></div>
+  </div>
+</div></div>
+</div>
+
+<!-- ===== 方案2: 大卡片杂志式 ===== -->
+<div class="pn" id="p2">
+<div class="phone"><div class="scr d2">
+  <div class="sb"><span class="t">9:41</span><span style="color:#8E8E93">📶 🔋</span></div>
+  <div class="hero">
+    <div class="hero-date">6月12日 · 周三</div>
+    <div class="hero-title">早安，张老师</div>
+    <div class="hero-sub">今天有8节课等着你</div>
+    <div class="hero-stats">
+      <div class="hs-item"><span class="hs-val">128</span><span class="hs-lbl">消课</span></div>
+      <div class="hs-item"><span class="hs-val">56</span><span class="hs-lbl">学员</span></div>
+      <div class="hs-item"><span class="hs-val">8</span><span class="hs-lbl">排课</span></div>
+    </div>
+  </div>
+  <div class="func-grid">
+    <div class="func-card" style="background:linear-gradient(135deg,#2D3436,#636E72)"><div class="fc-icon" style="background:rgba(255,255,255,0.2)"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><div class="fc-name">消课</div><div class="fc-desc">快速消课打卡</div><div class="fc-num">03</div></div>
+    <div class="func-card" style="background:linear-gradient(135deg,#636E72,#B2BEC3)"><div class="fc-icon" style="background:rgba(255,255,255,0.2)"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div><div class="fc-name">学生管理</div><div class="fc-desc">56位在读学员</div><div class="fc-num">56</div></div>
+    <div class="func-card" style="background:linear-gradient(135deg,#B2BEC3,#DFE6E9)"><div class="fc-icon" style="background:rgba(0,0,0,0.12)"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg></div><div class="fc-name">班级管理</div><div class="fc-desc">6个活跃班级</div><div class="fc-num">06</div></div>
+    <div class="func-card" style="background:linear-gradient(135deg,#2D3436,#485460)"><div class="fc-icon" style="background:rgba(255,255,255,0.2)"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg></div><div class="fc-name">排课</div><div class="fc-desc">本周8节排课</div><div class="fc-num">08</div></div>
+  </div>
+  <div class="course-section">
+    <div class="course-head"><span class="course-title">今日课程</span><span class="course-more">查看全部</span></div>
+    <div class="course-scroll">
+      <div class="course-card"><div class="cc-top" style="background:#2D3436"></div><div class="cc-body"><div class="cc-name">钢琴启蒙A班</div><div class="cc-info">09:00-10:00 · 教室1</div><div class="cc-bottom"><span class="cc-count">8人</span><span class="cc-status" style="background:#2D343618;color:#2D3436">进行中</span></div></div></div>
+      <div class="course-card"><div class="cc-top" style="background:#636E72"></div><div class="cc-body"><div class="cc-name">舞蹈基础班</div><div class="cc-info">10:30-11:30 · 舞蹈室</div><div class="cc-bottom"><span class="cc-count">12人</span><span class="cc-status" style="background:#636E7218;color:#636E72">待上课</span></div></div></div>
+      <div class="course-card"><div class="cc-top" style="background:#B2BEC3"></div><div class="cc-body"><div class="cc-name">美术创意班</div><div class="cc-info">14:00-15:30 · 画室</div><div class="cc-bottom"><span class="cc-count">10人</span><span class="cc-status" style="background:#B2BEC318;color:#636E72">待上课</span></div></div></div>
+    </div>
+  </div>
+  <div class="rec-section">
+    <div class="rec-head">最近消课</div>
+    <div class="rec-item"><div class="rec-av" style="background:#2D3436">李</div><div class="rec-info"><div class="rec-name">李明轩</div><div class="rec-detail">钢琴启蒙A班</div></div><div class="rec-val" style="color:#2D3436">-1</div></div>
+    <div class="rec-item"><div class="rec-av" style="background:#636E72">王</div><div class="rec-info"><div class="rec-name">王子涵</div><div class="rec-detail">舞蹈基础班</div></div><div class="rec-val" style="color:#636E72">-2</div></div>
+  </div>
+  <div style="height:16px"></div>
+  <div class="tbar">
+    <div class="tb on"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>首页</span></div>
+    <div class="tb"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg><span>统计</span></div>
+    <div class="tb"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>我的</span></div>
+    <div class="hi"></div>
+  </div>
+</div></div>
+</div>
+
+<!-- ===== 方案3: 左右分栏式 ===== -->
+<div class="pn" id="p3">
+<div class="phone"><div class="scr d3">
+  <div class="sb" style="background:#1B2838"><span class="t">9:41</span><span>📶 🔋</span></div>
+  <div class="main-wrap">
+    <div class="sidebar">
+      <div class="side-av">张</div>
+      <div class="side-item on"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>首页</span></div>
+      <div class="side-item"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>消课</span></div>
+      <div class="side-item"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>学生</span></div>
+      <div class="side-item"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg><span>班级</span></div>
+      <div class="side-item"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg><span>排课</span></div>
+    </div>
+    <div class="content">
+      <div class="cnt-greet">早上好</div>
+      <div class="cnt-name">张老师</div>
+      <div class="stat-strip">
+        <div class="ss-item"><div class="ss-val">128</div><div class="ss-lbl">今日消课</div></div>
+        <div class="ss-item"><div class="ss-val">56</div><div class="ss-lbl">在读学员</div></div>
+        <div class="ss-item"><div class="ss-val">8</div><div class="ss-lbl">今日排课</div></div>
+      </div>
+      <div class="func-row">
+        <div class="fr-item"><div class="fr-icon" style="background:#FF6B35"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 12H8v-2h8v2z"/></svg></div><div class="fr-txt">课包管理</div></div>
+        <div class="fr-item"><div class="fr-icon" style="background:#FF9F1C"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 14H8v-2h8v2zm0-4H8v-2h8v2z"/></svg></div><div class="fr-txt">上课记录</div></div>
+        <div class="fr-item"><div class="fr-icon" style="background:#2EC4B6"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg></div><div class="fr-txt">统计</div></div>
+        <div class="fr-item"><div class="fr-icon" style="background:#E71D36"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div><div class="fr-txt">请假</div></div>
+      </div>
+      <div class="cls-section">
+        <div class="cls-head"><span class="cls-title">今日课程</span><span class="cls-more">全部 ›</span></div>
+        <div class="cls-card"><div class="cls-bar" style="background:#FF6B35"></div><div class="cls-info"><div class="cls-name">钢琴启蒙A班</div><div class="cls-time">09:00-10:00 · 8人 · 教室1</div></div><span class="cls-st" style="background:#FF6B3518;color:#FF6B35">进行中</span></div>
+        <div class="cls-card"><div class="cls-bar" style="background:#FF9F1C"></div><div class="cls-info"><div class="cls-name">舞蹈基础班</div><div class="cls-time">10:30-11:30 · 12人 · 舞蹈室</div></div><span class="cls-st" style="background:#FF9F1C18;color:#D4880F">待上课</span></div>
+        <div class="cls-card"><div class="cls-bar" style="background:#2EC4B6"></div><div class="cls-info"><div class="cls-name">美术创意班</div><div class="cls-time">14:00-15:30 · 10人 · 画室</div></div><span class="cls-st" style="background:#2EC4B618;color:#2EC4B6">待上课</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="tbar">
+    <div class="tb on"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>首页</span></div>
+    <div class="tb"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg><span>统计</span></div>
+    <div class="tb"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>我的</span></div>
+    <div class="hi"></div>
+  </div>
+</div></div>
+</div>
+
+<script>
+function sw(n){
+  document.querySelectorAll('.pn').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('p'+n).classList.add('on');
+  document.getElementById('t'+n).classList.add('on');
+}
+</script>
+</body>
+</html>

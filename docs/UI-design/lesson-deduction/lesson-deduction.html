@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>消课流程 - UI演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+    background: linear-gradient(180deg, #f5faf8, #e3f2ef);
+    min-height: 100vh; max-width: 414px; margin: 0 auto;
+    position: relative; overflow-x: hidden;
+  }
+  :root {
+    --primary: #5EC8A8; --primary-dark: #4AB893; --primary-light: #a7e4cf; --primary-bg: #f0faf5;
+    --accent: #e88aaa; --accent-bg: #fdf0f4;
+    --info: #6ba3d6; --info-bg: #f0f5fb;
+    --amber: #d4a24e; --amber-bg: #faf6ee;
+    --purple: #9b7ed8; --purple-bg: #f3f0fb;
+    --text: #2d4a3e; --text-sec: #7a9a8e; --text-light: #a0b8ad;
+    --border: #d4e8df; --bg: #fff; --danger: #d94040; --danger-bg: #fef2f2;
+    --shadow: 0 4px 20px -4px rgba(54,73,67,0.1);
+  }
+
+  /* 导航栏 */
+  .navbar {
+    background: linear-gradient(135deg, var(--primary), #7dd8bc);
+    padding: 48px 20px 16px; position: sticky; top: 0; z-index: 10;
+  }
+  .navbar .title-row { display: flex; align-items: center; justify-content: space-between; }
+  .navbar h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .navbar .back-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.2); border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-right: 12px;
+  }
+  .navbar .back-btn:active { background: rgba(255,255,255,0.35); }
+  .navbar .back-btn svg { width: 18px; height: 18px; fill: #fff; }
+
+  /* Tab */
+  .page-tabs {
+    display: flex; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .page-tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 14px; font-weight: 500; color: var(--text-sec);
+    cursor: pointer; border-bottom: 2.5px solid transparent;
+    transition: all 0.15s;
+  }
+  .page-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+  /* 内容区 */
+  .content { padding: 16px 16px 120px; }
+  .section { margin-bottom: 16px; }
+  .section-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+  }
+  .section-title .required { color: var(--danger); font-size: 10px; }
+
+  /* 卡片 */
+  .card {
+    background: var(--bg); border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+
+  /* 选择触发器 */
+  .picker-trigger {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 12px; border: 1.5px dashed var(--border);
+    background: #fafdfb; cursor: pointer; transition: all 0.15s;
+  }
+  .picker-trigger:active { background: var(--primary-bg); border-color: var(--primary); }
+  .picker-trigger .plus {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--primary-bg); color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600;
+  }
+  .picker-trigger .text { font-size: 14px; color: var(--text-sec); }
+
+  /* 已选学员 */
+  .selected-student {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border-radius: 12px; background: var(--primary-bg);
+  }
+  .selected-student .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600; color: #fff;
+  }
+  .selected-student .info { flex: 1; }
+  .selected-student .name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .selected-student .meta { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .selected-student .change-btn {
+    padding: 4px 12px; border-radius: 8px; border: 1px solid var(--primary);
+    background: #fff; color: var(--primary); font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .selected-student .change-btn:active { background: var(--primary-bg); transform: scale(0.95); }
+
+  /* 课包选择 */
+  .package-group { margin-bottom: 12px; }
+  .package-group-title {
+    font-size: 11px; font-weight: 600; color: var(--text-light);
+    margin-bottom: 6px; display: flex; align-items: center; gap: 4px;
+  }
+  .package-group-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .package-option {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border);
+    background: #fafdfb; cursor: pointer; transition: all 0.15s; margin-bottom: 6px;
+  }
+  .package-option:active { transform: scale(0.98); }
+  .package-option.selected {
+    border-color: var(--primary); background: var(--primary-bg);
+  }
+  .package-option .radio {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .package-option.selected .radio {
+    border-color: var(--primary); background: var(--primary);
+  }
+  .package-option .radio svg { width: 12px; height: 12px; fill: #fff; opacity: 0; transition: 0.1s; }
+  .package-option.selected .radio svg { opacity: 1; }
+  .package-option .pkg-info { flex: 1; }
+  .package-option .pkg-name { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .package-option .pkg-remaining { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .package-option .pkg-tag {
+    font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+  }
+  .tag-subject { background: var(--primary-bg); color: var(--primary); }
+  .tag-general { background: var(--amber-bg); color: var(--amber); }
+  .tag-shared { background: var(--info-bg); color: var(--info); }
+  .tag-gift { background: var(--accent-bg); color: var(--accent); }
+  .package-option .pkg-hours { font-size: 14px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+
+  /* 选中课包后折叠其他 */
+  .package-list.collapsed .package-group:not(.selected-group) {
+    max-height: 0; overflow: hidden; margin: 0; opacity: 0;
+    transition: all 0.3s ease;
+  }
+  .package-list .package-group { transition: all 0.3s ease; max-height: 200px; opacity: 1; }
+  .package-list.collapsed .selected-group { max-height: 200px; opacity: 1; }
+  .change-pkg-btn {
+    font-size: 12px; color: var(--primary); font-weight: 500;
+    cursor: pointer; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .change-pkg-btn:active { opacity: 0.7; }
+  .change-pkg-btn svg { width: 12px; height: 12px; fill: var(--primary); }
+
+  /* 班级选择 */
+  .class-option {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border);
+    background: #fafdfb; cursor: pointer; transition: all 0.15s; margin-bottom: 6px;
+  }
+  .class-option:active { transform: scale(0.98); }
+  .class-option.selected { border-color: var(--primary); background: var(--primary-bg); }
+  .class-option .cls-icon {
+    width: 34px; height: 34px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+  }
+  .class-option .cls-info { flex: 1; }
+  .class-option .cls-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .class-option .cls-meta { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .class-option .cls-check {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .class-option.selected .cls-check {
+    border-color: var(--primary); background: var(--primary);
+  }
+  .class-option .cls-check svg { width: 12px; height: 12px; fill: #fff; opacity: 0; }
+  .class-option.selected .cls-check svg { opacity: 1; }
+
+  /* 已选班级的更换按钮 */
+  .cls-change-btn {
+    padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    color: var(--primary); background: var(--primary-bg); cursor: pointer;
+    flex-shrink: 0; transition: opacity 0.15s;
+  }
+  .cls-change-btn:active { opacity: 0.7; }
+
+  /* 学员圆形勾选框 */
+  .stu-check {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all 0.15s; cursor: pointer;
+  }
+  .stu-check.checked {
+    border-color: var(--primary); background: var(--primary);
+  }
+  .stu-check svg { width: 13px; height: 13px; fill: #fff; opacity: 0; transition: opacity 0.15s; }
+  .stu-check.checked svg { opacity: 1; }
+
+  /* 课时步进器 */
+  .stepper {
+    display: flex; align-items: center; gap: 0;
+    border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden;
+    background: #fafdfb; width: fit-content;
+  }
+  .stepper button {
+    width: 36px; height: 36px; border: none; background: transparent;
+    font-size: 18px; color: var(--primary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .stepper button:active { background: var(--primary-bg); }
+  .stepper button:disabled { color: var(--text-light); cursor: not-allowed; }
+  .stepper input {
+    width: 56px; height: 36px; border: none; border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border); text-align: center; font-size: 15px;
+    font-weight: 600; color: var(--text); outline: none; background: #fff;
+  }
+
+  /* 表单行 */
+  .form-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid #f0f5f2;
+  }
+  .form-row:last-child { border-bottom: none; }
+  .form-row .label { font-size: 13px; color: var(--text-sec); }
+  .form-row .value { font-size: 13px; color: var(--text); font-weight: 500; }
+
+  /* 星级评分 */
+  .star-rating { display: flex; gap: 4px; }
+  .star-rating .star {
+    width: 24px; height: 24px; cursor: pointer; transition: all 0.1s;
+  }
+  .star-rating .star:active { transform: scale(0.85); }
+  .star-rating .star svg { width: 24px; height: 24px; }
+  .star-rating .star.empty svg { fill: #d4e8df; }
+  .star-rating .star.filled svg { fill: #f0b429; }
+
+  /* 文本域 */
+  .form-textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); font-size: 13px; outline: none;
+    background: #fafdfb; resize: none; min-height: 60px; font-family: inherit;
+  }
+  .form-textarea:focus { border-color: var(--primary); background: #fff; }
+
+  /* 底部按钮 */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); padding: 12px 16px 28px;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    max-width: 414px; margin: 0 auto; z-index: 10;
+  }
+  .submit-btn {
+    width: 100%; padding: 14px; border-radius: 14px; border: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .submit-btn:active { transform: scale(0.97); opacity: 0.9; }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* 弹窗 */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 150; display: none; opacity: 0; transition: opacity 0.25s;
+  }
+  .overlay.show { display: block; opacity: 1; }
+
+  .sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-radius: 20px 20px 0 0;
+    z-index: 161; max-width: 414px; margin: 0 auto;
+    transform: translateY(100%); transition: transform 0.3s ease;
+    max-height: 80vh; display: flex; flex-direction: column;
+  }
+  .sheet.show { transform: translateY(0); }
+  .sheet .handle { width: 36px; height: 4px; border-radius: 2px; background: #d4e8df; margin: 12px auto 0; }
+  .sheet .sheet-header {
+    padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet .sheet-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .sheet .sheet-close {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: #f0f0f0; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .sheet .sheet-close:active { background: #e0e0e0; }
+  .sheet .sheet-close svg { width: 14px; height: 14px; fill: var(--text-sec); }
+  .sheet .sheet-search { padding: 12px 20px 0; }
+  .sheet .sheet-search input {
+    width: 100%; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--border); font-size: 13px; outline: none; background: #fafdfb;
+  }
+  .sheet .sheet-search input:focus { border-color: var(--primary); }
+  .sheet .sheet-body { flex: 1; overflow-y: auto; padding: 8px 20px 20px; }
+
+  /* 学员选择项 */
+  .stu-pick-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid #f0f5f2; cursor: pointer;
+  }
+  .stu-pick-item:active { background: #fafdfb; }
+  .stu-pick-item .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .stu-pick-item .sinfo { flex: 1; }
+  .stu-pick-item .sname { font-size: 14px; font-weight: 500; color: var(--text); }
+  .stu-pick-item .smeta { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+
+  /* 班级消课 - 学员网格 */
+  .class-stu-list { display: flex; flex-direction: column; gap: 8px; }
+  .class-stu-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 12px; background: #fafdfb;
+    transition: all 0.15s;
+  }
+  .class-stu-item.absent { opacity: 0.5; }
+  .class-stu-item.owe { background: #fef8f0; border: 1px solid #f0d8a8; }
+  .class-stu-item.no-pkg { background: #fef2f2; border: 1px solid #f0c0c0; }
+  .class-stu-item .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .class-stu-item .sinfo { flex: 1; min-width: 0; }
+  .class-stu-item .sname { font-size: 13px; font-weight: 500; color: var(--text); }
+  .class-stu-item .stu-pkg-info { margin-top: 3px; }
+  .class-stu-item .pkg-status {
+    font-size: 11px; padding: 2px 8px; border-radius: 6px; display: inline-block;
+  }
+  .class-stu-item .pkg-status.ok { background: var(--primary-bg); color: var(--primary); }
+  .class-stu-item .pkg-status.owe { background: #fff3e0; color: #e68a00; font-weight: 500; }
+  .class-stu-item .pkg-status.no-pkg { background: var(--danger-bg); color: var(--danger); }
+  .class-stu-item .status-btn {
+    padding: 4px 10px; border-radius: 8px; border: none;
+    font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .class-stu-item .status-btn.present { background: var(--primary-bg); color: var(--primary); }
+  .class-stu-item .status-btn.absent { background: var(--amber-bg); color: var(--amber); }
+  .class-stu-item .status-btn.owe-btn { background: #fff3e0; color: #e68a00; }
+  .class-stu-item .status-btn.disabled { background: #f0f0f0; color: #bbb; cursor: not-allowed; }
+  .class-stu-item .status-btn:active:not(.disabled) { transform: scale(0.95); }
+
+  /* 确认对话框 */
+  .confirm-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 200; display: none; align-items: center; justify-content: center;
+  }
+  .confirm-overlay.show { display: flex; }
+  .confirm-dialog {
+    background: #fff; border-radius: 16px; padding: 24px; width: 300px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15); text-align: center;
+  }
+  .confirm-dialog .cd-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+  .confirm-dialog .cd-msg { font-size: 13px; color: var(--text-sec); line-height: 1.6; margin-bottom: 20px; }
+  .confirm-dialog .cd-btns { display: flex; gap: 10px; }
+  .confirm-dialog .cd-btn {
+    flex: 1; padding: 10px; border-radius: 10px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .confirm-dialog .cd-btn.cancel { background: #f0f4f2; color: var(--text-sec); }
+  .confirm-dialog .cd-btn.confirm { background: var(--amber); color: #fff; }
+  .confirm-dialog .cd-btn:active { transform: scale(0.97); }
+
+  /* 科目匹配提示 */
+  .match-tip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; border-radius: 8px; margin-bottom: 10px;
+    font-size: 11px; font-weight: 500;
+  }
+  .match-tip.auto { background: #e8f8f0; color: #3aab7f; }
+  .match-tip.fallback { background: var(--amber-bg); color: var(--amber); }
+  .match-tip svg { width: 14px; height: 14px; fill: currentColor; flex-shrink: 0; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    background: rgba(45,74,62,0.9); color: #fff; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; z-index: 300; opacity: 0; transition: all 0.25s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 已选学员 - 含课时信息 */
+  .selected-student .pkg-hours-inline {
+    font-size: 20px; font-weight: 700; color: var(--primary);
+    line-height: 1;
+  }
+  .selected-student .pkg-hours-label {
+    font-size: 10px; color: var(--text-sec); text-align: right; margin-top: 2px;
+  }
+  .selected-student .pkg-name-inline {
+    font-size: 11px; color: var(--text-sec); margin-top: 4px;
+  }
+
+  /* 变更申请提示 */
+  .change-request-banner {
+    background: var(--amber-bg); border-radius: 10px; padding: 10px 14px;
+    margin-top: 8px; display: flex; align-items: flex-start; gap: 8px;
+  }
+  .change-request-banner svg { width: 16px; height: 16px; fill: var(--amber); flex-shrink: 0; margin-top: 1px; }
+  .change-request-banner .text { font-size: 12px; color: var(--amber); line-height: 1.5; }
+  .change-request-banner .text strong { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- 导航栏 -->
+<div class="navbar">
+  <div class="title-row">
+    <div style="display:flex;align-items:center">
+      <button class="back-btn" onclick="showToast('返回上级')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>消课</h1>
+    </div>
+  </div>
+</div>
+
+<!-- Tab切换 -->
+<div class="page-tabs">
+  <div class="page-tab active" onclick="switchMode('single',this)">学员消课</div>
+  <div class="page-tab" onclick="switchMode('class',this)">班级消课</div>
+</div>
+
+<!-- 单人消课内容 -->
+<div class="content" id="singleMode">
+  <!-- Step 1: 选学员 -->
+  <div class="section" id="stepStudent">
+    <div class="section-title"><span class="required">*</span> 选择学员</div>
+    <div id="studentArea">
+      <div class="picker-trigger" onclick="openStudentPicker()">
+        <div class="plus">+</div>
+        <div class="text">点击选择学员</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: 消课信息（选学员后直接显示） -->
+  <div class="section" id="stepForm" style="display:none">
+    <div class="section-title"><span class="required">*</span> 消课课时</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="stepper">
+        <button onclick="adjustHours(-0.5)">−</button>
+        <input type="number" id="hoursInput" value="1" min="0.5" step="0.5" onchange="onHoursChange()">
+        <button onclick="adjustHours(0.5)">+</button>
+      </div>
+    </div>
+
+    <div class="section-title">上课时间</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="form-row">
+        <span class="label">日期</span>
+        <input type="date" value="2026-06-11" style="border:none;text-align:right;font-size:13px;color:var(--text);outline:none;font-family:inherit">
+      </div>
+      <div class="form-row">
+        <span class="label">时间</span>
+        <input type="time" value="14:30" style="border:none;text-align:right;font-size:13px;color:var(--text);outline:none;font-family:inherit">
+      </div>
+    </div>
+
+    <div class="section-title">教学内容</div>
+    <textarea class="form-textarea" placeholder="记录本节课教学内容（选填）" style="margin-bottom:16px"></textarea>
+
+    <div class="section-title">学生表现</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="star-rating" id="starRating"></div>
+    </div>
+
+    <div class="section-title">课后作业</div>
+    <textarea class="form-textarea" placeholder="布置课后作业（选填）" style="margin-bottom:8px"></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="width:60px;height:60px;border-radius:10px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fafdfb">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--text-light)"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 班级消课内容 -->
+<div class="content" id="classMode" style="display:none">
+  <!-- 选班级 -->
+  <div class="section">
+    <div class="section-title"><span class="required">*</span> 选择班级</div>
+    <div id="classSelectArea"></div>
+  </div>
+
+  <!-- 学员名单 -->
+  <div class="section" id="classStudentSection" style="display:none">
+    <div class="section-title">学员名单 <span id="classCountInfo" style="font-size:11px;color:var(--text-light);font-weight:400"></span></div>
+    <div id="classStudentList" class="class-stu-list"></div>
+  </div>
+
+  <!-- 班级消课信息 -->
+  <div class="section" id="classFormSection" style="display:none">
+    <div class="section-title"><span class="required">*</span> 消课课时</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="stepper">
+        <button onclick="adjustClassHours(-0.5)">−</button>
+        <input type="number" id="classHoursInput" value="1" min="0.5" step="0.5">
+        <button onclick="adjustClassHours(0.5)">+</button>
+      </div>
+    </div>
+    <div class="section-title">上课时间</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="form-row">
+        <span class="label">日期</span>
+        <input type="date" value="2026-06-11" style="border:none;text-align:right;font-size:13px;color:var(--text);outline:none;font-family:inherit">
+      </div>
+      <div class="form-row">
+        <span class="label">时间</span>
+        <input type="time" value="14:30" style="border:none;text-align:right;font-size:13px;color:var(--text);outline:none;font-family:inherit">
+      </div>
+    </div>
+    <div class="section-title">教学内容</div>
+    <textarea class="form-textarea" placeholder="记录本节课教学内容（选填）"></textarea>
+  </div>
+</div>
+
+<!-- 底部按钮 -->
+<div class="bottom-bar">
+  <button class="submit-btn" id="submitBtn" disabled onclick="submitLesson()">确认消课</button>
+</div>
+
+<!-- 学员选择弹窗 -->
+<div class="overlay" id="stuOverlay" onclick="closeStudentPicker()"></div>
+<div class="sheet" id="stuSheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">选择学员</span>
+    <button class="sheet-close" onclick="closeStudentPicker()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-search">
+    <input placeholder="搜索学员姓名或手机号" oninput="searchStudent(this.value)">
+  </div>
+  <div class="sheet-body" id="stuPickerList"></div>
+</div>
+
+<!-- 班级选择弹窗 -->
+<div class="overlay" id="classOverlay" onclick="closeClassPicker()"></div>
+<div class="sheet" id="classSheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">选择班级</span>
+    <button class="sheet-close" onclick="closeClassPicker()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body" id="classPickerList"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- 确认对话框 -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-dialog">
+    <div class="cd-title" id="cdTitle"></div>
+    <div class="cd-msg" id="cdMsg"></div>
+    <div class="cd-btns">
+      <button class="cd-btn cancel" onclick="closeConfirmDialog()">取消</button>
+      <button class="cd-btn confirm" id="cdConfirmBtn" onclick="doConfirm()">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 模拟数据 =====
+const SUBJECTS = [
+  { id: 'sub1', name: '钢琴', icon: '🎹', color: '#5EC8A8' },
+  { id: 'sub2', name: '书法', icon: '✏️', color: '#d4a24e' },
+  { id: 'sub3', name: '美术', icon: '🎨', color: '#e88aaa' },
+  { id: 'sub4', name: '声乐', icon: '🎵', color: '#9b7ed8' },
+  { id: 'sub5', name: '舞蹈', icon: '💃', color: '#6ba3d6' },
+];
+
+const STUDENTS = [
+  { id: 's1', name: '张小明', phone: '138****1234', nickname: '小明', avatar: '#5EC8A8' },
+  { id: 's2', name: '张小红', phone: '138****1234', nickname: '小红', avatar: '#e88aaa' },
+  { id: 's3', name: '李思思', phone: '139****5678', nickname: '思思', avatar: '#9b7ed8' },
+  { id: 's4', name: '王大力', phone: '137****9012', nickname: '大力', avatar: '#6ba3d6' },
+  { id: 's5', name: '赵小美', phone: '136****3456', nickname: '小美', avatar: '#d4a24e' },
+  { id: 's6', name: '陈欠课', phone: '159****7890', nickname: '欠课测试', avatar: '#d94040' },
+];
+
+// 课包数据
+const PACKAGES = [
+  { id: 'pkg1', name: '钢琴课', subjectId: 'sub1', total: 24, remaining: 18, type: 'hour', role: 'owner', sharedWith: [] },
+  { id: 'pkg2', name: '书法课', subjectId: 'sub2', total: 36, remaining: 22, type: 'hour', role: 'owner', sharedWith: [] },
+  { id: 'pkg3', name: '家庭共享课包', subjectId: null, total: 60, remaining: 42, type: 'hour', role: 'sharer', sharedWith: ['张小红'] },
+  { id: 'pkg4', name: '赠送课时', subjectId: null, total: 4, remaining: 3, type: 'gift', role: 'owner', sharedWith: [] },
+  { id: 'pkg5', name: '美术课', subjectId: 'sub3', total: 20, remaining: 15, type: 'hour', role: 'owner', sharedWith: [] },
+  { id: 'pkg6', name: '声乐课', subjectId: 'sub4', total: 16, remaining: 10, type: 'hour', role: 'owner', sharedWith: [] },
+  { id: 'pkg7', name: '钢琴课(将用完)', subjectId: 'sub1', total: 24, remaining: 0, type: 'hour', role: 'owner', sharedWith: [] },
+  { id: 'pkg8', name: '声乐课(将用完)', subjectId: 'sub4', total: 16, remaining: 0, type: 'hour', role: 'owner', sharedWith: [] },
+];
+
+// 学员-课包关联
+const STUDENT_PACKAGES = {
+  's1': ['pkg1', 'pkg2', 'pkg3', 'pkg4'],  // 张小明：钢琴、书法、家庭共享、赠送（多科目）
+  's2': ['pkg3', 'pkg5'],                    // 张小红：家庭共享、美术（多科目）
+  's3': ['pkg1', 'pkg6'],                    // 李思思：钢琴、声乐（多科目）
+  's4': ['pkg2', 'pkg5'],                    // 王大力：书法、美术（多科目）
+  's5': ['pkg4', 'pkg6'],                    // 赵小美：赠送、声乐（多科目）
+  's6': ['pkg7', 'pkg8'],                    // 陈欠课：钢琴(0课时)、声乐(0课时)
+};
+
+const CLASSES = [
+  { id: 'cls1', name: '钢琴基础班', subjectId: 'sub1', schedule: '周二、四 14:00-15:30', students: ['s1','s3','s6'] },
+  { id: 'cls2', name: '书法美术班', subjectId: null, schedule: '周三 16:00-17:30', students: ['s1','s4'] },
+  { id: 'cls3', name: '声乐班', subjectId: 'sub4', schedule: '周五 10:00-11:30', students: ['s3','s5','s6'] },
+  { id: 'cls4', name: '美术提高班', subjectId: 'sub3', schedule: '周六 09:00-10:30', students: ['s2','s4'] },
+];
+
+// ===== 状态 =====
+let currentMode = 'single';
+let selectedStudentId = null;
+let selectedClassId = null;
+let selectedPackageId = null;
+let classAbsentIds = new Set();
+let classPkgMap = {};
+let performance = 0;
+
+/**
+ * 获取学员的课包列表
+ */
+function getStudentPackages(studentId) {
+  const pkgIds = STUDENT_PACKAGES[studentId] || [];
+  return pkgIds.map(id => PACKAGES.find(p => p.id === id)).filter(Boolean);
+}
+
+/** 从课包列表中选出最优课包（优先科目匹配且有余额） */
+function pickBestPackage(pkgs, hoursNeeded) {
+  const withSub = pkgs.find(p => p.subjectId && p.remaining >= hoursNeeded);
+  if (withSub) return withSub;
+  const general = pkgs.find(p => !p.subjectId && p.remaining >= hoursNeeded);
+  if (general) return general;
+  const any = pkgs.find(p => p.remaining >= hoursNeeded);
+  if (any) return any;
+  return pkgs[0];
+}
+
+/** 自动选择课包（选学员后调用） */
+function autoSelectPackage() {
+  if (!selectedStudentId) return;
+  const pkgs = getStudentPackages(selectedStudentId);
+  const hoursNeeded = parseFloat(document.getElementById('hoursInput')?.value) || 1;
+  if (pkgs.length === 0) {
+    selectedPackageId = null;
+  } else {
+    selectedPackageId = pickBestPackage(pkgs, hoursNeeded).id;
+  }
+}
+
+// ===== 模式切换 =====
+function switchMode(mode, el) {
+  currentMode = mode;
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('singleMode').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('classMode').style.display = mode === 'class' ? '' : 'none';
+  updateSubmitBtn();
+}
+
+// ===== 学员选择 =====
+function openStudentPicker() {
+  document.getElementById('stuOverlay').classList.add('show');
+  document.getElementById('stuSheet').classList.add('show');
+  searchStudent('');
+}
+
+function closeStudentPicker() {
+  document.getElementById('stuOverlay').classList.remove('show');
+  document.getElementById('stuSheet').classList.remove('show');
+}
+
+function searchStudent(kw) {
+  const list = document.getElementById('stuPickerList');
+  let filtered = STUDENTS;
+  if (kw.trim()) {
+    filtered = STUDENTS.filter(s => s.name.includes(kw) || s.phone.includes(kw) || (s.nickname && s.nickname.includes(kw)));
+  }
+  list.innerHTML = filtered.map(s => `
+    <div class="stu-pick-item" onclick="selectStudent('${s.id}')">
+      <div class="avatar" style="background:${s.avatar}">${s.name[0]}</div>
+      <div class="sinfo">
+        <div class="sname">${s.name}</div>
+        <div class="smeta">${s.phone}</div>
+      </div>
+    </div>
+  `).join('');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-light);font-size:13px">未找到学员</div>';
+  }
+}
+
+function selectStudent(id) {
+  selectedStudentId = id;
+  selectedClassId = null;
+  selectedPackageId = null;
+  closeStudentPicker();
+  // 自动匹配课包
+  autoSelectPackage();
+  renderStudentArea();
+  document.getElementById('stepForm').style.display = '';
+  updateSubmitBtn();
+}
+
+function renderStudentArea() {
+  const s = STUDENTS.find(x => x.id === selectedStudentId);
+  if (!s) return;
+  const pkg = selectedPackageId ? PACKAGES.find(p => p.id === selectedPackageId) : null;
+
+  let pkgInfoHtml = '';
+  if (pkg) {
+    const tagHtml = getPkgTagHtml(pkg);
+    const isOwe = pkg.remaining === 0;
+    pkgInfoHtml = `
+      <div style="text-align:right">
+        <div class="pkg-hours-inline" style="${isOwe ? 'color:var(--danger)' : ''}">${pkg.remaining}</div>
+        <div class="pkg-hours-label">剩余课时</div>
+        <div class="pkg-name-inline">${pkg.name} ${tagHtml}</div>
+      </div>
+    `;
+  } else {
+    pkgInfoHtml = `
+      <div style="text-align:right">
+        <div class="pkg-hours-inline" style="color:var(--danger)">0</div>
+        <div class="pkg-hours-label">无可用课包</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('studentArea').innerHTML = `
+    <div class="selected-student">
+      <div class="avatar" style="background:${s.avatar}">${s.name[0]}</div>
+      <div class="info">
+        <div class="name">${s.name}</div>
+        <div class="meta">${s.phone}</div>
+      </div>
+      ${pkgInfoHtml}
+      <button class="change-btn" onclick="openStudentPicker()">更换</button>
+    </div>
+  `;
+}
+
+// ===== 课包标签 =====
+function getPkgTagHtml(pkg) {
+  const tags = [];
+  if (pkg.subjectId) {
+    const sub = SUBJECTS.find(s => s.id === pkg.subjectId);
+    if (sub) tags.push(`<span class="pkg-tag tag-subject">${sub.icon} ${sub.name}</span>`);
+  } else {
+    tags.push(`<span class="pkg-tag tag-general">通用</span>`);
+  }
+  if (pkg.role === 'sharer') tags.push(`<span class="pkg-tag tag-shared">共享</span>`);
+  if (pkg.type === 'gift') tags.push(`<span class="pkg-tag tag-gift">赠送</span>`);
+  return tags.join('');
+}
+
+// ===== 课时步进器 =====
+function adjustHours(delta) {
+  const input = document.getElementById('hoursInput');
+  let val = parseFloat(input.value) || 0;
+  val = Math.max(0.5, val + delta);
+  val = Math.round(val * 10) / 10;
+  input.value = val;
+  updateSubmitBtn();
+}
+
+function onHoursChange() {
+  const input = document.getElementById('hoursInput');
+  let val = parseFloat(input.value) || 0;
+  if (val < 0.5) val = 0.5;
+  val = Math.round(val * 10) / 10;
+  input.value = val;
+  updateSubmitBtn();
+}
+
+function adjustClassHours(delta) {
+  const input = document.getElementById('classHoursInput');
+  let val = parseFloat(input.value) || 0;
+  val = Math.max(0.5, val + delta);
+  val = Math.round(val * 10) / 10;
+  input.value = val;
+}
+
+// ===== 星级评分 =====
+function renderStars() {
+  const el = document.getElementById('starRating');
+  el.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    el.innerHTML += `<div class="star ${i <= performance ? 'filled' : 'empty'}" onclick="setPerformance(${i})">
+      <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+    </div>`;
+  }
+}
+
+function setPerformance(n) {
+  performance = n;
+  renderStars();
+}
+
+// ===== 班级消课 =====
+function renderClassSelect() {
+  const area = document.getElementById('classSelectArea');
+  if (selectedClassId) {
+    // 已选中班级 → 只显示选中的 + 更换按钮
+    const cls = CLASSES.find(c => c.id === selectedClassId);
+    const sub = cls.subjectId ? SUBJECTS.find(s => s.id === cls.subjectId) : null;
+    area.innerHTML = `
+      <div class="class-option selected">
+        <div class="cls-icon" style="background:${sub ? sub.color+'20' : 'var(--amber-bg)'}">${sub ? sub.icon : '📋'}</div>
+        <div class="cls-info">
+          <div class="cls-name">${cls.name}</div>
+          <div class="cls-meta">${cls.schedule}${sub ? ' · '+sub.name : ' · 综合班'} · ${cls.students.length}人</div>
+        </div>
+        <div class="cls-change-btn" onclick="openClassPicker()">更换</div>
+      </div>
+    `;
+  } else {
+    // 未选中 → 显示所有班级
+    area.innerHTML = CLASSES.map(cls => {
+      const sub = cls.subjectId ? SUBJECTS.find(s => s.id === cls.subjectId) : null;
+      return `
+        <div class="class-option" onclick="selectClassMode('${cls.id}')">
+          <div class="cls-icon" style="background:${sub ? sub.color+'20' : 'var(--amber-bg)'}">${sub ? sub.icon : '📋'}</div>
+          <div class="cls-info">
+            <div class="cls-name">${cls.name}</div>
+            <div class="cls-meta">${cls.schedule}${sub ? ' · '+sub.name : ' · 综合班'} · ${cls.students.length}人</div>
+          </div>
+          <div class="cls-check">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function openClassPicker() {
+  document.getElementById('classOverlay').classList.add('show');
+  document.getElementById('classSheet').classList.add('show');
+  renderClassPickerList();
+}
+
+function closeClassPicker() {
+  document.getElementById('classOverlay').classList.remove('show');
+  document.getElementById('classSheet').classList.remove('show');
+}
+
+function renderClassPickerList() {
+  const list = document.getElementById('classPickerList');
+  list.innerHTML = CLASSES.map(cls => {
+    const sub = cls.subjectId ? SUBJECTS.find(s => s.id === cls.subjectId) : null;
+    const isSelected = cls.id === selectedClassId;
+    return `
+      <div class="stu-pick-item" style="${isSelected ? 'opacity:0.5;pointer-events:none' : ''}" onclick="selectClassMode('${cls.id}');closeClassPicker()">
+        <div class="cls-icon" style="background:${sub ? sub.color+'20' : 'var(--amber-bg)'};width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${sub ? sub.icon : '📋'}</div>
+        <div class="sinfo">
+          <div class="sname">${cls.name}${isSelected ? ' (当前)' : ''}</div>
+          <div class="smeta">${cls.schedule}${sub ? ' · '+sub.name : ' · 综合班'} · ${cls.students.length}人</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectClassMode(id) {
+  selectedClassId = id;
+  classAbsentIds.clear();
+  classPkgMap = {};
+  const cls = CLASSES.find(c => c.id === id);
+
+  // 默认全部签到（都不在缺席列表中）
+  // 为每个学员自动匹配课包
+  cls.students.forEach(sid => {
+    const pkgIds = STUDENT_PACKAGES[sid] || [];
+    const pkgs = pkgIds.map(pid => PACKAGES.find(p => p.id === pid)).filter(Boolean);
+    let match = pkgs.find(p => p.subjectId === cls.subjectId && p.remaining > 0);
+    if (!match) match = pkgs.find(p => p.subjectId === cls.subjectId);
+    if (!match) match = pkgs.find(p => !p.subjectId && p.remaining > 0);
+    if (!match) match = pkgs.find(p => !p.subjectId);
+    if (!match && pkgs.length > 0) match = pkgs[0];
+    if (match) classPkgMap[sid] = match.id;
+  });
+
+  renderClassSelect();
+  renderClassStudents();
+  document.getElementById('classStudentSection').style.display = '';
+  document.getElementById('classFormSection').style.display = '';
+  updateSubmitBtn();
+}
+
+function renderClassStudents() {
+  const cls = CLASSES.find(c => c.id === selectedClassId);
+  if (!cls) return;
+  const list = document.getElementById('classStudentList');
+  const checkedCount = cls.students.length - classAbsentIds.size;
+  const hoursNeeded = parseFloat(document.getElementById('classHoursInput')?.value) || 1;
+
+  document.getElementById('classCountInfo').textContent = `(签到 ${checkedCount}/${cls.students.length})`;
+
+  list.innerHTML = cls.students.map(sid => {
+    const s = STUDENTS.find(x => x.id === sid);
+    const isChecked = !classAbsentIds.has(sid);
+    const pkgIds = STUDENT_PACKAGES[sid] || [];
+    const pkgs = pkgIds.map(pid => PACKAGES.find(p => p.id === pid)).filter(Boolean);
+
+    let defaultPkg = pkgs.find(p => p.subjectId === cls.subjectId && p.remaining >= hoursNeeded);
+    if (!defaultPkg) defaultPkg = pkgs.find(p => p.subjectId === cls.subjectId);
+    if (!defaultPkg) defaultPkg = pkgs.find(p => !p.subjectId && p.remaining >= hoursNeeded);
+    if (!defaultPkg) defaultPkg = pkgs.find(p => !p.subjectId);
+    if (!defaultPkg && pkgs.length > 0) defaultPkg = pkgs[0];
+
+    const hasEnough = defaultPkg && defaultPkg.remaining >= hoursNeeded;
+    const noPackage = !defaultPkg;
+    const isOwe = defaultPkg && !hasEnough;
+
+    if (defaultPkg) classPkgMap[sid] = defaultPkg.id;
+
+    const pkgTag = defaultPkg
+      ? (defaultPkg.subjectId ? (SUBJECTS.find(x => x.id === defaultPkg.subjectId)?.name || '通用') : '通用')
+      : '无课包';
+
+    return `
+      <div class="class-stu-item ${!isChecked ? 'absent' : ''} ${isOwe && isChecked ? 'owe' : ''} ${noPackage && isChecked ? 'no-pkg' : ''}" onclick="toggleCheckin('${sid}')">
+        <div class="avatar" style="background:${s.avatar}">${s.name[0]}</div>
+        <div class="sinfo">
+          <div class="sname">${s.name}</div>
+          ${isChecked ? `<div class="stu-pkg-info">
+            ${noPackage
+              ? '<span class="pkg-status no-pkg">无可用课包</span>'
+              : isOwe
+                ? `<span class="pkg-status owe">欠课 · ${pkgTag}仅剩${defaultPkg.remaining}课时</span>`
+                : `<span class="pkg-status ok">${pkgTag} · 剩余${defaultPkg.remaining}课时</span>`
+            }
+          </div>` : ''}
+        </div>
+        <div class="stu-check ${isChecked ? 'checked' : ''}">
+          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleCheckin(sid) {
+  if (classAbsentIds.has(sid)) {
+    classAbsentIds.delete(sid);
+  } else {
+    classAbsentIds.add(sid);
+  }
+  renderClassStudents();
+  updateSubmitBtn();
+}
+
+// ===== 确认对话框 =====
+let confirmCallback = null;
+function showConfirmDialog(title, msg, onConfirm) {
+  confirmCallback = onConfirm;
+  document.getElementById('cdTitle').textContent = title;
+  document.getElementById('cdMsg').textContent = msg;
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function closeConfirmDialog() {
+  document.getElementById('confirmOverlay').classList.remove('show');
+  confirmCallback = null;
+}
+function doConfirm() {
+  if (confirmCallback) confirmCallback();
+  closeConfirmDialog();
+}
+
+// ===== 提交 =====
+function updateSubmitBtn() {
+  const btn = document.getElementById('submitBtn');
+  if (currentMode === 'single') {
+    btn.disabled = !(selectedStudentId && selectedPackageId);
+    if (selectedStudentId && selectedPackageId) {
+      const pkg = PACKAGES.find(p => p.id === selectedPackageId);
+      const hours = parseFloat(document.getElementById('hoursInput')?.value) || 1;
+      btn.textContent = `确认消课 · 扣减 ${hours} 课时`;
+    } else {
+      btn.textContent = '确认消课';
+    }
+  } else {
+    const cls = CLASSES.find(c => c.id === selectedClassId);
+    const presentCount = cls ? cls.students.length - classAbsentIds.size : 0;
+    btn.disabled = !selectedClassId || presentCount === 0;
+    const hours = parseFloat(document.getElementById('classHoursInput')?.value) || 1;
+    btn.textContent = `一键消课 · ${presentCount}人签到 · 每人${hours}课时`;
+  }
+}
+
+function submitLesson() {
+  if (currentMode === 'single') {
+    const s = STUDENTS.find(x => x.id === selectedStudentId);
+    const pkg = PACKAGES.find(p => p.id === selectedPackageId);
+    const hours = parseFloat(document.getElementById('hoursInput').value) || 1;
+
+    // 检查跨科目
+    let extraMsg = '';
+    if (selectedClassId) {
+      const cls = CLASSES.find(c => c.id === selectedClassId);
+      if (cls.subjectId && pkg.subjectId && cls.subjectId !== pkg.subjectId) {
+        extraMsg = '\n已自动发起课包科目变更申请';
+      }
+    }
+
+    showToast(`消课成功！${s.name} · ${pkg.name} · 扣减${hours}课时${extraMsg}`);
+  } else {
+    const cls = CLASSES.find(c => c.id === selectedClassId);
+    const presentCount = cls.students.length - classAbsentIds.size;
+    const hours = parseFloat(document.getElementById('classHoursInput').value) || 1;
+    showToast(`班级消课成功！${cls.name} · ${presentCount}人 · 每人${hours}课时`);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== 初始化 =====
+renderStars();
+renderClassSelect();
+updateSubmitBtn();
+</script>
+</body>
+</html>

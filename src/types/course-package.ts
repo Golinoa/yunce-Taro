@@ -1,0 +1,107 @@
+/**
+ * 课时套餐状态
+ */
+export type PackageStatus = 'active' | 'completed' | 'expired';
+
+/**
+ * 收费方式
+ */
+export type FeeMethod = 'cash' | 'transfer' | 'wechat' | 'alipay' | 'other';
+
+/**
+ * 课程包模板类型
+ */
+export type PackageType = 'hour_package' | 'term' | 'monthly' | 'trial';
+
+/**
+ * 分期计划项
+ */
+export interface ScheduleItem {
+  period: number;
+  amount: string;
+  date: string;
+  reminder: boolean;
+}
+
+/**
+ * 课程包模板 (course_package_templates 表)
+ * 教师创建的可复用课包模板，创建班级时可关联
+ *
+ * 各类型字段规则（统一用 valid_days 管理有效期）：
+ * - 课时包(hour_package): lesson_count必填, valid_days选填(0=永久)
+ * - 期课(term): lesson_count必填, valid_days必填(如45天)
+ * - 月卡(monthly): valid_days必填(默认30), lesson_count选填(0=不限)
+ * - 体验课(trial): lesson_count默认1, valid_days默认7
+ *
+ * 实际起止日期在学生购买时计算：start_date=购买日, end_date=购买日+valid_days
+ */
+export interface CoursePackageTemplate {
+  id: string;
+  teacher_id: string;
+  name: string; // 课程包名称，如"暑假特训课包"
+  type: PackageType; // 类型：课时包/期课/月卡/体验课
+  price: number; // 价格（元）
+  lesson_count: number; // 包含课时数（0表示不限）
+  duration: number; // 每节课时长（分钟）
+  valid_days?: number; // 有效天数（0=永久，期课/月卡必填，体验课默认7）
+  description?: string; // 描述
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 课时套餐 (course_packages 表)
+ * 学生购买的具体课包实例，消课时自动扣减
+ *
+ * 购买时由模板的 valid_days 计算出 start_date 和 end_date
+ */
+export interface CoursePackage {
+  id: string;
+  teacher_id: string;
+  student_id: string;
+  name: string;
+  type?: PackageType; // 课包类型（来自模板）
+  total_hours: number;
+  remaining_hours: number;
+  status: PackageStatus;
+  valid_days?: number; // 有效天数（来自模板）
+  start_date?: string; // 有效期开始日期（购买时设置）
+  end_date?: string; // 有效期结束日期（= start_date + valid_days）
+  expiry_date?: string; // 过期日期（兼容旧字段，同 end_date）
+  fee_amount?: number;
+  fee_method?: FeeMethod;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+
+  // 科目关联（可选，用于课包自动匹配）
+  subject_id?: string; // 关联科目ID，null=通用课包
+  package_role?: 'owner' | 'sharer'; // 拥有/共享
+  shared_with?: string[]; // 共享人列表
+  package_tag?: 'hour' | 'gift'; // 课时包/赠送
+
+  // 充值相关（新增）
+  template_id?: string; // 关联课包模板ID
+  gift_hours?: number; // 赠送课时（不计入收费）
+  installment_enabled?: boolean; // 是否分期
+  installment_period?: number; // 分期期数
+  installment_schedule?: ScheduleItem[]; // 分期计划
+}
+
+/**
+ * 充值表单数据
+ */
+export interface RechargeFormData {
+  student_id: string;
+  template_id?: string;
+  name: string;
+  total_hours: number;
+  valid_days?: number;
+  gift_hours?: number;
+  fee_amount?: number;
+  fee_method?: FeeMethod;
+  installment_enabled?: boolean;
+  installment_period?: number;
+  installment_schedule?: ScheduleItem[];
+  note?: string;
+}

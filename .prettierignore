@@ -1,0 +1,6 @@
+dist/
+node_modules/
+.swc/
+native/
+*.min.js
+*.config.js

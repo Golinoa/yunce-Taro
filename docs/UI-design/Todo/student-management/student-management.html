@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>学员管理 - 设计方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --primary: #5EC8A8; --primary-dark: #4AB893; --primary-bg: #f0faf5;
+    --accent: #e88aaa; --accent-bg: #fdf0f4;
+    --info: #6ba3d6; --info-bg: #f0f5fb;
+    --amber: #d4a24e; --amber-bg: #faf6ee;
+    --purple: #9b7ed8; --purple-bg: #f3f0fb;
+    --success: #3ABF6E; --success-bg: #edf9f1;
+    --text: #2d4a3e; --text-sec: #7a9a8e; --text-light: #a0b8ad;
+    --destructive: #D94040; --destructive-bg: #fef2f2;
+    --border: #D5E8E0; --bg-page: #F5FAF8; --bg: #fff;
+    --shadow: 0 4px 20px -4px rgba(54,73,67,0.1);
+    --radius-card: 16px; --radius-input: 12px; --radius-btn: 24px; --radius-tag: 10px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; background: var(--bg-page); min-height: 100vh; }
+
+  /* 页面标题 */
+  .page-header { padding: 32px 24px 16px; }
+  .page-header h1 { font-size: 28px; font-weight: 800; color: var(--text); }
+  .page-header p { font-size: 14px; color: var(--text-sec); margin-top: 6px; }
+
+  /* 双屏容器 */
+  .dual-frame { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; padding: 0 16px 32px; align-items: flex-start; }
+  .frame-wrap { }
+  .frame-label { font-size: 13px; font-weight: 600; color: var(--text-sec); margin-bottom: 8px; padding-left: 4px; }
+
+  .phone-frame { width: 375px; background: #f5faf8; border-radius: 24px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04); min-height: 720px; position: relative; display: flex; flex-direction: column; }
+
+  /* ====== 导航栏 ====== */
+  .navbar { background: linear-gradient(135deg, #5ec8a8, #7dd8be); padding: 48px 20px 0; position: sticky; top: 0; z-index: 10; }
+  .navbar .title-row { display: flex; align-items: center; justify-content: space-between; }
+  .navbar h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .navbar .nav-action { font-size: 13px; color: #fff; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+  .navbar .nav-action svg { width: 16px; height: 16px; fill: #fff; }
+  /* 添加学员按钮 */
+  .add-student-btn { height: 32px; padding: 0 12px; border-radius: 16px; border: none; background: rgba(255,255,255,0.22); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: all 0.15s; flex-shrink: 0; white-space: nowrap; }
+  .add-student-btn:active { transform: scale(0.96); background: rgba(255,255,255,0.35); }
+
+  /* 头部内搜索栏 */
+  .header-search { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .header-search .search-input-wrap { flex: 1; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.25); backdrop-filter: blur(4px); border-radius: 12px; padding: 9px 12px; border: none; }
+  .header-search .search-input-wrap svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.65); flex-shrink: 0; }
+  .header-search .search-input-wrap input { flex: 1; border: none; outline: none; font-size: 13px; color: #fff; background: transparent; font-family: inherit; }
+  .header-search .search-input-wrap input::placeholder { color: rgba(255,255,255,0.65); }
+  .header-search .search-input-wrap .clear-btn { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,0.4); border: none; cursor: pointer; display: none; align-items: center; justify-content: center; flex-shrink: 0; }
+  .header-search .search-input-wrap .clear-btn.show { display: flex; }
+  .header-search .search-input-wrap .clear-btn svg { width: 11px; height: 11px; fill: #fff; }
+
+  /* 头部内排序按钮 */
+  .header-search .sort-select { position: relative; flex-shrink: 0; }
+  .header-search .sort-select-trigger { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.22); backdrop-filter: blur(4px); border: none; cursor: pointer; transition: all 0.15s; }
+  .header-search .sort-select-trigger:active { background: rgba(255,255,255,0.35); transform: scale(0.96); }
+  .header-search .sort-select-trigger.active { background: rgba(255,255,255,0.4); }
+  .header-search .sort-select-trigger svg { width: 18px; height: 18px; fill: rgba(255,255,255,0.85); }
+  .header-search .sort-select-trigger.active svg { fill: #fff; }
+  .header-search .sort-select-dropdown { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100; padding: 6px; min-width: 140px; display: none; animation: dropIn 0.15s ease; }
+  .header-search .sort-select.open .sort-select-dropdown { display: block; }
+  .sort-option { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; color: var(--text); cursor: pointer; transition: background 0.15s; }
+  .sort-option:hover { background: var(--bg-secondary); }
+  .sort-option.selected { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+  .sort-option .so-check { width: 14px; height: 14px; fill: var(--primary); margin-left: auto; flex-shrink: 0; opacity: 0; }
+  .sort-option.selected .so-check { opacity: 1; }
+
+  /* 头部内统计摘要 */
+  .header-stats { display: flex; gap: 8px; padding: 14px 0 16px; }
+  .header-stats .stat-chip { flex: 1; text-align: center; padding: 8px 4px; background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border-radius: 10px; }
+  .header-stats .stat-chip .val { font-size: 16px; font-weight: 700; color: #fff; }
+  .header-stats .stat-chip .label { font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 1px; }
+  .header-stats .stat-chip.warn .val { color: #ffe082; }
+  .header-stats .stat-chip.accent .val { color: #ffc1cc; }
+
+  /* ====== 筛选栏（双下拉框） ====== */
+  .filter-bar { display: flex; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative; z-index: 10; }
+  .filter-bar .filter-item { flex: 1; position: relative; }
+  .filter-bar .filter-item + .filter-item { border-left: 1px solid #f0f0f0; }
+  .filter-trigger { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 11px 12px; font-size: 13px; font-weight: 500; color: var(--text-sec); cursor: pointer; transition: all 0.15s; user-select: none; }
+  .filter-trigger:active { background: #f5f5f5; }
+  .filter-trigger.active { color: var(--primary); font-weight: 600; }
+  .filter-trigger .ft-label { white-space: nowrap; }
+  .filter-trigger svg { width: 14px; height: 14px; fill: currentColor; transition: transform 0.2s; flex-shrink: 0; }
+  .filter-item.open .filter-trigger svg { transform: rotate(180deg); }
+  .filter-trigger .ft-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  /* 下拉面板 */
+  .filter-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border-radius: 0 0 12px 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 6px; display: none; animation: dropIn 0.15s ease; }
+  .filter-item.open .filter-dropdown { display: block; }
+  .filter-option { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; color: var(--text); cursor: pointer; transition: background 0.15s; }
+  .filter-option:hover { background: var(--bg-secondary); }
+  .filter-option.selected { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+  .filter-option .fo-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .filter-option .fo-check { width: 14px; height: 14px; fill: var(--primary); margin-left: auto; flex-shrink: 0; opacity: 0; }
+  .filter-option.selected .fo-check { opacity: 1; }
+
+  @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .content { padding: 12px 16px 160px; flex: 1; overflow-y: auto; }
+
+  /* ====== 学生卡片 ====== */
+  .stu-card { background: #fff; border-radius: 32px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 12px; cursor: pointer; transition: transform 0.15s; border-left: 3px solid transparent; }
+  .stu-card:active { transform: scale(0.98); }
+  .stu-card.status-normal { border-left-color: var(--primary); }
+  .stu-card.status-warn { border-left-color: var(--amber); }
+  .stu-card.status-danger { border-left-color: var(--destructive); }
+  .stu-card.status-expiring { border-left-color: var(--info); }
+  .stu-card.status-owe { border-left-color: var(--accent); }
+  .stu-card .sc-top { display: flex; align-items: center; gap: 12px; }
+  .stu-card .avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .stu-card .sc-info { flex: 1; min-width: 0; }
+  .stu-card .sc-name { font-size: 16px; font-weight: 700; color: var(--text); }
+  .stu-card .sc-meta { font-size: 12px; color: var(--text-sec); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .stu-card .sc-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-light); flex-shrink: 0; }
+  .stu-card .sc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .stu-card .sc-hours-wrap { text-align: right; }
+  .stu-card .sc-hours { font-size: 20px; font-weight: 800; color: var(--primary); line-height: 1.2; }
+  .stu-card .sc-hours.warn { color: var(--amber); }
+  .stu-card .sc-hours.danger { color: var(--destructive); }
+  .stu-card .sc-hours-label { font-size: 11px; color: var(--text-light); }
+  .stu-card .sc-arrow { width: 16px; height: 16px; fill: var(--text-light); }
+
+  /* 课包标签行 */
+  .stu-card .sc-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .stu-card .sc-tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+
+  /* 进度条 */
+  .stu-card .sc-progress { margin-top: 10px; }
+  .stu-card .sc-progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .stu-card .sc-progress-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); transition: width 0.5s ease; }
+  .stu-card .sc-progress-fill.warn { background: linear-gradient(90deg, var(--amber), #e8c47a); }
+  .stu-card .sc-progress-fill.danger { background: linear-gradient(90deg, var(--destructive), #e87070); }
+  .stu-card .sc-progress-fill.expiring { background: linear-gradient(90deg, var(--info), #8fc0e8); }
+  .stu-card .sc-progress-text { font-size: 11px; color: var(--text-light); margin-top: 4px; display: flex; justify-content: space-between; }
+
+  /* 即将过期提示 */
+  .stu-card .sc-expire-hint { margin-top: 8px; display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--info); }
+  .stu-card .sc-expire-hint svg { width: 12px; height: 12px; fill: var(--info); }
+  .stu-card .sc-owe-hint { margin-top: 8px; display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent); padding: 6px 10px; background: var(--accent-bg); border-radius: 8px; }
+  .stu-card .sc-owe-hint svg { width: 12px; height: 12px; fill: var(--accent); flex-shrink: 0; }
+  .stu-card .sc-owe-badge { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; background: var(--accent-bg); color: var(--accent); margin-left: 6px; }
+
+  /* ====== 详情页 ====== */
+  .detail-header { background: linear-gradient(135deg, var(--primary), #7dd8bc); padding: 48px 20px 24px; border-radius: 0 0 24px 24px; color: #fff; position: relative; overflow: hidden; }
+  .detail-header::before { content: ''; position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+  .detail-header::after { content: ''; position: absolute; bottom: -20px; right: 50px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.06); }
+  .dh-top { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+  .dh-avatar { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: var(--primary); background: #fff; border: 3px solid rgba(255,255,255,0.4); flex-shrink: 0; }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name { font-size: 22px; font-weight: 800; }
+  .dh-nickname { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+  .dh-code { font-size: 12px; opacity: 0.7; font-family: monospace; letter-spacing: 2px; margin-top: 2px; }
+  .dh-phone { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+  .dh-edit { padding: 8px 16px; border-radius: 12px; background: rgba(255,255,255,0.2); font-size: 13px; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 4px; flex-shrink: 0; position: relative; z-index: 1; transition: background 0.15s; }
+  .dh-edit:active { background: rgba(255,255,255,0.3); }
+  .dh-edit svg { width: 14px; height: 14px; fill: #fff; }
+
+  .dh-meta { display: flex; gap: 12px; margin-top: 12px; position: relative; z-index: 1; flex-wrap: wrap; }
+  .dh-meta-item { display: flex; align-items: center; gap: 4px; font-size: 12px; opacity: 0.7; }
+  .dh-meta-item svg { width: 14px; height: 14px; fill: #fff; opacity: 0.7; }
+
+  /* 统计三栏 */
+  .dh-stats { display: flex; gap: 10px; margin-top: 20px; position: relative; z-index: 1; }
+  .dh-stat { flex: 1; background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); border-radius: 12px; padding: 14px 0; text-align: center; }
+  .dh-stat .ds-val { font-size: 24px; font-weight: 800; color: #fff; }
+  .dh-stat .ds-label { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+
+  /* Tab 栏 */
+  .tab-bar { display: flex; background: var(--bg); border-radius: 16px; padding: 4px; margin: -20px 16px 0; box-shadow: var(--shadow); position: relative; z-index: 2; }
+  .tab-item { flex: 1; padding: 10px 0; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-sec); cursor: pointer; border-radius: 12px; transition: all 0.2s; position: relative; }
+  .tab-item.active { color: var(--primary); background: var(--primary-bg); font-weight: 600; }
+  .tab-item .tab-badge { position: absolute; top: 2px; right: 6px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--destructive); color: #fff; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+
+  /* Tab 内容 */
+  .tab-content { padding: 16px; }
+  .tab-content.hidden { display: none; }
+
+  /* 课包卡片（详情页） */
+  .pkg-card { background: var(--bg); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
+  .pkg-card .pc-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .pkg-card .pc-name { font-size: 15px; font-weight: 700; color: var(--text); }
+  .pkg-card .pc-date { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .pkg-card .pc-status { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .pkg-card .pc-status.active { background: var(--primary-bg); color: var(--primary); }
+  .pkg-card .pc-status.expired { background: var(--destructive-bg); color: var(--destructive); }
+  .pkg-card .pc-status.completed { background: #f0f0f0; color: #999; }
+  .pkg-card .pc-progress { margin-top: 12px; }
+  .pkg-card .pc-progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .pkg-card .pc-progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); }
+  .pkg-card .pc-progress-fill.expired { background: linear-gradient(90deg, var(--destructive), #e87070); }
+  .pkg-card .pc-progress-fill.completed { background: #ccc; }
+  .pkg-card .pc-progress-text { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sec); margin-top: 4px; }
+  .pkg-card .pc-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .pkg-card .pc-tag { padding: 4px 10px; border-radius: 8px; font-size: 12px; color: var(--text-sec); background: #f5f5f5; }
+  .pkg-card .pc-tag.gift { background: var(--success-bg); color: var(--success); }
+  .pkg-card .pc-tag.shared { background: var(--info-bg); color: var(--info); }
+  .pkg-card .pc-expire { margin-top: 8px; display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--info); }
+  .pkg-card .pc-expire svg { width: 12px; height: 12px; fill: var(--info); }
+
+  /* 记录卡片 */
+  .record-card { background: var(--bg); border-radius: var(--radius-card); padding: 14px 16px; box-shadow: var(--shadow); margin-bottom: 10px; display: flex; gap: 12px; }
+  .record-card .rc-dot { display: flex; flex-direction: column; align-items: center; width: 12px; flex-shrink: 0; padding-top: 4px; }
+  .record-card .rc-dot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .record-card .rc-dot .line { width: 2px; flex: 1; background: var(--border); margin-top: 4px; min-height: 20px; }
+  .record-card .rc-body { flex: 1; min-width: 0; }
+  .record-card .rc-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .record-card .rc-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .record-card .rc-date { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .record-card .rc-hours { font-size: 15px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+  .record-card .rc-detail { margin-top: 8px; padding: 8px 12px; background: #f5faf8; border-radius: 8px; font-size: 12px; color: var(--text-sec); line-height: 1.6; }
+
+  /* 底部操作栏 */
+  .bottom-bar { position: sticky; bottom: 0; left: 0; right: 0; background: var(--bg); padding: 12px 16px 28px; box-shadow: 0 -2px 12px rgba(0,0,0,0.06); z-index: 10; display: flex; gap: 10px; }
+  .bottom-bar .bb-btn { flex: 1; padding: 14px; border-radius: var(--radius-btn); border: none; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; transition: transform 0.15s; }
+  .bottom-bar .bb-btn:active { transform: scale(0.97); }
+  .bottom-bar .bb-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; }
+  .bottom-bar .bb-outline { background: var(--bg); color: var(--destructive); border: 1.5px solid var(--destructive); }
+  .bottom-bar .bb-secondary { background: var(--primary-bg); color: var(--primary); }
+
+  /* 空状态 */
+  .empty-state { text-align: center; padding: 48px 20px; }
+  .empty-state .es-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+  .empty-state .es-text { font-size: 14px; color: var(--text-light); }
+  .empty-state .es-hint { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+
+  /* 弹窗遮罩 */
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; display: none; align-items: center; justify-content: center; animation: fadeIn 0.2s; }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: var(--bg); border-radius: 20px; padding: 28px 24px 20px; width: 300px; text-align: center; animation: slideUp 0.25s; }
+  .modal-box .mb-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .modal-box .mb-desc { font-size: 14px; color: var(--text-sec); line-height: 1.5; margin-bottom: 24px; }
+  .modal-box .mb-actions { display: flex; gap: 10px; }
+  .modal-box .mb-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 0.15s; }
+  .modal-box .mb-btn:active { transform: scale(0.97); }
+  .modal-box .mb-cancel { background: #f0f0f0; color: var(--text-sec); }
+  .modal-box .mb-confirm { background: var(--destructive); color: #fff; }
+
+  /* Toast */
+  .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(45,74,62,0.9); color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; z-index: 300; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* 视图切换按钮 */
+  .view-switch { display: flex; gap: 8px; padding: 0 24px 12px; }
+  .view-btn { padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--bg); font-size: 13px; color: var(--text-sec); cursor: pointer; font-weight: 500; transition: all 0.2s; }
+  .view-btn.active { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); }
+
+  /* ====== 设计标注系统 ====== */
+  .anno-toggle { position: fixed; top: 12px; right: 12px; z-index: 9999; padding: 8px 16px; border-radius: 20px; border: 2px solid var(--primary); background: #fff; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.12); transition: all 0.2s; user-select: none; }
+  .anno-toggle.active { background: var(--primary); color: #fff; }
+  .anno-toggle:hover { transform: scale(1.05); }
+  .anno-layer { display: none; pointer-events: none; }
+  .anno-layer.show { display: block; }
+  .anno-mark { position: absolute; z-index: 200; pointer-events: auto; }
+  .anno-mark .anno-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; line-height: 1.3; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+  .anno-mark.size .anno-badge { background: #E3F2FD; color: #1565C0; border: 1px solid #90CAF9; }
+  .anno-mark.spacing .anno-badge { background: #FFF3E0; color: #E65100; border: 1px solid #FFCC80; }
+  .anno-mark.color .anno-badge { background: #F3E5F5; color: #7B1FA2; border: 1px solid #CE93D8; }
+  .anno-mark.typo .anno-badge { background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7; }
+  .anno-mark.radius .anno-badge { background: #FCE4EC; color: #C62828; border: 1px solid #F48FB1; }
+  .anno-mark .anno-swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
+  .anno-panel { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 9998; background: #fff; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.12); max-width: 600px; width: 100%; max-height: 60vh; overflow-y: auto; display: none; }
+  .anno-panel.show { display: block; }
+  .anno-panel-header { padding: 16px 20px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: #fff; z-index: 1; }
+  .anno-panel-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  .anno-panel-close { width: 28px; height: 28px; border-radius: 50%; border: none; background: #f0f0f0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .anno-panel-body { padding: 12px 20px 24px; }
+  .anno-section { margin-bottom: 16px; }
+  .anno-section-title { font-size: 12px; font-weight: 700; color: var(--text-sec); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .anno-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .anno-table th { text-align: left; padding: 6px 8px; background: #f8faf9; color: var(--text-sec); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .anno-table td { padding: 6px 8px; border-bottom: 1px solid #f0f5f2; color: var(--text); }
+  .anno-table .val { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 600; color: #1565C0; }
+  .anno-table .color-cell { display: flex; align-items: center; gap: 6px; }
+  .anno-table .color-dot { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+  .anno-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .anno-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-sec); }
+  .anno-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- 标注切换按钮 -->
+<button class="anno-toggle" id="annoToggle" onclick="toggleAnnotations()">设计标注</button>
+
+<div class="page-header">
+  <h1>学员管理</h1>
+  <p>列表页 + 详情页 · 完整交互设计</p>
+</div>
+
+<div class="view-switch">
+  <button class="view-btn active" onclick="switchView('list')">学员列表</button>
+  <button class="view-btn" onclick="switchView('detail')">学员详情</button>
+</div>
+
+<div class="dual-frame">
+
+<!-- ========== 学员列表 ========== -->
+<div class="frame-wrap" id="viewList">
+  <div class="frame-label">学员列表</div>
+  <div class="phone-frame">
+    <div class="navbar">
+      <div class="title-row">
+        <h1>学员管理</h1>
+        <button class="add-student-btn" onclick="showToast('跳转添加学员')">添加学员</button>
+      </div>
+      <!-- 搜索栏 -->
+      <div class="header-search">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input placeholder="搜索姓名或手机号" id="searchInput" oninput="handleSearch(this)">
+          <button class="clear-btn" id="clearBtn" onclick="clearSearch()">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+        <!-- 排序按钮 -->
+        <div class="sort-select" id="sortSelect" data-value="default">
+          <div class="sort-select-trigger" onclick="toggleSortSelect()">
+            <svg viewBox="0 0 24 24"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
+          </div>
+          <div class="sort-select-dropdown">
+            <div class="sort-option selected" data-val="default" onclick="selectSortOption(this,'default','默认排序')">
+              默认排序<span class="so-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+            </div>
+            <div class="sort-option" data-val="hours-desc" onclick="selectSortOption(this,'hours-desc','课时从多到少')">
+              课时从多到少<span class="so-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+            </div>
+            <div class="sort-option" data-val="hours-asc" onclick="selectSortOption(this,'hours-asc','课时从少到多')">
+              课时从少到多<span class="so-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+            </div>
+            <div class="sort-option" data-val="name-asc" onclick="selectSortOption(this,'name-asc','姓名A-Z')">
+              姓名A-Z<span class="so-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+            </div>
+            <div class="sort-option" data-val="name-desc" onclick="selectSortOption(this,'name-desc','姓名Z-A')">
+              姓名Z-A<span class="so-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 统计摘要 -->
+      <div class="header-stats">
+        <div class="stat-chip"><div class="val">9</div><div class="label">总学员</div></div>
+        <div class="stat-chip"><div class="val">4</div><div class="label">课时充足</div></div>
+        <div class="stat-chip warn"><div class="val">2</div><div class="label">课时不足</div></div>
+        <div class="stat-chip accent"><div class="val">2</div><div class="label">欠课</div></div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="filter-bar" id="filterBar">
+      <!-- 课时状态 -->
+      <div class="filter-item" id="statusFilter" data-value="all">
+        <div class="filter-trigger" onclick="toggleFilter('statusFilter')">
+          <span class="ft-label" id="statusLabel">课时状态</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="all" onclick="selectFilter('statusFilter',this,'all','课时状态')">
+            全部<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="sufficient" onclick="selectFilter('statusFilter',this,'sufficient','课时充足')">
+            <span class="fo-dot" style="background:var(--primary)"></span>课时充足<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="low" onclick="selectFilter('statusFilter',this,'low','课时不足')">
+            <span class="fo-dot" style="background:var(--amber)"></span>课时不足<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="expiring" onclick="selectFilter('statusFilter',this,'expiring','即将过期')">
+            <span class="fo-dot" style="background:var(--info)"></span>即将过期<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="expired" onclick="selectFilter('statusFilter',this,'expired','已过期')">
+            <span class="fo-dot" style="background:var(--destructive)"></span>已过期<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="owe" onclick="selectFilter('statusFilter',this,'owe','欠课')">
+            <span class="fo-dot" style="background:var(--accent)"></span>欠课<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+        </div>
+      </div>
+      <!-- 科目 -->
+      <div class="filter-item" id="subjectFilter" data-value="all">
+        <div class="filter-trigger" onclick="toggleFilter('subjectFilter')">
+          <span class="ft-label" id="subjectLabel">全部科目</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="all" onclick="selectFilter('subjectFilter',this,'all','科目')">
+            全部科目<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="piano" onclick="selectFilter('subjectFilter',this,'piano','钢琴')">
+            钢琴<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="vocal" onclick="selectFilter('subjectFilter',this,'vocal','声乐')">
+            声乐<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="theory" onclick="selectFilter('subjectFilter',this,'theory','乐理')">
+            乐理<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="calligraphy" onclick="selectFilter('subjectFilter',this,'calligraphy','书法')">
+            书法<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="general" onclick="selectFilter('subjectFilter',this,'general','通用')">
+            通用<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 学生卡片列表 -->
+      <div id="studentList">
+
+        <!-- 卡片1：课时充足 + 多课包 -->
+        <div class="stu-card status-normal" data-status="sufficient" data-subjects="piano,general" data-hours="70" data-name="张小明" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,#5EC8A8,#7dd8bc)">张</div>
+            <div class="sc-info">
+              <div class="sc-name">张小明</div>
+              <div class="sc-meta"><span>138****1234</span><span class="dot"></span><span>2个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours">70</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--primary-bg);color:var(--primary)">钢琴课 28h</span>
+            <span class="sc-tag" style="background:var(--info-bg);color:var(--info)">通用课 42h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill" style="width:30%"></div></div>
+            <div class="sc-progress-text"><span>已用 30%</span><span>30/100 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片2：课时不足 -->
+        <div class="stu-card status-warn" data-status="low" data-subjects="vocal" data-hours="3" data-name="王小萌" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--amber),#e8c47a)">王</div>
+            <div class="sc-info">
+              <div class="sc-name">王小萌</div>
+              <div class="sc-meta"><span>139****5678</span><span class="dot"></span><span>1个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours warn">3</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--amber-bg);color:var(--amber)">声乐课 3h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill warn" style="width:85%"></div></div>
+            <div class="sc-progress-text"><span>已用 85%</span><span>17/20 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片3：即将过期 -->
+        <div class="stu-card status-expiring" data-status="expiring" data-subjects="piano" data-hours="12" data-name="赵思琪" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--info),#8fc0e8)">赵</div>
+            <div class="sc-info">
+              <div class="sc-name">赵思琪</div>
+              <div class="sc-meta"><span>137****9999</span><span class="dot"></span><span>1个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours">12</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--info-bg);color:var(--info)">钢琴课 12h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill expiring" style="width:60%"></div></div>
+            <div class="sc-progress-text"><span>已用 60%</span><span>18/30 课时</span></div>
+          </div>
+          <div class="sc-expire-hint">
+            <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            钢琴课将于7月15日到期，还剩18天
+          </div>
+        </div>
+
+        <!-- 卡片4：已过期 -->
+        <div class="stu-card status-danger" data-status="expired" data-subjects="theory" data-hours="0" data-name="陈雨萱" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--destructive),#e87070)">陈</div>
+            <div class="sc-info">
+              <div class="sc-name">陈雨萱</div>
+              <div class="sc-meta"><span>138****4444</span><span class="dot"></span><span>1个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours danger">0</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--destructive-bg);color:var(--destructive)">乐理课 已过期</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill danger" style="width:100%"></div></div>
+            <div class="sc-progress-text"><span>已用 100%</span><span>16/16 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片5：正常 + 仅赠送课时 -->
+        <div class="stu-card status-normal" data-status="sufficient" data-subjects="piano" data-hours="22" data-name="李子轩" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--purple),#bda4e8)">李</div>
+            <div class="sc-info">
+              <div class="sc-name">李子轩</div>
+              <div class="sc-meta"><span>138****3333</span><span class="dot"></span><span>2个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours">22</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--purple-bg);color:var(--purple)">钢琴课 18h</span>
+            <span class="sc-tag" style="background:var(--success-bg);color:var(--success)">赠送 4h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill" style="width:40%"></div></div>
+            <div class="sc-progress-text"><span>已用 40%</span><span>12/30 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片6：正常 + 单课包 -->
+        <div class="stu-card status-normal" data-status="sufficient" data-subjects="piano" data-hours="35" data-name="刘浩然" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--accent),#f0b3c7)">刘</div>
+            <div class="sc-info">
+              <div class="sc-name">刘浩然</div>
+              <div class="sc-meta"><span>138****5555</span><span class="dot"></span><span>1个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours">35</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--accent-bg);color:var(--accent)">钢琴课 35h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill" style="width:27%"></div></div>
+            <div class="sc-progress-text"><span>已用 27%</span><span>13/48 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片7：课时不足 + 多课包混合 -->
+        <div class="stu-card status-warn" data-status="low" data-subjects="vocal,theory" data-hours="5" data-name="孙悦" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,#5EC8A8,#7dd8bc)">孙</div>
+            <div class="sc-info">
+              <div class="sc-name">孙悦</div>
+              <div class="sc-meta"><span>136****7777</span><span class="dot"></span><span>2个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours warn">5</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--amber-bg);color:var(--amber)">声乐课 2h</span>
+            <span class="sc-tag" style="background:var(--primary-bg);color:var(--primary)">乐理课 3h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill warn" style="width:83%"></div></div>
+            <div class="sc-progress-text"><span>已用 83%</span><span>25/30 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片8：正常 + 无手机号 -->
+        <div class="stu-card status-normal" data-status="sufficient" data-subjects="piano" data-hours="16" data-name="周子涵" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--amber),#e8c47a)">周</div>
+            <div class="sc-info">
+              <div class="sc-name">周子涵</div>
+              <div class="sc-meta"><span>暂无手机号</span><span class="dot"></span><span>1个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours">16</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--amber-bg);color:var(--amber)">钢琴课 16h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill" style="width:47%"></div></div>
+            <div class="sc-progress-text"><span>已用 47%</span><span>14/30 课时</span></div>
+          </div>
+        </div>
+
+        <!-- 卡片9：欠课学员 - 缺课待补 -->
+        <div class="stu-card status-owe" data-status="owe" data-subjects="piano" data-hours="18" data-name="吴思远" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--accent),#f0b3c7)">吴</div>
+            <div class="sc-info">
+              <div class="sc-name">吴思远<span class="sc-owe-badge"><svg viewBox="0 0 24 24" width="10" height="10" style="fill:var(--accent);vertical-align:-1px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>欠2节</span></div>
+              <div class="sc-meta"><span>135****2222</span><span class="dot"></span><span>1个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours" style="color:var(--accent)">18</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--accent-bg);color:var(--accent)">钢琴课 18h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill" style="width:40%;background:linear-gradient(90deg, var(--accent), #f0b3c7)"></div></div>
+            <div class="sc-progress-text"><span>已用 40%</span><span>12/30 课时</span></div>
+          </div>
+          <div class="sc-owe-hint">
+            <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            因请假缺课2节，需安排补课（6月5日、6月8日）
+          </div>
+        </div>
+
+        <!-- 卡片10：欠课学员 - 课时不足+欠课 -->
+        <div class="stu-card status-owe" data-status="owe" data-subjects="vocal,calligraphy" data-hours="4" data-name="郑雨桐" onclick="switchView('detail')">
+          <div class="sc-top">
+            <div class="avatar" style="background:linear-gradient(135deg,#e88a8a,var(--accent))">郑</div>
+            <div class="sc-info">
+              <div class="sc-name">郑雨桐<span class="sc-owe-badge"><svg viewBox="0 0 24 24" width="10" height="10" style="fill:var(--accent);vertical-align:-1px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>欠3节</span></div>
+              <div class="sc-meta"><span>136****8888</span><span class="dot"></span><span>2个课包</span></div>
+            </div>
+            <div class="sc-right">
+              <div class="sc-hours-wrap">
+                <div class="sc-hours warn" style="color:var(--accent)">4</div>
+                <div class="sc-hours-label">剩余课时</div>
+              </div>
+              <svg class="sc-arrow" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag" style="background:var(--accent-bg);color:var(--accent)">声乐课 2h</span>
+            <span class="sc-tag" style="background:var(--amber-bg);color:var(--amber)">书法课 2h</span>
+          </div>
+          <div class="sc-progress">
+            <div class="sc-progress-bar"><div class="sc-progress-fill warn" style="width:87%;background:linear-gradient(90deg, var(--accent), var(--amber))"></div></div>
+            <div class="sc-progress-text"><span>已用 87%</span><span>26/30 课时</span></div>
+          </div>
+          <div class="sc-owe-hint">
+            <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            因病缺课3节，需安排补课（5月28日、6月1日、6月3日）
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 学员详情 ========== -->
+<div class="frame-wrap" id="viewDetail">
+  <div class="frame-label">学员详情</div>
+  <div class="phone-frame">
+    <!-- 顶部渐变信息卡 -->
+    <div class="detail-header">
+      <div class="dh-top">
+        <div class="dh-avatar">张</div>
+        <div class="dh-info">
+          <div class="dh-name">张小明</div>
+          <div class="dh-nickname">小明</div>
+          <div class="dh-code">ST001</div>
+          <div class="dh-phone">138****1234</div>
+        </div>
+        <div class="dh-edit" onclick="showToast('跳转编辑页')">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          编辑
+        </div>
+      </div>
+      <div class="dh-meta">
+        <div class="dh-meta-item">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          西城区金融街10号
+        </div>
+        <div class="dh-meta-item">
+          <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+          2018-06-15
+        </div>
+      </div>
+      <div class="dh-stats">
+        <div class="dh-stat"><div class="ds-val">70</div><div class="ds-label">剩余课时</div></div>
+        <div class="dh-stat"><div class="ds-val">30</div><div class="ds-label">总已消课</div></div>
+        <div class="dh-stat"><div class="ds-val">12</div><div class="ds-label">今年消耗</div></div>
+      </div>
+    </div>
+
+    <!-- Tab 栏 -->
+    <div class="tab-bar">
+      <div class="tab-item active" onclick="switchTab(this, 'records')">课时记录</div>
+      <div class="tab-item" onclick="switchTab(this, 'packages')">课时套餐</div>
+      <div class="tab-item" onclick="switchTab(this, 'leaves')">请假<span class="tab-badge">2</span></div>
+      <div class="tab-item" onclick="switchTab(this, 'parents')">家长</div>
+    </div>
+
+    <!-- Tab 内容：课时记录 -->
+    <div class="tab-content" id="tab-records">
+      <div class="record-card">
+        <div class="rc-dot"><div class="dot"></div><div class="line"></div></div>
+        <div class="rc-body">
+          <div class="rc-top">
+            <div><div class="rc-title">钢琴课</div><div class="rc-date">2025年6月10日</div></div>
+            <div class="rc-hours">-1课时</div>
+          </div>
+          <div class="rc-detail">课程内容：音阶练习、拜厄第28条<br>表现评价：节奏感有进步</div>
+        </div>
+      </div>
+      <div class="record-card">
+        <div class="rc-dot"><div class="dot"></div><div class="line"></div></div>
+        <div class="rc-body">
+          <div class="rc-top">
+            <div><div class="rc-title">通用课包</div><div class="rc-date">2025年6月7日</div></div>
+            <div class="rc-hours">-2课时</div>
+          </div>
+        </div>
+      </div>
+      <div class="record-card">
+        <div class="rc-dot"><div class="dot"></div><div class="line"></div></div>
+        <div class="rc-body">
+          <div class="rc-top">
+            <div><div class="rc-title">钢琴课</div><div class="rc-date">2025年6月3日</div></div>
+            <div class="rc-hours">-1课时</div>
+          </div>
+          <div class="rc-detail">课程内容：乐理基础复习</div>
+        </div>
+      </div>
+      <div class="record-card">
+        <div class="rc-dot"><div class="dot"></div><div class="line"></div></div>
+        <div class="rc-body">
+          <div class="rc-top">
+            <div><div class="rc-title">钢琴课</div><div class="rc-date">2025年5月27日</div></div>
+            <div class="rc-hours">-1课时</div>
+          </div>
+          <div class="rc-detail">课程内容：车尔尼599第15条<br>表现评价：手型有改善</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 内容：课时套餐 -->
+    <div class="tab-content hidden" id="tab-packages">
+      <div class="pkg-card">
+        <div class="pc-top">
+          <div><div class="pc-name">钢琴课</div><div class="pc-date">2025年1月15日 充值</div></div>
+          <div class="pc-status active">进行中</div>
+        </div>
+        <div class="pc-progress">
+          <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:30%"></div></div>
+          <div class="pc-progress-text"><span>28/40 课时</span><span>70%</span></div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag">¥200</span>
+          <span class="pc-tag">微信</span>
+        </div>
+      </div>
+      <div class="pkg-card">
+        <div class="pc-top">
+          <div><div class="pc-name">家庭共享课包</div><div class="pc-date">2025年2月1日 充值</div></div>
+          <div class="pc-status active">进行中</div>
+        </div>
+        <div class="pc-progress">
+          <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:30%"></div></div>
+          <div class="pc-progress-text"><span>42/60 课时</span><span>70%</span></div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag">¥300</span>
+          <span class="pc-tag">微信</span>
+          <span class="pc-tag shared">共享</span>
+        </div>
+      </div>
+      <div class="pkg-card">
+        <div class="pc-top">
+          <div><div class="pc-name">赠送课时</div><div class="pc-date">2025年3月1日 赠送</div></div>
+          <div class="pc-status active">进行中</div>
+        </div>
+        <div class="pc-progress">
+          <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:25%"></div></div>
+          <div class="pc-progress-text"><span>3/4 课时</span><span>75%</span></div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag gift">赠送</span>
+        </div>
+      </div>
+      <div class="pkg-card">
+        <div class="pc-top">
+          <div><div class="pc-name">乐理课</div><div class="pc-date">2024年6月1日 充值</div></div>
+          <div class="pc-status expired">已过期</div>
+        </div>
+        <div class="pc-progress">
+          <div class="pc-progress-bar"><div class="pc-progress-fill expired" style="width:100%"></div></div>
+          <div class="pc-progress-text"><span>0/16 课时</span><span>100%</span></div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag">¥100</span>
+          <span class="pc-tag">现金</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 内容：请假 -->
+    <div class="tab-content hidden" id="tab-leaves">
+      <div class="pkg-card">
+        <div class="pc-top">
+          <div><div class="pc-name">请假</div><div class="pc-date">2025年6月5日</div></div>
+          <div class="pc-status active">已通过</div>
+        </div>
+        <div style="margin-top:8px;padding:8px 12px;background:#f5faf8;border-radius:8px;font-size:12px;color:var(--text-sec)">原因：身体不适，需要休息</div>
+      </div>
+      <div class="pkg-card">
+        <div class="pc-top">
+          <div><div class="pc-name">调课</div><div class="pc-date">2025年5月20日 → 5月22日</div></div>
+          <div class="pc-status active">已通过</div>
+        </div>
+        <div style="margin-top:8px;padding:8px 12px;background:#f5faf8;border-radius:8px;font-size:12px;color:var(--text-sec)">原因：学校活动冲突</div>
+      </div>
+    </div>
+
+    <!-- Tab 内容：家长 -->
+    <div class="tab-content hidden" id="tab-parents">
+      <div class="pkg-card" style="text-align:center;padding:24px">
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">学生邀请码</div>
+        <div style="font-size:32px;font-weight:800;color:var(--primary);letter-spacing:4px;font-family:monospace">ST001</div>
+        <div style="margin-top:16px;padding:12px;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:transform 0.15s" onclick="showToast('邀请码已复制')" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''">复制邀请码</div>
+      </div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin:16px 0 8px">已绑定家长</div>
+      <div class="pkg-card" style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#f0b3c7);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" width="18" height="18" style="fill:#fff"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text)">王大明</div>
+            <div style="font-size:12px;color:var(--text-sec)">13900001111</div>
+          </div>
+        </div>
+        <div style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--destructive);font-size:12px;color:var(--destructive);cursor:pointer;transition:transform 0.15s" onclick="showDeleteModal('parent')" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform=''">解绑</div>
+      </div>
+      <div class="pkg-card" style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--info),#8fc0e8);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" width="18" height="18" style="fill:#fff"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text)">张丽华</div>
+            <div style="font-size:12px;color:var(--text-sec)">13800002222</div>
+          </div>
+        </div>
+        <div style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--destructive);font-size:12px;color:var(--destructive);cursor:pointer;transition:transform 0.15s" onclick="showDeleteModal('parent')" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform=''">解绑</div>
+      </div>
+    </div>
+
+    <!-- 底部操作栏 -->
+    <div class="bottom-bar">
+      <button class="bb-btn bb-secondary" onclick="showToast('跳转课时充值')">课时充值</button>
+      <button class="bb-btn bb-primary" onclick="showToast('跳转编辑页')">编辑</button>
+      <button class="bb-btn bb-outline" onclick="showDeleteModal('student')">删除</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box">
+    <div class="mb-title" id="modalTitle">确认删除</div>
+    <div class="mb-desc" id="modalDesc">删除后学生数据将无法恢复，是否确认？</div>
+    <div class="mb-actions">
+      <button class="mb-btn mb-cancel" onclick="hideDeleteModal()">取消</button>
+      <button class="mb-btn mb-confirm" onclick="confirmDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== 视图切换 ======
+function switchView(view) {
+  var listWrap = document.getElementById('viewList');
+  var detailWrap = document.getElementById('viewDetail');
+  var btns = document.querySelectorAll('.view-btn');
+  btns.forEach(function(b) { b.classList.remove('active'); });
+
+  if (view === 'list') {
+    listWrap.style.display = '';
+    detailWrap.style.display = 'none';
+    btns[0].classList.add('active');
+  } else {
+    listWrap.style.display = 'none';
+    detailWrap.style.display = '';
+    btns[1].classList.add('active');
+  }
+}
+
+// ====== 排序功能 ======
+var currentSort = 'default';
+
+function toggleSortSelect() {
+  var el = document.getElementById('sortSelect');
+  var wasOpen = el.classList.contains('open');
+  
+  // 关闭排序下拉
+  document.querySelectorAll('.sort-select').forEach(function(s) { s.classList.remove('open'); });
+  
+  if (!wasOpen) {
+    el.classList.add('open');
+  }
+}
+
+function selectSortOption(optionEl, value, label) {
+  var selectEl = document.getElementById('sortSelect');
+  var trigger = selectEl.querySelector('.sort-select-trigger');
+
+  // 更新选中状态
+  selectEl.querySelectorAll('.sort-option').forEach(function(o) { o.classList.remove('selected'); });
+  optionEl.classList.add('selected');
+
+  // 更新active样式（非默认排序时高亮图标）
+  if (value === 'default') {
+    trigger.classList.remove('active');
+  } else {
+    trigger.classList.add('active');
+  }
+
+  // 更新数据值
+  selectEl.setAttribute('data-value', value);
+
+  // 关闭下拉
+  selectEl.classList.remove('open');
+
+  // 应用排序
+  currentSort = value;
+  applyFilters();
+}
+
+// ====== 筛选下拉框 ======
+var currentFilter = 'all';
+var currentSubject = 'all';
+
+function toggleFilter(id) {
+  var el = document.getElementById(id);
+  var wasOpen = el.classList.contains('open');
+  
+  // 关闭所有筛选下拉
+  document.querySelectorAll('.filter-item').forEach(function(s) { s.classList.remove('open'); });
+  
+  if (!wasOpen) {
+    el.classList.add('open');
+  }
+}
+
+function selectFilter(filterId, optionEl, value, label) {
+  var filterEl = document.getElementById(filterId);
+  var trigger = filterEl.querySelector('.filter-trigger');
+  var labelEl = trigger.querySelector('.ft-label');
+
+  // 更新选中状态
+  filterEl.querySelectorAll('.filter-option').forEach(function(o) { o.classList.remove('selected'); });
+  optionEl.classList.add('selected');
+
+  // 更新显示文本和激活样式
+  labelEl.textContent = label;
+  if (value === 'all') {
+    trigger.classList.remove('active');
+  } else {
+    trigger.classList.add('active');
+  }
+
+  // 更新数据值
+  filterEl.setAttribute('data-value', value);
+
+  // 关闭下拉
+  filterEl.classList.remove('open');
+
+  // 应用筛选
+  if (filterId === 'statusFilter') {
+    currentFilter = value;
+  } else if (filterId === 'subjectFilter') {
+    currentSubject = value;
+  }
+  applyFilters();
+}
+
+// 点击外部关闭下拉
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.sort-select')) {
+    document.querySelectorAll('.sort-select').forEach(function(s) { s.classList.remove('open'); });
+  }
+  if (!e.target.closest('.filter-item')) {
+    document.querySelectorAll('.filter-item').forEach(function(s) { s.classList.remove('open'); });
+  }
+});
+
+function applyFilters() {
+  var cards = document.querySelectorAll('.stu-card');
+  var visibleCards = [];
+
+  // 筛选
+  cards.forEach(function(card) {
+    var status = card.getAttribute('data-status');
+    var subjects = (card.getAttribute('data-subjects') || '').split(',');
+
+    var statusMatch = currentFilter === 'all' || status === currentFilter;
+    var subjectMatch = currentSubject === 'all' || subjects.indexOf(currentSubject) !== -1;
+
+    if (statusMatch && subjectMatch) {
+      card.style.display = '';
+      visibleCards.push(card);
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  // 排序
+  sortCards(visibleCards);
+
+  // 更新空状态
+  var listEl = document.getElementById('studentList');
+  var existingEmpty = listEl.querySelector('.empty-state');
+  if (existingEmpty) existingEmpty.remove();
+
+  if (visibleCards.length === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = '<div class="es-icon">🔍</div><div class="es-text">未找到匹配的学员</div><div class="es-hint">尝试其他筛选条件</div>';
+    listEl.appendChild(empty);
+  }
+}
+
+function sortCards(cards) {
+  if (currentSort === 'default') return;
+  
+  var sorted = Array.from(cards).sort(function(a, b) {
+    if (currentSort === 'hours-desc') {
+      var hoursA = parseInt(a.getAttribute('data-hours')) || 0;
+      var hoursB = parseInt(b.getAttribute('data-hours')) || 0;
+      return hoursB - hoursA;
+    } else if (currentSort === 'hours-asc') {
+      var hoursA = parseInt(a.getAttribute('data-hours')) || 0;
+      var hoursB = parseInt(b.getAttribute('data-hours')) || 0;
+      return hoursA - hoursB;
+    } else if (currentSort === 'name-asc') {
+      var nameA = a.getAttribute('data-name') || '';
+      var nameB = b.getAttribute('data-name') || '';
+      return nameA.localeCompare(nameB, 'zh-CN');
+    } else if (currentSort === 'name-desc') {
+      var nameA = a.getAttribute('data-name') || '';
+      var nameB = b.getAttribute('data-name') || '';
+      return nameB.localeCompare(nameA, 'zh-CN');
+    }
+    return 0;
+  });
+  
+  // 重新排列DOM
+  var listEl = document.getElementById('studentList');
+  sorted.forEach(function(card) {
+    listEl.appendChild(card);
+  });
+}
+
+// ====== 搜索 ======
+function handleSearch(input) {
+  var val = input.value.trim().toLowerCase();
+  var clearBtn = document.getElementById('clearBtn');
+  clearBtn.classList.toggle('show', val.length > 0);
+
+  if (!val) {
+    applyFilters();
+    return;
+  }
+
+  var cards = document.querySelectorAll('.stu-card');
+  var visibleCount = 0;
+
+  cards.forEach(function(card) {
+    var name = card.querySelector('.sc-name').textContent.toLowerCase();
+    var meta = card.querySelector('.sc-meta').textContent.toLowerCase();
+    var match = name.includes(val) || meta.includes(val);
+    card.style.display = match ? '' : 'none';
+    if (match) visibleCount++;
+  });
+
+  var listEl = document.getElementById('studentList');
+  var existingEmpty = listEl.querySelector('.empty-state');
+  if (existingEmpty) existingEmpty.remove();
+
+  if (visibleCount === 0 && val) {
+    var empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = '<div class="es-icon">🔍</div><div class="es-text">未找到"' + val + '"相关学员</div><div class="es-hint">请检查姓名或手机号</div>';
+    listEl.appendChild(empty);
+  }
+}
+
+function clearSearch() {
+  var input = document.getElementById('searchInput');
+  input.value = '';
+  document.getElementById('clearBtn').classList.remove('show');
+  applyFilters();
+  var existingEmpty = document.querySelector('#studentList .empty-state');
+  if (existingEmpty) existingEmpty.remove();
+  input.focus();
+}
+
+// ====== Tab 切换 ======
+function switchTab(el, key) {
+  el.parentElement.querySelectorAll('.tab-item').forEach(function(t) { t.classList.remove('active'); });
+  el.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.add('hidden'); });
+  var target = document.getElementById('tab-' + key);
+  if (target) target.classList.remove('hidden');
+}
+
+// ====== 删除弹窗 ======
+var deleteType = '';
+function showDeleteModal(type) {
+  deleteType = type;
+  var modal = document.getElementById('deleteModal');
+  var title = document.getElementById('modalTitle');
+  var desc = document.getElementById('modalDesc');
+  var confirmBtn = modal.querySelector('.mb-confirm');
+
+  if (type === 'parent') {
+    title.textContent = '解除绑定';
+    desc.textContent = '确认解除该家长的绑定？解除后该家长将无法查看学生课时信息。';
+    confirmBtn.textContent = '确认解绑';
+  } else {
+    title.textContent = '确认删除';
+    desc.textContent = '删除后学生数据将无法恢复，是否确认？';
+    confirmBtn.textContent = '确认删除';
+  }
+  modal.classList.add('show');
+}
+
+function hideDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('show');
+}
+
+function confirmDelete() {
+  hideDeleteModal();
+  if (deleteType === 'parent') {
+    showToast('已解绑');
+  } else {
+    showToast('已删除，返回列表');
+    setTimeout(function() { switchView('list'); }, 1000);
+  }
+}
+
+// 点击遮罩关闭
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+  if (e.target === this) hideDeleteModal();
+});
+
+// ====== Toast ======
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function() { t.classList.remove('show'); }, 2000);
+}
+
+// 初始隐藏详情视图
+document.getElementById('viewDetail').style.display = 'none';
+
+// ====== 设计标注系统 ======
+function toggleAnnotations() {
+  var layer = document.getElementById('annoLayer');
+  var btn = document.getElementById('annoToggle');
+  var panel = document.getElementById('annoPanel');
+  layer.classList.toggle('show');
+  btn.classList.toggle('active');
+  if (!layer.classList.contains('show')) {
+    panel.classList.remove('show');
+  }
+}
+function toggleAnnoPanel() {
+  document.getElementById('annoPanel').classList.toggle('show');
+}
+</script>
+
+<!-- 标注层 -->
+<div class="anno-layer" id="annoLayer">
+  <!-- 列表视图标注（左侧手机框内） -->
+  <!-- 导航栏 -->
+  <div class="anno-mark spacing" style="top:80px;left:calc(50% - 207px + 0px)"><div class="anno-badge">pt:48px</div></div>
+  <div class="anno-mark spacing" style="top:84px;left:calc(50% - 207px + 20px)"><div class="anno-badge">px:20px</div></div>
+  <div class="anno-mark typo" style="top:86px;left:calc(50% - 207px + 64px)"><div class="anno-badge">20px/700</div></div>
+
+  <!-- 搜索框 -->
+  <div class="anno-mark radius" style="top:130px;left:calc(50% - 207px + 16px)"><div class="anno-badge">r:12px</div></div>
+  <div class="anno-mark size" style="top:134px;left:calc(50% - 207px + 20px)"><div class="anno-badge">h:40px</div></div>
+
+  <!-- 筛选下拉 -->
+  <div class="anno-mark spacing" style="top:176px;left:calc(50% - 207px + 16px)"><div class="anno-badge">gap:8px</div></div>
+  <div class="anno-mark radius" style="top:178px;left:calc(50% - 207px + 16px)"><div class="anno-badge">r:10px</div></div>
+  <div class="anno-mark size" style="top:180px;left:calc(50% - 207px + 16px)"><div class="anno-badge">h:36px</div></div>
+  <div class="anno-mark typo" style="top:182px;left:calc(50% - 207px + 28px)"><div class="anno-badge">11px/400</div></div>
+  <div class="anno-mark typo" style="top:182px;left:calc(50% - 207px + 72px)"><div class="anno-badge">13px/600</div></div>
+
+  <!-- 统计摘要 -->
+  <div class="anno-mark spacing" style="top:222px;left:calc(50% - 207px + 16px)"><div class="anno-badge">gap:8px</div></div>
+  <div class="anno-mark radius" style="top:226px;left:calc(50% - 207px + 20px)"><div class="anno-badge">r:12px</div></div>
+  <div class="anno-mark typo" style="top:232px;left:calc(50% - 207px + 26px)"><div class="anno-badge">22px/800</div></div>
+  <div class="anno-mark typo" style="top:256px;left:calc(50% - 207px + 26px)"><div class="anno-badge">11px/sec</div></div>
+
+  <!-- 学员卡片 -->
+  <div class="anno-mark radius" style="top:286px;left:calc(50% - 207px + 16px)"><div class="anno-badge">r:16px</div></div>
+  <div class="anno-mark spacing" style="top:290px;left:calc(50% - 207px + 20px)"><div class="anno-badge">p:16px</div></div>
+  <div class="anno-mark size" style="top:294px;left:calc(50% - 207px + 22px)"><div class="anno-badge">48×48</div></div>
+  <div class="anno-mark spacing" style="top:292px;left:calc(50% - 207px + 80px)"><div class="anno-badge">gap:12px</div></div>
+  <div class="anno-mark typo" style="top:296px;left:calc(50% - 207px + 82px)"><div class="anno-badge">16px/700</div></div>
+  <div class="anno-mark typo" style="top:314px;left:calc(50% - 207px + 82px)"><div class="anno-badge">12px/sec</div></div>
+  <div class="anno-mark typo" style="top:298px;right:calc(50% - 207px + 24px)"><div class="anno-badge">20px/800</div></div>
+  <div class="anno-mark color" style="top:286px;left:calc(50% - 207px + 16px)"><div class="anno-badge"><span class="anno-swatch" style="background:#5EC8A8"></span>左边框3px</div></div>
+  <div class="anno-mark spacing" style="top:344px;left:calc(50% - 207px + 24px)"><div class="anno-badge">gap:6px</div></div>
+  <div class="anno-mark radius" style="top:348px;left:calc(50% - 207px + 28px)"><div class="anno-badge">r:6px</div></div>
+  <div class="anno-mark typo" style="top:350px;left:calc(50% - 207px + 44px)"><div class="anno-badge">11px/500</div></div>
+  <div class="anno-mark size" style="top:370px;left:calc(50% - 207px + 24px)"><div class="anno-badge">h:4px</div></div>
+  <div class="anno-mark radius" style="top:370px;left:calc(50% - 207px + 24px)"><div class="anno-badge">r:2px</div></div>
+
+  <!-- 欠课卡片特殊标注 -->
+  <div class="anno-mark color" style="top:540px;left:calc(50% - 207px + 16px)"><div class="anno-badge"><span class="anno-swatch" style="background:#e88aaa"></span>欠课边框</div></div>
+  <div class="anno-mark radius" style="top:560px;left:calc(50% - 207px + 24px)"><div class="anno-badge">r:4px</div></div>
+  <div class="anno-mark typo" style="top:562px;left:calc(50% - 207px + 28px)"><div class="anno-badge">10px/600</div></div>
+  <div class="anno-mark radius" style="top:590px;left:calc(50% - 207px + 24px)"><div class="anno-badge">r:8px</div></div>
+  <div class="anno-mark typo" style="top:592px;left:calc(50% - 207px + 36px)"><div class="anno-badge">11px/400</div></div>
+
+  <!-- 下拉面板标注 -->
+  <div class="anno-mark radius" style="top:200px;left:calc(50% - 207px + 16px)"><div class="anno-badge">r:12px</div></div>
+  <div class="anno-mark spacing" style="top:204px;left:calc(50% - 207px + 18px)"><div class="anno-badge">p:6px</div></div>
+  <div class="anno-mark spacing" style="top:218px;left:calc(50% - 207px + 20px)"><div class="anno-badge">p:10/12</div></div>
+  <div class="anno-mark radius" style="top:220px;left:calc(50% - 207px + 22px)"><div class="anno-badge">r:8px</div></div>
+</div>
+
+<!-- 标注规格面板 -->
+<div class="anno-panel" id="annoPanel">
+  <div class="anno-panel-header">
+    <span class="anno-panel-title">学员管理 - 设计标注规格</span>
+    <button class="anno-panel-close" onclick="toggleAnnoPanel()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="#7a9a8e"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="anno-panel-body">
+    <div class="anno-legend">
+      <div class="anno-legend-item"><div class="anno-legend-dot" style="background:#1565C0"></div>尺寸</div>
+      <div class="anno-legend-item"><div class="anno-legend-dot" style="background:#E65100"></div>间距</div>
+      <div class="anno-legend-item"><div class="anno-legend-dot" style="background:#7B1FA2"></div>颜色</div>
+      <div class="anno-legend-item"><div class="anno-legend-dot" style="background:#2E7D32"></div>字号</div>
+      <div class="anno-legend-item"><div class="anno-legend-dot" style="background:#C62828"></div>圆角</div>
+    </div>
+
+    <!-- 颜色Token -->
+    <div class="anno-section">
+      <div class="anno-section-title">颜色 Token</div>
+      <table class="anno-table">
+        <thead><tr><th>Token</th><th>色值</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>--primary</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#5EC8A8"></span>#5EC8A8</div></td><td>主色/正常态</td></tr>
+          <tr><td>--primary-dark</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#4AB893"></span>#4AB893</div></td><td>主色深</td></tr>
+          <tr><td>--primary-bg</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#f0faf5"></span>#f0faf5</div></td><td>主色浅底</td></tr>
+          <tr><td>--amber</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#d4a24e"></span>#d4a24e</div></td><td>警告/课时不足</td></tr>
+          <tr><td>--destructive</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#D94040"></span>#D94040</div></td><td>危险/已过期</td></tr>
+          <tr><td>--info</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#6ba3d6"></span>#6ba3d6</div></td><td>信息/即将过期</td></tr>
+          <tr><td>--success</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#3ABF6E"></span>#3ABF6E</div></td><td>成功/赠送</td></tr>
+          <tr><td>--purple</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#9b7ed8"></span>#9b7ed8</div></td><td>紫色标签</td></tr>
+          <tr><td>--accent</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#e88aaa"></span>#e88aaa</div></td><td>强调色</td></tr>
+          <tr><td>--text</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#2d4a3e"></span>#2d4a3e</div></td><td>主文字</td></tr>
+          <tr><td>--text-sec</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#7a9a8e"></span>#7a9a8e</div></td><td>次文字</td></tr>
+          <tr><td>--text-light</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#a0b8ad"></span>#a0b8ad</div></td><td>辅助文字</td></tr>
+          <tr><td>--border</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#D5E8E0"></span>#D5E8E0</div></td><td>边框</td></tr>
+          <tr><td>--bg-page</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#F5FAF8"></span>#F5FAF8</div></td><td>页面底色</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 字号规范 -->
+    <div class="anno-section">
+      <div class="anno-section-title">字号规范</div>
+      <table class="anno-table">
+        <thead><tr><th>位置</th><th>字号</th><th>字重</th><th>颜色</th></tr></thead>
+        <tbody>
+          <tr><td>导航标题</td><td class="val">20px</td><td>700</td><td>--text</td></tr>
+          <tr><td>搜索输入</td><td class="val">14px</td><td>400</td><td>--text</td></tr>
+          <tr><td>筛选标签</td><td class="val">11px/400 标签 + 13px/600 值</td><td>--text-sec/--primary</td></tr>
+          <tr><td>筛选下拉选项</td><td class="val">13px</td><td>400/600</td><td>--text/--primary</td></tr>
+          <tr><td>欠课徽章</td><td class="val">10px</td><td>600</td><td>--accent</td></tr>
+          <tr><td>欠课提示</td><td class="val">11px</td><td>400</td><td>--accent</td></tr>
+          <tr><td>统计数字</td><td class="val">22px</td><td>800</td><td>各状态色</td></tr>
+          <tr><td>统计标签</td><td class="val">11px</td><td>400</td><td>--text-sec</td></tr>
+          <tr><td>学员姓名</td><td class="val">16px</td><td>700</td><td>--text</td></tr>
+          <tr><td>学员元信息</td><td class="val">12px</td><td>400</td><td>--text-sec</td></tr>
+          <tr><td>课时数字</td><td class="val">20px</td><td>800</td><td>各状态色</td></tr>
+          <tr><td>课时标签</td><td class="val">11px</td><td>400</td><td>--text-light</td></tr>
+          <tr><td>课包标签</td><td class="val">11px</td><td>500</td><td>各色</td></tr>
+          <tr><td>进度文字</td><td class="val">11px</td><td>400</td><td>--text-light</td></tr>
+          <tr><td>过期提示</td><td class="val">11px</td><td>400</td><td>--info</td></tr>
+          <tr><td>详情Tab</td><td class="val">13px</td><td>600/400</td><td>--primary/--text-sec</td></tr>
+          <tr><td>课包名</td><td class="val">15px</td><td>700</td><td>--text</td></tr>
+          <tr><td>课包日期</td><td class="val">12px</td><td>400</td><td>--text-sec</td></tr>
+          <tr><td>主按钮</td><td class="val">16px</td><td>700</td><td>#fff</td></tr>
+          <tr><td>次按钮</td><td class="val">14px</td><td>600</td><td>--primary</td></tr>
+          <tr><td>危险按钮</td><td class="val">14px</td><td>600</td><td>--destructive</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 间距规范 -->
+    <div class="anno-section">
+      <div class="anno-section-title">间距规范</div>
+      <table class="anno-table">
+        <thead><tr><th>位置</th><th>属性</th><th>值</th></tr></thead>
+        <tbody>
+          <tr><td>导航栏</td><td class="val">padding</td><td>48px 20px 14px</td></tr>
+          <tr><td>搜索区</td><td class="val">padding</td><td>0 16px</td></tr>
+          <tr><td>筛选下拉栏</td><td class="val">padding/gap</td><td>4px 16px 12px / 8px</td></tr>
+          <tr><td>筛选触发器</td><td class="val">padding</td><td>8px 12px</td></tr>
+          <tr><td>筛选下拉面板</td><td class="val">padding</td><td>6px</td></tr>
+          <tr><td>筛选选项</td><td class="val">padding</td><td>10px 12px</td></tr>
+          <tr><td>统计摘要栏</td><td class="val">padding/gap</td><td>0 16px / 8px</td></tr>
+          <tr><td>统计单项</td><td class="val">padding</td><td>12px 10px</td></tr>
+          <tr><td>卡片列表</td><td class="val">padding/gap</td><td>0 16px / 12px</td></tr>
+          <tr><td>学员卡片</td><td class="val">padding</td><td>16px</td></tr>
+          <tr><td>卡片头像间距</td><td class="val">gap</td><td>12px</td></tr>
+          <tr><td>课包标签行</td><td class="val">margin-top/gap</td><td>10px / 6px</td></tr>
+          <tr><td>进度条</td><td class="val">height</td><td>4px</td></tr>
+          <tr><td>底部栏</td><td class="val">padding</td><td>12px 16px 28px</td></tr>
+          <tr><td>底部按钮间距</td><td class="val">gap</td><td>10px</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 圆角规范 -->
+    <div class="anno-section">
+      <div class="anno-section-title">圆角规范</div>
+      <table class="anno-table">
+        <thead><tr><th>组件</th><th>圆角</th></tr></thead>
+        <tbody>
+          <tr><td>搜索框</td><td class="val">12px</td></tr>
+          <tr><td>筛选触发器</td><td class="val">10px</td></tr>
+          <tr><td>筛选下拉面板</td><td class="val">12px</td></tr>
+          <tr><td>筛选选项</td><td class="val">8px</td></tr>
+          <tr><td>欠课徽章</td><td class="val">4px</td></tr>
+          <tr><td>欠课提示条</td><td class="val">8px</td></tr>
+          <tr><td>统计单项</td><td class="val">12px</td></tr>
+          <tr><td>学员卡片</td><td class="val">16px</td></tr>
+          <tr><td>课包标签</td><td class="val">6px</td></tr>
+          <tr><td>进度条</td><td class="val">2px</td></tr>
+          <tr><td>详情Tab栏</td><td class="val">16px</td></tr>
+          <tr><td>详情Tab选中</td><td class="val">12px</td></tr>
+          <tr><td>课包卡片</td><td class="val">16px</td></tr>
+          <tr><td>主按钮</td><td class="val">24px</td></tr>
+          <tr><td>头像</td><td class="val">50%</td></tr>
+          <tr><td>弹窗</td><td class="val">20px 20px 0 0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 下拉筛选组件规范 -->
+    <div class="anno-section">
+      <div class="anno-section-title">下拉筛选组件规范</div>
+      <table class="anno-table">
+        <thead><tr><th>属性</th><th>值</th></tr></thead>
+        <tbody>
+          <tr><td>触发器高度</td><td class="val">36px</td></tr>
+          <tr><td>触发器边框</td><td class="val">1.5px solid var(--border)</td></tr>
+          <tr><td>触发器选中态</td><td class="val">border: var(--primary) + bg: var(--primary-bg)</td></tr>
+          <tr><td>箭头图标</td><td class="val">14×14px, rotate(180deg) 展开</td></tr>
+          <tr><td>下拉面板阴影</td><td class="val">0 8px 24px rgba(0,0,0,0.12)</td></tr>
+          <tr><td>下拉面板圆角</td><td class="val">12px</td></tr>
+          <tr><td>选项高度</td><td class="val">~36px (padding 10px 12px)</td></tr>
+          <tr><td>选项选中态</td><td class="val">bg: var(--primary-bg) + color: var(--primary) + 勾选图标</td></tr>
+          <tr><td>状态选项圆点</td><td class="val">8×8px, 各状态色</td></tr>
+          <tr><td>勾选图标</td><td class="val">14×14px, fill: var(--primary)</td></tr>
+          <tr><td>入场动画</td><td class="val">0.15s ease, translateY(-6px) → 0</td></tr>
+          <tr><td>互斥逻辑</td><td class="val">开一个下拉自动关闭另一个</td></tr>
+          <tr><td>点击外部</td><td class="val">关闭所有下拉</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 卡片状态规范 -->
+    <div class="anno-section">
+      <div class="anno-section-title">卡片状态规范</div>
+      <table class="anno-table">
+        <thead><tr><th>状态</th><th>左边框</th><th>课时数字色</th><th>进度条</th></tr></thead>
+        <tbody>
+          <tr><td>正常(sufficient)</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#5EC8A8"></span>--primary</div></td><td>--primary</td><td>主色渐变</td></tr>
+          <tr><td>不足(low)</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#d4a24e"></span>--amber</div></td><td>--amber</td><td>警告渐变</td></tr>
+          <tr><td>即将过期(expiring)</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#6ba3d6"></span>--info</div></td><td>--primary</td><td>信息渐变</td></tr>
+          <tr><td>已过期(expired)</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#D94040"></span>--destructive</div></td><td>--destructive</td><td>危险渐变</td></tr>
+          <tr><td>欠课(owe)</td><td class="val"><div class="color-cell"><span class="color-dot" style="background:#e88a8a"></span>--accent</div></td><td>--accent</td><td>强调渐变</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 交互规范 -->
+    <div class="anno-section">
+      <div class="anno-section-title">交互规范</div>
+      <table class="anno-table">
+        <thead><tr><th>交互</th><th>效果</th></tr></thead>
+        <tbody>
+          <tr><td>搜索过滤</td><td class="val">300ms防抖，姓名+手机号模糊匹配</td></tr>
+          <tr><td>筛选切换</td><td class="val">下拉单选框，选中项高亮+勾选标记</td></tr>
+          <tr><td>科目筛选</td><td class="val">下拉单选框，与状态筛选组合使用</td></tr>
+          <tr><td>卡片按压</td><td class="val">scale(0.98) + opacity:0.9</td></tr>
+          <tr><td>Tab切换</td><td class="val">内容区滑动切换</td></tr>
+          <tr><td>删除弹窗</td><td class="val">遮罩0.45 + 居中弹窗</td></tr>
+          <tr><td>Toast</td><td class="val">顶部居中，2s自动消失</td></tr>
+          <tr><td>下拉刷新</td><td class="val">usePullDownRefresh</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<button class="anno-toggle" style="bottom:12px;right:12px;top:auto" onclick="toggleAnnoPanel()">规格表</button>
+</body>
+</html>

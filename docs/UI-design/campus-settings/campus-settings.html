@@ -1,0 +1,2009 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>校区设置 - UI演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+    background: linear-gradient(180deg, #f5faf8, #e3f2ef);
+    min-height: 100vh; max-width: 414px; margin: 0 auto;
+    position: relative; overflow-x: hidden;
+  }
+  :root {
+    --primary: #5EC8A8; --primary-dark: #4AB893; --primary-light: #a7e4cf; --primary-bg: #f0faf5;
+    --accent: #e88aaa; --accent-bg: #fdf0f4;
+    --info: #6ba3d6; --info-bg: #f0f5fb;
+    --amber: #d4a24e; --amber-bg: #faf6ee;
+    --purple: #9b7ed8; --purple-bg: #f3f0fb;
+    --text: #2d4a3e; --text-sec: #7a9a8e; --text-light: #a0b8ad;
+    --border: #d4e8df; --bg: #fff; --danger: #d94040; --danger-bg: #fef2f2;
+    --shadow: 0 4px 20px -4px rgba(54,73,67,0.1);
+  }
+
+  /* ===== 导航栏（与全局一致） ===== */
+  .navbar {
+    background: linear-gradient(135deg, var(--primary), #7dd8bc);
+    padding: 48px 20px 20px; position: relative;
+  }
+  .navbar .title-row { display: flex; align-items: center; justify-content: space-between; }
+  .navbar h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .navbar .back-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .navbar .back-btn:active { background: rgba(255,255,255,0.35); }
+  .navbar .back-btn svg { width: 18px; height: 18px; fill: #fff; }
+  .navbar .save-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.22); backdrop-filter: blur(4px);
+    border: none; cursor: pointer; transition: all 0.15s;
+  }
+  .navbar .save-btn:active { background: rgba(255,255,255,0.35); transform: scale(0.96); }
+  .navbar .save-btn span { font-size: 13px; color: #fff; font-weight: 500; }
+
+  /* ===== 内容区 ===== */
+  .content { padding: 16px 16px 100px; }
+
+  /* ===== 分组标题 ===== */
+  .section-title {
+    font-size: 12px; font-weight: 600; color: var(--text-light);
+    text-transform: uppercase; letter-spacing: 0.5px; margin: 18px 0 8px 4px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* ===== 卡片列表（与全局一致） ===== */
+  .card-list { display: flex; flex-direction: column; gap: 10px; }
+  .card-e {
+    background: var(--bg); border-radius: 14px; padding: 12px 14px;
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: transform 0.15s ease;
+  }
+  .card-e:active { transform: scale(0.98); }
+
+  /* 图标 */
+  .card-e .icon-sm {
+    width: 38px; height: 38px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .card-e .icon-sm svg { width: 19px; height: 19px; }
+  .icon-primary { background: var(--primary-bg); } .icon-primary svg { fill: var(--primary); }
+  .icon-accent { background: var(--accent-bg); } .icon-accent svg { fill: var(--accent); }
+  .icon-info { background: var(--info-bg); } .icon-info svg { fill: var(--info); }
+  .icon-amber { background: var(--amber-bg); } .icon-amber svg { fill: var(--amber); }
+  .icon-purple { background: var(--purple-bg); } .icon-purple svg { fill: var(--purple); }
+
+  /* 信息区 */
+  .card-e .info { flex: 1; min-width: 0; }
+  .card-e .name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .card-e .desc { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+
+  /* 箭头 */
+  .card-e .btn-arrow {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--primary-bg); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-e .btn-arrow svg { width: 14px; height: 14px; fill: var(--primary); }
+
+  /* ===== 内页导航栏 ===== */
+  .sub-header {
+    padding: 48px 20px 12px;
+  }
+  .sub-header .title-row { display: flex; align-items: center; justify-content: space-between; }
+  .sub-header .back-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--primary-bg); border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .sub-header .back-btn:active { background: rgba(94,200,168,0.25); transform: scale(0.96); }
+  .sub-header .back-btn svg { width: 18px; height: 18px; fill: var(--primary); }
+  .sub-header h1 { font-size: 18px; font-weight: 700; color: var(--text); flex: 1; text-align: center; margin: 0 32px; }
+  .sub-header .add-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 14px; border-radius: 20px;
+    background: var(--primary-bg);
+    border: none; cursor: pointer; transition: all 0.15s;
+  }
+  .sub-header .add-btn:active { background: rgba(94,200,168,0.25); transform: scale(0.96); }
+  .sub-header .add-btn svg { width: 14px; height: 14px; fill: var(--primary); }
+  .sub-header .add-btn span { font-size: 13px; color: var(--primary); font-weight: 500; }
+
+  /* ===== 分校区管理卡片（方案B：白卡数据式） ===== */
+  .campus-card {
+    background: var(--bg); border-radius: 20px; padding: 22px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+    margin-bottom: 12px; position: relative; overflow: hidden;
+  }
+  .campus-card .corner-accent {
+    position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, transparent 50%, var(--primary-bg) 50%);
+    border-radius: 0 20px 0 0;
+  }
+  .campus-card .corner-accent::after {
+    content: ''; position: absolute; top: 12px; right: 12px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--primary); opacity: 0.4;
+  }
+  .campus-card .header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+    position: relative; z-index: 1;
+  }
+  .campus-card .campus-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+    flex-shrink: 0; color: #fff;
+  }
+  .campus-card .campus-info { flex: 1; }
+  .campus-card .campus-name { font-size: 16px; font-weight: 700; color: var(--text); }
+  .campus-card .campus-type {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; padding: 2px 8px; border-radius: 6px;
+    margin-top: 4px; font-weight: 600;
+  }
+  .campus-card .campus-type.self {
+    background: var(--primary-bg); color: var(--primary-dark);
+  }
+  .campus-card .campus-type.self::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--primary);
+  }
+  .campus-card .campus-type.partner {
+    background: var(--amber-bg); color: var(--amber);
+  }
+  .campus-card .campus-type.partner::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--amber);
+  }
+
+  .campus-card .partner-info {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .campus-card .partner-tag {
+    font-size: 10px; padding: 3px 8px; border-radius: 6px;
+    background: var(--amber-bg); color: var(--amber); font-weight: 500;
+  }
+
+  /* 合作模式按钮 */
+  .partner-mode-btn {
+    padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: #fafdfb; font-size: 12px; color: var(--text-sec);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .partner-mode-btn.selected {
+    border-color: var(--primary); background: var(--primary-bg); color: var(--primary);
+  }
+  .partner-mode-btn:active { transform: scale(0.96); }
+  .campus-card .campus-actions { display: flex; gap: 8px; }
+  .campus-card .more-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: none;
+    background: transparent; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .campus-card .more-btn:active { background: var(--bg); }
+  .campus-card .more-btn svg { width: 20px; height: 20px; }
+  .campus-card .header { position: relative; }
+  .dropdown-menu {
+    position: absolute; top: 40px; right: 0; width: 140px;
+    background: var(--bg); border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12); border: 1px solid var(--border);
+    z-index: 50; overflow: hidden;
+  }
+  .menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; font-size: 13px; color: var(--text);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .menu-item:active { background: #f0f4f2; }
+  .menu-item svg { width: 16px; height: 16px; fill: var(--text-sec); flex-shrink: 0; }
+  .menu-item.danger { color: var(--danger); }
+  .menu-item.danger svg { fill: var(--danger); }
+
+  .campus-card .stats-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .campus-card .stat-item { text-align: center; }
+  .campus-card .stat-val { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.2; }
+  .campus-card .stat-val .unit { font-size: 11px; font-weight: 500; color: var(--text-sec); }
+  .campus-card .stat-label { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+
+  /* ===== 发薪日设置 ===== */
+  .salary-card {
+    background: var(--bg); border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .salary-card .set-row {
+    display: flex; align-items: center; padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .salary-card .set-row:last-child { border-bottom: none; }
+  .salary-card .set-label { font-size: 13px; color: var(--text); flex: 1; }
+  .salary-card .set-value { font-size: 12px; color: var(--text-sec); }
+  .salary-card .set-value strong { color: var(--amber); font-weight: 600; }
+  .salary-card .set-edit {
+    font-size: 12px; color: var(--primary); cursor: pointer;
+    padding: 4px 10px; border-radius: 6px; background: var(--primary-bg);
+  }
+  .salary-card .set-switch {
+    width: 44px; height: 26px; border-radius: 13px; background: var(--border);
+    position: relative; cursor: pointer; transition: background 0.2s;
+  }
+  .salary-card .set-switch.on { background: var(--primary); }
+  .salary-card .set-switch::after {
+    content: ''; position: absolute; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; top: 2px; left: 2px; transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .salary-card .set-switch.on::after { transform: translateX(18px); }
+
+  /* ===== 时间范围选择 ===== */
+  .time-range-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  }
+  .time-input {
+    flex: 1; text-align: center; padding: 10px;
+  }
+  .time-sep { color: var(--text-sec); font-size: 13px; flex-shrink: 0; }
+
+  /* ===== 课时单价卡片 ===== */
+  .price-card {
+    background: var(--bg); border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--shadow); margin-bottom: 10px;
+  }
+  .price-card .price-header { display: flex; align-items: center; gap: 12px; }
+  .price-card .price-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    flex-shrink: 0;
+  }
+  .price-card .price-info { flex: 1; }
+  .price-card .price-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .price-card .price-desc { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .price-card .price-value {
+    font-size: 18px; font-weight: 700; color: var(--primary);
+  }
+  .price-card .price-value span { font-size: 12px; font-weight: 400; color: var(--text-sec); }
+  .price-card .price-actions {
+    display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  /* 薪资模板 */
+  .salary-models { margin-top: 10px; }
+  .sm-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sm-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .sm-add { font-size: 12px; color: var(--primary); cursor: pointer; }
+  .sm-card {
+    background: var(--bg); border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--shadow); margin-bottom: 10px; cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .sm-card:active { transform: scale(0.98); }
+  .sm-card .sm-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .sm-card .sm-tag {
+    font-size: 10px; padding: 2px 8px; border-radius: 6px; margin-left: 8px;
+  }
+  .sm-card .sm-tag.default { background: var(--amber-bg); color: var(--amber); }
+  .sm-card .sm-tag.info { background: var(--info-bg); color: var(--info); }
+  .sm-card .sm-desc { font-size: 12px; color: var(--text-sec); margin-top: 4px; }
+  .sm-card .sm-count { font-size: 11px; color: var(--text-light); margin-top: 6px; }
+
+  /* 发薪汇总卡片 */
+  .salary-summary-card {
+    background: var(--bg); border-radius: 14px; padding: 16px;
+    box-shadow: var(--shadow); border-top: 3px solid var(--amber);
+  }
+  .ss-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .ss-icon { font-size: 28px; }
+  .ss-info { flex: 1; }
+  .ss-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .ss-sub { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .ss-countdown {
+    font-size: 12px; color: var(--amber); background: var(--amber-bg);
+    padding: 8px 12px; border-radius: 8px; margin-bottom: 12px;
+  }
+  .ss-stats { display: flex; gap: 12px; }
+  .ss-stat-item { flex: 1; text-align: center; }
+  .ss-stat-item.highlight .ss-val { color: var(--amber); }
+  .ss-stat-item.warn .ss-val { color: var(--danger); }
+  .ss-val { font-size: 16px; font-weight: 700; color: var(--text); }
+  .ss-label { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+
+  /* ===== 科目卡片 ===== */
+  .subject-card {
+    background: var(--bg); border-radius: 14px; padding: 12px 14px;
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .subject-card .subj-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    flex-shrink: 0;
+  }
+  .subject-card .subj-info { flex: 1; }
+  .subject-card .subj-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .subject-card .subj-actions { display: flex; gap: 6px; }
+  .subject-card .subj-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: none;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .subject-card .subj-btn:active { transform: scale(0.9); }
+  .subject-card .subj-btn.edit { background: var(--info-bg); }
+  .subject-card .subj-btn.delete { background: var(--danger-bg); }
+  .subject-card .subj-btn svg { width: 14px; height: 14px; }
+
+  /* ===== 节假日卡片 ===== */
+  .holiday-card {
+    background: var(--bg); border-radius: 14px; padding: 12px 14px;
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .holiday-card .hol-icon {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--amber-bg);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+    flex-shrink: 0;
+  }
+  .holiday-card .hol-info { flex: 1; }
+  .holiday-card .hol-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .holiday-card .hol-date { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .holiday-card .hol-status {
+    font-size: 10px; padding: 3px 10px; border-radius: 6px;
+    background: var(--danger-bg); color: var(--danger); font-weight: 600;
+  }
+
+  /* 节假日图标选择器 */
+  .hol-icon-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  .hol-icon-opt {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 8px; border-radius: 12px;
+    border: 2px solid var(--border); background: #fafdfb;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .hol-icon-opt:active { transform: scale(0.95); }
+  .hol-icon-opt.selected {
+    border-color: var(--primary); background: var(--primary-bg);
+  }
+  .hol-icon-preview {
+    font-size: 24px; line-height: 1;
+  }
+  .hol-icon-label {
+    font-size: 10px; color: var(--text-light); font-weight: 500;
+  }
+  .hol-icon-opt.selected .hol-icon-label {
+    color: var(--primary-dark);
+  }
+
+  /* ===== 通知设置 ===== */
+  .notify-card {
+    background: var(--bg); border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--shadow); margin-bottom: 10px;
+  }
+  .notify-card .notify-title {
+    font-size: 12px; font-weight: 600; color: var(--text-light);
+    margin-bottom: 10px; padding-left: 8px;
+  }
+  .notify-card .notify-title::before {
+    content: ''; display: inline-block; width: 4px; height: 12px;
+    border-radius: 2px; background: var(--primary); margin-right: 6px; vertical-align: middle;
+  }
+  .notify-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .notify-row:last-child { border-bottom: none; }
+  .notify-row .notify-label { font-size: 13px; color: var(--text); }
+  .notify-row .notify-sub { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+  .notify-toggle {
+    width: 44px; height: 26px; border-radius: 13px; background: var(--border);
+    position: relative; cursor: pointer; transition: background 0.2s;
+  }
+  .notify-toggle.on { background: var(--primary); }
+  .notify-toggle::after {
+    content: ''; position: absolute; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; top: 2px; left: 2px; transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .notify-toggle.on::after { transform: translateX(18px); }
+
+  /* ===== 弹窗 ===== */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 100; display: none; opacity: 0; transition: opacity 0.2s;
+  }
+  .overlay.show { display: block; opacity: 1; }
+
+  .sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-radius: 20px 20px 0 0;
+    z-index: 110; max-width: 414px; margin: 0 auto;
+    transform: translateY(100%); transition: transform 0.3s ease;
+    max-height: 80vh; display: flex; flex-direction: column;
+  }
+  .sheet.show { transform: translateY(0); }
+  .sheet .handle { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 12px auto 0; }
+  .sheet .sheet-header {
+    padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet .sheet-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .sheet .sheet-close {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .sheet .sheet-close:active { background: #e0e0e0; }
+  .sheet .sheet-close svg { width: 14px; height: 14px; fill: var(--text-sec); }
+  .sheet .sheet-body { flex: 1; overflow-y: auto; padding: 16px 20px 32px; }
+
+  /* ===== 表单 ===== */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 12px; font-weight: 500; color: var(--text-sec); margin-bottom: 6px; display: block; }
+  .form-input {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1.5px solid var(--border); font-size: 14px; outline: none;
+    background: #fafdfb; transition: border-color 0.15s;
+  }
+  .form-input:focus { border-color: var(--primary); background: var(--bg); }
+
+  /* ===== Emoji选择器 ===== */
+  .emoji-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .emoji-btn {
+    width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: #fafdfb; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+  }
+  .emoji-btn:active { transform: scale(0.9); }
+  .emoji-btn.selected { border-color: var(--primary); background: var(--primary-bg); }
+
+  /* ===== 颜色选择器 ===== */
+  .color-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-btn {
+    width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .color-btn.selected { border-color: var(--text); transform: scale(1.1); }
+
+  /* ===== 底部按钮 ===== */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); padding: 12px 16px 28px;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    max-width: 414px; margin: 0 auto; z-index: 10;
+  }
+  .submit-btn {
+    width: 100%; padding: 12px; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .submit-btn:active { transform: scale(0.97); opacity: 0.9; }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    background: rgba(45,74,62,0.9); color: #fff; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; z-index: 200; opacity: 0; transition: all 0.2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 确认弹窗 */
+  .confirm-dialog {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+    background: var(--bg); border-radius: 20px; padding: 28px 24px 20px;
+    width: 300px; z-index: 300; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15); opacity: 0;
+    transition: all 0.25s; pointer-events: none;
+  }
+  .confirm-dialog.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+  .confirm-icon { font-size: 40px; margin-bottom: 12px; }
+  .confirm-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .confirm-desc { font-size: 13px; color: var(--text-sec); line-height: 1.5; margin-bottom: 6px; }
+  .confirm-tip { font-size: 11px; color: var(--text-light); background: var(--primary-bg); padding: 6px 12px; border-radius: 8px; margin-bottom: 20px; }
+  .confirm-actions { display: flex; gap: 10px; }
+  .confirm-cancel {
+    flex: 1; padding: 11px; border-radius: 12px; border: none;
+    background: #f0f4f2; color: var(--text-sec); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .confirm-cancel:active { background: #e4e9e6; }
+  .confirm-ok {
+    flex: 1; padding: 11px; border-radius: 12px; border: none;
+    background: var(--primary); color: #fff; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .confirm-ok:active { background: var(--primary-dark); }
+
+  /* ===== 校区信息卡片（方案B：白卡数据式） ===== */
+  .campus-card {
+    background: var(--bg); border-radius: 20px; padding: 22px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .campus-card .corner-accent {
+    position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, transparent 50%, var(--primary-bg) 50%);
+    border-radius: 0 20px 0 0;
+  }
+  .campus-card .corner-accent::after {
+    content: ''; position: absolute; top: 12px; right: 12px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--primary); opacity: 0.4;
+  }
+  .campus-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 18px; position: relative; z-index: 1;
+  }
+  .campus-name-wrap { display: flex; align-items: center; gap: 14px; }
+  .campus-icon-box {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #fff;
+    box-shadow: 0 4px 12px rgba(94,200,168,0.3);
+  }
+  .campus-icon-box.branch-icon {
+    background: linear-gradient(135deg, var(--info), #4a8fc4);
+    box-shadow: 0 4px 12px rgba(107,163,214,0.3);
+  }
+  .campus-icon-box.partner-icon {
+    background: linear-gradient(135deg, var(--amber), #c4923e);
+    box-shadow: 0 4px 12px rgba(212,162,78,0.3);
+  }
+  .campus-name { font-size: 18px; font-weight: 700; color: var(--text); }
+  .campus-type-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 3px; padding: 2px 8px; border-radius: 6px;
+    background: var(--primary-bg); color: var(--primary-dark);
+    font-size: 10px; font-weight: 600;
+  }
+  .campus-type-tag::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--primary);
+  }
+  .campus-type-tag.branch-tag {
+    background: #e8f2fb; color: var(--info);
+  }
+  .campus-type-tag.branch-tag::before { background: var(--info); }
+  .campus-type-tag.partner-tag {
+    background: var(--amber-bg); color: var(--amber);
+  }
+  .campus-type-tag.partner-tag::before { background: var(--amber); }
+  .campus-switch {
+    padding: 9px 16px; border-radius: 12px;
+    background: var(--primary); border: none;
+    color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(94,200,168,0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .campus-switch:active { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(94,200,168,0.35); }
+  .campus-stats-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 16px;
+  }
+  .campus-stat-card {
+    padding: 14px 10px; border-radius: 12px;
+    background: #f8fbf9; text-align: center;
+    border: 1px solid #eef4f0;
+  }
+  .campus-stat-val {
+    font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.2;
+  }
+  .campus-stat-val .unit { font-size: 12px; font-weight: 500; color: var(--text-sec); }
+  .campus-stat-lbl {
+    font-size: 11px; color: var(--text-light); margin-top: 4px;
+  }
+  .campus-detail-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-sec); margin-top: 8px;
+  }
+  .campus-detail-row svg { width: 16px; height: 16px; fill: var(--primary); flex-shrink: 0; }
+
+  /* ===== 校区选择器弹窗（方案B：方形勾选+彩色图标） ===== */
+  .campus-selector { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 100; }
+  .selector-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); animation: fadeIn 0.2s;
+  }
+  .selector-content {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-radius: 20px 20px 0 0;
+    padding: 20px; animation: slideUp 0.3s;
+    max-height: 70vh; overflow-y: auto;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .selector-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .selector-header h3 { font-size: 16px; font-weight: 600; color: var(--text); }
+  .close-btn { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: #f0f5f2; color: var(--text-sec); font-size: 14px; cursor: pointer; }
+  .selector-list { display: flex; flex-direction: column; gap: 10px; }
+  .selector-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px; border-radius: 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.25s;
+  }
+  .selector-item:active { transform: scale(0.98); }
+  .selector-item.active {
+    border-color: var(--primary);
+    box-shadow: 0 4px 16px rgba(94,200,168,0.15);
+  }
+  .selector-item .sel-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #fff; flex-shrink: 0;
+  }
+  .selector-item .sel-icon.main { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+  .selector-item .sel-icon.branch { background: linear-gradient(135deg, var(--info), #4a8fc4); }
+  .selector-item .sel-icon.partner { background: linear-gradient(135deg, var(--amber), #c4923e); }
+  .selector-item .sel-body { flex: 1; }
+  .selector-item .sel-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .selector-item .sel-meta { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+  .selector-item .check-box {
+    width: 20px; height: 20px; border-radius: 6px;
+    border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .selector-item .check-box svg { opacity: 0; transition: opacity 0.2s; width: 14px; height: 14px; fill: #fff; }
+  .selector-item.active .check-box {
+    background: var(--primary); border-color: var(--primary);
+  }
+  .selector-item.active .check-box svg { opacity: 1; }
+
+  /* 主页面卡片额外margin */
+  #mainContent .campus-card { margin: 16px; }
+</style>
+<body>
+
+<!-- ===== 主页面 ===== -->
+<div class="navbar">
+  <div class="title-row">
+    <button class="back-btn" onclick="goBack()">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <h1>校区设置</h1>
+    <div style="width:32px"></div>
+  </div>
+</div>
+
+<div class="content" id="mainContent" style="padding-bottom:80px">
+  <!-- ===== 校区信息卡片（方案B：白卡数据式） ===== -->
+  <div class="campus-card" id="campusCard">
+    <div class="corner-accent"></div>
+    <div class="campus-header">
+      <div class="campus-name-wrap">
+        <div class="campus-icon-box" id="campusIconBox">👑</div>
+        <div>
+          <div class="campus-name" id="currentCampus">盛睿艺术</div>
+          <span class="campus-type-tag" id="campusTypeTag">主校区</span>
+        </div>
+      </div>
+      <button class="campus-switch" onclick="showCampusSelector()">切换校区</button>
+    </div>
+    <div class="campus-stats-row">
+      <div class="campus-stat-card">
+        <div class="campus-stat-val" id="campusStudents">120</div>
+        <div class="campus-stat-lbl">学生</div>
+      </div>
+      <div class="campus-stat-card">
+        <div class="campus-stat-val" id="campusTeachers">3</div>
+        <div class="campus-stat-lbl">教师</div>
+      </div>
+      <div class="campus-stat-card">
+        <div class="campus-stat-val" id="campusRevenue">2.8<span class="unit">万</span></div>
+        <div class="campus-stat-lbl">月营收</div>
+      </div>
+    </div>
+    <div class="campus-detail-row">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      <span id="campusAddress">北京市海淀区中关村大街1号</span>
+    </div>
+    <div class="campus-detail-row">
+      <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+      <span id="campusPhone">400-123-4567</span>
+    </div>
+  </div>
+
+  <!-- ===== 校区选择器弹窗（方案B） ===== -->
+  <div class="campus-selector" id="campusSelector" style="display:none">
+    <div class="selector-overlay" onclick="hideCampusSelector()"></div>
+    <div class="selector-content">
+      <div class="selector-header">
+        <h3>选择校区</h3>
+        <button class="close-btn" onclick="hideCampusSelector()">✕</button>
+      </div>
+      <div class="selector-list">
+        <div class="selector-item active" onclick="selectCampus('main', this)">
+          <div class="sel-icon main">👑</div>
+          <div class="sel-body">
+            <div class="sel-name">盛睿艺术</div>
+            <div class="sel-meta">120学生 · 主校区</div>
+          </div>
+          <div class="check-box">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+        </div>
+        <div class="selector-item" onclick="selectCampus('branch1', this)">
+          <div class="sel-icon branch">🏢</div>
+          <div class="sel-body">
+            <div class="sel-name">保利校区</div>
+            <div class="sel-meta">180学生 · 分校区</div>
+          </div>
+          <div class="check-box">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+        </div>
+        <div class="selector-item" onclick="selectCampus('branch2', this)">
+          <div class="sel-icon branch">🏢</div>
+          <div class="sel-body">
+            <div class="sel-name">望京校区</div>
+            <div class="sel-meta">95学生 · 分校区</div>
+          </div>
+          <div class="check-box">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+        </div>
+        <div class="selector-item" onclick="selectCampus('partner1', this)">
+          <div class="sel-icon partner">✏️</div>
+          <div class="sel-body">
+            <div class="sel-name">墨香书法</div>
+            <div class="sel-meta">45学生 · 合作机构</div>
+          </div>
+          <div class="check-box">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">通知管理</div>
+  <div class="card-list">
+    <div class="card-e" onclick="switchTab('notify')">
+      <div class="icon-sm icon-purple">
+        <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">通知设置</div>
+        <div class="desc">学员与教师消息推送</div>
+      </div>
+      <div class="btn-arrow">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">校区管理</div>
+  <div class="card-list">
+    <div class="card-e" onclick="switchTab('campus')">
+      <div class="icon-sm icon-primary">
+        <svg viewBox="0 0 24 24"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">分校区管理</div>
+        <div class="desc">管理自营校区与合作机构</div>
+      </div>
+      <div class="btn-arrow">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </div>
+    </div>
+    <div class="card-e" onclick="switchTab('salary')">
+      <div class="icon-sm icon-info">
+        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.51.77 2.61 2.04h2.21c-.13-1.71-1.13-3.2-3.02-3.7V3h-2.8v2.2c-1.82.42-3.1 1.6-3.1 3.4 0 2.22 1.72 3.28 4.4 3.94 2.5.62 3.1 1.54 3.1 2.51 0 .73-.54 1.85-2.7 1.85-2.25 0-3.09-.95-3.21-2.18H6.8c.15 2.07 1.5 3.55 3.7 4v2.2h2.8v-2.2c1.95-.42 3.1-1.7 3.1-3.4 0-2.68-2.28-3.68-4.6-4.26z"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">发薪日设置</div>
+        <div class="desc">每月15日发薪</div>
+      </div>
+      <div class="btn-arrow">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </div>
+    </div>
+    <div class="card-e" onclick="switchTab('subject')">
+      <div class="icon-sm icon-accent">
+        <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">校区科目</div>
+        <div class="desc">钢琴、舞蹈、美术等</div>
+      </div>
+      <div class="btn-arrow">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </div>
+    </div>
+    <div class="card-e" onclick="switchTab('holiday')">
+      <div class="icon-sm icon-amber">
+        <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">节假日设置</div>
+        <div class="desc">法定节假日与自定义休息日</div>
+      </div>
+      <div class="btn-arrow">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </div>
+    </div>
+    <div class="card-e" onclick="switchTab('price')">
+      <div class="icon-sm icon-primary">
+        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.51.77 2.61 2.04h2.21c-.13-1.71-1.13-3.2-3.02-3.7V3h-2.8v2.2c-1.82.42-3.1 1.6-3.1 3.4 0 2.22 1.72 3.28 4.4 3.94 2.5.62 3.1 1.54 3.1 2.51 0 .73-.54 1.85-2.7 1.85-2.25 0-3.09-.95-3.21-2.18H6.8c.15 2.07 1.5 3.55 3.7 4v2.2h2.8v-2.2c1.95-.42 3.1-1.7 3.1-3.4 0-2.68-2.28-3.68-4.6-4.26z"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">课时单价</div>
+        <div class="desc">按科目设置收费标准</div>
+      </div>
+      <div class="btn-arrow">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部固定保存按钮 -->
+<div class="bottom-bar">
+  <button class="submit-btn" onclick="showToast('保存成功')">保存设置</button>
+</div>
+
+<!-- ===== 分校区管理页 ===== -->
+<div class="content" id="campusTab" style="display:none">
+  <div class="sub-header">
+    <div class="title-row">
+      <button class="back-btn" onclick="switchTab('main')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>分校区管理</h1>
+      <button class="add-btn" onclick="openAddCampus()">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>添加</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:0">自营校区</div>
+  <div class="campus-card">
+    <div class="corner-accent"></div>
+    <div class="header">
+      <div class="campus-icon" style="background:linear-gradient(135deg,var(--info),#4a8fc4)">🏢</div>
+      <div class="campus-info">
+        <div class="campus-name">云策艺术·香山校区</div>
+        <span class="campus-type self">自营校区</span>
+      </div>
+      <button class="more-btn" onclick="toggleMenu('menu-xiangshan')">
+        <svg viewBox="0 0 24 24" fill="var(--text-light)"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
+      <div class="dropdown-menu" id="menu-xiangshan" style="display:none">
+        <div class="menu-item" onclick="confirmSetMain('xiangshan','云策艺术·香山校区');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>设为主校区
+        </div>
+        <div class="menu-item" onclick="openEditCampus('xiangshan');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>修改
+        </div>
+        <div class="menu-item danger" onclick="deleteCampus('xiangshan');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>删除
+        </div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-val">120</div><div class="stat-label">学生</div></div>
+      <div class="stat-item"><div class="stat-val">3</div><div class="stat-label">教师</div></div>
+      <div class="stat-item"><div class="stat-val">2.8<span class="unit">万</span></div><div class="stat-label">月营收</div></div>
+    </div>
+  </div>
+  <div class="campus-card">
+    <div class="corner-accent"></div>
+    <div class="header">
+      <div class="campus-icon" style="background:linear-gradient(135deg,var(--accent),#d4709a)">🏢</div>
+      <div class="campus-info">
+        <div class="campus-name">云策艺术·保利校区</div>
+        <span class="campus-type self">自营校区</span>
+      </div>
+      <button class="more-btn" onclick="toggleMenu('menu-poly')">
+        <svg viewBox="0 0 24 24" fill="var(--text-light)"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
+      <div class="dropdown-menu" id="menu-poly" style="display:none">
+        <div class="menu-item" onclick="confirmSetMain('poly','云策艺术·保利校区');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>设为主校区
+        </div>
+        <div class="menu-item" onclick="openEditCampus('poly');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>修改
+        </div>
+        <div class="menu-item danger" onclick="deleteCampus('poly');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>删除
+        </div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-val">180</div><div class="stat-label">学生</div></div>
+      <div class="stat-item"><div class="stat-val">2</div><div class="stat-label">教师</div></div>
+      <div class="stat-item"><div class="stat-val">2.4<span class="unit">万</span></div><div class="stat-label">月营收</div></div>
+    </div>
+  </div>
+
+  <div class="section-title">合作机构</div>
+  <div class="campus-card">
+    <div class="corner-accent" style="background:linear-gradient(135deg, transparent 50%, var(--amber-bg) 50%)"></div>
+    <div class="header">
+      <div class="campus-icon" style="background:linear-gradient(135deg,var(--amber),#c4923e)">✏️</div>
+      <div class="campus-info">
+        <div class="campus-name">墨香书法工作室</div>
+        <span class="campus-type partner">合作机构 · 课时分成</span>
+      </div>
+      <button class="more-btn" onclick="toggleMenu('menu-calligraphy')">
+        <svg viewBox="0 0 24 24" fill="var(--text-light)"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
+      <div class="dropdown-menu" id="menu-calligraphy" style="display:none">
+        <div class="menu-item" onclick="openEditCampus('calligraphy');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>修改
+        </div>
+        <div class="menu-item danger" onclick="deleteCampus('calligraphy');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>删除
+        </div>
+      </div>
+    </div>
+    <div class="partner-info">
+      <span class="partner-tag">分成比例 30%</span>
+      <span class="partner-tag">方负责师资</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-val">45</div><div class="stat-label">学生</div></div>
+      <div class="stat-item"><div class="stat-val">1</div><div class="stat-label">教师</div></div>
+      <div class="stat-item"><div class="stat-val">0.24<span class="unit">万</span></div><div class="stat-label">本月分成</div></div>
+    </div>
+  </div>
+  <div class="campus-card">
+    <div class="corner-accent" style="background:linear-gradient(135deg, transparent 50%, var(--amber-bg) 50%)"></div>
+    <div class="header">
+      <div class="campus-icon" style="background:linear-gradient(135deg,var(--amber),#d4a03a)">🏫</div>
+      <div class="campus-info">
+        <div class="campus-name">阳光幼儿园</div>
+        <span class="campus-type partner">合作机构 · 场地合作</span>
+      </div>
+      <button class="more-btn" onclick="toggleMenu('menu-kindergarten')">
+        <svg viewBox="0 0 24 24" fill="var(--text-light)"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
+      <div class="dropdown-menu" id="menu-kindergarten" style="display:none">
+        <div class="menu-item" onclick="openEditCampus('kindergarten');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>修改
+        </div>
+        <div class="menu-item danger" onclick="deleteCampus('kindergarten');closeAllMenus()">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>删除
+        </div>
+      </div>
+    </div>
+    <div class="partner-info">
+      <span class="partner-tag">场地费 ¥2000/月</span>
+      <span class="partner-tag">我方负责师资</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-val">55</div><div class="stat-label">学生</div></div>
+      <div class="stat-item"><div class="stat-val">2</div><div class="stat-label">教师</div></div>
+      <div class="stat-item"><div class="stat-val">1.0<span class="unit">万</span></div><div class="stat-label">本月净收</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 发薪日设置页 ===== -->
+<div class="content" id="salaryTab" style="display:none">
+  <div class="sub-header">
+    <div class="title-row">
+      <button class="back-btn" onclick="switchTab('main')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>发薪设置</h1>
+      <div style="width:32px"></div>
+    </div>
+  </div>
+
+  <!-- 发薪设置 -->
+  <div class="section-title" style="margin-top:0">发薪规则</div>
+  <div class="salary-card">
+    <div class="set-row">
+      <div class="set-label">发薪日</div>
+      <div class="set-value">每月 <strong id="salaryDayDisplay">15号</strong></div>
+      <div class="set-edit" onclick="openSalaryDayPicker()">修改</div>
+    </div>
+    <div class="set-row">
+      <div class="set-label">课时报表推送</div>
+      <div class="set-value">发薪前 <strong id="pushDaysDisplay">1天</strong></div>
+      <div class="set-edit" onclick="openPushDaysPicker()">修改</div>
+    </div>
+    <div class="set-row">
+      <div class="set-label">自动确认</div>
+      <div class="set-value">发薪日自动确认未处理薪资</div>
+      <div class="set-switch on" onclick="this.classList.toggle('on')"></div>
+    </div>
+  </div>
+
+  <!-- 薪资模板 -->
+  <div class="section-title">薪资模板</div>
+  <div class="salary-models">
+    <div class="sm-title-row">
+      <span class="sm-title">工资模型</span>
+      <span class="sm-add" onclick="openSalaryModelModal()">+ 新建模板</span>
+    </div>
+    <div class="sm-card" onclick="openEditSalaryModel(0)">
+      <div class="sm-name">标准主讲 <span class="sm-tag default">默认</span></div>
+      <div class="sm-desc">底薪 + 课时费 + 全勤奖 + 绩效奖金</div>
+      <div class="sm-count">3位教师使用</div>
+    </div>
+    <div class="sm-card" onclick="openEditSalaryModel(1)">
+      <div class="sm-name">纯课时 <span class="sm-tag info">助教</span></div>
+      <div class="sm-desc">课时费，无底薪无奖金</div>
+      <div class="sm-count">2位教师使用</div>
+    </div>
+  </div>
+
+  <!-- 发薪提醒 -->
+  <div class="section-title">本月发薪状态</div>
+  <div class="salary-summary-card">
+    <div class="ss-header">
+      <div class="ss-icon">💰</div>
+      <div class="ss-info">
+        <div class="ss-title">6月工资待处理</div>
+        <div class="ss-sub"><strong>3</strong> 位教师待确认/发放</div>
+      </div>
+    </div>
+    <div class="ss-countdown">距发薪日还有 <strong>3</strong> 天</div>
+    <div class="ss-stats">
+      <div class="ss-stat-item highlight"><div class="ss-val">¥37,400</div><div class="ss-label">应发总额</div></div>
+      <div class="ss-stat-item"><div class="ss-val">186</div><div class="ss-label">总课时</div></div>
+      <div class="ss-stat-item warn"><div class="ss-val">3</div><div class="ss-label">待确认</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 校区科目页 ===== -->
+<div class="content" id="subjectTab" style="display:none">
+  <div class="sub-header">
+    <div class="title-row">
+      <button class="back-btn" onclick="switchTab('main')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>校区科目</h1>
+      <button class="add-btn" onclick="openAddSubject()">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>添加</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:0">科目列表</div>
+  <div id="subjectList"></div>
+</div>
+
+<!-- ===== 节假日设置页 ===== -->
+<div class="content" id="holidayTab" style="display:none">
+  <div class="sub-header">
+    <div class="title-row">
+      <button class="back-btn" onclick="switchTab('main')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>节假日设置</h1>
+      <button class="add-btn" onclick="openAddHoliday()">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>添加</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:0">法定节假日</div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">元旦</div><div class="hol-date">2026年1月1日</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">春节</div><div class="hol-date">2026年1月28日-1月30日（3天）</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">清明节</div><div class="hol-date">2026年4月4日</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">劳动节</div><div class="hol-date">2026年5月1日</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">端午节</div><div class="hol-date">2026年6月15日-6月17日（3天）</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">中秋节</div><div class="hol-date">2026年9月10日</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">📅</div>
+    <div class="hol-info"><div class="hol-name">国庆节</div><div class="hol-date">2026年10月1日-10月7日（7天）</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+
+  <div class="section-title">自定义节假日</div>
+  <div class="holiday-card">
+    <div class="hol-icon">🎉</div>
+    <div class="hol-info"><div class="hol-name">校庆日</div><div class="hol-date">每年9月1日</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">☀️</div>
+    <div class="hol-info"><div class="hol-name">暑假</div><div class="hol-date">2026年7月15日-8月28日（45天）</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+  <div class="holiday-card">
+    <div class="hol-icon">❄️</div>
+    <div class="hol-info"><div class="hol-name">寒假</div><div class="hol-date">2026年1月20日-2月24日（36天）</div></div>
+    <span class="hol-status">休息</span>
+  </div>
+</div>
+
+<!-- ===== 通知设置页 ===== -->
+<div class="content" id="notifyTab" style="display:none">
+  <div class="sub-header">
+    <div class="title-row">
+      <button class="back-btn" onclick="switchTab('main')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>通知设置</h1>
+      <div style="width:32px"></div>
+    </div>
+  </div>
+
+  <div class="notify-card">
+    <div class="notify-title">通知学员</div>
+    <div class="notify-row">
+      <div><div class="notify-label">上课前一天提醒</div><div class="notify-sub">上课前一天20:00点推送</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">上课当天提醒</div><div class="notify-sub">上课前30分钟推送</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">学员点名通知</div><div class="notify-sub">显示剩余课时</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">课堂点评提醒</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">课后作业提醒</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">课时不足续费提醒</div><div class="notify-sub">每7天提醒1次</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">学员生日提醒</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+  </div>
+
+  <div class="notify-card">
+    <div class="notify-title">通知老师</div>
+    <div class="notify-row">
+      <div><div class="notify-label">上课前一天提醒</div><div class="notify-sub">上课前一天19:00点推送</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+    <div class="notify-row">
+      <div><div class="notify-label">上课当天通知</div><div class="notify-sub">上课前60分钟推送</div></div>
+      <div class="notify-toggle on" onclick="this.classList.toggle('on')"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 课时单价设置页 ===== -->
+<div class="content" id="priceTab" style="display:none">
+  <div class="sub-header">
+    <div class="title-row">
+      <button class="back-btn" onclick="switchTab('main')">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <h1>课时单价</h1>
+      <button class="add-btn" onclick="openAddPriceRule()">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>添加</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:0">按科目定价</div>
+  <div class="price-card">
+    <div class="price-header">
+      <div class="price-icon" style="background:var(--primary-bg)">🎹</div>
+      <div class="price-info">
+        <div class="price-name">钢琴</div>
+        <div class="price-desc">一对一授课</div>
+      </div>
+      <div class="price-value">¥150<span>/课时</span></div>
+    </div>
+    <div class="price-actions">
+      <button class="subj-btn edit" onclick="openEditPrice('piano')">
+        <svg viewBox="0 0 24 24" fill="var(--info)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="price-card">
+    <div class="price-header">
+      <div class="price-icon" style="background:var(--accent-bg)">💃</div>
+      <div class="price-info">
+        <div class="price-name">舞蹈</div>
+        <div class="price-desc">小组课（6人内）</div>
+      </div>
+      <div class="price-value">¥80<span>/课时</span></div>
+    </div>
+    <div class="price-actions">
+      <button class="subj-btn edit" onclick="openEditPrice('dance')">
+        <svg viewBox="0 0 24 24" fill="var(--info)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="price-card">
+    <div class="price-header">
+      <div class="price-icon" style="background:var(--info-bg)">🎨</div>
+      <div class="price-info">
+        <div class="price-name">美术</div>
+        <div class="price-desc">小组课（8人内）</div>
+      </div>
+      <div class="price-value">¥60<span>/课时</span></div>
+    </div>
+    <div class="price-actions">
+      <button class="subj-btn edit" onclick="openEditPrice('art')">
+        <svg viewBox="0 0 24 24" fill="var(--info)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="price-card">
+    <div class="price-header">
+      <div class="price-icon" style="background:var(--amber-bg)">✏️</div>
+      <div class="price-info">
+        <div class="price-name">书法</div>
+        <div class="price-desc">小组课（10人内）</div>
+      </div>
+      <div class="price-value">¥50<span>/课时</span></div>
+    </div>
+    <div class="price-actions">
+      <button class="subj-btn edit" onclick="openEditPrice('calligraphy')">
+        <svg viewBox="0 0 24 24" fill="var(--info)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title">按班型定价</div>
+  <div class="price-card">
+    <div class="price-header">
+      <div class="price-icon" style="background:var(--primary-bg)">∞</div>
+      <div class="price-info">
+        <div class="price-name">循环课包</div>
+        <div class="price-desc">不限课时，按月收费</div>
+      </div>
+      <div class="price-value">¥1200<span>/月</span></div>
+    </div>
+    <div class="price-actions">
+      <button class="subj-btn edit" onclick="openEditPrice('unlimited')">
+        <svg viewBox="0 0 24 24" fill="var(--info)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：校区编辑 ===== -->
+<div class="overlay" id="campusOverlay" onclick="closeCampusForm()"></div>
+<div class="sheet" id="campusSheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="campusFormTitle">添加校区</span>
+    <button class="sheet-close" onclick="closeCampusForm()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <div class="form-group">
+      <label class="form-label">校区名称</label>
+      <input type="text" class="form-input" placeholder="请输入校区名称" id="campusName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">校区类型</label>
+      <div style="display:flex;gap:10px">
+        <button style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--primary);background:var(--primary-bg);color:var(--primary);font-size:13px;font-weight:500;cursor:pointer" id="typeSelf">自营校区</button>
+        <button style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--border);background:#fafdfb;color:var(--text-sec);font-size:13px;font-weight:500;cursor:pointer" id="typePartner" onclick="toggleCampusType()">合作机构</button>
+      </div>
+    </div>
+
+    <!-- 合作设置区域（合作机构时显示） -->
+    <div class="form-group" id="partnerSettings" style="display:none">
+      <label class="form-label">合作方式</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="partner-mode-btn selected" onclick="selectPartnerMode(this,'split')">课时分成</button>
+        <button class="partner-mode-btn" onclick="selectPartnerMode(this,'venue')">场地合作</button>
+        <button class="partner-mode-btn" onclick="selectPartnerMode(this,'brand')">品牌加盟</button>
+      </div>
+    </div>
+    <div class="form-group" id="partnerRatioGroup" style="display:none">
+      <label class="form-label">分成比例（我方）</label>
+      <div style="display:flex;align-items:center;gap:12px">
+        <input type="range" id="partnerRatio" min="10" max="90" value="30" style="flex:1" oninput="updateRatioDisplay()">
+        <span id="partnerRatioValue" style="font-size:14px;font-weight:600;color:var(--primary);min-width:40px">30%</span>
+      </div>
+    </div>
+    <div class="form-group" id="partnerVenueGroup" style="display:none">
+      <label class="form-label">场地费用（元/月）</label>
+      <input type="number" class="form-input" placeholder="请输入场地费用" id="campusVenueFee" value="2000">
+    </div>
+    <div class="form-group" id="partnerTeacherGroup" style="display:none">
+      <label class="form-label">师资安排</label>
+      <div style="display:flex;gap:8px">
+        <button class="partner-mode-btn selected" onclick="selectTeacherMode(this,'we')">我方负责</button>
+        <button class="partner-mode-btn" onclick="selectTeacherMode(this,'partner')">对方负责</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">联系电话</label>
+      <input type="tel" class="form-input" placeholder="请输入联系电话" id="campusPhone">
+    </div>
+    <div class="form-group">
+      <label class="form-label">校区地址</label>
+      <input type="text" class="form-input" placeholder="请输入详细地址" id="campusAddress">
+    </div>
+    <button class="submit-btn" style="margin-top:16px" onclick="saveCampus()">保存</button>
+  </div>
+</div>
+
+<!-- ===== 弹窗：科目编辑 ===== -->
+<div class="overlay" id="subjectOverlay" onclick="closeSubjectForm()"></div>
+<div class="sheet" id="subjectSheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="subjectFormTitle">添加科目</span>
+    <button class="sheet-close" onclick="closeSubjectForm()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <div class="form-group">
+      <label class="form-label">科目名称</label>
+      <input type="text" class="form-input" placeholder="如：钢琴、舞蹈、美术" id="subjectName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">科目图标</label>
+      <div class="emoji-grid" id="emojiGrid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">科目颜色</label>
+      <div class="color-grid">
+        <div class="color-btn" style="background:var(--primary)" onclick="selectColor(this,'var(--primary)')"></div>
+        <div class="color-btn" style="background:var(--accent)" onclick="selectColor(this,'var(--accent)')"></div>
+        <div class="color-btn" style="background:var(--info)" onclick="selectColor(this,'var(--info)')"></div>
+        <div class="color-btn" style="background:var(--amber)" onclick="selectColor(this,'var(--amber)')"></div>
+        <div class="color-btn" style="background:var(--purple)" onclick="selectColor(this,'var(--purple)')"></div>
+        <div class="color-btn" style="background:#e86868" onclick="selectColor(this,'#e86868')"></div>
+      </div>
+    </div>
+    <button class="submit-btn" style="margin-top:16px" onclick="saveSubject()">保存</button>
+  </div>
+</div>
+
+<!-- ===== 弹窗：节假日编辑 ===== -->
+<div class="overlay" id="holidayOverlay" onclick="closeHolidayForm()"></div>
+<div class="sheet" id="holidaySheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">添加节假日</span>
+    <button class="sheet-close" onclick="closeHolidayForm()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <div class="form-group">
+      <label class="form-label">图标</label>
+      <div class="hol-icon-grid" id="holIconGrid">
+        <div class="hol-icon-opt selected" onclick="selectHolIcon(this,'📅')">
+          <span class="hol-icon-preview">📅</span>
+          <span class="hol-icon-label">法定</span>
+        </div>
+        <div class="hol-icon-opt" onclick="selectHolIcon(this,'🎉')">
+          <span class="hol-icon-preview">🎉</span>
+          <span class="hol-icon-label">活动</span>
+        </div>
+        <div class="hol-icon-opt" onclick="selectHolIcon(this,'☀️')">
+          <span class="hol-icon-preview">☀️</span>
+          <span class="hol-icon-label">暑假</span>
+        </div>
+        <div class="hol-icon-opt" onclick="selectHolIcon(this,'❄️')">
+          <span class="hol-icon-preview">❄️</span>
+          <span class="hol-icon-label">寒假</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">节假日名称</label>
+      <input type="text" class="form-input" placeholder="如：校庆日、运动会" id="holidayName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">开始日期</label>
+      <input type="date" class="form-input" id="holidayStart">
+    </div>
+    <div class="form-group">
+      <label class="form-label">结束日期</label>
+      <input type="date" class="form-input" id="holidayEnd">
+    </div>
+    <button class="submit-btn" style="margin-top:16px" onclick="saveHoliday()">保存</button>
+  </div>
+</div>
+
+<!-- ===== 弹窗：薪资模板 ===== -->
+<div class="overlay" id="salaryModelOverlay" onclick="closeSalaryModelForm()"></div>
+<div class="sheet" id="salaryModelSheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="salaryModelTitle">新建薪资模板</span>
+    <button class="sheet-close" onclick="closeSalaryModelForm()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <div class="form-group">
+      <label class="form-label">模板名称</label>
+      <input type="text" class="form-input" placeholder="如：资深主讲、助教" id="modelName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">模板类型</label>
+      <div style="display:flex;gap:8px">
+        <button class="partner-mode-btn selected" onclick="selectModelType(this,'standard')">标准（底薪+课时+奖金）</button>
+        <button class="partner-mode-btn" onclick="selectModelType(this,'hourly')">纯课时</button>
+      </div>
+    </div>
+    <div id="modelStandardFields">
+      <div class="form-group">
+        <label class="form-label">底薪（元/月）</label>
+        <input type="number" class="form-input" placeholder="0" id="modelBase">
+      </div>
+      <div class="form-group">
+        <label class="form-label">默认课时费（元/课时）</label>
+        <input type="number" class="form-input" placeholder="0" id="modelRate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">全勤奖（元/月）</label>
+        <input type="number" class="form-input" placeholder="0" id="modelAttend">
+      </div>
+      <div class="form-group">
+        <label class="form-label">绩效奖金（元/月）</label>
+        <input type="number" class="form-input" placeholder="0" id="modelPerf">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">设为默认模板</label>
+      <div style="display:flex;gap:8px">
+        <button class="partner-mode-btn" onclick="selectDefault(this,false)">否</button>
+        <button class="partner-mode-btn selected" onclick="selectDefault(this,true)">是</button>
+      </div>
+    </div>
+    <button class="submit-btn" style="margin-top:16px" onclick="saveSalaryModel()">保存</button>
+  </div>
+</div>
+
+<!-- ===== 弹窗：发薪日修改 ===== -->
+<div class="overlay" id="salaryDayOverlay" onclick="closeSalaryDayPicker()"></div>
+<div class="sheet" id="salaryDaySheet">
+  <div class="handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">修改发薪日</span>
+    <button class="sheet-close" onclick="closeSalaryDayPicker()">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <div class="form-group">
+      <label class="form-label">每月发薪日</label>
+      <div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--primary-bg);border-radius:12px">
+        <button style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);background:var(--bg);font-size:20px;color:var(--primary);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="adjustSalaryDayPicker(-1)">−</button>
+        <div style="flex:1;text-align:center">
+          <span style="font-size:32px;font-weight:700;color:var(--text)" id="salaryDayPickerValue">15</span>
+          <span style="font-size:14px;color:var(--text-sec)">日</span>
+        </div>
+        <button style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);background:var(--bg);font-size:20px;color:var(--primary);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="adjustSalaryDayPicker(1)">＋</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">课时报表推送</label>
+      <div style="display:flex;gap:8px">
+        <button class="partner-mode-btn" onclick="selectPushDays(this,0)">当天</button>
+        <button class="partner-mode-btn selected" onclick="selectPushDays(this,1)">提前1天</button>
+        <button class="partner-mode-btn" onclick="selectPushDays(this,3)">提前3天</button>
+        <button class="partner-mode-btn" onclick="selectPushDays(this,7)">提前7天</button>
+      </div>
+    </div>
+    <button class="submit-btn" style="margin-top:16px" onclick="saveSalaryDaySettings()">保存</button>
+  </div>
+</div>
+
+<!-- ===== 确认弹窗：设为主校区 ===== -->
+<div class="overlay" id="setMainOverlay" onclick="closeSetMain()"></div>
+<div class="confirm-dialog" id="setMainDialog">
+  <div class="confirm-icon">👑</div>
+  <div class="confirm-title">设为主校区</div>
+  <div class="confirm-desc" id="setMainDesc">确定将「云策艺术·香山校区」设为主校区吗？</div>
+  <div class="confirm-tip">原主校区将变为自营分校区</div>
+  <div class="confirm-actions">
+    <button class="confirm-cancel" onclick="closeSetMain()">取消</button>
+    <button class="confirm-ok" onclick="doSetMain()">确认</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 校区数据 =====
+const CAMPUSES = [
+  {id:'main', name:'盛睿艺术', icon:'👑', type:'主校区', address:'北京市海淀区中关村大街1号', phone:'400-123-4567', students:120, teachers:3, revenue:2.8},
+  {id:'branch1', name:'保利校区', icon:'🏢', type:'分校区', address:'北京市朝阳区保利大厦3层', phone:'400-123-4568', students:180, teachers:2, revenue:2.4},
+  {id:'branch2', name:'望京校区', icon:'🏢', type:'分校区', address:'北京市朝阳区望京SOHO', phone:'400-123-4569', students:95, teachers:4, revenue:1.6},
+  {id:'partner1', name:'墨香书法', icon:'✏️', type:'合作机构', address:'北京市西城区书法大厦', phone:'400-123-4570', students:45, teachers:1, revenue:0.24},
+];
+
+let currentCampusId = 'main';
+
+function showCampusSelector() {
+  document.getElementById('campusSelector').style.display = 'block';
+}
+
+function hideCampusSelector() {
+  document.getElementById('campusSelector').style.display = 'none';
+}
+
+function selectCampus(campusId, element) {
+  currentCampusId = campusId;
+  const campus = CAMPUSES.find(c => c.id === campusId);
+  if (campus) {
+    // 更新卡片信息
+    document.getElementById('currentCampus').textContent = campus.name;
+    document.getElementById('campusTypeTag').textContent = campus.type;
+    document.getElementById('campusAddress').textContent = campus.address;
+    document.getElementById('campusPhone').textContent = campus.phone;
+    document.getElementById('campusStudents').textContent = campus.students;
+    document.getElementById('campusTeachers').textContent = campus.teachers;
+    // 更新营收
+    const revenueEl = document.getElementById('campusRevenue');
+    if (campus.revenue >= 1) {
+      revenueEl.innerHTML = campus.revenue.toFixed(1) + '<span class="unit">万</span>';
+    } else {
+      revenueEl.innerHTML = (campus.revenue * 10000).toFixed(0) + '<span class="unit">元</span>';
+    }
+    // 更新卡片图标和类型标签样式
+    const iconBox = document.getElementById('campusIconBox');
+    const typeTag = document.getElementById('campusTypeTag');
+    iconBox.className = 'campus-icon-box';
+    typeTag.className = 'campus-type-tag';
+    if (campusId === 'main') {
+      iconBox.textContent = '👑';
+    } else if (campus.type === '合作机构') {
+      iconBox.textContent = '✏️';
+      iconBox.classList.add('partner-icon');
+      typeTag.classList.add('partner-tag');
+    } else {
+      iconBox.textContent = '🏢';
+      iconBox.classList.add('branch-icon');
+      typeTag.classList.add('branch-tag');
+    }
+    
+    // 更新选择器选中状态
+    document.querySelectorAll('.selector-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    element.classList.add('active');
+  }
+  hideCampusSelector();
+  showToast(`已切换到 ${campus.name}`);
+}
+
+const SUBJECTS = [
+  {id:'sub1',name:'钢琴',icon:'🎹',color:'var(--primary)'},
+  {id:'sub2',name:'舞蹈',icon:'💃',color:'var(--accent)'},
+  {id:'sub3',name:'美术',icon:'🎨',color:'var(--info)'},
+  {id:'sub4',name:'书法',icon:'✏️',color:'var(--amber)'},
+  {id:'sub5',name:'声乐',icon:'🎵',color:'var(--purple)'},
+  {id:'sub6',name:'吉他',icon:'🎸',color:'var(--primary)'},
+  {id:'sub7',name:'架子鼓',icon:'🥁',color:'var(--accent)'},
+  {id:'sub8',name:'小提琴',icon:'🎻',color:'var(--info)'},
+  {id:'sub9',name:'古筝',icon:'🪕',color:'var(--amber)'},
+  {id:'sub10',name:'萨克斯',icon:'🎷',color:'var(--purple)'},
+  {id:'sub11',name:'长笛',icon:'🪈',color:'var(--primary)'},
+  {id:'sub12',name:'葫芦丝',icon:'🎶',color:'var(--accent)'},
+  {id:'sub13',name:'瑜伽',icon:'🧘',color:'var(--info)'},
+  {id:'sub14',name:'足球',icon:'⚽',color:'var(--amber)'},
+  {id:'sub15',name:'篮球',icon:'🏀',color:'var(--purple)'},
+  {id:'sub16',name:'游泳',icon:'🏊',color:'var(--primary)'},
+  {id:'sub17',name:'跆拳道',icon:'🥋',color:'var(--accent)'},
+  {id:'sub18',name:'绘画',icon:'🖼️',color:'var(--info)'},
+  {id:'sub19',name:'手工',icon:'✂️',color:'var(--amber)'},
+  {id:'sub20',name:'口才',icon:'🗣️',color:'var(--purple)'},
+  {id:'sub21',name:'编程',icon:'💻',color:'var(--primary)'},
+  {id:'sub22',name:'围棋',icon:'⚫',color:'var(--accent)'},
+  {id:'sub23',name:'象棋',icon:'🀄',color:'var(--info)'},
+  {id:'sub24',name:'口才演讲',icon:'🎤',color:'var(--amber)'},
+  {id:'sub25',name:'表演',icon:'🎭',color:'var(--purple)'},
+  {id:'sub26',name:'摄影',icon:'📷',color:'var(--primary)'},
+  {id:'sub27',name:'尤克里里',icon:'🎸',color:'var(--accent)'},
+  {id:'sub28',name:'电子琴',icon:'🎹',color:'var(--info)'},
+  {id:'sub29',name:'贝斯',icon:'🎸',color:'var(--amber)'},
+  {id:'sub30',name:'主持',icon:'🎙️',color:'var(--purple)'}
+];
+
+const EMOJIS = ['🎹','💃','🎨','✏️','🎵','🎸','🥁','🎻','🪕','🎷','🪈','🎶','🧘','⚽','🏀','🏊','🥋','🖼️','✂️','🗣️','💻','⚫','🀄','🎤','🎭','📷','🎙️','🎬','🎧','🧩'];
+
+let selectedEmoji = '';
+let selectedColor = '';
+
+function renderSubjects() {
+  const list = document.getElementById('subjectList');
+  list.innerHTML = SUBJECTS.map(s => `
+    <div class="subject-card">
+      <div class="subj-icon" style="background:${s.color}">${s.icon}</div>
+      <div class="subj-info"><div class="subj-name">${s.name}</div></div>
+      <div class="subj-actions">
+        <button class="subj-btn edit" onclick="openEditSubject('${s.id}')">
+          <svg viewBox="0 0 24 24" fill="var(--info)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+        <button class="subj-btn delete" onclick="deleteSubject('${s.id}')">
+          <svg viewBox="0 0 24 24" fill="var(--danger)"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderEmojiGrid() {
+  const grid = document.getElementById('emojiGrid');
+  grid.innerHTML = EMOJIS.map(e => `
+    <div class="emoji-btn" onclick="selectEmoji(this,'${e}')">${e}</div>
+  `).join('');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.content').forEach(el => el.style.display = 'none');
+  const bottomBar = document.querySelector('.bottom-bar');
+  if (tab === 'main') {
+    document.getElementById('mainContent').style.display = 'block';
+    bottomBar.style.display = 'block';
+  } else {
+    document.getElementById(tab + 'Tab').style.display = 'block';
+    bottomBar.style.display = 'none';
+  }
+  if (tab === 'subject') renderSubjects();
+}
+
+function adjustSalaryDay(delta) {
+  const el = document.getElementById('salaryDayValue');
+  let val = parseInt(el.textContent) + delta;
+  val = Math.max(1, Math.min(31, val));
+  el.textContent = val;
+}
+
+// ===== 薪资模板相关 =====
+function openSalaryModelModal() {
+  document.getElementById('salaryModelTitle').textContent = '新建薪资模板';
+  document.getElementById('modelName').value = '';
+  document.getElementById('modelBase').value = '';
+  document.getElementById('modelRate').value = '';
+  document.getElementById('modelAttend').value = '';
+  document.getElementById('modelPerf').value = '';
+  document.getElementById('salaryModelOverlay').classList.add('show');
+  document.getElementById('salaryModelSheet').classList.add('show');
+}
+
+function openEditSalaryModel(id) {
+  document.getElementById('salaryModelTitle').textContent = '编辑薪资模板';
+  document.getElementById('salaryModelOverlay').classList.add('show');
+  document.getElementById('salaryModelSheet').classList.add('show');
+}
+
+function closeSalaryModelForm() {
+  document.getElementById('salaryModelOverlay').classList.remove('show');
+  document.getElementById('salaryModelSheet').classList.remove('show');
+}
+
+function selectModelType(el, type) {
+  document.querySelectorAll('#salaryModelSheet .partner-mode-btn').forEach(btn => btn.classList.remove('selected'));
+  el.classList.add('selected');
+  if (type === 'hourly') {
+    document.getElementById('modelStandardFields').style.display = 'none';
+  } else {
+    document.getElementById('modelStandardFields').style.display = 'block';
+  }
+}
+
+function selectDefault(el, isDefault) {
+  el.parentElement.querySelectorAll('.partner-mode-btn').forEach(btn => btn.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function saveSalaryModel() {
+  showToast('薪资模板已保存');
+  closeSalaryModelForm();
+}
+
+// ===== 发薪日设置相关 =====
+let currentSalaryDay = 15;
+let currentPushDays = 1;
+
+function openSalaryDayPicker() {
+  document.getElementById('salaryDayPickerValue').textContent = currentSalaryDay;
+  document.getElementById('salaryDayOverlay').classList.add('show');
+  document.getElementById('salaryDaySheet').classList.add('show');
+}
+
+function closeSalaryDayPicker() {
+  document.getElementById('salaryDayOverlay').classList.remove('show');
+  document.getElementById('salaryDaySheet').classList.remove('show');
+}
+
+function adjustSalaryDayPicker(delta) {
+  const el = document.getElementById('salaryDayPickerValue');
+  let val = parseInt(el.textContent) + delta;
+  val = Math.max(1, Math.min(28, val));
+  el.textContent = val;
+}
+
+function selectPushDays(el, days) {
+  el.parentElement.querySelectorAll('.partner-mode-btn').forEach(btn => btn.classList.remove('selected'));
+  el.classList.add('selected');
+  currentPushDays = days;
+}
+
+function saveSalaryDaySettings() {
+  currentSalaryDay = parseInt(document.getElementById('salaryDayPickerValue').textContent);
+  document.getElementById('salaryDayDisplay').textContent = currentSalaryDay + '号';
+  document.getElementById('pushDaysDisplay').textContent = currentPushDays === 0 ? '当天' : currentPushDays + '天';
+  showToast('发薪设置已保存');
+  closeSalaryDayPicker();
+}
+
+function openPushDaysPicker() {
+  openSalaryDayPicker();
+}
+
+function openAddCampus() {
+  document.getElementById('campusFormTitle').textContent = '添加校区';
+  document.getElementById('campusName').value = '';
+  document.getElementById('campusPhone').value = '';
+  document.getElementById('campusAddress').value = '';
+  // Reset to self campus type
+  resetCampusType();
+  // Hide partner settings
+  hidePartnerSettings();
+  document.getElementById('campusOverlay').classList.add('show');
+  document.getElementById('campusSheet').classList.add('show');
+}
+
+function openEditCampus(id) {
+  document.getElementById('campusFormTitle').textContent = '编辑校区';
+  document.getElementById('campusOverlay').classList.add('show');
+  document.getElementById('campusSheet').classList.add('show');
+}
+
+function closeCampusForm() {
+  document.getElementById('campusOverlay').classList.remove('show');
+  document.getElementById('campusSheet').classList.remove('show');
+}
+
+function resetCampusType() {
+  const self = document.getElementById('typeSelf');
+  const partner = document.getElementById('typePartner');
+  self.style.borderColor = 'var(--primary)';
+  self.style.background = 'var(--primary-bg)';
+  self.style.color = 'var(--primary)';
+  partner.style.borderColor = 'var(--border)';
+  partner.style.background = '#fafdfb';
+  partner.style.color = 'var(--text-sec)';
+}
+
+function toggleCampusType() {
+  const self = document.getElementById('typeSelf');
+  const partner = document.getElementById('typePartner');
+  self.style.borderColor = 'var(--border)';
+  self.style.background = '#fafdfb';
+  self.style.color = 'var(--text-sec)';
+  partner.style.borderColor = 'var(--amber)';
+  partner.style.background = 'var(--amber-bg)';
+  partner.style.color = 'var(--amber)';
+  // Show partner settings
+  showPartnerSettings();
+}
+
+function showPartnerSettings() {
+  document.getElementById('partnerSettings').style.display = 'block';
+  document.getElementById('partnerRatioGroup').style.display = 'block';
+  document.getElementById('partnerVenueGroup').style.display = 'block';
+  document.getElementById('partnerTeacherGroup').style.display = 'block';
+}
+
+function hidePartnerSettings() {
+  document.getElementById('partnerSettings').style.display = 'none';
+  document.getElementById('partnerRatioGroup').style.display = 'none';
+  document.getElementById('partnerVenueGroup').style.display = 'none';
+  document.getElementById('partnerTeacherGroup').style.display = 'none';
+}
+
+function selectPartnerMode(el, mode) {
+  document.querySelectorAll('.partner-mode-btn').forEach(btn => btn.classList.remove('selected'));
+  el.classList.add('selected');
+  // Show/hide relevant fields based on mode
+  if (mode === 'split' || mode === 'brand') {
+    document.getElementById('partnerRatioGroup').style.display = 'block';
+    document.getElementById('partnerVenueGroup').style.display = 'none';
+  } else if (mode === 'venue') {
+    document.getElementById('partnerRatioGroup').style.display = 'none';
+    document.getElementById('partnerVenueGroup').style.display = 'block';
+  }
+}
+
+function selectTeacherMode(el, mode) {
+  document.querySelectorAll('#partnerTeacherGroup .partner-mode-btn').forEach(btn => btn.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function updateRatioDisplay() {
+  const ratio = document.getElementById('partnerRatio').value;
+  document.getElementById('partnerRatioValue').textContent = ratio + '%';
+}
+
+function saveCampus() {
+  showToast('保存成功');
+  closeCampusForm();
+}
+
+function deleteCampus(id) {
+  showToast('已删除');
+}
+
+// ===== 菜单控制 =====
+function toggleMenu(menuId) {
+  const menu = document.getElementById(menuId);
+  const isVisible = menu.style.display !== 'none';
+  closeAllMenus();
+  if (!isVisible) menu.style.display = 'block';
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display = 'none');
+}
+
+// 点击空白处关闭菜单
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.more-btn') && !e.target.closest('.dropdown-menu')) {
+    closeAllMenus();
+  }
+});
+
+// ===== 设为主校区 =====
+let pendingMainCampusId = '';
+let pendingMainCampusName = '';
+
+function confirmSetMain(id, name) {
+  pendingMainCampusId = id;
+  pendingMainCampusName = name;
+  document.getElementById('setMainDesc').textContent = `确定将「${name}」设为主校区吗？`;
+  document.getElementById('setMainOverlay').classList.add('show');
+  document.getElementById('setMainDialog').classList.add('show');
+}
+
+function closeSetMain() {
+  document.getElementById('setMainOverlay').classList.remove('show');
+  document.getElementById('setMainDialog').classList.remove('show');
+  pendingMainCampusId = '';
+  pendingMainCampusName = '';
+}
+
+function doSetMain() {
+  closeSetMain();
+  showToast(`已将「${pendingMainCampusName}」设为主校区`);
+}
+
+function openAddSubject() {
+  document.getElementById('subjectFormTitle').textContent = '添加科目';
+  document.getElementById('subjectName').value = '';
+  selectedEmoji = '';
+  selectedColor = '';
+  renderEmojiGrid();
+  document.querySelectorAll('.emoji-btn').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.color-btn').forEach(el => el.classList.remove('selected'));
+  document.getElementById('subjectOverlay').classList.add('show');
+  document.getElementById('subjectSheet').classList.add('show');
+}
+
+function openEditSubject(id) {
+  document.getElementById('subjectFormTitle').textContent = '编辑科目';
+  const s = SUBJECTS.find(x => x.id === id);
+  if (s) {
+    document.getElementById('subjectName').value = s.name;
+    selectedEmoji = s.icon;
+    selectedColor = s.color;
+    renderEmojiGrid();
+  }
+  document.getElementById('subjectOverlay').classList.add('show');
+  document.getElementById('subjectSheet').classList.add('show');
+}
+
+function closeSubjectForm() {
+  document.getElementById('subjectOverlay').classList.remove('show');
+  document.getElementById('subjectSheet').classList.remove('show');
+}
+
+function selectEmoji(el, emoji) {
+  document.querySelectorAll('.emoji-btn').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedEmoji = emoji;
+}
+
+function selectColor(el, color) {
+  document.querySelectorAll('.color-btn').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedColor = color;
+}
+
+function saveSubject() {
+  showToast('保存成功');
+  closeSubjectForm();
+}
+
+function deleteSubject(id) {
+  showToast('已删除');
+}
+
+let selectedHolIcon = '📅';
+
+function selectHolIcon(el, icon) {
+  document.querySelectorAll('.hol-icon-opt').forEach(opt => opt.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedHolIcon = icon;
+}
+
+function openAddHoliday() {
+  document.getElementById('holidayName').value = '';
+  document.getElementById('holidayStart').value = '';
+  document.getElementById('holidayEnd').value = '';
+  // 重置图标选择为默认📅
+  selectedHolIcon = '📅';
+  document.querySelectorAll('.hol-icon-opt').forEach(opt => opt.classList.remove('selected'));
+  document.querySelector('.hol-icon-opt').classList.add('selected');
+  document.getElementById('holidayOverlay').classList.add('show');
+  document.getElementById('holidaySheet').classList.add('show');
+}
+
+function closeHolidayForm() {
+  document.getElementById('holidayOverlay').classList.remove('show');
+  document.getElementById('holidaySheet').classList.remove('show');
+}
+
+function saveHoliday() {
+  showToast('保存成功');
+  closeHolidayForm();
+}
+
+function goBack() {
+  showToast('返回上级');
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+renderSubjects();
+</script>
+</body>
+</html>

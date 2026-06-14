@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>教师管理 - 方案A优化版</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--primary:#5EC8A8;--primary-dark:#4AB893;--primary-bg:#f0faf5;--accent:#e88aaa;--accent-bg:#fdf0f4;--info:#6ba3d6;--info-bg:#f0f5fb;--amber:#d4a24e;--amber-bg:#faf6ee;--purple:#9b7ed8;--purple-bg:#f3e5f5;--success:#3ABF6E;--success-bg:#edf9f1;--text:#2d4a3e;--text-sec:#7a9a8e;--text-light:#a0b8ad;--destructive:#D94040;--destructive-bg:#fef2f2;--border:#D5E8E0;--bg-page:#F5FAF8;--bg:#fff;--shadow:0 4px 20px -4px rgba(54,73,67,0.1);--shadow-sm:0 2px 8px rgba(0,0,0,0.06);--radius-card:16px;--radius-btn:24px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC',sans-serif;background:var(--bg-page);min-height:100vh;max-width:430px;margin:0 auto;position:relative;overflow-x:hidden}
+.page{display:none;min-height:100vh;flex-direction:column}.page.active{display:flex}
+/* 主头部 */
+.main-header{background:linear-gradient(135deg,#5ec8a8,#7dd8be);padding:48px 20px 0;position:sticky;top:0;z-index:10}
+.mh-top{display:flex;align-items:center;justify-content:space-between}
+.mh-title{font-size:20px;font-weight:700;color:#fff}
+.mh-btn{height:32px;padding:0 12px;border-radius:16px;border:none;background:rgba(255,255,255,0.22);color:#fff;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:all .15s;flex-shrink:0;white-space:nowrap}
+.mh-btn:active{transform:scale(.96)}
+/* search removed */
+.mh-stats{display:flex;gap:8px;padding:14px 0 12px}
+.stat-chip{flex:1;text-align:center;padding:8px 4px;background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);border-radius:10px}
+.stat-chip .val{font-size:16px;font-weight:700;color:#fff}
+.stat-chip .label{font-size:10px;color:rgba(255,255,255,0.8);margin-top:1px}
+.stat-chip.warn .val{color:#ffe082}
+/* 三Tab */
+.main-tabs-wrap{padding:0 0 8px}
+.main-tabs{display:flex;gap:4px;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);border-radius:14px;padding:4px}
+.main-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;border-radius:10px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.75);cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);user-select:none}
+.main-tab svg{width:16px;height:16px;fill:currentColor;transition:all .25s;flex-shrink:0}
+.main-tab:active{transform:scale(.96)}
+.main-tab.active{color:#fff;font-weight:700;background:rgba(255,255,255,0.25);box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.main-tab.active svg{fill:#fff}
+.tab-badge{min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;margin-left:2px}
+.tab-badge.badge-amber{background:var(--amber);color:#fff}
+.tab-panel{display:none;flex:1;overflow-y:auto;animation:fadeSlideUp .3s ease}.tab-panel.active{display:flex;flex-direction:column}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* 通用 */
+.tag{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.tag-primary{background:var(--primary-bg);color:var(--primary)}
+.tag-info{background:var(--info-bg);color:var(--info)}
+.tag-amber{background:var(--amber-bg);color:var(--amber)}
+.tag-purple{background:var(--purple-bg);color:var(--purple)}
+.tag-success{background:var(--success-bg);color:var(--success)}
+.tag-destructive{background:var(--destructive-bg);color:var(--destructive)}
+.reminder-card{background:var(--amber-bg);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.reminder-card svg{width:20px;height:20px;fill:var(--amber);flex-shrink:0}
+.reminder-card .rc-text{flex:1;font-size:12px;color:var(--amber);line-height:1.5}
+.reminder-card .rc-text strong{font-weight:700}
+.reminder-card .rc-action{padding:6px 12px;border-radius:8px;background:var(--amber);color:#fff;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0}
+/* 薪资Tab */
+.salary-panel{padding:16px 16px 24px}
+.salary-summary{background:var(--bg);border-radius:var(--radius-card);padding:16px;box-shadow:var(--shadow);margin-bottom:14px;border-top:3px solid var(--amber)}
+.ss-row{display:flex;gap:8px}
+.ss-item{flex:1;text-align:center;padding:10px 0;background:var(--bg-page);border-radius:10px}
+.ss-item .si-val{font-size:18px;font-weight:800;color:var(--text)}
+.ss-item .si-label{font-size:10px;color:var(--text-light);margin-top:2px}
+.ss-item.highlight .si-val{color:var(--amber)}
+.ss-item.warn .si-val{color:var(--destructive)}
+.salary-item{background:var(--bg);border-radius:var(--radius-card);padding:16px;box-shadow:var(--shadow);margin-bottom:12px;cursor:pointer;transition:transform .15s}
+.salary-item:active{transform:scale(.98)}
+.sl-top{display:flex;align-items:center;gap:12px}
+.sl-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.sl-info{flex:1;min-width:0}
+.sl-name{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px}
+.sl-meta{font-size:12px;color:var(--text-sec);margin-top:2px}
+.sl-right{text-align:right;flex-shrink:0}
+.sl-amount{font-size:18px;font-weight:800;color:var(--amber);line-height:1.2}
+.sl-status-text{font-size:11px;color:var(--text-light)}
+.sl-breakdown{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.sl-actions{display:flex;gap:8px;margin-top:12px}
+.sl-btn{flex:1;padding:8px 0;border-radius:10px;border:none;font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.sl-btn:active{transform:scale(.96)}
+.sl-btn-primary{background:var(--amber-bg);color:var(--amber)}
+.sl-btn-confirm{background:linear-gradient(135deg,var(--amber),#c4922e);color:#fff}
+.sl-btn-done{background:#f5f5f5;color:var(--text-light);cursor:default}
+.salary-models{margin-bottom:14px}
+.salary-models.collapsible .sm-title{cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+.salary-models.collapsible .sm-title:active{opacity:.7}
+.sm-toggle{margin-left:auto;display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:8px;background:var(--primary-bg);color:var(--primary);font-size:12px;font-weight:600;transition:all .2s}
+.sm-toggle-text{line-height:1}
+.sm-toggle-arrow{display:flex;align-items:center;justify-content:center;transition:transform .25s}
+.sm-toggle-arrow svg{width:14px;height:14px;fill:var(--primary)}
+.salary-models.collapsible:not(.collapsed) .sm-toggle-arrow{transform:rotate(180deg)}
+.salary-models.collapsible:not(.collapsed) .sm-toggle{background:var(--primary);color:#fff}
+.salary-models.collapsible:not(.collapsed) .sm-toggle-arrow svg{fill:#fff}
+.salary-models.collapsible .sm-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease;max-height:500px;opacity:1}
+.salary-models.collapsible.collapsed .sm-body{max-height:0;opacity:0}
+.sm-add-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-radius:10px;border:1.5px dashed var(--border);color:var(--text-sec);font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px;transition:all .15s}
+.sm-add-btn svg{width:16px;height:16px;fill:var(--primary)}
+.sm-add-btn:active{background:var(--primary-bg);border-color:var(--primary);color:var(--primary)}
+.sm-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.sm-title .smt-add{font-size:12px;color:var(--primary);font-weight:500;cursor:pointer}
+.sm-card{background:var(--bg);border-radius:12px;padding:14px;box-shadow:var(--shadow-sm);margin-bottom:8px;border-left:3px solid var(--amber);cursor:pointer;transition:transform .15s}
+.sm-card:active{transform:scale(.98)}
+.sm-card.model-assist{border-left-color:var(--info)}
+.sm-name{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px}
+.sm-desc{font-size:12px;color:var(--text-sec);margin-top:6px;line-height:1.6}
+.sm-tag{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500}
+.sm-tag-default{background:var(--primary-bg);color:var(--primary)}
+.sm-count{font-size:11px;color:var(--text-light);margin-top:4px}
+.sl-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px}
+/* 教师Tab - 下拉筛选栏 */
+.filter-bar{display:flex;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:relative;z-index:10;flex-shrink:0;border-radius:12px 12px 0 0;margin:0 -20px;padding:0 20px}
+/* 薪资子Tab样式 */
+.filter-bar.sub-tabs{justify-content:center;gap:0;padding:0}
+.sub-tab{flex:1;text-align:center;padding:11px 0;font-size:13px;font-weight:500;color:var(--text-sec);cursor:pointer;transition:all .2s;position:relative;user-select:none}
+.sub-tab:active{opacity:.7}
+.sub-tab.active{color:var(--primary);font-weight:600}
+.sub-tab.active::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:20px;height:3px;border-radius:2px;background:var(--primary)}
+/* 薪资子面板 */
+.salary-sub-panel{display:none}
+.salary-sub-panel.active{display:block;animation:fadeIn .2s ease}
+/* 历史月份导航 */
+.history-month-nav{display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 0;position:relative}
+.hmn-arrow{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--bg-page);transition:all .15s}
+.hmn-arrow:active{background:#e0e0e0}
+.hmn-arrow svg{width:18px;height:18px;fill:var(--text-sec)}
+.hmn-title{font-size:15px;font-weight:600;color:var(--text)}
+.hmn-title-wrap{display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px 10px;border-radius:8px;transition:background .15s}
+.hmn-title-wrap:active{background:var(--bg-page)}
+.hmn-caret{width:16px;height:16px;fill:var(--text-sec);transition:transform .2s}
+.hmn-title-wrap.open .hmn-caret{transform:rotate(180deg)}
+/* 年月选择器 */
+.month-picker{position:fixed;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.15);padding:12px;z-index:100;display:none;animation:dropIn .15s ease;min-width:260px}
+.month-picker.show{display:block}
+.mp-header{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px}
+.mp-arrow{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--bg-page);transition:all .15s}
+.mp-arrow:active{background:#e0e0e0}
+.mp-arrow svg{width:16px;height:16px;fill:var(--text-sec)}
+.mp-year{font-size:16px;font-weight:700;color:var(--text);min-width:50px;text-align:center}
+.mp-months{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mp-month{padding:8px 0;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;transition:all .15s}
+.mp-month:active{background:var(--bg-page)}
+.mp-month:hover{background:var(--bg-page)}
+.mp-month.current{background:var(--primary);color:#fff;font-weight:600}
+.mp-month.future{color:var(--text-light);pointer-events:none}
+/* 历史汇总 */
+.history-summary{margin-bottom:14px}
+.hs-row{display:flex;background:#fff;border-radius:12px;padding:14px;gap:0}
+.hs-item{flex:1;text-align:center}
+.hs-item+.hs-item{border-left:1px solid #f0f0f0}
+.hsi-val{font-size:16px;font-weight:700;color:var(--text);margin-bottom:2px}
+.hsi-label{font-size:11px;color:var(--text-light)}
+/* 历史状态条 */
+.history-status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f0faf0;border-radius:10px;margin-bottom:14px}
+.hsb-tag{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--success)}
+.hsb-tag svg{width:14px;height:14px;fill:var(--success)}
+.hsb-date{font-size:12px;color:var(--text-sec)}
+/* 设置页 */
+.settings-section{margin-bottom:16px}
+.set-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px}
+.set-card{background:#fff;border-radius:12px;overflow:hidden}
+.set-row{display:flex;align-items:center;padding:14px;gap:8px}
+.set-row+.set-row{border-top:1px solid #f5f5f5}
+.set-label{font-size:13px;color:var(--text);font-weight:500;min-width:80px}
+.set-value{flex:1;font-size:13px;color:var(--text-sec)}
+.set-value strong{color:var(--text);font-weight:600}
+.set-edit{font-size:12px;color:var(--primary);font-weight:500;cursor:pointer;padding:4px 8px;border-radius:6px}
+.set-edit:active{background:var(--primary-bg)}
+.set-switch{width:44px;height:26px;border-radius:13px;background:#e0e0e0;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.set-switch::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:transform .2s}
+.set-switch.on{background:var(--primary)}
+.set-switch.on::after{transform:translateX(18px)}
+/* 历史发薪记录列表 */
+.history-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fff;border-radius:10px;margin-bottom:8px}
+.hi-left{flex:1}
+.hi-name{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:4px}
+.hi-meta{font-size:11px;color:var(--text-light);margin-top:2px}
+.hi-remark{color:var(--amber);font-weight:500}
+.hi-amount{font-size:15px;font-weight:700;color:var(--success)}
+.filter-bar .filter-item{flex:1;position:relative}
+.filter-bar .filter-item+.filter-item{border-left:1px solid #f0f0f0}
+.filter-trigger{display:flex;align-items:center;justify-content:center;gap:3px;padding:10px 6px;font-size:12px;font-weight:500;color:var(--text-sec);cursor:pointer;transition:all .15s;user-select:none}
+.filter-trigger:active{background:#f5f5f5}
+.filter-trigger.active{color:var(--primary);font-weight:600}
+.filter-trigger .ft-label{white-space:nowrap}
+.filter-trigger svg{width:14px;height:14px;fill:currentColor;transition:transform .2s;flex-shrink:0}
+.filter-item.open .filter-trigger svg{transform:rotate(180deg)}
+.filter-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border-radius:0 0 12px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:6px;display:none;animation:dropIn .15s ease;z-index:20}
+.filter-item.open .filter-dropdown{display:block}
+.filter-option{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;font-size:13px;color:var(--text);cursor:pointer;transition:background .15s}
+.filter-option:hover{background:var(--bg-page)}
+.filter-option.selected{background:var(--primary-bg);color:var(--primary);font-weight:600}
+.filter-option .fo-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.filter-option .fo-check{width:14px;height:14px;fill:var(--primary);margin-left:auto;flex-shrink:0;opacity:0}
+.filter-option.selected .fo-check{opacity:1}
+@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.teacher-content{padding:12px 16px 24px;flex:1;overflow-y:auto}
+.card{background:var(--bg);border-radius:var(--radius-card);padding:16px;box-shadow:var(--shadow);margin-bottom:12px;cursor:pointer;transition:transform .15s;border-left:3px solid transparent}
+.card:active{transform:scale(.98)}
+.card.role-lead{border-left-color:var(--primary)}
+.card.role-assist{border-left-color:var(--info)}
+.card.role-parttime{border-left-color:var(--amber)}
+.card.status-resigned{opacity:.65;position:relative}
+.card.status-resigned::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(135deg,transparent,transparent 8px,rgba(0,0,0,.02) 8px,rgba(0,0,0,.02) 16px);border-radius:var(--radius-card);pointer-events:none}
+.card.status-resigned .tc-avatar{filter:grayscale(.6)}
+.card.status-resigned .tc-hours{color:var(--text-light)}
+.tag-resigned{background:rgba(142,142,147,.12);color:#8e8e93}
+.tag-parttime{background:var(--amber-bg);color:var(--amber)}
+.tag-destructive{background:rgba(217,64,64,0.1);color:var(--destructive)}
+.resign-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
+.resign-badge.rb-quit{background:#fff3e0;color:#e65100}
+.resign-badge.rb-expire{background:#e3f2fd;color:#1565c0}
+.resign-badge.rb-dismiss{background:#fce4ec;color:#c62828}
+.resign-info{margin-top:8px;padding:8px 10px;background:rgba(142,142,147,.06);border-radius:8px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-sec)}
+.resign-info svg{width:14px;height:14px;fill:var(--text-light);flex-shrink:0}
+.resign-info .ri-type{font-weight:600;color:#8e8e93}
+.resign-info .ri-date{margin-left:auto;color:var(--text-light)}
+.tc-top{display:flex;align-items:center;gap:12px}
+.tc-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px}
+.tc-meta{font-size:12px;color:var(--text-sec);margin-top:2px;display:flex;align-items:center;gap:6px}
+.tc-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--text-light)}
+.tc-right{text-align:right;flex-shrink:0}
+.tc-hours{font-size:20px;font-weight:800;color:var(--primary);line-height:1.2}
+.tc-hours-label{font-size:11px;color:var(--text-light)}
+.tc-salary-status{margin-top:10px;display:flex;align-items:center;justify-content:space-between}
+.tc-salary-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sec)}
+.tc-salary-amount{font-size:14px;font-weight:700;color:var(--amber)}
+/* 排课Tab */
+.schedule-panel{padding:16px 16px 24px}
+.sch-date-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sch-date-nav .sdn-arrow{width:32px;height:32px;border-radius:10px;background:var(--bg);box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.sch-date-nav .sdn-arrow:active{transform:scale(.94)}
+.sch-date-nav .sdn-arrow svg{width:16px;height:16px;fill:var(--text-sec)}
+.sch-date-center{text-align:center;flex:1}
+.sch-date-center .sdc-main{font-size:16px;font-weight:700;color:var(--text)}
+.sch-date-center .sdc-sub{font-size:11px;color:var(--text-light);margin-top:1px}
+.sch-week-bar{display:flex;gap:4px;margin-bottom:14px;background:var(--bg);border-radius:12px;padding:8px 6px;box-shadow:var(--shadow-sm)}
+.sch-week-day{flex:1;text-align:center;padding:6px 0;border-radius:8px;cursor:pointer;transition:all .15s}
+.sch-week-day .swd-day{font-size:10px;color:var(--text-light)}
+.sch-week-day .swd-date{font-size:14px;font-weight:600;color:var(--text);margin-top:2px}
+.sch-week-day .swd-dot{width:4px;height:4px;border-radius:50%;background:var(--info);margin:3px auto 0}
+.sch-week-day.today{background:var(--info-bg)}
+.sch-week-day.today .swd-date{color:var(--info);font-weight:700}
+.sch-week-day.selected{background:var(--info);color:#fff}
+.sch-week-day.selected .swd-day{color:rgba(255,255,255,0.8)}
+.sch-week-day.selected .swd-date{color:#fff}
+.sch-week-day.selected .swd-dot{background:#fff}
+.sch-section-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sch-section-title .sch-today-tag{padding:2px 8px;border-radius:4px;background:var(--info-bg);color:var(--info);font-size:11px;font-weight:600}
+.sch-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.sch-item:last-child{border-bottom:none}
+.sch-time{width:50px;font-size:13px;font-weight:600;color:var(--text);flex-shrink:0;text-align:right;padding-top:2px}
+.sch-dot{width:10px;display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:4px}
+.sch-dot .dot{width:8px;height:8px;border-radius:50%;background:var(--info)}
+.sch-dot .line{width:2px;flex:1;background:var(--border);margin-top:4px}
+.sch-info{flex:1}
+.sch-title{font-size:14px;font-weight:600;color:var(--text)}
+.sch-desc{font-size:12px;color:var(--text-sec);margin-top:2px}
+.sch-teachers{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.sch-teacher-tag{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s}
+.sch-teacher-tag:active{transform:scale(.96)}
+.sch-teacher-tag.lead{background:var(--primary-bg);color:var(--primary)}
+.sch-teacher-tag.assist{background:var(--info-bg);color:var(--info)}
+.sch-rate{font-size:11px;color:var(--amber);font-weight:500;margin-top:2px}
+.sch-empty{text-align:center;padding:40px 0;color:var(--text-light);font-size:13px}
+.sch-empty svg{width:48px;height:48px;fill:var(--border);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
+/* 详情页头部 */
+.detail-header{background:linear-gradient(135deg,var(--primary),#7dd8bc);padding:48px 20px 24px;border-radius:0 0 24px 24px;color:#fff;position:relative;overflow:hidden}
+.detail-header::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08)}
+.dh-top{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.dh-back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.dh-back svg{width:16px;height:16px;fill:#fff}
+.dh-avatar{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--primary);background:#fff;border:3px solid rgba(255,255,255,0.4);flex-shrink:0}
+.dh-info{flex:1}
+.dh-name{font-size:20px;font-weight:800}
+.dh-role{font-size:12px;opacity:.8;margin-top:2px}
+.dh-phone{font-size:13px;opacity:.8;margin-top:2px}
+.dh-actions{display:flex;gap:8px;flex-shrink:0}
+.dh-action-btn{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.dh-action-btn svg{width:16px;height:16px;fill:#fff}
+.dh-stats{display:flex;gap:10px;margin-top:20px;position:relative;z-index:1}
+.dh-stat{flex:1;background:rgba(255,255,255,0.2);backdrop-filter:blur(8px);border-radius:12px;padding:14px 0;text-align:center}
+.dh-stat .ds-val{font-size:22px;font-weight:800;color:#fff}
+.dh-stat .ds-label{font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px}
+.tab-bar{display:flex;background:var(--bg);border-radius:16px;padding:4px;box-shadow:var(--shadow);margin:-20px 16px 0;position:relative;z-index:2}
+.tab-item{flex:1;padding:10px 0;text-align:center;font-size:13px;font-weight:500;color:var(--text-sec);cursor:pointer;border-radius:12px;transition:all .2s}
+.tab-item.active{color:var(--primary);background:var(--primary-bg);font-weight:600}
+.tab-content{display:none;padding:16px;padding-bottom:100px}
+.tab-content.active{display:block}
+.salary-card{background:var(--bg);border-radius:var(--radius-card);padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
+.salary-card .sc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.salary-card .sc-title{font-size:15px;font-weight:700;color:var(--text)}
+.sc-status{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.sc-status.pending{background:var(--amber-bg);color:var(--amber)}
+.sc-status.confirmed{background:var(--primary-bg);color:var(--primary)}
+.sc-status.paid{background:var(--success-bg);color:var(--success)}
+.salary-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5}
+.salary-row:last-child{border-bottom:none}
+.salary-row .sr-label{font-size:13px;color:var(--text-sec)}
+.salary-row .sr-value{font-size:14px;font-weight:600;color:var(--text)}
+.salary-total{display:flex;align-items:center;justify-content:space-between;padding:12px 0 0;margin-top:4px;border-top:2px solid var(--border)}
+.salary-total .st-label{font-size:14px;font-weight:700;color:var(--text)}
+.salary-total .st-value{font-size:20px;font-weight:800;color:var(--primary)}
+.rate-rule{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.rate-rule:last-child{border-bottom:none}
+.rr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rr-name{flex:1;font-size:13px;color:var(--text)}
+.rr-rate{font-size:14px;font-weight:700;color:var(--primary)}
+.rr-unit{font-size:11px;color:var(--text-light)}
+.override-card{background:#f8faf9;border-radius:10px;padding:10px 12px;margin-top:8px}
+.override-card .oc-title{font-size:12px;font-weight:600;color:var(--text)}
+.override-card .oc-item{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:12px;color:var(--text-sec)}
+.override-card .oc-rate{font-weight:600;color:var(--amber)}
+.lesson-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.lesson-item:last-child{border-bottom:none}
+.li-date{width:48px;text-align:center;flex-shrink:0}
+.li-day{font-size:18px;font-weight:800;color:var(--text)}
+.li-weekday{font-size:10px;color:var(--text-light)}
+.li-info{flex:1}
+.li-title{font-size:14px;font-weight:600;color:var(--text)}
+.li-desc{font-size:12px;color:var(--text-sec);margin-top:2px}
+.li-hours{font-size:14px;font-weight:700;color:var(--primary);flex-shrink:0}
+.pay-record{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.pay-record:last-child{border-bottom:none}
+.pr-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--success-bg)}
+.pr-icon svg{width:18px;height:18px;fill:var(--success)}
+.pr-month{font-size:14px;font-weight:600;color:var(--text)}
+.pr-date{font-size:11px;color:var(--text-light);margin-top:1px}
+.pr-amount{font-size:15px;font-weight:700;color:var(--text);text-align:right}
+.pr-status{font-size:11px;color:var(--success);text-align:right}
+.feedback-card{background:var(--bg);border-radius:var(--radius-card);padding:14px 16px;box-shadow:var(--shadow-sm);margin-bottom:10px}
+.fc-student{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.fc-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
+.fc-name{font-size:13px;font-weight:600;color:var(--text)}
+.fc-date{font-size:11px;color:var(--text-light);margin-left:auto}
+.fc-content{font-size:13px;color:var(--text-sec);line-height:1.6}
+.schedule-item{display:flex;gap:12px;padding:10px 0}
+.si-time{width:50px;font-size:13px;font-weight:600;color:var(--text);flex-shrink:0;text-align:right}
+.si-dot{width:10px;display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:4px}
+.si-dot .dot{width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.si-dot .line{width:2px;flex:1;background:var(--border);margin-top:4px}
+.si-info{flex:1}
+.si-title{font-size:14px;font-weight:600;color:var(--text)}
+.si-desc{font-size:12px;color:var(--text-sec);margin-top:2px}
+/* 工资单详情页 */
+.sd-header{background:linear-gradient(135deg,var(--amber),#c4922e);padding:48px 20px 24px;border-radius:0 0 24px 24px;color:#fff;position:relative;overflow:hidden}
+.sd-header::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08)}
+.sd-top{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.sd-back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.sd-back svg{width:16px;height:16px;fill:#fff}
+.sd-teacher{display:flex;align-items:center;gap:12px;flex:1}
+.sd-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--amber);background:#fff;border:2px solid rgba(255,255,255,0.4);flex-shrink:0}
+.sd-name{font-size:18px;font-weight:800}
+.sd-role{font-size:12px;opacity:.8;margin-top:1px}
+.sd-status-badge{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(255,255,255,0.25);color:#fff}
+.sd-amount-area{text-align:center;margin-top:20px;position:relative;z-index:1}
+.sd-amount-label{font-size:12px;opacity:.8}
+.sd-amount-val{font-size:36px;font-weight:900;margin-top:4px}
+.sd-month{font-size:13px;opacity:.7;margin-top:4px}
+.sd-body{padding:16px;padding-bottom:100px;margin-top:-16px}
+.sd-card{background:var(--bg);border-radius:var(--radius-card);padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
+.sd-card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.sd-card-title .sdct-action{font-size:12px;color:var(--primary);font-weight:500;cursor:pointer}
+.sd-flow{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:16px}
+.sd-flow-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.sd-flow-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.sd-flow-dot.done{background:var(--success);color:#fff}
+.sd-flow-dot.current{background:var(--amber);color:#fff;box-shadow:0 0 0 4px rgba(212,162,78,0.2)}
+.sd-flow-dot.todo{background:#e0e0e0;color:#999}
+.sd-flow-label{font-size:10px;color:var(--text-light)}
+.sd-flow-label.active{color:var(--text);font-weight:600}
+.sd-flow-line{width:30px;height:2px;background:#e0e0e0;margin-bottom:16px}
+.sd-flow-line.done{background:var(--success)}
+.deduction-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5}
+.deduction-item:last-child{border-bottom:none}
+.deduction-reason{font-size:13px;color:var(--text-sec)}
+.deduction-amount{font-size:14px;font-weight:600;color:var(--destructive)}
+.lesson-detail-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.lesson-detail-item:last-child{border-bottom:none}
+.ldi-date{width:36px;text-align:center;flex-shrink:0}
+.ldi-day{font-size:16px;font-weight:800;color:var(--text)}
+.ldi-weekday{font-size:9px;color:var(--text-light)}
+.ldi-info{flex:1}
+.ldi-title{font-size:13px;font-weight:600;color:var(--text)}
+.ldi-desc{font-size:11px;color:var(--text-sec);margin-top:1px}
+.ldi-right{text-align:right;flex-shrink:0}
+.ldi-hours{font-size:13px;font-weight:700;color:var(--primary)}
+.ldi-rate{font-size:10px;color:var(--text-light)}
+/* 底部栏 */
+.bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--bg);padding:12px 16px 28px;box-shadow:0 -2px 12px rgba(0,0,0,0.06);z-index:10;display:flex;gap:10px}
+.bb-btn{flex:1;padding:14px;border-radius:var(--radius-btn);border:none;font-size:15px;font-weight:600;cursor:pointer;text-align:center;transition:transform .15s}
+.bb-btn:active{transform:scale(.97)}
+.bb-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
+.bb-secondary{background:var(--primary-bg);color:var(--primary)}
+.bb-amber{background:linear-gradient(135deg,var(--amber),#c4922e);color:#fff}
+/* 弹窗 */
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(45,74,62,0.9);color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-content{background:var(--bg);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:24px 20px 40px;max-height:80vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:16px;text-align:center}
+.modal-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.modal-row:last-child{border-bottom:none}
+.modal-label{font-size:14px;color:var(--text-sec);flex-shrink:0}
+.modal-input{width:140px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;text-align:right;color:var(--text);background:var(--bg-page)}
+.modal-input-wide{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);background:var(--bg-page);margin-top:8px}
+.modal-btn{width:100%;padding:14px;border-radius:var(--radius-btn);border:none;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
+.modal-btn:active{transform:scale(.97)}
+.modal-btn-cancel{background:#f5f5f5;color:var(--text-sec)}
+.modal-btn-amber{background:linear-gradient(135deg,var(--amber),#c4922e);color:#fff}
+/* 发放确认弹窗 */
+.pcf-info{background:var(--bg-page);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text-sec);line-height:1.6}
+.pcf-info .pcf-name{font-weight:600;color:var(--text)}
+.pcf-info .pcf-amount{font-size:18px;font-weight:800;color:var(--amber)}
+.pcf-remark{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--text);background:var(--bg-page);resize:none;font-family:inherit;box-sizing:border-box}
+.pcf-remark::placeholder{color:var(--text-light)}
+.pcf-remark:focus{outline:none;border-color:var(--primary)}
+.pcf-btns{display:flex;gap:10px}
+.pcf-btns .modal-btn{flex:1}
+.modal-select{display:flex;gap:8px;margin-top:8px}
+.modal-select-item{flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px;text-align:center;font-size:13px;font-weight:500;color:var(--text-sec);cursor:pointer;transition:all .15s}
+.modal-select-item.active{border-color:var(--primary);color:var(--primary);background:var(--primary-bg);font-weight:600}
+.modal-select-item:active{transform:scale(.96)}
+.modal-form-group{margin-bottom:14px}
+.modal-form-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+.modal-form-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--text);background:var(--bg-page)}
+.modal-form-input::placeholder{color:var(--text-light)}
+.modal-checkbox-row{display:flex;align-items:center;gap:8px;padding:8px 0}
+.modal-checkbox{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
+.modal-checkbox.checked{background:var(--primary);border-color:var(--primary)}
+.modal-checkbox.checked svg{display:block}
+.modal-checkbox svg{width:12px;height:12px;fill:#fff;display:none}
+.modal-checkbox-label{font-size:13px;color:var(--text)}
+.modal-teacher-list{max-height:200px;overflow-y:auto}
+.modal-teacher-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.modal-teacher-item:last-child{border-bottom:none}
+.mti-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.mti-name{flex:1;font-size:14px;color:var(--text)}
+.mti-role{font-size:11px;color:var(--text-light)}
+/* 快捷发薪入口卡片 */
+.quick-pay-card{background:linear-gradient(135deg,#d4a24e,#c4922e);margin:12px 16px 0;border-radius:14px;padding:14px 16px;box-shadow:0 4px 16px rgba(212,162,78,0.3);position:relative;overflow:hidden}
+.quick-pay-card::before{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1)}
+.quick-pay-card::after{content:'';position:absolute;bottom:-15px;left:30px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,0.06)}
+.qpc-top{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.qpc-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.qpc-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.qpc-icon svg{width:22px;height:22px;fill:#fff}
+.qpc-info{flex:1;min-width:0}
+.qpc-title{font-size:15px;font-weight:700;color:#fff}
+.qpc-sub{font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px}
+.qpc-sub strong{font-size:16px;font-weight:800;color:#fff}
+.qpc-action{padding:8px 16px;border-radius:10px;border:none;background:rgba(255,255,255,0.95);color:var(--amber);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:all .15s}
+.qpc-action:active{transform:scale(.96)}
+.qpc-countdown{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.15);position:relative;z-index:1}
+.qpc-cd-text{font-size:12px;color:rgba(255,255,255,0.8)}
+.qpc-cd-text strong{font-size:18px;font-weight:900;color:#fff;margin:0 2px}
+.qpc-pending-tags{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;position:relative;z-index:1}
+.qpc-tag{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500;background:rgba(255,255,255,0.2);color:#fff;backdrop-filter:blur(4px)}
+/* 批量操作栏 */
+.batch-bar{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow-sm);margin-bottom:12px}
+.bb-left{display:flex;align-items:center;gap:10px}
+.bb-checkbox{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0}
+.bb-checkbox.checked{background:var(--amber);border-color:var(--amber)}
+.bb-checkbox.checked svg{display:block}
+.bb-checkbox svg{width:14px;height:14px;fill:#fff;display:none}
+.bb-label{font-size:13px;color:var(--text-sec)}
+.bb-label strong{color:var(--text);font-weight:700}
+.bb-btns{display:flex;gap:8px}
+.bb-btn-sm{padding:7px 14px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.bb-btn-sm:active{transform:scale(.96)}
+.bb-btn-sm.confirm{background:linear-gradient(135deg,var(--amber),#c4922e);color:#fff;box-shadow:0 2px 8px rgba(212,162,78,0.3)}
+.bb-btn-sm.pay{background:linear-gradient(135deg,var(--success),#2ea55a);color:#fff;box-shadow:0 2px 8px rgba(58,191,110,0.3)}
+/* 薪资卡片增强 */
+.salary-item{position:relative}
+.salary-item .si-check{position:absolute;top:16px;left:16px;width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;z-index:2}
+.salary-item .si-check.checked{background:var(--amber);border-color:var(--amber)}
+.salary-item .si-check.checked svg{display:block}
+.salary-item .si-check svg{width:14px;height:14px;fill:#fff;display:none}
+.salary-item.selected{background:#fffbf5;border:1.5px solid var(--amber)}
+.salary-item .sl-top{padding-left:30px}
+.sl-btn-confirm{background:linear-gradient(135deg,var(--amber),#c4922e)!important;color:#fff!important;box-shadow:0 3px 10px rgba(212,162,78,0.35)!important}
+.sl-btn-pay{background:linear-gradient(135deg,var(--success),#2ea55a)!important;color:#fff!important;box-shadow:0 3px 10px rgba(58,191,110,0.35)!important}
+/* 悬浮快捷按钮 */
+/* FAB removed */
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<!-- ==================== 主页面 ==================== -->
+<div class="page active" id="mainPage">
+  <div class="main-header">
+    <div class="mh-top">
+      <h1 class="mh-title">教师管理</h1>
+      <button class="mh-btn" onclick="openModal('addTeacherModal')">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff;margin-right:4px"><path d="M12 5v14M5 12h14"/></svg>
+        添加教师
+      </button>
+    </div>
+    <div class="mh-stats">
+      <div class="stat-chip"><div class="val" id="statTotal">5</div><div class="label">在职教师</div></div>
+      <div class="stat-chip"><div class="val">186</div><div class="label">本月总课时</div></div>
+      <div class="stat-chip warn"><div class="val" id="statPending">3</div><div class="label">待发工资</div></div>
+    </div>
+    <div class="main-tabs-wrap">
+      <div class="main-tabs">
+        <div class="main-tab active" onclick="switchMainTab(this,0)">
+          <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          教师
+        </div>
+        <div class="main-tab" onclick="switchMainTab(this,1)">
+          <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+          薪资
+          <span class="tab-badge badge-amber" id="salaryBadge">3</span>
+        </div>
+        <div class="main-tab" onclick="switchMainTab(this,2)">
+          <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+          排课
+        </div>
+      </div>
+    </div>
+    <!-- 教师Tab筛选栏 -->
+    <div class="filter-bar" id="teacherFilterBar" style="display:flex">
+      <div class="filter-item" id="roleFilter" data-value="all">
+        <div class="filter-trigger" onclick="toggleTeacherFilter('roleFilter')">
+          <span class="ft-label" id="roleLabel">全部角色</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="all" onclick="selectTeacherFilter('roleFilter',this,'all','全部角色')">
+            全部角色<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="lead" onclick="selectTeacherFilter('roleFilter',this,'lead','主讲')">
+            <span class="fo-dot" style="background:var(--primary)"></span>主讲<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="assist" onclick="selectTeacherFilter('roleFilter',this,'assist','助教')">
+            <span class="fo-dot" style="background:var(--info)"></span>助教<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="parttime" onclick="selectTeacherFilter('roleFilter',this,'parttime','兼职')">
+            <span class="fo-dot" style="background:var(--amber)"></span>兼职<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+        </div>
+      </div>
+      <div class="filter-item" id="subjectFilter" data-value="all">
+        <div class="filter-trigger" onclick="toggleTeacherFilter('subjectFilter')">
+          <span class="ft-label" id="subjectLabel">全部科目</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="all" onclick="selectTeacherFilter('subjectFilter',this,'all','全部科目')">
+            全部科目<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="piano" onclick="selectTeacherFilter('subjectFilter',this,'piano','钢琴')">钢琴<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="vocal" onclick="selectTeacherFilter('subjectFilter',this,'vocal','声乐')">声乐<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="theory" onclick="selectTeacherFilter('subjectFilter',this,'theory','乐理')">乐理<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="calligraphy" onclick="selectTeacherFilter('subjectFilter',this,'calligraphy','书法')">书法<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="art" onclick="selectTeacherFilter('subjectFilter',this,'art','美术')">美术<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="guitar" onclick="selectTeacherFilter('subjectFilter',this,'guitar','吉他')">吉他<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="dance" onclick="selectTeacherFilter('subjectFilter',this,'dance','舞蹈')">舞蹈<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="drum" onclick="selectTeacherFilter('subjectFilter',this,'drum','架子鼓')">架子鼓<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="violin" onclick="selectTeacherFilter('subjectFilter',this,'violin','小提琴')">小提琴<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+        </div>
+      </div>
+      <div class="filter-item" id="statusFilter" data-value="active">
+        <div class="filter-trigger" onclick="toggleTeacherFilter('statusFilter')">
+          <span class="ft-label" id="statusLabel">在职</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="active" onclick="selectTeacherFilter('statusFilter',this,'active','在职')">
+            <span class="fo-dot" style="background:var(--success)"></span>在职<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="resigned" onclick="selectTeacherFilter('statusFilter',this,'resigned','已离职')">
+            <span class="fo-dot" style="background:#8e8e93"></span>已离职<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="all" onclick="selectTeacherFilter('statusFilter',this,'all','全部状态')">
+            全部状态<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 薪资Tab子Tab栏 -->
+    <div class="filter-bar sub-tabs" id="salaryFilterBar" style="display:none">
+      <div class="sub-tab active" onclick="switchSalaryTab(this,0)">本月</div>
+      <div class="sub-tab" onclick="switchSalaryTab(this,1)">历史</div>
+      <div class="sub-tab" onclick="switchSalaryTab(this,2)">设置</div>
+    </div>
+    <!-- 排课Tab筛选栏 -->
+    <div class="filter-bar" id="scheduleFilterBar" style="display:none">
+      <div class="filter-item" id="campusFilter" data-value="all">
+        <div class="filter-trigger" onclick="toggleScheduleFilter('campusFilter')">
+          <span class="ft-label" id="campusLabel">全部校区</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="all" onclick="selectScheduleFilter('campusFilter',this,'all','全部校区')">
+            全部校区<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="main" onclick="selectScheduleFilter('campusFilter',this,'main','中心校区')">
+            <span class="fo-dot" style="background:var(--primary)"></span>中心校区<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="east" onclick="selectScheduleFilter('campusFilter',this,'east','东校区')">
+            <span class="fo-dot" style="background:var(--info)"></span>东校区<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="south" onclick="selectScheduleFilter('campusFilter',this,'south','南校区')">
+            <span class="fo-dot" style="background:var(--purple)"></span>南校区<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+        </div>
+      </div>
+      <div class="filter-item" id="schSubjectFilter" data-value="all">
+        <div class="filter-trigger" onclick="toggleScheduleFilter('schSubjectFilter')">
+          <span class="ft-label" id="schSubjectLabel">全部科目</span>
+          <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="filter-dropdown">
+          <div class="filter-option selected" data-val="all" onclick="selectScheduleFilter('schSubjectFilter',this,'all','全部科目')">
+            全部科目<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+          </div>
+          <div class="filter-option" data-val="piano" onclick="selectScheduleFilter('schSubjectFilter',this,'piano','钢琴')">钢琴<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="vocal" onclick="selectScheduleFilter('schSubjectFilter',this,'vocal','声乐')">声乐<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="calligraphy" onclick="selectScheduleFilter('schSubjectFilter',this,'calligraphy','书法')">书法<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+          <div class="filter-option" data-val="art" onclick="selectScheduleFilter('schSubjectFilter',this,'art','美术')">美术<span class="fo-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 教师Tab（默认首页） -->
+  <div class="tab-panel active" id="mainTab0">
+    <div class="teacher-content" id="teacherList"></div>
+  </div>
+
+  <!-- 薪资Tab -->
+  <div class="tab-panel" id="mainTab1">
+    <!-- 本月 -->
+    <div class="salary-sub-panel active" id="salarySub0">
+      <div class="salary-panel">
+        <!-- 发薪规则提醒（最上方） -->
+        <div class="reminder-card">
+          <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          <div class="rc-text">每月 <strong>15号</strong> 发放工资，提前1天推送课时报表</div>
+          <div class="rc-action" onclick="switchSalaryTab(document.querySelectorAll('.sub-tab')[2],2)">设置</div>
+        </div>
+        <!-- 快捷发薪入口卡片 -->
+        <div class="quick-pay-card" id="quickPayCard">
+          <div class="qpc-top">
+            <div class="qpc-left">
+              <div class="qpc-icon">
+                <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+              </div>
+              <div class="qpc-info">
+                <div class="qpc-title">6月工资待处理</div>
+                <div class="qpc-sub"><strong id="qpcPendingCount">3</strong> 位教师待确认/发放</div>
+              </div>
+            </div>
+          </div>
+          <div class="qpc-countdown">
+            <span class="qpc-cd-text">距发薪日还有 <strong id="qpcCountdown">3</strong> 天</span>
+          </div>
+          <div class="qpc-pending-tags" id="qpcPendingTags"></div>
+        </div>
+        <div class="salary-summary">
+          <div class="ss-row">
+            <div class="ss-item highlight"><div class="si-val" id="sumTotal">¥37,400</div><div class="si-label">应发总额</div></div>
+            <div class="ss-item"><div class="si-val">186</div><div class="si-label">总课时</div></div>
+            <div class="ss-item warn"><div class="si-val" id="sumPending2">3</div><div class="si-label">待确认</div></div>
+          </div>
+        </div>
+        <!-- 批量操作栏 -->
+        <div class="batch-bar" id="batchBar">
+          <div class="bb-left">
+            <div class="bb-checkbox" id="batchCheckAll" onclick="toggleBatchAll()">
+              <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+            <span class="bb-label">全选 · 已选 <strong id="batchSelectedCount">0</strong> 人</span>
+          </div>
+          <div class="bb-btns">
+            <button class="bb-btn-sm confirm" onclick="batchAction('confirm')">批量确认</button>
+            <button class="bb-btn-sm pay" onclick="batchAction('pay')">批量发放</button>
+          </div>
+        </div>
+        <div class="sl-title">6月薪资明细</div>
+        <div id="salaryList"></div>
+      </div>
+    </div>
+    <!-- 历史 -->
+    <div class="salary-sub-panel" id="salarySub1">
+      <div class="salary-panel">
+        <div class="history-month-nav">
+          <div class="hmn-arrow" onclick="changeHistoryMonth(-1)"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
+          <div class="hmn-title-wrap" onclick="toggleMonthPicker()">
+            <span class="hmn-title" id="historyMonthTitle">2025年5月</span>
+            <svg class="hmn-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
+          <div class="hmn-arrow" onclick="changeHistoryMonth(1)"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+          <!-- 年月选择器 -->
+          <div class="month-picker" id="monthPicker">
+            <div class="mp-header">
+              <div class="mp-arrow" onclick="event.stopPropagation();pickerYearChange(-1)"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
+              <div class="mp-year" id="pickerYear">2025</div>
+              <div class="mp-arrow" onclick="event.stopPropagation();pickerYearChange(1)"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+            </div>
+            <div class="mp-months" id="pickerMonths"></div>
+          </div>
+        </div>
+        <div class="history-summary">
+          <div class="hs-row">
+            <div class="hs-item"><div class="hsi-val">¥35,200</div><div class="hsi-label">实发总额</div></div>
+            <div class="hs-item"><div class="hsi-val">8</div><div class="hsi-label">发薪人数</div></div>
+            <div class="hs-item"><div class="hsi-val">172</div><div class="hsi-label">总课时</div></div>
+          </div>
+        </div>
+        <div class="history-status-bar">
+          <span class="hsb-tag hsb-done"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> 已发放</span>
+          <span class="hsb-date">发放日期：2025-05-15</span>
+        </div>
+        <div id="historyList"></div>
+      </div>
+    </div>
+    <!-- 设置 -->
+    <div class="salary-sub-panel" id="salarySub2">
+      <div class="salary-panel">
+        <div class="settings-section">
+          <div class="set-title">发薪设置</div>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-label">发薪日</div>
+              <div class="set-value">每月 <strong>15号</strong></div>
+              <div class="set-edit" onclick="openModal('paySettingsModal')">修改</div>
+            </div>
+            <div class="set-row">
+              <div class="set-label">课时报表推送</div>
+              <div class="set-value">发薪前 <strong>1天</strong></div>
+              <div class="set-edit" onclick="openModal('paySettingsModal')">修改</div>
+            </div>
+            <div class="set-row">
+              <div class="set-label">自动确认</div>
+              <div class="set-value">发薪日自动确认未处理薪资</div>
+              <div class="set-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+        </div>
+        <div class="salary-models" id="salaryModelsSection2">
+          <div class="sm-title">工资模型 <span class="smt-add" onclick="openModal('salaryModelModal')">+ 新建薪资模板</span></div>
+          <div class="sm-card" onclick="openModelEdit(0)">
+            <div class="sm-name">标准主讲 <span class="sm-tag sm-tag-default">默认</span></div>
+            <div class="sm-desc">底薪 + 课时费(统一/按班级) + 全勤奖 + 绩效奖金</div>
+            <div class="sm-count">3位教师使用</div>
+          </div>
+          <div class="sm-card model-assist" onclick="openModelEdit(1)">
+            <div class="sm-name">纯课时 <span class="sm-tag tag-info">助教</span></div>
+            <div class="sm-desc">课时费(统一/按班级)，无底薪无奖金</div>
+            <div class="sm-count">2位教师使用</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 排课Tab -->
+  <div class="tab-panel" id="mainTab2">
+    <div class="schedule-panel">
+      <div class="sch-date-nav">
+        <div class="sdn-arrow" onclick="changeWeek(-1)"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
+        <div class="sch-date-center"><div class="sdc-main" id="weekTitle">6月9日 - 6月15日</div><div class="sdc-sub" id="weekSub">本周 8节课</div></div>
+        <div class="sdn-arrow" onclick="changeWeek(1)"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
+      </div>
+      <div class="sch-week-bar" id="weekBar"></div>
+      <div id="scheduleList"></div>
+    </div>
+  </div>
+
+
+<!-- ==================== 教师详情页 ==================== -->
+<div class="page" id="detailPage">
+  <div class="detail-header">
+    <div class="dh-top">
+      <div class="dh-back" onclick="goBack('mainPage')"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
+      <div class="dh-avatar" id="detailAvatar">王</div>
+      <div class="dh-info">
+        <div class="dh-name" id="detailName">王老师</div>
+        <div class="dh-role" id="detailRole">主讲教师 · 钢琴·乐理</div>
+        <div class="dh-phone" id="detailPhone">138****1234</div>
+      </div>
+      <div class="dh-actions">
+        <div class="dh-action-btn" onclick="openEditTeacher()"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
+        <div class="dh-action-btn" onclick="showMoreActions()"><svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
+      </div>
+    </div>
+    <div class="dh-stats">
+      <div class="dh-stat"><div class="ds-val" id="detailHours">42</div><div class="ds-label">本月课时</div></div>
+      <div class="dh-stat"><div class="ds-val" id="detailStudents">8</div><div class="ds-label">授课学员</div></div>
+      <div class="dh-stat"><div class="ds-val" id="detailClasses">3</div><div class="ds-label">带班数</div></div>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item active" onclick="switchTab(this,0)">薪资</div>
+    <div class="tab-item" onclick="switchTab(this,1)">课时</div>
+    <div class="tab-item" onclick="switchTab(this,2)">反馈</div>
+    <div class="tab-item" onclick="switchTab(this,3)">排课</div>
+  </div>
+  <div id="tabContents">
+    <div class="tab-content active" id="tab0">
+      <div class="salary-card" style="cursor:pointer" onclick="openSalaryDetail(currentTeacher?currentTeacher.id:1)">
+        <div class="sc-header"><div class="sc-title">2026年6月工资</div><div class="sc-status pending" id="detailSalaryStatus">待确认</div></div>
+        <div class="salary-row"><span class="sr-label">底薪</span><span class="sr-value" id="dsBase">¥3,000</span></div>
+        <div class="salary-row"><span class="sr-label">课时费</span><span class="sr-value" id="dsLesson">¥4,200</span></div>
+        <div class="salary-row"><span class="sr-label">全勤奖</span><span class="sr-value" id="dsAttend">¥500</span></div>
+        <div class="salary-row"><span class="sr-label">绩效奖金</span><span class="sr-value" id="dsPerf">¥700</span></div>
+        <div class="salary-row"><span class="sr-label">扣款</span><span class="sr-value" id="dsDeduct" style="color:var(--destructive)">-¥0</span></div>
+        <div class="salary-total"><span class="st-label">应发合计</span><span class="st-value" id="dsTotal">¥8,400</span></div>
+        <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--primary)">点击查看工资单详情 →</div>
+      </div>
+      <div class="salary-card">
+        <div class="sc-header"><div class="sc-title">工资模型</div><span style="font-size:12px;color:var(--primary);cursor:pointer" onclick="openEditTeacher()">切换</span></div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)" id="dsModelName">标准主讲</div>
+        <div style="font-size:12px;color:var(--text-sec);margin-top:4px" id="dsModelDesc">底薪 + 课时费(统一/按班级) + 全勤奖 + 绩效奖金</div>
+        <div class="override-card" style="margin-top:10px">
+          <div class="oc-title">班级计费覆盖（排课时设置，优先级最高）</div>
+          <div class="oc-item"><span>钢琴基础班（主讲）</span><span class="oc-rate">¥120/课时</span></div>
+          <div class="oc-item"><span>钢琴进阶班（主讲）</span><span class="oc-rate">¥150/课时</span></div>
+        </div>
+      </div>
+      <div class="salary-card">
+        <div class="sc-header"><div class="sc-title">工资记录</div><span style="font-size:12px;color:var(--primary);cursor:pointer">全部</span></div>
+        <div class="pay-record" onclick="openSalaryDetail(1,'2026-05')"><div class="pr-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><div style="flex:1"><div class="pr-month">5月工资</div><div class="pr-date">2026-06-15 发放</div></div><div><div class="pr-amount">¥7,800</div><div class="pr-status">已发放</div></div></div>
+        <div class="pay-record" onclick="openSalaryDetail(1,'2026-04')"><div class="pr-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><div style="flex:1"><div class="pr-month">4月工资</div><div class="pr-date">2026-05-15 发放</div></div><div><div class="pr-amount">¥8,100</div><div class="pr-status">已发放</div></div></div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab1">
+      <div class="lesson-item"><div class="li-date"><div class="li-day">12</div><div class="li-weekday">周四</div></div><div class="li-info"><div class="li-title">钢琴基础班</div><div class="li-desc">张小明、李思思 等3人 · 14:00-15:30</div></div><div class="li-hours">1.5h</div></div>
+      <div class="lesson-item"><div class="li-date"><div class="li-day">11</div><div class="li-weekday">周三</div></div><div class="li-info"><div class="li-title">乐理课</div><div class="li-desc">王芳、刘洋 等5人 · 16:00-17:00</div></div><div class="li-hours">1.0h</div></div>
+      <div class="lesson-item"><div class="li-date"><div class="li-day">10</div><div class="li-weekday">周二</div></div><div class="li-info"><div class="li-title">钢琴进阶班</div><div class="li-desc">赵敏、钱华 等4人 · 14:00-15:30</div></div><div class="li-hours">1.5h</div></div>
+      <div class="lesson-item"><div class="li-date"><div class="li-day">9</div><div class="li-weekday">周一</div></div><div class="li-info"><div class="li-title">钢琴基础班</div><div class="li-desc">张小明 等3人 · 14:00-15:30</div></div><div class="li-hours">1.5h</div></div>
+    </div>
+    <div class="tab-content" id="tab2">
+      <div class="feedback-card"><div class="fc-student"><div class="fc-avatar" style="background:linear-gradient(135deg,#5EC8A8,#7dd8bc)">张</div><span class="fc-name">张小明</span><span class="fc-date">6月12日</span></div><div class="fc-content">今天练习了车尔尼599第45条，节奏感有明显进步，但手指力度还需加强。</div></div>
+      <div class="feedback-card"><div class="fc-student"><div class="fc-avatar" style="background:linear-gradient(135deg,#9b7ed8,#bda4e8)">李</div><span class="fc-name">李思思</span><span class="fc-date">6月10日</span></div><div class="fc-content">钢琴进阶课表现优秀，肖邦夜曲op9no2的踏板运用越来越细腻了。</div></div>
+    </div>
+    <div class="tab-content" id="tab3">
+      <div class="schedule-item"><div class="si-time">14:00</div><div class="si-dot"><div class="dot"></div><div class="line"></div></div><div class="si-info"><div class="si-title">钢琴基础班</div><div class="si-desc">3人 · 教室A · ¥120/课时</div></div></div>
+      <div class="schedule-item"><div class="si-time">16:00</div><div class="si-dot"><div class="dot"></div><div class="line"></div></div><div class="si-info"><div class="si-title">乐理课</div><div class="si-desc">5人 · 教室B · ¥80/课时</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 工资单详情页（独立页面） ==================== -->
+<div class="page" id="salaryDetailPage">
+  <div class="sd-header">
+    <div class="sd-top">
+      <div class="sd-back" onclick="goBack(salaryDetailFrom)"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
+      <div class="sd-teacher">
+        <div class="sd-avatar" id="sdAvatar">王</div>
+        <div><div class="sd-name" id="sdName">王老师</div><div class="sd-role" id="sdRole">主讲教师</div></div>
+      </div>
+      <div class="sd-status-badge" id="sdStatusBadge">待确认</div>
+    </div>
+    <div class="sd-amount-area">
+      <div class="sd-amount-label">应发金额</div>
+      <div class="sd-amount-val" id="sdAmount">¥8,400</div>
+      <div class="sd-month" id="sdMonth">2026年6月</div>
+    </div>
+  </div>
+  <div class="sd-body">
+    <!-- 状态流转 -->
+    <div class="sd-card">
+      <div class="sd-flow" id="sdFlow"></div>
+    </div>
+    <!-- 金额构成 -->
+    <div class="sd-card">
+      <div class="sd-card-title">金额构成</div>
+      <div class="salary-row"><span class="sr-label">底薪</span><span class="sr-value" id="sdBase">¥3,000</span></div>
+      <div class="salary-row"><span class="sr-label">课时费</span><span class="sr-value" id="sdLesson">¥4,200</span></div>
+      <div class="salary-row"><span class="sr-label">全勤奖</span><span class="sr-value" id="sdAttend">¥500</span></div>
+      <div class="salary-row"><span class="sr-label">绩效奖金</span><span class="sr-value" id="sdPerf">¥700</span></div>
+      <div id="sdDeductions"></div>
+      <div class="salary-row"><span class="sr-label" style="color:var(--destructive)">扣款合计</span><span class="sr-value" id="sdDeductTotal" style="color:var(--destructive)">-¥0</span></div>
+      <div class="salary-total"><span class="st-label">应发合计</span><span class="st-value" id="sdTotal">¥8,400</span></div>
+    </div>
+    <!-- 课时明细 -->
+    <div class="sd-card">
+      <div class="sd-card-title">课时明细 <span class="sdct-action" id="sdLessonCount">42课时</span></div>
+      <div id="sdLessonList"></div>
+    </div>
+    <!-- 扣款 -->
+    <div class="sd-card" id="sdDeductCard">
+      <div class="sd-card-title">扣款/补发 <span class="sdct-action" onclick="openModal('deductionModal')">+ 添加</span></div>
+      <div id="sdDeductList"><div style="text-align:center;padding:12px 0;color:var(--text-light);font-size:13px">暂无扣款记录</div></div>
+    </div>
+  </div>
+  <div class="bottom-bar" id="sdBottomBar">
+    <button class="bb-btn bb-secondary" onclick="goBack(salaryDetailFrom)">返回</button>
+    <button class="bb-btn bb-amber" id="sdActionBtn" onclick="salaryDetailAction()">确认工资</button>
+  </div>
+</div>
+
+<!-- ==================== 弹窗们 ==================== -->
+
+<!-- 添加教师弹窗 -->
+<div class="modal-overlay" id="addTeacherModal">
+  <div class="modal-content">
+    <div class="modal-title">添加教师</div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">姓名</div>
+      <input class="modal-form-input" id="addName" placeholder="请输入教师姓名">
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">手机号</div>
+      <input class="modal-form-input" id="addPhone" placeholder="请输入手机号" type="tel">
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">任教科目</div>
+      <input class="modal-form-input" id="addSubject" placeholder="如：钢琴、声乐、美术">
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">角色</div>
+      <div class="modal-select" id="addRoleSelect">
+        <div class="modal-select-item active" onclick="selectRole(this,'lead')">主讲教师</div>
+        <div class="modal-select-item" onclick="selectRole(this,'assist')">助教教师</div>
+        <div class="modal-select-item" onclick="selectRole(this,'parttime')">兼职教师</div>
+      </div>
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">工资模型</div>
+      <div class="modal-select" id="addModelSelect">
+        <div class="modal-select-item active" onclick="selectModel(this,0)">标准主讲</div>
+        <div class="modal-select-item" onclick="selectModel(this,1)">纯课时</div>
+        <div class="modal-select-item" onclick="selectModel(this,2)">自定义</div>
+      </div>
+    </div>
+    <div id="addCustomModel" style="display:none">
+      <div class="modal-form-group"><div class="modal-form-label">底薪</div><input class="modal-form-input" id="addCBase" placeholder="0" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">默认课时费（元/课时）</div><input class="modal-form-input" id="addCRate" placeholder="0" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">全勤奖</div><input class="modal-form-input" id="addCAttend" placeholder="0" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">绩效奖金</div><input class="modal-form-input" id="addCPerf" placeholder="0" type="number"></div>
+    </div>
+    <button class="modal-btn" onclick="addTeacher()">保存</button>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal('addTeacherModal')">取消</button>
+  </div>
+</div>
+
+<!-- 编辑教师弹窗 -->
+<div class="modal-overlay" id="editTeacherModal">
+  <div class="modal-content">
+    <div class="modal-title">编辑教师信息</div>
+    <div class="modal-form-group"><div class="modal-form-label">姓名</div><input class="modal-form-input" id="editName"></div>
+    <div class="modal-form-group"><div class="modal-form-label">手机号</div><input class="modal-form-input" id="editPhone" type="tel"></div>
+    <div class="modal-form-group"><div class="modal-form-label">任教科目</div><input class="modal-form-input" id="editSubject"></div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">角色</div>
+      <div class="modal-select" id="editRoleSelect">
+        <div class="modal-select-item" onclick="selectEditRole(this,'lead')">主讲教师</div>
+        <div class="modal-select-item" onclick="selectEditRole(this,'assist')">助教教师</div>
+        <div class="modal-select-item" onclick="selectEditRole(this,'parttime')">兼职教师</div>
+      </div>
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">工资模型</div>
+      <div class="modal-select" id="editModelSelect">
+        <div class="modal-select-item" onclick="selectEditModel(this,0)">标准主讲</div>
+        <div class="modal-select-item" onclick="selectEditModel(this,1)">纯课时</div>
+        <div class="modal-select-item" onclick="selectEditModel(this,2)">自定义</div>
+      </div>
+    </div>
+    <div id="editCustomModel" style="display:none">
+      <div class="modal-form-group"><div class="modal-form-label">底薪</div><input class="modal-form-input" id="editCBase" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">课时费（元/课时）</div><input class="modal-form-input" id="editCRate" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">全勤奖</div><input class="modal-form-input" id="editCAttend" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">绩效奖金</div><input class="modal-form-input" id="editCPerf" type="number"></div>
+    </div>
+    <button class="modal-btn" onclick="saveEditTeacher()">保存</button>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal('editTeacherModal')">取消</button>
+  </div>
+</div>
+
+<!-- 工资模型弹窗 -->
+<div class="modal-overlay" id="salaryModelModal">
+  <div class="modal-content">
+    <div class="modal-title" id="modelModalTitle">新建工资模型</div>
+    <div class="modal-form-group"><div class="modal-form-label">模型名称</div><input class="modal-form-input" id="modelName" placeholder="如：资深主讲"></div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">模型类型</div>
+      <div class="modal-select" id="modelTypeSelect">
+        <div class="modal-select-item active" onclick="selectModelType(this,'standard')">标准（底薪+课时+奖金）</div>
+        <div class="modal-select-item" onclick="selectModelType(this,'hourly')">纯课时</div>
+      </div>
+    </div>
+    <div id="modelStandardFields">
+      <div class="modal-form-group"><div class="modal-form-label">底薪</div><input class="modal-form-input" id="modelBase" placeholder="0" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">默认课时费（元/课时）</div><input class="modal-form-input" id="modelRate" placeholder="0" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">全勤奖</div><input class="modal-form-input" id="modelAttend" placeholder="0" type="number"></div>
+      <div class="modal-form-group"><div class="modal-form-label">绩效奖金</div><input class="modal-form-input" id="modelPerf" placeholder="0" type="number"></div>
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">分配教师</div>
+      <div class="modal-teacher-list" id="modelTeacherList"></div>
+    </div>
+    <button class="modal-btn" onclick="saveSalaryModel()">保存</button>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal('salaryModelModal')">取消</button>
+  </div>
+</div>
+
+<!-- 发放设置弹窗 -->
+<div class="modal-overlay" id="paySettingsModal">
+  <div class="modal-content">
+    <div class="modal-title">发放设置</div>
+    <div class="modal-row"><span class="modal-label">每月发薪日</span><input class="modal-input" id="payDay" value="15" type="number" min="1" max="28"> <span style="font-size:13px;color:var(--text-sec)">号</span></div>
+    <div class="modal-row"><span class="modal-label">提前推送天数</span><input class="modal-input" id="pushDays" value="1" type="number" min="0" max="7"> <span style="font-size:13px;color:var(--text-sec)">天</span></div>
+    <button class="modal-btn" onclick="savePaySettings()">保存</button>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal('paySettingsModal')">取消</button>
+  </div>
+</div>
+
+<!-- 扣款弹窗 -->
+<div class="modal-overlay" id="deductionModal">
+  <div class="modal-content">
+    <div class="modal-title">添加扣款/补发</div>
+    <div class="modal-form-group"><div class="modal-form-label">类型</div>
+      <div class="modal-select" id="deductTypeSelect">
+        <div class="modal-select-item active" onclick="selectDeductType(this,'deduct')">扣款</div>
+        <div class="modal-select-item" onclick="selectDeductType(this,'bonus')">补发</div>
+      </div>
+    </div>
+    <div class="modal-form-group"><div class="modal-form-label">原因</div><input class="modal-form-input" id="deductReason" placeholder="如：迟到扣款"></div>
+    <div class="modal-form-group"><div class="modal-form-label">金额</div><input class="modal-form-input" id="deductAmount" placeholder="0" type="number"></div>
+    <button class="modal-btn modal-btn-amber" onclick="addDeduction()">确认添加</button>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal('deductionModal')">取消</button>
+  </div>
+</div>
+
+<!-- 更多操作弹窗 -->
+<div class="modal-overlay" id="moreActionsModal">
+  <div class="modal-content">
+    <div class="modal-title">更多操作</div>
+    <div class="modal-row" style="cursor:pointer" onclick="closeModal('moreActionsModal');confirmResign()"><span class="modal-label" style="color:var(--destructive)">标记离职</span></div>
+    <div class="modal-row" style="cursor:pointer" onclick="closeModal('moreActionsModal');showToast('功能开发中')"><span class="modal-label">导出工资记录</span></div>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal('moreActionsModal')">取消</button>
+  </div>
+</div>
+
+<!-- 离职确认弹窗 -->
+<div class="modal-overlay" id="resignConfirmModal">
+  <div class="modal-content">
+    <div class="modal-title">确认标记离职</div>
+    <div class="pcf-info" id="resignConfirmInfo"></div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">离职类型</div>
+      <div class="modal-select" id="resignTypeSelect">
+        <div class="modal-select-item active" onclick="selectResignType(this,'quit')">主动离职</div>
+        <div class="modal-select-item" onclick="selectResignType(this,'expire')">合同到期</div>
+        <div class="modal-select-item" onclick="selectResignType(this,'dismiss')">辞退</div>
+      </div>
+    </div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">离职原因（选填）</div>
+      <textarea class="pcf-remark" id="resignReason" placeholder="可填写离职原因" rows="2"></textarea>
+    </div>
+    <div class="pcf-btns">
+      <button class="modal-btn modal-btn-cancel" onclick="closeModal('resignConfirmModal')" style="margin-top:0">取消</button>
+      <button class="modal-btn modal-btn-amber" onclick="doResign()" style="margin-top:0;background:var(--destructive)">确认离职</button>
+    </div>
+  </div>
+</div>
+
+<!-- 发放确认弹窗 -->
+<div class="modal-overlay" id="payConfirmModal">
+  <div class="modal-content">
+    <div class="modal-title" id="payConfirmTitle">确认发放</div>
+    <div class="pcf-info" id="payConfirmInfo"></div>
+    <div class="modal-form-group">
+      <div class="modal-form-label">备注（选填）</div>
+      <textarea class="pcf-remark" id="payConfirmRemark" placeholder="可填写发放说明、特殊调整等" rows="3"></textarea>
+    </div>
+    <div class="pcf-btns">
+      <button class="modal-btn modal-btn-cancel" onclick="closeModal('payConfirmModal')" style="margin-top:0">取消</button>
+      <button class="modal-btn modal-btn-amber" id="payConfirmBtn" onclick="confirmPayAction()" style="margin-top:0">确认发放</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const teachers=[
+  {id:1,name:'王老师',role:'lead',roleText:'主讲',subject:'钢琴·乐理',phone:'138****1234',hours:42,students:8,classes:3,base:3000,rate:100,attend:500,perf:700,salaryStatus:'pending',modelIdx:0,color:'linear-gradient(135deg,#5EC8A8,#7dd8bc)',initial:'王',deductions:[],status:'active'},
+  {id:2,name:'李老师',role:'lead',roleText:'主讲',subject:'声乐',phone:'139****5678',hours:36,students:6,classes:2,base:3000,rate:100,attend:500,perf:100,salaryStatus:'paid',modelIdx:0,color:'linear-gradient(135deg,#9b7ed8,#bda4e8)',initial:'李',deductions:[],status:'active'},
+  {id:3,name:'张老师',role:'assist',roleText:'助教',subject:'钢琴',phone:'137****9012',hours:24,students:5,classes:2,base:0,rate:100,attend:0,perf:0,salaryStatus:'pending',modelIdx:1,color:'linear-gradient(135deg,#6ba3d6,#8fc0e8)',initial:'张',deductions:[{reason:'迟到扣款',amount:200,type:'deduct'}],status:'active'},
+  {id:4,name:'陈老师',role:'lead',roleText:'主讲',subject:'书法·美术',phone:'136****3456',hours:28,students:7,classes:2,base:2500,rate:100,attend:0,perf:300,salaryStatus:'confirmed',modelIdx:0,color:'linear-gradient(135deg,#e88aaa,#f0b3c7)',initial:'陈',deductions:[],status:'active'},
+  {id:5,name:'赵老师',role:'assist',roleText:'助教',subject:'美术',phone:'135****7890',hours:18,students:4,classes:1,base:0,rate:100,attend:0,perf:0,salaryStatus:'pending',modelIdx:1,color:'linear-gradient(135deg,#d4a24e,#e8c47a)',initial:'赵',deductions:[],status:'active'},
+  {id:6,name:'周老师',role:'parttime',roleText:'兼职',subject:'吉他',phone:'133****2468',hours:12,students:3,classes:1,base:0,rate:120,attend:0,perf:0,salaryStatus:'pending',modelIdx:1,color:'linear-gradient(135deg,#f0963c,#f5b66a)',initial:'周',deductions:[],status:'active'},
+  {id:7,name:'吴老师',role:'parttime',roleText:'兼职',subject:'舞蹈',phone:'132****1357',hours:8,students:6,classes:1,base:0,rate:80,attend:0,perf:0,salaryStatus:'confirmed',modelIdx:1,color:'linear-gradient(135deg,#45b7a0,#6dd5be)',initial:'吴',deductions:[],status:'active'},
+  {id:8,name:'孙老师',role:'parttime',roleText:'兼职',subject:'架子鼓',phone:'131****9753',hours:6,students:2,classes:1,base:0,rate:150,attend:0,perf:0,salaryStatus:'paid',modelIdx:1,color:'linear-gradient(135deg,#e06050,#f08070)',initial:'孙',deductions:[],status:'active'},
+  {id:9,name:'郑老师',role:'lead',roleText:'主讲',subject:'声乐·乐理',phone:'130****8642',hours:0,students:0,classes:0,base:3000,rate:100,attend:0,perf:0,salaryStatus:'paid',modelIdx:0,color:'linear-gradient(135deg,#8e7cc3,#b09de0)',initial:'郑',deductions:[],status:'resigned',resignType:'主动离职',resignDate:'2026-05-20',resignReason:'个人发展'},
+  {id:10,name:'黄老师',role:'assist',roleText:'助教',subject:'钢琴',phone:'129****7531',hours:0,students:0,classes:0,base:0,rate:100,attend:0,perf:0,salaryStatus:'paid',modelIdx:1,color:'linear-gradient(135deg,#7ca8c0,#9dc8e0)',initial:'黄',deductions:[],status:'resigned',resignType:'合同到期',resignDate:'2026-04-30',resignReason:'合同未续签'},
+  {id:11,name:'林老师',role:'parttime',roleText:'兼职',subject:'小提琴',phone:'128****6420',hours:0,students:0,classes:0,base:0,rate:100,attend:0,perf:0,salaryStatus:'paid',modelIdx:1,color:'linear-gradient(135deg,#c4a35a,#e0c47a)',initial:'林',deductions:[],status:'resigned',resignType:'辞退',resignDate:'2026-05-10',resignReason:'教学考核不达标'}
+];
+const scheduleData={'2026-06-09':[{time:'14:00',title:'钢琴基础班',desc:'3人·教室A·1.5h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥120/课时'},{time:'16:00',title:'乐理课',desc:'5人·教室B·1h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥80/课时'}],'2026-06-10':[{time:'14:00',title:'钢琴进阶班',desc:'4人·教室B·1.5h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥150/课时'},{time:'10:00',title:'声乐基础班',desc:'4人·教室A·1.5h',teachers:[{name:'李老师',role:'lead',id:2}],rate:'¥100/课时'}],'2026-06-11':[{time:'09:00',title:'声乐基础班',desc:'4人·教室A·1.5h',teachers:[{name:'李老师',role:'lead',id:2}],rate:'¥100/课时'},{time:'10:30',title:'钢琴基础班',desc:'3人·教室B·1.5h',teachers:[{name:'王老师',role:'lead',id:1},{name:'张老师',role:'assist',id:3}],rate:'主讲¥120·助教¥60'},{time:'16:00',title:'乐理课',desc:'5人·教室B·1h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥80/课时'}],'2026-06-12':[{time:'09:00',title:'声乐基础班',desc:'4人·教室A·1.5h',teachers:[{name:'李老师',role:'lead',id:2}],rate:'¥100/课时'},{time:'10:30',title:'钢琴基础班',desc:'3人·教室B·1.5h',teachers:[{name:'王老师',role:'lead',id:1},{name:'张老师',role:'assist',id:3}],rate:'主讲¥120·助教¥60'},{time:'14:00',title:'书法班',desc:'5人·教室C·2h',teachers:[{name:'陈老师',role:'lead',id:4}],rate:'¥100/课时'},{time:'16:00',title:'乐理课',desc:'5人·教室B·1h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥80/课时'}],'2026-06-13':[{time:'10:00',title:'美术班',desc:'4人·教室D·1.5h',teachers:[{name:'陈老师',role:'lead',id:4},{name:'赵老师',role:'assist',id:5}],rate:'主讲¥100·助教¥50'},{time:'15:00',title:'声乐进阶班',desc:'3人·教室A·1.5h',teachers:[{name:'李老师',role:'lead',id:2}],rate:'¥120/课时'}],'2026-06-14':[{time:'09:30',title:'钢琴进阶班',desc:'4人·教室B·1.5h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥150/课时'},{time:'14:00',title:'钢琴一对一',desc:'1人·教室C·1h',teachers:[{name:'王老师',role:'lead',id:1}],rate:'¥150/课时'},{time:'15:30',title:'美术班',desc:'4人·教室D·1.5h',teachers:[{name:'陈老师',role:'lead',id:4},{name:'赵老师',role:'assist',id:5}],rate:'主讲¥100·助教¥50'}],'2026-06-15':[{time:'10:00',title:'声乐基础班',desc:'4人·教室A·1.5h',teachers:[{name:'李老师',role:'lead',id:2}],rate:'¥100/课时'}]};
+let currentTeacher=null,currentFilter='all',currentSubject='all',currentStatus='active',selectedDate='2026-06-12',weekOffset=0,salaryDetailFrom='mainPage',addRole='lead',addModelIdx=0,editRole='lead',editModelIdx=0;
+
+function calcTotal(t){const lf=t.hours*t.rate;return t.base+lf+t.attend+t.perf-t.deductions.reduce((s,d)=>s+(d.type==='deduct'?d.amount:-d.amount),0);}
+function switchMainTab(el,idx){document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));const panel=document.getElementById('mainTab'+idx);panel.classList.add('active');panel.style.animation='none';panel.offsetHeight;panel.style.animation='';const tfb=document.getElementById('teacherFilterBar');const sfb=document.getElementById('salaryFilterBar');const cfb=document.getElementById('scheduleFilterBar');if(tfb)tfb.style.display=idx===0?'flex':'none';if(sfb)sfb.style.display=idx===1?'flex':'none';if(cfb)cfb.style.display=idx===2?'flex':'none';if(idx===0)renderList();if(idx===1)renderSalaryList();if(idx===2)renderScheduleTab();}
+function switchSalaryTab(el,idx){document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.salary-sub-panel').forEach(p=>p.classList.remove('active'));const panel=document.getElementById('salarySub'+idx);panel.classList.add('active');if(idx===1)renderHistoryList();}
+function renderList(){const list=document.getElementById('teacherList');const subjectMap={piano:'钢琴',vocal:'声乐',theory:'乐理',calligraphy:'书法',art:'美术',guitar:'吉他',dance:'舞蹈',drum:'架子鼓',violin:'小提琴'};const filtered=teachers.filter(t=>{if(currentFilter!=='all'&&currentFilter!==t.role)return false;if(currentSubject!=='all'){const subLabel=subjectMap[currentSubject]||'';if(!t.subject.includes(subLabel))return false;}if(currentStatus!=='all'&&currentStatus!==t.status)return false;return true;});const activeCount=teachers.filter(t=>t.status==='active').length;document.getElementById('statTotal').textContent=activeCount;const pc=teachers.filter(t=>t.salaryStatus!=='paid'&&t.status==='active').length;document.getElementById('statPending').textContent=pc;const badge=document.getElementById('salaryBadge');if(badge)badge.textContent=pc;const roleTagMap={lead:'tag-primary',assist:'tag-info',parttime:'tag-parttime'};const resignBadgeMap={'主动离职':'rb-quit','合同到期':'rb-expire','辞退':'rb-dismiss'};list.innerHTML=filtered.map(t=>{const total=calcTotal(t);const sm={pending:{text:'待确认',cls:'tag-amber'},confirmed:{text:'已确认',cls:'tag-purple'},paid:{text:'已发放',cls:'tag-success'}};const s=sm[t.salaryStatus];const isResigned=t.status==='resigned';const roleTag=roleTagMap[t.role]||'tag-info';const resignCls=isResigned?' status-resigned':'';let resignHtml='';if(isResigned){const rbCls=resignBadgeMap[t.resignType]||'rb-quit';resignHtml=`<div class="resign-info"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg><span class="ri-type">${t.resignType}</span><span>${t.resignReason}</span><span class="ri-date">${t.resignDate}</span></div>`;}return`<div class="card role-${t.role}${resignCls}" onclick="openDetail(${t.id})"><div class="tc-top"><div class="tc-avatar" style="background:${t.color}">${t.initial}</div><div class="tc-info"><div class="tc-name">${t.name} <span class="tag ${roleTag}">${t.roleText}</span>${isResigned?'<span class="tag tag-resigned">已离职</span>':''}</div><div class="tc-meta">${t.phone} <span class="dot"></span> ${t.subject}</div></div><div class="tc-right"><div class="tc-hours">${t.hours}</div><div class="tc-hours-label">${isResigned?'已离职':'本月课时'}</div></div></div>${!isResigned?`<div class="tc-salary-status"><div class="tc-salary-row"><span class="tag ${s.cls}" style="font-size:10px">${s.text}</span><span style="font-size:12px;color:var(--text-sec)">6月工资</span></div><div class="tc-salary-amount" style="color:${t.salaryStatus==='paid'?'var(--success)':'var(--amber)'}">¥${total.toLocaleString()}</div></div>`:''}${resignHtml}</div>`;}).join('');if(!filtered.length)list.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--text-light);font-size:13px">暂无匹配的教师</div>';}
+// 下拉筛选交互
+function toggleTeacherFilter(id){const item=document.getElementById(id);const wasOpen=item.classList.contains('open');document.querySelectorAll('#teacherFilterBar .filter-item').forEach(i=>i.classList.remove('open'));if(!wasOpen)item.classList.add('open');}
+function selectTeacherFilter(filterId,el,val,label){const item=document.getElementById(filterId);item.dataset.value=val;item.classList.remove('open');item.querySelectorAll('.filter-option').forEach(o=>o.classList.remove('selected'));el.classList.add('selected');const trigger=item.querySelector('.filter-trigger');if(filterId==='statusFilter'){trigger.classList.toggle('active',val!=='active');}else{trigger.classList.toggle('active',val!=='all');}if(filterId==='roleFilter'){currentFilter=val;document.getElementById('roleLabel').textContent=val==='all'?'全部角色':label;}else if(filterId==='subjectFilter'){currentSubject=val;document.getElementById('subjectLabel').textContent=val==='all'?'全部科目':label;}else if(filterId==='statusFilter'){currentStatus=val;document.getElementById('statusLabel').textContent=label;}renderList();}
+function setFilter(el,filter){currentFilter=filter;renderList();}
+function toggleCollapse(id){const el=document.getElementById(id);el.classList.toggle('collapsed');const textEl=document.getElementById(id.replace('Section','ToggleText'));if(textEl)textEl.textContent=el.classList.contains('collapsed')?'展开':'收起';}
+function renderSalaryList(){const list=document.getElementById('salaryList');const roleTagMap={lead:'tag-primary',assist:'tag-info',parttime:'tag-parttime'};let totalAll=0,pendingCount=0;const activeTeachers=teachers.filter(t=>t.status==='active'||t.salaryStatus!=='paid');list.innerHTML=activeTeachers.map(t=>{const lf=t.hours*t.rate;const total=calcTotal(t);totalAll+=total;if(t.salaryStatus==='pending'||t.salaryStatus==='confirmed')pendingCount++;const sm={pending:{text:'待确认',cls:'tag-amber',btnText:'确认',btnCls:'sl-btn-confirm'},confirmed:{text:'已确认',cls:'tag-purple',btnText:'发放',btnCls:'sl-btn-pay'},paid:{text:'已发放',cls:'tag-success',btnText:'已完成',btnCls:'sl-btn-done'}};const s=sm[t.salaryStatus];const roleTag=roleTagMap[t.role]||'tag-info';return`<div class="salary-item${t.salaryStatus!=='paid'?' selectable':''}" data-id="${t.id}" onclick="openSalaryDetail(${t.id})">${t.salaryStatus!=='paid'?`<div class="si-check" onclick="event.stopPropagation();toggleSalaryCheck(this,${t.id})"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>`:''}<div class="sl-top"><div class="sl-avatar" style="background:${t.color}">${t.initial}</div><div class="sl-info"><div class="sl-name">${t.name} <span class="tag ${roleTag}">${t.roleText}</span> ${t.status==='resigned'?'<span class="tag tag-destructive" style="font-size:10px">已离职</span> ':''}<span class="tag ${s.cls}" style="font-size:10px">${s.text}</span></div><div class="sl-meta">${t.hours}课时 · ${t.subject}</div></div><div class="sl-right"><div class="sl-amount">¥${total.toLocaleString()}</div><div class="sl-status-text">6月工资</div></div></div><div class="sl-breakdown">${t.base?`<span class="tag tag-primary">底薪¥${t.base}</span>`:''}<span class="tag tag-info">课时¥${lf}</span>${t.attend?`<span class="tag tag-amber">全勤¥${t.attend}</span>`:''}${t.perf?`<span class="tag tag-purple">绩效¥${t.perf}</span>`:''}</div><div class="sl-actions"><button class="sl-btn sl-btn-primary" onclick="event.stopPropagation();openSalaryDetail(${t.id})">查看工资单</button>${t.salaryStatus!=='paid'?`<button class="sl-btn ${s.btnCls}" onclick="event.stopPropagation();quickAction(${t.id})">${s.btnText}</button>`:''}</div></div>`;}).join('');document.getElementById('sumTotal').textContent=`¥${totalAll.toLocaleString()}`;document.getElementById('sumPending2').textContent=pendingCount;updatePendingCount();}
+function quickAction(id){const t=teachers.find(x=>x.id===id);if(t.salaryStatus==='pending'){t.salaryStatus='confirmed';showToast(`${t.name} 工资已确认`);renderSalaryList();renderList();updatePendingCount();}else if(t.salaryStatus==='confirmed'){pendingPayAction={type:'single',ids:[id]};const total=calcTotal(t);document.getElementById('payConfirmTitle').textContent='确认发放';document.getElementById('payConfirmInfo').innerHTML=`确认发放 <span class="pcf-name">${t.name}</span> 的6月工资<br>发放金额：<span class="pcf-amount">¥${total.toLocaleString()}</span>`;document.getElementById('payConfirmRemark').value='';document.getElementById('payConfirmBtn').textContent='确认发放';openModal('payConfirmModal');}else{showToast('工资已发放');}}
+let pendingPayAction=null;
+function confirmPayAction(){if(!pendingPayAction)return;const remark=document.getElementById('payConfirmRemark').value.trim();let lastPaidId=null;if(pendingPayAction.type==='single'){const id=pendingPayAction.ids[0];const t=teachers.find(x=>x.id===id);if(t){t.salaryStatus='paid';t.payRemark=remark;showToast(`${t.name} 工资已发放`);lastPaidId=id;}}else if(pendingPayAction.type==='batch'){let count=0;pendingPayAction.ids.forEach(id=>{const t=teachers.find(x=>x.id===id);if(t&&t.salaryStatus==='confirmed'){t.salaryStatus='paid';t.payRemark=remark;count++;}});if(count>0)showToast(`已发放 ${count} 位教师工资`);}pendingPayAction=null;closeModal('payConfirmModal');renderSalaryList();renderList();updatePendingCount();if(lastPaidId&&document.getElementById('salaryDetailPage').classList.contains('active')){openSalaryDetail(lastPaidId);}}
+// 排课
+function renderScheduleTab(){renderWeekBar();renderScheduleList();}
+function renderWeekBar(){const bar=document.getElementById('weekBar');const today=new Date('2026-06-12');const dow=today.getDay();const monday=new Date(today);monday.setDate(today.getDate()-(dow===0?6:dow-1)+weekOffset*7);const weekDays=['一','二','三','四','五','六','日'];const todayStr='2026-06-12';let html='',weekDates=[];for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);const ds=d.toISOString().slice(0,10);weekDates.push(ds);const isToday=ds===todayStr,isSelected=ds===selectedDate;const hasClass=scheduleData[ds]&&scheduleData[ds].length>0;html+=`<div class="sch-week-day${isToday?' today':''}${isSelected?' selected':''}" onclick="selectDate('${ds}')"><div class="swd-day">周${weekDays[i]}</div><div class="swd-date">${d.getDate()}</div>${hasClass?'<div class="swd-dot"></div>':''}</div>`;}bar.innerHTML=html;const ss=`${monday.getMonth()+1}月${monday.getDate()}日`;const ed=new Date(monday);ed.setDate(monday.getDate()+6);document.getElementById('weekTitle').textContent=`${ss} - ${ed.getMonth()+1}月${ed.getDate()}日`;let tc=0;weekDates.forEach(d=>{if(scheduleData[d])tc+=scheduleData[d].length;});document.getElementById('weekSub').textContent=`本周 ${tc}节课`;}
+function selectDate(ds){selectedDate=ds;renderWeekBar();renderScheduleList();}
+function changeWeek(dir){weekOffset+=dir;const today=new Date('2026-06-12');const dow=today.getDay();const monday=new Date(today);monday.setDate(today.getDate()-(dow===0?6:dow-1)+weekOffset*7);const nd=new Date(monday);nd.setDate(monday.getDate()+(dow===0?6:dow-1));selectedDate=nd.toISOString().slice(0,10);renderWeekBar();renderScheduleList();}
+function renderScheduleList(){const container=document.getElementById('scheduleList');const items=scheduleData[selectedDate]||[];const dateObj=new Date(selectedDate);const isToday=selectedDate==='2026-06-12';const weekDays=['周日','周一','周二','周三','周四','周五','周六'];let html=`<div class="sch-section-title">${dateObj.getMonth()+1}月${dateObj.getDate()}日 ${weekDays[dateObj.getDay()]}${isToday?'<span class="sch-today-tag">今日</span>':''}</div>`;if(!items.length){html+=`<div class="sch-empty"><svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>当日暂无排课</div>`;}else{items.forEach((item,i)=>{const isLast=i===items.length-1;html+=`<div class="sch-item"><div class="sch-time">${item.time}</div><div class="sch-dot"><div class="dot"></div>${!isLast?'<div class="line"></div>':''}</div><div class="sch-info"><div class="sch-title">${item.title}</div><div class="sch-desc">${item.desc}</div><div class="sch-teachers">${item.teachers.map(t=>`<span class="sch-teacher-tag ${t.role}" onclick="event.stopPropagation();openDetail(${t.id})">${t.name} ${t.role==='lead'?'主讲':'助教'}</span>`).join('')}</div><div class="sch-rate">${item.rate}</div></div></div>`;});}container.innerHTML=html;}
+// 教师详情
+function openDetail(id){currentTeacher=teachers.find(t=>t.id===id);const t=currentTeacher;document.getElementById('detailAvatar').textContent=t.initial;document.getElementById('detailName').textContent=t.name;document.getElementById('detailRole').textContent=`${t.roleText}教师 · ${t.subject}`;document.getElementById('detailPhone').textContent=t.phone;document.getElementById('detailHours').textContent=t.hours;document.getElementById('detailStudents').textContent=t.students;document.getElementById('detailClasses').textContent=t.classes;const lf=t.hours*t.rate;const total=calcTotal(t);document.getElementById('dsBase').textContent=`¥${t.base.toLocaleString()}`;document.getElementById('dsLesson').textContent=`¥${lf.toLocaleString()}`;document.getElementById('dsAttend').textContent=`¥${t.attend.toLocaleString()}`;document.getElementById('dsPerf').textContent=`¥${t.perf.toLocaleString()}`;const deductTotal=t.deductions.reduce((s,d)=>s+(d.type==='deduct'?d.amount:-d.amount),0);document.getElementById('dsDeduct').textContent=`-¥${deductTotal.toLocaleString()}`;document.getElementById('dsTotal').textContent=`¥${total.toLocaleString()}`;const sm={pending:{text:'待确认',cls:'pending'},confirmed:{text:'已确认',cls:'confirmed'},paid:{text:'已发放',cls:'paid'}};const s=sm[t.salaryStatus];const el=document.getElementById('detailSalaryStatus');el.textContent=s.text;el.className='sc-status '+s.cls;const modelNames=['标准主讲','纯课时','自定义'];document.getElementById('dsModelName').textContent=modelNames[t.modelIdx]||'自定义';document.getElementById('dsModelDesc').textContent=t.modelIdx===0?'底薪 + 课时费 + 全勤奖 + 绩效奖金':'课时费(统一/按班级)';showPage('detailPage');}
+function switchTab(el,idx){document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));document.getElementById('tab'+idx).classList.add('active');}
+function openEditTeacher(){if(!currentTeacher)return;const t=currentTeacher;document.getElementById('editName').value=t.name;document.getElementById('editPhone').value=t.phone.replace(/\*/g,'1234');document.getElementById('editSubject').value=t.subject;editRole=t.role;editModelIdx=t.modelIdx;document.querySelectorAll('#editRoleSelect .modal-select-item').forEach((el,i)=>{const roles=['lead','assist','parttime'];el.classList.toggle('active',roles[i]===t.role);});document.querySelectorAll('#editModelSelect .modal-select-item').forEach((el,i)=>{el.classList.toggle('active',i===t.modelIdx);});document.getElementById('editCustomModel').style.display=t.modelIdx===2?'block':'none';if(t.modelIdx===2){document.getElementById('editCBase').value=t.base;document.getElementById('editCRate').value=t.rate;document.getElementById('editCAttend').value=t.attend;document.getElementById('editCPerf').value=t.perf;}openModal('editTeacherModal');}
+function selectEditRole(el,role){editRole=role;document.querySelectorAll('#editRoleSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+function selectEditModel(el,idx){editModelIdx=idx;document.querySelectorAll('#editModelSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');document.getElementById('editCustomModel').style.display=idx===2?'block':'none';}
+function saveEditTeacher(){if(!currentTeacher)return;const t=currentTeacher;t.name=document.getElementById('editName').value||t.name;t.phone=document.getElementById('editPhone').value||t.phone;t.subject=document.getElementById('editSubject').value||t.subject;t.role=editRole;t.roleText=editRole==='lead'?'主讲':editRole==='parttime'?'兼职':'助教';t.modelIdx=editModelIdx;if(editModelIdx===2){t.base=parseInt(document.getElementById('editCBase').value)||0;t.rate=parseInt(document.getElementById('editCRate').value)||0;t.attend=parseInt(document.getElementById('editCAttend').value)||0;t.perf=parseInt(document.getElementById('editCPerf').value)||0;}else if(editModelIdx===1){t.base=0;t.attend=0;t.perf=0;t.rate=100;}else{t.base=3000;t.rate=100;t.attend=500;t.perf=700;}closeModal('editTeacherModal');openDetail(t.id);showToast('教师信息已更新');}
+function showMoreActions(){openModal('moreActionsModal');}
+let resignType='quit';
+function selectResignType(el,type){resignType=type;document.querySelectorAll('#resignTypeSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+function confirmResign(){if(!currentTeacher)return;const t=currentTeacher;const unpaid=t.salaryStatus!=='paid';document.getElementById('resignConfirmInfo').innerHTML=`确认将 <span class="pcf-name">${t.name}</span> 标记为离职？${unpaid?'<br><span style="color:var(--destructive);font-weight:500">该教师尚有未结清薪资，离职后仍可在薪资列表中处理</span>':''}`;document.getElementById('resignReason').value='';resignType='quit';document.querySelectorAll('#resignTypeSelect .modal-select-item').forEach((e,i)=>e.classList.toggle('active',i===0));openModal('resignConfirmModal');}
+function doResign(){if(!currentTeacher)return;const t=currentTeacher;t.status='resigned';t.resignType=resignType;t.resignDate=new Date().toISOString().slice(0,10);t.resignReason=document.getElementById('resignReason').value.trim();closeModal('resignConfirmModal');renderList();renderSalaryList();updatePendingCount();showToast(`${t.name} 已标记离职`);}
+// 工资单详情页
+function openSalaryDetail(id,month){const t=teachers.find(x=>x.id===id);if(!t)return;salaryDetailFrom=document.getElementById('detailPage').classList.contains('active')?'detailPage':'mainPage';document.getElementById('sdAvatar').textContent=t.initial;document.getElementById('sdAvatar').style.background=t.color;document.getElementById('sdName').textContent=t.name;document.getElementById('sdRole').textContent=t.roleText+'教师';const lf=t.hours*t.rate;const total=calcTotal(t);const deductTotal=t.deductions.reduce((s,d)=>s+(d.type==='deduct'?d.amount:-d.amount),0);document.getElementById('sdBase').textContent=`¥${t.base.toLocaleString()}`;document.getElementById('sdLesson').textContent=`¥${lf.toLocaleString()}`;document.getElementById('sdAttend').textContent=`¥${t.attend.toLocaleString()}`;document.getElementById('sdPerf').textContent=`¥${t.perf.toLocaleString()}`;document.getElementById('sdDeductTotal').textContent=`-¥${deductTotal.toLocaleString()}`;document.getElementById('sdTotal').textContent=`¥${total.toLocaleString()}`;document.getElementById('sdAmount').textContent=`¥${total.toLocaleString()}`;document.getElementById('sdMonth').textContent=month?`${month.replace('-','年')}月`:'2026年6月';document.getElementById('sdLessonCount').textContent=t.hours+'课时';const sm={pending:{text:'待确认',step:0},confirmed:{text:'已确认',step:1},paid:{text:'已发放',step:2}};const s=sm[t.salaryStatus];document.getElementById('sdStatusBadge').textContent=s.text;const flowEl=document.getElementById('sdFlow');const steps=['待确认','已确认','已发放'];flowEl.innerHTML=steps.map((label,i)=>{const cls=i<s.step?'done':i===s.step?'current':'todo';const labelCls=i<=s.step?'active':'';return`<div class="sd-flow-step"><div class="sd-flow-dot ${cls}">${i<s.step?'✓':i+1}</div><div class="sd-flow-label ${labelCls}">${label}</div></div>${i<2?`<div class="sd-flow-line ${i<s.step?'done':''}"></div>`:''}`;}).join('');const lessonList=document.getElementById('sdLessonList');const lessons=[{day:12,wd:'周四',title:'钢琴基础班',desc:'3人·14:00-15:30',hours:1.5,rate:'¥120'},{day:11,wd:'周三',title:'乐理课',desc:'5人·16:00-17:00',hours:1,rate:'¥80'},{day:10,wd:'周二',title:'钢琴进阶班',desc:'4人·14:00-15:30',hours:1.5,rate:'¥150'},{day:9,wd:'周一',title:'钢琴基础班',desc:'3人·14:00-15:30',hours:1.5,rate:'¥120'},{day:8,wd:'周日',title:'钢琴一对一',desc:'1人·10:00-11:00',hours:1,rate:'¥150'}];lessonList.innerHTML=lessons.map(l=>`<div class="lesson-detail-item"><div class="ldi-date"><div class="ldi-day">${l.day}</div><div class="ldi-weekday">${l.wd}</div></div><div class="ldi-info"><div class="ldi-title">${l.title}</div><div class="ldi-desc">${l.desc}</div></div><div class="ldi-right"><div class="ldi-hours">${l.hours}h</div><div class="ldi-rate">${l.rate}/课时</div></div></div>`).join('');const deductList=document.getElementById('sdDeductList');if(t.deductions.length){deductList.innerHTML=t.deductions.map(d=>`<div class="deduction-item"><span class="deduction-reason">${d.reason}</span><span class="deduction-amount">${d.type==='deduct'?'-':'+'}¥${d.amount}</span></div>`).join('');}else{deductList.innerHTML='<div style="text-align:center;padding:12px 0;color:var(--text-light);font-size:13px">暂无扣款记录</div>';}const actionBtn=document.getElementById('sdActionBtn');if(t.salaryStatus==='pending'){actionBtn.textContent='确认工资';actionBtn.className='bb-btn bb-amber';actionBtn.style.display='';}else if(t.salaryStatus==='confirmed'){actionBtn.textContent='确认发放';actionBtn.className='bb-btn bb-amber';actionBtn.style.display='';}else{actionBtn.style.display='none';}showPage('salaryDetailPage');}
+function salaryDetailAction(){if(!currentTeacher&&salaryDetailFrom==='mainPage'){const name=document.getElementById('sdName').textContent;currentTeacher=teachers.find(t=>t.name===name);}if(!currentTeacher)return;const t=currentTeacher;if(t.salaryStatus==='pending'){t.salaryStatus='confirmed';showToast('工资已确认');openSalaryDetail(t.id);}else if(t.salaryStatus==='confirmed'){pendingPayAction={type:'single',ids:[t.id]};const total=calcTotal(t);document.getElementById('payConfirmTitle').textContent='确认发放';document.getElementById('payConfirmInfo').innerHTML=`确认发放 <span class="pcf-name">${t.name}</span> 的6月工资<br>发放金额：<span class="pcf-amount">¥${total.toLocaleString()}</span>`;document.getElementById('payConfirmRemark').value='';document.getElementById('payConfirmBtn').textContent='确认发放';openModal('payConfirmModal');}else{showToast('工资已发放');}}
+// 添加教师
+function selectRole(el,role){addRole=role;document.querySelectorAll('#addRoleSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');if(role==='lead'){addModelIdx=0;document.querySelectorAll('#addModelSelect .modal-select-item').forEach((e,i)=>e.classList.toggle('active',i===0));}else if(role==='parttime'){addModelIdx=1;document.querySelectorAll('#addModelSelect .modal-select-item').forEach((e,i)=>e.classList.toggle('active',i===1));}else{addModelIdx=1;document.querySelectorAll('#addModelSelect .modal-select-item').forEach((e,i)=>e.classList.toggle('active',i===1));}document.getElementById('addCustomModel').style.display='none';}
+function selectModel(el,idx){addModelIdx=idx;document.querySelectorAll('#addModelSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');document.getElementById('addCustomModel').style.display=idx===2?'block':'none';}
+function addTeacher(){const name=document.getElementById('addName').value;if(!name){showToast('请输入教师姓名');return;}const phone=document.getElementById('addPhone').value||'未填写';const subject=document.getElementById('addSubject').value||'未设置';const colors=['linear-gradient(135deg,#5EC8A8,#7dd8bc)','linear-gradient(135deg,#9b7ed8,#bda4e8)','linear-gradient(135deg,#6ba3d6,#8fc0e8)','linear-gradient(135deg,#e88aaa,#f0b3c7)','linear-gradient(135deg,#d4a24e,#e8c47a)'];const newId=teachers.length+1;const newT={id:newId,name,role:addRole,roleText:addRole==='lead'?'主讲':addRole==='parttime'?'兼职':'助教',subject,phone,hours:0,students:0,classes:0,base:addModelIdx===1?0:(addModelIdx===2?parseInt(document.getElementById('addCBase').value)||0:3000),rate:addModelIdx===2?parseInt(document.getElementById('addCRate').value)||0:100,attend:addModelIdx===1?0:(addModelIdx===2?parseInt(document.getElementById('addCAttend').value)||0:500),perf:addModelIdx===1?0:(addModelIdx===2?parseInt(document.getElementById('addCPerf').value)||0:700),salaryStatus:'pending',modelIdx:addModelIdx,color:colors[newId%colors.length],initial:name[0],deductions:[]};teachers.push(newT);closeModal('addTeacherModal');renderList();renderSalaryList();showToast(`${name} 已添加`);}
+// 工资模型
+function openModelEdit(idx){document.getElementById('modelModalTitle').textContent=idx===0?'编辑工资模型':'编辑工资模型';openModal('salaryModelModal');const tl=document.getElementById('modelTeacherList');tl.innerHTML=teachers.map(t=>`<div class="modal-teacher-item"><div class="mti-avatar" style="background:${t.color}">${t.initial}</div><span class="mti-name">${t.name}</span><span class="mti-role">${t.roleText}</span><div class="modal-checkbox ${(t.modelIdx===idx||idx===-1)?'checked':''}" onclick="this.classList.toggle('checked')"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div></div>`).join('');}
+function selectModelType(el,type){document.querySelectorAll('#modelTypeSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');document.getElementById('modelStandardFields').style.display=type==='hourly'?'none':'block';}
+function saveSalaryModel(){showToast('工资模型已保存');closeModal('salaryModelModal');}
+// 发放设置
+function savePaySettings(){showToast('发放设置已保存');closeModal('paySettingsModal');updatePayCountdown();}
+// 扣款
+function selectDeductType(el,type){document.querySelectorAll('#deductTypeSelect .modal-select-item').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+function addDeduction(){if(!currentTeacher)return;const reason=document.getElementById('deductReason').value;const amount=parseInt(document.getElementById('deductAmount').value);if(!reason||!amount){showToast('请填写完整');return;}const type=document.querySelector('#deductTypeSelect .modal-select-item.active').textContent.includes('扣款')?'deduct':'bonus';currentTeacher.deductions.push({reason,amount,type});closeModal('deductionModal');if(document.getElementById('salaryDetailPage').classList.contains('active')){openSalaryDetail(currentTeacher.id);}else{openDetail(currentTeacher.id);}showToast('已添加');}
+// 通用
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function goBack(from){showPage(from||'mainPage');renderList();renderSalaryList();}
+function openModal(id){document.getElementById(id).classList.add('show');}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+renderList();renderSalaryList();
+// 点击外部关闭下拉筛选
+document.addEventListener('click',function(e){if(!e.target.closest('#teacherFilterBar')){document.querySelectorAll('#teacherFilterBar .filter-item').forEach(i=>i.classList.remove('open'));}if(!e.target.closest('#scheduleFilterBar')){document.querySelectorAll('#scheduleFilterBar .filter-item').forEach(i=>i.classList.remove('open'));}});
+// 排课下拉筛选
+function toggleScheduleFilter(id){const item=document.getElementById(id);const wasOpen=item.classList.contains('open');document.querySelectorAll('#scheduleFilterBar .filter-item').forEach(i=>i.classList.remove('open'));if(!wasOpen)item.classList.add('open');}
+function selectScheduleFilter(filterId,el,val,label){const item=document.getElementById(filterId);item.dataset.value=val;item.classList.remove('open');item.querySelectorAll('.filter-option').forEach(o=>o.classList.remove('selected'));el.classList.add('selected');const trigger=item.querySelector('.filter-trigger');trigger.classList.toggle('active',val!=='all');if(filterId==='campusFilter'){document.getElementById('campusLabel').textContent=val==='all'?'全部校区':label;}else if(filterId==='schSubjectFilter'){document.getElementById('schSubjectLabel').textContent=val==='all'?'全部科目':label;}renderScheduleTab();}
+// 历史月份切换
+let historyMonthOffset=-1;
+let pickerYear=2025,pickerMonth=5;
+function changeHistoryMonth(dir){historyMonthOffset+=dir;if(historyMonthOffset>0)historyMonthOffset=0;const d=new Date();d.setMonth(d.getMonth()+historyMonthOffset);const title=d.getFullYear()+'年'+(d.getMonth()+1)+'月';document.getElementById('historyMonthTitle').textContent=title;renderHistoryList();}
+function toggleMonthPicker(){const picker=document.getElementById('monthPicker');const wrap=document.querySelector('.hmn-title-wrap');const isOpen=picker.classList.toggle('show');wrap.classList.toggle('open',isOpen);if(isOpen){const rect=wrap.getBoundingClientRect();picker.style.top=(rect.bottom+6)+'px';picker.style.left=(rect.left+rect.width/2-130)+'px';const d=new Date();d.setMonth(d.getMonth()+historyMonthOffset);pickerYear=d.getFullYear();pickerMonth=d.getMonth()+1;renderPickerMonths();}}
+function pickerYearChange(dir){pickerYear+=dir;document.getElementById('pickerYear').textContent=pickerYear;renderPickerMonths();}
+function renderPickerMonths(){const container=document.getElementById('pickerMonths');document.getElementById('pickerYear').textContent=pickerYear;const now=new Date();const curY=now.getFullYear(),curM=now.getMonth()+1;let html='';for(let m=1;m<=12;m++){const isCurrent=(pickerYear===curY&&m===curM);const isFuture=(pickerYear>curY||(pickerYear===curY&&m>curM));const cls=isCurrent?'mp-month current':isFuture?'mp-month future':'mp-month';html+=`<div class="${cls}" onclick="selectPickerMonth(${m})">${m}月</div>`;}container.innerHTML=html;}
+function selectPickerMonth(m){const now=new Date();const curY=now.getFullYear(),curM=now.getMonth()+1;pickerMonth=m;historyMonthOffset=(pickerYear-curY)*12+(m-curM);if(historyMonthOffset>0)historyMonthOffset=0;const title=pickerYear+'年'+m+'月';document.getElementById('historyMonthTitle').textContent=title;document.getElementById('monthPicker').classList.remove('show');document.querySelector('.hmn-title-wrap').classList.remove('open');renderHistoryList();}
+document.addEventListener('click',function(e){if(!e.target.closest('.hmn-title-wrap')&&!e.target.closest('.month-picker')){const picker=document.getElementById('monthPicker');if(picker)picker.classList.remove('show');const wrap=document.querySelector('.hmn-title-wrap');if(wrap)wrap.classList.remove('open');}});
+// 历史发薪记录
+function renderHistoryList(){const list=document.getElementById('historyList');if(!list)return;const historyData=[{name:'王老师',role:'主讲',subject:'钢琴',amount:'¥8,600',hours:42,remark:'含课时调整+2'},{name:'李老师',role:'主讲',subject:'声乐',amount:'¥7,200',hours:36,remark:''},{name:'张老师',role:'助教',subject:'钢琴',amount:'¥3,600',hours:24,remark:'代课3节'},{name:'陈老师',role:'主讲',subject:'书法/美术',amount:'¥6,800',hours:34,remark:''},{name:'赵老师',role:'助教',subject:'美术',amount:'¥2,400',hours:16,remark:''},{name:'周老师',role:'兼职',subject:'吉他',amount:'¥3,200',hours:16,remark:'试用期薪资'},{name:'吴老师',role:'兼职',subject:'舞蹈',amount:'¥2,800',hours:14,remark:''},{name:'孙老师',role:'兼职',subject:'架子鼓',amount:'¥1,600',hours:8,remark:''}];const roleTagMap={lead:'tag-primary',assist:'tag-info',parttime:'tag-parttime'};list.innerHTML=historyData.map(t=>`<div class="history-item"><div class="hi-left"><div class="hi-name">${t.name} <span class="tag ${roleTagMap[t.role]||'tag-info'}" style="font-size:10px">${t.role}</span></div><div class="hi-meta">${t.subject} · ${t.hours}课时${t.remark?` · <span class="hi-remark">${t.remark}</span>`:''}</div></div><div class="hi-amount">${t.amount}</div></div>`).join('');}
+
+// ===== 高频操作优化：批量操作 =====
+function toggleSalaryCheck(el,id){
+  el.classList.toggle('checked');
+  const item=el.closest('.salary-item');
+  item.classList.toggle('selected');
+  updateBatchCount();
+}
+function updateBatchCount(){
+  const checked=document.querySelectorAll('.salary-item.selected').length;
+  document.getElementById('batchSelectedCount').textContent=checked;
+  const checkAll=document.getElementById('batchCheckAll');
+  const selectableCount=document.querySelectorAll('.salary-item.selectable').length;
+  checkAll.classList.toggle('checked',checked>0&&checked===selectableCount);
+}
+function toggleBatchAll(){
+  const checkAll=document.getElementById('batchCheckAll');
+  const isChecked=checkAll.classList.toggle('checked');
+  const items=document.querySelectorAll('.salary-item.selectable');
+  let count=0;
+  items.forEach(item=>{
+    if(isChecked){
+      item.classList.add('selected');
+      const chk=item.querySelector('.si-check');
+      if(chk)chk.classList.add('checked');
+      count++;
+    }else{
+      item.classList.remove('selected');
+      const chk=item.querySelector('.si-check');
+      if(chk)chk.classList.remove('checked');
+    }
+  });
+  document.getElementById('batchSelectedCount').textContent=count;
+}
+function batchAction(type){
+  const selectedItems=document.querySelectorAll('.salary-item.selected');
+  if(selectedItems.length===0){showToast('请先选择教师');return;}
+  if(type==='confirm'){
+    let count=0;
+    selectedItems.forEach(item=>{const id=parseInt(item.dataset.id);const t=teachers.find(x=>x.id===id);if(t&&t.salaryStatus==='pending'){t.salaryStatus='confirmed';count++;}});
+    if(count===0){showToast('所选教师均非待确认状态');return;}
+    renderSalaryList();renderList();showToast(`已确认 ${count} 位教师工资`);
+  }else if(type==='pay'){
+    const ids=[];let totalAmt=0;const names=[];
+    selectedItems.forEach(item=>{const id=parseInt(item.dataset.id);const t=teachers.find(x=>x.id===id);if(t&&t.salaryStatus==='confirmed'){ids.push(id);totalAmt+=calcTotal(t);names.push(t.name);}});
+    if(ids.length===0){showToast('所选教师均非已确认状态');return;}
+    pendingPayAction={type:'batch',ids};
+    const nameStr=names.length<=3?names.join('、'):names.slice(0,3).join('、')+'等';
+    document.getElementById('payConfirmTitle').textContent='批量确认发放';
+    document.getElementById('payConfirmInfo').innerHTML=`确认发放 <span class="pcf-name">${nameStr} ${ids.length}位教师</span> 的6月工资<br>发放总额：<span class="pcf-amount">¥${totalAmt.toLocaleString()}</span>`;
+    document.getElementById('payConfirmRemark').value='';
+    document.getElementById('payConfirmBtn').textContent=`确认发放 ${ids.length} 人`;
+    openModal('payConfirmModal');
+  }
+}
+
+// ===== 发薪日倒计时+待处理标签 =====
+function updatePendingCount(){
+  const pending=teachers.filter(t=>t.salaryStatus!=='paid');
+  const count=pending.length;
+  const qpcCount=document.getElementById('qpcPendingCount');
+  if(qpcCount)qpcCount.textContent=count;
+  const tagsEl=document.getElementById('qpcPendingTags');
+  if(tagsEl){
+    tagsEl.innerHTML=pending.map(t=>`<span class="qpc-tag">${t.name} · ${t.salaryStatus==='pending'?'待确认':'待发放'}</span>`).join('');
+  }
+  updatePayCountdown();
+  const card=document.getElementById('quickPayCard');
+  if(card)card.style.display=count===0?'none':'block';
+}
+function updatePayCountdown(){
+  const payDay=parseInt(document.getElementById('payDay')?document.getElementById('payDay').value:15)||15;
+  const today=new Date();
+  const currentYear=today.getFullYear();
+  const currentMonth=today.getMonth();
+  let payDate=new Date(currentYear,currentMonth,payDay);
+  if(today>payDate)payDate=new Date(currentYear,currentMonth+1,payDay);
+  const diffTime=payDate-today;
+  const diffDays=Math.ceil(diffTime/(1000*60*60*24));
+  const cdEl=document.getElementById('qpcCountdown');
+  if(cdEl)cdEl.textContent=diffDays;
+}
+// 页面加载时初始化
+updatePendingCount();
+</script>
+</body>
+</html>

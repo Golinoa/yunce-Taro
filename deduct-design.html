@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>手动消课</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+    background: #eef3f0; min-height: 100vh;
+  }
+  :root {
+    --primary: #5EC8A8; --primary-dark: #4AB893; --primary-light: #a7e4cf; --primary-bg: #f0faf5;
+    --accent: #e88aaa; --accent-bg: #fdf0f4;
+    --info: #6ba3d6; --info-bg: #f0f5fb;
+    --amber: #d4a24e; --amber-bg: #faf6ee;
+    --purple: #9b7ed8; --purple-bg: #f3f0fb;
+    --text: #2d4a3e; --text-sec: #7a9a8e; --text-light: #a0b8ad;
+    --border: #d4e8df; --bg: #fff; --danger: #d94040; --danger-bg: #fef2f2;
+    --shadow: 0 4px 20px -4px rgba(54,73,67,0.1);
+  }
+
+  .page { max-width: 414px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; padding-bottom: 90px; }
+
+  /* ===== 导航栏 ===== */
+  .navbar {
+    background: linear-gradient(135deg, var(--primary), #7dd8bc);
+    padding: 48px 20px 20px; position: relative;
+  }
+  .navbar .title-row { display: flex; align-items: center; justify-content: space-between; }
+  .navbar h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .navbar .nav-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 14px; border-radius: 20px;
+    background: rgba(255,255,255,0.22); backdrop-filter: blur(4px);
+    border: none; cursor: pointer; transition: all 0.15s;
+  }
+  .navbar .nav-btn:active { background: rgba(255,255,255,0.35); transform: scale(0.96); }
+  .navbar .nav-btn svg { width: 14px; height: 14px; fill: #fff; }
+  .navbar .nav-btn span { font-size: 13px; color: #fff; font-weight: 500; }
+
+  /* ===== Tab切换栏（对齐班级管理） ===== */
+  .page-tabs {
+    display: flex; gap: 0; background: #fff; border-radius: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .page-tab {
+    flex: 1; padding: 10px; text-align: center;
+    font-size: 13px; font-weight: 500; color: var(--text-sec);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .page-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .page-tab:active { background: #f5f5f5; }
+  .page-tab svg { width: 15px; height: 15px; }
+
+  /* ===== 内容区 ===== */
+  .content { padding: 16px 16px 0; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ===== 表单卡片 ===== */
+  .form-card {
+    background: var(--bg); border-radius: 18px; padding: 18px;
+    box-shadow: var(--shadow); margin-bottom: 14px;
+  }
+  .form-card .card-title {
+    font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .form-card .card-title .required { color: var(--danger); font-size: 14px; }
+  .form-card .card-title .optional { color: var(--text-light); font-size: 11px; font-weight: 400; margin-left: auto; }
+
+  /* ===== 选择学员 ===== */
+  .student-picker {
+    border: 2px dashed rgba(94,200,168,0.4); border-radius: 16px; padding: 20px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--primary-bg); cursor: pointer; transition: all 0.15s;
+  }
+  .student-picker:active { transform: scale(0.98); background: #e0f5ec; }
+  .student-picker .plus { font-size: 22px; color: var(--primary); font-weight: 700; }
+  .student-picker .text { font-size: 14px; color: var(--primary); font-weight: 500; }
+
+  .student-selected {
+    display: flex; align-items: center; gap: 14px; padding: 14px;
+    border-radius: 16px; background: #fafdfb; cursor: pointer; transition: all 0.15s;
+  }
+  .student-selected:active { background: #f0f5f2; }
+  .student-selected .avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0;
+    border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .student-selected .sinfo { flex: 1; }
+  .student-selected .sname { font-size: 16px; font-weight: 600; color: var(--text); }
+  .student-selected .smeta { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  .student-selected .arrow { font-size: 20px; color: var(--text-light); }
+
+  /* ===== 班级选择 ===== */
+  .class-option {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 14px; margin-bottom: 8px;
+    border: 2px solid var(--border); cursor: pointer; transition: all 0.15s;
+    background: #fafdfb;
+  }
+  .class-option:last-child { margin-bottom: 0; }
+  .class-option.selected { border-color: var(--primary); background: var(--primary-bg); }
+  .class-option:active { transform: scale(0.98); }
+  .class-option .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .class-option .cinfo { flex: 1; }
+  .class-option .cname { font-size: 14px; font-weight: 500; color: var(--text); }
+  .class-option .cdetail { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+  .class-option .cremain { font-size: 12px; font-weight: 600; color: var(--primary); flex-shrink: 0; }
+  .class-option .tag { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+  .tag-unlimited { background: var(--primary-bg); color: var(--primary); }
+  .tag-limited { background: var(--amber-bg); color: var(--amber); }
+
+  /* ===== 班级选中态（单选模式） ===== */
+  .class-option .radio-circle {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .class-option.selected .radio-circle { border-color: var(--primary); background: var(--primary); }
+  .class-option .radio-circle svg { width: 12px; height: 12px; fill: #fff; opacity: 0; transition: opacity 0.15s; }
+  .class-option.selected .radio-circle svg { opacity: 1; }
+  .class-option .change-btn {
+    font-size: 11px; color: var(--primary); font-weight: 600;
+    background: var(--primary-bg); padding: 4px 10px; border-radius: 6px;
+    cursor: pointer; border: none; transition: all 0.15s; display: none;
+  }
+  .class-option.selected .change-btn { display: block; }
+  .class-option.selected .change-btn:active { background: var(--primary-light); }
+  .class-options-list .class-option { transition: all 0.25s ease; overflow: hidden; }
+  .class-options-list.has-selected .class-option:not(.selected) {
+    max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0;
+    border-width: 0; opacity: 0; margin: 0;
+  }
+
+  /* ===== 课时步进器 ===== */
+  .hours-stepper {
+    display: flex; align-items: center; gap: 0;
+    border: 2px solid var(--border); border-radius: 14px; overflow: hidden;
+    background: #fafdfb;
+  }
+  .hours-stepper .step-btn {
+    width: 48px; height: 48px; border: none; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 20px; color: var(--text-sec); transition: all 0.15s;
+  }
+  .hours-stepper .step-btn:active { background: var(--primary-bg); color: var(--primary); }
+  .hours-stepper .step-btn:disabled { color: var(--text-light); cursor: default; }
+  .hours-stepper .step-btn:disabled:active { background: transparent; }
+  .hours-stepper .step-input {
+    flex: 1; border: none; text-align: center; font-size: 20px; font-weight: 700;
+    color: var(--primary); background: transparent; outline: none;
+    border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    padding: 10px 0; min-width: 0;
+  }
+  .hours-stepper .step-input::-webkit-inner-spin-button,
+  .hours-stepper .step-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .hours-stepper .step-input[type=number] { -moz-appearance: textfield; }
+  .hours-stepper .step-unit {
+    font-size: 11px; color: var(--text-sec); margin-left: 8px; flex-shrink: 0;
+  }
+
+  /* ===== 日期时间 ===== */
+  .datetime-row { display: flex; gap: 10px; }
+  .datetime-row .dt-item {
+    flex: 1; padding: 10px 12px; border-radius: 12px;
+    border: 1px solid var(--border); background: #fafdfb;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .datetime-row .dt-item:active { background: #f0f5f2; }
+  .datetime-row .dt-item .dt-val { font-size: 14px; color: var(--text); font-weight: 500; }
+  .datetime-row .dt-item .dt-icon { width: 16px; height: 16px; fill: var(--text-light); }
+
+  /* ===== 文本域 ===== */
+  .form-textarea {
+    width: 100%; padding: 12px 14px; border-radius: 14px;
+    border: 1px solid var(--border); font-size: 13px; line-height: 1.6;
+    outline: none; background: #fafdfb; transition: border 0.15s;
+    resize: none; min-height: 80px;
+  }
+  .form-textarea:focus { border-color: var(--primary); background: #fff; }
+  .form-textarea::placeholder { color: var(--text-light); }
+
+  /* ===== 星级评分 ===== */
+  .star-rating { display: flex; align-items: center; gap: 4px; padding: 4px 0; }
+  .star-rating .star {
+    font-size: 28px; cursor: pointer; transition: all 0.15s; color: var(--border);
+    line-height: 1;
+  }
+  .star-rating .star:active { transform: scale(0.85); }
+  .star-rating .star.active { color: #f5a623; }
+  .star-rating .star-label { font-size: 12px; color: var(--text-sec); margin-left: 8px; }
+
+  /* ===== 图片上传 ===== */
+  .image-upload-area { display: flex; flex-wrap: wrap; gap: 10px; }
+  .image-upload-area .img-item {
+    width: 72px; height: 72px; border-radius: 12px; overflow: hidden; position: relative;
+    background: #e8f0ec;
+  }
+  .image-upload-area .img-item img { width: 100%; height: 100%; object-fit: cover; }
+  .image-upload-area .img-item .img-del {
+    position: absolute; top: -4px; right: -4px; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--danger); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .image-upload-area .add-btn {
+    width: 72px; height: 72px; border-radius: 12px;
+    border: 2px dashed rgba(94,200,168,0.4); background: var(--primary-bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .image-upload-area .add-btn:active { background: #d4ede3; }
+  .image-upload-area .add-btn svg { width: 20px; height: 20px; fill: var(--primary); }
+  .image-upload-area .add-btn span { font-size: 10px; color: var(--primary); }
+
+  /* ===== 班级模式：学员勾选 ===== */
+  .student-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .student-grid .stu-item {
+    padding: 10px; border-radius: 14px; border: 2px solid var(--border);
+    background: #fafdfb; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .student-grid .stu-item:active { transform: scale(0.97); }
+  .student-grid .stu-item.present { border-color: rgba(94,200,168,0.3); background: var(--primary-bg); }
+  .student-grid .stu-item.absent { border-color: rgba(217,64,64,0.3); background: var(--danger-bg); }
+  .student-grid .stu-item .mini-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .student-grid .stu-item.present .mini-avatar { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+  .student-grid .stu-item.absent .mini-avatar { background: var(--danger); }
+  .student-grid .stu-item .stu-info { flex: 1; min-width: 0; }
+  .student-grid .stu-item .stu-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .student-grid .stu-item .stu-status { font-size: 10px; color: var(--text-sec); margin-top: 1px; }
+  .student-grid .stu-item.absent .stu-status { color: var(--danger); }
+
+  .check-all-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .check-all-btn { font-size: 12px; color: var(--primary); font-weight: 600; background: none; border: none; cursor: pointer; }
+  .checked-count { font-size: 11px; color: var(--primary); font-weight: 600; background: var(--primary-bg); padding: 3px 10px; border-radius: 6px; }
+
+  /* ===== 底部按钮 ===== */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border); padding: 12px 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    max-width: 414px; margin: 0 auto;
+  }
+  .bottom-bar .btn-row { display: flex; gap: 10px; }
+  .bottom-bar .btn {
+    flex: 1; padding: 14px; border-radius: 16px; border: none;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .bottom-bar .btn:active { transform: scale(0.97); }
+  .bottom-bar .btn-cancel { background: #e8f0ec; color: var(--text-sec); }
+  .bottom-bar .btn-submit { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; }
+
+  /* ===== 弹窗 ===== */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 200; display: none; opacity: 0; transition: opacity 0.25s;
+  }
+  .overlay.show { display: block; opacity: 1; }
+
+  .bottom-sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-radius: 22px 22px 0 0;
+    z-index: 201; max-width: 414px; margin: 0 auto;
+    transform: translateY(100%); transition: transform 0.3s ease;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .bottom-sheet.show { transform: translateY(0); }
+  .bottom-sheet .handle { width: 36px; height: 4px; border-radius: 2px; background: #d4e8df; margin: 12px auto 0; }
+  .bottom-sheet .sheet-body { padding: 16px 20px 34px; }
+  .bottom-sheet .sheet-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
+
+  /* ===== 学员选择弹窗 ===== */
+  .picker-search {
+    width: 100%; padding: 10px 12px 10px 36px; border-radius: 12px;
+    border: 1px solid var(--border); font-size: 13px; outline: none;
+    background: #fafdfb; transition: border 0.15s; margin-bottom: 12px;
+  }
+  .picker-search:focus { border-color: var(--primary); background: #fff; }
+  .picker-search-wrap { position: relative; }
+  .picker-search-wrap .search-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; fill: var(--text-light);
+  }
+  .picker-list { display: flex; flex-direction: column; gap: 4px; max-height: 55vh; overflow-y: auto; }
+  .picker-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border-radius: 14px; cursor: pointer; transition: all 0.15s;
+  }
+  .picker-item:active { background: #f0f5f2; }
+  .picker-item .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .picker-item .pinfo { flex: 1; }
+  .picker-item .pname { font-size: 14px; font-weight: 500; color: var(--text); }
+  .picker-item .pmeta { font-size: 11px; color: var(--text-sec); margin-top: 1px; }
+  .picker-empty { text-align: center; padding: 30px; font-size: 13px; color: var(--text-light); }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    background: rgba(45,74,62,0.9); color: #fff; padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== 折叠区域 ===== */
+  .collapse-header {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; padding: 2px 0;
+  }
+  .collapse-header .collapse-arrow {
+    width: 16px; height: 16px; fill: var(--text-light);
+    transition: transform 0.2s;
+  }
+  .collapse-header.open .collapse-arrow { transform: rotate(180deg); }
+  .collapse-body { display: none; padding-top: 12px; }
+  .collapse-body.open { display: block; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- 导航栏 -->
+  <div class="navbar">
+    <div class="title-row">
+      <h1>手动消课</h1>
+      <button class="nav-btn" onclick="showToast('查看全部消课记录')">
+        <svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+        <span>记录</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab切换栏 -->
+  <div class="page-tabs">
+    <div class="page-tab active" onclick="switchMode('single',this)">
+      <svg viewBox="0 0 24 24" style="fill:currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      学员消课
+    </div>
+    <div class="page-tab" onclick="switchMode('class',this)">
+      <svg viewBox="0 0 24 24" style="fill:currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      班级消课
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ==================== 学员消课 ==================== -->
+    <div class="tab-content active" id="tabSingle">
+
+      <!-- 1. 选择学员 -->
+      <div class="form-card">
+        <div class="card-title">选择学员 <span class="required">*</span></div>
+        <div id="singleStudentArea">
+          <div class="student-picker" onclick="openStudentPicker()">
+            <span class="plus">+</span>
+            <span class="text">点击选择学员</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 选择班级/课包 -->
+      <div class="form-card" id="singleClassCard" style="display:none">
+        <div class="card-title">选择班级/课包 <span class="required">*</span></div>
+        <div id="singleClassOptions" class="class-options-list"></div>
+      </div>
+
+      <!-- 3. 消课课时 -->
+      <div class="form-card" id="singleHoursCard" style="display:none">
+        <div class="card-title">消课课时 <span class="required">*</span></div>
+        <div style="display:flex;align-items:center;">
+          <div class="hours-stepper">
+            <button class="step-btn" onclick="stepHours('single',-1)">−</button>
+            <input class="step-input" type="number" id="singleHoursInput" value="1" min="0.5" step="0.5" onchange="clampHours('single')">
+            <button class="step-btn" onclick="stepHours('single',1)">+</button>
+          </div>
+          <span class="hours-stepper" style="border:none;background:none;">
+            <span style="font-size:11px;color:var(--text-sec);margin-left:8px;">课时</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 4. 上课时间 -->
+      <div class="form-card" id="singleTimeCard" style="display:none">
+        <div class="card-title">上课时间</div>
+        <div class="datetime-row">
+          <div class="dt-item" onclick="showToast('选择日期')">
+            <span class="dt-val" id="singleDate">2026-06-11</span>
+            <svg class="dt-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+          </div>
+          <div class="dt-item" onclick="showToast('选择时间')">
+            <span class="dt-val" id="singleTime">14:30</span>
+            <svg class="dt-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. 教学内容 -->
+      <div class="form-card" id="singleContentCard" style="display:none">
+        <div class="card-title">教学内容 <span class="optional">选填</span></div>
+        <textarea class="form-textarea" placeholder="记录本次教学内容..." id="singleContent"></textarea>
+      </div>
+
+      <!-- 6. 学生表现 -->
+      <div class="form-card" id="singlePerfCard" style="display:none">
+        <div class="card-title">学生表现 <span class="optional">选填</span></div>
+        <div class="star-rating" id="singleStars">
+          <span class="star" onclick="setSingleRating(1)">★</span>
+          <span class="star" onclick="setSingleRating(2)">★</span>
+          <span class="star" onclick="setSingleRating(3)">★</span>
+          <span class="star" onclick="setSingleRating(4)">★</span>
+          <span class="star" onclick="setSingleRating(5)">★</span>
+          <span class="star-label" id="singleRatingLabel"></span>
+        </div>
+      </div>
+
+      <!-- 7. 课后作业 -->
+      <div class="form-card collapse-card" id="singleHomeworkCard" style="display:none">
+        <div class="collapse-header" onclick="toggleCollapse(this)">
+          <div class="card-title" style="margin-bottom:0">课后作业 <span class="optional">选填</span></div>
+          <svg class="collapse-arrow" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+        </div>
+        <div class="collapse-body">
+          <textarea class="form-textarea" placeholder="布置课后作业或练习内容..." id="singleHomework"></textarea>
+          <div style="margin-top:10px">
+            <div class="image-upload-area" id="singleImageArea">
+              <div class="add-btn" onclick="addSingleImage()">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                <span>上传</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== 班级消课 ==================== -->
+    <div class="tab-content" id="tabClass">
+
+      <!-- 1. 选择班级 -->
+      <div class="form-card">
+        <div class="card-title">选择班级 <span class="required">*</span></div>
+        <div id="classOptions"></div>
+      </div>
+
+      <!-- 2. 学员名单 -->
+      <div class="form-card" id="classStudentCard" style="display:none">
+        <div class="card-title">学员名单 <span class="optional">点击标记请假</span></div>
+        <div class="check-all-row">
+          <button class="check-all-btn" onclick="toggleAllClassStudents()">全选/取消</button>
+          <div class="checked-count" id="classCount">0 人出席</div>
+        </div>
+        <div class="student-grid" id="classStudentGrid"></div>
+      </div>
+
+      <!-- 3. 消课课时 -->
+      <div class="form-card" id="classHoursCard" style="display:none">
+        <div class="card-title">消课课时 <span class="required">*</span></div>
+        <div style="display:flex;align-items:center;">
+          <div class="hours-stepper">
+            <button class="step-btn" onclick="stepHours('class',-1)">−</button>
+            <input class="step-input" type="number" id="classHoursInput" value="1" min="0.5" step="0.5" onchange="clampHours('class')">
+            <button class="step-btn" onclick="stepHours('class',1)">+</button>
+          </div>
+          <span style="font-size:11px;color:var(--text-sec);margin-left:8px;">课时</span>
+        </div>
+      </div>
+
+      <!-- 4. 上课时间 -->
+      <div class="form-card" id="classTimeCard" style="display:none">
+        <div class="card-title">上课时间</div>
+        <div class="datetime-row">
+          <div class="dt-item" onclick="showToast('选择日期')">
+            <span class="dt-val" id="classDate">2026-06-11</span>
+            <svg class="dt-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+          </div>
+          <div class="dt-item" onclick="showToast('选择时间')">
+            <span class="dt-val" id="classTime">14:30</span>
+            <svg class="dt-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. 教学内容 -->
+      <div class="form-card" id="classContentCard" style="display:none">
+        <div class="card-title">教学内容 <span class="optional">选填</span></div>
+        <textarea class="form-textarea" placeholder="记录本次教学内容..." id="classContent"></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 底部按钮 -->
+  <div class="bottom-bar">
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="showToast('返回')">取消</button>
+      <button class="btn btn-submit" id="submitBtn" onclick="handleSubmit()">确认消课</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 学员选择弹窗 ===== -->
+<div class="overlay" id="pickerOverlay" onclick="closeStudentPicker()"></div>
+<div class="bottom-sheet" id="pickerSheet">
+  <div class="handle"></div>
+  <div class="sheet-body">
+    <div class="sheet-title">选择学员</div>
+    <div class="picker-search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input class="picker-search" placeholder="搜索学员姓名或手机号" oninput="searchStudent(this.value)">
+    </div>
+    <div class="picker-list" id="pickerList"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 数据 =====
+const allStudents = [
+  { id:'s1', name:'张小明', phone:'138****1234', color:'#5EC8A8', nickname:'小明',
+    packages:[{id:'p1',classId:'piano',name:'钢琴基础班',remaining:null},{id:'p2',classId:'summer',name:'暑期特训班',remaining:14}] },
+  { id:'s2', name:'李小红', phone:'139****5678', color:'#e88aaa', nickname:'小红',
+    packages:[{id:'p3',classId:'piano',name:'钢琴基础班',remaining:null}] },
+  { id:'s3', name:'王小刚', phone:'137****9012', color:'#6ba3d6', nickname:'小刚',
+    packages:[{id:'p4',classId:'piano',name:'钢琴基础班',remaining:null}] },
+  { id:'s4', name:'赵小丽', phone:'136****3456', color:'#d4a24e', nickname:'小丽',
+    packages:[{id:'p5',classId:'piano',name:'钢琴基础班',remaining:null}] },
+  { id:'s5', name:'陈小雨', phone:'135****7890', color:'#9b7ed8', nickname:'小雨',
+    packages:[{id:'p6',classId:'dance',name:'舞蹈启蒙班',remaining:null}] },
+  { id:'s6', name:'刘小华', phone:'134****2345', color:'#5EC8A8', nickname:'小华',
+    packages:[{id:'p7',classId:'dance',name:'舞蹈启蒙班',remaining:null}] },
+  { id:'s7', name:'周小芳', phone:'133****6789', color:'#e88aaa', nickname:'小芳',
+    packages:[{id:'p8',classId:'dance',name:'舞蹈启蒙班',remaining:null}] },
+  { id:'s8', name:'张大伟', phone:'132****0123', color:'#d4a24e', nickname:'大伟',
+    packages:[{id:'p9',classId:'summer',name:'暑期特训班',remaining:14}] },
+  { id:'s9', name:'李小芳', phone:'131****4567', color:'#5EC8A8', nickname:'小芳',
+    packages:[{id:'p10',classId:'summer',name:'暑期特训班',remaining:15}] },
+  { id:'s10', name:'王小明', phone:'130****8901', color:'#6ba3d6', nickname:'小明',
+    packages:[{id:'p11',classId:'summer',name:'暑期特训班',remaining:14}] },
+];
+
+const allClasses = [
+  { id:'piano', name:'钢琴基础班', color:'#5EC8A8', schedule:'每周二、四 14:00-15:30', teacher:'王老师', type:'unlimited',
+    students:['s1','s2','s3','s4'] },
+  { id:'dance', name:'舞蹈启蒙班', color:'#e88aaa', schedule:'每周六 10:00-11:30', teacher:'王老师', type:'unlimited',
+    students:['s5','s6','s7'] },
+  { id:'summer', name:'暑期特训班', color:'#d4a24e', schedule:'每周一、三、五 09:00-11:00', teacher:'李老师', type:'limited',
+    students:['s1','s8','s9','s10'] },
+];
+
+const ratingLabels = ['','1 星','2 星','3 星','4 星','5 星'];
+
+// ===== 状态 =====
+let currentMode = 'single';
+let selectedStudent = null;
+let selectedSingleClassId = null;
+let singleHours = 1;
+let singleRating = 0;
+let singleImages = [];
+
+let selectedClassId = null;
+let classAbsentIds = new Set();
+let classHours = 1;
+
+// ===== 工具 =====
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2000);
+}
+function getStudent(id){ return allStudents.find(s=>s.id===id); }
+function getClass(id){ return allClasses.find(c=>c.id===id); }
+
+// ===== 模式切换 =====
+function switchMode(mode, el){
+  currentMode = mode;
+  el.parentElement.querySelectorAll('.page-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tabSingle').classList.toggle('active', mode==='single');
+  document.getElementById('tabClass').classList.toggle('active', mode==='class');
+  updateSubmitBtn();
+}
+
+// ===== 学员选择弹窗 =====
+function openStudentPicker(){
+  renderPickerList(allStudents);
+  document.getElementById('pickerOverlay').classList.add('show');
+  document.getElementById('pickerSheet').classList.add('show');
+}
+function closeStudentPicker(){
+  document.getElementById('pickerOverlay').classList.remove('show');
+  document.getElementById('pickerSheet').classList.remove('show');
+}
+function searchStudent(kw){
+  if(!kw.trim()){ renderPickerList(allStudents); return; }
+  const results=allStudents.filter(s=>s.name.includes(kw)||s.phone.includes(kw)||(s.nickname&&s.nickname.includes(kw)));
+  renderPickerList(results);
+}
+function renderPickerList(list){
+  const el=document.getElementById('pickerList');
+  if(list.length===0){ el.innerHTML='<div class="picker-empty">未找到学员</div>'; return; }
+  el.innerHTML=list.map(s=>{
+    const totalRemain = s.packages.reduce((sum,p)=>sum+(p.remaining||0),0);
+    const remainText = s.packages.some(p=>p.remaining===null) ? '无限课时' : `剩余 ${totalRemain} 课时`;
+    return `<div class="picker-item" onclick="selectStudent('${s.id}')">
+      <div class="avatar" style="background:${s.color}">${s.name[0]}</div>
+      <div class="pinfo">
+        <div class="pname">${s.name}${s.nickname?' · '+s.nickname:''}</div>
+        <div class="pmeta">${s.phone} · ${remainText}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectStudent(id){
+  selectedStudent = getStudent(id);
+  selectedSingleClassId = null;
+  singleHours = 1;
+  singleRating = 0;
+  singleImages = [];
+  closeStudentPicker();
+  renderSingleStudent();
+  showSingleFormCards();
+}
+
+function renderSingleStudent(){
+  const s = selectedStudent;
+  const totalRemain = s.packages.reduce((sum,p)=>sum+(p.remaining||0),0);
+  const remainText = s.packages.some(p=>p.remaining===null) ? '无限课时' : `剩余 ${totalRemain} 课时`;
+  document.getElementById('singleStudentArea').innerHTML=`
+    <div class="student-selected" onclick="openStudentPicker()">
+      <div class="avatar" style="background:linear-gradient(135deg,${s.color},${s.color}dd)">${s.name[0]}</div>
+      <div class="sinfo">
+        <div class="sname">${s.name}${s.nickname?' · '+s.nickname:''}</div>
+        <div class="smeta">${remainText}</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>`;
+}
+
+function showSingleFormCards(){
+  const s = selectedStudent;
+  const classOpts = document.getElementById('singleClassOptions');
+  classOpts.classList.remove('has-selected');
+  classOpts.innerHTML = s.packages.map(p=>{
+    const c = getClass(p.classId);
+    return `<div class="class-option" onclick="pickSingleClass('${p.classId}',this)">
+      <div class="radio-circle"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+      <div class="cinfo">
+        <div class="cname">${p.name}</div>
+        <div class="cdetail">${c.schedule} · ${c.teacher}</div>
+      </div>
+      <span class="tag ${c.type==='unlimited'?'tag-unlimited':'tag-limited'}">${c.type==='unlimited'?'无限':'有限'}</span>
+      <span class="cremain">${p.remaining!==null?'剩余'+p.remaining:'∞'}</span>
+      <button class="change-btn" onclick="event.stopPropagation();changeSingleClass()">更换</button>
+    </div>`;
+  }).join('');
+  // 默认选第一个
+  if(s.packages.length>0){
+    selectedSingleClassId = s.packages[0].classId;
+    const firstOpt = classOpts.querySelector('.class-option');
+    firstOpt.classList.add('selected');
+    classOpts.classList.add('has-selected');
+  }
+  // 显示所有表单卡片
+  ['singleClassCard','singleHoursCard','singleTimeCard','singleContentCard','singlePerfCard','singleHomeworkCard'].forEach(id=>{
+    document.getElementById(id).style.display='';
+  });
+  // 重置课时步进器
+  document.getElementById('singleHoursInput').value = 1;
+  singleHours = 1;
+  // 重置星级
+  setSingleRating(0);
+  updateSubmitBtn();
+}
+
+function pickSingleClass(classId, el){
+  selectedSingleClassId = classId;
+  const list = el.parentElement;
+  list.querySelectorAll('.class-option').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+  list.classList.add('has-selected');
+}
+
+function changeSingleClass(){
+  const classOpts = document.getElementById('singleClassOptions');
+  classOpts.classList.remove('has-selected');
+  classOpts.querySelectorAll('.class-option').forEach(o=>o.classList.remove('selected'));
+  selectedSingleClassId = null;
+}
+
+// ===== 课时步进器 =====
+function stepHours(mode, delta){
+  const input = document.getElementById(mode==='single'?'singleHoursInput':'classHoursInput');
+  let val = parseFloat(input.value) || 0;
+  val = Math.round((val + delta * 0.5) * 10) / 10;
+  if(val < 0.5) val = 0.5;
+  if(val > 99) val = 99;
+  input.value = val;
+  if(mode==='single') singleHours = val;
+  else classHours = val;
+}
+function clampHours(mode){
+  const input = document.getElementById(mode==='single'?'singleHoursInput':'classHoursInput');
+  let val = parseFloat(input.value) || 0.5;
+  if(val < 0.5) val = 0.5;
+  if(val > 99) val = 99;
+  val = Math.round(val * 10) / 10;
+  input.value = val;
+  if(mode==='single') singleHours = val;
+  else classHours = val;
+}
+function setSingleRating(n){
+  singleRating = n;
+  document.querySelectorAll('#singleStars .star').forEach((s,i)=>s.classList.toggle('active',i<n));
+  document.getElementById('singleRatingLabel').textContent = n>0?ratingLabels[n]:'';
+}
+function addSingleImage(){
+  if(singleImages.length>=3){ showToast('最多上传3张图片'); return; }
+  singleImages.push('img_'+Date.now());
+  renderSingleImages();
+  showToast('上传成功');
+}
+function removeSingleImage(idx){
+  singleImages.splice(idx,1);
+  renderSingleImages();
+}
+function renderSingleImages(){
+  const area=document.getElementById('singleImageArea');
+  const imgs= singleImages.map((img,i)=>`
+    <div class="img-item">
+      <div style="width:100%;height:100%;background:linear-gradient(135deg,var(--primary-bg),var(--primary-light));display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--primary)">图片${i+1}</div>
+      <div class="img-del" onclick="removeSingleImage(${i})">×</div>
+    </div>`).join('');
+  const addBtn = singleImages.length<3?`<div class="add-btn" onclick="addSingleImage()"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>上传</span></div>`:'';
+  area.innerHTML = imgs + addBtn;
+}
+
+// ===== 折叠 =====
+function toggleCollapse(header){
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+// ===== 班级消课 =====
+function renderClassOptions(){
+  const wrap = document.getElementById('classOptions');
+  wrap.classList.add('class-options-list');
+  wrap.innerHTML = allClasses.map(c=>`
+    <div class="class-option" onclick="pickClass('${c.id}',this)">
+      <div class="radio-circle"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+      <div class="cinfo">
+        <div class="cname">${c.name}</div>
+        <div class="cdetail">${c.schedule} · ${c.teacher}</div>
+      </div>
+      <span class="tag ${c.type==='unlimited'?'tag-unlimited':'tag-limited'}">${c.type==='unlimited'?'无限':'有限'}</span>
+      <button class="change-btn" onclick="event.stopPropagation();changeClass()">更换</button>
+    </div>
+  `).join('');
+}
+
+function pickClass(classId, el){
+  selectedClassId = classId;
+  classAbsentIds.clear();
+  const list = el.parentElement;
+  list.querySelectorAll('.class-option').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+  list.classList.add('has-selected');
+  renderClassStudents();
+  document.getElementById('classStudentCard').style.display='';
+  document.getElementById('classHoursCard').style.display='';
+  document.getElementById('classTimeCard').style.display='';
+  document.getElementById('classContentCard').style.display='';
+  // 重置课时步进器
+  document.getElementById('classHoursInput').value = 1;
+  classHours = 1;
+  updateSubmitBtn();
+}
+
+function changeClass(){
+  const wrap = document.getElementById('classOptions');
+  wrap.classList.remove('has-selected');
+  wrap.querySelectorAll('.class-option').forEach(o=>o.classList.remove('selected'));
+  selectedClassId = null;
+  document.getElementById('classStudentCard').style.display='none';
+  document.getElementById('classHoursCard').style.display='none';
+  document.getElementById('classTimeCard').style.display='none';
+  document.getElementById('classContentCard').style.display='none';
+  updateSubmitBtn();
+}
+
+function renderClassStudents(){
+  const c = getClass(selectedClassId);
+  const grid = document.getElementById('classStudentGrid');
+  grid.innerHTML = c.students.map(sid=>{
+    const s = getStudent(sid);
+    return `<div class="stu-item present" id="stu_${sid}" onclick="toggleClassStudent('${sid}')">
+      <div class="mini-avatar">${s.name[0]}</div>
+      <div class="stu-info">
+        <div class="stu-name">${s.name}</div>
+        <div class="stu-status">出席</div>
+      </div>
+    </div>`;
+  }).join('');
+  updateClassCount();
+}
+
+function toggleClassStudent(sid){
+  const el = document.getElementById('stu_'+sid);
+  if(classAbsentIds.has(sid)){
+    classAbsentIds.delete(sid);
+    el.classList.remove('absent');
+    el.classList.add('present');
+    el.querySelector('.stu-status').textContent='出席';
+  } else {
+    classAbsentIds.add(sid);
+    el.classList.remove('present');
+    el.classList.add('absent');
+    el.querySelector('.stu-status').textContent='请假';
+  }
+  updateClassCount();
+  updateSubmitBtn();
+}
+
+function toggleAllClassStudents(){
+  const c = getClass(selectedClassId);
+  if(classAbsentIds.size===0){
+    c.students.forEach(sid=>classAbsentIds.add(sid));
+    c.students.forEach(sid=>{
+      const el=document.getElementById('stu_'+sid);
+      el.classList.remove('present'); el.classList.add('absent');
+      el.querySelector('.stu-status').textContent='请假';
+    });
+  } else {
+    classAbsentIds.clear();
+    c.students.forEach(sid=>{
+      const el=document.getElementById('stu_'+sid);
+      el.classList.remove('absent'); el.classList.add('present');
+      el.querySelector('.stu-status').textContent='出席';
+    });
+  }
+  updateClassCount();
+  updateSubmitBtn();
+}
+
+function updateClassCount(){
+  const c = getClass(selectedClassId);
+  if(!c) return;
+  const present = c.students.length - classAbsentIds.size;
+  document.getElementById('classCount').textContent = present + ' 人出席';
+}
+
+// ===== 提交 =====
+function updateSubmitBtn(){
+  const btn = document.getElementById('submitBtn');
+  if(currentMode==='single'){
+    btn.textContent = selectedStudent ? '确认消课' : '确认消课';
+  } else {
+    const c = selectedClassId ? getClass(selectedClassId) : null;
+    const present = c ? c.students.length - classAbsentIds.size : 0;
+    btn.textContent = present > 0 ? `一键消课 (${present}人)` : '一键消课';
+  }
+}
+
+function handleSubmit(){
+  if(currentMode==='single'){
+    if(!selectedStudent){ showToast('请选择学员'); return; }
+    if(!selectedSingleClassId){ showToast('请选择班级/课包'); return; }
+    const c = getClass(selectedSingleClassId);
+    const h = parseFloat(document.getElementById('singleHoursInput').value) || 1;
+    showToast(`已为 ${selectedStudent.name}（${c.name}）消课 ${h} 课时`);
+  } else {
+    if(!selectedClassId){ showToast('请选择班级'); return; }
+    const c = getClass(selectedClassId);
+    const present = c.students.length - classAbsentIds.size;
+    if(present===0){ showToast('至少需要一名学员出席'); return; }
+    const h = parseFloat(document.getElementById('classHoursInput').value) || 1;
+    showToast(`已为 ${c.name} 的 ${present} 名学员消课 ${h} 课时`);
+  }
+}
+
+// ===== 初始化 =====
+renderClassOptions();
+updateSubmitBtn();
+</script>
+</body>
+</html>

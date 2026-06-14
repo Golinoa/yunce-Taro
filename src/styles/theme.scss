@@ -1,0 +1,21 @@
+// ============================================
+// ⚠️ 已废弃 - 请勿在此文件中添加新变量
+// ============================================
+// 所有设计值已迁移至：
+//   - CSS 变量：src/app.scss（page 选择器内）
+//   - JS 运行时：src/theme.ts（单一数据源）
+//   - UnoCSS：uno.config.ts（theme 配置）
+//
+// 本文件仅保留作为兼容参考，新代码请使用：
+//   - 颜色：hsl(var(--primary)) 或 UnoCSS 类名 bg-primary
+//   - 间距：UnoCSS 类名 p-4 / gap-3 等
+//   - 圆角：UnoCSS 类名 rounded-lg / rounded-card 等
+//   - 阴影：UnoCSS 类名 shadow-card / shadow-elegant 等
+// ============================================
+
+// 以下变量仅供参考，与 CSS 变量对应关系：
+// $color-primary: #5EC8A8  →  --primary: 168 55% 58%
+// $color-accent: #E89BB8   →  --accent: 340 60% 78%
+// $color-bg-page: #FAFDFB  →  --background: 160 30% 97%
+// $color-text-primary: #374842 → --foreground: 160 15% 25%
+// $color-border: #D5E8E0   →  --border: 168 25% 88%

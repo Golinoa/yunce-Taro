@@ -1,0 +1,14 @@
+// ============================================
+// ⚠️ 已废弃 - 请勿在此文件中添加新变量
+// ============================================
+// 所有设计值已迁移至：
+//   - CSS 变量：src/app.scss（page 选择器内）
+//   - JS 运行时：src/theme.ts（单一数据源）
+//   - UnoCSS：uno.config.ts（theme 配置 + rules）
+//
+// Mixins 已不再使用，推荐替代方案：
+//   @mixin text-ellipsis    → UnoCSS: truncate
+//   @mixin flex-center      → UnoCSS shortcut: center
+//   @mixin scroll-x-container → UnoCSS: overflow-x-auto scrollbar-hide
+//   @mixin button-reset     → 直接使用 UnoCSS 重置样式
+// ============================================
