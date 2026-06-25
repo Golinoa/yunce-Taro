@@ -40,7 +40,7 @@ const PERIOD_OPTIONS = [
 const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
   totalAmount,
   enabled,
-  onToggle,
+  onToggle: _onToggle,
   periodCount,
   onPeriodChange,
   schedule,
@@ -83,9 +83,37 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
     (index: number, field: keyof ScheduleItem, val: string | boolean) => {
       const next = [...schedule];
       next[index] = { ...next[index], [field]: val };
+
+      // 手动修改金额后，自动均分剩余金额到后续期数
+      if (field === 'amount' && val !== '') {
+        const changedAmount = parseFloat(String(val)) || 0;
+        // 计算已分配金额（含当前修改的期）
+        const allocatedBefore = next
+          .slice(0, index + 1)
+          .reduce(
+            (sum, s, i) => sum + (i === index ? changedAmount : parseFloat(s.amount) || 0),
+            0,
+          );
+        const remaining = total - allocatedBefore;
+        const remainingPeriods = next.length - index - 1;
+
+        if (remainingPeriods > 0) {
+          const perPeriod =
+            remaining > 0 ? Math.floor((remaining / remainingPeriods) * 100) / 100 : 0;
+          const lastAdjust =
+            remaining > 0 ? Math.round((remaining - perPeriod * remainingPeriods) * 100) / 100 : 0;
+          for (let i = index + 1; i < next.length; i++) {
+            next[i] = {
+              ...next[i],
+              amount: i === next.length - 1 ? String(perPeriod + lastAdjust) : String(perPeriod),
+            };
+          }
+        }
+      }
+
       onScheduleChange(next);
     },
-    [schedule, onScheduleChange],
+    [schedule, onScheduleChange, total],
   );
 
   if (!enabled) return null;
@@ -155,7 +183,13 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
                     type="digit"
                     placeholder="0.00"
                     value={item.amount}
-                    onInput={(e) => handleScheduleUpdate(index, 'amount', e.detail.value || '')}
+                    onInput={(e) => {
+                      const v = e.detail.value || '';
+                      // 禁止负数输入
+                      const num = parseFloat(v);
+                      if (v && (isNaN(num) || num < 0)) return;
+                      handleScheduleUpdate(index, 'amount', v);
+                    }}
                   />
                 </View>
               </View>

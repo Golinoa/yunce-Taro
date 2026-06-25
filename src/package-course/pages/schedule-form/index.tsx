@@ -3,12 +3,13 @@ import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import ActionButton from '@/components/ActionButton';
 import Empty from '@/components/Empty';
+import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import { scheduleService } from '@/services';
+import { classService, notificationService, scheduleService, studentService } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
 import type { Class } from '@/types/class';
-import type { ScheduleColor, DayOfWeek } from '@/types/schedule';
+import type { Schedule, ScheduleColor, DayOfWeek } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
@@ -42,17 +43,21 @@ const ScheduleForm: React.FC = () => {
   const currentUserId = profile?.id || '';
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
   const fetchClassesByTeacher = useClassStore((state) => state.fetchByTeacher);
-  const scheduleId = useMemo(() => {
+  const routerParams = useMemo(() => {
     const instance = Taro.getCurrentInstance();
-    return decodeURIComponent(instance?.router?.params?.id || '');
+    return instance?.router?.params || {};
   }, []);
+  const scheduleId = useMemo(() => decodeURIComponent(routerParams.id || ''), [routerParams]);
+  const formMode = useMemo(() => decodeURIComponent(routerParams.mode || ''), [routerParams]);
   const isEdit = !!scheduleId;
+  const isRescheduleMode = isEdit && formMode === 'reschedule';
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [originalSchedule, setOriginalSchedule] = useState<Schedule | null>(null);
 
   // 基础数据
   const [students, setStudents] = useState<Student[]>([]);
@@ -95,6 +100,19 @@ const ScheduleForm: React.FC = () => {
           return;
         }
 
+        // 如果是调课模式，检查是否是过去的课程
+        if (isRescheduleMode) {
+          const today = dayjs().startOf('day');
+          const originalDate = today.day(sch.day_of_week === 7 ? 0 : sch.day_of_week);
+          if (originalDate.isBefore(today)) {
+            Taro.showToast({ title: '已结束的课程不支持调课', icon: 'none', duration: 2000 });
+            setTimeout(() => Taro.navigateBack(), 1500);
+            setLoading(false);
+            return;
+          }
+        }
+
+        setOriginalSchedule(sch);
         setMode(!USE_MOCK || sch.class_id ? 'class' : 'student');
         if (sch.student_id) setStudentId(sch.student_id);
         if (sch.class_id) setClassId(sch.class_id);
@@ -105,6 +123,7 @@ const ScheduleForm: React.FC = () => {
         setNote(sch.note || '');
         setReminderMinutes(sch.reminder_minutes || 0);
       } else {
+        setOriginalSchedule(null);
         if (stuList.length > 0) setStudentId(stuList[0].id);
         if (clsList.length > 0) setClassId(clsList[0].id);
         if (!USE_MOCK) setMode('class');
@@ -115,7 +134,7 @@ const ScheduleForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, isEdit, scheduleId, fetchStudentsByTeacher, fetchClassesByTeacher]);
+  }, [currentUserId, isEdit, scheduleId, fetchStudentsByTeacher, fetchClassesByTeacher, isRescheduleMode]);
 
   useEffect(() => {
     void loadFormData();
@@ -140,6 +159,46 @@ const ScheduleForm: React.FC = () => {
     () => classes.findIndex((c) => c.id === classId),
     [classes, classId],
   );
+  const selectedClass = useMemo(
+    () => classes.find((item) => item.id === classId) || null,
+    [classId, classes],
+  );
+  const selectedStudent = useMemo(
+    () => students.find((item) => item.id === studentId) || null,
+    [studentId, students],
+  );
+  const originalTargetName = useMemo(() => {
+    if (!originalSchedule) {
+      return '';
+    }
+    if (originalSchedule.class_id) {
+      return (
+        classes.find((item) => item.id === originalSchedule.class_id)?.name ||
+        originalSchedule.class_info?.name ||
+        '未命名班级'
+      );
+    }
+    if (originalSchedule.student_id) {
+      return students.find((item) => item.id === originalSchedule.student_id)?.name || '未命名学员';
+    }
+    return '未命名课程';
+  }, [classes, originalSchedule, students]);
+  const originalScheduleText = useMemo(() => {
+    if (!originalSchedule) {
+      return '';
+    }
+    return `${DAY_LABELS[originalSchedule.day_of_week - 1]} ${originalSchedule.start_time}-${originalSchedule.end_time}`;
+  }, [originalSchedule]);
+  const nextScheduleText = useMemo(
+    () => `${DAY_LABELS[dayOfWeek - 1]} ${startTime}-${endTime}`,
+    [dayOfWeek, endTime, startTime],
+  );
+  const currentTargetName = useMemo(() => {
+    if (mode === 'class') {
+      return selectedClass?.name || '请选择班级';
+    }
+    return selectedStudent?.name || '请选择学员';
+  }, [mode, selectedClass, selectedStudent]);
 
   const submitBlockedReason = useMemo(() => {
     if (!currentUserId) return '未获取到登录信息，请重新进入页面';
@@ -156,6 +215,49 @@ const ScheduleForm: React.FC = () => {
   const canSubmit = useMemo(
     () => !loading && !loadError && !notFound && !submitBlockedReason,
     [loadError, loading, notFound, submitBlockedReason],
+  );
+  const pageTitle = useMemo(() => {
+    if (isRescheduleMode) {
+      return '调课';
+    }
+    return isEdit ? '编辑排课' : '创建排课';
+  }, [isEdit, isRescheduleMode]);
+  const submitButtonText = useMemo(() => {
+    if (saving) {
+      return isRescheduleMode ? '调课中...' : '保存中...';
+    }
+    return isRescheduleMode ? '确认调课' : '保存';
+  }, [isRescheduleMode, saving]);
+  const handleNotifyStudentAndParents = useCallback(
+    async (targetStudentId: string, title: string, content: string) => {
+      try {
+        await notificationService.send({
+          sender_id: currentUserId,
+          receiver_id: targetStudentId,
+          title,
+          content,
+          related_id: targetStudentId,
+        });
+      } catch (err) {
+        logError('scheduleForm notify student', err);
+      }
+
+      try {
+        const parents = await studentService.getParents(targetStudentId);
+        for (const binding of parents) {
+          await notificationService.send({
+            sender_id: currentUserId,
+            receiver_id: binding.parent_id,
+            title,
+            content,
+            related_id: targetStudentId,
+          });
+        }
+      } catch (err) {
+        logError('scheduleForm notify parents', err);
+      }
+    },
+    [currentUserId],
   );
 
   // 保存
@@ -195,7 +297,26 @@ const ScheduleForm: React.FC = () => {
 
         if (isEdit) {
           await scheduleService.update(scheduleId, data);
-          Taro.showToast({ title: '更新成功', icon: 'success' });
+          if (isRescheduleMode) {
+            const originalText = originalScheduleText || '原排课';
+            const updatedText = `${DAY_LABELS[dayOfWeek - 1]} ${startTime}-${endTime}`;
+            if (mode === 'class' && classId) {
+              const classStudents = await classService.getStudents(classId);
+              const title = '调课通知';
+              const content = `${selectedClass?.name || '班级课程'} 已由 ${originalText} 调整为 ${updatedText}，请留意最新上课安排。`;
+              for (const student of classStudents) {
+                await handleNotifyStudentAndParents(student.id, title, content);
+              }
+            }
+            if (mode === 'student' && studentId) {
+              await handleNotifyStudentAndParents(
+                studentId,
+                '调课通知',
+                `${selectedStudent?.name || '您的课程'} 已由 ${originalText} 调整为 ${updatedText}，请留意最新上课安排。`,
+              );
+            }
+          }
+          Taro.showToast({ title: isRescheduleMode ? '调课成功' : '更新成功', icon: 'success' });
         } else {
           await scheduleService.create(data);
           Taro.showToast({ title: '添加成功', icon: 'success' });
@@ -221,6 +342,7 @@ const ScheduleForm: React.FC = () => {
     studentId,
     classId,
     dayOfWeek,
+    handleNotifyStudentAndParents,
     startTime,
     endTime,
     color,
@@ -228,9 +350,14 @@ const ScheduleForm: React.FC = () => {
     reminderMinutes,
     submitBlockedReason,
     isEdit,
+    isRescheduleMode,
+    originalScheduleText,
     scheduleId,
     currentUserId,
     saving,
+    selectedClass?.name,
+    selectedStudent?.name,
+    studentId,
   ]);
 
   // 删除
@@ -304,14 +431,66 @@ const ScheduleForm: React.FC = () => {
         {/* 标题 */}
         <View className="px-8 pt-8 pb-4">
           <Text className="text-[40rpx] font-bold text-foreground block">
-            {isEdit ? '编辑排课' : '创建排课'}
+            {pageTitle}
           </Text>
+          {isRescheduleMode ? (
+            <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
+              已回填当前班级排课信息，可灵活调整上课日、时间和其他排课设置
+            </Text>
+          ) : null}
         </View>
 
         <View className="px-8">
+          {isRescheduleMode ? (
+            <View className="mb-7 rounded-[28rpx] bg-white shadow-soft overflow-hidden">
+              <View className="bg-gradient-primary px-[28rpx] py-[24rpx]">
+                <View className="flex items-center gap-[12rpx]">
+                  <Icon name="mdi-swap-horizontal" size="sm" color="white" />
+                  <Text className="text-[30rpx] font-semibold text-white">调课预览</Text>
+                </View>
+                <Text className="mt-[10rpx] block text-[24rpx] text-white/85">
+                  调整后会自动通知受影响学员与家长
+                </Text>
+              </View>
+              <View className="px-[28rpx] py-[24rpx]">
+                <View className="rounded-[22rpx] bg-muted px-[24rpx] py-[22rpx]">
+                  <Text className="text-[24rpx] text-muted-foreground block">原排课</Text>
+                  <Text className="mt-[10rpx] block text-[32rpx] font-semibold text-foreground">
+                    {originalTargetName || '未命名课程'}
+                  </Text>
+                  <View className="mt-[14rpx] flex items-center gap-[10rpx]">
+                    <Icon name="mdi-calendar-clock" size="xs" color="mutedForeground" />
+                    <Text className="text-[24rpx] text-foreground-secondary">
+                      {originalScheduleText || '未设置'}
+                    </Text>
+                  </View>
+                </View>
+                <View className="flex items-center justify-center py-[20rpx]">
+                  <View className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-primary-10">
+                    <Icon name="mdi-arrow-right" size="sm" color="primary" />
+                  </View>
+                </View>
+                <View className="rounded-[22rpx] border-[2rpx] border-solid border-primary/30 bg-primary-5 px-[24rpx] py-[22rpx]">
+                  <Text className="text-[24rpx] text-primary block">调整后</Text>
+                  <Text className="mt-[10rpx] block text-[32rpx] font-semibold text-foreground">
+                    {currentTargetName}
+                  </Text>
+                  <View className="mt-[14rpx] flex items-center gap-[10rpx]">
+                    <Icon name="mdi-calendar-check-outline" size="xs" color="primary" />
+                    <Text className="text-[24rpx] text-foreground-secondary">
+                      {nextScheduleText}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           {/* ====== 排课类型 ====== */}
           <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">课程类型</Text>
+            <Text className="text-lg text-foreground font-medium block mb-3">
+              {isRescheduleMode ? '调课对象类型' : '课程类型'}
+            </Text>
             <View className="flex gap-4">
               <View
                 className={`flex-1 py-6 rounded-[24rpx] border-[4rpx] bg-white flex items-center justify-center shadow-soft ${mode === 'student' ? 'border-primary bg-gradient-primary shadow-elegant' : 'border-input'}`}
@@ -344,7 +523,13 @@ const ScheduleForm: React.FC = () => {
           {/* ====== 选择对象 ====== */}
           <View className="mb-7">
             <Text className="text-lg text-foreground font-medium block mb-3">
-              {mode === 'student' ? '选择学生' : '选择班级'}
+              {mode === 'student'
+                ? isRescheduleMode
+                  ? '调整后的学生'
+                  : '选择学生'
+                : isRescheduleMode
+                  ? '调整后的班级'
+                  : '选择班级'}
             </Text>
             {mode === 'student' ? (
               <Picker
@@ -385,7 +570,9 @@ const ScheduleForm: React.FC = () => {
 
           {/* ====== 星期几 ====== */}
           <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">上课日</Text>
+            <Text className="text-lg text-foreground font-medium block mb-3">
+              {isRescheduleMode ? '调整到' : '上课日'}
+            </Text>
             <View className="flex gap-2">
               {DAY_VALUES.map((d, i) => (
                 <View
@@ -405,7 +592,9 @@ const ScheduleForm: React.FC = () => {
 
           {/* ====== 时间设置 ====== */}
           <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">上课时间</Text>
+            <Text className="text-lg text-foreground font-medium block mb-3">
+              {isRescheduleMode ? '调整后时间' : '上课时间'}
+            </Text>
             <View className="flex items-center gap-4">
               <Picker mode="time" value={startTime} onChange={(e) => setStartTime(e.detail.value)}>
                 <View className="flex-1 py-6 px-7 rounded-[24rpx] border-[2rpx] border-input bg-white flex items-center justify-center shadow-soft">
@@ -427,7 +616,9 @@ const ScheduleForm: React.FC = () => {
 
           {/* ====== 颜色主题 ====== */}
           <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">颜色标签</Text>
+            <Text className="text-lg text-foreground font-medium block mb-3">
+              {isRescheduleMode ? '课程标签' : '颜色标签'}
+            </Text>
             <View className="flex gap-3">
               {COLOR_OPTIONS.map((c) => (
                 <View
@@ -464,10 +655,12 @@ const ScheduleForm: React.FC = () => {
 
           {/* ====== 备注 ====== */}
           <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">备注</Text>
+            <Text className="text-lg text-foreground font-medium block mb-3">
+              {isRescheduleMode ? '调课备注' : '备注'}
+            </Text>
             <View className="py-6 px-7 rounded-[24rpx] border-[2rpx] border-input bg-white shadow-soft mb-3">
               <Text className={note ? 'text-lg text-foreground' : 'text-lg text-muted-foreground'}>
-                {note || '可选备注'}
+                {note || (isRescheduleMode ? '可填写调课原因或说明' : '可选备注')}
               </Text>
             </View>
             <View className="flex flex-wrap gap-3">
@@ -492,12 +685,12 @@ const ScheduleForm: React.FC = () => {
             </View>
           ) : null}
           <ActionButton
-            text={saving ? '保存中...' : '保存'}
+            text={submitButtonText}
             fixed={false}
             onClick={handleSave}
             disabled={!canSubmit || saving || deleting}
           />
-          {isEdit && (
+          {isEdit && !isRescheduleMode && (
             <View
               className={`py-7 px-8 rounded-[24rpx] border-2 flex items-center justify-center ${saving || deleting ? 'border-border bg-muted' : 'border-destructive bg-white'}`}
               onClick={saving || deleting ? undefined : handleDelete}

@@ -1,0 +1,253 @@
+/**
+ * CampusCard - 校区卡片组件
+ *
+ * 用于分校区管理页，展示校区基本信息、统计数据和操作入口。
+ *
+ * 设计定稿（对齐 campus-settings.html）：
+ * - 右上角三角装饰 + 小圆点
+ * - 三点菜单：使用原生 ActionSheet 弹出操作项
+ * - 合作校区有 partner-info 标签行（分成比例、师资等）
+ * - 统计行：学生/教师/月营收
+ * - 底部独立一行：运营数据 →（蓝色带横线箭头）
+ */
+import { View, Text } from '@tarojs/components';
+import Taro from '@tarojs/taro';
+import cn from 'classnames';
+import React, { useCallback, useMemo } from 'react';
+import Icon from '@/components/Icon';
+import { CAMPUS_TYPE_MAP, PARTNER_MODE_MAP } from '@/data/campus';
+import type { CampusUIModel } from '@/types/campus';
+
+export interface CampusCardProps {
+  /** 校区数据 */
+  campus: CampusUIModel;
+  /** 点击运营数据入口 */
+  onDataClick?: (id: string) => void;
+  /** 设为主校区 */
+  onSetMain?: (id: string) => void;
+  /** 编辑校区 */
+  onEdit?: (id: string) => void;
+  /** 删除校区 */
+  onDelete?: (id: string) => void;
+}
+
+const CampusCard: React.FC<CampusCardProps> = ({
+  campus,
+  onDataClick,
+  onSetMain,
+  onEdit,
+  onDelete,
+}) => {
+  const typeInfo = useMemo(
+    () => CAMPUS_TYPE_MAP[campus.type] || CAMPUS_TYPE_MAP.self,
+    [campus.type],
+  );
+
+  const partnerModeText = useMemo(
+    () => (campus.partnerMode ? PARTNER_MODE_MAP[campus.partnerMode] : ''),
+    [campus.partnerMode],
+  );
+
+  /** 格式化营收数字 */
+  const formatRevenue = useCallback((revenue: number, unit?: string) => {
+    if (unit === '万') {
+      const wan = revenue / 10000;
+      return wan >= 1 ? `${wan.toFixed(1)}` : `${wan}`;
+    }
+    if (revenue >= 10000) {
+      return `${(revenue / 10000).toFixed(1)}`;
+    }
+    return `${revenue}`;
+  }, []);
+
+  const revenueDisplay = useMemo(
+    () => formatRevenue(campus.stats.revenue, campus.stats.revenueUnit),
+    [campus.stats.revenue, campus.stats.revenueUnit, formatRevenue],
+  );
+
+  const revenueUnit = useMemo(
+    () => campus.stats.revenueUnit || (campus.stats.revenue >= 10000 ? '万' : ''),
+    [campus.stats.revenueUnit, campus.stats.revenue],
+  );
+
+  /** 三点菜单 — 使用原生 ActionSheet */
+  const handleMenuClick = useCallback(async () => {
+    const items: string[] = [];
+    const actions: (() => void)[] = [];
+
+    if (!campus.isMain && onSetMain) {
+      items.push('设为主校区');
+      actions.push(() => onSetMain(campus.id));
+    }
+    if (onEdit) {
+      items.push('编辑');
+      actions.push(() => onEdit(campus.id));
+    }
+    if (!campus.isMain && onDelete) {
+      items.push('删除');
+      actions.push(() => onDelete(campus.id));
+    }
+
+    if (items.length === 0) return;
+
+    try {
+      const { tapIndex } = await Taro.showActionSheet({
+        itemList: items,
+        itemColor: '#333',
+      });
+      actions[tapIndex]?.();
+    } catch {
+      // 用户取消，不做处理
+    }
+  }, [campus.id, campus.isMain, onSetMain, onEdit, onDelete]);
+
+  const handleDataClick = useCallback(() => {
+    onDataClick?.(campus.id);
+  }, [campus.id, onDataClick]);
+
+  return (
+    <View className="relative bg-white rounded-[40rpx] shadow-soft p-[44rpx] mb-[20rpx] overflow-hidden border-[2rpx] border-border">
+      {/* 右上角三角装饰 + 小圆点 */}
+      <View
+        className="absolute top-0 right-0 w-[160rpx] h-[160rpx] rounded-br-[40rpx]"
+        style={{
+          background:
+            campus.type === 'partner'
+              ? 'linear-gradient(135deg, transparent 50%, hsl(43 74% 66% / 0.1) 50%)'
+              : 'linear-gradient(135deg, transparent 50%, hsl(168 55% 58% / 0.08) 50%)',
+        }}
+      />
+      <View
+        className="absolute top-[24rpx] right-[24rpx] w-[16rpx] h-[16rpx] rounded-full"
+        style={{
+          background:
+            campus.type === 'partner' ? 'hsl(43 74% 66% / 0.4)' : 'hsl(168 55% 58% / 0.4)',
+        }}
+      />
+
+      {/* Header 行：图标 + 名称 + 类型标签 + 三点菜单 */}
+      <View className="flex flex-row items-center relative z-1">
+        {/* 校区图标 — 设计稿：48px/圆角14px/字号24px */}
+        <View
+          className="w-[96rpx] h-[96rpx] rounded-[28rpx] flex items-center justify-center mr-[28rpx] flex-shrink-0"
+          style={{
+            background: campus.iconGradient,
+            boxShadow:
+              campus.type === 'partner'
+                ? '0 8rpx 24rpx hsl(43 74% 66% / 0.3)'
+                : '0 8rpx 24rpx hsl(168 55% 58% / 0.3)',
+          }}
+        >
+          <Text className="text-[48rpx] text-white">{campus.icon}</Text>
+        </View>
+
+        {/* 校区信息 */}
+        <View className="flex-1 min-w-0">
+          <Text className="text-[32rpx] font-bold text-foreground truncate">{campus.name}</Text>
+          {/* 铭牌 — 设计稿：.campus-type-tag / inline-flex / gap:4px / padding:2px 8px / 圆角6px / 字号10px/600 / ::before 5px圆点 */}
+          <View className="flex flex-row items-center gap-[8rpx] mt-[6rpx]">
+            <View
+              className={cn(
+                'flex flex-row items-center gap-[8rpx] px-[16rpx] py-[4rpx] rounded-[12rpx]',
+                campus.isMain ? 'bg-amber-10' : typeInfo.tagBg,
+              )}
+            >
+              <View
+                className={cn(
+                  'w-[10rpx] h-[10rpx] rounded-full',
+                  campus.isMain ? 'bg-amber' : typeInfo.dotColor,
+                )}
+              />
+              <Text
+                className={cn(
+                  'text-[20rpx] font-semibold',
+                  campus.isMain ? 'text-amber' : typeInfo.tagText,
+                )}
+              >
+                {campus.isMain ? '主校区' : typeInfo.label}
+              </Text>
+            </View>
+            {partnerModeText && (
+              <View className="bg-muted px-[16rpx] py-[4rpx] rounded-[12rpx]">
+                <Text className="text-[20rpx] text-muted-foreground">· {partnerModeText}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* 三点菜单按钮 */}
+        <View
+          className="w-[56rpx] h-[56rpx] flex items-center justify-center rounded-full press-bg flex-shrink-0"
+          onClick={handleMenuClick}
+        >
+          <Icon name="mdi-dots-vertical" size="md" color="muted" />
+        </View>
+      </View>
+
+      {/* 合作校区标签行 */}
+      {campus.type === 'partner' && campus.partnerTags && campus.partnerTags.length > 0 && (
+        <View className="flex flex-row flex-wrap gap-[12rpx] mt-[16rpx]">
+          {campus.partnerTags.map((tag, idx) => (
+            <View key={idx} className="bg-amber-10 px-[16rpx] py-[6rpx] rounded-[8rpx]">
+              <Text className="text-[22rpx] text-amber font-medium">{tag}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* 地址 — 有值才显示 */}
+      {campus.address && (
+        <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
+          <Icon name="mdi-map-marker" size="sm" color="primary" />
+          <Text className="text-[24rpx] text-muted-foreground flex-1">{campus.address}</Text>
+        </View>
+      )}
+
+      {/* 电话 — 有值才显示 */}
+      {campus.phone && (
+        <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
+          <Icon name="mdi-phone" size="sm" color="primary" />
+          <Text className="text-[24rpx] text-muted-foreground">{campus.phone}</Text>
+        </View>
+      )}
+
+      {/* 统计行 — 设计稿：.stats-row / grid 3列 / gap:10px / pt:14px / border-top / stat-val:20px 800 / stat-label:11px */}
+      <View className="grid grid-cols-3 gap-[20rpx] mt-[24rpx] pt-[28rpx] border-t-d5e8e0">
+        <View className="flex flex-col items-center">
+          <Text className="text-[40rpx] font-extrabold text-foreground">
+            {campus.stats.students}
+          </Text>
+          <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">学生</Text>
+        </View>
+        <View className="flex flex-col items-center">
+          <Text className="text-[40rpx] font-extrabold text-foreground">
+            {campus.stats.teachers}
+          </Text>
+          <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">教师</Text>
+        </View>
+        <View className="flex flex-col items-center">
+          <View className="flex flex-row items-baseline justify-center">
+            <Text className="text-[40rpx] font-extrabold text-foreground">{revenueDisplay}</Text>
+            {revenueUnit && (
+              <Text className="text-[22rpx] text-muted-foreground ml-[4rpx]">{revenueUnit}</Text>
+            )}
+          </View>
+          <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">
+            {campus.type === 'partner' ? '本月分成' : '月营收'}
+          </Text>
+        </View>
+      </View>
+
+      {/* 底部：运营数据入口 — 设计稿：.data-row / justify-end / gap:4px / pt:14px / mt:14px / data-text:11px/500/primary */}
+      <View
+        className="flex flex-row items-center justify-end gap-[8rpx] pt-[28rpx] mt-[28rpx] border-t-d5e8e0"
+        onClick={handleDataClick}
+      >
+        <Text className="text-[22rpx] text-primary font-medium">运营数据</Text>
+        <Icon name="mdi-arrow-right" size={28} color="primary" />
+      </View>
+    </View>
+  );
+};
+
+export default CampusCard;

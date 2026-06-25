@@ -26,11 +26,8 @@ interface RankListProps {
   mode?: 'lesson' | 'income' | 'payment' | 'detail';
 }
 
-const RANK_COLORS: Record<number, string> = {
-  0: '#FFB800',
-  1: '#C0C0C0',
-  2: '#CD7F32',
-};
+// 前三名背景色类名（UnoCSS，禁止内联 style）
+const RANK_BG_CLASSES = ['bg-kpi-amber', 'bg-muted', 'bg-kpi-orange'];
 
 const RankList: React.FC<RankListProps> = ({
   title,
@@ -55,7 +52,7 @@ const RankList: React.FC<RankListProps> = ({
           {displayData.map((item, index) => {
             const percent = (item.value / maxValue) * 100;
             const isTopThree = index < 3;
-            const rankColor = RANK_COLORS[index] || '#999999';
+            const rankBgClass = RANK_BG_CLASSES[index] || 'bg-muted';
 
             // 课时/收入排行模式
             if (mode === 'lesson' || mode === 'income') {
@@ -63,8 +60,7 @@ const RankList: React.FC<RankListProps> = ({
                 <View key={item.id} className="flex items-center gap-3">
                   {isTopThree ? (
                     <View
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: rankColor }}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${rankBgClass}`}
                     >
                       <Text className="text-sm text-white font-bold">{index + 1}</Text>
                     </View>

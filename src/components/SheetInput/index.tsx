@@ -20,7 +20,7 @@ export interface SheetInputProps {
   /** 输入值 */
   value?: string;
   /** 输入事件 */
-  onInput?: (e: any) => void;
+  onInput?: CommonEventFunction;
   /** 输入类型 */
   type?: 'text' | 'number' | 'digit' | 'idcard' | 'safe-password';
   /** 是否错误状态 */
@@ -36,9 +36,9 @@ export interface SheetInputProps {
   /** 最大长度 */
   maxlength?: number;
   /** 焦点事件 */
-  onFocus?: (e: any) => void;
+  onFocus?: CommonEventFunction;
   /** 失焦事件 */
-  onBlur?: (e: any) => void;
+  onBlur?: CommonEventFunction;
 }
 
 const INPUT_STYLES = {
@@ -109,8 +109,10 @@ export interface SheetPickerItemProps {
 export const SheetPickerItem: React.FC<SheetPickerItemProps> = ({ children, className }) => {
   return (
     <View
-      className={cn('py-[16rpx] px-5 rounded-xl text-md text-center text-foreground', className)}
-      style={{ backgroundColor: '#f5faf8', border: '2rpx solid #D5E8E0' }}
+      className={cn(
+        'py-[16rpx] px-5 rounded-xl text-md text-center text-foreground bg-f5faf8 border-d5e8e0',
+        className,
+      )}
     >
       {children}
     </View>
@@ -205,11 +207,7 @@ export const SheetDivider: React.FC<SheetDividerProps> = ({
   className,
 }) => {
   if (direction === 'vertical') {
-    return (
-      <View className={cn('w-[2rpx] h-4', className)} style={{ backgroundColor: '#D5E8E0' }} />
-    );
+    return <View className={cn('w-[2rpx] h-4 bg-d5e8e0', className)} />;
   }
-  return (
-    <View className={cn('h-[2rpx] w-full', className)} style={{ backgroundColor: '#D5E8E0' }} />
-  );
+  return <View className={cn('h-[2rpx] w-full bg-d5e8e0', className)} />;
 };

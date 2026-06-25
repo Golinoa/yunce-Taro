@@ -4,25 +4,7 @@ import React from 'react';
 import Icon from '@/components/Icon';
 import { MDI_ICONS } from '@/components/Icon/icons';
 import type { QuickEntry } from '@/services/home';
-
-const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
-const DEBUG_SESSION_ID = 'page-slow-nav';
-
-function reportNavDebug(location: string, msg: string, data: Record<string, unknown>): void {
-  Taro.request({
-    url: DEBUG_SERVER_URL,
-    method: 'POST',
-    data: {
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'pre-fix',
-      hypothesisId: 'H1',
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    },
-  }).catch(() => {});
-}
+import { reportLocalDebug } from '@/utils/local-debug';
 
 export interface KingKongSectionProps {
   entries: QuickEntry[];
@@ -56,7 +38,7 @@ const TRIPLE_CARD_CONFIG = [
     label: '约试听',
     subLabel: '新增 试听预约',
     icon: 'mdi-account-plus',
-    url: '/package-student/pages/student-form/index',
+    url: '/pages/booking/index',
   },
   {
     label: '查课时',
@@ -114,9 +96,14 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {
   const gridEntries = entries.slice(0, 8);
   const handleNavigate = (url: string, label: string) => {
     // #region debug-point H1:home-navigate-click
-    reportNavDebug('src/components/home/KingKongSection/index.tsx:onClick', '[DEBUG] home navigate click', {
-      url,
-      label,
+    reportLocalDebug({
+      hypothesisId: 'H1',
+      location: 'src/components/home/KingKongSection/index.tsx:onClick',
+      msg: '[DEBUG] home navigate click',
+      data: {
+        url,
+        label,
+      },
     });
     // #endregion
     Taro.navigateTo({ url });

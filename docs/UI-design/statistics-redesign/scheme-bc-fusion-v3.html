@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>统计页面 - 方案B+C融合 v2（预警优先）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#ff6b35',
+            'primary-light': '#ffa070',
+            'primary-dark': '#e55a2b',
+            accent: '#e879a8',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            info: '#3b82f6',
+            'bg-base': '#f8f9fa',
+            'card-bg': '#ffffff',
+            'text-primary': '#1a1a1a',
+            'text-secondary': '#555555',
+            'text-tertiary': '#8a8a8a',
+            'border-light': '#eef0f2',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans SC', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', 'Noto Sans SC', sans-serif; background: #d0d0d0; }
+    .phone-frame { max-width: 414px; margin: 20px auto; background: #f8f9fa; min-height: 812px; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,0.15); position: relative; }
+    .scroll-content { overflow-y: auto; height: 812px; padding-bottom: 40px; }
+    .scroll-content::-webkit-scrollbar { display: none; }
+    .number-display { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .gradient-soft { background: linear-gradient(180deg, #fff8f5, #f8f9fa); }
+    .nav-pill { backdrop-filter: blur(20px); background: rgba(255,255,255,0.92); }
+    .section-divider { height: 8px; background: #f0f0f0; }
+    .tab-pill-active { background: white; color: #1a1a1a; box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-weight: 600; }
+    .tab-pill-inactive { color: '#8a8a8a'; }
+    .rank-tab-active { background: #1a1a1a; color: white; }
+    .rank-tab-inactive { background: white; border: 1px solid #eef0f2; color: #555; }
+    .fi-tab-active { color: #1a1a1a; font-weight: 600; position: relative; }
+    .fi-tab-active::after { content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); width: 24px; height: 2px; background: #1a1a1a; border-radius: 2px; }
+    .fi-tab-inactive { color: #8a8a8a; }
+    .filter-active { background: #1a1a1a; color: white; }
+    .filter-inactive { background: white; border: 1px solid #eef0f2; color: #555; }
+    .kpi-big { font-size: 40px; line-height: 1.1; font-weight: 700; }
+    .insight-card { transition: all 0.3s ease; }
+    .insight-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+    .alert-card { transition: all 0.2s ease; cursor: pointer; position: relative; overflow: hidden; }
+    .alert-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.12); }
+    .alert-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 2px 0 0 2px; }
+    .alert-card-danger::before { background: #ef4444; }
+    .alert-card-warning::before { background: #f59e0b; }
+    .alert-card-primary::before { background: #ff6b35; }
+    .rank-item { transition: background 0.2s ease; }
+    .rank-item:hover { background: #fafafa; }
+    .collapse-enter { max-height: 500px; opacity: 1; transition: all 0.4s ease; overflow: hidden; }
+    .collapse-exit { max-height: 0; opacity: 0; transition: all 0.4s ease; overflow: hidden; }
+    .alert-summary { transition: all 0.2s ease; cursor: pointer; }
+    .alert-summary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(239,68,68,0.15); }
+    .alert-summary:active { transform: scale(0.98); }
+    /* Toast */
+    .toast-container { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 100; }
+    .toast { background: rgba(26,26,26,0.92); color: white; padding: 10px 20px; border-radius: 24px; font-size: 14px; backdrop-filter: blur(10px); animation: toastIn 0.3s ease, toastOut 0.3s ease 2s forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
+    /* 脉冲红点 */
+    .pulse-dot { position: relative; }
+    .pulse-dot::after { content: ''; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; border: 2px solid white; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 70% { box-shadow: 0 0 0 6px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
+    .divider-h { height: 1px; background: linear-gradient(90deg, transparent, #e0e0e0, transparent); }
+  </style>
+</head>
+<body class="min-h-screen py-8">
+
+<!-- 说明标签 -->
+<div class="max-w-[414px] mx-auto mb-4 px-4">
+  <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+    <h1 class="text-lg font-bold text-text-primary mb-1">方案B+C融合 v2（预警优先）</h1>
+    <p class="text-sm text-text-secondary">针对BC融合版审查出的8项缺陷进行优化：预警上提至首屏、Header待办红点、预警摘要条、趋势默认收起、洞察去重、财务独立预警、预警卡片左侧色条增强。所有按钮可点击。</p>
+  </div>
+</div>
+
+<div class="phone-frame">
+  <div id="toast-wrap" class="toast-container"></div>
+  <div class="scroll-content" id="scroll-content">
+
+    <!-- 固定顶部导航 -->
+    <div class="sticky top-0 z-50 px-4 py-3 nav-pill border-b border-border-light">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold text-text-primary">数据中心</h1>
+          <!-- 待办红点 -->
+          <span id="header-badge" class="pulse-dot bg-danger text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">16</span>
+        </div>
+        <div class="flex items-center gap-1 bg-gray-100 rounded-full p-0.5" id="view-toggle">
+          <button data-view="operation" class="px-3 py-1.5 rounded-full text-xs font-medium tab-pill-active transition-all">运营</button>
+          <button data-view="finance" class="px-3 py-1.5 rounded-full text-xs font-medium tab-pill-inactive transition-all">财务</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- L1: 核心决策区 -->
+    <div class="gradient-soft px-6 pt-6 pb-3">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2 cursor-pointer" id="period-display">
+          <span class="text-sm text-text-secondary" id="current-period-text">2026年6月</span>
+          <svg class="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+        <div class="flex items-center gap-1 text-xs text-success bg-success/5 px-2 py-1 rounded-lg" id="health-badge">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+          <span>整体向好</span>
+        </div>
+      </div>
+
+      <!-- 运营视角 KPI：5个卡片整体为一个扁长方形 -->
+      <div id="kpi-operation" class="flex gap-2 mb-4" style="min-height: 100px;">
+        <!-- 左1：在册学员（窄+矮） -->
+        <div class="rounded-xl p-2 relative overflow-hidden flex flex-col justify-between" style="background: linear-gradient(160deg, #34d399 0%, #10b981 50%, #059669 100%); flex: 0.58;">
+          <div class="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white/8"></div>
+          <div class="absolute bottom-2 left-2 w-6 h-6 rounded-full bg-white/5"></div>
+          <div class="relative z-10">
+            <div class="flex items-center gap-1 mb-0.5">
+              <span class="text-[9px] font-medium text-white/90">在册学员</span>
+              <div class="flex items-center gap-0.5 bg-white/20 px-1 py-0.5 rounded-full">
+                <svg class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                <span class="text-[8px] text-white font-bold" id="op-students-trend">+3</span>
+              </div>
+            </div>
+            <div class="text-[16px] font-bold text-white number-display leading-none tracking-tight" id="op-students">48<span class="text-[9px] font-normal text-white/70 ml-0.5">人</span></div>
+          </div>
+          <div class="relative z-10 text-[9px] text-white/80" id="op-students-note">本月新增+3</div>
+        </div>
+        <!-- 左2：消耗课时（窄+矮） -->
+        <div class="rounded-xl p-2 relative overflow-hidden flex flex-col justify-between" style="background: linear-gradient(160deg, #fb923c 0%, #f97316 50%, #ea580c 100%); flex: 0.58;">
+          <div class="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white/8"></div>
+          <div class="absolute bottom-2 right-4 w-5 h-5 rounded-full bg-white/5"></div>
+          <div class="relative z-10">
+            <span class="text-[9px] font-medium text-white/90 block mb-0.5">消耗课时</span>
+            <div class="text-[16px] font-bold text-white number-display leading-none tracking-tight" id="op-hours">186</div>
+          </div>
+          <div class="relative z-10">
+            <div class="flex items-center gap-1 text-[9px] text-white/80 mb-0.5">
+              <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span>课时</span>
+            </div>
+            <div class="text-[9px] text-white font-semibold flex items-center gap-0.5" id="op-hours-trend">
+              <svg class="w-2 h-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+              <span>+8.2%环比</span>
+            </div>
+          </div>
+        </div>
+        <!-- 右列：上2大 + 下1长条（宽） -->
+        <div class="flex flex-col gap-1.5" style="flex: 1.6;">
+          <!-- 上排：2个横向大卡片（占更多高度） -->
+          <div class="flex gap-1.5" style="flex: 1.3;">
+            <!-- 上课人次：蓝色 -->
+            <div class="flex-1 rounded-xl p-2 relative overflow-hidden flex flex-col justify-between" style="background: linear-gradient(160deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%);">
+              <div class="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-white/8"></div>
+              <div class="relative z-10 flex items-center gap-1">
+                <div class="w-4 h-4 rounded bg-white/20 flex items-center justify-center">
+                  <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                </div>
+                <span class="text-[9px] font-medium text-white/90">上课人次</span>
+              </div>
+              <div class="relative z-10 text-[16px] font-bold text-white number-display leading-none tracking-tight" id="op-count">42<span class="text-[9px] font-normal text-white/70 ml-0.5">次</span></div>
+              <div class="relative z-10 text-[9px] text-white font-medium flex items-center gap-0.5" id="op-count-trend">
+                <svg class="w-2 h-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                <span>+5.0%环比</span>
+              </div>
+            </div>
+            <!-- 新签学员：紫色 -->
+            <div class="flex-1 rounded-xl p-2 relative overflow-hidden flex flex-col justify-between" style="background: linear-gradient(160deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%);">
+              <div class="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-white/8"></div>
+              <div class="relative z-10 flex items-center gap-1">
+                <div class="w-4 h-4 rounded bg-white/20 flex items-center justify-center">
+                  <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                </div>
+                <span class="text-[9px] font-medium text-white/90">新签学员</span>
+              </div>
+              <div class="relative z-10 text-[16px] font-bold text-white number-display leading-none tracking-tight" id="op-newsign">5<span class="text-[9px] font-normal text-white/70 ml-0.5">人</span></div>
+              <div class="relative z-10 text-[9px] text-white/80" id="op-newsign-note">¥4,400</div>
+            </div>
+          </div>
+          <!-- 下排：剩余课时 横向长条（文字纵向排列） -->
+          <div class="flex-1 rounded-xl p-2 relative overflow-hidden flex items-center justify-between" style="background: linear-gradient(160deg, #fcd34d 0%, #fbbf24 50%, #f59e0b 100%);">
+            <div class="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-white/10"></div>
+            <div class="relative z-10 flex flex-col justify-between h-full">
+              <div class="flex items-center gap-1 mb-0.5">
+                <div class="w-4 h-4 rounded bg-white/25 flex items-center justify-center">
+                  <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <span class="text-[9px] font-medium text-white/90">剩余课时</span>
+              </div>
+              <div class="text-[16px] font-bold text-white number-display leading-none tracking-tight" id="op-remain">1,248<span class="text-[9px] font-normal text-white/80 ml-0.5">课时</span></div>
+              <div class="text-[9px] text-white/90 font-medium mt-0.5" id="op-remain-note">可消约6.7个月</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 财务视角 KPI -->
+      <div id="kpi-finance" class="hidden mb-4">
+        <div class="bg-text-primary rounded-3xl p-6 text-white relative overflow-hidden mb-4">
+          <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-white/5"></div>
+          <div class="absolute top-20 -right-4 w-16 h-16 rounded-full bg-white/5"></div>
+          <div class="relative z-10">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xs font-medium text-white/50 uppercase tracking-wider">本月营收</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-success/20 text-success font-medium" id="fi-revenue-badge">+12.5% 环比</span>
+            </div>
+            <div class="kpi-big number-display mb-1" id="fi-revenue">¥42,600</div>
+            <div class="flex items-center gap-4 text-sm text-white/60 mt-2">
+              <span id="fi-bills">42笔收费</span>
+              <span>·</span>
+              <span id="fi-avg">客均 ¥1,014</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-border-light text-center">
+            <div class="text-xs text-text-tertiary mb-1">课消金额</div>
+            <div class="text-xl font-bold text-text-primary number-display" id="fi-lesson-amount">¥38,200</div>
+            <div class="text-xs text-success mt-1" id="fi-lesson-trend">+10.3%</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-border-light text-center">
+            <div class="text-xs text-text-tertiary mb-1">新签金额</div>
+            <div class="text-xl font-bold text-text-primary number-display" id="fi-new-amount">¥4,400</div>
+            <div class="text-xs text-text-tertiary mt-1" id="fi-new-note">2位新学员</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-border-light text-center">
+            <div class="text-xs text-text-tertiary mb-1">待收金额</div>
+            <div class="text-xl font-bold text-text-primary number-display" id="fi-pending">¥6,800</div>
+            <div class="text-xs text-warning mt-1" id="fi-pending-note">3笔分期</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快捷时段筛选 -->
+      <div class="flex gap-2" id="period-filters">
+        <button data-period="month" class="flex-1 py-2 rounded-xl text-xs font-medium filter-active transition-all">本月</button>
+        <button data-period="lastMonth" class="flex-1 py-2 rounded-xl text-xs font-medium filter-inactive transition-all">上月</button>
+        <button data-period="quarter" class="flex-1 py-2 rounded-xl text-xs font-medium filter-inactive transition-all">本季度</button>
+        <button data-period="year" class="flex-1 py-2 rounded-xl text-xs font-medium filter-inactive transition-all">本年</button>
+      </div>
+    </div>
+
+    <!-- 主体区域 -->
+    <div class="px-6 pt-0 pb-4">
+      <!-- 运营视角：预警 + 关键洞察 -->
+      <div class="flex flex-col gap-2 mb-3" id="main-content">
+        <!-- 卡片1：待处理预警 -->
+        <div id="alert-summary" class="alert-summary bg-white rounded-xl p-3 shadow-sm border border-danger/20 flex items-center justify-between cursor-pointer" onclick="openAlertModal()">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-danger/10 flex items-center justify-center relative flex-shrink-0">
+              <svg class="w-4 h-4 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+              <span id="summary-dot" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-danger rounded-full border border-white"></span>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold text-text-primary">待处理预警 <span id="summary-total" class="text-danger">16</span> 项</div>
+              <div class="text-xs text-text-secondary mt-0.5 truncate" id="summary-detail">课时不足 5 · 即将过期 3 · 待续费 8</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 text-danger text-xs font-medium flex-shrink-0 ml-2">
+            <span>查看</span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+          </div>
+        </div>
+
+        <!-- 关键洞察标题 -->
+        <div class="text-xs text-text-tertiary font-medium px-1">关键洞察</div>
+
+        <!-- 卡片2：本月收入创新高 -->
+        <div class="insight-card bg-white rounded-xl p-3 border border-border-light flex items-start gap-3">
+          <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+          </div>
+          <div>
+            <div class="text-sm font-medium text-text-primary">本月收入创新高</div>
+            <div class="text-xs text-text-secondary mt-0.5">较上月增长 ¥4,700，主要来源于3位学员续费</div>
+          </div>
+        </div>
+
+        <!-- 卡片3：暑期课包预热 -->
+        <div class="insight-card bg-white rounded-xl p-3 border border-border-light flex items-start gap-3">
+          <div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div>
+            <div class="text-sm font-medium text-text-primary">暑期课包预热</div>
+            <div class="text-xs text-text-secondary mt-0.5">已有8位家长咨询暑期集训，建议提前排课并发布促销</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 财务视角：多维度财务分析 -->
+      <div class="hidden mb-3" id="finance-analysis">
+        <!-- 收支利润概览（紧凑横条） -->
+        <div class="bg-white rounded-xl p-3 border border-border-light mb-3 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3.5 h-3.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path></svg>
+            </div>
+            <div>
+              <div class="text-[10px] text-text-tertiary">总收入</div>
+              <div class="text-sm font-bold text-success number-display" id="fa-total-revenue">¥42,600</div>
+            </div>
+          </div>
+          <div class="text-text-tertiary text-lg">−</div>
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-danger/10 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3.5 h-3.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"></path></svg>
+            </div>
+            <div>
+              <div class="text-[10px] text-text-tertiary">总支出</div>
+              <div class="text-sm font-bold text-danger number-display" id="fa-expense-total">¥28,400</div>
+            </div>
+          </div>
+          <div class="text-text-tertiary text-lg">=</div>
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path></svg>
+            </div>
+            <div>
+              <div class="text-[10px] text-text-tertiary">净利润 <span class="text-success" id="fa-profit-margin">33.3%</span></div>
+              <div class="text-sm font-bold text-text-primary number-display" id="fa-net-profit">¥14,200</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 收入/支出构成 Tab 切换 -->
+        <div class="bg-white rounded-xl border border-border-light mb-3 overflow-hidden">
+          <div class="flex border-b border-border-light" id="finance-tabs">
+            <button data-fi-tab="income" class="flex-1 py-2.5 text-xs font-medium transition-all fi-tab-active">收入构成</button>
+            <button data-fi-tab="expense" class="flex-1 py-2.5 text-xs font-medium transition-all fi-tab-inactive">支出构成</button>
+          </div>
+          <!-- 收入构成内容 -->
+          <div class="p-4" id="fi-tab-income">
+            <div class="space-y-3">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">课消收入</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-lesson-amount">¥38,200</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-success rounded-full" style="width: 89.7%;" id="fa-lesson-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-lesson-pct">占比 89.7%</div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">新签收入</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-new-amount">¥4,400</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-primary rounded-full" style="width: 10.3%;" id="fa-new-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-new-pct">占比 10.3%</div>
+              </div>
+            </div>
+          </div>
+          <!-- 支出构成内容 -->
+          <div class="p-4 hidden" id="fi-tab-expense">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs text-text-tertiary">总支出</span>
+              <div class="flex items-center gap-1">
+                <span class="text-sm font-bold text-danger number-display" id="fa-total-expense">¥28,400</span>
+                <span class="text-[10px] text-danger ml-1" id="fa-expense-trend">+5.2%</span>
+              </div>
+            </div>
+            <div class="space-y-2.5">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">教师薪资</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-salary">¥18,600</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-danger rounded-full" style="width: 65.5%;" id="fa-salary-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-salary-pct">占比 65.5%</div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">场地租金</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-rent">¥5,200</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-warning rounded-full" style="width: 18.3%;" id="fa-rent-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-rent-pct">占比 18.3%</div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">水电物业</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-utility">¥1,800</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-info rounded-full" style="width: 6.3%;" id="fa-utility-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-utility-pct">占比 6.3%</div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">营销推广</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-marketing">¥1,500</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-primary rounded-full" style="width: 5.3%;" id="fa-marketing-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-marketing-pct">占比 5.3%</div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs text-text-secondary">其他支出</span>
+                  <span class="text-xs font-semibold text-text-primary" id="fa-other">¥1,300</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-gray-400 rounded-full" style="width: 4.6%;" id="fa-other-bar"></div>
+                </div>
+                <div class="text-[10px] text-text-tertiary mt-0.5" id="fa-other-pct">占比 4.6%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 财务关键指标 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white rounded-xl p-3 border border-border-light">
+            <div class="text-[10px] text-text-tertiary mb-1">环比</div>
+            <div class="flex items-baseline gap-1">
+              <span class="text-lg font-bold text-success number-display" id="fa-mom-val">+12.5%</span>
+              <span class="text-[10px] text-text-tertiary" id="fa-mom-label">收入</span>
+            </div>
+            <div class="text-[10px] text-text-secondary mt-0.5" id="fa-mom-desc">多收 ¥4,700</div>
+          </div>
+          <div class="bg-white rounded-xl p-3 border border-border-light">
+            <div class="text-[10px] text-text-tertiary mb-1">同比去年</div>
+            <div class="flex items-baseline gap-1">
+              <span class="text-lg font-bold text-success number-display" id="fa-yoy-val">+31.2%</span>
+              <span class="text-[10px] text-text-tertiary" id="fa-yoy-label">收入</span>
+            </div>
+            <div class="text-[10px] text-text-secondary mt-0.5" id="fa-yoy-desc">多收 ¥10,100</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 下排：排行明细（全宽） -->
+      <div id="rank-section">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-base font-semibold text-text-primary" id="rank-title">排行明细</h3>
+          <span class="text-xs text-text-tertiary" id="rank-period">本月</span>
+        </div>
+        <!-- 排行切换标签（仅运营页） -->
+        <div id="rank-tabs" class="flex gap-2 mb-3">
+          <button data-rank-tab="student" class="rank-tab rank-tab-active flex-1 py-2 rounded-xl text-xs font-medium transition-all">学员消课</button>
+          <button data-rank-tab="teacher" class="rank-tab rank-tab-inactive flex-1 py-2 rounded-xl text-xs font-medium transition-all">教师上课</button>
+          <button data-rank-tab="campus" class="rank-tab rank-tab-inactive flex-1 py-2 rounded-xl text-xs font-medium transition-all">校区业绩</button>
+        </div>
+        <!-- 运营视角排行 -->
+        <div class="bg-white rounded-2xl border border-border-light overflow-hidden" id="rank-operation">
+          <div id="rank-student-list"></div>
+          <div id="rank-teacher-list" class="hidden"></div>
+          <div id="rank-campus-list" class="hidden"></div>
+        </div>
+        <!-- 财务视角排行 -->
+        <div class="bg-white rounded-2xl border border-border-light overflow-hidden hidden" id="rank-finance">
+          <div id="rank-finance-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分隔带 -->
+    <div class="section-divider"></div>
+
+    <!-- L5: 趋势分析（默认收起，放在底部） -->
+    <div class="px-6 py-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold text-text-primary" id="trend-title">趋势分析</h3>
+        <button id="toggle-trend" class="text-xs text-primary font-medium flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-primary/5 transition-colors">
+          <span id="toggle-trend-text">展开</span>
+          <svg id="toggle-trend-icon" class="w-3 h-3 transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+        </button>
+      </div>
+      <div id="trend-content" class="collapse-exit">
+        <div class="bg-white rounded-2xl p-4 border border-border-light shadow-sm mb-4">
+          <div id="chart-trend-bc" style="width:100%;height:200px;"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white rounded-2xl p-4 border border-border-light">
+            <div class="text-xs text-text-tertiary mb-1">环比</div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-xl font-bold text-success number-display" id="mom-val">+8.2%</span>
+              <span class="text-xs text-text-tertiary" id="mom-label">课时</span>
+            </div>
+            <div class="text-xs text-text-secondary mt-1" id="mom-desc">多消耗14课时</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 border border-border-light">
+            <div class="text-xs text-text-tertiary mb-1">同比去年</div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-xl font-bold text-success number-display" id="yoy-val">+23.6%</span>
+              <span class="text-xs text-text-tertiary" id="yoy-label">课时</span>
+            </div>
+            <div class="text-xs text-text-secondary mt-1" id="yoy-desc">多消耗42课时</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部 -->
+    <div class="text-center py-4">
+      <span class="text-xs text-text-tertiary">数据更新时间：2026-06-16 10:30</span>
+    </div>
+    <div class="h-6"></div>
+
+    <!-- 预警弹窗 -->
+    <div id="alert-modal" class="absolute inset-0 z-[100] hidden" onclick="closeAlertModal(event)">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 opacity-0" id="alert-modal-backdrop"></div>
+      <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-h-[75vh] overflow-y-auto transform translate-y-full transition-transform duration-300" id="alert-modal-panel" onclick="event.stopPropagation()">
+        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">预警处理</h3>
+            <p class="text-xs text-text-secondary mt-0.5" id="alert-modal-subtitle">共 16 项待处理</p>
+          </div>
+          <button onclick="closeAlertModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+            <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div id="alert-modal-content" class="space-y-3 pb-4"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== Mock Data ====================
+const DATA = {
+  month: {
+    periodText: '2026年6月',
+    operation: {
+      hours: 186, hoursTrend: '+8.2%', hoursTrendUp: true,
+      remain: 1248, remainNote: '可消约6.7个月',
+      count: 42, countTrend: '+5.0%', countTrendUp: true,
+      students: 48, studentsNote: '本月新增 +3',
+      newSign: 5, newSignNote: '¥4,400 新签金额',
+      chartHours: [12, 8, 18, 15, 22, 20],
+      chartIncome: [36, 24, 54, 45, 66, 60],
+      momVal: '+8.2%', momLabel: '课时', momDesc: '多消耗14课时',
+      yoyVal: '+23.6%', yoyLabel: '课时', yoyDesc: '多消耗42课时',
+      health: '整体向好', healthColor: 'success',
+      alerts: { hours: 5, expire: 3, renew: 8, feedback: 2, newParents: 4 }, alertTotal: 22,
+      alertSummary: '课时不足 5 · 即将过期 3 · 待续费 8 · 差评 2 · 新家长 4',
+      studentRank: [
+        { name: '张小明', avatar: '张', value: '22 课时', color: 'primary' },
+        { name: '李小红', avatar: '李', value: '18 课时', color: 'accent' },
+        { name: '王小刚', avatar: '王', value: '15 课时', color: 'success' },
+        { name: '赵小丽', avatar: '赵', value: '12 课时', color: 'info' },
+        { name: '刘小强', avatar: '刘', value: '10 课时', color: 'warning' },
+      ],
+      teacherRank: [
+        { name: '陈老师', avatar: '陈', value: '68 课时', color: 'primary' },
+        { name: '林老师', avatar: '林', value: '55 课时', color: 'accent' },
+        { name: '周老师', avatar: '周', value: '48 课时', color: 'success' },
+        { name: '吴老师', avatar: '吴', value: '42 课时', color: 'info' },
+        { name: '郑老师', avatar: '郑', value: '38 课时', color: 'warning' },
+      ],
+      campusRank: [
+        { name: '朝阳校区', avatar: '朝', value: '¥18,600', color: 'primary' },
+        { name: '海淀校区', avatar: '海', value: '¥15,200', color: 'accent' },
+        { name: '西城校区', avatar: '西', value: '¥12,800', color: 'success' },
+        { name: '东城校区', avatar: '东', value: '¥9,400', color: 'info' },
+        { name: '丰台校区', avatar: '丰', value: '¥6,200', color: 'warning' },
+      ],
+    },
+    finance: {
+      revenue: '¥42,600', revenueBadge: '+12.5% 环比',
+      bills: '42笔收费', avg: '客均 ¥1,014',
+      lessonAmount: '¥38,200', lessonTrend: '+10.3%',
+      newAmount: '¥4,400', newNote: '2位新学员',
+      pending: '¥6,800', pendingNote: '3笔分期',
+      // 支出数据
+      totalExpense: '¥28,400', expenseTrend: '+5.2%',
+      salary: '¥18,600', salaryPct: 65.5,
+      rent: '¥5,200', rentPct: 18.3,
+      utility: '¥1,800', utilityPct: 6.3,
+      marketing: '¥1,500', marketingPct: 5.3,
+      other: '¥1,300', otherPct: 4.6,
+      netProfit: '¥14,200', profitMargin: '33.3%',
+      momVal: '+12.5%', momLabel: '收入', momDesc: '多收 ¥4,700',
+      yoyVal: '+31.2%', yoyLabel: '收入', yoyDesc: '多收 ¥10,100',
+      // 支出环比同比
+      expenseMomVal: '+5.2%', expenseMomLabel: '支出', expenseMomDesc: '多支出 ¥1,400',
+      expenseYoyVal: '+8.6%', expenseYoyLabel: '支出', expenseYoyDesc: '多支出 ¥2,200',
+      // 趋势数据
+      chartIncome: [38, 32, 45, 40, 42, 43],
+      chartExpense: [24, 26, 28, 27, 28, 28],
+      // 收入来源排行
+      incomeRank: [
+        { name: '课时续费', avatar: '续', value: '¥38,200', color: 'success' },
+        { name: '新签课包', avatar: '新', value: '¥4,400', color: 'primary' },
+      ],
+      // 支出类别排行
+      expenseRank: [
+        { name: '教师薪资', avatar: '薪', value: '¥18,600', color: 'primary' },
+        { name: '场地租金', avatar: '租', value: '¥5,200', color: 'accent' },
+        { name: '水电物业', avatar: '水', value: '¥1,800', color: 'info' },
+        { name: '市场推广', avatar: '推', value: '¥1,500', color: 'warning' },
+        { name: '其他支出', avatar: '他', value: '¥1,300', color: 'success' },
+      ],
+      health: '整体向好', healthColor: 'success',
+      alerts: { overdue: 2, refund: 1, invoice: 4, abnormal: 1 }, alertTotal: 8,
+      alertSummary: '逾期待收 2 · 退费申请 1 · 发票待开 4 · 异常缴费 1',
+    },
+    insights: [
+      { type: 'success', title: '本月收入创新高', desc: '较上月增长 ¥4,700，主要来源于3位学员续费' },
+      { type: 'info', title: '暑期课包预热', desc: '已有8位家长咨询暑期集训，建议提前排课并发布促销' },
+    ],
+  },
+  lastMonth: {
+    periodText: '2026年5月',
+    operation: {
+      hours: 172, hoursTrend: '+3.6%', hoursTrendUp: true,
+      remain: 1286, remainNote: '可消约7.1个月',
+      count: 40, countTrend: '-2.4%', countTrendUp: false,
+      students: 46, studentsNote: '本月新增 +1',
+      newSign: 3, newSignNote: '¥2,200 新签金额',
+      chartHours: [10, 12, 14, 18, 20, 17],
+      chartIncome: [32, 40, 42, 50, 58, 52],
+      momVal: '+3.6%', momLabel: '课时', momDesc: '多消耗6课时',
+      yoyVal: '+18.2%', yoyLabel: '课时', yoyDesc: '多消耗28课时',
+      health: '基本平稳', healthColor: 'warning',
+      alerts: { hours: 7, expire: 2, renew: 5, feedback: 1, newParents: 2 }, alertTotal: 17,
+      alertSummary: '课时不足 7 · 即将过期 2 · 待续费 5 · 差评 1 · 新家长 2',
+      studentRank: [
+        { name: '张小明', avatar: '张', value: '20 课时', color: 'primary' },
+        { name: '李小红', avatar: '李', value: '16 课时', color: 'accent' },
+        { name: '王小刚', avatar: '王', value: '14 课时', color: 'success' },
+        { name: '赵小丽', avatar: '赵', value: '11 课时', color: 'info' },
+        { name: '刘小强', avatar: '刘', value: '9 课时', color: 'warning' },
+      ],
+      teacherRank: [
+        { name: '陈老师', avatar: '陈', value: '62 课时', color: 'primary' },
+        { name: '林老师', avatar: '林', value: '50 课时', color: 'accent' },
+        { name: '周老师', avatar: '周', value: '45 课时', color: 'success' },
+        { name: '吴老师', avatar: '吴', value: '40 课时', color: 'info' },
+        { name: '郑老师', avatar: '郑', value: '35 课时', color: 'warning' },
+      ],
+      campusRank: [
+        { name: '朝阳校区', avatar: '朝', value: '¥16,800', color: 'primary' },
+        { name: '海淀校区', avatar: '海', value: '¥14,000', color: 'accent' },
+        { name: '西城校区', avatar: '西', value: '¥11,500', color: 'success' },
+        { name: '东城校区', avatar: '东', value: '¥8,600', color: 'info' },
+        { name: '丰台校区', avatar: '丰', value: '¥5,800', color: 'warning' },
+      ],
+    },
+    finance: {
+      revenue: '¥37,900', revenueBadge: '+3.2% 环比',
+      bills: '38笔收费', avg: '客均 ¥997',
+      lessonAmount: '¥34,600', lessonTrend: '+5.1%',
+      newAmount: '¥3,300', newNote: '1位新学员',
+      pending: '¥8,200', pendingNote: '4笔分期',
+      // 支出数据
+      totalExpense: '¥27,000', expenseTrend: '-2.1%',
+      salary: '¥17,800', salaryPct: 65.9,
+      rent: '¥5,200', rentPct: 19.3,
+      utility: '¥1,600', utilityPct: 5.9,
+      marketing: '¥1,200', marketingPct: 4.4,
+      other: '¥1,200', otherPct: 4.4,
+      netProfit: '¥10,900', profitMargin: '28.8%',
+      momVal: '+3.2%', momLabel: '收入', momDesc: '多收 ¥1,200',
+      yoyVal: '+24.8%', yoyLabel: '收入', yoyDesc: '多收 ¥7,500',
+      // 支出环比同比
+      expenseMomVal: '-2.1%', expenseMomLabel: '支出', expenseMomDesc: '少支出 ¥600',
+      expenseYoyVal: '+4.2%', expenseYoyLabel: '支出', expenseYoyDesc: '多支出 ¥1,100',
+      // 趋势数据
+      chartIncome: [32, 35, 38, 36, 37, 38],
+      chartExpense: [28, 27, 26, 27, 27, 27],
+      // 收入来源排行
+      incomeRank: [
+        { name: '课时续费', avatar: '续', value: '¥34,600', color: 'success' },
+        { name: '新签课包', avatar: '新', value: '¥3,300', color: 'primary' },
+      ],
+      // 支出类别排行
+      expenseRank: [
+        { name: '教师薪资', avatar: '薪', value: '¥17,800', color: 'primary' },
+        { name: '场地租金', avatar: '租', value: '¥5,200', color: 'accent' },
+        { name: '水电物业', avatar: '水', value: '¥1,600', color: 'info' },
+        { name: '市场推广', avatar: '推', value: '¥1,200', color: 'warning' },
+        { name: '其他支出', avatar: '他', value: '¥1,200', color: 'success' },
+      ],
+      health: '基本平稳', healthColor: 'warning',
+      alerts: { overdue: 3, refund: 0, invoice: 2, abnormal: 0 }, alertTotal: 5,
+      alertSummary: '逾期待收 3 · 退费申请 0 · 发票待开 2',
+    },
+    insights: [
+      { type: 'success', title: '续费率保持稳定', desc: '本月续费学员3人，续费金额占整体收入72%' },
+      { type: 'warning', title: '新增学员放缓', desc: '5月仅新增1位学员，建议加强招生推广力度' },
+    ],
+  },
+  quarter: {
+    periodText: '2026年第二季度',
+    operation: {
+      hours: 542, hoursTrend: '+15.3%', hoursTrendUp: true,
+      remain: 1248, remainNote: '可消约6.7个月',
+      count: 128, countTrend: '+12.1%', countTrendUp: true,
+      students: 48, studentsNote: '本季新增 +5',
+      newSign: 12, newSignNote: '¥15,600 新签金额',
+      chartHours: [45, 52, 48, 55, 60, 58],
+      chartIncome: [120, 135, 128, 150, 165, 158],
+      momVal: '+15.3%', momLabel: '课时', momDesc: '较Q1多消耗72课时',
+      yoyVal: '+28.4%', yoyLabel: '课时', yoyDesc: '较Q2去年多消耗120课时',
+      health: '增长强劲', healthColor: 'success',
+      alerts: { hours: 5, expire: 3, renew: 8, feedback: 3, newParents: 6 }, alertTotal: 25,
+      alertSummary: '课时不足 5 · 即将过期 3 · 待续费 8 · 差评 3 · 新家长 6',
+      studentRank: [
+        { name: '张小明', avatar: '张', value: '65 课时', color: 'primary' },
+        { name: '李小红', avatar: '李', value: '52 课时', color: 'accent' },
+        { name: '王小刚', avatar: '王', value: '48 课时', color: 'success' },
+        { name: '赵小丽', avatar: '赵', value: '40 课时', color: 'info' },
+        { name: '刘小强', avatar: '刘', value: '35 课时', color: 'warning' },
+      ],
+      teacherRank: [
+        { name: '陈老师', avatar: '陈', value: '198 课时', color: 'primary' },
+        { name: '林老师', avatar: '林', value: '165 课时', color: 'accent' },
+        { name: '周老师', avatar: '周', value: '142 课时', color: 'success' },
+        { name: '吴老师', avatar: '吴', value: '128 课时', color: 'info' },
+        { name: '郑老师', avatar: '郑', value: '110 课时', color: 'warning' },
+      ],
+      campusRank: [
+        { name: '朝阳校区', avatar: '朝', value: '¥52,000', color: 'primary' },
+        { name: '海淀校区', avatar: '海', value: '¥44,000', color: 'accent' },
+        { name: '西城校区', avatar: '西', value: '¥38,000', color: 'success' },
+        { name: '东城校区', avatar: '东', value: '¥28,000', color: 'info' },
+        { name: '丰台校区', avatar: '丰', value: '¥18,000', color: 'warning' },
+      ],
+    },
+    finance: {
+      revenue: '¥128,400', revenueBadge: '+18.6% 环比',
+      bills: '126笔收费', avg: '客均 ¥1,019',
+      lessonAmount: '¥112,000', lessonTrend: '+16.2%',
+      newAmount: '¥16,400', newNote: '5位新学员',
+      pending: '¥18,600', pendingNote: '8笔分期',
+      // 支出数据
+      totalExpense: '¥82,000', expenseTrend: '+8.5%',
+      salary: '¥54,000', salaryPct: 65.9,
+      rent: '¥15,600', rentPct: 19.0,
+      utility: '¥5,000', utilityPct: 6.1,
+      marketing: '¥4,200', marketingPct: 5.1,
+      other: '¥3,200', otherPct: 3.9,
+      netProfit: '¥46,400', profitMargin: '36.1%',
+      momVal: '+18.6%', momLabel: '收入', momDesc: '较Q1多收 ¥20,100',
+      yoyVal: '+35.2%', yoyLabel: '收入', yoyDesc: '较Q2去年多收 ¥33,400',
+      // 支出环比同比
+      expenseMomVal: '+8.5%', expenseMomLabel: '支出', expenseMomDesc: '较Q1多支出 ¥6,400',
+      expenseYoyVal: '+12.4%', expenseYoyLabel: '支出', expenseYoyDesc: '较Q2去年多支出 ¥9,000',
+      // 趋势数据
+      chartIncome: [38, 42, 45, 40, 42, 43],
+      chartExpense: [25, 27, 28, 27, 28, 28],
+      // 收入来源排行
+      incomeRank: [
+        { name: '课时续费', avatar: '续', value: '¥112,000', color: 'success' },
+        { name: '新签课包', avatar: '新', value: '¥16,400', color: 'primary' },
+      ],
+      // 支出类别排行
+      expenseRank: [
+        { name: '教师薪资', avatar: '薪', value: '¥54,000', color: 'primary' },
+        { name: '场地租金', avatar: '租', value: '¥15,600', color: 'accent' },
+        { name: '水电物业', avatar: '水', value: '¥5,000', color: 'info' },
+        { name: '市场推广', avatar: '推', value: '¥4,200', color: 'warning' },
+        { name: '其他支出', avatar: '他', value: '¥3,200', color: 'success' },
+      ],
+      health: '增长强劲', healthColor: 'success',
+      alerts: { overdue: 4, refund: 2, invoice: 6, abnormal: 2 }, alertTotal: 14,
+      alertSummary: '逾期待收 4 · 退费申请 2 · 发票待开 6 · 异常缴费 2',
+    },
+    insights: [
+      { type: 'success', title: 'Q2营收突破12万', desc: '创季度历史新高，新签与续费双增长' },
+      { type: 'info', title: '暑期课包预热', desc: '已有8位家长咨询暑期集训，建议提前排课' },
+    ],
+  },
+  year: {
+    periodText: '2026年全年',
+    operation: {
+      hours: 1024, hoursTrend: '+22.1%', hoursTrendUp: true,
+      remain: 1248, remainNote: '可消约6.7个月',
+      count: 520, countTrend: '+22.4%', countTrendUp: true,
+      students: 48, studentsNote: '本年新增 +12',
+      newSign: 28, newSignNote: '¥52,000 新签金额',
+      chartHours: [80, 95, 110, 125, 140, 155],
+      chartIncome: [220, 260, 310, 350, 400, 440],
+      momVal: '+22.1%', momLabel: '课时', momDesc: '较2025年同期多消耗186课时',
+      yoyVal: '+22.1%', yoyLabel: '课时', momDesc: '较2025年同期多消耗186课时',
+      health: '高速增长', healthColor: 'success',
+      alerts: { hours: 5, expire: 3, renew: 8, feedback: 4, newParents: 8 }, alertTotal: 28,
+      alertSummary: '课时不足 5 · 即将过期 3 · 待续费 8 · 差评 4 · 新家长 8',
+      studentRank: [
+        { name: '张小明', avatar: '张', value: '128 课时', color: 'primary' },
+        { name: '李小红', avatar: '李', value: '105 课时', color: 'accent' },
+        { name: '王小刚', avatar: '王', value: '96 课时', color: 'success' },
+        { name: '赵小丽', avatar: '赵', value: '82 课时', color: 'info' },
+        { name: '刘小强', avatar: '刘', value: '70 课时', color: 'warning' },
+      ],
+      teacherRank: [
+        { name: '陈老师', avatar: '陈', value: '380 课时', color: 'primary' },
+        { name: '林老师', avatar: '林', value: '320 课时', color: 'accent' },
+        { name: '周老师', avatar: '周', value: '285 课时', color: 'success' },
+        { name: '吴老师', avatar: '吴', value: '250 课时', color: 'info' },
+        { name: '郑老师', avatar: '郑', value: '210 课时', color: 'warning' },
+      ],
+      campusRank: [
+        { name: '朝阳校区', avatar: '朝', value: '¥105,000', color: 'primary' },
+        { name: '海淀校区', avatar: '海', value: '¥88,000', color: 'accent' },
+        { name: '西城校区', avatar: '西', value: '¥76,000', color: 'success' },
+        { name: '东城校区', avatar: '东', value: '¥58,000', color: 'info' },
+        { name: '丰台校区', avatar: '丰', value: '¥38,000', color: 'warning' },
+      ],
+    },
+    finance: {
+      revenue: '¥256,000', revenueBadge: '+26.4% 同比',
+      bills: '248笔收费', avg: '客均 ¥1,032',
+      lessonAmount: '¥218,000', lessonTrend: '+24.1%',
+      newAmount: '¥38,000', newNote: '12位新学员',
+      pending: '¥32,400', pendingNote: '12笔分期',
+      // 支出数据
+      totalExpense: '¥168,000', expenseTrend: '+12.3%',
+      salary: '¥108,000', salaryPct: 64.3,
+      rent: '¥31,200', rentPct: 18.6,
+      utility: '¥10,800', utilityPct: 6.4,
+      marketing: '¥9,600', marketingPct: 5.7,
+      other: '¥8,400', otherPct: 5.0,
+      netProfit: '¥88,000', profitMargin: '34.4%',
+      momVal: '+26.4%', momLabel: '收入', momDesc: '较2025年多收 ¥53,400',
+      yoyVal: '+26.4%', yoyLabel: '收入', yoyDesc: '较2025年多收 ¥53,400',
+      // 支出环比同比
+      expenseMomVal: '+12.3%', expenseMomLabel: '支出', expenseMomDesc: '较2025年多支出 ¥18,400',
+      expenseYoyVal: '+12.3%', expenseYoyLabel: '支出', expenseYoyDesc: '较2025年多支出 ¥18,400',
+      // 趋势数据
+      chartIncome: [180, 200, 220, 240, 250, 256],
+      chartExpense: [120, 130, 140, 150, 160, 168],
+      // 收入来源排行
+      incomeRank: [
+        { name: '课时续费', avatar: '续', value: '¥218,000', color: 'success' },
+        { name: '新签课包', avatar: '新', value: '¥38,000', color: 'primary' },
+      ],
+      // 支出类别排行
+      expenseRank: [
+        { name: '教师薪资', avatar: '薪', value: '¥108,000', color: 'primary' },
+        { name: '场地租金', avatar: '租', value: '¥31,200', color: 'accent' },
+        { name: '水电物业', avatar: '水', value: '¥10,800', color: 'info' },
+        { name: '市场推广', avatar: '推', value: '¥9,600', color: 'warning' },
+        { name: '其他支出', avatar: '他', value: '¥8,400', color: 'success' },
+      ],
+      health: '高速增长', healthColor: 'success',
+      alerts: { overdue: 6, refund: 3, invoice: 10, abnormal: 3 }, alertTotal: 22,
+      alertSummary: '逾期待收 6 · 退费申请 3 · 发票待开 10 · 异常缴费 3',
+    },
+    insights: [
+      { type: 'success', title: '年度营收突破25万', desc: '同比增长26.4%，新签学员12人，续费率86%' },
+      { type: 'success', title: '消课效率提升', desc: '人均课时从18.5提升至21.3，课消进度良好' },
+    ],
+  },
+};
+
+// ==================== State ====================
+let state = {
+  view: 'operation',
+  period: 'month',
+  trendCollapsed: true,
+  rankTab: 'student',
+  fiTab: 'income',
+};
+
+let chartInstance = null;
+
+// ==================== DOM Refs ====================
+const els = {
+  viewToggle: document.getElementById('view-toggle'),
+  kpiOp: document.getElementById('kpi-operation'),
+  kpiFi: document.getElementById('kpi-finance'),
+  periodFilters: document.getElementById('period-filters'),
+  currentPeriodText: document.getElementById('current-period-text'),
+  healthBadge: document.getElementById('health-badge'),
+  rankTitle: document.getElementById('rank-title'),
+  rankOp: document.getElementById('rank-operation'),
+  rankFi: document.getElementById('rank-finance'),
+  rankPeriod: document.getElementById('rank-period'),
+  rankTabs: document.getElementById('rank-tabs'),
+  mainContent: document.getElementById('main-content'),
+  financeAnalysis: document.getElementById('finance-analysis'),
+  rankStudentList: document.getElementById('rank-student-list'),
+  rankTeacherList: document.getElementById('rank-teacher-list'),
+  rankCampusList: document.getElementById('rank-campus-list'),
+  headerBadge: document.getElementById('header-badge'),
+  summaryTotal: document.getElementById('summary-total'),
+  summaryDetail: document.getElementById('summary-detail'),
+  toggleTrend: document.getElementById('toggle-trend'),
+  toggleTrendText: document.getElementById('toggle-trend-text'),
+  toggleTrendIcon: document.getElementById('toggle-trend-icon'),
+  trendContent: document.getElementById('trend-content'),
+  alertModal: document.getElementById('alert-modal'),
+  alertModalBackdrop: document.getElementById('alert-modal-backdrop'),
+  alertModalPanel: document.getElementById('alert-modal-panel'),
+  alertModalSubtitle: document.getElementById('alert-modal-subtitle'),
+  alertModalContent: document.getElementById('alert-modal-content'),
+};
+
+// ==================== Helpers ====================
+function showToast(msg) {
+  const wrap = document.getElementById('toast-wrap');
+  const div = document.createElement('div');
+  div.className = 'toast';
+  div.textContent = msg;
+  wrap.appendChild(div);
+  setTimeout(() => div.remove(), 2400);
+}
+
+function handleAlert(title, count) {
+  showToast(`即将跳转：${title}（${count}项）`);
+}
+
+function openAlertModal() {
+  const d = DATA[state.period];
+  const viewData = state.view === 'operation' ? d.operation : d.finance;
+  els.alertModalSubtitle.textContent = `共 ${viewData.alertTotal} 项待处理`;
+  els.alertModalContent.innerHTML = renderAlertCards(viewData.alerts, state.view);
+  els.alertModal.classList.remove('hidden');
+  // 触发动画
+  requestAnimationFrame(() => {
+    els.alertModalBackdrop.classList.remove('opacity-0');
+    els.alertModalPanel.classList.remove('translate-y-full');
+  });
+}
+
+function closeAlertModal(event) {
+  if (event && event.target !== els.alertModal && event.target !== els.alertModalBackdrop) return;
+  els.alertModalBackdrop.classList.add('opacity-0');
+  els.alertModalPanel.classList.add('translate-y-full');
+  setTimeout(() => {
+    els.alertModal.classList.add('hidden');
+  }, 300);
+}
+
+// ==================== Alert Cards Render (for Modal) ====================
+function renderAlertCards(alerts, view) {
+  if (view === 'operation') {
+    let html = '';
+    if (alerts.hours > 0) {
+      html += `<div class="alert-card alert-card-danger bg-gray-50 rounded-2xl p-4 border border-danger/10" onclick="handleAlert('课时不足学员', ${alerts.hours})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-danger/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">课时不足学员</div>
+              <div class="text-xs text-text-secondary">剩余课时低于5课时</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-danger number-display">${alerts.hours}</div>
+            <div class="text-xs text-danger font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.expire > 0) {
+      html += `<div class="alert-card alert-card-warning bg-gray-50 rounded-2xl p-4 border border-warning/10" onclick="handleAlert('即将过期课包', ${alerts.expire})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">即将过期课包</div>
+              <div class="text-xs text-text-secondary">7天内到期</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-warning number-display">${alerts.expire}</div>
+            <div class="text-xs text-warning font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.renew > 0) {
+      html += `<div class="alert-card alert-card-primary bg-gray-50 rounded-2xl p-4 border border-primary/10" onclick="handleAlert('本月待续费学员', ${alerts.renew})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">本月待续费</div>
+              <div class="text-xs text-text-secondary">建议跟进续费</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-primary number-display">${alerts.renew}</div>
+            <div class="text-xs text-primary font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.feedback > 0) {
+      html += `<div class="alert-card alert-card-danger bg-gray-50 rounded-2xl p-4 border border-danger/10" onclick="handleAlert('家长差评反馈', ${alerts.feedback})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-danger/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">家长差评反馈</div>
+              <div class="text-xs text-text-secondary">教学质量投诉，需立即跟进</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-danger number-display">${alerts.feedback}</div>
+            <div class="text-xs text-danger font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.newParents > 0) {
+      html += `<div class="alert-card alert-card-info bg-gray-50 rounded-2xl p-4 border border-info/10" onclick="handleAlert('新家长待跟进', ${alerts.newParents})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">新家长待跟进</div>
+              <div class="text-xs text-text-secondary">已注册未体验，建议联系</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-info number-display">${alerts.newParents}</div>
+            <div class="text-xs text-info font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    return html;
+  } else {
+    let html = '';
+    if (alerts.overdue > 0) {
+      html += `<div class="alert-card alert-card-danger bg-gray-50 rounded-2xl p-4 border border-danger/10" onclick="handleAlert('逾期待收款项', ${alerts.overdue})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-danger/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">逾期待收款项</div>
+              <div class="text-xs text-text-secondary">超过约定收款日</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-danger number-display">${alerts.overdue}</div>
+            <div class="text-xs text-danger font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.refund > 0) {
+      html += `<div class="alert-card alert-card-warning bg-gray-50 rounded-2xl p-4 border border-warning/10" onclick="handleAlert('退费申请待审核', ${alerts.refund})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">退费申请待审核</div>
+              <div class="text-xs text-text-secondary">家长提交退费请求</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-warning number-display">${alerts.refund}</div>
+            <div class="text-xs text-warning font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.invoice > 0) {
+      html += `<div class="alert-card alert-card-primary bg-gray-50 rounded-2xl p-4 border border-primary/10" onclick="handleAlert('发票待开具', ${alerts.invoice})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">发票待开具</div>
+              <div class="text-xs text-text-secondary">家长已申请未开票</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-primary number-display">${alerts.invoice}</div>
+            <div class="text-xs text-primary font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (alerts.abnormal > 0) {
+      html += `<div class="alert-card alert-card-warning bg-gray-50 rounded-2xl p-4 border border-warning/10" onclick="handleAlert('异常缴费提醒', ${alerts.abnormal})">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-text-primary">异常缴费提醒</div>
+              <div class="text-xs text-text-secondary">缴费金额或方式异常</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-warning number-display">${alerts.abnormal}</div>
+            <div class="text-xs text-warning font-medium">立即处理 →</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    return html;
+  }
+}
+
+// ==================== Rank Render ====================
+function renderRankTabs() {
+  els.rankTabs.querySelectorAll('button').forEach(btn => {
+    if (btn.dataset.rankTab === state.rankTab) {
+      btn.className = 'rank-tab rank-tab-active flex-1 py-2 rounded-xl text-xs font-medium transition-all';
+    } else {
+      btn.className = 'rank-tab rank-tab-inactive flex-1 py-2 rounded-xl text-xs font-medium transition-all';
+    }
+  });
+}
+
+function renderRankItem(item, index, total) {
+  const isTop3 = index < 3;
+  const rankClass = isTop3
+    ? index === 0
+      ? 'bg-gradient-to-br from-yellow-400 to-yellow-500'
+      : index === 1
+      ? 'bg-gradient-to-br from-gray-300 to-gray-400'
+      : 'bg-gradient-to-br from-orange-300 to-orange-400'
+    : '';
+  const rankText = isTop3 ? '' : `<span class="w-7 text-center text-xs text-text-tertiary">${index + 1}</span>`;
+  const rankBadge = isTop3
+    ? `<div class="w-7 h-7 rounded-full ${rankClass} flex items-center justify-center text-white text-xs font-bold">${index + 1}</div>`
+    : rankText;
+  const borderClass = index < total - 1 ? 'border-b border-border-light' : '';
+  return `
+    <div class="p-4 flex items-center justify-between ${borderClass} rank-item">
+      <div class="flex items-center gap-3">
+        ${rankBadge}
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-${item.color}/10 flex items-center justify-center text-${item.color} text-xs font-bold">${item.avatar}</div>
+          <span class="text-sm text-text-primary">${item.name}</span>
+        </div>
+      </div>
+      <span class="text-sm font-semibold text-text-primary">${item.value}</span>
+    </div>`;
+}
+
+function renderRankLists(op) {
+  const studentHtml = op.studentRank.slice(0, 10).map((item, idx) => renderRankItem(item, idx, op.studentRank.length)).join('');
+  const teacherHtml = op.teacherRank.slice(0, 10).map((item, idx) => renderRankItem(item, idx, op.teacherRank.length)).join('');
+  const campusHtml = op.campusRank.slice(0, 10).map((item, idx) => renderRankItem(item, idx, op.campusRank.length)).join('');
+  els.rankStudentList.innerHTML = studentHtml;
+  els.rankTeacherList.innerHTML = teacherHtml;
+  els.rankCampusList.innerHTML = campusHtml;
+
+  // 控制显示哪个列表
+  els.rankStudentList.classList.toggle('hidden', state.rankTab !== 'student');
+  els.rankTeacherList.classList.toggle('hidden', state.rankTab !== 'teacher');
+  els.rankCampusList.classList.toggle('hidden', state.rankTab !== 'campus');
+}
+
+// 财务排行渲染 - 根据 Tab 显示收入来源或支出类别
+function renderFinanceRank(fi) {
+  const rankData = state.fiTab === 'income' ? fi.incomeRank : fi.expenseRank;
+  const html = rankData.slice(0, 10).map((item, idx) => renderRankItem(item, idx, rankData.length)).join('');
+  document.getElementById('rank-finance-list').innerHTML = html;
+}
+
+// ==================== Render ====================
+function render() {
+  const d = DATA[state.period];
+  const op = d.operation;
+  const fi = d.finance;
+  const viewData = state.view === 'operation' ? op : fi;
+
+  // Period text
+  els.currentPeriodText.textContent = d.periodText;
+  els.rankPeriod.textContent = state.period === 'month' ? '本月' : state.period === 'lastMonth' ? '上月' : state.period === 'quarter' ? '本季度' : '本年';
+
+  // Health badge
+  const healthColor = viewData.healthColor;
+  const healthIcon = healthColor === 'success'
+    ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>'
+    : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path>';
+  els.healthBadge.className = `flex items-center gap-1 text-xs bg-${healthColor}/5 text-${healthColor} px-2 py-1 rounded-lg`;
+  els.healthBadge.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">${healthIcon}</svg><span>${viewData.health}</span>`;
+
+  // View toggle buttons
+  els.viewToggle.querySelectorAll('button').forEach(btn => {
+    if (btn.dataset.view === state.view) {
+      btn.className = 'px-3 py-1.5 rounded-full text-xs font-medium tab-pill-active transition-all';
+    } else {
+      btn.className = 'px-3 py-1.5 rounded-full text-xs font-medium tab-pill-inactive transition-all';
+    }
+  });
+
+  // KPI visibility
+  if (state.view === 'operation') {
+    els.kpiOp.classList.remove('hidden');
+    els.kpiFi.classList.add('hidden');
+    els.mainContent.classList.remove('hidden');
+    els.financeAnalysis.classList.add('hidden');
+    els.rankTitle.textContent = '排行明细';
+    els.rankOp.classList.remove('hidden');
+    els.rankFi.classList.add('hidden');
+    els.rankTabs.classList.remove('hidden');
+    // 渲染排行
+    renderRankTabs();
+    renderRankLists(op);
+  } else {
+    els.kpiOp.classList.add('hidden');
+    els.kpiFi.classList.remove('hidden');
+    els.mainContent.classList.add('hidden');
+    els.financeAnalysis.classList.remove('hidden');
+    // 排行标题根据 Tab 切换
+    els.rankTitle.textContent = state.fiTab === 'income' ? '收入来源排行' : '支出类别排行';
+    els.rankOp.classList.add('hidden');
+    els.rankFi.classList.remove('hidden');
+    els.rankTabs.classList.add('hidden');
+    // 更新财务分析数据
+    updateFinanceAnalysis(fi);
+    // 渲染财务排行
+    renderFinanceRank(fi);
+    // 更新财务 Tab 样式
+    document.querySelectorAll('#finance-tabs button').forEach(btn => {
+      if (btn.dataset.fiTab === state.fiTab) {
+        btn.className = 'flex-1 py-2.5 text-xs font-medium transition-all fi-tab-active';
+      } else {
+        btn.className = 'flex-1 py-2.5 text-xs font-medium transition-all fi-tab-inactive';
+      }
+    });
+    document.getElementById('fi-tab-income').classList.toggle('hidden', state.fiTab !== 'income');
+    document.getElementById('fi-tab-expense').classList.toggle('hidden', state.fiTab !== 'expense');
+  }
+
+  // 趋势分析标题 - 根据视角和 Tab 切换
+  const trendTitleEl = document.querySelector('h3#trend-title');
+  if (trendTitleEl) {
+    if (state.view === 'operation') {
+      trendTitleEl.textContent = '趋势分析';
+    } else {
+      trendTitleEl.textContent = state.fiTab === 'income' ? '收入趋势分析' : '支出趋势分析';
+    }
+  }
+
+  // Operation KPI values
+  document.getElementById('op-hours').innerHTML = `${op.hours}`;
+  const hoursTrendEl = document.getElementById('op-hours-trend');
+  hoursTrendEl.className = 'text-[10px] text-white flex items-center gap-0.5';
+  hoursTrendEl.innerHTML = `<svg class="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${op.hoursTrendUp ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'}"></path></svg><span>${op.hoursTrend}环比</span>`;
+
+  document.getElementById('op-remain').innerHTML = `${op.remain.toLocaleString()}<span class="text-[10px] font-normal text-white/70 ml-0.5">课时</span>`;
+  document.getElementById('op-remain-note').textContent = op.remainNote;
+
+  document.getElementById('op-count').innerHTML = `${op.count}<span class="text-[10px] font-normal text-white/70 ml-0.5">次</span>`;
+  const countTrendEl = document.getElementById('op-count-trend');
+  countTrendEl.className = 'text-[10px] text-white flex items-center gap-0.5';
+  countTrendEl.innerHTML = `<svg class="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${op.countTrendUp ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'}"></path></svg><span>${op.countTrend}环比</span>`;
+
+  document.getElementById('op-students').innerHTML = `${op.students}<span class="text-sm font-normal text-white/70 ml-1">人</span>`;
+  document.getElementById('op-students-note').textContent = op.studentsNote;
+  // 从 studentsNote 中提取数字作为趋势标签（如 "本月新增 +3" 提取 "+3"）
+  const trendMatch = op.studentsNote.match(/[+-]?\d+/);
+  document.getElementById('op-students-trend').textContent = trendMatch ? trendMatch[0] : '+0';
+
+  // 新签学员
+  document.getElementById('op-newsign').innerHTML = `${op.newSign}<span class="text-xs font-normal text-white/70 ml-1">人</span>`;
+  document.getElementById('op-newsign-note').textContent = op.newSignNote;
+
+  // Finance KPI values
+  document.getElementById('fi-revenue').textContent = fi.revenue;
+  document.getElementById('fi-revenue-badge').textContent = fi.revenueBadge;
+  document.getElementById('fi-bills').textContent = fi.bills;
+  document.getElementById('fi-avg').textContent = fi.avg;
+  document.getElementById('fi-lesson-amount').textContent = fi.lessonAmount;
+  document.getElementById('fi-lesson-trend').textContent = fi.lessonTrend;
+  document.getElementById('fi-new-amount').textContent = fi.newAmount;
+  document.getElementById('fi-new-note').textContent = fi.newNote;
+  document.getElementById('fi-pending').textContent = fi.pending;
+  document.getElementById('fi-pending-note').textContent = fi.pendingNote;
+
+  // Mom/Yoy - 财务视角下根据 Tab 切换收入/支出数据
+  const momValEl = document.getElementById('mom-val');
+  const yoyValEl = document.getElementById('yoy-val');
+  const viewFi = state.view === 'finance';
+  const useExpense = viewFi && state.fiTab === 'expense';
+  const curMomVal = useExpense ? fi.expenseMomVal : (viewFi ? fi.momVal : op.momVal);
+  const curMomLabel = useExpense ? fi.expenseMomLabel : (viewFi ? fi.momLabel : op.momLabel);
+  const curMomDesc = useExpense ? fi.expenseMomDesc : (viewFi ? fi.momDesc : op.momDesc);
+  const curYoyVal = useExpense ? fi.expenseYoyVal : (viewFi ? fi.yoyVal : op.yoyVal);
+  const curYoyLabel = useExpense ? fi.expenseYoyLabel : (viewFi ? fi.yoyLabel : op.yoyLabel);
+  const curYoyDesc = useExpense ? fi.expenseYoyDesc : (viewFi ? fi.yoyDesc : op.yoyDesc);
+
+  momValEl.textContent = curMomVal;
+  momValEl.className = `text-xl font-bold number-display ${curMomVal.startsWith('+') ? 'text-success' : 'text-danger'}`;
+  document.getElementById('mom-label').textContent = curMomLabel;
+  document.getElementById('mom-desc').textContent = curMomDesc;
+
+  yoyValEl.textContent = curYoyVal;
+  yoyValEl.className = `text-xl font-bold number-display ${curYoyVal.startsWith('+') ? 'text-success' : 'text-danger'}`;
+  document.getElementById('yoy-label').textContent = curYoyLabel;
+  document.getElementById('yoy-desc').textContent = curYoyDesc;
+
+  // Alerts - header badge, summary
+  els.headerBadge.textContent = viewData.alertTotal;
+  els.summaryTotal.textContent = viewData.alertTotal;
+  els.summaryDetail.textContent = viewData.alertSummary;
+
+  // Period filters
+  els.periodFilters.querySelectorAll('button').forEach(btn => {
+    if (btn.dataset.period === state.period) {
+      btn.className = 'flex-1 py-2 rounded-xl text-xs font-medium filter-active transition-all';
+    } else {
+      btn.className = 'flex-1 py-2 rounded-xl text-xs font-medium filter-inactive transition-all';
+    }
+  });
+
+  // Chart - 根据视角和财务 Tab 切换数据
+  if (state.view === 'finance') {
+    updateChart(fi.chartIncome, fi.chartExpense, 'finance');
+  } else {
+    updateChart(op.chartHours, op.chartIncome, 'operation');
+  }
+}
+
+// 财务分析数据更新
+function updateFinanceAnalysis(fi) {
+  // 收入构成
+  const lessonNum = parseFloat(fi.lessonAmount.replace(/[¥,]/g, ''));
+  const newNum = parseFloat(fi.newAmount.replace(/[¥,]/g, ''));
+  const total = lessonNum + newNum;
+  const lessonPct = (lessonNum / total * 100).toFixed(1);
+  const newPct = (newNum / total * 100).toFixed(1);
+
+  document.getElementById('fa-lesson-amount').textContent = fi.lessonAmount;
+  document.getElementById('fa-lesson-pct').textContent = `占比 ${lessonPct}%`;
+  document.getElementById('fa-lesson-bar').style.width = `${lessonPct}%`;
+  document.getElementById('fa-new-amount').textContent = fi.newAmount;
+  document.getElementById('fa-new-pct').textContent = `占比 ${newPct}%`;
+  document.getElementById('fa-new-bar').style.width = `${newPct}%`;
+
+  // 支出构成
+  document.getElementById('fa-total-expense').textContent = fi.totalExpense;
+  document.getElementById('fa-expense-trend').textContent = fi.expenseTrend;
+  document.getElementById('fa-salary').textContent = fi.salary;
+  document.getElementById('fa-salary-pct').textContent = `占比 ${fi.salaryPct}%`;
+  document.getElementById('fa-salary-bar').style.width = `${fi.salaryPct}%`;
+  document.getElementById('fa-rent').textContent = fi.rent;
+  document.getElementById('fa-rent-pct').textContent = `占比 ${fi.rentPct}%`;
+  document.getElementById('fa-rent-bar').style.width = `${fi.rentPct}%`;
+  document.getElementById('fa-utility').textContent = fi.utility;
+  document.getElementById('fa-utility-pct').textContent = `占比 ${fi.utilityPct}%`;
+  document.getElementById('fa-utility-bar').style.width = `${fi.utilityPct}%`;
+  document.getElementById('fa-marketing').textContent = fi.marketing;
+  document.getElementById('fa-marketing-pct').textContent = `占比 ${fi.marketingPct}%`;
+  document.getElementById('fa-marketing-bar').style.width = `${fi.marketingPct}%`;
+  document.getElementById('fa-other').textContent = fi.other;
+  document.getElementById('fa-other-pct').textContent = `占比 ${fi.otherPct}%`;
+  document.getElementById('fa-other-bar').style.width = `${fi.otherPct}%`;
+
+  // 收支利润概览
+  document.getElementById('fa-total-revenue').textContent = fi.revenue;
+  document.getElementById('fa-expense-total').textContent = fi.totalExpense;
+  document.getElementById('fa-net-profit').textContent = fi.netProfit;
+  document.getElementById('fa-profit-margin').textContent = fi.profitMargin;
+
+  // 环比同比 - 根据 Tab 切换收入/支出数据
+  const useExp = state.fiTab === 'expense';
+  const faMomVal = useExp ? fi.expenseMomVal : fi.momVal;
+  const faMomLabel = useExp ? fi.expenseMomLabel : fi.momLabel;
+  const faMomDesc = useExp ? fi.expenseMomDesc : fi.momDesc;
+  const faYoyVal = useExp ? fi.expenseYoyVal : fi.yoyVal;
+  const faYoyLabel = useExp ? fi.expenseYoyLabel : fi.yoyLabel;
+  const faYoyDesc = useExp ? fi.expenseYoyDesc : fi.yoyDesc;
+
+  const momEl = document.getElementById('fa-mom-val');
+  momEl.textContent = faMomVal;
+  momEl.className = `text-lg font-bold number-display ${faMomVal.startsWith('+') ? 'text-success' : 'text-danger'}`;
+  document.getElementById('fa-mom-label').textContent = faMomLabel;
+  document.getElementById('fa-mom-desc').textContent = faMomDesc;
+
+  const yoyEl = document.getElementById('fa-yoy-val');
+  yoyEl.textContent = faYoyVal;
+  yoyEl.className = `text-lg font-bold number-display ${faYoyVal.startsWith('+') ? 'text-success' : 'text-danger'}`;
+  document.getElementById('fa-yoy-label').textContent = faYoyLabel || '收入';
+  document.getElementById('fa-yoy-desc').textContent = faYoyDesc || '';
+}
+
+function updateChart(data1, data2, viewType) {
+  if (!chartInstance) return;
+  const isOp = viewType === 'operation';
+  const isFiIncome = viewType === 'finance' && state.fiTab === 'income';
+  const isFiExpense = viewType === 'finance' && state.fiTab === 'expense';
+
+  let series = [];
+  if (isOp) {
+    // 运营视角：课时(橙) + 收入(绿)
+    series = [
+      {
+        name: '课时', data: data1, type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#ff6b35', borderColor: '#fff', borderWidth: 2 },
+        lineStyle: { color: '#ff6b35', width: 3 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(255,107,53,0.2)' }, { offset: 1, color: 'rgba(255,107,53,0.02)' }] } },
+        yAxisIndex: 0,
+      },
+      {
+        name: '收入', data: data2, type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#10b981', borderColor: '#fff', borderWidth: 2 },
+        lineStyle: { color: '#10b981', width: 2 },
+        yAxisIndex: 1,
+      }
+    ];
+  } else if (isFiIncome) {
+    // 财务-收入：只显示收入(绿)
+    series = [
+      {
+        name: '收入', data: data1, type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#10b981', borderColor: '#fff', borderWidth: 2 },
+        lineStyle: { color: '#10b981', width: 3 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(16,185,129,0.2)' }, { offset: 1, color: 'rgba(16,185,129,0.02)' }] } },
+        yAxisIndex: 0,
+      }
+    ];
+  } else if (isFiExpense) {
+    // 财务-支出：只显示支出(红)
+    series = [
+      {
+        name: '支出', data: data2, type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#ef4444', borderColor: '#fff', borderWidth: 2 },
+        lineStyle: { color: '#ef4444', width: 3 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(239,68,68,0.2)' }, { offset: 1, color: 'rgba(239,68,68,0.02)' }] } },
+        yAxisIndex: 0,
+      }
+    ];
+  }
+
+  chartInstance.setOption({
+    grid: { left: 0, right: 10, top: 10, bottom: 0, containLabel: true },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#eee', textStyle: { color: '#333' } },
+    legend: { show: false },
+    xAxis: { type: 'category', data: state.period === 'year' ? ['1月','3月','5月','7月','9月','11月'] : state.period === 'quarter' ? ['4月','5月','6月','7月','8月','9月'] : ['1月','2月','3月','4月','5月','6月'], axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#999', fontSize: 11 } },
+    yAxis: [{ type: 'value', show: false }, { type: 'value', show: false }],
+    series: series
+  }, { notMerge: true });
+}
+
+// ==================== Events ====================
+els.viewToggle.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') {
+    state.view = e.target.dataset.view;
+    render();
+  }
+});
+
+els.periodFilters.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') {
+    state.period = e.target.dataset.period;
+    render();
+  }
+});
+
+els.rankTabs.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') {
+    state.rankTab = e.target.dataset.rankTab;
+    renderRankTabs();
+    renderRankLists(DATA[state.period].operation);
+  }
+});
+
+// 财务构成 Tab 切换 - 重新渲染以更新图表、环比同比、排行、标题
+document.getElementById('finance-tabs').addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') {
+    state.fiTab = e.target.dataset.fiTab;
+    render();
+  }
+});
+
+els.toggleTrend.addEventListener('click', () => {
+  state.trendCollapsed = !state.trendCollapsed;
+  if (state.trendCollapsed) {
+    els.trendContent.classList.remove('collapse-enter');
+    els.trendContent.classList.add('collapse-exit');
+    els.toggleTrendText.textContent = '展开';
+    els.toggleTrendIcon.style.transform = 'rotate(180deg)';
+  } else {
+    els.trendContent.classList.remove('collapse-exit');
+    els.trendContent.classList.add('collapse-enter');
+    els.toggleTrendText.textContent = '收起';
+    els.toggleTrendIcon.style.transform = 'rotate(0deg)';
+    // 展开后重新调整图表大小并刷新数据
+    setTimeout(() => {
+      if (chartInstance) {
+        chartInstance.resize();
+        const d = DATA[state.period];
+        if (state.view === 'finance') {
+          updateChart(d.finance.chartIncome, d.finance.chartExpense, 'finance');
+        } else {
+          updateChart(d.operation.chartHours, d.operation.chartIncome, 'operation');
+        }
+      }
+    }, 300);
+  }
+});
+
+// ==================== Chart Init ====================
+function initChart() {
+  chartInstance = echarts.init(document.getElementById('chart-trend-bc'));
+  chartInstance.setOption({
+    grid: { left: 0, right: 10, top: 10, bottom: 0, containLabel: true },
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#eee', textStyle: { color: '#333' } },
+    legend: { show: false },
+    xAxis: { type: 'category', data: ['1月','2月','3月','4月','5月','6月'], axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#999', fontSize: 11 } },
+    yAxis: [
+      { type: 'value', show: false },
+      { type: 'value', show: false }
+    ],
+    series: [
+      {
+        name: '课时',
+        data: [12, 8, 18, 15, 22, 20],
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { color: '#ff6b35', width: 3 },
+        itemStyle: { color: '#ff6b35', borderColor: '#fff', borderWidth: 2 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(255,107,53,0.2)' }, { offset: 1, color: 'rgba(255,107,53,0.02)' }] } },
+        yAxisIndex: 0,
+      },
+      {
+        name: '收入',
+        data: [36, 24, 54, 45, 66, 60],
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { color: '#10b981', width: 2 },
+        itemStyle: { color: '#10b981', borderColor: '#fff', borderWidth: 2 },
+        yAxisIndex: 1,
+      }
+    ]
+  });
+  window.addEventListener('resize', () => chartInstance && chartInstance.resize());
+}
+
+// ==================== Boot ====================
+initChart();
+render();
+</script>
+
+</body>
+</html>

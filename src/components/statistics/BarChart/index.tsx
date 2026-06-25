@@ -18,7 +18,7 @@ const BarChart: React.FC<BarChartProps> = ({
   title,
   data,
   unit = '',
-  barColor = 'bg-gradient-accent',
+  barColor = 'bg-progress-primary',
 }) => {
   if (!data || data.length === 0) {
     return (

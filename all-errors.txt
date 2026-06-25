@@ -1,0 +1,5 @@
+﻿
+src/services/student.ts(845,22): error TS2339: Property 'className' does not ex
+ist on type 'BackendScheduleListItem | BackendScheduleDetailResponse'.
+
+

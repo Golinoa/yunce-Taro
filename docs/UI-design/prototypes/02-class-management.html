@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>云策教务 - 班级管理 低保真原型</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{font-family:'PingFang SC','SF Pro Display','Helvetica Neue','Microsoft YaHei',sans-serif;background:#F0F2F5;min-height:100vh;display:flex;justify-content:center;padding:20px 0}
+.phone{width:375px;height:812px;border-radius:44px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.15);position:relative;flex-shrink:0}
+.phone .scr{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;position:relative}
+.phone .scr::-webkit-scrollbar{width:0;display:none}
+
+.sb{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:#1A1A1A;font-size:12px;position:sticky;top:0;background:#fff;z-index:10}
+.sb .t{font-size:14px;font-weight:700}
+
+/* 页面导航 */
+.page-nav{display:flex;align-items:center;padding:0 20px 12px;background:#fff;position:sticky;top:44px;z-index:10}
+.page-back{width:32px;height:32px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:none;margin-right:12px}
+.page-title{font-size:18px;font-weight:800;color:#1A1A1A;flex:1}
+
+/* 筛选栏 */
+.filter-bar{display:flex;gap:8px;padding:0 20px 12px;background:#fff}
+.filter-chip{display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:16px;background:#F5F5F5;font-size:12px;font-weight:500;color:#8E8E93;cursor:pointer;border:none}
+.filter-chip.on{background:#E8F5E9;color:#2E7D32}
+
+/* 班级卡片 */
+.class-list{padding:0 20px 100px}
+.class-card{background:#fff;border:1px solid #F0F0F0;border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer;transition:transform .15s}
+.class-card:active{transform:scale(.98)}
+.cc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cc-name{font-size:15px;font-weight:700;color:#1A1A1A}
+.cc-status{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600}
+.cc-active{background:#E8F5E9;color:#2E7D32}
+.cc-ended{background:#F5F5F5;color:#8E8E93}
+.cc-frozen{background:#FFF3E0;color:#E65100}
+.cc-meta{display:flex;gap:16px;font-size:12px;color:#8E8E93}
+.cc-meta span{display:flex;align-items:center;gap:4px}
+.cc-progress{margin-top:10px}
+.cc-bar{height:4px;background:#F0F0F0;border-radius:2px;overflow:hidden}
+.cc-fill{height:100%;border-radius:2px;background:#5EC8A8}
+.cc-bar-text{font-size:10px;color:#8E8E93;margin-top:4px}
+.cc-campus{font-size:10px;color:#5EC8A8;font-weight:600;margin-top:6px}
+
+/* 空状态 */
+.empty-state{text-align:center;padding:60px 20px;color:#8E8E93}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-text{font-size:14px;font-weight:500}
+
+/* FAB */
+.fab{position:sticky;bottom:100px;right:20px;width:52px;height:52px;border-radius:26px;background:#5EC8A8;color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;box-shadow:0 4px 16px rgba(94,200,168,0.4);z-index:20;margin-left:auto;margin-right:20px}
+
+/* ===== 弹窗通用 ===== */
+.overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.overlay.show{display:flex}
+.sheet{width:100%;background:#fff;border-radius:20px 20px 0 0;max-height:85%;overflow-y:auto;padding-bottom:34px}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:#E0E0E0;margin:10px auto 0}
+.sheet-header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between}
+.sheet-title{font-size:16px;font-weight:700;color:#1A1A1A}
+.sheet-close{width:28px;height:28px;border-radius:14px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:none}
+.sheet-actions{padding:16px 20px;display:flex;gap:10px}
+.btn{flex:1;padding:14px 0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s}
+.btn:active{opacity:.7}
+.btn-primary{background:#5EC8A8;color:#fff}
+.btn-secondary{background:#F5F5F5;color:#1A1A1A}
+.btn-danger{background:#FF3B30;color:#fff}
+.btn-warn{background:#FF9500;color:#fff}
+
+/* ===== 创建班级表单 ===== */
+.form-group{padding:0 20px;margin-bottom:16px}
+.form-label{font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:8px;display:block}
+.form-label .required{color:#FF3B30;margin-left:2px}
+.form-input{width:100%;height:44px;border:1px solid #E0E0E0;border-radius:10px;padding:0 14px;font-size:14px;color:#1A1A1A;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:#5EC8A8}
+.form-input::placeholder{color:#C7C7CC}
+.form-select{width:100%;height:44px;border:1px solid #E0E0E0;border-radius:10px;padding:0 14px;font-size:14px;color:#1A1A1A;outline:none;appearance:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%238E8E93'/%3E%3C/svg%3E") no-repeat right 14px center}
+.form-hint{font-size:11px;color:#8E8E93;margin-top:4px}
+
+/* ===== 班级详情 ===== */
+.detail-header{padding:20px;background:linear-gradient(135deg,#5EC8A8,#4AB89A);color:#fff}
+.dh-name{font-size:20px;font-weight:800}
+.dh-meta{display:flex;gap:12px;margin-top:8px;font-size:12px;opacity:.8}
+.dh-campus{font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.2);margin-top:8px;display:inline-block}
+.detail-stats{display:flex;gap:1px;margin:0 16px;margin-top:-12px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.ds-item{flex:1;text-align:center;padding:14px 8px}
+.ds-val{font-size:20px;font-weight:800;color:#1A1A1A}
+.ds-lbl{font-size:10px;color:#8E8E93;margin-top:2px}
+
+/* 学员列表 */
+.student-list{padding:0 20px;margin-top:16px}
+.sl-label{font-size:13px;font-weight:600;color:#8E8E93;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+.sl-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F5F5F5}
+.sl-item:last-child{border-bottom:none}
+.sl-avatar{width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.sl-body{flex:1}
+.sl-name{font-size:13px;font-weight:600;color:#1A1A1A}
+.sl-pkg{font-size:11px;color:#8E8E93}
+.sl-actions{display:flex;gap:6px}
+.sl-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:none;cursor:pointer;font-weight:600}
+.sl-btn-transfer{background:#E8F5E9;color:#2E7D32}
+.sl-btn-remove{background:#FFEBEE;color:#C62828}
+
+/* 操作栏 */
+.detail-actions{padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.da-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:12px;background:#F5F5F5;cursor:pointer;border:none;font-size:14px;font-weight:600;color:#1A1A1A;width:auto;text-align:left}
+.da-btn:active{opacity:.7}
+.da-btn-icon{font-size:18px}
+.da-btn-danger{color:#FF3B30}
+
+/* ===== 调班确认弹窗 ===== */
+.transfer-info{padding:16px 20px}
+.transfer-from{display:flex;align-items:center;gap:10px;padding:12px;background:#FFEBEE;border-radius:10px;margin-bottom:12px}
+.transfer-arrow{text-align:center;font-size:20px;color:#8E8E93;margin:4px 0}
+.transfer-to-list{display:flex;flex-direction:column;gap:8px}
+.transfer-to-item{display:flex;align-items:center;gap:10px;padding:12px;background:#F5F5F5;border-radius:10px;cursor:pointer;transition:background .2s;border:2px solid transparent}
+.transfer-to-item:active{background:#E8E8E8}
+.transfer-to-item.selected{border-color:#5EC8A8;background:#E8F5E9}
+.tti-name{font-size:14px;font-weight:600;color:#1A1A1A;flex:1}
+.tti-info{font-size:11px;color:#8E8E93}
+
+/* ===== 结课弹窗 ===== */
+.endclass-info{padding:16px 20px}
+.endclass-warn{display:flex;align-items:flex-start;gap:10px;padding:12px;background:#FFF3E0;border-radius:10px;margin-bottom:16px}
+.endclass-warn-icon{font-size:20px;flex-shrink:0}
+.endclass-warn-text{font-size:13px;color:#E65100;line-height:1.5}
+.endclass-detail{font-size:13px;color:#1A1A1A;line-height:1.8}
+.endclass-detail strong{color:#5EC8A8}
+.endclass-options{margin-top:12px}
+.eco-item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #E0E0E0;border-radius:10px;margin-bottom:8px;cursor:pointer}
+.eco-item:active{background:#F5F5F5}
+.eco-radio{width:20px;height:20px;border-radius:10px;border:2px solid #E0E0E0;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.eco-radio.checked{border-color:#5EC8A8;background:#5EC8A8;color:#fff;font-size:10px}
+.eco-body{flex:1}
+.eco-title{font-size:13px;font-weight:600;color:#1A1A1A}
+.eco-desc{font-size:11px;color:#8E8E93;margin-top:2px}
+
+/* ===== 删除确认弹窗 ===== */
+.delete-info{padding:16px 20px}
+.delete-warn{display:flex;align-items:flex-start;gap:10px;padding:12px;background:#FFEBEE;border-radius:10px;margin-bottom:16px}
+.delete-warn-icon{font-size:20px;flex-shrink:0}
+.delete-warn-text{font-size:13px;color:#C62828;line-height:1.5;font-weight:600}
+
+/* ===== 基于旧班新建弹窗 ===== */
+.copy-info{padding:16px 20px}
+.copy-detail{font-size:13px;color:#1A1A1A;line-height:1.8}
+.copy-checklist{margin-top:12px}
+.ck-item{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;color:#1A1A1A}
+.ck-check{width:18px;height:18px;border-radius:4px;border:2px solid #5EC8A8;background:#5EC8A8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.ck-uncheck{width:18px;height:18px;border-radius:4px;border:2px solid #E0E0E0;flex-shrink:0}
+
+/* TabBar */
+.tbar{position:sticky;bottom:0;left:0;right:0;height:82px;background:#fff;border-top:1px solid #F0F0F0;display:flex;align-items:flex-start;padding-top:8px;z-index:50}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border:none;background:transparent}
+.tb-icon{font-size:18px}
+.tb-text{font-size:10px;font-weight:500;color:#8E8E93}
+.tb.on .tb-text{color:#5EC8A8;font-weight:700}
+.tb.on .tb-icon{color:#5EC8A8}
+.home-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#1A1A1A;opacity:.12}
+
+/* 页面切换 */
+.page{display:none}
+.page.active{display:block}
+</style>
+</head>
+<body>
+
+<div class="phone">
+<div class="scr">
+
+<!-- ===== 页面1: 班级列表 ===== -->
+<div class="page active" id="classListPage">
+  <div class="sb"><span class="t">9:41</span><span style="color:#8E8E93">📶 🔋</span></div>
+  <div class="page-nav" style="justify-content:space-between">
+    <div class="page-title">班级管理</div>
+    <button class="page-back" style="margin:0" onclick="showToast('搜索')">🔍</button>
+  </div>
+
+  <!-- 筛选栏 -->
+  <div class="filter-bar">
+    <button class="filter-chip on">全部</button>
+    <button class="filter-chip">进行中</button>
+    <button class="filter-chip">已结课</button>
+    <button class="filter-chip">🎹 钢琴</button>
+    <button class="filter-chip">💃 舞蹈</button>
+  </div>
+
+  <!-- 班级列表 -->
+  <div class="class-list">
+    <!-- 进行中 -->
+    <div class="class-card" onclick="showPage('classDetailPage')">
+      <div class="cc-header">
+        <span class="cc-name">🎹 钢琴基础班</span>
+        <span class="cc-status cc-active">进行中</span>
+      </div>
+      <div class="cc-meta">
+        <span>👤 王老师</span>
+        <span>👥 6人</span>
+        <span>📍 保利校区</span>
+      </div>
+      <div class="cc-progress">
+        <div class="cc-bar"><div class="cc-fill" style="width:60%"></div></div>
+        <div class="cc-bar-text">已消 18/30 课时</div>
+      </div>
+    </div>
+
+    <div class="class-card" onclick="showPage('classDetailPage')">
+      <div class="cc-header">
+        <span class="cc-name">💃 舞蹈启蒙班</span>
+        <span class="cc-status cc-active">进行中</span>
+      </div>
+      <div class="cc-meta">
+        <span>👤 张老师</span>
+        <span>👥 8人</span>
+        <span>📍 保利校区</span>
+      </div>
+      <div class="cc-progress">
+        <div class="cc-bar"><div class="cc-fill" style="width:35%"></div></div>
+        <div class="cc-bar-text">已消 7/20 课时</div>
+      </div>
+    </div>
+
+    <!-- 已结课 -->
+    <div class="class-card" onclick="showPage('classDetailPage')">
+      <div class="cc-header">
+        <span class="cc-name">🎤 声乐启蒙班</span>
+        <span class="cc-status cc-ended">已结课</span>
+      </div>
+      <div class="cc-meta">
+        <span>👤 李老师</span>
+        <span>👥 4人</span>
+        <span>📍 万达校区</span>
+      </div>
+      <div class="cc-progress">
+        <div class="cc-bar"><div class="cc-fill" style="width:100%;background:#8E8E93"></div></div>
+        <div class="cc-bar-text">已消 24/24 课时 · 2人课包冻结</div>
+      </div>
+    </div>
+
+    <div class="class-card" onclick="showPage('classDetailPage')">
+      <div class="cc-header">
+        <span class="cc-name">🎨 创意美术班</span>
+        <span class="cc-status cc-frozen">已结课(可恢复)</span>
+      </div>
+      <div class="cc-meta">
+        <span>👤 刘老师</span>
+        <span>👥 5人</span>
+        <span>📍 保利校区</span>
+      </div>
+      <div class="cc-progress">
+        <div class="cc-bar"><div class="cc-fill" style="width:80%;background:#FF9500"></div></div>
+        <div class="cc-bar-text">已消 16/20 课时 · 结课3天内可恢复</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="showSheet('createClassSheet')">+</button>
+
+  <!-- TabBar -->
+  <div class="tbar">
+    <button class="tb" onclick="showToast('首页')"><span class="tb-icon">🏠</span><span class="tb-text">首页</span></button>
+    <button class="tb" onclick="showToast('课表')"><span class="tb-icon">📅</span><span class="tb-text">课表</span></button>
+    <button class="tb" onclick="showToast('统计')"><span class="tb-icon">📊</span><span class="tb-text">统计</span></button>
+    <button class="tb" onclick="showToast('我的')"><span class="tb-icon">👤</span><span class="tb-text">我的</span></button>
+    <div class="home-indicator"></div>
+  </div>
+</div>
+
+<!-- ===== 页面2: 班级详情 ===== -->
+<div class="page" id="classDetailPage">
+  <div class="sb"><span class="t">9:41</span><span style="color:#8E8E93">📶 🔋</span></div>
+  <div class="page-nav">
+    <button class="page-back" onclick="showPage('classListPage')">‹</button>
+    <div class="page-title">班级详情</div>
+    <button class="page-back" style="margin:0" onclick="showSheet('moreActionsSheet')">⋯</button>
+  </div>
+
+  <!-- 详情头部 -->
+  <div class="detail-header">
+    <div class="dh-name">🎹 钢琴基础班</div>
+    <div class="dh-meta">
+      <span>👤 王老师</span>
+      <span>👥 6人</span>
+      <span>📋 进行中</span>
+    </div>
+    <div class="dh-campus">📍 保利校区</div>
+  </div>
+
+  <!-- 统计 -->
+  <div class="detail-stats">
+    <div class="ds-item"><div class="ds-val">30</div><div class="ds-lbl">总课时</div></div>
+    <div class="ds-item"><div class="ds-val">18</div><div class="ds-lbl">已消课</div></div>
+    <div class="ds-item"><div class="ds-val">12</div><div class="ds-lbl">剩余</div></div>
+    <div class="ds-item"><div class="ds-val">6</div><div class="ds-lbl">学员</div></div>
+  </div>
+
+  <!-- 学员列表 -->
+  <div class="student-list">
+    <div class="sl-label">学员列表</div>
+
+    <div class="sl-item">
+      <div class="sl-avatar" style="background:#5EC8A8">张</div>
+      <div class="sl-body"><div class="sl-name">张小明</div><div class="sl-pkg">钢琴课包 · 剩余17课时</div></div>
+      <div class="sl-actions">
+        <button class="sl-btn sl-btn-transfer" onclick="event.stopPropagation();showSheet('transferSheet')">调班</button>
+        <button class="sl-btn sl-btn-remove" onclick="event.stopPropagation();showSheet('removeStudentSheet')">移除</button>
+      </div>
+    </div>
+
+    <div class="sl-item">
+      <div class="sl-avatar" style="background:#7C8CF8">李</div>
+      <div class="sl-body"><div class="sl-name">李思思</div><div class="sl-pkg">通用课包 · 剩余9课时</div></div>
+      <div class="sl-actions">
+        <button class="sl-btn sl-btn-transfer" onclick="event.stopPropagation();showSheet('transferSheet')">调班</button>
+        <button class="sl-btn sl-btn-remove" onclick="event.stopPropagation();showSheet('removeStudentSheet')">移除</button>
+      </div>
+    </div>
+
+    <div class="sl-item">
+      <div class="sl-avatar" style="background:#F8A07C">王</div>
+      <div class="sl-body"><div class="sl-name">王芳</div><div class="sl-pkg">钢琴课包 · 剩余1课时 ⚠️</div></div>
+      <div class="sl-actions">
+        <button class="sl-btn sl-btn-transfer" onclick="event.stopPropagation();showSheet('transferSheet')">调班</button>
+        <button class="sl-btn sl-btn-remove" onclick="event.stopPropagation();showSheet('removeStudentSheet')">移除</button>
+      </div>
+    </div>
+
+    <div class="sl-item">
+      <div class="sl-avatar" style="background:#A07CF8">陈</div>
+      <div class="sl-body"><div class="sl-name">陈美美</div><div class="sl-pkg">🔒冻结课包 · 原班级已结课</div></div>
+      <div class="sl-actions">
+        <button class="sl-btn sl-btn-transfer" onclick="event.stopPropagation();showSheet('transferSheet')">调班</button>
+        <button class="sl-btn sl-btn-remove" onclick="event.stopPropagation();showSheet('removeStudentSheet')">移除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作 -->
+  <div class="detail-actions">
+    <button class="da-btn" onclick="showToast('跳转课表消课')"><span class="da-btn-icon">📋</span>去消课签到</button>
+    <button class="da-btn" onclick="showSheet('endClassSheet')"><span class="da-btn-icon">🏁</span>结课</button>
+    <button class="da-btn" onclick="showSheet('copyClassSheet')"><span class="da-btn-icon">📋</span>基于此班新建</button>
+    <button class="da-btn da-btn-danger" onclick="showSheet('deleteClassSheet')"><span class="da-btn-icon">🗑️</span>删除班级</button>
+  </div>
+</div>
+
+<!-- ===== 创建班级弹窗 ===== -->
+<div class="overlay" id="createClassSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">创建班级</div>
+      <button class="sheet-close" onclick="closeSheet('createClassSheet')">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">班级名称<span class="required">*</span></label>
+      <input class="form-input" placeholder="请输入班级名称">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">科目<span class="required">*</span></label>
+      <select class="form-select">
+        <option value="">请选择科目</option>
+        <option>🎹 钢琴</option>
+        <option>🎤 声乐</option>
+        <option>💃 舞蹈</option>
+        <option>🎨 美术</option>
+        <option>📖 乐理</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">所属校区<span class="required">*</span></label>
+      <select class="form-select">
+        <option value="">请选择校区</option>
+        <option>保利校区（主校区）</option>
+        <option>万达校区</option>
+        <option>合作机构-星艺</option>
+      </select>
+      <div class="form-hint">不同校区可有同名班级</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">授课教师<span class="required">*</span></label>
+      <select class="form-select">
+        <option value="">请选择教师（仅显示在职）</option>
+        <option>王老师（钢琴）</option>
+        <option>李老师（声乐）</option>
+        <option>张老师（舞蹈）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">总课时</label>
+      <input class="form-input" type="number" placeholder="请输入总课时" value="30">
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('createClassSheet')">取消</button>
+      <button class="btn btn-primary" onclick="showToast('班级创建成功！');closeSheet('createClassSheet')">创建班级</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 调班确认弹窗 ===== -->
+<div class="overlay" id="transferSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">调班</div>
+      <button class="sheet-close" onclick="closeSheet('transferSheet')">✕</button>
+    </div>
+
+    <div class="transfer-info">
+      <div style="font-size:13px;font-weight:600;color:#8E8E93;margin-bottom:12px">当前班级</div>
+      <div class="transfer-from">
+        <span style="font-size:20px">🎹</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#C62828">钢琴基础班</div>
+          <div style="font-size:11px;color:#8E8E93">王老师 · 保利校区</div>
+        </div>
+      </div>
+
+      <div class="transfer-arrow">↓</div>
+
+      <div style="font-size:13px;font-weight:600;color:#8E8E93;margin-bottom:8px">选择目标班级</div>
+      <div class="transfer-to-list">
+        <div class="transfer-to-item" onclick="this.classList.toggle('selected')">
+          <span style="font-size:18px">💃</span>
+          <div style="flex:1"><div class="tti-name">舞蹈启蒙班</div><div class="tti-info">张老师 · 保利校区 · 8人</div></div>
+        </div>
+        <div class="transfer-to-item" onclick="this.classList.toggle('selected')">
+          <span style="font-size:18px">🎹</span>
+          <div style="flex:1"><div class="tti-name">钢琴进阶班</div><div class="tti-info">王老师 · 万达校区 · 4人</div></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:12px;color:#2E7D32;line-height:1.5">
+        ℹ️ 调班只改归属，历史消课记录保留不动，后续消课从新班级科目匹配课包。
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('transferSheet')">取消</button>
+      <button class="btn btn-primary" onclick="showToast('已将张小明调至舞蹈启蒙班');closeSheet('transferSheet')">确认调班</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 移除学员确认弹窗 ===== -->
+<div class="overlay" id="removeStudentSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">移除学员</div>
+      <button class="sheet-close" onclick="closeSheet('removeStudentSheet')">✕</button>
+    </div>
+    <div class="delete-info">
+      <div class="delete-warn">
+        <span class="delete-warn-icon">⚠️</span>
+        <span class="delete-warn-text">确认将「张小明」从班级移除？</span>
+      </div>
+      <div style="font-size:13px;color:#1A1A1A;line-height:1.8">
+        该学员的课时记录将保留，课包不受影响。<br>
+        移除后可重新添加回班级。
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('removeStudentSheet')">取消</button>
+      <button class="btn btn-danger" onclick="showToast('已移除张小明');closeSheet('removeStudentSheet')">确认移除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 结课弹窗 ===== -->
+<div class="overlay" id="endClassSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">结课</div>
+      <button class="sheet-close" onclick="closeSheet('endClassSheet')">✕</button>
+    </div>
+    <div class="endclass-info">
+      <div class="endclass-warn">
+        <span class="endclass-warn-icon">⚠️</span>
+        <span class="endclass-warn-text">结课后，欠课学员的课包将被冻结，需手动选择使用。</span>
+      </div>
+      <div class="endclass-detail">
+        班级：<strong>🎹 钢琴基础班</strong><br>
+        学员：<strong>6人</strong>（2人课时不足）<br>
+        剩余课时：<strong>12课时</strong>
+      </div>
+
+      <div class="endclass-options">
+        <div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:8px">结课后操作</div>
+        <div class="eco-item" onclick="this.querySelector('.eco-radio').classList.toggle('checked')">
+          <div class="eco-radio checked">✓</div>
+          <div class="eco-body"><div class="eco-title">基于此班新建第二期</div><div class="eco-desc">复制班级信息，重新添加学员</div></div>
+        </div>
+        <div class="eco-item" onclick="this.querySelector('.eco-radio').classList.toggle('checked')">
+          <div class="eco-radio"></div>
+          <div class="eco-body"><div class="eco-title">仅结课，不新建</div><div class="eco-desc">学员可后续手动分班</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('endClassSheet')">取消</button>
+      <button class="btn btn-warn" onclick="showToast('班级已结课，2人课包已冻结');closeSheet('endClassSheet')">确认结课</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 基于旧班新建弹窗 ===== -->
+<div class="overlay" id="copyClassSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">基于旧班新建</div>
+      <button class="sheet-close" onclick="closeSheet('copyClassSheet')">✕</button>
+    </div>
+    <div class="copy-info">
+      <div class="copy-detail">
+        基于旧班 <strong>🎹 钢琴基础班(第一期)</strong> 创建新班级
+      </div>
+      <div class="copy-checklist">
+        <div style="font-size:13px;font-weight:600;color:#1A1A1A;margin:12px 0 8px">将复制以下信息</div>
+        <div class="ck-item"><div class="ck-check">✓</div>班级名称（可修改）</div>
+        <div class="ck-item"><div class="ck-check">✓</div>科目</div>
+        <div class="ck-item"><div class="ck-check">✓</div>授课教师</div>
+        <div class="ck-item"><div class="ck-check">✓</div>所属校区</div>
+        <div class="ck-item"><div class="ck-check">✓</div>总课时</div>
+
+        <div style="font-size:13px;font-weight:600;color:#1A1A1A;margin:16px 0 8px">不复制</div>
+        <div class="ck-item" style="color:#8E8E93"><div class="ck-uncheck"></div>学员列表（需重新添加）</div>
+        <div class="ck-item" style="color:#8E8E93"><div class="ck-uncheck"></div>消课记录（各期独立）</div>
+      </div>
+
+      <div style="margin-top:12px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:12px;color:#2E7D32;line-height:1.5">
+        💡 可从旧班学员中勾选添加到新班级
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('copyClassSheet')">取消</button>
+      <button class="btn btn-primary" onclick="showToast('新班级已创建');closeSheet('copyClassSheet')">创建新班级</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 删除班级确认弹窗 ===== -->
+<div class="overlay" id="deleteClassSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">删除班级</div>
+      <button class="sheet-close" onclick="closeSheet('deleteClassSheet')">✕</button>
+    </div>
+    <div class="delete-info">
+      <div class="delete-warn">
+        <span class="delete-warn-icon">🗑️</span>
+        <span class="delete-warn-text">删除后无法找回，确认删除「钢琴基础班」？</span>
+      </div>
+      <div style="font-size:13px;color:#1A1A1A;line-height:1.8">
+        关联数据：<br>
+        · 6名学员的班级归属<br>
+        · 18条消课记录<br>
+        · 学员课包数据不受影响
+      </div>
+      <div style="margin-top:12px;padding:10px;background:#FFF3E0;border-radius:8px;font-size:12px;color:#E65100">
+        💡 建议使用"结课"代替"删除"，结课后数据仍可查看
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('deleteClassSheet')">取消</button>
+      <button class="btn btn-danger" onclick="showToast('班级已删除');closeSheet('deleteClassSheet')">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 更多操作弹窗 ===== -->
+<div class="overlay" id="moreActionsSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">更多操作</div>
+      <button class="sheet-close" onclick="closeSheet('moreActionsSheet')">✕</button>
+    </div>
+    <div style="padding:0 20px">
+      <div class="da-btn" onclick="showToast('编辑班级');closeSheet('moreActionsSheet')"><span class="da-btn-icon">✏️</span>编辑班级信息</div>
+      <div class="da-btn" onclick="showSheet('endClassSheet');closeSheet('moreActionsSheet')"><span class="da-btn-icon">🏁</span>结课</div>
+      <div class="da-btn" onclick="showSheet('copyClassSheet');closeSheet('moreActionsSheet')"><span class="da-btn-icon">📋</span>基于此班新建</div>
+      <div class="da-btn" style="color:#5EC8A8" onclick="showToast('已恢复为进行中');closeSheet('moreActionsSheet')"><span class="da-btn-icon">↩️</span>恢复上课（结课7天内）</div>
+      <div class="da-btn da-btn-danger" onclick="showSheet('deleteClassSheet');closeSheet('moreActionsSheet')"><span class="da-btn-icon">🗑️</span>删除班级</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById(id).closest('.scr').scrollTop = 0;
+}
+function showSheet(id) {
+  document.getElementById(id).classList.add('show');
+}
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('show');
+}
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.75);color:#fff;padding:12px 24px;border-radius:10px;font-size:13px;z-index:9999;pointer-events:none';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+</script>
+</body>
+</html>

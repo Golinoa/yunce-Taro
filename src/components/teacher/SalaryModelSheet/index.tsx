@@ -17,6 +17,7 @@ interface SalaryModelSheetProps {
   visible: boolean;
   /** 编辑时传入已有模型，新建时传 null */
   model: SalaryModel | null;
+  submitting?: boolean;
   onClose: () => void;
   onSubmit: (data: {
     name: string;
@@ -37,6 +38,7 @@ const MODEL_TYPE_OPTIONS: { label: string; value: SalaryModelType; desc: string 
 const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
   visible,
   model,
+  submitting = false,
   onClose,
   onSubmit,
 }) => {
@@ -84,6 +86,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
   };
 
   const handleSubmit = () => {
+    if (submitting) return;
     if (!name.trim()) return;
     onSubmit({
       name: name.trim(),
@@ -96,6 +99,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
   };
 
   const handleClose = () => {
+    if (submitting) return;
     onClose();
   };
 
@@ -130,7 +134,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
                     ? 'border-primary bg-primary-bg'
                     : 'border-border bg-background',
                 )}
-                onClick={() => handleTypeChange(opt.value)}
+                onClick={submitting ? undefined : () => handleTypeChange(opt.value)}
               >
                 <View className="flex items-center justify-between">
                   <Text
@@ -156,10 +160,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
             {/* 底薪 */}
             <View className="flex items-center justify-between">
               <Text className="text-sm text-muted-foreground">底薪</Text>
-              <View
-                className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl"
-                style={{ backgroundColor: '#f5faf8', border: '3rpx solid #D5E8E0' }}
-              >
+              <View className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl bg-f5faf8-border-d5e8e0">
                 <Text className="text-xs text-muted-foreground">¥</Text>
                 <Input
                   className="w-[120rpx] text-sm text-foreground text-right"
@@ -174,10 +175,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
             {/* 课时费单价 */}
             <View className="flex items-center justify-between">
               <Text className="text-sm text-muted-foreground">课时费单价</Text>
-              <View
-                className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl"
-                style={{ backgroundColor: '#f5faf8', border: '3rpx solid #D5E8E0' }}
-              >
+              <View className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl bg-f5faf8-border-d5e8e0">
                 <Text className="text-xs text-muted-foreground">¥</Text>
                 <Input
                   className="w-[120rpx] text-sm text-foreground text-right"
@@ -191,10 +189,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
             {/* 全勤奖 */}
             <View className="flex items-center justify-between">
               <Text className="text-sm text-muted-foreground">全勤奖</Text>
-              <View
-                className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl"
-                style={{ backgroundColor: '#f5faf8', border: '3rpx solid #D5E8E0' }}
-              >
+              <View className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl bg-f5faf8-border-d5e8e0">
                 <Text className="text-xs text-muted-foreground">¥</Text>
                 <Input
                   className="w-[120rpx] text-sm text-foreground text-right"
@@ -209,10 +204,7 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
             {/* 绩效奖金 */}
             <View className="flex items-center justify-between">
               <Text className="text-sm text-muted-foreground">绩效奖金</Text>
-              <View
-                className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl"
-                style={{ backgroundColor: '#f5faf8', border: '3rpx solid #D5E8E0' }}
-              >
+              <View className="flex items-center gap-1 py-[14rpx] px-[20rpx] rounded-xl bg-f5faf8-border-d5e8e0">
                 <Text className="text-xs text-muted-foreground">¥</Text>
                 <Input
                   className="w-[120rpx] text-sm text-foreground text-right"
@@ -232,6 +224,9 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
               {Number(attend) > 0 ? ` + 全勤 ¥${attend}` : ''}
               {Number(perf) > 0 ? ` + 绩效 ¥${perf}` : ''}
             </Text>
+            <Text className="text-xs text-amber/60 block mt-1">
+              当前为统一费率模式，班级差异化计费即将推出
+            </Text>
           </View>
         </View>
 
@@ -239,11 +234,13 @@ const SalaryModelSheet: React.FC<SalaryModelSheetProps> = ({
         <View
           className={cn(
             'w-full py-[28rpx] rounded-2xl text-center text-base font-semibold',
-            name.trim() ? 'bg-gradient-primary text-white' : 'bg-muted text-muted-foreground',
+            name.trim() && !submitting
+              ? 'bg-gradient-primary text-white'
+              : 'bg-muted text-muted-foreground',
           )}
-          onClick={name.trim() ? handleSubmit : undefined}
+          onClick={name.trim() && !submitting ? handleSubmit : undefined}
         >
-          {model ? '保存修改' : '创建模型'}
+          {submitting ? '保存中...' : model ? '保存修改' : '创建模型'}
         </View>
       </View>
     </BottomSheet>

@@ -1,82 +1,116 @@
-@use '@/styles/compat.scss';
+@use './styles/compat.scss';
 
 // ============================================
 // UnoCSS 自定义动画 keyframes
 // ============================================
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12rpx); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12rpx);
+  }
 }
 
 // ============================================
 // 云策教务 - CSS 自定义属性（全局变量）
 // 单一数据源：src/theme.ts，修改时请同步
 // 基于 HSL 色彩体系，所有色值通过 CSS 变量引用
+// 配色方案对齐设计稿 scheme-bc-fusion-v2.html（蓝色主题 + 花瓣五色）
 // ============================================
 
 page {
-  // --- 主题色 ---
-  --primary: 168 55% 58%;
+  // --- 主题色（对齐设计稿 #3B6EF5 采集工具蓝） ---
+  --primary: 224 90% 60%;
   --primary-foreground: 0 0% 100%;
-  --primary-glow: 168 55% 75%;
-  --primary-dark: 168 45% 45%;
+  --primary-glow: 222 87% 69%;
+  --primary-dark: 221 83% 53%;
 
   // --- 次要色 ---
-  --secondary: 168 35% 92%;
-  --secondary-foreground: 160 15% 25%;
+  --secondary: 224 90% 95%;
+  --secondary-foreground: 224 50% 25%;
 
-  // --- 强调色 ---
-  --accent: 340 60% 78%;
+  // --- 强调色（对齐设计稿 #8B5CF6 花瓣素材紫） ---
+  --accent: 258 90% 66%;
   --accent-foreground: 0 0% 100%;
-  --accent-glow: 340 60% 88%;
+  --accent-glow: 258 90% 76%;
 
   // --- 背景 ---
-  --background: 160 30% 97%;
-  --foreground: 160 15% 25%;
+  --background: 210 20% 97%;
+  --foreground: 0 0% 10%;
 
   // --- 卡片 ---
   --card: 0 0% 100%;
-  --card-foreground: 160 15% 25%;
+  --card-foreground: 0 0% 10%;
 
   // --- 柔和 ---
-  --muted: 168 25% 94%;
-  --muted-foreground: 160 10% 50%;
+  --muted: 210 20% 96%;
+  --muted-foreground: 0 0% 54%;
 
-  // --- 危险 ---
-  --destructive: 0 70% 65%;
+  // --- 文本三级色（对齐设计稿 text-primary/secondary/tertiary） ---
+  --foreground-secondary: 0 0% 33%;
+
+  // --- 危险（对齐设计稿 #ef4444） ---
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  // --- 边框/输入 ---
-  --border: 168 25% 88%;
-  --input: 168 25% 88%;
-  --input-border: 165 20% 78%;
-  --ring: 168 55% 58%;
+  // --- 边框/输入（对齐设计稿 #eef0f2 border-light） ---
+  --border: 210 20% 94%;
+  --border-light: 210 20% 94%;
+  --input: 210 20% 94%;
+  --input-border: 210 20% 90%;
+  --ring: 224 90% 60%;
 
-  // --- 状态色 ---
-  --success: 140 55% 50%;
-  --warning: 43 74% 66%;
-  --error: 0 70% 65%;
-  --info: 200 55% 65%;
+  // --- 状态色（对齐设计稿） ---
+  --success: 160 84% 39%;
+  --warning: 38 92% 50%;
+  --error: 0 84% 60%;
+  --info: 199 89% 48%;
 
-  // --- 图表色板 ---
-  --chart-1: 168 55% 58%;
-  --chart-2: 340 60% 78%;
-  --chart-3: 200 55% 65%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
+  // --- 身份角色色（对齐注册流程设计稿） ---
+  --role-principal: 38 92% 50%;
+  --role-principal-glow: 45 91% 59%;
+  --role-principal-dark: 32 94% 44%;
+  --role-teacher: 224 90% 60%;
+  --role-teacher-glow: 222 87% 69%;
+  --role-teacher-dark: 221 83% 53%;
+  --role-parent: 258 90% 66%;
+  --role-parent-glow: 258 90% 76%;
+  --role-parent-dark: 262 83% 58%;
 
-  // --- 渐变 ---
-  --gradient-primary: linear-gradient(135deg, hsl(168 55% 58%), hsl(168 55% 75%));
-  --gradient-accent: linear-gradient(135deg, hsl(340 60% 78%), hsl(340 60% 88%));
-  --gradient-subtle: linear-gradient(180deg, #f5faf8, #e3f2ef);
+  // --- 花瓣五色（对齐设计稿 petal 配色） ---
+  --petal-blue: 224 90% 60%;
+  --petal-purple: 258 90% 66%;
+  --petal-orange: 38 92% 50%;
+  --petal-red: 0 84% 60%;
+  --petal-cyan: 189 94% 43%;
 
-  // --- 阴影 ---
-  --shadow-elegant: 0 20rpx 60rpx -20rpx hsl(168 55% 58% / 0.3);
-  --shadow-soft: 0 8rpx 40rpx -8rpx rgba(54, 73, 67, 0.1);
-  --shadow-card: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
-  --shadow-card-hover: 0 4rpx 20rpx rgba(0, 0, 0, 0.12);
-  --shadow-float: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+  // --- 图表色板（对齐花瓣五色） ---
+  --chart-1: 224 90% 60%;
+  --chart-2: 258 90% 66%;
+  --chart-3: 189 94% 43%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 0 84% 60%;
+
+  // --- 渐变（对齐设计稿蓝色主题，使用 CSS 变量） ---
+  --gradient-primary: linear-gradient(
+    135deg,
+    hsl(var(--primary-glow)) 0%,
+    hsl(var(--primary)) 50%,
+    hsl(var(--primary-dark)) 100%
+  );
+  --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-glow)));
+  --gradient-subtle: linear-gradient(180deg, hsl(var(--primary) / 0.06), hsl(var(--background)));
+
+  // --- 阴影（对齐设计稿蓝色主题阴影） ---
+  --shadow-elegant: 0 20rpx 60rpx -20rpx rgba(59, 110, 245, 0.3);
+  --shadow-soft: 0 8rpx 40rpx -8rpx rgba(59, 110, 245, 0.08);
+  --shadow-card: 0 2rpx 12rpx rgba(59, 110, 245, 0.06);
+  --shadow-card-hover: 0 4rpx 20rpx rgba(59, 110, 245, 0.1);
+  --shadow-float: 0 4rpx 16rpx rgba(59, 110, 245, 0.08);
   --shadow-popup: 0 8rpx 32rpx rgba(0, 0, 0, 0.15);
+  --shadow-rollcall: 0 4rpx 16rpx rgba(37, 99, 235, 0.3);
 
   // --- 圆角（基础） ---
   --radius: 30rpx;
@@ -119,7 +153,8 @@ page {
   --safe-top: env(safe-area-inset-top);
 
   // --- 全局基础样式 ---
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
     sans-serif;
   font-size: 28rpx;
   line-height: 1.5;
@@ -127,9 +162,14 @@ page {
   background-color: hsl(var(--background));
 }
 
-/* ===== 渐变背景工具类（UnoCSS rules 在 unocss-applet 中无法生成，改用全局 SCSS） ===== */
+/* ===== 渐变背景工具类（使用 CSS 变量） ===== */
 .bg-gradient-primary {
-  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow))) !important;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary-glow)) 0%,
+    hsl(var(--primary)) 50%,
+    hsl(var(--primary-dark)) 100%
+  ) !important;
 }
 .bg-gradient-primary-dark {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-dark))) !important;
@@ -138,7 +178,11 @@ page {
   background: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-glow))) !important;
 }
 .bg-gradient-subtle {
-  background: linear-gradient(180deg, #f5faf8, #e3f2ef) !important;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--primary) / 0.06),
+    hsl(var(--background))
+  ) !important;
 }
 .bg-progress-primary {
   background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary-glow))) !important;
@@ -153,4 +197,368 @@ page {
 }
 .form-border-error {
   border-color: hsl(0, 70%, 65%) !important;
+}
+
+/* ===== 首页设计稿迁移工具类 ===== */
+.glass-card-bg {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.icon-glass {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.icon-glass-purple {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15),
+    rgba(167, 139, 250, 0.2)
+  ) !important;
+}
+.icon-glass-orange {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(251, 146, 60, 0.2)) !important;
+}
+.icon-glass-red {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.2)) !important;
+}
+.icon-glass-blue {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(96, 165, 250, 0.2)) !important;
+}
+.icon-glass-violet {
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.15),
+    rgba(192, 132, 252, 0.2)
+  ) !important;
+}
+.icon-glass-teal {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(45, 212, 191, 0.2)) !important;
+}
+.icon-glass-rose {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(251, 113, 133, 0.2)) !important;
+}
+.icon-glass-amber {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(252, 191, 36, 0.2)) !important;
+}
+.rounded-b-80rpx {
+  border-radius: 0 0 80rpx 80rpx !important;
+}
+.shadow-rollcall {
+  box-shadow: 0 4rpx 16rpx hsl(var(--primary-dark) / 0.3) !important;
+}
+.shadow-stats {
+  box-shadow: 0 8rpx 40rpx hsl(var(--primary) / 0.08) !important;
+}
+
+/* ========== 以下样式直接复制自设计稿 homepages.html ========== */
+/* 设计稿基准宽度430px, rpx基准750rpx=屏幕宽度, 1px ≈ 1.744rpx */
+
+/* 背景层 - 蓝色渐变主题（使用 CSS 变量） */
+.gradient-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50vh;
+  min-height: 340px;
+  z-index: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary-glow)) 0%,
+    hsl(var(--primary)) 50%,
+    hsl(var(--primary-dark)) 100%
+  );
+}
+
+/* 顶部高光层 - 增强渐变层次感 */
+.gradient-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--primary-glow) / 0.35) 0%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* 装饰光斑 - 增加视觉趣味 */
+.gradient-bg::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  right: -20%;
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(
+    circle,
+    hsl(var(--primary-glow) / 0.4) 0%,
+    transparent 70%
+  );
+  filter: blur(40rpx);
+  pointer-events: none;
+}
+
+/* 白色丝绸飘带 SVG - v14 不再使用 */
+.silk-ribbon-svg {
+  display: none;
+}
+
+/* 底部融合过渡 - 蓝色渐变到白色（使用 CSS 变量） */
+.gradient-fade {
+  position: absolute;
+  bottom: 0;
+  left: -10%;
+  right: -10%;
+  height: 260rpx;
+  background:
+    radial-gradient(ellipse 45% 50% at 15% 20%, hsl(var(--primary-glow) / 0.5) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 60% at 70% 15%, hsl(var(--primary) / 0.45) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 45% at 40% 40%, hsl(var(--primary) / 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse 35% 50% at 85% 50%, hsl(var(--primary-dark) / 0.3) 0%, transparent 60%);
+  filter: blur(18px);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 装饰性圆点图案 - v14 不再使用 */
+.dots-pattern {
+  display: none;
+}
+
+/* 飘带Canvas容器 */
+.silk-ribbon-canvas-wrapper {
+  width: 100%;
+  height: 100%;
+}
+.silk-ribbon-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 隐藏所有滚动条 */
+::-webkit-scrollbar,
+.no-scrollbar ::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent;
+}
+
+/* ===== v14 设计稿新增样式 ========== */
+
+/* IP 形象 - 趴在统计卡片上边框（对齐设计稿） */
+.ip-mascot {
+  position: absolute;
+  right: 8rpx;
+  top: -144rpx;
+  width: 260rpx;
+  height: 200rpx;
+  z-index: 100;
+  pointer-events: none;
+  filter: drop-shadow(0 12rpx 32rpx hsl(var(--primary-dark) / 0.18));
+  animation: ip-float 4s ease-in-out infinite;
+}
+
+@keyframes ip-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8rpx);
+  }
+}
+
+/* 统计卡片 + IP 包裹层 */
+.stats-ip-wrapper {
+  position: relative;
+  margin: 24rpx 32rpx 0;
+  z-index: 200;
+  filter: drop-shadow(0 16rpx 48rpx hsl(var(--primary-dark) / 0.12));
+}
+
+/* 统计卡片 Tab - 主题蓝 active 样式 */
+.stats-tab-active-v14 {
+  background: hsl(var(--primary) / 0.1) !important;
+  color: hsl(var(--primary-dark)) !important;
+  font-weight: 700 !important;
+}
+.stats-tab-inactive-v14 {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-weight: 600 !important;
+}
+
+/* 金刚区白色圆角容器（使用 CSS 变量） */
+.kingkong-section {
+  background: hsl(var(--card));
+  border-radius: 48rpx 48rpx 0 0;
+  box-shadow: 0 -12rpx 48rpx hsl(var(--primary-dark) / 0.08);
+  position: relative;
+  z-index: 100;
+  margin-top: 24rpx;
+  padding-top: 72rpx;
+}
+
+/* 金刚区顶部高光线 - 增强层次感 */
+.kingkong-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120rpx;
+  height: 6rpx;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary) / 0.3),
+    transparent
+  );
+  border-radius: 3rpx;
+  margin-top: 16rpx;
+}
+
+/* v14 Tab 切换栏 */
+.tab-item-v14 {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  padding: 12rpx 20rpx;
+  border-radius: 24rpx;
+  position: relative;
+  transition:
+    color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.2s ease;
+  white-space: nowrap;
+  z-index: 0;
+  overflow: hidden;
+}
+.tab-item-v14:active {
+  opacity: 0.8;
+  transform: scale(0.96);
+}
+.tab-item-v14.active {
+  color: hsl(var(--foreground));
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.tab-item-v14.active::after {
+  content: '';
+  position: absolute;
+  bottom: 4rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50%;
+  height: 10rpx;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary-glow)) 55%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  filter: blur(3rpx);
+  opacity: 0.65;
+  z-index: -1;
+  animation: tab-indicator-pulse 2s ease-in-out infinite;
+}
+
+@keyframes tab-indicator-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: translateX(-50%) scaleX(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(-50%) scaleX(1.1);
+  }
+}
+
+/* v14 课程卡片状态样式 */
+
+/* 隐藏金刚区图标网格滚动条 */
+.kingkong-grid-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.kingkong-grid-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  color: transparent;
+}
+
+/* 课程卡片状态样式 - 对齐设计稿橙色主题 */
+.course-time-normal {
+  background: linear-gradient(135deg, hsl(var(--warning) / 0.08), hsl(var(--warning) / 0.15));
+  border-right: 2rpx solid hsl(var(--warning) / 0.3);
+}
+.course-time-urgent-v14 {
+  background: linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7)) !important;
+  border-right-color: hsl(var(--warning)) !important;
+}
+.course-time-done-v14 {
+  background: hsl(var(--success) / 0.08) !important;
+  border-right-color: hsl(var(--success) / 0.2) !important;
+}
+.course-time-ended-v14 {
+  background: hsl(var(--muted)) !important;
+  border-right-color: hsl(var(--border)) !important;
+}
+
+/* 进度条 - 对齐项目蓝色主题 */
+.progress-fill-active {
+  background: linear-gradient(90deg, hsl(var(--primary-glow)), hsl(var(--primary))) !important;
+}
+.progress-fill-done {
+  background: hsl(var(--success)) !important;
+}
+.progress-fill-ended {
+  background: hsl(var(--border)) !important;
+}
+
+/* v14 消课手风琴（使用 CSS 变量） */
+.recent-group-v14 {
+  background: hsl(var(--card));
+  border-radius: 28rpx;
+  box-shadow: 0 6rpx 28rpx hsl(var(--primary-dark) / 0.06);
+  margin-bottom: 20rpx;
+  overflow: hidden;
+  border: 2rpx solid hsl(var(--border));
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
+}
+.recent-group-v14:active {
+  box-shadow: 0 4rpx 20rpx hsl(var(--primary-dark) / 0.1);
+  transform: translateY(2rpx);
+}
+
+/* v14 消课进度条 */
+.bar-fill-green {
+  background: linear-gradient(90deg, hsl(var(--success)), hsl(var(--success) / 0.8)) !important;
+}
+.bar-fill-orange {
+  background: linear-gradient(90deg, hsl(var(--warning)), hsl(var(--warning) / 0.8)) !important;
+}
+.bar-fill-red {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--destructive)),
+    hsl(var(--destructive) / 0.8)
+  ) !important;
 }

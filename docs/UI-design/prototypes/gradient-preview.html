@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>渐变背景配色方案预览</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{min-height:100vh;background:#1a1a1a;font-family:'PingFang SC','SF Pro Display','Helvetica Neue','Microsoft YaHei',sans-serif}
+
+/* 主题切换器 */
+.theme-switcher{
+  position:fixed;top:20px;right:20px;z-index:1000;
+  display:flex;flex-direction:column;gap:10px;
+}
+.ts-btn{
+  width:44px;height:44px;border-radius:50%;cursor:pointer;
+  border:3px solid rgba(255,255,255,0.3);transition:all .3s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3);
+}
+.ts-btn:hover{transform:scale(1.15);border-color:#fff}
+.ts-btn.active{border-color:#fff;transform:scale(1.1)}
+
+/* 手机模拟器 */
+.phones{display:flex;flex-wrap:wrap;gap:30px;padding:30px;justify-content:center}
+.phone{
+  width:375px;height:700px;border-radius:40px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  position:relative;flex-shrink:0;
+}
+
+/* 渐变背景 - 自然柔和过渡 */
+.gradient-bg{
+  position:absolute;top:0;left:0;right:0;
+  transition:background 0.5s ease;
+}
+
+/* 装饰层：大圆 */
+.gradient-bg .deco-circle-1{
+  position:absolute;top:-80px;right:-60px;
+  width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,0.3) 0%,rgba(255,255,255,0.1) 40%,transparent 70%);
+}
+.gradient-bg .deco-circle-2{
+  position:absolute;bottom:20px;left:-80px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,0.25) 0%,rgba(255,255,255,0.08) 40%,transparent 70%);
+}
+.gradient-bg .deco-circle-3{
+  position:absolute;top:100px;left:60px;
+  width:80px;height:80px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,0.18) 0%,transparent 70%);
+}
+.gradient-bg .deco-circle-4{
+  position:absolute;top:40px;right:120px;
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(255,255,255,0.15);
+}
+.gradient-bg .deco-circle-5{
+  position:absolute;bottom:60px;right:30px;
+  width:60px;height:60px;border-radius:50%;
+  background:rgba(255,255,255,0.12);
+}
+
+/* 装饰层：加密点阵 - 从右上向左下渐变透明 */
+.gradient-bg .deco-dots{
+  position:absolute;top:20px;right:10px;
+  width:150px;height:120px;
+  background-image:radial-gradient(circle,rgba(255,255,255,0.9) 1.5px,transparent 2px);
+  background-size:12px 12px;
+  -webkit-mask-image:linear-gradient(225deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.6) 25%,rgba(0,0,0,0.2) 55%,transparent 100%);
+  mask-image:linear-gradient(225deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.6) 25%,rgba(0,0,0,0.2) 55%,transparent 100%);
+  pointer-events:none;
+}
+
+/* 装饰层：丝绸飘带 */
+.gradient-bg .deco-silk{
+  position:absolute;top:-30px;right:-60px;
+  width:220px;height:140px;
+  background:linear-gradient(160deg,rgba(255,255,255,0.45) 0%,rgba(255,255,255,0.2) 35%,rgba(255,255,255,0.05) 65%,transparent 100%);
+  border-radius:45% 55% 35% 65% / 55% 40% 60% 45%;
+  filter:blur(22px);
+  transform:rotate(-25deg);
+  mix-blend-mode:overlay;
+  pointer-events:none;
+}
+.gradient-bg .deco-silk-2{
+  position:absolute;top:10px;right:-20px;
+  width:160px;height:80px;
+  background:linear-gradient(140deg,rgba(255,255,255,0.3) 0%,rgba(255,255,255,0.1) 50%,transparent 100%);
+  border-radius:60% 40% 50% 50% / 40% 60% 40% 60%;
+  filter:blur(14px);
+  transform:rotate(-10deg);
+  mix-blend-mode:soft-light;
+  pointer-events:none;
+}
+
+/* 装饰层：斜线纹理 */
+.gradient-bg .deco-lines{
+  position:absolute;top:50%;right:0;
+  width:120px;height:180px;
+  opacity:.05;
+  transform:translateY(-50%);
+}
+
+/* 装饰层：波浪底部 - 更柔和 */
+.gradient-bg .deco-wave{
+  position:absolute;bottom:0;left:0;right:0;
+  height:50px;
+}
+
+/* 噪点纹理叠加 */
+.gradient-bg::after{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  background-size:180px 180px;
+  pointer-events:none;z-index:1;
+  mix-blend-mode:soft-light;
+}
+
+/* 底部信息 */
+.phone-info{
+  position:absolute;bottom:30px;left:0;right:0;
+  text-align:center;z-index:10;
+}
+.phone-info h3{font-size:16px;font-weight:600;margin-bottom:4px;color:#333}
+.phone-info p{font-size:11px;opacity:0.6;color:#666}
+</style>
+</head>
+<body>
+
+<!-- 主题切换器 -->
+<div class="theme-switcher">
+  <div class="ts-btn active" style="background:linear-gradient(135deg,#5EC8A8,#2D8A6E)" data-theme="green" onclick="switchTheme('green')" title="薄荷绿"></div>
+  <div class="ts-btn" style="background:linear-gradient(135deg,#5B8DEF,#2D5AC9)" data-theme="blue" onclick="switchTheme('blue')" title="天空蓝"></div>
+  <div class="ts-btn" style="background:linear-gradient(135deg,#A855F7,#7C3AED)" data-theme="purple" onclick="switchTheme('purple')" title="薰衣草紫"></div>
+  <div class="ts-btn" style="background:linear-gradient(135deg,#F472B6,#DB2777)" data-theme="pink" onclick="switchTheme('pink')" title="樱花粉"></div>
+  <div class="ts-btn" style="background:linear-gradient(135deg,#FB923C,#EA580C)" data-theme="orange" onclick="switchTheme('orange')" title="活力橙"></div>
+  <div class="ts-btn" style="background:linear-gradient(135deg,#64748B,#334155)" data-theme="gray" onclick="switchTheme('gray')" title="高级灰"></div>
+  <div class="ts-btn" style="background:linear-gradient(135deg,#EF4444,#B91C1C)" data-theme="red" onclick="switchTheme('red')" title="玫瑰红"></div>
+</div>
+
+<div class="phones">
+  <!-- 手机1：1/3高度 -->
+  <div class="phone" style="background:#fff">
+    <div class="gradient-bg" id="bg1" style="height:33.33%">
+      <div class="deco-circle-1"></div>
+      <div class="deco-circle-2"></div>
+      <div class="deco-circle-3"></div>
+      <div class="deco-circle-4"></div>
+      <div class="deco-circle-5"></div>
+      <div class="deco-dots"></div>
+      <div class="deco-silk"></div>
+      <div class="deco-silk-2"></div>
+      <svg class="deco-lines" viewBox="0 0 120 180" fill="none">
+        <line x1="15" y1="0" x2="0" y2="180" stroke="white" stroke-width="1"/>
+        <line x1="45" y1="0" x2="30" y2="180" stroke="white" stroke-width="1"/>
+        <line x1="75" y1="0" x2="60" y2="180" stroke="white" stroke-width="1"/>
+        <line x1="105" y1="0" x2="90" y2="180" stroke="white" stroke-width="1"/>
+      </svg>
+      <svg class="deco-wave" viewBox="0 0 375 50" preserveAspectRatio="none">
+        <path d="M0 25 Q60 5 120 20 T240 15 T360 25 T375 20 V50 H0 Z" fill="rgba(255,255,255,0.2)"/>
+        <path d="M0 35 Q80 18 160 30 T320 28 T375 35 V50 H0 Z" fill="rgba(255,255,255,0.12)"/>
+        <path d="M0 45 Q100 30 200 42 T375 45 V50 H0 Z" fill="rgba(255,255,255,0.08)"/>
+      </svg>
+    </div>
+    <div class="phone-info">
+      <h3>方案1：占屏幕 1/3</h3>
+      <p>高度233px，轻盈感</p>
+    </div>
+  </div>
+
+  <!-- 手机2：1/2高度 -->
+  <div class="phone" style="background:#fff">
+    <div class="gradient-bg" id="bg2" style="height:50%">
+      <div class="deco-circle-1"></div>
+      <div class="deco-circle-2"></div>
+      <div class="deco-circle-3"></div>
+      <div class="deco-circle-4"></div>
+      <div class="deco-circle-5"></div>
+      <div class="deco-dots"></div>
+      <div class="deco-silk"></div>
+      <div class="deco-silk-2"></div>
+      <svg class="deco-lines" viewBox="0 0 120 180" fill="none">
+        <line x1="15" y1="0" x2="0" y2="180" stroke="white" stroke-width="1"/>
+        <line x1="45" y1="0" x2="30" y2="180" stroke="white" stroke-width="1"/>
+        <line x1="75" y1="0" x2="60" y2="180" stroke="white" stroke-width="1"/>
+        <line x1="105" y1="0" x2="90" y2="180" stroke="white" stroke-width="1"/>
+      </svg>
+      <svg class="deco-wave" viewBox="0 0 375 50" preserveAspectRatio="none">
+        <path d="M0 25 Q60 5 120 20 T240 15 T360 25 T375 20 V50 H0 Z" fill="rgba(255,255,255,0.2)"/>
+        <path d="M0 35 Q80 18 160 30 T320 28 T375 35 V50 H0 Z" fill="rgba(255,255,255,0.12)"/>
+        <path d="M0 45 Q100 30 200 42 T375 45 V50 H0 Z" fill="rgba(255,255,255,0.08)"/>
+      </svg>
+    </div>
+    <div class="phone-info">
+      <h3>方案2：占屏幕 1/2</h3>
+      <p>高度350px，沉浸感强</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// 自然柔和渐变 - 颜色从深到浅平滑过渡，无明显色带
+const themes = {
+  green: {
+    // 薄荷绿：深绿自然过渡到白色
+    gradient: 'linear-gradient(180deg, #3D9970 0%, #5EC8A8 25%, #8ED8C0 50%, #B8E8D5 75%, #E5F4EF 90%, #F8FCFA 100%)',
+    name: '薄荷绿'
+  },
+  blue: {
+    // 天空蓝：从深蓝自然过渡到白色
+    gradient: 'linear-gradient(180deg, #4A90D9 0%, #6BA3E5 25%, #8FBAF0 50%, #B8D0F5 75%, #E5EEF9 90%, #F5F9FD 100%)',
+    name: '天空蓝'
+  },
+  purple: {
+    // 薰衣草紫：从深紫自然过渡到白色
+    gradient: 'linear-gradient(180deg, #8B5CF6 0%, #A78BFA 25%, #C4B5FD 50%, #DDD6FE 75%, #EDE9FE 90%, #FAF5FF 100%)',
+    name: '薰衣草紫'
+  },
+  pink: {
+    // 樱花粉：从深粉自然过渡到白色
+    gradient: 'linear-gradient(180deg, #EC4899 0%, #F472B6 25%, #F9A8D4 50%, #FBCFE8 75%, #FDF2F8 90%, #FFF5F7 100%)',
+    name: '樱花粉'
+  },
+  orange: {
+    // 活力橙：从深橙自然过渡到白色
+    gradient: 'linear-gradient(180deg, #F97316 0%, #FB923C 25%, #FDBA74 50%, #FED7AA 75%, #FFEDD5 90%, #FFF7ED 100%)',
+    name: '活力橙'
+  },
+  gray: {
+    // 高级灰：从深灰自然过渡到白色
+    gradient: 'linear-gradient(180deg, #475569 0%, #64748B 25%, #94A3B8 50%, #CBD5E1 75%, #E2E8F0 90%, #F1F5F9 100%)',
+    name: '高级灰'
+  },
+  red: {
+    // 玫瑰红：从深红自然过渡到白色
+    gradient: 'linear-gradient(180deg, #DC2626 0%, #EF4444 25%, #FCA5A5 50%, #FECACA 75%, #FEE2E2 90%, #FEF2F2 100%)',
+    name: '玫瑰红'
+  }
+};
+
+function switchTheme(theme) {
+  const { gradient } = themes[theme];
+  
+  document.querySelectorAll('.gradient-bg').forEach(bg => {
+    bg.style.background = gradient;
+  });
+  
+  document.querySelectorAll('.ts-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelector(`[data-theme="${theme}"]`).classList.add('active');
+}
+</script>
+
+</body>
+</html>

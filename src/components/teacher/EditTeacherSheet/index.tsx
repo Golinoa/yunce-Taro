@@ -16,6 +16,7 @@ import type { TeacherRole, SalaryModelType, TeacherUIModel } from '@/types/teach
 interface EditTeacherSheetProps {
   visible: boolean;
   teacher: TeacherUIModel | null;
+  submitting?: boolean;
   onClose: () => void;
   onSubmit: (
     id: string,
@@ -63,6 +64,7 @@ const getSalaryModelType = (modelIdx: number): SalaryModelType => {
 const EditTeacherSheet: React.FC<EditTeacherSheetProps> = ({
   visible,
   teacher,
+  submitting = false,
   onClose,
   onSubmit,
 }) => {
@@ -84,6 +86,7 @@ const EditTeacherSheet: React.FC<EditTeacherSheetProps> = ({
   }, [visible, teacher]);
 
   const handleSubmit = () => {
+    if (submitting) return;
     if (!teacher || !name.trim()) return;
     onSubmit(teacher.id, {
       name: name.trim(),
@@ -95,6 +98,7 @@ const EditTeacherSheet: React.FC<EditTeacherSheetProps> = ({
   };
 
   const handleClose = () => {
+    if (submitting) return;
     onClose();
   };
 
@@ -198,11 +202,13 @@ const EditTeacherSheet: React.FC<EditTeacherSheetProps> = ({
         <View
           className={cn(
             'w-full py-[28rpx] rounded-2xl text-center text-base font-semibold',
-            name.trim() ? 'bg-gradient-primary text-white' : 'bg-muted text-muted-foreground',
+            name.trim() && !submitting
+              ? 'bg-gradient-primary text-white'
+              : 'bg-muted text-muted-foreground',
           )}
-          onClick={name.trim() ? handleSubmit : undefined}
+          onClick={name.trim() && !submitting ? handleSubmit : undefined}
         >
-          保存修改
+          {submitting ? '保存中...' : '保存修改'}
         </View>
       </View>
     </BottomSheet>

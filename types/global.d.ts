@@ -1,5 +1,9 @@
 /// <reference types="@tarojs/taro" />
 
+// @tarojs/components 类型补充（官方类型定义缺失的公共类型）
+declare type CommonEventFunction = (event: Record<string, any>) => void;
+declare type RequestParams<T = any> = Record<string, any> & { data?: T };
+
 // Taro 4.x 新增 API 类型补充（官方类型定义暂未覆盖）
 // 使用 interface 合并而非 declare module 覆盖，避免丢失原有类型导出
 declare namespace Taro {
@@ -30,6 +34,7 @@ declare module '*.gif';
 declare module '*.jpg';
 declare module '*.jpeg';
 declare module '*.svg';
+declare module '*.webp';
 declare module '*.css';
 declare module '*.less';
 declare module '*.scss';

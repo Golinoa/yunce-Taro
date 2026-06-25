@@ -55,7 +55,7 @@ export const usePackageTemplateStore = create<PackageTemplateState>((set, get) =
 
   invalidate: (teacherId) => {
     set((s) => ({
-      cache: { ...s.cache, [teacherId]: undefined },
+      cache: { ...s.cache, [teacherId]: undefined } as PackageTemplateState['cache'],
       lastFetch: { ...s.lastFetch, [teacherId]: 0 },
     }));
   },

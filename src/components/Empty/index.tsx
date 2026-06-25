@@ -5,6 +5,7 @@
 import { View, Text } from '@tarojs/components';
 import React from 'react';
 import Icon from '@/components/Icon';
+import type { IconName } from '@/components/Icon';
 
 const MDI_ICON_NAMES: string[] = [
   'mdi-inbox',
@@ -42,7 +43,7 @@ const Empty: React.FC<EmptyProps> = ({
     <View className="flex flex-col items-center justify-center py-12">
       {isMdi ? (
         <View className="mb-3 drop-shadow-sm">
-          <Icon name={icon as any} size="xxl" color="muted" />
+          <Icon name={icon as IconName} size="xxl" color="muted" />
         </View>
       ) : (
         <Text className="text-6xl mb-3 drop-shadow-sm">{icon}</Text>

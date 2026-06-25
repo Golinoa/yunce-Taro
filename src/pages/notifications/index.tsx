@@ -36,23 +36,63 @@ function formatTime(dateStr: string): string {
   return `${month}月${day}日`;
 }
 
+function getNotificationFallbackUrl(
+  notification: Notification,
+  currentRole: string | null,
+): { url: string; mode: 'navigateTo' | 'switchTab' } | null {
+  switch (notification.type) {
+    case 'lesson_complete':
+      return {
+        url: notification.related_id
+          ? `/package-course/pages/lesson-detail/index?id=${notification.related_id}`
+          : '/package-course/pages/records/index',
+        mode: 'navigateTo',
+      };
+    case 'leave_request':
+    case 'leave_response':
+      return {
+        url: notification.related_id
+          ? `/package-course/pages/leave-request/index?userRole=${currentRole || 'teacher'}&requestId=${notification.related_id}`
+          : `/package-course/pages/leave-request/index?userRole=${currentRole || 'teacher'}`,
+        mode: 'navigateTo',
+      };
+    case 'schedule_change':
+      return {
+        url: '/pages/schedule/index',
+        mode: 'switchTab',
+      };
+    default:
+      return null;
+  }
+}
+
 const NotificationsPage: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, currentRole } = useAuth();
   const userId = profile?.id || '';
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadNotifications = useCallback(async () => {
-    try {
-      const list = await notificationService.getByReceiver(userId);
-      setNotifications(list);
-    } catch (err) {
-      logError('load notifications', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadNotifications = useCallback(
+    async (isRefresh = false) => {
+      if (!isRefresh) setLoading(true);
+      else setRefreshing(true);
+      setErrorMsg('');
+      try {
+        const list = await notificationService.getByReceiver(userId);
+        setNotifications(list);
+      } catch (err) {
+        logError('load notifications', err);
+        setErrorMsg('消息加载失败，请稍后重试');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [userId],
+  );
 
   useEffect(() => {
     loadNotifications();
@@ -60,7 +100,7 @@ const NotificationsPage: React.FC = () => {
 
   // 每次显示页面时刷新
   Taro.useDidShow(() => {
-    loadNotifications();
+    loadNotifications(true);
   });
 
   // 未读数
@@ -74,8 +114,9 @@ const NotificationsPage: React.FC = () => {
     try {
       await notificationService.markAsRead(id);
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
-    } catch {
-      // ignore
+    } catch (err) {
+      logError('mark notification read', err);
+      Taro.showToast({ title: '标记已读失败', icon: 'none' });
     }
   }, []);
 
@@ -85,10 +126,11 @@ const NotificationsPage: React.FC = () => {
       await notificationService.markAllAsRead(userId);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       Taro.showToast({ title: '已全部标记为已读', icon: 'success' });
-    } catch {
-      Taro.showToast({ title: '操作失败', icon: 'none' });
+    } catch (err) {
+      logError('mark all notifications read', err);
+      Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
     }
-  }, []);
+  }, [userId]);
 
   // 点击通知
   const handleNotificationClick = useCallback(
@@ -96,24 +138,20 @@ const NotificationsPage: React.FC = () => {
       if (!notification.is_read) {
         await handleMarkRead(notification.id);
       }
-      // 根据类型跳转相关页面
-      if (notification.related_id) {
-        switch (notification.type) {
-          case 'lesson_complete':
-            Taro.navigateTo({ url: `/pages/lesson-detail/index?id=${notification.related_id}` });
-            break;
-          case 'leave_request':
-          case 'leave_response':
-            Taro.navigateTo({
-              url: `/pages/leave-request/index?userRole=teacher&requestId=${notification.related_id}`,
-            });
-            break;
-          default:
-            break;
-        }
+
+      const target = getNotificationFallbackUrl(notification, currentRole);
+      if (!target) {
+        return;
       }
+
+      if (target.mode === 'switchTab') {
+        Taro.switchTab({ url: target.url });
+        return;
+      }
+
+      Taro.navigateTo({ url: target.url });
     },
-    [handleMarkRead],
+    [currentRole, handleMarkRead],
   );
 
   if (loading) {
@@ -121,6 +159,23 @@ const NotificationsPage: React.FC = () => {
       <PageContainer>
         <View className="flex items-center justify-center pt-50">
           <Loading text="加载中..." />
+        </View>
+      </PageContainer>
+    );
+  }
+
+  // 错误态：加载失败且无缓存数据时展示重试入口
+  if (errorMsg && notifications.length === 0) {
+    return (
+      <PageContainer>
+        <View className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center gap-[32rpx] px-8">
+          <Empty icon="mdi-alert-circle" description={errorMsg} />
+          <View
+            className="bg-gradient-primary px-[48rpx] py-[16rpx] rounded-[16rpx] active:opacity-90"
+            onClick={() => loadNotifications()}
+          >
+            <Text className="text-[28rpx] text-white font-medium">重新加载</Text>
+          </View>
         </View>
       </PageContainer>
     );
@@ -145,7 +200,25 @@ const NotificationsPage: React.FC = () => {
               <Text className="text-sm text-primary font-medium">全部已读</Text>
             </View>
           )}
+          {refreshing && (
+            <View className="ml-auto">
+              <Text className="text-sm text-muted-foreground">刷新中...</Text>
+            </View>
+          )}
         </View>
+
+        {/* 顶部错误提示条（有缓存数据时仍展示错误） */}
+        {errorMsg && notifications.length > 0 && (
+          <View className="mx-8 mb-3 bg-destructive-10 border-2 border-destructive-20 rounded-2xl p-4 flex items-center justify-between">
+            <Text className="flex-1 text-base text-destructive">{errorMsg}</Text>
+            <View
+              className="px-4 py-2 rounded-full bg-destructive"
+              onClick={() => loadNotifications(true)}
+            >
+              <Text className="text-white text-sm font-medium">重试</Text>
+            </View>
+          </View>
+        )}
 
         {/* 通知列表 */}
         {notifications.length === 0 ? (

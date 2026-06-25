@@ -7,7 +7,7 @@ import { View, Text, Picker } from '@tarojs/components';
 import React from 'react';
 
 /** 筛选模式 */
-export type FilterMode = 'month' | 'year' | 'custom';
+export type FilterMode = 'month' | 'quarter' | 'year' | 'custom';
 
 /** 筛选选项配置 */
 export interface FilterOption {
@@ -60,57 +60,63 @@ const FilterBar: React.FC<FilterBarProps> = ({
           return (
             <View
               key={opt.key}
-              className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isActive ? 'bg-white text-primary shadow-soft' : 'bg-white/20 text-white backdrop-blur-sm'}`}
+              className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isActive ? 'bg-primary text-white shadow-soft' : 'bg-white border border-solid border-border-light text-foreground-secondary'}`}
               onClick={() => onQuickFilter(opt.key)}
             >
-              <Text className={isActive ? 'text-primary' : 'text-white'}>{opt.label}</Text>
+              <Text className={isActive ? 'text-white' : 'text-foreground-secondary'}>
+                {opt.label}
+              </Text>
             </View>
           );
         })}
         <View
-          className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isCustomActive ? 'bg-white text-primary shadow-soft' : 'bg-white/20 text-white backdrop-blur-sm'}`}
+          className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isCustomActive ? 'bg-primary text-white shadow-soft' : 'bg-white border border-solid border-border-light text-foreground-secondary'}`}
           onClick={onToggleCustomPicker}
         >
-          <Text className={isCustomActive ? 'text-primary' : 'text-white'}>自定义</Text>
+          <Text className={isCustomActive ? 'text-white' : 'text-foreground-secondary'}>
+            自定义
+          </Text>
         </View>
       </View>
 
       {showCustomPicker && (
         <View className="mt-1_d5 flex flex-col gap-1_d5">
-          <View className="bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-3 flex items-center gap-3">
-            <Text className="text-base text-white/80 whitespace-nowrap">开始</Text>
+          <View className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
+            <Text className="text-base text-muted-foreground whitespace-nowrap">开始</Text>
             <Picker
               mode="date"
               value={startDate || todayStr}
-              onChange={(e) => {
-                const val = (e as any).detail?.value || '';
+              onChange={(e: Parameters<CommonEventFunction>[0]) => {
+                const val = (e as { detail?: { value?: string } }).detail?.value || '';
                 onStartChange(val);
               }}
             >
-              <Text className="text-lg font-semibold text-white">
+              <Text className="text-lg font-semibold text-foreground">
                 {startDate || '选择开始日期'}
               </Text>
             </Picker>
           </View>
-          <View className="bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-3 flex items-center gap-3">
-            <Text className="text-base text-white/80 whitespace-nowrap">结束</Text>
+          <View className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
+            <Text className="text-base text-muted-foreground whitespace-nowrap">结束</Text>
             <Picker
               mode="date"
               value={endDate || todayStr}
-              onChange={(e) => {
-                const val = (e as any).detail?.value || '';
+              onChange={(e: Parameters<CommonEventFunction>[0]) => {
+                const val = (e as { detail?: { value?: string } }).detail?.value || '';
                 onEndChange(val);
               }}
             >
-              <Text className="text-lg font-semibold text-white">{endDate || '选择结束日期'}</Text>
+              <Text className="text-lg font-semibold text-foreground">
+                {endDate || '选择结束日期'}
+              </Text>
             </Picker>
           </View>
           {startDate && endDate && onCustomQuery && (
             <View
-              className="w-full rounded-2xl py-2 bg-white text-primary text-base font-semibold shadow-soft flex items-center justify-center"
+              className="w-full rounded-2xl py-2 bg-primary text-white text-base font-semibold shadow-soft flex items-center justify-center"
               onClick={onCustomQuery}
             >
-              <Text className="text-base text-primary font-semibold">查询</Text>
+              <Text className="text-base text-white font-semibold">查询</Text>
             </View>
           )}
         </View>

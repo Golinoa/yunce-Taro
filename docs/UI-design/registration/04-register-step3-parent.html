@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>注册 Step3 家长 - 云策教务</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #8B5CF6;
+      --primary-light: #A78BFA;
+      --primary-soft: rgba(139,92,246,0.08);
+      --text-primary: #1A1A2E;
+      --text-secondary: #6B7280;
+      --text-tertiary: #9CA3AF;
+      --bg-page: #FAF8FF;
+      --border: #E9E3F5;
+      --error: #EF4444;
+      --success: #10B981;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+    .phone-frame {
+      width: 375px; min-height: 812px;
+      background: var(--bg-page);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .header-deco {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 220px;
+      background: linear-gradient(180deg, rgba(139,92,246,0.08) 0%, transparent 100%);
+      z-index: 0;
+      overflow: hidden;
+    }
+    .header-deco::before {
+      content: ''; position: absolute;
+      width: 180px; height: 180px; border-radius: 50%;
+      background: rgba(139,92,246,0.06);
+      top: -50px; right: -50px;
+    }
+    .content {
+      position: relative; z-index: 1;
+      flex: 1;
+      padding: 56px 28px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+    .back-btn {
+      display: flex; align-items: center; gap: 4px;
+      color: var(--text-secondary); font-size: 15px;
+      margin-bottom: 28px; cursor: pointer;
+      width: fit-content;
+    }
+    .back-btn svg { width: 20px; height: 20px; }
+    .stepper { display: flex; align-items: center; margin-bottom: 32px; }
+    .step-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600; transition: all 0.3s;
+    }
+    .step-dot.done { background: var(--primary-soft); color: var(--primary); }
+    .step-dot.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(139,92,246,0.25); }
+    .step-line { flex: 1; height: 2px; margin: 0 6px; }
+    .step-line.done { background: var(--primary-soft); }
+    .page-title { font-size: 26px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+    .page-subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 32px; }
+
+    .role-header {
+      display: flex; align-items: center;
+      padding: 16px 18px;
+      background: white;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+    }
+    .role-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      background: linear-gradient(135deg, #A78BFA, #8B5CF6);
+      display: flex; align-items: center; justify-content: center;
+      margin-right: 14px;
+    }
+    .role-icon svg { width: 24px; height: 24px; fill: white; }
+    .role-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+    .role-subtitle { font-size: 13px; color: var(--text-tertiary); margin-top: 2px; }
+
+    .form-card {
+      background: white;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+      margin-bottom: 16px;
+    }
+    .form-section-title {
+      font-size: 16px; font-weight: 600; color: var(--text-primary);
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .form-section-title .dot { width: 4px; height: 16px; border-radius: 2px; background: var(--primary); }
+    .form-group { margin-bottom: 18px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label {
+      font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      margin-bottom: 8px; display: flex; align-items: center; gap: 4px;
+    }
+    .optional-tag {
+      font-size: 11px; color: var(--text-tertiary);
+      background: var(--bg-page); padding: 1px 6px;
+      border-radius: 4px; font-weight: 400;
+    }
+    .form-input {
+      width: 100%; height: 52px;
+      border: 1.5px solid var(--border); border-radius: 14px;
+      padding: 0 16px; font-size: 15px;
+      color: var(--text-primary); background: white;
+      outline: none; transition: all 0.2s;
+    }
+    .form-input::placeholder { color: var(--text-tertiary); }
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px var(--primary-soft);
+    }
+    .code-row { display: flex; gap: 10px; }
+    .code-row .form-input { flex: 1; }
+    .verify-btn {
+      height: 52px; padding: 0 18px; border: none;
+      border-radius: 14px; background: var(--primary-soft);
+      color: var(--primary); font-size: 14px; font-weight: 500;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s;
+    }
+    .verify-btn:hover { background: rgba(139,92,246,0.12); }
+
+    .bound-child {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; background: var(--primary-soft);
+      border-radius: 14px; margin-top: 14px;
+    }
+    .bound-child-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, #A78BFA, #8B5CF6);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 16px; font-weight: 600;
+    }
+    .bound-child-info { flex: 1; }
+    .bound-child-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .bound-child-detail { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+    .bound-child-check {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--success);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bound-child-check svg { width: 14px; height: 14px; fill: white; }
+    .add-more {
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 10px; margin-top: 10px;
+      font-size: 13px; color: var(--primary);
+      cursor: pointer;
+    }
+    .add-more svg { width: 14px; height: 14px; }
+    .skip-btn {
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      width: 100%; height: 44px;
+      border: 1px dashed var(--border); border-radius: 12px;
+      background: transparent; color: var(--text-tertiary);
+      font-size: 13px; cursor: pointer; margin-top: 12px;
+      transition: all 0.2s;
+    }
+    .skip-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+    .skip-btn svg { width: 14px; height: 14px; }
+
+    .bottom-actions {
+      margin-top: auto;
+      padding-top: 24px;
+      display: flex; gap: 12px;
+    }
+    .btn {
+      flex: 1; height: 52px;
+      border-radius: 14px;
+      font-size: 16px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+    }
+    .btn-prev {
+      background: white;
+      border: 1.5px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .btn-next {
+      border: none;
+      background: linear-gradient(135deg, #A78BFA, #8B5CF6);
+      color: white;
+      box-shadow: 0 8px 24px rgba(139,92,246,0.25);
+    }
+    .btn-next:active { transform: scale(0.98); opacity: 0.95; }
+    .safe-area { height: 20px; }
+
+    .annotation {
+      position: fixed; top: 20px; right: 20px;
+      background: white; border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      max-width: 280px; font-size: 13px;
+      line-height: 1.6; color: var(--text-secondary);
+      z-index: 100;
+    }
+    .annotation h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+    .annotation .field-tag {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 4px; font-size: 12px; font-weight: 500; margin: 2px;
+    }
+    .annotation .field-tag.opt { background: var(--primary-soft); color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="annotation">
+    <h3>Step3 - 家长信息</h3>
+    <div><span class="field-tag opt">学生邀请码</span></div>
+    <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">
+      邀请码选填，可稍后绑定<br/>
+      支持绑定不同校区的多个孩子
+    </div>
+  </div>
+
+  <div class="phone-frame">
+    <div class="header-deco"></div>
+    <div class="content">
+      <div class="back-btn" onclick="location.href='03-register-step2.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        上一步
+      </div>
+
+      <div class="stepper">
+        <div class="step-dot done">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+        </div>
+        <div class="step-line done"></div>
+        <div class="step-dot done">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+        </div>
+        <div class="step-line done"></div>
+        <div class="step-dot active">3</div>
+      </div>
+
+      <div class="page-title">完善家长信息</div>
+      <div class="page-subtitle">绑定孩子后可查看课时与上课记录</div>
+
+      <div class="role-header">
+        <div class="role-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </div>
+        <div>
+          <div class="role-title">家长</div>
+          <div class="role-subtitle">学生家长</div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-section-title"><span class="dot"></span>绑定孩子 <span class="optional-tag">选填</span></div>
+        <div class="form-group">
+          <div class="form-label">学生邀请码</div>
+          <div class="code-row">
+            <input class="form-input" type="text" placeholder="请输入8位学生邀请码" maxlength="8" />
+            <button class="verify-btn">验证</button>
+          </div>
+        </div>
+
+        <div class="bound-child">
+          <div class="bound-child-avatar">明</div>
+          <div class="bound-child-info">
+            <div class="bound-child-name">张小明</div>
+            <div class="bound-child-detail">阳光校区 · 钢琴班 · 剩余24课时</div>
+          </div>
+          <div class="bound-child-check">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+        </div>
+
+        <div class="add-more">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          继续绑定其他孩子
+        </div>
+
+        <button class="skip-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+          稍后绑定
+        </button>
+      </div>
+
+      <div class="bottom-actions">
+        <a href="03-register-step2.html" class="btn btn-prev">上一步</a>
+        <button class="btn btn-next" onclick="alert('家长注册完成，进入家长首页')">完成注册</button>
+      </div>
+      <div class="safe-area"></div>
+    </div>
+  </div>
+</body>
+</html>

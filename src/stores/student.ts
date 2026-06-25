@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { studentService } from '@/services';
 import type { Student } from '@/types/student';
+import { logError } from '@/utils/logger';
 
 interface StudentState {
   /** 按 teacherId 缓存的学员列表 */
@@ -58,7 +59,8 @@ export const useStudentStore = create<StudentState>((set, get) => ({
         lastFetch: { ...s.lastFetch, [teacherId]: now },
       }));
       return list;
-    } catch {
+    } catch (err) {
+      logError('student fetchByTeacher', err);
       set((s) => ({ loading: { ...s.loading, [teacherId]: false } }));
       return cache[teacherId] || [];
     }
@@ -76,7 +78,7 @@ export const useStudentStore = create<StudentState>((set, get) => ({
 
   invalidate: (teacherId) => {
     set((s) => ({
-      cache: { ...s.cache, [teacherId]: undefined },
+      cache: { ...s.cache, [teacherId]: undefined } as StudentState['cache'],
       lastFetch: { ...s.lastFetch, [teacherId]: 0 },
     }));
   },

@@ -18,6 +18,7 @@ export interface LeaveRequest {
   teacher_id: string;
   type: LeaveType;
   original_date: string;
+  end_date?: string; // 请假结束日期
   new_date?: string; // 调课时的新日期
   reason?: string;
   status: LeaveStatus;

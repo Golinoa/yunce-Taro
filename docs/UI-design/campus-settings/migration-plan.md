@@ -1,131 +1,300 @@
-# 校区设置模块 迁移计划
+# 校区设置模块 — 迁移文档
 
-## 迁移时间
-2026-06-13
+## 文件结构
 
-## 来源
-`docs/UI-design/campus-settings/campus-settings.html`（校区设置页面设计稿）
-
-## 目标位置
-`src/pages/campus-settings/` 及相关组件
-
----
-
-## 设计稿功能清单
-
-| 功能模块 | 功能点 | 优先级 | 状态 |
-|---------|-------|--------|------|
-| 校区切换 | 校区切换器、校区选择弹窗 | P0 | 待开发 |
-| 校区信息 | 名称、电话、地址编辑 | P0 | 待开发 |
-| 分校区管理 | 校区列表、添加、编辑、删除 | P0 | 待开发 |
-| 发薪日设置 | 发薪模式（固定日期/指定星期）、星期选择 | P1 | 待开发 |
-| 校区科目 | 科目列表、添加、编辑、删除、颜色图标 | P0 | 待开发 |
-| 营业时间 | 工作日/周末时间范围、特殊日期管理 | P1 | 待开发 |
-| 课时单价 | 按课程类型/按科目设置单价 | P1 | 待开发 |
-
----
-
-## 需要创建/修改的文件
-
-### 1. 页面文件
-
-| 文件路径 | 说明 |
-|---------|------|
-| `src/pages/campus-settings/index.tsx` | 校区设置首页 |
-| `src/pages/campus-settings/sub-campus.tsx` | 分校区管理页 |
-| `src/pages/campus-settings/salary-day.tsx` | 发薪日设置页 |
-| `src/pages/campus-settings/subject.tsx` | 校区科目页 |
-| `src/pages/campus-settings/business-hours.tsx` | 营业时间页 |
-| `src/pages/campus-settings/course-price.tsx` | 课时单价页 |
-
-### 2. 组件文件
-
-| 文件路径 | 说明 |
-|---------|------|
-| `src/components/CampusSwitcher/index.tsx` | 校区切换器组件 |
-| `src/components/SettingList/index.tsx` | 设置项列表组件 |
-| `src/components/SubjectCard/index.tsx` | 科目卡片组件 |
-| `src/components/PriceCard/index.tsx` | 价格卡片组件 |
-| `src/components/BottomSheet/index.tsx` | 底部弹窗组件 |
-| `src/components/TimeRangePicker/index.tsx` | 时间范围选择器 |
-| `src/components/WeekdayPicker/index.tsx` | 星期选择器 |
-| `src/components/ColorPicker/index.tsx` | 颜色选择器 |
-| `src/components/EmojiPicker/index.tsx` | Emoji选择器 |
-
-### 3. 数据模型文件
-
-| 文件路径 | 说明 |
-|---------|------|
-| `src/models/campus.ts` | 校区数据模型 |
-| `src/models/subject.ts` | 科目数据模型 |
-| `src/models/business-hours.ts` | 营业时间数据模型 |
-| `src/models/course-price.ts` | 课时单价数据模型 |
-
-### 4. 状态管理
-
-| 文件路径 | 说明 |
-|---------|------|
-| `src/store/campusStore.ts` | 校区状态管理（Zustand） |
-
-### 5. API 接口
-
-| 接口路径 | 说明 |
-|---------|------|
-| `GET /api/campus/list` | 获取校区列表 |
-| `POST /api/campus/create` | 创建校区 |
-| `PUT /api/campus/:id` | 更新校区 |
-| `DELETE /api/campus/:id` | 删除校区 |
-| `GET /api/subject/list` | 获取科目列表 |
-| `POST /api/subject/create` | 创建科目 |
-| `PUT /api/subject/:id` | 更新科目 |
-| `DELETE /api/subject/:id` | 删除科目 |
-| `GET /api/business-hours` | 获取营业时间 |
-| `PUT /api/business-hours` | 更新营业时间 |
-| `GET /api/course-price/list` | 获取课时单价列表 |
-| `POST /api/course-price/create` | 创建单价规则 |
-| `PUT /api/course-price/:id` | 更新单价规则 |
-
----
-
-## 设计 Token 同步清单
-
-```typescript
-// 颜色
---primary: #5EC8A8;
---primary-dark: #3DA88A;
---primary-bg: #EDF5F2;
---accent: #E89BB8;
---accent-bg: #FDF0F4;
---info: #6BB5D4;
---info-bg: #F0F7FB;
---warning: #E8C468;
---warning-bg: #FBF6E8;
---danger: #D94040;
---danger-bg: #FEF2F2;
---text: #374842;
---text-sec: #738C82;
---text-light: #A0B0A8;
---border: #D5E8E0;
---bg-page: #F5F7FA;
---bg-card: #FFFFFF;
-
-// 圆角
---radius-card: 16px;
---radius-input: 12px;
---radius-button: 14px;
---radius-tag: 8px;
-
-// 字号
---text-xs: 12px;
---text-sm: 13px;
---text-md: 14px;
---text-lg: 16px;
---text-xl: 18px;
+```
+docs/UI-design/campus-settings/
+├── campus-settings.html        # 设计稿原型（唯一设计源）
+├── campus-card-options.html    # 校区卡片备选方案参考
+└── migration-plan.md           # 本文档
 ```
 
 ---
 
-## 微信小程序适配清单
+## 一、页面结构与导航
+
+### 1.1 页面层级
+
+```
+校区设置首页（main）
+├── 分校区管理页（campusTab）
+│   ├── 校区运营数据页（dataTab）
+│   ├── 添加校区弹窗
+│   └── 编辑校区弹窗
+├── 发薪日设置页（salaryTab）
+│   ├── 薪资模板管理
+│   └── 节假日设置页（holidayTab）
+├── 校区科目页（subjectTab）
+├── 营业时间页（timeTab）
+└── 节假日设置页（holidayTab）
+```
+
+### 1.2 导航方式
+
+- 首页通过 `switchTab(tabName)` 切换子页面，子页面通过返回按钮回到首页
+- 所有子页面使用 `display: none/block` 切换，单页应用模式
+- 导航栏：首页为绿色渐变背景 + 标题；子页面为白色背景 + 返回按钮 + 标题
+
+---
+
+## 二、校区设置首页
+
+### 2.1 页面布局
+
+顶部导航栏（绿色渐变）→ 校区切换器 → 设置项卡片列表
+
+### 2.2 校区切换器
+
+- 位置：导航栏下方
+- 显示：当前校区名称 + 下拉箭头
+- 点击：弹出校区选择弹窗（底部弹出 BottomSheet）
+- 选择弹窗内容：校区列表，每项含图标 + 名称 + 类型标签，选中项有绿色边框 + 勾选标记
+
+### 2.3 设置项列表
+
+每项结构：左侧图标（圆角方形彩色背景）+ 中间名称/描述 + 右侧箭头
+
+| 设置项 | 图标色系 | 描述 | 跳转 |
+|-------|---------|------|------|
+| 分校区管理 | info 蓝 | 管理自营与合作校区 | campusTab |
+| 发薪日设置 | primary 绿 | 固定日期/指定星期 | salaryTab |
+| 校区科目 | accent 粉 | 钢琴、舞蹈、美术等 | subjectTab |
+| 节假日设置 | amber 黄 | 法定节假日与自定义休息日 | holidayTab |
+
+---
+
+## 三、分校区管理页（核心页面）
+
+### 3.1 页面结构
+
+- 顶部：返回按钮 + "分校区管理" 标题 + 添加按钮
+- 内容区：按类型分组展示校区卡片
+  - 自营校区组（section-title: "自营校区"）
+  - 合作机构组（section-title: "合作机构"）
+
+### 3.2 校区卡片设计（最终定稿）
+
+```
+┌──────────────────────────────────────┐
+│  🏢  校区名称              ⋮(三点)   │  ← header 行
+│      [自营校区]                       │
+│──────────────────────────────────────│
+│  120      3        2.8万             │  ← stats 三列统计
+│  学生      教师      月营收           │
+│──────────────────────────────────────│
+│                    运营数据  →        │  ← data-row 底部入口
+└──────────────────────────────────────┘
+```
+
+#### 3.2.1 卡片结构详解
+
+| 区域 | 元素 | 说明 |
+|------|------|------|
+| header | campus-icon | 左侧圆角方形图标，渐变背景色 + emoji |
+| header | campus-name | 校区名称，16px 加粗 |
+| header | campus-type | 类型标签：自营=绿底绿字+圆点，合作=黄底黄字+圆点 |
+| header | more-btn | 右上角三点菜单按钮，32×32px |
+| stats-row | 3列统计 | 学生数/教师数/月营收，20px 加粗数值 + 11px 标签 |
+| data-row | 运营数据入口 | 右对齐，蓝色"运营数据"文字 + 蓝色长箭头图标 |
+
+#### 3.2.2 卡片视觉细节
+
+- 圆角：20px
+- 内边距：22px
+- 阴影：`0 4px 20px -4px rgba(54,73,67,0.1)`
+- 边框：1px solid var(--border)
+- 右上角装饰：corner-accent 三角色块（主色/琥珀色半透明）
+- stats-row 与 data-row 之间用 1px border-top 分隔
+
+#### 3.2.3 自营校区 vs 合作校区差异
+
+| 差异点 | 自营校区 | 合作校区 |
+|-------|---------|---------|
+| 图标背景 | 蓝色/粉色渐变 | 琥珀色渐变 |
+| 类型标签 | 绿色"自营校区" | 黄色"合作机构 · 模式" |
+| corner-accent | 主色半透明 | 琥珀色半透明 |
+| 三点菜单 | 设为主校区/编辑/删除 | 编辑/删除（无"设为主校区"） |
+| 额外信息 | 无 | partner-info 标签行（分成比例/场地费等） |
+| 统计项 | 学生/教师/月营收 | 学生/教师/本月分成或本月净收 |
+
+### 3.3 三点菜单交互
+
+- 触发：点击右上角三点按钮
+- 展示：dropdown-menu 下拉菜单，绝对定位在按钮下方
+- 菜单项：
+  - **设为主校区**（仅自营校区显示）→ 弹出确认弹窗
+  - **编辑** → 打开编辑校区弹窗
+  - **删除**（红色危险项）→ 执行删除
+- 关闭：点击菜单项后自动关闭；点击空白处关闭
+
+### 3.4 运营数据入口交互
+
+- 位置：卡片底部独立一行，右对齐
+- 样式：蓝色"运营数据"文字 + 蓝色长箭头图标（→）
+- 点击：跳转到校区运营数据页（openCampusData）
+- 上方有 1px 分隔线
+
+### 3.5 设为主校区确认弹窗
+
+- 图标：👑
+- 标题："设为主校区"
+- 描述："确定将「xxx」设为主校区吗？"
+- 提示："原主校区将变为自营分校区"
+- 操作：取消 / 确认
+
+### 3.6 添加/编辑校区弹窗
+
+- 底部弹出 BottomSheet
+- 表单字段：校区名称、联系电话、校区地址、校区类型（自营/合作）、合作模式（仅合作校区）
+- 合作模式选项：课时分成 / 场地合作
+- 编辑时自动回填已有数据
+
+---
+
+## 四、发薪日设置页
+
+### 4.1 页面结构
+
+- 顶部：返回按钮 + "发薪日设置" 标题
+- 发薪模式切换：固定日期 / 指定星期（两个按钮切换）
+- 固定日期模式：1-28 号选择网格
+- 指定星期模式：星期选择器 + 月份第几周选择
+
+### 4.2 薪资模板
+
+- 列表展示薪资模板卡片
+- 每个模板显示：名称、类型标签、底薪/课时费/全勤/绩效、关联教师数
+- 操作：添加模板、编辑模板（回填所有字段）、删除模板
+- 编辑弹窗字段：模板名称、类型（标准主讲/纯课时）、底薪、课时费比例、全勤奖、绩效奖金
+
+---
+
+## 五、节假日设置页
+
+### 5.1 页面结构
+
+- 顶部：返回按钮 + "节假日设置" 标题 + 添加按钮
+- Tab 切换：法定节假日 / 自定义假期
+
+### 5.2 法定节假日
+
+- 只读展示，不可编辑/删除
+- 每项：图标 + 名称 + 日期范围 + "休"标签
+
+### 5.3 自定义假期
+
+- 可编辑、可删除
+- 编辑弹窗字段：假期名称、开始日期、结束日期、状态（休息/调课）
+- 删除需二次确认
+
+---
+
+## 六、校区科目页
+
+### 6.1 页面结构
+
+- 顶部：返回按钮 + "校区科目" 标题 + 添加按钮
+- 科目卡片网格（2列）
+
+### 6.2 科目卡片
+
+- 左侧：彩色圆角方块 + emoji 图标
+- 右侧：科目名称 + 关联课程数
+- 操作：点击编辑，长按或滑动删除
+
+---
+
+## 七、营业时间页
+
+### 7.1 页面结构
+
+- 工作日时间范围（开始-结束）
+- 周末时间范围（开始-结束）
+- 特殊日期列表
+
+---
+
+## 八、校区运营数据页
+
+### 8.1 页面结构
+
+- 顶部：返回按钮 + "校区名 · 运营数据" 标题
+- Tab 切换：月度 / 季度 / 年度
+- 统计卡片：学生数、教师数、营收、课时
+- 排行榜：教师课时排行
+
+---
+
+## 九、交互规范汇总
+
+### 9.1 弹窗规范
+
+| 弹窗类型 | 组件 | 触发方式 |
+|---------|------|---------|
+| 校区选择 | BottomSheet | 点击校区切换器 |
+| 添加/编辑校区 | BottomSheet | 点击添加按钮/菜单编辑 |
+| 添加/编辑科目 | BottomSheet | 点击添加按钮/科目卡片 |
+| 添加/编辑薪资模板 | BottomSheet | 点击添加/编辑按钮 |
+| 添加/编辑节假日 | BottomSheet | 点击添加/编辑按钮 |
+| 确认操作 | 确认弹窗 | 删除、设为主校区等危险操作 |
+
+### 9.2 Toast 提示
+
+- 保存成功、删除成功等操作反馈
+- 顶部短暂显示，1.5s 自动消失
+
+### 9.3 下拉菜单
+
+- 三点菜单触发
+- 点击菜单项执行操作并关闭
+- 点击空白处关闭
+
+---
+
+## 十、设计 Token
+
+```typescript
+// 颜色
+--primary: #5EC8A8;
+--primary-dark: #4AB893;
+--primary-light: #a7e4cf;
+--primary-bg: #f0faf5;
+--accent: #e88aaa;
+--accent-bg: #fdf0f4;
+--info: #6ba3d6;
+--info-bg: #f0f5fb;
+--amber: #d4a24e;
+--amber-bg: #faf6ee;
+--purple: #9b7ed8;
+--purple-bg: #f3f0fb;
+--text: #2d4a3e;
+--text-sec: #7a9a8e;
+--text-light: #a0b8ad;
+--border: #d4e8df;
+--bg: #fff;
+--danger: #d94040;
+--danger-bg: #fef2f2;
+--shadow: 0 4px 20px -4px rgba(54,73,67,0.1);
+
+// 圆角
+card: 20px;
+input: 12px;
+button: 14px;
+tag: 8px;
+icon-bg: 14px;
+
+// 字号
+xs: 10px;
+sm: 11-12px;
+md: 13px;
+lg: 16px;
+xl: 18-20px;
+stat-val: 20px;
+```
+
+---
+
+## 十一、微信小程序适配
 
 | 项目 | 规格 |
 |------|------|
@@ -139,33 +308,25 @@
 
 ---
 
-## 迁移步骤
+## 十二、迁移步骤
 
 ### Phase 1: 基础建设
-1. 创建数据模型定义
-2. 创建 Zustand Store
-3. 创建基础组件（BottomSheet, SettingList）
-4. 创建 API 接口 mock
+1. 创建数据模型定义（campus.ts / subject.ts / business-hours.ts）
+2. 创建 Zustand Store（campusStore.ts）
+3. 创建基础组件（BottomSheet / SettingList / FormInput）
+4. 创建 API 接口 mock（services/campus.ts）
 
 ### Phase 2: 核心页面
-1. 校区设置首页
-2. 分校区管理页
-3. 校区科目管理页
+1. 校区设置首页（index.tsx）
+2. 分校区管理页（sub-campus.tsx）— 含校区卡片、三点菜单、运营数据入口
+3. 校区科目管理页（subject.tsx）
 
 ### Phase 3: 扩展功能
-1. 发薪日设置页
-2. 营业时间设置页
-3. 课时单价设置页
+1. 发薪日设置页（salary-day.tsx）— 含薪资模板
+2. 节假日设置页（holiday.tsx）
+3. 营业时间设置页（business-hours.tsx）
 
 ### Phase 4: 集成优化
-1. API 接口对接
+1. API 接口对接（mock → 真实接口）
 2. 状态管理集成
-3. 细节打磨与测试
-
----
-
-## 后续计划
-
-1. **权限管理**：不同角色对校区的可见性和操作权限
-2. **数据统计**：校区运营数据看板
-3. **配置同步**：分校区配置的统一管理
+3. 细节打磨与性能优化

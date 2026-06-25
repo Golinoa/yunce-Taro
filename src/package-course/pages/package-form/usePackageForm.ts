@@ -8,26 +8,8 @@ import type { Subject } from '@/types/campus';
 import type { CoursePackageTemplate, FeeMethod, PackageType } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
-
-const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
-const DEBUG_SESSION_ID = 'page-slow-nav';
-
-function reportPackageFormPerf(location: string, msg: string, data: Record<string, unknown>): void {
-  Taro.request({
-    url: DEBUG_SERVER_URL,
-    method: 'POST',
-    data: {
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'pre-fix',
-      hypothesisId: 'H2',
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    },
-  }).catch(() => {});
-}
 
 // ============================================
 // 常量
@@ -133,11 +115,12 @@ export function usePackageForm() {
     const init = async () => {
       initStartAtRef.current = Date.now();
       // #region debug-point H2:package-form-init-start
-      reportPackageFormPerf(
-        'src/package-course/pages/package-form/usePackageForm.ts:init',
-        '[DEBUG] package form init start',
-        { currentUserId, isEdit, packageId, routeStudentId },
-      );
+      reportLocalDebug({
+        hypothesisId: 'H2',
+        location: 'src/package-course/pages/package-form/usePackageForm.ts:init',
+        msg: '[DEBUG] package form init start',
+        data: { currentUserId, isEdit, packageId, routeStudentId },
+      });
       // #endregion
       setLoading(true);
       setLoadError('');
@@ -198,17 +181,18 @@ export function usePackageForm() {
         setLoadError('课包表单初始化失败，请稍后重试');
       } finally {
         // #region debug-point H2:package-form-init-end
-        reportPackageFormPerf(
-          'src/package-course/pages/package-form/usePackageForm.ts:init',
-          '[DEBUG] package form init end',
-          {
+        reportLocalDebug({
+          hypothesisId: 'H2',
+          location: 'src/package-course/pages/package-form/usePackageForm.ts:init',
+          msg: '[DEBUG] package form init end',
+          data: {
             currentUserId,
             isEdit,
             packageId,
             routeStudentId,
             durationMs: Date.now() - initStartAtRef.current,
           },
-        );
+        });
         // #endregion
         setLoading(false);
       }

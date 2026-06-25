@@ -5,7 +5,9 @@
  */
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Loading from '@/components/Loading';
 import type { Profile } from '@/types/profile';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { useAuth } from '@/utils/auth';
 
 // 无需登录即可访问的页面
@@ -24,29 +26,6 @@ const PUBLIC_PAGES = [
 const LOGIN_PAGE = '/pages/login/index';
 const REDIRECT_KEY = 'loginRedirectPath';
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
-const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
-const DEBUG_SESSION_ID = 'page-slow-nav';
-
-function reportRouteGuardDebug(
-  location: string,
-  msg: string,
-  data: Record<string, unknown>,
-): void {
-  Taro.request({
-    url: DEBUG_SERVER_URL,
-    method: 'POST',
-    data: {
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'pre-fix',
-      hypothesisId: 'H3',
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    },
-  }).catch(() => {});
-}
-
 function hasValidStoredSession(): boolean {
   try {
     const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
@@ -146,12 +125,17 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     // 已登录 或 在公开页面 → 放行
     if (profile || isPublicPage) {
       // #region debug-point H3:route-guard-pass
-      reportRouteGuardDebug('src/utils/route-guard.tsx:checkAuth', '[DEBUG] route guard pass', {
-        currentPath,
-        loading,
-        hasProfile: Boolean(profile),
-        isPublicPage,
-        elapsedMs: Date.now() - guardStartAtRef.current,
+      reportLocalDebug({
+        hypothesisId: 'H3',
+        location: 'src/utils/route-guard.tsx:checkAuth',
+        msg: '[DEBUG] route guard pass',
+        data: {
+          currentPath,
+          loading,
+          hasProfile: Boolean(profile),
+          isPublicPage,
+          elapsedMs: Date.now() - guardStartAtRef.current,
+        },
       });
       // #endregion
       setAuthorized(true);
@@ -171,11 +155,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     if (!hasRefreshed.current) {
       hasRefreshed.current = true;
       // #region debug-point H3:route-guard-refresh
-      reportRouteGuardDebug(
-        'src/utils/route-guard.tsx:useEffect',
-        '[DEBUG] route guard refresh start',
-        { hasProfile: Boolean(profile) },
-      );
+      reportLocalDebug({
+        hypothesisId: 'H3',
+        location: 'src/utils/route-guard.tsx:useEffect',
+        msg: '[DEBUG] route guard refresh start',
+        data: { hasProfile: Boolean(profile) },
+      });
       // #endregion
       refreshProfile()
         .then(() => checkAuth())
@@ -202,7 +187,16 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   });
 
-  if (!authorized) return null;
+  if (!authorized) {
+    return (
+      <Loading
+        fullScreen
+        size="large"
+        title={loading ? '正在校验登录状态' : '正在准备页面'}
+        text={loading ? '请稍候，正在恢复你的访问上下文' : '页面即将打开，请稍候'}
+      />
+    );
+  }
   return <>{children}</>;
 };
 

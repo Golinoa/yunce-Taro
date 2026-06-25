@@ -28,12 +28,12 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
   const total = calcTotal(teacher);
   const lessonFee = teacher.hours * teacher.rate;
 
-  const handleAction = (e: any) => {
+  const handleAction = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     onAction?.();
   };
 
-  const handleViewDetail = (e: any) => {
+  const handleViewDetail = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     onViewDetail?.();
   };
@@ -136,8 +136,7 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
       <View className={cn('flex gap-2 mt-3', selectable && 'pl-[52rpx]')}>
         {/* 查看工资单 - 所有状态都有 */}
         <View
-          className="flex-1 py-2 rounded-xl text-center text-xs font-semibold text-amber"
-          style={{ background: 'rgba(212,162,78,0.08)' }}
+          className="flex-1 py-2 rounded-xl text-center text-xs font-semibold text-amber bg-amber-10"
           onClick={handleViewDetail}
         >
           查看工资单

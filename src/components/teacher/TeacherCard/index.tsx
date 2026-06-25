@@ -17,6 +17,12 @@ const ROLE_TAG_MAP: Record<string, string> = {
   parttime: 'bg-amber-10 text-amber',
 };
 
+const ACCESS_SCOPE_TAG_MAP: Record<string, string> = {
+  self: 'bg-muted text-muted-foreground',
+  subject: 'bg-purple-10 text-purple',
+  org: 'bg-destructive-10 text-destructive',
+};
+
 const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
   const isResigned = teacher.status === 'resigned';
   const total = calcTotal(teacher);
@@ -50,6 +56,16 @@ const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
                 已离职
               </View>
             )}
+          </View>
+          <View className="flex items-center gap-2 mt-2 flex-wrap">
+            <View
+              className={cn(
+                'px-2 py-[2rpx] rounded-tag text-xs font-medium whitespace-nowrap',
+                ACCESS_SCOPE_TAG_MAP[teacher.accessScope] || ACCESS_SCOPE_TAG_MAP.self,
+              )}
+            >
+              {teacher.accessScopeText}
+            </View>
           </View>
           <View className="flex items-center gap-2 mt-1">
             <Text className="text-xs text-muted-foreground">{teacher.subject}</Text>

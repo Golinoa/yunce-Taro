@@ -1,576 +1,733 @@
-import { View, Text } from '@tarojs/components';
+import { View, Text, ScrollView, Image, Swiper, SwiperItem } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import Empty from '@/components/Empty';
-import ChildSelector from '@/components/home/ChildSelector';
-import HourProgress from '@/components/home/HourProgress';
-import RecentRecordItem from '@/components/home/RecentRecordItem';
-import ScheduleTimeline from '@/components/home/ScheduleTimeline';
-import StatCard from '@/components/home/StatCard';
-import StudentQuickList from '@/components/home/StudentQuickList';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import KingKongSection from '@/components/home/KingKongSection';
+import StatsOverview from '@/components/home/StatsOverview';
+import TodayScheduleCard from '@/components/home/TodayScheduleCard';
+import TodoList from '@/components/home/TodoList';
+import type { TodoItem } from '@/components/home/TodoList';
 import Icon from '@/components/Icon';
-import PageContainer from '@/components/PageContainer';
+import LessonConsumptionList, {
+  buildLessonConsumptionSections,
+  pickHomeRecentLessonRecords,
+} from '@/components/lesson/LessonConsumptionList';
+import RoleSwitchSheet from '@/components/RoleSwitchSheet';
+import { lessonRecordService } from '@/services';
 import { homeService } from '@/services/home';
-import type { CoursePackage } from '@/types/course-package';
+import type {
+  StatsPeriod,
+  StatsData,
+  QuickEntry,
+  HomeTeacherSummary,
+  HomeOperationContent,
+  OperationActionConfig,
+  OperationActivityItem,
+  OperationBannerItem,
+} from '@/services/home';
+import { useCampusStore } from '@/stores/campus';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
-import type { Student } from '@/types/student';
-import type { Teacher } from '@/types/teacher';
-import { useAuth } from '@/utils/auth';
+import { isStaffRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
-/** 首页 - 使用 UnoCSS 原子化类名，1:1 对齐原版 */
+/** Tab 类型 */
+type HomeTab = 'schedule' | 'todo' | 'recent';
+
+const HOME_TAB_SWIPER_DURATION = 260;
+const HOME_TAB_ORDER: HomeTab[] = ['schedule', 'todo', 'recent'];
+
+const getHomeTabIndex = (tab: HomeTab): number => HOME_TAB_ORDER.indexOf(tab);
+
+const getHomeTabByIndex = (index: number): HomeTab => HOME_TAB_ORDER[index] || 'schedule';
+
+/** 校区选项 */
+interface CampusOption {
+  id: string;
+  name: string;
+  isMain: boolean;
+}
+
+/**
+ * Home - 教师端首页 v14
+ *
+ * 对齐设计稿 index_v14.html：
+ * - 黄绿渐变头部 + 导航栏 + 问候语
+ * - 白色统计卡片 + 时段Tab + "更多"按钮
+ * - 金刚区：三卡片 + 图标网格 + 分页
+ * - Tab切换：今日课表 / 待办事项 / 最近消课
+ */
+const ROLE_LABEL: Record<string, string> = {
+  principal: '校长',
+  teacher: '教师',
+  parent: '家长',
+};
+
+const EMPTY_OPERATION_CONTENT: HomeOperationContent = {
+  placements: {
+    banners: [],
+    cards: [],
+    floatings: [],
+    notices: [],
+    popups: [],
+  },
+  updatedAt: '',
+};
+
+const normalizeMiniProgramPath = (path?: string): string | null => {
+  if (!path) {
+    return null;
+  }
+
+  return path.startsWith('/') ? path : `/${path}`;
+};
+
+const getOperationTarget = (actionConfig?: OperationActionConfig) => {
+  if (!actionConfig) {
+    return { target: null, type: 'NONE' as const };
+  }
+
+  const type = actionConfig.type || 'NONE';
+  const target = actionConfig.path || actionConfig.url || actionConfig.appId || null;
+  return { target, type };
+};
+
+const getOperationSummary = (item: OperationActivityItem): string => {
+  return item.summary?.trim() || item.content?.trim() || '暂无活动说明';
+};
+
 const Home: React.FC = () => {
-  const { profile } = useAuth();
-  const isTeacher = profile?.role === 'teacher';
+  const { profile, currentRole, currentIdentity } = useAuth();
+  const { orgName, campuses, setMainCampus, fetchCampuses } = useCampusStore();
+  const [roleSheetVisible, setRoleSheetVisible] = useState(false);
+  const mainCampus = campuses.find((c) => c.isMain) || campuses[0];
+  const navSafeHeight = useNavSafeHeight();
+
+  // ---- 招呼语：昵称最多 5 字，按字数动态缩放字号 ----
+  const nickname = (profile?.name || '').slice(0, 5);
+  const greetingSize = nickname ? [72, 64, 56, 48, 40][nickname.length - 1] || 40 : 64;
+
+  // ---- 校区下拉选择 ----
+  const [showCampusPicker, setShowCampusPicker] = useState(false);
+  const campusOptions: CampusOption[] = campuses.map((c) => ({
+    id: c.id,
+    name: c.name,
+    isMain: c.isMain,
+  }));
+  const handleToggleCampusPicker = useCallback(() => {
+    if (campusOptions.length === 0) {
+      Taro.showToast({ title: '暂无校区', icon: 'none' });
+      return;
+    }
+    setShowCampusPicker((prev) => !prev);
+  }, [campusOptions]);
+  const handleCampusSelect = useCallback(
+    async (campus: CampusOption) => {
+      setShowCampusPicker(false);
+      if (!campus.isMain) {
+        await setMainCampus(campus.id);
+      }
+    },
+    [setMainCampus],
+  );
 
   // ---- 教师端状态 ----
-  const [_teacher, setTeacher] = useState<Teacher | null>(null);
-  const [teacherStudents, setTeacherStudents] = useState<Student[]>([]);
-  const [teacherSchedules, setTeacherSchedules] = useState<Schedule[]>([]);
-  const [teacherRecords, setTeacherRecords] = useState<LessonRecord[]>([]);
-  const [todayRecordCount, setTodayRecordCount] = useState(0);
-  const [totalRemaining, setTotalRemaining] = useState(0);
+  const [teacher, setTeacher] = useState<HomeTeacherSummary | null>(null);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
 
-  // ---- 家长端状态 ----
-  const [parentChildren, setParentChildren] = useState<Student[]>([]);
-  const [activeStudentId, setActiveStudentId] = useState('');
-  const [parentPackages, setParentPackages] = useState<CoursePackage[]>([]);
-  const [parentSchedules, setParentSchedules] = useState<Schedule[]>([]);
-  const [parentRecords, setParentRecords] = useState<LessonRecord[]>([]);
-  const [parentLoading, setParentLoading] = useState(false);
+  // ---- 统计概览状态 ----
+  const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('today');
+  const [statsData, setStatsData] = useState<StatsData>({
+    checkinCount: 0,
+    leaveCount: 0,
+    lessonHours: 0,
+    lessonAmount: 0,
+  });
+
+  // ---- 快捷入口 ----
+  const [quickEntries, setQuickEntries] = useState<QuickEntry[]>([]);
+
+  // ---- Tab 状态 ----
+  const [activeTab, setActiveTab] = useState<HomeTab>('schedule');
+  const [homeSwiperCurrent, setHomeSwiperCurrent] = useState(0);
+  const [homeSwiperHeight, setHomeSwiperHeight] = useState(420);
+
+  // ---- 待办事项 ----
+  const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
+
+  // ---- 最近消课 ----
+  const [recentRecords, setRecentRecords] = useState<LessonRecord[]>([]);
+
+  // ---- 未读消息数 ----
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [operationContent, setOperationContent] = useState<HomeOperationContent>(EMPTY_OPERATION_CONTENT);
+  const [operationLoading, setOperationLoading] = useState(true);
+  const [operationError, setOperationError] = useState('');
 
   // ---- 公共状态 ----
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [errorMsg, setErrorMsg] = useState('');
+  const isFirstMount = useRef(true);
+  const shownPopupIdsRef = useRef<string[]>([]);
+  const homeTabMeasureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const activeChild = useMemo(
-    () => parentChildren.find((c) => c.id === activeStudentId),
-    [parentChildren, activeStudentId],
-  );
+  // ============================================
+  // 统计数据加载
+  // ============================================
+  const loadStatsData = useCallback(async (teacherId: string, period: StatsPeriod) => {
+    try {
+      const data = await homeService.getStatsByPeriod(teacherId, period);
+      setStatsData(data);
+    } catch (err) {
+      logError('Home loadStatsData', err);
+    }
+  }, []);
 
   // ============================================
   // 教师端数据加载
   // ============================================
-  const loadTeacherData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!profile?.id) return;
-    setErrorMsg('');
+
+    if (!isStaffRole(currentRole)) {
+      try {
+        const unread = await homeService.getUnreadCount(profile.id, currentRole);
+        setUnreadCount(unread);
+      } catch (err) {
+        logError('Home loadUnreadCount', err);
+      }
+      return;
+    }
 
     try {
-      const teacherData = await homeService.getTeacher(profile.id);
+      const teacherData = await homeService.getTeacher(profile.id, currentRole);
       if (!teacherData) {
-        setErrorMsg('未找到教师信息');
         return;
       }
       setTeacher(teacherData);
 
-      const [studentList, scheduleList, recordList, remaining, unread, todayCount] =
-        await Promise.all([
-          homeService.getStudents(teacherData.id),
-          homeService.getTodaySchedules(teacherData.id),
-          homeService.getRecentRecords(teacherData.id, 5),
-          homeService.getTotalRemainingHours(teacherData.id),
-          homeService.getUnreadCount(profile.id),
-          homeService.getTodayRecordCount(teacherData.id),
-        ]);
+      const recentLessonRequest =
+        currentRole === 'teacher'
+          ? lessonRecordService.getByTeacher(teacherData.id)
+          : lessonRecordService.getAll();
 
-      setTeacherStudents(studentList);
-      setTeacherSchedules(scheduleList);
-      setTeacherRecords(recordList);
-      setTotalRemaining(remaining);
-      setUnreadCount(unread);
-      setTodayRecordCount(todayCount);
-    } catch (err) {
-      logError('Home loadTeacherData', err);
-      setErrorMsg('数据加载失败，请下拉刷新重试');
-    }
-  }, [profile]);
-
-  // ============================================
-  // 家长端数据加载
-  // ============================================
-  const loadParentChildData = useCallback(async (studentId: string) => {
-    if (!studentId) return;
-    setParentLoading(true);
-    try {
-      const [records, packages, schedules] = await Promise.all([
-        homeService.getRecordsByStudent(studentId),
-        homeService.getPackagesByStudent(studentId),
-        homeService.getSchedulesByStudent(studentId),
+      const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
+        homeService.getTodaySchedules(teacherData.id, currentRole),
+        homeService.getUnreadCount(profile.id, currentRole),
+        homeService.getTodoItems(teacherData.id, currentRole),
+        recentLessonRequest,
       ]);
-      setParentRecords(records);
-      setParentPackages(packages);
-      setParentSchedules(schedules);
+      setSchedules(scheduleList);
+      setUnreadCount(unread);
+      setTodoItems(todoList);
+      setRecentRecords(lessonRecords);
+      await loadStatsData(teacherData.id, 'today');
     } catch (err) {
-      logError('Home loadParentChildData', err);
+      logError('Home loadData', err);
     }
-    setParentLoading(false);
-  }, []);
+  }, [profile, currentRole, loadStatsData]);
 
-  const loadParentData = useCallback(async () => {
-    if (!profile?.id) return;
-    setErrorMsg('');
+  const executeOperationAction = useCallback(async (actionConfig?: OperationActionConfig) => {
+    const { target, type } = getOperationTarget(actionConfig);
 
-    try {
-      const children = await homeService.getStudentsByParent(profile.id);
-      setParentChildren(children);
+    if (type === 'NONE') {
+      return;
+    }
 
-      const storedId = Taro.getStorageSync('activeStudentId') || '';
-      const validId = children.find((c) => c.id === storedId)?.id || children[0]?.id || '';
-      setActiveStudentId(validId);
-
-      if (validId) {
-        await loadParentChildData(validId);
+    if ((type === 'PAGE' || type === 'TAB') && target) {
+      const path = normalizeMiniProgramPath(target);
+      if (!path) {
+        Taro.showToast({ title: '运营配置缺少跳转页面', icon: 'none' });
+        return;
       }
 
-      const unread = await homeService.getUnreadCount(profile.id);
-      setUnreadCount(unread);
-    } catch (err) {
-      logError('Home loadParentData', err);
-      setErrorMsg('数据加载失败，请下拉刷新重试');
+      if (type === 'TAB') {
+        Taro.switchTab({ url: path });
+      } else {
+        Taro.navigateTo({ url: path });
+      }
+      return;
     }
-  }, [profile, loadParentChildData]);
 
-  const handleChildChange = useCallback(
-    async (studentId: string) => {
-      setActiveStudentId(studentId);
-      Taro.setStorageSync('activeStudentId', studentId);
-      await loadParentChildData(studentId);
+    if (type === 'MINI_PROGRAM' && actionConfig?.appId) {
+      try {
+        await Taro.navigateToMiniProgram({
+          appId: actionConfig.appId,
+          path: actionConfig.path,
+        });
+      } catch {
+        Taro.showToast({ title: '打开关联小程序失败', icon: 'none' });
+      }
+      return;
+    }
+
+    if (type === 'WEBVIEW') {
+      if (target) {
+        try {
+          await Taro.setClipboardData({
+            data: target,
+          });
+          Taro.showToast({ title: '活动链接已复制', icon: 'success' });
+        } catch {
+          Taro.showToast({ title: '活动链接暂不可用', icon: 'none' });
+        }
+        return;
+      }
+      Taro.showToast({ title: 'H5 活动页暂未配置链接', icon: 'none' });
+      return;
+    }
+
+    if (type === 'ACTIVITY') {
+      const path = normalizeMiniProgramPath(target || actionConfig?.path);
+      if (path) {
+        Taro.navigateTo({ url: path });
+        return;
+      }
+      Taro.showToast({ title: '活动详情暂未配置页面', icon: 'none' });
+      return;
+    }
+
+    Taro.showToast({ title: '运营跳转配置暂不可用', icon: 'none' });
+  }, []);
+
+  const handleOperationTap = useCallback(
+    async (item: OperationActivityItem | OperationBannerItem) => {
+      await executeOperationAction(item.actionConfig);
     },
-    [loadParentChildData],
+    [executeOperationAction],
+  );
+
+  const loadOperationContent = useCallback(async () => {
+    setOperationLoading(true);
+    setOperationError('');
+    try {
+      const content = await homeService.getOperationContent(currentRole);
+      setOperationContent(content);
+    } catch (error) {
+      logError('Home loadOperationContent', error);
+      setOperationContent(EMPTY_OPERATION_CONTENT);
+      setOperationError('运营内容加载失败');
+    } finally {
+      setOperationLoading(false);
+    }
+  }, [currentRole]);
+
+  /** 统计时段切换 */
+  const handleStatsPeriodChange = useCallback(
+    (period: StatsPeriod) => {
+      setStatsPeriod(period);
+      if (teacher?.id) {
+        loadStatsData(teacher.id, period);
+      }
+    },
+    [teacher, loadStatsData],
   );
 
   // ============================================
-  // 统一加载入口
+  // 初始化
   // ============================================
-  const loadData = useCallback(() => {
-    if (isTeacher) {
-      loadTeacherData();
-    } else {
-      loadParentData();
-    }
-  }, [isTeacher, loadTeacherData, loadParentData]);
+  useEffect(() => {
+    // 按当前身份加载快捷入口与校区数据
+    setQuickEntries(homeService.getQuickEntries(currentRole));
+    fetchCampuses();
+  }, [currentRole, fetchCampuses]);
 
+  // 当身份或登录状态变化时重新加载数据
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [profile, currentRole, loadData]);
+
+  useEffect(() => {
+    loadOperationContent();
+  }, [loadOperationContent]);
+
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     loadData();
+    loadOperationContent();
   });
 
-  // 家长端课时汇总
-  const parentSummary = useMemo(() => {
-    const all = parentPackages.reduce((s, p) => s + (p.total_hours || 0), 0);
-    const remaining = parentPackages.reduce((s, p) => s + (p.remaining_hours || 0), 0);
-    return { totalAll: all, totalUsed: all - remaining, totalRemaining: remaining };
-  }, [parentPackages]);
+  useEffect(() => {
+    const popup = operationContent.placements.popups[0];
+    if (!popup || shownPopupIdsRef.current.includes(popup.id)) {
+      return;
+    }
+
+    shownPopupIdsRef.current = [...shownPopupIdsRef.current, popup.id];
+    Taro.showModal({
+      title: popup.title || '活动提醒',
+      content: getOperationSummary(popup),
+      confirmText: '去看看',
+      cancelText: '稍后',
+      success: (result) => {
+        if (result.confirm) {
+          void executeOperationAction(popup.actionConfig);
+        }
+      },
+    });
+  }, [executeOperationAction, operationContent]);
+
+  // Tab 配置
+  const TAB_OPTIONS: { key: HomeTab; label: string; badge?: number }[] = [
+    { key: 'schedule', label: '今日课表' },
+    { key: 'todo', label: '待办事项', badge: todoItems.length },
+    { key: 'recent', label: '最近消课' },
+  ];
+
+  const recentSections = useMemo(
+    () => buildLessonConsumptionSections(pickHomeRecentLessonRecords(recentRecords)),
+    [recentRecords],
+  );
+
+  const measureHomeSwiperHeight = useCallback((targetTab?: HomeTab) => {
+    if (!isStaffRole(currentRole)) {
+      return;
+    }
+
+    const nextTab = targetTab || getHomeTabByIndex(homeSwiperCurrent);
+    const targetId = `#home-tab-panel-${nextTab}`;
+
+    Taro.nextTick(() => {
+      const query = Taro.createSelectorQuery();
+      query.select(targetId).boundingClientRect();
+      query.exec((result) => {
+        const rect = result?.[0];
+        if (rect?.height) {
+          setHomeSwiperHeight(Math.max(320, Math.ceil(rect.height)));
+        }
+      });
+    });
+  }, [currentRole, homeSwiperCurrent]);
+
+  const scheduleHomeSwiperMeasure = useCallback((targetTab?: HomeTab) => {
+    if (homeTabMeasureTimerRef.current) {
+      clearTimeout(homeTabMeasureTimerRef.current);
+    }
+
+    homeTabMeasureTimerRef.current = setTimeout(() => {
+      measureHomeSwiperHeight(targetTab);
+    }, HOME_TAB_SWIPER_DURATION + 40);
+  }, [measureHomeSwiperHeight]);
+
+  const handleHomeTabChange = useCallback((tab: HomeTab) => {
+    setHomeSwiperCurrent(getHomeTabIndex(tab));
+    scheduleHomeSwiperMeasure(tab);
+  }, [scheduleHomeSwiperMeasure]);
+
+  const handleHomeSwiperChange = useCallback((event: { detail?: { current?: number } }) => {
+    const current = event.detail?.current ?? 0;
+    const nextTab = getHomeTabByIndex(current);
+    setHomeSwiperCurrent(current);
+    scheduleHomeSwiperMeasure(nextTab);
+  }, [scheduleHomeSwiperMeasure]);
+
+  const handleHomeSwiperFinish = useCallback((event: { detail?: { current?: number } }) => {
+    const current = event.detail?.current ?? homeSwiperCurrent;
+    const nextTab = getHomeTabByIndex(current);
+    setActiveTab(nextTab);
+    measureHomeSwiperHeight(nextTab);
+  }, [homeSwiperCurrent, measureHomeSwiperHeight]);
+
+  useEffect(() => {
+    setHomeSwiperCurrent(getHomeTabIndex(activeTab));
+  }, [activeTab]);
+
+  useEffect(() => {
+    measureHomeSwiperHeight(activeTab);
+  }, [activeTab, schedules, todoItems, recentRecords, measureHomeSwiperHeight]);
+
+  useEffect(() => {
+    return () => {
+      if (homeTabMeasureTimerRef.current) {
+        clearTimeout(homeTabMeasureTimerRef.current);
+      }
+    };
+  }, []);
+
+  const noticeItem = operationContent.placements.notices[0] || null;
+  const floatingItem = operationContent.placements.floatings[0] || null;
 
   return (
-    <PageContainer safeBottom>
-      <View className="min-h-screen bg-gradient-subtle pb-24">
-        {/* ========== 顶部渐变区域 ========== */}
-        <View className="bg-gradient-primary px-6 pt-8 pb-10 rounded-b-60rpx shadow-elegant relative overflow-hidden">
-          {/* 装饰圆 */}
-          <View className="absolute top-4 right-4 w-24 h-24 rounded-full bg-white/10 blur-xl" />
-          <View className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/10 blur-lg" />
+    <>
+      <ScrollView scrollY showScrollbar={false} className="h-screen bg-[var(--muted)] no-scrollbar">
+        {/* ========== 渐变背景层 ========== */}
+        <View className="gradient-bg" />
+        <View className="gradient-fade" />
 
-          {/* 通知铃铛 */}
-          <View className="absolute top-6 right-6 z-20">
-            <View
-              className="relative w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
-              onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
-            >
-              <Icon name="mdi-bell" size="lg" color="white" />
-              {unreadCount > 0 && (
-                <View className="absolute -top-1 -right-1 min-w-18px h-18px rounded-full bg-badge text-white text-10px font-bold flex items-center justify-center px-1">
-                  <Text>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        {/* ========== 内容层 ========== */}
+        <View className="relative z-[200]">
+          {/* ===== 自定义导航栏：状态栏占位 + 机构/校区信息 + 胶囊安全区 ===== */}
+          <View
+            style={{ height: `${navSafeHeight}px` }}
+            className="flex items-end px-[32rpx] pb-[12rpx]"
+          >
+            <View className="flex items-center gap-[16rpx]">
+              {/* 机构名称 */}
+              <Text className="text-[32rpx] font-bold text-white truncate max-w-[200rpx]">
+                {orgName || currentIdentity?.organizationName || '云策教务'}
+              </Text>
+              {/* 校区选择器 - 点击展开下拉 */}
+              <View className="relative shrink-0">
+                <View
+                  className="flex items-center gap-[8rpx] py-[12rpx] pr-[12rpx] pl-[4rpx]"
+                  onClick={handleToggleCampusPicker}
+                >
+                  <Icon name="mdi-map-marker" size="xs" color="white" />
+                  <Text className="text-[28rpx] text-white/90 truncate max-w-[160rpx]">
+                    {mainCampus?.name || '主校区'}
+                  </Text>
+                  <Icon
+                    name={showCampusPicker ? 'mdi-chevron-down' : 'mdi-chevron-right'}
+                    size="md"
+                    color="white"
+                  />
                 </View>
+              </View>
+            </View>
+          </View>
+
+          {/* 通知铃铛 - 绝对定位，避免被胶囊按钮遮挡 */}
+          <View
+            className="absolute right-[32rpx]"
+            style={{ top: `${navSafeHeight - 4}px` }}
+            onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+          >
+            <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
+              <Icon name="mdi-bell-outline" size={44} color="white" />
+              {unreadCount > 0 && (
+                <View className="absolute top-[10rpx] right-[10rpx] w-[18rpx] h-[18rpx] bg-destructive rounded-full border-[2rpx] border-[hsl(var(--primary))]" />
               )}
             </View>
           </View>
 
-          <View className="relative z-10">
-            {isTeacher ? (
-              /* ---- 教师顶部 ---- */
-              <>
-                <Text className="text-white text-xl opacity-90">教师工作台</Text>
-                <Text className="text-white text-3xl font-bold mt-1 block">
-                  {profile?.name || '用户'}，您好
-                </Text>
-                <View className="flex gap-3 mt-5">
-                  <StatCard label="今日消课" value={todayRecordCount} />
-                  <StatCard label="学生人数" value={teacherStudents.length} />
-                  <StatCard label="剩余课时" value={totalRemaining} />
+          {/* ===== 主标题 ===== */}
+          <View className="px-[40rpx] pt-[24rpx] pb-0">
+            <Text
+              className="font-black text-white leading-tight tracking-tight"
+              style={{ fontSize: `${greetingSize}rpx` }}
+            >
+              你好~ {nickname || ROLE_LABEL[currentRole || 'teacher']}
+            </Text>
+          </View>
+
+          {/* ===== 统计卡片 + IP 形象 ===== */}
+          {isStaffRole(currentRole) ? (
+            <View className="stats-ip-wrapper">
+              <Image className="ip-mascot" src="/assets/images/ip-mascot.png" mode="aspectFit" />
+              <StatsOverview
+                period={statsPeriod}
+                onPeriodChange={handleStatsPeriodChange}
+                data={statsData}
+              />
+            </View>
+          ) : (
+            <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
+              <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
+              <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">
+                {ROLE_LABEL[currentRole || 'parent']}端首页
+              </Text>
+              <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
+                当前联调阶段先展示通用运营内容{'\n'}
+                可从消息通知和个人中心继续使用家长侧能力
+              </Text>
+              <View className="mt-[24rpx] flex gap-[16rpx] w-full">
+                <View
+                  className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
+                  onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+                >
+                  <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
                 </View>
-              </>
-            ) : (
-              /* ---- 家长顶部 ---- */
-              <>
-                <Text className="text-white/80 text-xl">家长看板</Text>
-                <Text className="text-white text-3xl font-bold mt-1 block">
-                  {activeChild
-                    ? activeChild.name
-                    : parentChildren.length === 0
-                      ? '欢迎使用'
-                      : '加载中…'}
+                <View
+                  className="flex-1 rounded-full border border-[hsl(var(--primary))] px-[24rpx] py-[18rpx] flex items-center justify-center"
+                  onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
+                >
+                  <Text className="text-[24rpx] font-medium text-primary">个人中心</Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View className="relative z-[120] px-[32rpx] mt-[24rpx]">
+          {operationLoading ? (
+            <View className="rounded-[32rpx] bg-white/80 px-[28rpx] py-[36rpx] text-center">
+              <Text className="text-[24rpx] text-muted-foreground">运营内容加载中...</Text>
+            </View>
+          ) : null}
+
+          {/* 广告位 - 圆形胶囊样式（默认隐藏，联调后由后端控制展示） */}
+          {!operationLoading && operationContent.placements.banners.length > 0 ? (
+            <View className="flex flex-wrap gap-[16rpx]">
+              {operationContent.placements.banners.map((banner) => (
+                <View
+                  key={banner.id}
+                  className="inline-flex items-center gap-[8rpx] rounded-full bg-[hsl(var(--primary)/0.1)] px-[24rpx] py-[14rpx] active:bg-[hsl(var(--primary)/0.15)] transition-colors duration-200"
+                  onClick={() => void handleOperationTap(banner)}
+                >
+                  <Icon name="mdi-bullhorn-outline" size="xs" className="text-primary shrink-0" />
+                  <Text className="text-[24rpx] font-semibold text-primary whitespace-nowrap">
+                    {banner.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {!operationLoading && operationError ? (
+            <View className="mt-[16rpx] rounded-[24rpx] bg-card px-[24rpx] py-[20rpx] text-center">
+              <Text className="text-[24rpx] text-muted-foreground">{operationError}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* ===== 金刚区（校长+教师显示） ===== */}
+        {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
+
+        {/* ===== Tab 切换栏 + 内容区 - 合并为同一白色容器，避免缝隙透出蓝色背景 ===== */}
+        <View className="relative z-[100] bg-card px-[32rpx] pb-[200rpx]">
+          {noticeItem ? (
+            <View
+              className="mt-[24rpx] mb-[8rpx] rounded-[24rpx] bg-[hsl(var(--primary)/0.08)] px-[24rpx] py-[20rpx] flex items-start gap-[16rpx]"
+              onClick={() => void handleOperationTap(noticeItem)}
+            >
+              <Icon name="mdi-bullhorn-outline" size="sm" className="text-primary shrink-0" />
+              <View className="flex-1 min-w-0">
+                <Text className="text-[26rpx] font-semibold text-foreground block">{noticeItem.title}</Text>
+                <Text className="text-[22rpx] text-muted-foreground mt-[4rpx]">
+                  {getOperationSummary(noticeItem)}
                 </Text>
-                {activeChild?.invite_code && (
-                  <View className="mt-1 flex items-center gap-2">
-                    <Text className="text-white/60 text-sm">标识码</Text>
-                    <Text className="text-white/90 text-sm font-mono">
-                      {activeChild.invite_code}
+              </View>
+            </View>
+          ) : null}
+
+          {operationContent.placements.cards.length > 0 ? (
+            <View className="mt-[24rpx] flex flex-col gap-[20rpx]">
+              {operationContent.placements.cards.map((card) => (
+                <View
+                  key={card.id}
+                  className="rounded-[28rpx] bg-card shadow-card border-[2rpx] border-[hsl(var(--border))] overflow-hidden"
+                  onClick={() => void handleOperationTap(card)}
+                >
+                  {card.coverImageUrl ? (
+                    <Image className="w-full h-[220rpx]" src={card.coverImageUrl} mode="aspectFill" />
+                  ) : null}
+                  <View className="px-[24rpx] py-[24rpx]">
+                    <Text className="text-[30rpx] font-bold text-foreground block">{card.title}</Text>
+                    <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] line-clamp-2">
+                      {getOperationSummary(card)}
                     </Text>
                   </View>
-                )}
-                {activeChild && (
-                  <View className="flex gap-3 mt-5">
-                    <StatCard label="总课时" value={parentSummary.totalAll} />
-                    <StatCard label="已消课" value={parentSummary.totalUsed} />
-                    <StatCard label="剩余" value={parentSummary.totalRemaining} />
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
-        {/* ========== 错误提示 ========== */}
-        {errorMsg && (
-          <View className="px-6 mt-4">
-            <View className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 flex items-center gap-3">
-              <Icon name="mdi-alert-circle" size="xl" color="error" />
-              <Text className="flex-1 text-destructive text-lg">{errorMsg}</Text>
+          <View className="flex items-baseline gap-[24rpx] -mx-[32rpx] px-[32rpx] py-[24rpx]">
+            {TAB_OPTIONS.map((tab) => (
               <View
-                className="px-3 py-1 rounded-full bg-destructive text-white text-base font-medium flex items-center justify-center leading-none"
-                onClick={loadData}
+                key={tab.key}
+                className={homeSwiperCurrent === getHomeTabIndex(tab.key) ? 'tab-item-v14 active' : 'tab-item-v14'}
+                onClick={() => handleHomeTabChange(tab.key)}
               >
-                <Text>重试</Text>
+                <Text>{tab.label}</Text>
+                {tab.badge && tab.badge > 0 && (
+                  <View className="inline-block bg-destructive text-white text-[18rpx] font-bold px-[8rpx] rounded-[16rpx] min-w-[28rpx] h-[28rpx] leading-[28rpx] text-center ml-[4rpx]">
+                    <Text className="text-white text-[18rpx]">{tab.badge}</Text>
+                  </View>
+                )}
               </View>
-            </View>
+            ))}
           </View>
-        )}
 
-        {/* ========== 教师视图 ========== */}
-        {isTeacher && (
-          <>
-            {/* 快捷入口 */}
-            <View className="px-6 -mt-4">
-              <View className="bg-white rounded-2xl shadow-soft p-5">
-                <Text className="text-xl font-semibold text-foreground mb-4 block">快捷入口</Text>
-                <View className="grid grid-cols-4 gap-x-4 gap-y-5">
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/lesson-form/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-check-circle" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">课时消课</Text>
+          {/* ===== Tab 内容区 ===== */}
+          {isStaffRole(currentRole) && (
+            <View onClick={() => scheduleHomeSwiperMeasure(getHomeTabByIndex(homeSwiperCurrent))}>
+              <Swiper
+                current={homeSwiperCurrent}
+                duration={HOME_TAB_SWIPER_DURATION}
+                easingFunction="easeOutCubic"
+                style={{ height: `${homeSwiperHeight}px` }}
+                onChange={handleHomeSwiperChange}
+                onAnimationFinish={handleHomeSwiperFinish}
+              >
+                <SwiperItem itemId="schedule">
+                  <View id="home-tab-panel-schedule">
+                    <TodayScheduleCard schedules={schedules} title="" />
                   </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/student-form/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-purple-soft flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-account-plus" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">添加学生</Text>
+                </SwiperItem>
+                <SwiperItem itemId="todo">
+                  <View id="home-tab-panel-todo" className="pt-[24rpx]">
+                    <TodoList items={todoItems} />
                   </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/package-form/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-orange-soft flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-cash-plus" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">课时充值</Text>
+                </SwiperItem>
+                <SwiperItem itemId="recent">
+                  <View id="home-tab-panel-recent" className="pt-[24rpx]">
+                    <LessonConsumptionList
+                      sections={recentSections}
+                      emptyText="暂无消课记录"
+                      footerText="查看更多"
+                      onFooterClick={() =>
+                        Taro.navigateTo({ url: '/package-teacher/pages/attendance/index' })
+                      }
+                    />
                   </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/students/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-gradient-accent flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-account-group" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">学生管理</Text>
-                  </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/classes/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-info-soft flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-school" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">班级管理</Text>
-                  </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/course-packages/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-soft bg-purple-vivid">
-                      <Icon name="mdi-package-variant" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">课包管理</Text>
-                  </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/teacher-list/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-teal-soft flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-account-supervisor" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">教师管理</Text>
-                  </View>
-                  <View
-                    className="flex flex-col items-center gap-1 p-1 rounded-2xl"
-                    onClick={() => Taro.navigateTo({ url: '/pages/campus/index' })}
-                  >
-                    <View className="w-12 h-12 rounded-2xl bg-rose-soft flex items-center justify-center shadow-soft">
-                      <Icon name="mdi-map-marker" size="lg" color="white" />
-                    </View>
-                    <Text className="text-base text-foreground whitespace-nowrap">校区设置</Text>
-                  </View>
-                </View>
+                </SwiperItem>
+              </Swiper>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* ===== 校区下拉菜单（fixed 定位避免被 ScrollView 裁剪） ===== */}
+      {showCampusPicker && (
+        <View
+          className="fixed inset-0 z-[9999]"
+          style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+          onClick={() => setShowCampusPicker(false)}
+        >
+          <View
+            className="absolute left-[32rpx] top-[120rpx] bg-card rounded-[20rpx] shadow-float py-[8rpx] min-w-[240rpx] border-[2rpx] border-[hsl(var(--border))]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {campusOptions.length === 0 ? (
+              <View className="px-[24rpx] py-[16rpx]">
+                <Text className="text-[26rpx] text-muted-foreground">暂无校区</Text>
               </View>
-            </View>
-
-            {/* 周课表 */}
-            <View className="px-6 mt-5">
-              <View className="bg-white rounded-2xl shadow-soft p-5">
-                <View className="flex items-center justify-between mb-1">
-                  <Text className="text-xl font-semibold text-foreground">周课表</Text>
-                  <View
-                    className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-soft"
-                    onClick={() => Taro.navigateTo({ url: '/pages/schedule-form/index' })}
-                  >
-                    <Icon name="mdi-plus" size="md" color="white" />
-                  </View>
-                </View>
-                <Text className="text-sm text-muted-foreground mb-4 block">
-                  （仅方便老师使用，家长端不展示）
-                </Text>
-                <ScheduleTimeline schedules={teacherSchedules} />
-              </View>
-            </View>
-
-            {/* 学生快捷入口 */}
-            <View className="px-6 mt-5">
-              <StudentQuickList students={teacherStudents} />
-            </View>
-
-            {/* 最近消课 */}
-            <View className="px-6 mt-6">
-              <View className="flex items-center justify-between mb-3">
-                <Text className="text-xl font-semibold text-foreground">最近核销</Text>
-                <Text
-                  className="text-primary text-base"
-                  onClick={() => Taro.navigateTo({ url: '/pages/records/index' })}
+            ) : (
+              campusOptions.map((campus) => (
+                <View
+                  key={campus.id}
+                  className={`px-[24rpx] py-[16rpx] text-[26rpx] ${campus.isMain ? 'text-[hsl(var(--primary))] font-bold' : 'text-foreground'}`}
+                  onClick={() => handleCampusSelect(campus)}
                 >
-                  查看全部
-                </Text>
-              </View>
-              <View className="space-y-3">
-                {teacherRecords.length > 0 ? (
-                  teacherRecords.map((r) => <RecentRecordItem key={r.id} record={r} />)
-                ) : (
-                  <View className="bg-white rounded-2xl p-8 shadow-soft text-center">
-                    <Icon name="mdi-inbox" size="xxl" color="muted" />
-                    <View className="text-muted-foreground text-lg">暂无记录</View>
-                  </View>
-                )}
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* ========== 家长视图 ========== */}
-        {!isTeacher && (
-          <>
-            {/* 未绑定学生 */}
-            {parentChildren.length === 0 && !errorMsg && (
-              <View className="px-6 mt-5">
-                <View className="bg-white rounded-2xl p-6 shadow-soft flex flex-col items-center gap-4 mt-6">
-                  <View className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Icon name="mdi-link-plus" size="xxl" color="primary" />
-                  </View>
-                  <View className="text-center">
-                    <View className="text-xl font-semibold text-foreground mb-1">还未绑定学生</View>
-                    <View className="text-base text-muted-foreground">
-                      请前往「我的」页面，绑定孩子的学习账户
-                    </View>
-                  </View>
-                  <View
-                    className="w-full btn-primary bg-gradient-primary text-white text-xl font-medium shadow-elegant"
-                    onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
-                  >
-                    <Text>前往绑定</Text>
-                  </View>
+                  <Text>
+                    {campus.name}
+                    {campus.isMain ? ' (主)' : ''}
+                  </Text>
                 </View>
-              </View>
+              ))
             )}
+          </View>
+        </View>
+      )}
 
-            {/* 已绑定学生 */}
-            {parentChildren.length > 0 && (
-              <View className="px-6 mt-5 space-y-5 pb-6">
-                {/* 孩子选择器 */}
-                <ChildSelector
-                  children={parentChildren}
-                  activeId={activeStudentId}
-                  onChange={handleChildChange}
-                />
+      {floatingItem ? (
+        <View
+          className="fixed right-[32rpx] bottom-[160rpx] z-[9998] max-w-[220rpx]"
+          onClick={() => void handleOperationTap(floatingItem)}
+        >
+          <View className="rounded-full bg-[hsl(var(--primary))] px-[24rpx] py-[18rpx] shadow-float">
+            <Text className="text-[24rpx] font-semibold text-white">{floatingItem.title}</Text>
+          </View>
+        </View>
+      ) : null}
 
-                {/* 课时汇总 */}
-                <HourProgress packages={parentPackages} />
-
-                {/* 课时不足提醒 */}
-                {parentSummary.totalRemaining < 3 && parentSummary.totalAll > 0 && (
-                  <View className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 flex items-center gap-3">
-                    <Icon name="mdi-alert-circle" size="xl" color="error" />
-                    <View>
-                      <View className="text-destructive font-medium text-lg">课时不足提醒</View>
-                      <View className="text-destructive/80 text-base">
-                        剩余课时仅 {parentSummary.totalRemaining} 课时，请联系教师充值
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {/* 今日课程 */}
-                {parentSchedules.length > 0 && (
-                  <View className="bg-white rounded-2xl shadow-soft p-4">
-                    <View className="flex items-center justify-between mb-3">
-                      <Text className="text-lg font-semibold text-foreground">上课安排</Text>
-                    </View>
-                    <ScheduleTimeline schedules={parentSchedules} />
-                  </View>
-                )}
-
-                {/* 上课记录 / 课时充值 Tab */}
-                <ParentRecordTab
-                  records={parentRecords}
-                  packages={parentPackages}
-                  loading={parentLoading}
-                />
-              </View>
-            )}
-          </>
-        )}
-      </View>
-    </PageContainer>
+      {/* 身份切换 Sheet */}
+      <RoleSwitchSheet visible={roleSheetVisible} onClose={() => setRoleSheetVisible(false)} />
+    </>
   );
 };
-
-// ============================================
-// 家长端记录/套餐 Tab 子组件
-// ============================================
-type TabKey = 'records' | 'packages';
-
-const ParentRecordTab: React.FC<{
-  records: LessonRecord[];
-  packages: CoursePackage[];
-  loading: boolean;
-}> = ({ records, packages, loading }) => {
-  const [activeTab, setActiveTab] = useState<TabKey>('records');
-
-  return (
-    <View className="bg-white rounded-2xl shadow-soft overflow-hidden">
-      {/* Tab 头 */}
-      <View className="flex border-b border-input">
-        <View
-          className={`flex-1 py-3 text-xl font-medium flex items-center justify-center leading-none ${activeTab === 'records' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'}`}
-          onClick={() => setActiveTab('records')}
-        >
-          <Text>上课记录</Text>
-        </View>
-        <View
-          className={`flex-1 py-3 text-xl font-medium flex items-center justify-center leading-none ${activeTab === 'packages' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'}`}
-          onClick={() => setActiveTab('packages')}
-        >
-          <Text>课时充值</Text>
-        </View>
-      </View>
-
-      {/* Tab 内容 */}
-      <View className="p-4 space-y-3">
-        {loading ? (
-          <View className="text-center py-8 text-muted-foreground text-lg">加载中…</View>
-        ) : activeTab === 'records' ? (
-          records.length > 0 ? (
-            records.map((r) => (
-              <View key={r.id} className="bg-muted/40 rounded-2xl p-4">
-                <View className="flex items-center justify-between">
-                  <View className="flex items-center gap-3">
-                    <View className="w-9 h-9 rounded-full bg-gradient-primary flex items-center justify-center">
-                      <Icon name="mdi-book-open-variant" size="sm" color="white" />
-                    </View>
-                    <View>
-                      <View className="text-lg font-medium text-foreground">
-                        {r.course_package?.name || '课程'}
-                      </View>
-                      <View className="text-sm text-muted-foreground">
-                        {formatDateCN(r.lesson_date)}
-                      </View>
-                    </View>
-                  </View>
-                  <Text className="text-lg font-semibold text-primary">-{r.hours_used}课时</Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Empty icon="mdi-calendar-blank" description="暂无上课记录" />
-          )
-        ) : packages.length > 0 ? (
-          packages.map((pkg) => (
-            <View key={pkg.id} className="bg-muted/40 rounded-2xl p-4">
-              <View className="flex items-center justify-between mb-2">
-                <View className="flex items-center gap-3">
-                  <View className="w-9 h-9 rounded-full bg-gradient-accent flex items-center justify-center">
-                    <Icon name="mdi-cash-multiple" size="sm" color="white" />
-                  </View>
-                  <View>
-                    <View className="text-lg font-medium text-foreground">{pkg.name}</View>
-                    <View className="text-sm text-muted-foreground">
-                      {formatDateCN(pkg.created_at)}
-                    </View>
-                  </View>
-                </View>
-                <View className="text-right">
-                  <View className="text-lg font-semibold text-primary">+{pkg.total_hours}课时</View>
-                  {pkg.fee_amount != null && pkg.fee_amount > 0 && (
-                    <View className="text-sm text-muted-foreground">¥{pkg.fee_amount}</View>
-                  )}
-                </View>
-              </View>
-              <View className="flex items-center justify-between text-sm text-muted-foreground">
-                <Text>
-                  剩余 {pkg.remaining_hours} / 共 {pkg.total_hours} 课时
-                </Text>
-                <Text
-                  className={`px-2 py-0_d5 rounded-full text-xs ${pkg.status === 'active' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}
-                >
-                  {pkg.status === 'active'
-                    ? '生效中'
-                    : pkg.status === 'completed'
-                      ? '已用完'
-                      : '已过期'}
-                </Text>
-              </View>
-            </View>
-          ))
-        ) : (
-          <Empty icon="mdi-package-variant" description="暂无充值记录" />
-        )}
-      </View>
-    </View>
-  );
-};
-
-/** 日期格式化 */
-function formatDateCN(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
 
 export default withRouteGuard(Home);

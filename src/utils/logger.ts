@@ -3,7 +3,10 @@
  * 对接真实 API 后可替换为远程日志服务
  */
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev =
+  typeof process !== 'undefined' &&
+  typeof process.env !== 'undefined' &&
+  process.env.NODE_ENV === 'development';
 
 /** 开发环境输出错误日志 */
 export function logError(context: string, err?: unknown): void {

@@ -1,4 +1,5 @@
 import { View, Text } from '@tarojs/components';
+import dayjs from 'dayjs';
 import React from 'react';
 import type { LessonRecord } from '@/types/lesson-record';
 
@@ -6,15 +7,11 @@ interface RecentRecordItemProps {
   record: LessonRecord;
 }
 
-function formatDateCN(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
 const RecentRecordItem: React.FC<RecentRecordItemProps> = ({ record }) => {
   const studentName = record.student?.name || '学生';
   const firstChar = studentName[0] || '学';
   const packageName = record.course_package?.name || '课程';
+  const dateText = dayjs(record.lesson_date).format('M月D日');
 
   return (
     <View className="flex items-center p-4 bg-white rounded-2xl shadow-soft mb-3 press-scale">
@@ -27,7 +24,7 @@ const RecentRecordItem: React.FC<RecentRecordItemProps> = ({ record }) => {
       </View>
       <View className="flex flex-col items-end gap-1">
         <Text className="text-lg font-semibold text-primary">-{record.hours_used}课时</Text>
-        <Text className="text-sm text-muted-foreground">{formatDateCN(record.lesson_date)}</Text>
+        <Text className="text-sm text-muted-foreground">{dateText}</Text>
       </View>
     </View>
   );

@@ -4,6 +4,7 @@
  * 联调时只需修改 BASE_URL 和拦截器逻辑
  */
 import Taro from '@tarojs/taro';
+import { reportLocalDebug } from '@/utils/local-debug';
 
 // 小程序运行时没有 Node.js 的 process，全局访问前必须先做兼容判断。
 // 小程序端默认走 app 口径，避免与 admin 后台接口混用。
@@ -14,29 +15,6 @@ const RAW_BASE_URL =
 const TIMEOUT = 10000;
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 const BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
-const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
-const DEBUG_SESSION_ID = 'page-slow-nav';
-
-function reportRequestDebug(
-  location: string,
-  msg: string,
-  data: Record<string, unknown>,
-): void {
-  Taro.request({
-    url: DEBUG_SERVER_URL,
-    method: 'POST',
-    data: {
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'pre-fix',
-      hypothesisId: 'H1',
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    },
-  }).catch(() => {});
-}
-
 const buildRequestUrl = (url: string): string => {
   const normalizedPath = url.startsWith('/') ? url : `/${url}`;
   return `${BASE_URL}${normalizedPath}`;
@@ -117,11 +95,16 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
     });
 
     // #region debug-point H1:request-success
-    reportRequestDebug('src/utils/request.ts:request', '[DEBUG] request success', {
+    reportLocalDebug({
+      hypothesisId: 'H1',
+      location: 'src/utils/request.ts:request',
+      msg: '[DEBUG] request success',
+      data: {
       method,
       url,
       durationMs: Date.now() - startAt,
       statusCode: res.statusCode,
+      },
     });
     // #endregion
 
@@ -153,11 +136,16 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
     throw new ApiError(res.statusCode, `请求失败 (${res.statusCode})`);
   } catch (err) {
     // #region debug-point H1:request-fail
-    reportRequestDebug('src/utils/request.ts:request', '[DEBUG] request fail', {
+    reportLocalDebug({
+      hypothesisId: 'H1',
+      location: 'src/utils/request.ts:request',
+      msg: '[DEBUG] request fail',
+      data: {
       method,
       url,
       durationMs: Date.now() - startAt,
       error: err instanceof Error ? err.message : String(err),
+      },
     });
     // #endregion
     if (err instanceof ApiError) throw err;

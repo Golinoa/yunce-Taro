@@ -50,6 +50,7 @@ export type {
 
 // 排课
 export type { ScheduleColor, DayOfWeek, Schedule } from './schedule';
+export type { TemporaryReschedule } from './temporary-reschedule';
 
 // 请假
 export type { LeaveType, LeaveStatus, LeaveRequest } from './leave-request';
@@ -59,3 +60,20 @@ export type { NotificationType, Notification } from './notification';
 
 // 反馈
 export type { Feedback } from './feedback';
+
+// 校区设置
+export type {
+  CampusType,
+  PartnerMode,
+  CampusUIModel,
+  CampusStats,
+  CampusFormData,
+  SalaryModelType as CampusSalaryModelType,
+  SalaryModel as CampusSalaryModel,
+  PayDayMode,
+  PayDaySettings,
+  HolidayStatus,
+  Holiday,
+  BusinessHours,
+  SpecialDate,
+} from './campus';

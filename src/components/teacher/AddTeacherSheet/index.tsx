@@ -15,6 +15,7 @@ import type { TeacherRole, SalaryModelType } from '@/types/teacher';
 
 interface AddTeacherSheetProps {
   visible: boolean;
+  submitting?: boolean;
   onClose: () => void;
   onSubmit: (data: {
     name: string;
@@ -49,7 +50,12 @@ const SUBJECT_OPTIONS = [
   '小提琴',
 ];
 
-const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({ visible, onClose, onSubmit }) => {
+const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({
+  visible,
+  submitting = false,
+  onClose,
+  onSubmit,
+}) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState('钢琴');
@@ -57,6 +63,7 @@ const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({ visible, onClose, onS
   const [modelType, setModelType] = useState<SalaryModelType>('standard');
 
   const handleSubmit = () => {
+    if (submitting) return;
     if (!name.trim()) {
       return;
     }
@@ -70,6 +77,7 @@ const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({ visible, onClose, onS
   };
 
   const handleClose = () => {
+    if (submitting) return;
     setName('');
     setPhone('');
     setSubject('钢琴');
@@ -178,11 +186,13 @@ const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({ visible, onClose, onS
         <View
           className={cn(
             'w-full py-[28rpx] rounded-2xl text-center text-base font-semibold',
-            name.trim() ? 'bg-gradient-primary text-white' : 'bg-muted text-muted-foreground',
+            name.trim() && !submitting
+              ? 'bg-gradient-primary text-white'
+              : 'bg-muted text-muted-foreground',
           )}
-          onClick={name.trim() ? handleSubmit : undefined}
+          onClick={name.trim() && !submitting ? handleSubmit : undefined}
         >
-          确认添加
+          {submitting ? '添加中...' : '确认添加'}
         </View>
       </View>
     </BottomSheet>

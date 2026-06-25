@@ -26,8 +26,12 @@ export interface FormInputProps {
   inputClassName?: string;
   hint?: string;
   prefix?: string;
+  suffix?: React.ReactNode;
   multiline?: boolean;
   minHeight?: string;
+  password?: boolean;
+  /** 输入框视觉变体 */
+  variant?: 'default' | 'capsule';
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -45,13 +49,18 @@ const FormInput: React.FC<FormInputProps> = ({
   inputClassName,
   hint,
   prefix,
+  suffix,
   multiline = false,
   minHeight = '120rpx',
+  password = false,
+  variant = 'default',
 }) => {
+  const isCapsule = variant === 'capsule';
+
   return (
-    <View className={cn('mb-4', className)}>
-      {/* 标签行 */}
-      {label && (
+    <View className={cn(!isCapsule && 'mb-4', className)}>
+      {/* 标签行（仅 default 变体显示） */}
+      {label && !isCapsule && (
         <View className="flex flex-row items-center gap-1 mb-[12rpx]">
           <Text className="text-sm text-muted-foreground font-medium">{label}</Text>
           {required && <Text className="text-base text-destructive">*</Text>}
@@ -60,13 +69,13 @@ const FormInput: React.FC<FormInputProps> = ({
       {/* 输入框容器 */}
       <View
         className={cn(
-          'relative w-full flex flex-row items-center py-[22rpx] px-[28rpx] rounded-2xl',
+          'relative w-full flex flex-row items-center',
+          isCapsule
+            ? 'py-[24rpx] px-[36rpx] rounded-full bg-white border-[2rpx] border-white/70 shadow-[0_12rpx_40rpx_rgba(59,110,245,0.10)]'
+            : 'py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light',
+          error && !isCapsule && 'border-destructive',
           disabled && 'opacity-60',
         )}
-        style={{
-          backgroundColor: '#f5faf8',
-          border: error ? '3rpx solid #E46767' : '3rpx solid #D5E8E0',
-        }}
       >
         {prefix && (
           <Text className="text-base font-semibold text-muted-foreground mr-2 flex-shrink-0">
@@ -89,7 +98,11 @@ const FormInput: React.FC<FormInputProps> = ({
           />
         ) : (
           <Input
-            className={cn('w-full text-base text-foreground', inputClassName)}
+            className={cn(
+              'w-full text-base text-foreground',
+              isCapsule && 'text-center',
+              inputClassName,
+            )}
             placeholder={placeholder}
             placeholderClass={placeholderClass || 'input-placeholder'}
             value={value}
@@ -97,8 +110,10 @@ const FormInput: React.FC<FormInputProps> = ({
             type={type}
             maxlength={maxlength}
             disabled={disabled}
+            password={password}
           />
         )}
+        {suffix}
       </View>
       {/* 错误提示：红色圆点! + 文字 */}
       {error && (

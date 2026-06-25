@@ -18,7 +18,22 @@ export type ClassStatus = 'active' | 'ended';
 /**
  * 班级颜色主题
  */
-export type ClassColor = 'primary' | 'accent' | 'amber' | 'info' | 'purple';
+export type ClassColor = 'primary' | 'red' | 'amber' | 'purple' | 'info' | 'teal';
+
+/**
+ * 班级图标（教培相关 emoji）
+ */
+export type ClassIcon =
+  | 'piano'
+  | 'dance'
+  | 'art'
+  | 'calligraphy'
+  | 'basketball'
+  | 'speech'
+  | 'rubik'
+  | 'go'
+  | 'book'
+  | 'music';
 
 /**
  * 班级信息 (classes 表)
@@ -45,7 +60,10 @@ export interface Class {
   start_date?: string; // 开始日期（课时制）
   end_date?: string; // 结束日期（课时制）
   color: ClassColor; // 主题色标识
+  icon?: ClassIcon; // 班级图标标识
   student_count: number; // 学生数量
+  campus_id?: string; // 关联校区ID
+  campus_name?: string; // 关联校区名称
 }
 
 /**

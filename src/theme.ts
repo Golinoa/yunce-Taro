@@ -11,78 +11,119 @@
 
 // ============================================
 // 颜色 Token（HSL 值，用于 CSS 变量和运行时拼接）
+// 配色方案对齐设计稿 scheme-bc-fusion-v2.html（蓝色主题 + 花瓣五色）
 // ============================================
 export const colors = {
-  // 主题色
-  primary: '168 55% 58%', // #5EC8A8
+  // 主题色（对齐设计稿 #3B6EF5 采集工具蓝）
+  primary: '224 90% 60%', // #3B6EF5
   primaryForeground: '0 0% 100%', // #FFFFFF
-  primaryGlow: '168 55% 75%', // #9EDDC7
-  primaryDark: '168 45% 45%', // #3DA88A
+  primaryGlow: '222 87% 69%', // #6B95F5
+  primaryDark: '221 83% 53%', // #2563EB
 
   // 次要色
-  secondary: '168 35% 92%', // #E3F2EF
-  secondaryForeground: '160 15% 25%', // #374842
+  secondary: '224 90% 95%', // #D8E5F8
+  secondaryForeground: '224 50% 25%', // #1E2D5C
 
-  // 强调色
-  accent: '340 60% 78%', // #E89BB8
+  // 强调色（对齐设计稿 #8B5CF6 花瓣素材紫）
+  accent: '258 90% 66%', // #8B5CF6
   accentForeground: '0 0% 100%', // #FFFFFF
-  accentGlow: '340 60% 88%', // #F2C5D6
+  accentGlow: '258 90% 76%', // #A78BFA
 
   // 背景
-  background: '160 30% 97%', // #FAFDFB
-  foreground: '160 15% 25%', // #374842
+  background: '210 20% 97%', // #f8f9fa
+  foreground: '0 0% 10%', // #1a1a1a
 
   // 卡片
   card: '0 0% 100%', // #FFFFFF
-  cardForeground: '160 15% 25%', // #374842
+  cardForeground: '0 0% 10%', // #1a1a1a
 
   // 柔和
-  muted: '168 25% 94%', // #EDF5F2
-  mutedForeground: '160 10% 50%', // #738C82
+  muted: '210 20% 96%', // #f0f2f5
+  mutedForeground: '0 0% 54%', // #8a8a8a
 
-  // 危险
-  destructive: '0 70% 65%', // #D94040
+  // 文本三级色（对齐设计稿 text-primary/secondary/tertiary）
+  foregroundSecondary: '0 0% 33%', // #555555
+
+  // 危险（对齐设计稿 #ef4444）
+  destructive: '0 84% 60%', // #ef4444
   destructiveForeground: '0 0% 100%',
 
-  // 边框
-  border: '168 25% 88%', // #D5E8E0
-  input: '168 25% 88%', // #D5E8E0
-  ring: '168 55% 58%', // #5EC8A8
+  // 边框（对齐设计稿 #eef0f2 border-light）
+  border: '210 20% 94%', // #eef0f2
+  borderLight: '210 20% 94%', // #eef0f2
+  input: '210 20% 94%', // #eef0f2
+  ring: '224 90% 60%', // #3B6EF5
 
-  // 状态色
-  success: '140 55% 50%', // #3ABF6E
-  warning: '43 74% 66%', // #E8C468
-  error: '0 70% 65%', // #D94040
-  info: '200 55% 65%', // #6BB5D4
+  // 状态色（对齐设计稿）
+  success: '160 84% 39%', // #10b981
+  warning: '38 92% 50%', // #f59e0b
+  error: '0 84% 60%', // #ef4444
+  info: '199 89% 48%', // #0EA5E9
 
-  // 图表色板
-  chart1: '168 55% 58%', // #5EC8A8
-  chart2: '340 60% 78%', // #E89BB8
-  chart3: '200 55% 65%', // #6BB5D4
-  chart4: '43 74% 66%', // #E8C468
-  chart5: '27 87% 67%', // #E8864A
+  // 身份角色色（对齐注册流程设计稿）
+  rolePrincipal: '38 92% 50%', // #F59E0B 校长
+  rolePrincipalGlow: '45 91% 59%', // #FBBF24
+  rolePrincipalDark: '32 94% 44%', // #D97706
+  roleTeacher: '224 90% 60%', // #3B6EF5 教师
+  roleTeacherGlow: '222 87% 69%', // #6B95F5
+  roleTeacherDark: '221 83% 53%', // #2563EB
+  roleParent: '258 90% 66%', // #8B5CF6 家长
+  roleParentGlow: '258 90% 76%', // #A78BFA
+  roleParentDark: '262 83% 58%', // #7C3AED
+
+  // 花瓣五色（对齐设计稿 petal 配色，用于 KPI 卡片渐变）
+  petalBlue: '224 90% 60%', // #3B6EF5
+  petalPurple: '258 90% 66%', // #8B5CF6
+  petalOrange: '38 92% 50%', // #F59E0B
+  petalRed: '0 84% 60%', // #EF4444
+  petalCyan: '189 94% 43%', // #06B6D4
+
+  // 图表色板（对齐花瓣五色）
+  chart1: '224 90% 60%', // #3B6EF5 蓝
+  chart2: '258 90% 66%', // #8B5CF6 紫
+  chart3: '189 94% 43%', // #06B6D4 青
+  chart4: '38 92% 50%', // #F59E0B 橙
+  chart5: '0 84% 60%', // #EF4444 红
 } as const;
 
 // ============================================
 // HEX 颜色快捷引用（仅用于无法使用 CSS 变量的场景，如 ECharts 配置）
 // ============================================
 export const hexColors = {
-  primary: '#5EC8A8',
-  primaryLight: '#9EDDC7',
-  primaryDark: '#3DA88A',
-  accent: '#E89BB8',
-  accentLight: '#F2C5D6',
-  background: '#FAFDFB',
-  foreground: '#374842',
+  primary: '#3B6EF5',
+  primaryLight: '#6B95F5',
+  primaryDark: '#2563EB',
+  accent: '#8B5CF6',
+  accentLight: '#A78BFA',
+  background: '#f8f9fa',
+  foreground: '#1a1a1a',
+  foregroundSecondary: '#555555',
   card: '#FFFFFF',
-  muted: '#EDF5F2',
-  mutedForeground: '#738C82',
-  destructive: '#D94040',
-  border: '#D5E8E0',
-  success: '#3ABF6E',
-  warning: '#E8C468',
-  error: '#D94040',
-  info: '#6BB5D4',
+  muted: '#f0f2f5',
+  mutedForeground: '#8a8a8a',
+  destructive: '#ef4444',
+  border: '#eef0f2',
+  borderLight: '#eef0f2',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  info: '#0EA5E9',
+  // 身份角色色
+  rolePrincipal: '#F59E0B',
+  rolePrincipalGlow: '#FBBF24',
+  rolePrincipalDark: '#D97706',
+  roleTeacher: '#3B6EF5',
+  roleTeacherGlow: '#6B95F5',
+  roleTeacherDark: '#2563EB',
+  roleParent: '#8B5CF6',
+  roleParentGlow: '#A78BFA',
+  roleParentDark: '#7C3AED',
+  // 花瓣五色
+  petalBlue: '#3B6EF5',
+  petalPurple: '#8B5CF6',
+  petalOrange: '#F59E0B',
+  petalRed: '#EF4444',
+  petalCyan: '#06B6D4',
 } as const;
 
 // ============================================
@@ -145,24 +186,26 @@ export const fontWeight = {
 } as const;
 
 // ============================================
-// 阴影 Token
+// 阴影 Token（对齐设计稿蓝色主题阴影）
 // ============================================
 export const shadows = {
-  elegant: '0 20rpx 60rpx -20rpx hsl(168 55% 58% / 0.3)',
-  soft: '0 8rpx 40rpx -8rpx rgba(54, 73, 67, 0.1)',
-  card: '0 2rpx 12rpx rgba(0, 0, 0, 0.08)',
-  cardHover: '0 4rpx 20rpx rgba(0, 0, 0, 0.12)',
-  float: '0 4rpx 16rpx rgba(0, 0, 0, 0.1)',
+  elegant: '0 20rpx 60rpx -20rpx rgba(59, 110, 245, 0.3)',
+  soft: '0 8rpx 40rpx -8rpx rgba(59, 110, 245, 0.08)',
+  card: '0 2rpx 12rpx rgba(59, 110, 245, 0.06)',
+  cardHover: '0 4rpx 20rpx rgba(59, 110, 245, 0.1)',
+  float: '0 4rpx 16rpx rgba(59, 110, 245, 0.08)',
   popup: '0 8rpx 32rpx rgba(0, 0, 0, 0.15)',
+  rollcall: '0 4rpx 16rpx rgba(37, 99, 235, 0.3)',
 } as const;
 
 // ============================================
-// 渐变 Token
+// 渐变 Token（对齐设计稿蓝色主题）
 // ============================================
 export const gradients = {
-  primary: 'linear-gradient(135deg, hsl(168 55% 58%), hsl(168 55% 75%))',
-  accent: 'linear-gradient(135deg, hsl(340 60% 78%), hsl(340 60% 88%))',
-  subtle: 'linear-gradient(180deg, #f5faf8, #e3f2ef)',
+  primary:
+    'linear-gradient(135deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 50%, hsl(var(--primary-dark)) 100%)',
+  accent: 'linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-glow)))',
+  subtle: 'linear-gradient(180deg, hsl(var(--primary)/0.06), hsl(var(--background)))',
 } as const;
 
 // ============================================
@@ -236,6 +279,7 @@ export async function applyTheme(overrides?: Partial<typeof colors>) {
   const vars = generateCSSVars(overrides);
   // Taro 4.x 支持 setPageStyle
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (Taro as any).setPageStyle?.({ style: vars });
   } catch {
     // 降级：直接设置 page 元素 style（兼容旧版本）

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>云策教务 - 课表页 低保真原型</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{font-family:'PingFang SC','SF Pro Display','Helvetica Neue','Microsoft YaHei',sans-serif;background:#F0F2F5;min-height:100vh;display:flex;justify-content:center;padding:20px 0}
+
+/* 手机壳 */
+.phone{width:375px;height:812px;border-radius:44px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.15);position:relative;flex-shrink:0}
+.phone .scr{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;position:relative}
+.phone .scr::-webkit-scrollbar{width:0;display:none}
+
+/* 状态栏 */
+.sb{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:#1A1A1A;font-size:12px;position:sticky;top:0;background:#fff;z-index:10}
+.sb .t{font-size:14px;font-weight:700}
+
+/* 导航栏 */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px 12px;background:#fff;position:sticky;top:44px;z-index:10}
+.nav-title{font-size:18px;font-weight:800;color:#1A1A1A}
+.nav-actions{display:flex;gap:12px}
+.nav-btn{width:32px;height:32px;border-radius:16px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:none}
+
+/* 日期选择器 */
+.date-bar{display:flex;align-items:center;gap:0;padding:0 16px 16px;background:#fff;position:sticky;top:92px;z-index:10}
+.date-arrow{width:28px;height:28px;border-radius:14px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;border:none;flex-shrink:0}
+.date-week{display:flex;flex:1;gap:2px;justify-content:center}
+.date-cell{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;width:40px;cursor:pointer;border-radius:12px;transition:background .2s}
+.date-cell:hover{background:#F5F5F5}
+.date-cell.on{background:#5EC8A8}
+.date-dow{font-size:10px;color:#8E8E93;font-weight:500}
+.date-num{font-size:14px;font-weight:700;color:#1A1A1A}
+.date-cell.on .date-dow{color:#fff}
+.date-cell.on .date-num{color:#fff}
+.date-today{width:4px;height:4px;border-radius:2px;background:#5EC8A8}
+.date-cell.on .date-today{background:#fff}
+
+/* 视图切换 */
+.view-toggle{display:flex;margin:0 20px 12px;background:#F5F5F5;border-radius:10px;padding:3px}
+.view-btn{flex:1;text-align:center;padding:7px 0;font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s;border:none;background:transparent;color:#8E8E93}
+.view-btn.on{background:#fff;color:#1A1A1A;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+
+/* === 日视图 === */
+.day-view{padding:0 20px 100px}
+.time-slot{display:flex;gap:12px;min-height:72px;position:relative}
+.time-label{width:36px;font-size:11px;color:#8E8E93;font-weight:600;padding-top:2px;flex-shrink:0;text-align:right}
+.time-line{position:absolute;left:48px;right:0;top:0;height:1px;background:#F0F0F0}
+
+/* 课程卡片 */
+.course-card{flex:1;margin:4px 0;padding:12px;border-radius:12px;cursor:pointer;transition:transform .15s;position:relative}
+.course-card:active{transform:scale(.98)}
+.cc-subject{font-size:14px;font-weight:700;color:#fff}
+.cc-info{font-size:11px;color:rgba(255,255,255,0.7);margin-top:4px}
+.cc-time{font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px}
+.cc-badge{position:absolute;top:8px;right:8px;min-width:18px;height:18px;border-radius:9px;background:rgba(255,255,255,0.3);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.cc-status{position:absolute;bottom:8px;right:8px;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600}
+
+/* 颜色方案 */
+.cc-piano{background:linear-gradient(135deg,#5EC8A8,#4AB89A)}
+.cc-vocal{background:linear-gradient(135deg,#7C8CF8,#6B7AE8)}
+.cc-dance{background:linear-gradient(135deg,#F8A07C,#E8906B)}
+.cc-art{background:linear-gradient(135deg,#F87CA0,#E86B90)}
+.cc-theory{background:linear-gradient(135deg,#A07CF8,#906BE8)}
+
+/* 已消课状态 */
+.cc-done{opacity:.6}
+.cc-done .cc-status{background:rgba(255,255,255,0.3);color:#fff}
+
+/* 空时段 */
+.empty-slot{flex:1;margin:4px 0;padding:12px;border:2px dashed #F0F0F0;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .2s}
+.empty-slot:hover{border-color:#5EC8A8}
+.empty-slot span{font-size:11px;color:#C7C7CC}
+
+/* === 周视图 === */
+.week-view{padding:0 12px 100px;display:none}
+.week-header{display:flex;gap:1px;padding:0 0 8px}
+.wh-cell{flex:1;text-align:center;font-size:10px;color:#8E8E93;font-weight:600;padding:4px 0}
+.week-grid{display:flex;gap:1px}
+.week-col{flex:1;display:flex;flex-direction:column;gap:2px}
+.wc-cell{min-height:48px;border-radius:6px;padding:4px;font-size:9px;cursor:pointer;transition:transform .1s}
+.wc-cell:active{transform:scale(.95)}
+.wc-cell.has-class{color:#fff}
+.wc-cell.empty{background:#FAFAFA;border:1px dashed #E8E8E8}
+.wc-name{font-weight:700;font-size:9px;line-height:1.2}
+.wc-time{opacity:.7;font-size:8px;margin-top:1px}
+
+/* === 消课签到弹窗 === */
+.overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.overlay.show{display:flex}
+.sheet{width:100%;background:#fff;border-radius:20px 20px 0 0;max-height:85%;overflow-y:auto;padding-bottom:34px}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:#E0E0E0;margin:10px auto 0}
+.sheet-header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between}
+.sheet-title{font-size:16px;font-weight:700;color:#1A1A1A}
+.sheet-close{width:28px;height:28px;border-radius:14px;background:#F5F5F5;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:none}
+
+/* 课程信息 */
+.lesson-info{padding:0 20px 16px}
+.li-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.li-label{font-size:12px;color:#8E8E93;width:48px}
+.li-value{font-size:13px;color:#1A1A1A;font-weight:500}
+
+/* 签到列表 */
+.checkin-list{padding:0 20px}
+.checkin-label{font-size:13px;font-weight:600;color:#8E8E93;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+.checkin-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F5F5F5}
+.checkin-item:last-child{border-bottom:none}
+.ci-avatar{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.ci-body{flex:1}
+.ci-name{font-size:14px;font-weight:600;color:#1A1A1A}
+.ci-pkg{font-size:11px;color:#8E8E93;margin-top:2px}
+.ci-pkg .pkg-deduct{color:#5EC8A8;font-weight:600}
+.ci-pkg .pkg-warn{color:#FF9500;font-weight:600}
+.ci-pkg .pkg-error{color:#FF3B30;font-weight:600}
+.ci-check{width:24px;height:24px;border-radius:12px;border:2px solid #E0E0E0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.ci-check.checked{background:#5EC8A8;border-color:#5EC8A8;color:#fff;font-size:12px;font-weight:700}
+.ci-check.disabled{background:#F5F5F5;border-color:#E0E0E0;cursor:not-allowed;opacity:.5}
+
+/* 课时输入 */
+.lesson-input{padding:16px 20px;display:flex;align-items:center;gap:12px}
+.li-label2{font-size:13px;font-weight:600;color:#1A1A1A}
+.li-stepper{display:flex;align-items:center;gap:0;border:1px solid #E0E0E0;border-radius:8px;overflow:hidden}
+.li-step{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;background:#F5F5F5;border:none;color:#1A1A1A}
+.li-step:active{background:#E8E8E8}
+.li-num{width:48px;height:36px;text-align:center;font-size:15px;font-weight:700;border:none;outline:none;color:#1A1A1A}
+
+/* 底部操作 */
+.sheet-actions{padding:16px 20px;display:flex;gap:10px}
+.btn{flex:1;padding:14px 0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s}
+.btn:active{opacity:.7}
+.btn-primary{background:#5EC8A8;color:#fff}
+.btn-secondary{background:#F5F5F5;color:#1A1A1A}
+.btn-danger{background:#FF3B30;color:#fff}
+
+/* === 消课预览弹窗 === */
+.preview-sheet .sheet{max-height:90%}
+.preview-item{padding:12px 20px;border-bottom:1px solid #F5F5F5}
+.preview-student{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ps-avatar{width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.ps-name{font-size:14px;font-weight:600;color:#1A1A1A}
+.ps-status{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:600;margin-left:auto}
+.ps-ok{background:#E8F5E9;color:#2E7D32}
+.ps-warn{background:#FFF3E0;color:#E65100}
+.ps-error{background:#FFEBEE;color:#C62828}
+.preview-detail{padding-left:42px}
+.pd-pkg{font-size:12px;color:#8E8E93;margin-bottom:4px}
+.pd-line{font-size:11px;color:#5EC8A8;font-weight:500}
+.pd-line .deduct{color:#FF9500}
+.pd-actions{display:flex;gap:8px;margin-top:6px;padding-left:42px}
+.pd-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-weight:600}
+.pd-btn-skip{background:#F5F5F5;color:#8E8E93}
+.pd-btn-change{background:#E8F5E9;color:#2E7D32}
+
+/* 冻结课包提示 */
+.frozen-tip{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#FFF8E1;border-radius:6px;margin-top:4px}
+.frozen-icon{font-size:12px}
+.frozen-text{font-size:11px;color:#F57F17;font-weight:500}
+
+/* === 跨科目审批弹窗 === */
+.cross-subject-sheet .sheet-header{border-bottom:1px solid #F0F0F0}
+.cross-info{padding:16px 20px}
+.cross-warn{display:flex;align-items:flex-start;gap:10px;padding:12px;background:#FFF3E0;border-radius:10px;margin-bottom:16px}
+.cross-warn-icon{font-size:20px;flex-shrink:0}
+.cross-warn-text{font-size:13px;color:#E65100;line-height:1.5}
+.cross-detail{font-size:13px;color:#1A1A1A;line-height:1.8}
+.cross-detail strong{color:#5EC8A8}
+.cross-actions{padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.btn-block{width:100%;padding:14px 0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;border:none}
+
+/* === 撤销确认 === */
+.undo-info{padding:16px 20px}
+.undo-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F5F5F5}
+.undo-label{font-size:13px;color:#8E8E93}
+.undo-value{font-size:13px;color:#1A1A1A;font-weight:600}
+
+/* TabBar */
+.tbar{position:sticky;bottom:0;left:0;right:0;height:82px;background:#fff;border-top:1px solid #F0F0F0;display:flex;align-items:flex-start;padding-top:8px;z-index:50}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border:none;background:transparent}
+.tb-icon{width:24px;height:24px;border-radius:4;display:flex;align-items:center;justify-content:center;font-size:18px}
+.tb-text{font-size:10px;font-weight:500;color:#8E8E93}
+.tb.on .tb-text{color:#5EC8A8;font-weight:700}
+.tb.on .tb-icon{color:#5EC8A8}
+.tb-dot{width:4px;height:4px;border-radius:2px;background:#5EC8A8;margin-top:1px}
+.home-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#1A1A1A;opacity:.12}
+
+/* 切换面板按钮 */
+.panel-tabs{display:flex;gap:8px;padding:0 20px 8px}
+.panel-tab{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #E0E0E0;cursor:pointer;background:#fff;color:#8E8E93;font-weight:500;transition:all .2s}
+.panel-tab.on{background:#5EC8A8;color:#fff;border-color:#5EC8A8}
+</style>
+</head>
+<body>
+
+<div class="phone">
+<div class="scr" id="mainScreen">
+  <!-- 状态栏 -->
+  <div class="sb"><span class="t">9:41</span><span style="color:#8E8E93">📶 🔋</span></div>
+
+  <!-- 导航栏 -->
+  <div class="nav">
+    <div class="nav-title">课表</div>
+    <div class="nav-actions">
+      <button class="nav-btn" onclick="showUndoSheet()">↩</button>
+      <button class="nav-btn">📅</button>
+    </div>
+  </div>
+
+  <!-- 日期选择器 -->
+  <div class="date-bar">
+    <button class="date-arrow" onclick="changeWeek(-1)">‹</button>
+    <div class="date-week" id="dateWeek"></div>
+    <button class="date-arrow" onclick="changeWeek(1)">›</button>
+  </div>
+
+  <!-- 视图切换 -->
+  <div class="view-toggle">
+    <button class="view-btn on" onclick="switchView('day')">日视图</button>
+    <button class="view-btn" onclick="switchView('week')">周视图</button>
+  </div>
+
+  <!-- 日视图 -->
+  <div class="day-view" id="dayView">
+    <!-- 08:00 -->
+    <div class="time-slot">
+      <div class="time-label">08:00</div>
+      <div class="time-line"></div>
+      <div class="empty-slot" onclick="showToast('排课功能开发中')"><span>+ 添加课程</span></div>
+    </div>
+    <!-- 09:00 -->
+    <div class="time-slot">
+      <div class="time-label">09:00</div>
+      <div class="time-line"></div>
+      <div class="course-card cc-piano" onclick="openCheckin('piano')">
+        <div class="cc-subject">🎹 钢琴基础班</div>
+        <div class="cc-info">王老师 · 6人</div>
+        <div class="cc-time">09:00 - 10:00</div>
+        <div class="cc-badge">6</div>
+      </div>
+    </div>
+    <!-- 10:00 -->
+    <div class="time-slot">
+      <div class="time-label">10:00</div>
+      <div class="time-line"></div>
+      <div class="course-card cc-vocal cc-done" onclick="showToast('已消课')">
+        <div class="cc-subject">🎤 声乐启蒙班</div>
+        <div class="cc-info">李老师 · 4人</div>
+        <div class="cc-time">10:00 - 11:00</div>
+        <div class="cc-status">已消课</div>
+      </div>
+    </div>
+    <!-- 11:00 -->
+    <div class="time-slot">
+      <div class="time-label">11:00</div>
+      <div class="time-line"></div>
+      <div class="empty-slot"><span>空闲</span></div>
+    </div>
+    <!-- 14:00 -->
+    <div class="time-slot">
+      <div class="time-label">14:00</div>
+      <div class="time-line"></div>
+      <div class="course-card cc-dance" onclick="openCheckin('dance')">
+        <div class="cc-subject">💃 舞蹈启蒙班</div>
+        <div class="cc-info">张老师 · 8人</div>
+        <div class="cc-time">14:00 - 15:30</div>
+        <div class="cc-badge">8</div>
+      </div>
+    </div>
+    <!-- 15:30 -->
+    <div class="time-slot">
+      <div class="time-label">15:30</div>
+      <div class="time-line"></div>
+      <div class="course-card cc-art" onclick="openCheckin('art')">
+        <div class="cc-subject">🎨 创意美术班</div>
+        <div class="cc-info">刘老师 · 5人</div>
+        <div class="cc-time">15:30 - 16:30</div>
+        <div class="cc-badge">5</div>
+      </div>
+    </div>
+    <!-- 16:30 -->
+    <div class="time-slot">
+      <div class="time-label">16:30</div>
+      <div class="time-line"></div>
+      <div class="course-card cc-theory" onclick="openCheckin('theory')">
+        <div class="cc-subject">📖 乐理大班</div>
+        <div class="cc-info">王老师 · 12人</div>
+        <div class="cc-time">16:30 - 17:30</div>
+        <div class="cc-badge">12</div>
+      </div>
+    </div>
+    <!-- 17:30 -->
+    <div class="time-slot">
+      <div class="time-label">17:30</div>
+      <div class="time-line"></div>
+      <div class="empty-slot"><span>空闲</span></div>
+    </div>
+  </div>
+
+  <!-- 周视图 -->
+  <div class="week-view" id="weekView">
+    <div class="week-header">
+      <div class="wh-cell">周一</div><div class="wh-cell">周二</div><div class="wh-cell">周三</div><div class="wh-cell">周四</div><div class="wh-cell">周五</div><div class="wh-cell">周六</div><div class="wh-cell">周日</div>
+    </div>
+    <div class="week-grid">
+      <!-- 周一 -->
+      <div class="week-col">
+        <div class="wc-cell has-class cc-piano" style="border-radius:6px" onclick="openCheckin('piano')"><div class="wc-name">🎹钢琴</div><div class="wc-time">9:00</div></div>
+        <div class="wc-cell empty"></div>
+        <div class="wc-cell has-class cc-dance" style="border-radius:6px" onclick="openCheckin('dance')"><div class="wc-name">💃舞蹈</div><div class="wc-time">14:00</div></div>
+      </div>
+      <!-- 周二 -->
+      <div class="week-col">
+        <div class="wc-cell empty"></div>
+        <div class="wc-cell has-class cc-vocal" style="border-radius:6px"><div class="wc-name">🎤声乐</div><div class="wc-time">10:00</div></div>
+        <div class="wc-cell empty"></div>
+      </div>
+      <!-- 周三 -->
+      <div class="week-col">
+        <div class="wc-cell has-class cc-piano" style="border-radius:6px" onclick="openCheckin('piano')"><div class="wc-name">🎹钢琴</div><div class="wc-time">9:00</div></div>
+        <div class="wc-cell has-class cc-art" style="border-radius:6px"><div class="wc-name">🎨美术</div><div class="wc-time">15:30</div></div>
+        <div class="wc-cell empty"></div>
+      </div>
+      <!-- 周四 -->
+      <div class="week-col">
+        <div class="wc-cell empty"></div>
+        <div class="wc-cell has-class cc-theory" style="border-radius:6px"><div class="wc-name">📖乐理</div><div class="wc-time">16:30</div></div>
+        <div class="wc-cell empty"></div>
+      </div>
+      <!-- 周五 -->
+      <div class="week-col">
+        <div class="wc-cell has-class cc-dance" style="border-radius:6px"><div class="wc-name">💃舞蹈</div><div class="wc-time">14:00</div></div>
+        <div class="wc-cell empty"></div>
+        <div class="wc-cell empty"></div>
+      </div>
+      <!-- 周六 -->
+      <div class="week-col">
+        <div class="wc-cell has-class cc-piano" style="border-radius:6px"><div class="wc-name">🎹钢琴</div><div class="wc-time">9:00</div></div>
+        <div class="wc-cell has-class cc-vocal" style="border-radius:6px"><div class="wc-name">🎤声乐</div><div class="wc-time">10:00</div></div>
+        <div class="wc-cell has-class cc-art" style="border-radius:6px"><div class="wc-name">🎨美术</div><div class="wc-time">15:30</div></div>
+      </div>
+      <!-- 周日 -->
+      <div class="week-col">
+        <div class="wc-cell empty"></div>
+        <div class="wc-cell empty"></div>
+        <div class="wc-cell empty"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TabBar -->
+  <div class="tbar">
+    <button class="tb" onclick="showToast('首页')"><span class="tb-icon">🏠</span><span class="tb-text">首页</span></button>
+    <button class="tb on"><span class="tb-icon">📅</span><span class="tb-text">课表</span><div class="tb-dot"></div></button>
+    <button class="tb" onclick="showToast('统计')"><span class="tb-icon">📊</span><span class="tb-text">统计</span></button>
+    <button class="tb" onclick="showToast('我的')"><span class="tb-icon">👤</span><span class="tb-text">我的</span></button>
+    <div class="home-indicator"></div>
+  </div>
+</div>
+
+<!-- ===== 消课签到弹窗 ===== -->
+<div class="overlay" id="checkinSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">消课签到</div>
+      <button class="sheet-close" onclick="closeSheet('checkinSheet')">✕</button>
+    </div>
+
+    <!-- 课程信息 -->
+    <div class="lesson-info">
+      <div class="li-row"><span class="li-label">班级</span><span class="li-value" id="lessonClassName">🎹 钢琴基础班</span></div>
+      <div class="li-row"><span class="li-label">教师</span><span class="li-value">王老师</span></div>
+      <div class="li-row"><span class="li-label">时间</span><span class="li-value">09:00 - 10:00</span></div>
+    </div>
+
+    <!-- 课时输入 -->
+    <div class="lesson-input">
+      <span class="li-label2">消课课时</span>
+      <div class="li-stepper">
+        <button class="li-step" onclick="changeLessons(-1)">−</button>
+        <input class="li-num" id="lessonCount" value="1" readonly>
+        <button class="li-step" onclick="changeLessons(1)">+</button>
+      </div>
+    </div>
+
+    <!-- 签到列表 -->
+    <div class="checkin-list">
+      <div class="checkin-label">学员签到</div>
+
+      <div class="checkin-item">
+        <div class="ci-avatar" style="background:#5EC8A8">张</div>
+        <div class="ci-body">
+          <div class="ci-name">张小明</div>
+          <div class="ci-pkg">钢琴课包 · <span class="pkg-deduct">扣1课时(剩17)</span></div>
+        </div>
+        <div class="ci-check checked" onclick="toggleCheck(this)">✓</div>
+      </div>
+
+      <div class="checkin-item">
+        <div class="ci-avatar" style="background:#7C8CF8">李</div>
+        <div class="ci-body">
+          <div class="ci-name">李思思</div>
+          <div class="ci-pkg">通用课包 · <span class="pkg-deduct">扣1课时(剩9)</span></div>
+        </div>
+        <div class="ci-check checked" onclick="toggleCheck(this)">✓</div>
+      </div>
+
+      <div class="checkin-item">
+        <div class="ci-avatar" style="background:#F8A07C">王</div>
+        <div class="ci-body">
+          <div class="ci-name">王芳</div>
+          <div class="ci-pkg">钢琴课包 · <span class="pkg-warn">仅剩1课时</span></div>
+        </div>
+        <div class="ci-check checked" onclick="toggleCheck(this)">✓</div>
+      </div>
+
+      <div class="checkin-item">
+        <div class="ci-avatar" style="background:#F87CA0">赵</div>
+        <div class="ci-body">
+          <div class="ci-name">赵小刚</div>
+          <div class="ci-pkg">钢琴课包 · <span class="pkg-error">课时不足！</span></div>
+        </div>
+        <div class="ci-check" onclick="toggleCheck(this)"></div>
+      </div>
+
+      <div class="checkin-item">
+        <div class="ci-avatar" style="background:#A07CF8">陈</div>
+        <div class="ci-body">
+          <div class="ci-name">陈美美</div>
+          <div class="ci-pkg">
+            🔒冻结课包 · <span style="color:#8E8E93">原班级已结课</span>
+            <div class="frozen-tip">
+              <span class="frozen-icon">🔒</span>
+              <span class="frozen-text">冻结课包，点击确认后可使用</span>
+            </div>
+          </div>
+        </div>
+        <div class="ci-check" onclick="toggleCheck(this)"></div>
+      </div>
+
+      <div class="checkin-item">
+        <div class="ci-avatar" style="background:#8E8E93">刘</div>
+        <div class="ci-body">
+          <div class="ci-name">刘大壮</div>
+          <div class="ci-pkg" style="color:#8E8E93">未到 · 自动记录请假</div>
+        </div>
+        <div class="ci-check disabled"></div>
+      </div>
+    </div>
+
+    <!-- 底部操作 -->
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('checkinSheet')">取消</button>
+      <button class="btn btn-primary" onclick="openPreview()">确认消课(3人)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 消课预览弹窗 ===== -->
+<div class="overlay preview-sheet" id="previewSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">消课预览</div>
+      <button class="sheet-close" onclick="closeSheet('previewSheet')">✕</button>
+    </div>
+
+    <div class="preview-item">
+      <div class="preview-student">
+        <div class="ps-avatar" style="background:#5EC8A8">张</div>
+        <div class="ps-name">张小明</div>
+        <div class="ps-status ps-ok">✅ 可消课</div>
+      </div>
+      <div class="preview-detail">
+        <div class="pd-pkg">钢琴课包（到期: 2026-12-31）</div>
+        <div class="pd-line">→ 购买课时: 12→11，赠送课时: 6→6</div>
+        <div class="pd-line">扣减后剩余: <strong>17课时</strong></div>
+      </div>
+    </div>
+
+    <div class="preview-item">
+      <div class="preview-student">
+        <div class="ps-avatar" style="background:#7C8CF8">李</div>
+        <div class="ps-name">李思思</div>
+        <div class="ps-status ps-ok">✅ 可消课</div>
+      </div>
+      <div class="preview-detail">
+        <div class="pd-pkg">通用课包（到期: 2027-03-15）</div>
+        <div class="pd-line">→ 购买课时: 5→4，赠送课时: 5→5</div>
+        <div class="pd-line">扣减后剩余: <strong>9课时</strong></div>
+      </div>
+    </div>
+
+    <div class="preview-item">
+      <div class="preview-student">
+        <div class="ps-avatar" style="background:#F8A07C">王</div>
+        <div class="ps-name">王芳</div>
+        <div class="ps-status ps-warn">⚠️ 课时紧张</div>
+      </div>
+      <div class="preview-detail">
+        <div class="pd-pkg">钢琴课包（到期: 2026-08-30）</div>
+        <div class="pd-line">→ 购买课时: 1→0，赠送课时: 0→0</div>
+        <div class="pd-line">扣减后剩余: <strong class="deduct">0课时</strong> ⚠️ 即将耗尽</div>
+      </div>
+    </div>
+
+    <div class="preview-item" style="background:#FFF8E1;border-radius:8px;margin:0 20px 8px">
+      <div class="preview-student">
+        <div class="ps-avatar" style="background:#8E8E93">赵</div>
+        <div class="ps-name">赵小刚</div>
+        <div class="ps-status ps-error">❌ 课时不足</div>
+      </div>
+      <div class="pd-actions">
+        <button class="pd-btn pd-btn-skip">跳过此学员</button>
+        <button class="pd-btn pd-btn-change" onclick="showCrossSubject()">使用其他课包</button>
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('previewSheet')">取消</button>
+      <button class="btn btn-primary" onclick="showToast('消课成功！3人签到，1人请假')">确认消课(3人)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 跨科目审批弹窗 ===== -->
+<div class="overlay cross-subject-sheet" id="crossSubjectSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">跨科目消课</div>
+      <button class="sheet-close" onclick="closeSheet('crossSubjectSheet')">✕</button>
+    </div>
+    <div class="cross-info">
+      <div class="cross-warn">
+        <span class="cross-warn-icon">⚠️</span>
+        <span class="cross-warn-text">该学员的课包科目与班级科目不匹配，首次使用需机构负责人审批。</span>
+      </div>
+      <div class="cross-detail">
+        学员：<strong>赵小刚</strong><br>
+        班级科目：<strong>钢琴</strong><br>
+        可用课包：<strong>书法课包（剩余8课时）</strong><br><br>
+        审批通过后，该课包将转为<strong>通用课包</strong>，后续消课可直接使用，每次消费将提醒负责人。
+      </div>
+    </div>
+    <div class="cross-actions">
+      <button class="btn-block btn-primary" onclick="showToast('已提交审批，等待负责人确认')">提交审批申请</button>
+      <button class="btn-block btn-secondary" onclick="closeSheet('crossSubjectSheet')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 撤销确认弹窗 ===== -->
+<div class="overlay" id="undoSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">撤销消课</div>
+      <button class="sheet-close" onclick="closeSheet('undoSheet')">✕</button>
+    </div>
+    <div class="undo-info">
+      <div class="undo-row"><span class="undo-label">班级</span><span class="undo-value">🎹 钢琴基础班</span></div>
+      <div class="undo-row"><span class="undo-label">消课时间</span><span class="undo-value">今天 09:00</span></div>
+      <div class="undo-row"><span class="undo-label">签到人数</span><span class="undo-value">3人</span></div>
+      <div class="undo-row"><span class="undo-label">撤销时限</span><span class="undo-value" style="color:#5EC8A8">剩余22小时</span></div>
+      <div style="margin-top:12px;padding:10px;background:#FFF3E0;border-radius:8px;font-size:12px;color:#E65100;line-height:1.5">
+        ⚠️ 撤销后将恢复所有学员的课包余额，消课记录标记为"已撤销"。
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" onclick="closeSheet('undoSheet')">取消</button>
+      <button class="btn btn-danger" onclick="showToast('已撤销消课，课包余额已恢复')">确认撤销</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// 日期选择器
+const dows = ['日','一','二','三','四','五','六'];
+let weekOffset = 0;
+
+function renderWeek() {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7);
+  
+  const container = document.getElementById('dateWeek');
+  container.innerHTML = '';
+  
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const isToday = d.toDateString() === today.toDateString();
+    const isSelected = i === (today.getDay() === 0 ? 6 : today.getDay() - 1) && weekOffset === 0;
+    
+    const cell = document.createElement('div');
+    cell.className = 'date-cell' + (isSelected ? ' on' : '');
+    cell.innerHTML = `
+      <span class="date-dow">${dows[d.getDay()]}</span>
+      <span class="date-num">${d.getDate()}</span>
+      ${isToday ? '<div class="date-today"></div>' : ''}
+    `;
+    cell.onclick = function() {
+      container.querySelectorAll('.date-cell').forEach(c => c.classList.remove('on'));
+      this.classList.add('on');
+    };
+    container.appendChild(cell);
+  }
+}
+
+function changeWeek(dir) {
+  weekOffset += dir;
+  renderWeek();
+}
+
+// 视图切换
+function switchView(view) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('on'));
+  event.target.classList.add('on');
+  document.getElementById('dayView').style.display = view === 'day' ? 'block' : 'none';
+  document.getElementById('weekView').style.display = view === 'week' ? 'flex' : 'none';
+}
+
+// 弹窗控制
+function openCheckin(type) {
+  document.getElementById('checkinSheet').classList.add('show');
+}
+function openPreview() {
+  closeSheet('checkinSheet');
+  document.getElementById('previewSheet').classList.add('show');
+}
+function showCrossSubject() {
+  closeSheet('previewSheet');
+  document.getElementById('crossSubjectSheet').classList.add('show');
+}
+function showUndoSheet() {
+  document.getElementById('undoSheet').classList.add('show');
+}
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// 签到勾选
+function toggleCheck(el) {
+  if (el.classList.contains('disabled')) return;
+  el.classList.toggle('checked');
+  el.textContent = el.classList.contains('checked') ? '✓' : '';
+}
+
+// 课时调整
+function changeLessons(delta) {
+  const input = document.getElementById('lessonCount');
+  let val = parseInt(input.value) + delta;
+  if (val < 1) val = 1;
+  if (val > 10) val = 10;
+  input.value = val;
+}
+
+// Toast
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.75);color:#fff;padding:12px 24px;border-radius:10px;font-size:13px;z-index:9999;pointer-events:none';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+
+// 初始化
+renderWeek();
+</script>
+</body>
+</html>

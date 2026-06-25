@@ -7,26 +7,8 @@ import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
-
-const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
-const DEBUG_SESSION_ID = 'page-slow-nav';
-
-function reportStudentFormPerf(location: string, msg: string, data: Record<string, unknown>): void {
-  Taro.request({
-    url: DEBUG_SERVER_URL,
-    method: 'POST',
-    data: {
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'pre-fix',
-      hypothesisId: 'H2',
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    },
-  }).catch(() => {});
-}
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -221,11 +203,12 @@ export function useStudentForm(): UseStudentFormReturn {
   const loadFormData = useCallback(async () => {
     initStartAtRef.current = Date.now();
     // #region debug-point H2:student-form-init-start
-    reportStudentFormPerf(
-      'src/package-student/pages/student-form/useStudentForm.ts:loadFormData',
-      '[DEBUG] student form init start',
-      { currentUserId, isEdit, studentId },
-    );
+    reportLocalDebug({
+      hypothesisId: 'H2',
+      location: 'src/package-student/pages/student-form/useStudentForm.ts:loadFormData',
+      msg: '[DEBUG] student form init start',
+      data: { currentUserId, isEdit, studentId },
+    });
     // #endregion
     setLoading(true);
     setLoadError('');
@@ -265,16 +248,17 @@ export function useStudentForm(): UseStudentFormReturn {
       setLoadError('学员表单初始化失败，请稍后重试');
     } finally {
       // #region debug-point H2:student-form-init-end
-      reportStudentFormPerf(
-        'src/package-student/pages/student-form/useStudentForm.ts:loadFormData',
-        '[DEBUG] student form init end',
-        {
+      reportLocalDebug({
+        hypothesisId: 'H2',
+        location: 'src/package-student/pages/student-form/useStudentForm.ts:loadFormData',
+        msg: '[DEBUG] student form init end',
+        data: {
           currentUserId,
           isEdit,
           studentId,
           durationMs: Date.now() - initStartAtRef.current,
         },
-      );
+      });
       // #endregion
       setLoading(false);
     }

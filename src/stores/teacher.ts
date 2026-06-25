@@ -3,12 +3,12 @@ import { teacherService, salaryModelService, salarySettingsService } from '@/ser
 import type {
   TeacherUIModel,
   TeacherFilter,
-  SalaryStatus,
   SalarySettings,
   Deduction,
   PendingPayAction,
   SalaryModel,
 } from '@/types/teacher';
+import { logError } from '@/utils/logger';
 
 /** 计算教师薪资总额（含扣款/补发） */
 export function calcTotal(t: TeacherUIModel): number {
@@ -28,6 +28,7 @@ interface TeacherState {
   settings: SalarySettings;
   pendingPayAction: PendingPayAction | null;
   loading: boolean;
+  error: string | null;
 
   // 数据加载
   fetchTeachers: () => Promise<void>;
@@ -78,6 +79,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   settings: { payDay: 15, pushDaysBefore: 1, autoConfirm: false, pushEnabled: true },
   pendingPayAction: null,
   loading: false,
+  error: null,
 
   // ===== 数据加载 =====
   fetchTeachers: async () => {
@@ -96,7 +98,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   },
 
   fetchAll: async () => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const [teachers, salaryModels, settings] = await Promise.all([
         teacherService.getList(),
@@ -104,8 +106,9 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
         salarySettingsService.get(),
       ]);
       set({ teachers, salaryModels, settings, loading: false });
-    } catch {
-      set({ loading: false });
+    } catch (err) {
+      logError('teacher fetchAll', err);
+      set({ loading: false, error: '教师数据加载失败，请重试' });
     }
   },
 

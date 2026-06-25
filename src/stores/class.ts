@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { classService } from '@/services';
 import type { Class } from '@/types/class';
+import { logError } from '@/utils/logger';
 
 interface ClassState {
   cache: Record<string, Class[]>;
@@ -47,7 +48,8 @@ export const useClassStore = create<ClassState>((set, get) => ({
         lastFetch: { ...s.lastFetch, [teacherId]: now },
       }));
       return list;
-    } catch {
+    } catch (err) {
+      logError('class fetchByTeacher', err);
       set((s) => ({ loading: { ...s.loading, [teacherId]: false } }));
       return cache[teacherId] || [];
     }
@@ -55,7 +57,7 @@ export const useClassStore = create<ClassState>((set, get) => ({
 
   invalidate: (teacherId) => {
     set((s) => ({
-      cache: { ...s.cache, [teacherId]: undefined },
+      cache: { ...s.cache, [teacherId]: undefined } as ClassState['cache'],
       lastFetch: { ...s.lastFetch, [teacherId]: 0 },
     }));
   },

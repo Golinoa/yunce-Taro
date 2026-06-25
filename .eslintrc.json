@@ -59,7 +59,7 @@
     // ========== 通用 ==========
     "no-console": ["warn", { "allow": ["warn", "error"] }],
     "no-debugger": "warn",
-    "eqeqeq": ["warn", "always"],
+    "eqeqeq": ["warn", "always", { "null": "ignore" }],
     "no-var": "error",
     "prefer-const": "warn",
     "no-param-reassign": "warn",

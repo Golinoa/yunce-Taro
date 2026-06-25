@@ -1,5 +1,10 @@
 import dayjs from 'dayjs';
-import type { TeacherUIModel, SalaryModel, SalarySettings } from '@/types/teacher';
+import type {
+  TeacherUIModel,
+  SalaryModel,
+  SalarySettings,
+  TeacherAccessScope,
+} from '@/types/teacher';
 
 // ============================================
 // 常量池
@@ -58,23 +63,23 @@ export const STATUS_OPTIONS = [
 // Mock 数据生成辅助
 // ============================================
 
-/** 科目-校区映射，保证全局一致性 */
-const SUBJECT_CAMPUS_MAP: Record<string, string> = {
-  钢琴: 'center',
-  声乐: 'center',
-  乐理: 'center',
-  书法: 'south',
-  美术: 'south',
-  吉他: 'east',
-  舞蹈: 'east',
-  架子鼓: 'east',
-  小提琴: 'center',
-};
-
 /** 当前年月 */
 const NOW = new Date();
 const CUR_YEAR = NOW.getFullYear();
 const CUR_MONTH = NOW.getMonth() + 1;
+
+const ACCESS_SCOPE_TEXT_MAP: Record<TeacherAccessScope, string> = {
+  self: '仅自己授课',
+  subject: '本科目全部学员',
+  org: '全机构教学数据',
+};
+
+const ACCESS_SCOPE_OVERRIDE_MAP: Record<string, TeacherAccessScope> = {
+  'teacher-001': 'self',
+  'teacher-002': 'subject',
+  'teacher-004': 'org',
+  'teacher-011': 'subject',
+};
 
 /** 生成月度发薪历史 */
 function genPayHistory(
@@ -101,10 +106,10 @@ function genPayHistory(
 // Mock 教师数据 - 覆盖各种场景
 // ============================================
 
-export const mockTeachers: TeacherUIModel[] = [
+const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[] = [
   // ===== 中心校区 - 主讲 =====
   {
-    id: '1',
+    id: 'teacher-001',
     name: '王老师',
     role: 'lead',
     roleText: '主讲',
@@ -131,7 +136,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(5, 8600, 800),
   },
   {
-    id: '2',
+    id: 'teacher-002',
     name: '李老师',
     role: 'lead',
     roleText: '主讲',
@@ -154,7 +159,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(5, 7200, 600),
   },
   {
-    id: '9',
+    id: 'teacher-009',
     name: '刘老师',
     role: 'lead',
     roleText: '主讲',
@@ -177,7 +182,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(4, 7000, 500),
   },
   {
-    id: '10',
+    id: 'teacher-010',
     name: '黄老师',
     role: 'lead',
     roleText: '主讲',
@@ -203,7 +208,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(3, 5800, 400),
   },
   {
-    id: '11',
+    id: 'teacher-011',
     name: '郑老师',
     role: 'lead',
     roleText: '主讲',
@@ -229,7 +234,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 中心校区 - 助教 =====
   {
-    id: '3',
+    id: 'teacher-003',
     name: '张老师',
     role: 'assist',
     roleText: '助教',
@@ -252,7 +257,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(4, 3600, 300),
   },
   {
-    id: '12',
+    id: 'teacher-012',
     name: '林老师',
     role: 'assist',
     roleText: '助教',
@@ -277,7 +282,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 南区分校 - 主讲 =====
   {
-    id: '4',
+    id: 'teacher-004',
     name: '陈老师',
     role: 'lead',
     roleText: '主讲',
@@ -300,7 +305,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(5, 6800, 500),
   },
   {
-    id: '13',
+    id: 'teacher-013',
     name: '何老师',
     role: 'lead',
     roleText: '主讲',
@@ -325,7 +330,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 南区分校 - 助教 =====
   {
-    id: '5',
+    id: 'teacher-005',
     name: '赵老师',
     role: 'assist',
     roleText: '助教',
@@ -348,7 +353,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(4, 2400, 200),
   },
   {
-    id: '14',
+    id: 'teacher-014',
     name: '钱老师',
     role: 'assist',
     roleText: '助教',
@@ -373,7 +378,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 南区分校 - 已离职 =====
   {
-    id: '15',
+    id: 'teacher-015',
     name: '冯老师',
     role: 'lead',
     roleText: '主讲',
@@ -401,7 +406,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 东区分校 - 兼职 =====
   {
-    id: '6',
+    id: 'teacher-006',
     name: '周老师',
     role: 'parttime',
     roleText: '兼职',
@@ -425,7 +430,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(3, 3200, 300),
   },
   {
-    id: '7',
+    id: 'teacher-007',
     name: '吴老师',
     role: 'parttime',
     roleText: '兼职',
@@ -448,7 +453,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(4, 2800, 200),
   },
   {
-    id: '8',
+    id: 'teacher-008',
     name: '孙老师',
     role: 'parttime',
     roleText: '兼职',
@@ -471,7 +476,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(3, 1600, 200),
   },
   {
-    id: '16',
+    id: 'teacher-016',
     name: '杨老师',
     role: 'parttime',
     roleText: '兼职',
@@ -496,7 +501,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 东区分校 - 已离职 =====
   {
-    id: '17',
+    id: 'teacher-017',
     name: '许老师',
     role: 'parttime',
     roleText: '兼职',
@@ -524,7 +529,7 @@ export const mockTeachers: TeacherUIModel[] = [
 
   // ===== 中心校区 - 更多兼职 =====
   {
-    id: '18',
+    id: 'teacher-018',
     name: '沈老师',
     role: 'parttime',
     roleText: '兼职',
@@ -547,7 +552,7 @@ export const mockTeachers: TeacherUIModel[] = [
     payHistory: genPayHistory(2, 1800, 200),
   },
   {
-    id: '19',
+    id: 'teacher-019',
     name: '韩老师',
     role: 'parttime',
     roleText: '兼职',
@@ -571,13 +576,22 @@ export const mockTeachers: TeacherUIModel[] = [
   },
 ];
 
+export const mockTeachers: TeacherUIModel[] = rawMockTeachers.map((teacher) => {
+  const accessScope = ACCESS_SCOPE_OVERRIDE_MAP[teacher.id] || 'self';
+  return {
+    ...teacher,
+    accessScope,
+    accessScopeText: ACCESS_SCOPE_TEXT_MAP[accessScope],
+  };
+});
+
 // ============================================
 // Mock 工资模型
 // ============================================
 
 export const mockSalaryModels: SalaryModel[] = [
   {
-    id: 'm1',
+    id: 'teacher-m1',
     name: '标准主讲',
     type: 'standard',
     base: 3000,
@@ -588,7 +602,7 @@ export const mockSalaryModels: SalaryModel[] = [
     teacherCount: 6,
   },
   {
-    id: 'm2',
+    id: 'teacher-m2',
     name: '纯课时',
     type: 'hourly',
     base: 0,
@@ -598,7 +612,7 @@ export const mockSalaryModels: SalaryModel[] = [
     teacherCount: 8,
   },
   {
-    id: 'm3',
+    id: 'teacher-m3',
     name: '自定义',
     type: 'custom',
     base: 0,
@@ -625,7 +639,6 @@ export const mockSalarySettings: SalarySettings = {
 // ============================================
 
 /** 排课数据 - 按日期分组 */
-const NOW_DATE = dayjs().format('YYYY-MM-DD');
 
 export const mockScheduleData: Record<
   string,
@@ -640,20 +653,18 @@ export const mockScheduleData: Record<
   }>
 > = (() => {
   // 生成本周的排课数据
-  const data: typeof mockScheduleData extends infer T
-    ? Record<
-        string,
-        Array<{
-          time: string;
-          title: string;
-          desc: string;
-          teachers: Array<{ name: string; role: 'lead' | 'assist' }>;
-          rate: string;
-          campus: string;
-          subject: string;
-        }>
-      >
-    : never = {};
+  const data: Record<
+    string,
+    Array<{
+      time: string;
+      title: string;
+      desc: string;
+      teachers: Array<{ name: string; role: 'lead' | 'assist' }>;
+      rate: string;
+      campus: string;
+      subject: string;
+    }>
+  > = {};
   const today = dayjs();
 
   // 周一到周五的课表模板
@@ -908,7 +919,7 @@ let _salaryModels: SalaryModel[] = [...mockSalaryModels];
 let _settings: SalarySettings = { ...mockSalarySettings };
 
 /** 模拟网络延迟 */
-function delay(ms: number = 300): Promise<void> {
+function delay(ms: number = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -920,6 +931,12 @@ function delay(ms: number = 300): Promise<void> {
 export async function mockGetTeachers(): Promise<TeacherUIModel[]> {
   await delay();
   return [..._teachers];
+}
+
+/** 获取在职教师列表（用于班级表单选择器） */
+export async function mockGetActiveTeachers(): Promise<TeacherUIModel[]> {
+  await delay();
+  return _teachers.filter((t) => t.status === 'active');
 }
 
 /** 获取单个教师 */
@@ -1049,7 +1066,7 @@ export async function mockCreateSalaryModel(model: SalaryModel): Promise<SalaryM
   return model;
 }
 
-/** 更新工资模型 */
+/** 更新工资模型 — 切换时按薪资状态处理历史数据一致性 */
 export async function mockUpdateSalaryModel(
   id: string,
   updates: Partial<SalaryModel>,
@@ -1059,6 +1076,25 @@ export async function mockUpdateSalaryModel(
   if (idx === -1) return null;
   _salaryModels[idx] = { ..._salaryModels[idx], ...updates };
   _salaryModels = [..._salaryModels];
+
+  // 工资模型切换后，按薪资状态处理教师历史数据一致性
+  // 规则：已发放 → 冻结不变；已确认未发放 → 可重算；待确认 → 按新模型计算
+  const newModel = _salaryModels[idx];
+  _teachers = _teachers.map((t) => {
+    if (t.modelIdx !== _salaryModels.findIndex((m) => m.id === id)) return t;
+    // 仅更新待确认教师的费率参数，已确认/已发放保持不变
+    if (t.salaryStatus === 'pending') {
+      return {
+        ...t,
+        base: newModel.base,
+        rate: newModel.rate,
+        attend: newModel.attend,
+        perf: newModel.perf,
+      };
+    }
+    return t;
+  });
+
   return _salaryModels[idx];
 }
 

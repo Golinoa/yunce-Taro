@@ -1,232 +1,174 @@
-import { View, Text, Input } from '@tarojs/components';
-import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState, useCallback, useEffect } from 'react';
-import ActionButton from '@/components/ActionButton';
+/**
+ * 注册 Step1：创建账号 - 支付宝风格
+ * 点击注册后检查协议同意状态，未同意则弹出协议确认 BottomSheet
+ */
+import { View, Text } from '@tarojs/components';
+import Taro from '@tarojs/taro';
+import cn from 'classnames';
+import React, { useCallback, useState } from 'react';
+import AgreementDialog from '@/components/AgreementDialog';
+import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
-import PageContainer from '@/components/PageContainer';
-import type { UserRole } from '@/types/profile';
+import { useAgreementStore } from '@/stores/agreement';
+import {
+  ACCOUNT_MAX_LENGTH,
+  ACCOUNT_RULE_TEXT,
+  isAccountFormatValid,
+  sanitizeAccountInput,
+} from '@/utils/account';
 import { useAuth } from '@/utils/auth';
-import { withRouteGuard } from '@/utils/route-guard';
+import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
-/** 注册页 */
-const Register: React.FC = () => {
-  const { signUpWithUsername, signInWithUsername, validateInviteCode } = useAuth();
+const MIN_PASSWORD_LENGTH = 6;
 
-  const [role, setRole] = useState<UserRole>('teacher');
+const RegisterStep1: React.FC = () => {
+  const { signUpStep1 } = useAuth();
+  const { setAgreed } = useAgreementStore();
+  const navHeight = useNavSafeHeight();
+
   const [username, setUsername] = useState('');
-  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
-  const [inviteCodeLocked, setInviteCodeLocked] = useState(false);
-  const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showAgreementSheet, setShowAgreementSheet] = useState(false);
 
-  // 从 URL 参数读取角色和邀请码
-  const loadParams = useCallback(() => {
-    const instance = Taro.getCurrentInstance();
-    const params = instance?.router?.params || {};
-    const paramRole = params.role || '';
-    const paramInviteCode = params.inviteCode || '';
+  const validate = useCallback(() => {
+    const normalizedUsername = username.trim();
+    const normalizedPassword = password.trim();
 
-    if (paramRole === 'teacher' || paramRole === 'parent') {
-      setRole(paramRole);
+    if (!normalizedUsername) {
+      Taro.showToast({ title: '请输入账号', icon: 'none' });
+      return false;
     }
-    if (paramInviteCode) {
-      const decoded = decodeURIComponent(paramInviteCode).toUpperCase();
-      setInviteCode(decoded);
-      setInviteCodeLocked(true);
+    if (!isAccountFormatValid(normalizedUsername)) {
+      Taro.showToast({ title: `账号仅支持${ACCOUNT_RULE_TEXT}`, icon: 'none' });
+      return false;
     }
+    if (!normalizedPassword) {
+      Taro.showToast({ title: '请输入密码', icon: 'none' });
+      return false;
+    }
+    if (normalizedPassword.length < MIN_PASSWORD_LENGTH) {
+      Taro.showToast({ title: `密码至少${MIN_PASSWORD_LENGTH}位`, icon: 'none' });
+      return false;
+    }
+    return true;
+  }, [username, password]);
+
+  const handleUsernameInput = useCallback((value: string) => {
+    // 注册账号只允许安全白名单字符，输入阶段直接过滤掉汉字、空格和特殊符号。
+    setUsername(sanitizeAccountInput(value));
   }, []);
 
-  useEffect(() => {
-    loadParams();
-  }, [loadParams]);
-  useDidShow(() => {
-    loadParams();
-  });
-
-  // 提交注册
-  const handleSubmit = useCallback(async () => {
-    if (!username.trim() || !password.trim() || !name.trim()) {
-      Taro.showToast({ title: '请填写完整信息', icon: 'none' });
-      return;
-    }
-    if (password.length < 6) {
-      Taro.showToast({ title: '密码至少6位', icon: 'none' });
-      return;
-    }
-    if (!agreed) {
-      Taro.showToast({ title: '请先同意用户协议', icon: 'none' });
-      return;
-    }
-    if (role === 'parent' && !inviteCode.trim()) {
-      Taro.showToast({ title: '请输入邀请码', icon: 'none' });
-      return;
-    }
-
-    if (role === 'parent' && inviteCode.trim()) {
-      setSubmitting(true);
-      const result = await validateInviteCode(inviteCode.trim().toUpperCase());
-      if (!result.valid) {
-        setSubmitting(false);
-        Taro.showToast({ title: '邀请码无效', icon: 'none' });
-        return;
-      }
-    }
+  const executeRegister = useCallback(async () => {
+    if (submitting) return;
 
     setSubmitting(true);
-    const { error: regError } = await signUpWithUsername(
-      username.trim(),
-      password.trim(),
-      role,
-      name.trim(),
-      role === 'parent' ? inviteCode.trim().toUpperCase() : undefined,
-    );
-
-    if (regError) {
-      setSubmitting(false);
-      Taro.showToast({ title: regError.message || '注册失败', icon: 'none' });
-      return;
-    }
-
-    const { error: loginError } = await signInWithUsername(username.trim(), password.trim());
+    const { error } = await signUpStep1(username.trim(), password.trim());
     setSubmitting(false);
+    setShowAgreementSheet(false);
 
-    if (loginError) {
-      Taro.showToast({ title: '注册成功，请登录', icon: 'success' });
-      setTimeout(() => Taro.redirectTo({ url: '/pages/login/index' }), 1500);
+    if (error) {
+      Taro.showToast({ title: error.message || '注册失败', icon: 'none' });
       return;
     }
 
-    Taro.showToast({ title: '注册成功', icon: 'success' });
-    Taro.setStorageSync('justLoggedIn', 'true');
-    setTimeout(() => {
-      Taro.reLaunch({ url: '/pages/home/index' });
-    }, 1500);
-  }, [
-    username,
-    password,
-    name,
-    role,
-    inviteCode,
-    agreed,
-    signUpWithUsername,
-    signInWithUsername,
-    validateInviteCode,
-  ]);
+    Taro.navigateTo({ url: '/pages/register/role-select' });
+  }, [submitting, username, password, signUpStep1]);
+
+  const handleRegisterClick = useCallback(() => {
+    if (!validate()) return;
+    setShowAgreementSheet(true);
+  }, [validate]);
+
+  const handleConfirmAgreement = useCallback(() => {
+    setAgreed(true);
+    setShowAgreementSheet(false);
+    executeRegister();
+  }, [setAgreed, executeRegister]);
+
+  const handleBackToLogin = useCallback(() => {
+    Taro.navigateBack();
+  }, []);
 
   return (
-    <PageContainer safeTop>
-      <View className="min-h-screen flex flex-col pt-8 pb-8 bg-gradient-subtle">
-        {/* 标题 */}
-        <Text className="text-[40rpx] font-bold gradient-text mb-6">注册账号</Text>
+    <View className="min-h-screen flex flex-col bg-background relative overflow-hidden">
+      {/* 顶部装饰背景：覆盖状态栏，统一颜色 */}
+      <View className="absolute top-0 left-0 right-0 h-[520rpx] overflow-hidden bg-register-deco">
+        <View className="absolute w-[400rpx] h-[400rpx] rounded-full bg-register-circle -top-[120rpx] -right-[120rpx]" />
+      </View>
 
-        {/* 角色选择 */}
-        <View className="flex gap-3 mb-6">
-          <View
-            className={`flex-1 py-3 rounded-xl flex items-center justify-center press-scale ${role === 'teacher' ? 'bg-gradient-primary border-none shadow-elegant' : `bg-card border-2 border-input`} ${inviteCodeLocked ? 'state-disabled' : ''}`}
-            onClick={() => {
-              if (!inviteCodeLocked) setRole('teacher');
-            }}
-          >
-            <Text
-              className={`text-lg ${role === 'teacher' ? 'text-primary-foreground font-medium' : 'text-muted-foreground'}`}
-            >
-              我是教师
-            </Text>
-          </View>
-          <View
-            className={`flex-1 py-3 rounded-xl flex items-center justify-center press-scale ${role === 'parent' ? 'bg-gradient-accent border-none shadow-elegant' : 'bg-card border-2 border-input'}`}
-            onClick={() => {
-              if (!inviteCodeLocked) setRole('parent');
-            }}
-          >
-            <Text
-              className={`text-lg ${role === 'parent' ? 'text-accent-foreground font-medium' : 'text-muted-foreground'}`}
-            >
-              我是家长
-            </Text>
-          </View>
-        </View>
+      {/* 导航安全区占位 */}
+      <View style={{ height: `${navHeight}px` }} className="relative z-10 flex-shrink-0" />
 
-        {/* 表单 */}
-        <View>
-          <View className="border-2 border-input rounded-xl py-3 px-4 bg-card shadow-soft overflow-hidden mb-3">
-            <Input
-              className="flex-1 text-lg text-foreground bg-transparent leading-normal"
-              placeholder="用户名（仅字母、数字、下划线）"
-              value={username}
-              onInput={(e) => setUsername(e.detail.value)}
-            />
-          </View>
-
-          <View className="border-2 border-input rounded-xl py-3 px-4 bg-card shadow-soft overflow-hidden mb-3">
-            <Input
-              className="flex-1 text-lg text-foreground bg-transparent leading-normal"
-              placeholder="姓名"
-              value={name}
-              onInput={(e) => setName(e.detail.value)}
-            />
-          </View>
-
-          <View className="border-2 border-input rounded-xl py-3 px-4 bg-card shadow-soft overflow-hidden mb-3">
-            <Input
-              className="flex-1 text-lg text-foreground bg-transparent leading-normal"
-              placeholder="密码（至少6位）"
-              password
-              value={password}
-              onInput={(e) => setPassword(e.detail.value)}
-            />
-          </View>
-
-          {/* 家长邀请码 */}
-          {role === 'parent' && (
-            <View
-              className={`border-2 border-input rounded-xl py-3 px-4 shadow-soft overflow-hidden mb-3 ${inviteCodeLocked ? 'bg-muted' : 'bg-card'}`}
-            >
-              <View className="flex items-center gap-2">
-                <Input
-                  className="flex-1 text-lg text-foreground bg-transparent leading-normal"
-                  placeholder="学生邀请码"
-                  value={inviteCode}
-                  disabled={inviteCodeLocked}
-                  onInput={(e) => {
-                    if (!inviteCodeLocked) {
-                      setInviteCode(e.detail.value.toUpperCase());
-                    }
-                  }}
-                />
-                {inviteCodeLocked && <Icon name="mdi-lock" size="sm" color="muted" />}
-              </View>
-            </View>
-          )}
-
-          {/* 用户协议 */}
-          <View className="flex items-start gap-2 mb-5 mt-1">
-            <View
-              className={`w-[36rpx] h-[36rpx] min-w-[36rpx] rounded-sm border-2 flex items-center justify-center mt-[4rpx] flex-shrink-0 ${agreed ? 'bg-primary border-primary' : 'border-border'}`}
-              onClick={() => setAgreed(!agreed)}
-            >
-              {agreed && <Text className="text-primary-foreground text-sm font-bold">✓</Text>}
-            </View>
-            <View className="flex flex-wrap text-sm text-muted-foreground leading-normal">
-              <Text>我已阅读并同意</Text>
-              <Text className="text-primary font-medium">《用户协议》</Text>
-              <Text>和</Text>
-              <Text className="text-primary font-medium">《隐私政策》</Text>
-            </View>
-          </View>
-
-          {/* 注册按钮 */}
-          <ActionButton
-            text={submitting ? '注册中...' : '注册'}
-            onClick={handleSubmit}
-            disabled={submitting}
-          />
+      {/* 顶部 IP：回到登录页同样的视觉位置 */}
+      <View className="relative z-10 flex flex-col items-center justify-start pt-[88rpx]">
+        <View className="absolute w-[420rpx] h-[420rpx] rounded-full bg-login-glow" />
+        <View className="relative w-[220rpx] h-[220rpx] rounded-full bg-login-orb flex items-center justify-center mt-[14rpx]">
+          <Icon name="school" size={120} className="text-primary" />
         </View>
       </View>
-    </PageContainer>
+
+      {/* 欢迎语与注册表单：整体下压，并拉开欢迎语与输入框间距 */}
+      <View className="relative z-10 px-[48rpx] pt-[80rpx]">
+        <View className="mb-[120rpx] flex items-center justify-center">
+          <Text className="text-[40rpx] font-semibold text-foreground text-center">
+            你好，欢迎注册云策教务
+          </Text>
+        </View>
+        <FormInput
+          variant="capsule"
+          placeholder="请输入账号（字母/数字/下划线）"
+          value={username}
+          onInput={(e) => handleUsernameInput(e.detail.value)}
+          maxlength={ACCOUNT_MAX_LENGTH}
+          hint={`仅支持${ACCOUNT_RULE_TEXT}`}
+          className="mb-[24rpx]"
+        />
+
+        <FormInput
+          variant="capsule"
+          placeholder="设置6位以上密码"
+          value={password}
+          onInput={(e) => setPassword(e.detail.value)}
+          password
+          className="mb-[48rpx]"
+        />
+
+        {/* 立即注册按钮 */}
+        <View
+          className={cn(
+            'h-[96rpx] rounded-full flex items-center justify-center mb-[28rpx]',
+            'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
+            (submitting || !username.trim() || !password.trim()) && 'opacity-50',
+          )}
+          onClick={handleRegisterClick}
+        >
+          <Text className="text-[34rpx] font-semibold text-white">
+            {submitting ? '注册中...' : '立即注册'}
+          </Text>
+        </View>
+      </View>
+
+      <View className="flex-1" />
+
+      {/* 底部 */}
+      <View className="relative z-10 px-[48rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))]">
+        <View className="flex items-center justify-center">
+          <Text className="text-[28rpx] text-primary" onClick={handleBackToLogin}>
+            已有账号？去登录
+          </Text>
+        </View>
+      </View>
+
+      {/* 协议确认弹框 */}
+      <AgreementDialog
+        visible={showAgreementSheet}
+        onClose={() => setShowAgreementSheet(false)}
+        onConfirm={handleConfirmAgreement}
+        confirmText="同意协议并注册新账号"
+      />
+    </View>
   );
 };
 
-export default withRouteGuard(Register);
+export default RegisterStep1;

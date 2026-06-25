@@ -1,7 +1,7 @@
 /**
  * 课时套餐状态
  */
-export type PackageStatus = 'active' | 'completed' | 'expired';
+export type PackageStatus = 'active' | 'completed' | 'expired' | 'frozen';
 
 /**
  * 收费方式
@@ -44,6 +44,7 @@ export interface CoursePackageTemplate {
   lesson_count: number; // 包含课时数（0表示不限）
   duration: number; // 每节课时长（分钟）
   valid_days?: number; // 有效天数（0=永久，期课/月卡必填，体验课默认7）
+  subject_id?: string; // 关联科目ID
   description?: string; // 描述
   created_at: string;
   updated_at: string;
@@ -54,6 +55,7 @@ export interface CoursePackageTemplate {
  * 学生购买的具体课包实例，消课时自动扣减
  *
  * 购买时由模板的 valid_days 计算出 start_date 和 end_date
+ * 课时拆分为购买/赠送两部分，消课按 FIFO 先扣购买再扣赠送
  */
 export interface CoursePackage {
   id: string;
@@ -62,7 +64,11 @@ export interface CoursePackage {
   name: string;
   type?: PackageType; // 课包类型（来自模板）
   total_hours: number;
-  remaining_hours: number;
+  remaining_hours: number; // 总剩余（= purchased_remaining + bonus_remaining）
+  /** 购买课时剩余（FIFO 优先扣减） */
+  purchased_remaining: number;
+  /** 赠送课时剩余（购买课时扣完后才扣减） */
+  bonus_remaining: number;
   status: PackageStatus;
   valid_days?: number; // 有效天数（来自模板）
   start_date?: string; // 有效期开始日期（购买时设置）
@@ -104,4 +110,21 @@ export interface RechargeFormData {
   installment_period?: number;
   installment_schedule?: ScheduleItem[];
   note?: string;
+  subject_id?: string;
+}
+
+/**
+ * FIFO 扣减结果（消课时返回，记录购买/赠送分别扣减了多少）
+ */
+export interface DeductResult {
+  /** 购买课时扣减量 */
+  purchased_deduct: number;
+  /** 赠送课时扣减量 */
+  bonus_deduct: number;
+  /** 购买课时剩余 */
+  purchased_remaining: number;
+  /** 赠送课时剩余 */
+  bonus_remaining: number;
+  /** 总剩余 */
+  remaining_hours: number;
 }

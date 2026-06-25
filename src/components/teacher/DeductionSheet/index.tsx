@@ -44,6 +44,7 @@ const DeductionSheet: React.FC<DeductionSheetProps> = ({
   const [type, setType] = useState<DeductionType>('deduct');
   const [reason, setReason] = useState('');
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
 
   const handleQuickReason = (label: string, quickType: DeductionType) => {
     setReason(label);
@@ -51,22 +52,32 @@ const DeductionSheet: React.FC<DeductionSheetProps> = ({
   };
 
   const handleSubmit = () => {
-    if (!reason.trim() || !amount || Number(amount) <= 0) return;
+    const numAmount = Number(amount);
+    if (!reason.trim()) {
+      Taro.showToast({ title: '请输入原因', icon: 'none' });
+      return;
+    }
+    if (!amount || isNaN(numAmount) || numAmount <= 0) {
+      setAmountError('金额必须为正数');
+      return;
+    }
     onSubmit({
       reason: reason.trim(),
-      amount: Number(amount),
+      amount: numAmount,
       type,
     });
     // 重置
     setType('deduct');
     setReason('');
     setAmount('');
+    setAmountError('');
   };
 
   const handleClose = () => {
     setType('deduct');
     setReason('');
     setAmount('');
+    setAmountError('');
     onClose();
   };
 
@@ -143,7 +154,11 @@ const DeductionSheet: React.FC<DeductionSheetProps> = ({
           placeholder="请输入金额"
           type="digit"
           value={amount}
-          onInput={(e) => setAmount(e.detail.value)}
+          onInput={(e) => {
+            setAmount(e.detail.value);
+            setAmountError('');
+          }}
+          error={amountError}
         />
 
         {/* 提交按钮 */}

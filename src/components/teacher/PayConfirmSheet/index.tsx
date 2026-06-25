@@ -10,6 +10,7 @@ interface PayConfirmSheetProps {
   action?: PendingPayAction | null;
   teacherName?: string;
   amount?: number;
+  submitting?: boolean;
   onConfirm: (remark: string) => void;
   onClose: () => void;
 }
@@ -27,17 +28,20 @@ const PayConfirmSheet: React.FC<PayConfirmSheetProps> = ({
   action,
   teacherName,
   amount,
+  submitting = false,
   onConfirm,
   onClose,
 }) => {
   const [remark, setRemark] = useState('');
 
   const handleConfirm = () => {
+    if (submitting) return;
     onConfirm(remark);
     setRemark('');
   };
 
   const handleClose = () => {
+    if (submitting) return;
     setRemark('');
     onClose();
   };
@@ -83,15 +87,15 @@ const PayConfirmSheet: React.FC<PayConfirmSheetProps> = ({
         <View className="flex gap-3">
           <View
             className="flex-1 py-3 rounded-xl text-center text-sm font-semibold bg-muted text-muted-foreground"
-            onClick={handleClose}
+            onClick={submitting ? undefined : handleClose}
           >
             取消
           </View>
           <View
-            className="flex-1 py-3 rounded-xl text-center text-sm font-semibold bg-gradient-to-r from-amber to-amber-dark text-white shadow-sm"
-            onClick={handleConfirm}
+            className={`flex-1 py-3 rounded-xl text-center text-sm font-semibold shadow-sm ${submitting ? 'bg-muted text-muted-foreground' : 'bg-gradient-to-r from-amber to-amber-dark text-white'}`}
+            onClick={submitting ? undefined : handleConfirm}
           >
-            确认发放
+            {submitting ? '发放中...' : '确认发放'}
           </View>
         </View>
       </View>

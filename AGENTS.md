@@ -49,7 +49,67 @@
 4. **类型定义** — Props 接口必须导出，禁止隐式 any
 5. **JSDoc** — 每个组件必须有使用场景 + 功能说明的 JSDoc 注释
 
-## 六、审查清单
+## 六、工程化工具链
+
+| 工具 | 作用 | 触发时机 |
+|------|------|---------|
+| ESLint | 代码规则检查 | `npm run lint` / pre-commit |
+| Prettier | 代码格式化 | `npm run format` / pre-commit |
+| TypeScript | 类型检查 | `npm run typecheck` |
+| husky | Git 钩子管理 | `git commit` 时自动触发 |
+| lint-staged | 只检查暂存文件 | pre-commit 钩子调用 |
+
+### 可用命令
+
+```bash
+npm run lint          # 检查代码规则
+npm run lint:fix      # 自动修复规则问题
+npm run format        # 格式化代码
+npm run format:check  # 检查格式是否合规
+npm run typecheck     # TypeScript 类型检查
+npm run check         # 全量检查（typecheck + lint + format）
+```
+
+### 提交流程
+
+```
+git commit
+  → husky pre-commit 钩子触发
+    → lint-staged 只检查暂存文件
+      → .ts/.tsx: eslint --fix + prettier --write
+      → .scss/.css/.json/.md: prettier --write
+        → 全部通过 → 提交成功
+        → 有 error → 提交被拒绝，修完再提交
+```
+
+## 七、编译铁律
+
+**每次代码修改完成后，必须删除 dist 目录并用 Mock 模式重新编译：**
+
+```bash
+$env:VITE_USE_MOCK="true"; npm run build:weapp
+```
+
+### 为什么必须这样做？
+
+| 问题 | 原因 |
+|------|------|
+| 网络异常 | `npm run build:weapp` 是生产模式，自动禁用 Mock（`VITE_USE_MOCK=false`），而 `BASE_URL` 为空，请求全部失败 |
+| 登录失败 | Mock 数据失效后，登录接口无法响应，导致"网络异常"错误 |
+
+### 正确的编译方式
+
+| 命令 | 说明 |
+|------|------|
+| `$env:VITE_USE_MOCK="true"; npm run build:weapp` | 强制开启 Mock，生产模式编译（推荐） |
+| `npm run dev:weapp` | 开发模式，自动开启 Mock + 热更新 |
+
+### 禁止的做法
+
+- ❌ 直接使用 `npm run build:weapp`（会禁用 Mock，导致网络异常）
+- ❌ 不删除 dist 目录直接编译（可能残留旧代码）
+
+## 八、审查清单
 
 每次代码生成/修改后，AI 必须自检：
 

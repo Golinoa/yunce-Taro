@@ -8,26 +8,8 @@ import type { CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
-
-const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
-const DEBUG_SESSION_ID = 'page-slow-nav';
-
-function reportClassesPerf(location: string, msg: string, data: Record<string, unknown>): void {
-  Taro.request({
-    url: DEBUG_SERVER_URL,
-    method: 'POST',
-    data: {
-      sessionId: DEBUG_SESSION_ID,
-      runId: 'pre-fix',
-      hypothesisId: 'H2',
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    },
-  }).catch(() => {});
-}
 
 // 班级图标映射（10 个教培相关 MDI 图标）
 export const CLASS_ICONS: Record<ClassIcon, string> = {
@@ -138,8 +120,13 @@ export function useClasses() {
   const loadClasses = useCallback(async () => {
     loadClassesStartAtRef.current = Date.now();
     // #region debug-point H2:classes-list-start
-    reportClassesPerf('src/package-course/pages/classes/useClasses.ts:loadClasses', '[DEBUG] classes list start', {
-      currentUserId,
+    reportLocalDebug({
+      hypothesisId: 'H2',
+      location: 'src/package-course/pages/classes/useClasses.ts:loadClasses',
+      msg: '[DEBUG] classes list start',
+      data: {
+        currentUserId,
+      },
     });
     // #endregion
     if (!profile || !currentUserId) {
@@ -158,9 +145,14 @@ export function useClasses() {
       setLoadError('班级列表加载失败，请稍后重试');
     } finally {
       // #region debug-point H2:classes-list-end
-      reportClassesPerf('src/package-course/pages/classes/useClasses.ts:loadClasses', '[DEBUG] classes list end', {
-        currentUserId,
-        durationMs: Date.now() - loadClassesStartAtRef.current,
+      reportLocalDebug({
+        hypothesisId: 'H2',
+        location: 'src/package-course/pages/classes/useClasses.ts:loadClasses',
+        msg: '[DEBUG] classes list end',
+        data: {
+          currentUserId,
+          durationMs: Date.now() - loadClassesStartAtRef.current,
+        },
       });
       // #endregion
       setLoading(false);
@@ -185,11 +177,12 @@ export function useClasses() {
     if (!profile || !currentUserId) return;
     preloadStartAtRef.current = Date.now();
     // #region debug-point H2:classes-preload-start
-    reportClassesPerf(
-      'src/package-course/pages/classes/useClasses.ts:preload',
-      '[DEBUG] classes preload start',
-      { currentUserId },
-    );
+    reportLocalDebug({
+      hypothesisId: 'H2',
+      location: 'src/package-course/pages/classes/useClasses.ts:preload',
+      msg: '[DEBUG] classes preload start',
+      data: { currentUserId },
+    });
     // #endregion
     const studentsPromise = fetchStudentsByTeacher(currentUserId)
       .then((list) => setAllStudents(list))
@@ -209,14 +202,15 @@ export function useClasses() {
       });
     // #region debug-point H2:classes-preload-end
     Promise.allSettled([studentsPromise, packagesPromise, teachersPromise]).then(() => {
-      reportClassesPerf(
-        'src/package-course/pages/classes/useClasses.ts:preload',
-        '[DEBUG] classes preload end',
-        {
+      reportLocalDebug({
+        hypothesisId: 'H2',
+        location: 'src/package-course/pages/classes/useClasses.ts:preload',
+        msg: '[DEBUG] classes preload end',
+        data: {
           currentUserId,
           durationMs: Date.now() - preloadStartAtRef.current,
         },
-      );
+      });
     });
     // #endregion
   }, [profile, currentUserId, fetchPackageTemplatesByTeacher, fetchStudentsByTeacher]);

@@ -18,6 +18,7 @@ export interface Student {
   parent_id?: string;
   fee_amount?: number;
   fee_method?: FeeMethod;
+  status?: 'active' | 'deleted';
   created_at: string;
   updated_at: string;
   // 关联查询字段
@@ -26,7 +27,10 @@ export interface Student {
     name: string;
     total_hours: number;
     remaining_hours: number;
+    purchased_remaining: number;
+    bonus_remaining: number;
     status?: PackageStatus;
+    subject_id?: string;
     fee_amount?: number;
     fee_method?: FeeMethod;
     note?: string;
@@ -60,7 +64,7 @@ export type StudentSort = 'default' | 'hours-desc' | 'hours-asc' | 'name-asc' | 
 export type StudentFilter = 'all' | 'sufficient' | 'low' | 'expiring' | 'expired' | 'owe';
 
 /** 科目筛选 */
-export type SubjectFilter = 'all' | 'piano' | 'vocal' | 'theory' | 'calligraphy' | 'general';
+export type SubjectFilter = string;
 
 /** 课包标签（卡片展示用） */
 export interface PackageTag {

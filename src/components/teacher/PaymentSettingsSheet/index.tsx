@@ -15,6 +15,7 @@ import type { SalarySettings } from '@/types/teacher';
 interface PaymentSettingsSheetProps {
   visible: boolean;
   settings: SalarySettings;
+  submitting?: boolean;
   onClose: () => void;
   onSubmit: (updates: Partial<SalarySettings>) => void;
 }
@@ -28,6 +29,7 @@ const PUSH_DAYS_OPTIONS = [1, 2, 3, 5, 7];
 const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
   visible,
   settings,
+  submitting = false,
   onClose,
   onSubmit,
 }) => {
@@ -60,6 +62,7 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
   };
 
   const handleSubmit = () => {
+    if (submitting) return;
     onSubmit({
       payDay,
       pushDaysBefore,
@@ -68,7 +71,11 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} title="发放设置" onClose={onClose}>
+    <BottomSheet
+      visible={visible}
+      title="发放设置"
+      onClose={submitting ? () => {} : onClose}
+    >
       <View className="px-4 pb-6">
         {/* 发薪日 */}
         <View className="mb-5">
@@ -79,10 +86,7 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
           {/* 输入框 */}
           <View className="flex items-center gap-2 mb-3">
             <Text className="text-sm text-muted-foreground">每月</Text>
-            <View
-              className="flex items-center py-[14rpx] px-[20rpx] rounded-xl"
-              style={{ backgroundColor: '#f5faf8', border: '3rpx solid #D5E8E0' }}
-            >
+            <View className="flex items-center py-[14rpx] px-[20rpx] rounded-xl bg-f5faf8-border-d5e8e0">
               <Input
                 className="w-[80rpx] text-sm text-center text-foreground"
                 type="number"
@@ -104,7 +108,7 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
                     ? 'border-primary bg-primary-bg text-primary font-semibold'
                     : 'border-border bg-background text-muted-foreground',
                 )}
-                onClick={() => handleQuickPayDay(day)}
+                onClick={submitting ? undefined : () => handleQuickPayDay(day)}
               >
                 {day}号
               </View>
@@ -128,7 +132,7 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
                     ? 'border-primary bg-primary-bg text-primary font-semibold'
                     : 'border-border bg-background text-muted-foreground',
                 )}
-                onClick={() => setPushDaysBefore(days)}
+                onClick={submitting ? undefined : () => setPushDaysBefore(days)}
               >
                 提前{days}天
               </View>
@@ -152,7 +156,7 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
                   'w-[44px] h-[26px] rounded-[13px] relative flex-shrink-0 transition-colors',
                   pushEnabled ? 'bg-primary' : 'bg-border',
                 )}
-                onClick={() => setPushEnabled(!pushEnabled)}
+                onClick={submitting ? undefined : () => setPushEnabled(!pushEnabled)}
               >
                 <View
                   className={cn(
@@ -167,10 +171,10 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
 
         {/* 提交按钮 */}
         <View
-          className="w-full py-[28rpx] rounded-2xl text-center text-base font-semibold bg-gradient-primary text-white"
-          onClick={handleSubmit}
+          className={`w-full py-[28rpx] rounded-2xl text-center text-base font-semibold ${submitting ? 'bg-muted text-muted-foreground' : 'bg-gradient-primary text-white'}`}
+          onClick={submitting ? undefined : handleSubmit}
         >
-          保存设置
+          {submitting ? '保存中...' : '保存设置'}
         </View>
       </View>
     </BottomSheet>

@@ -21,12 +21,14 @@ import {
   classService,
   subjectService,
   uploadService,
+  teacherService,
 } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import type { Subject } from '@/types/subject';
+import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
@@ -86,9 +88,15 @@ const LessonForm: React.FC = () => {
   const [checkedStudentIds, setCheckedStudentIds] = useState<Set<string>>(new Set());
   const [studentPackages, setStudentPackages] = useState<Map<string, CoursePackage>>(new Map());
   const [studentSubjects, setStudentSubjects] = useState<Map<string, Subject | null>>(new Map());
+  const [classActionMode, setClassActionMode] = useState<'consume' | 'cancel'>('consume');
+  const [cancelReason, setCancelReason] = useState('');
 
-  // ===== 教师ID =====
-  const teacherId = profile?.id || '';
+  // ===== 当前身份 =====
+  const currentUserId = profile?.id || '';
+  const currentTeacherId = profile?.teacher_profile?.id || currentUserId;
+  const [teacherOptions, setTeacherOptions] = useState<TeacherUIModel[]>([]);
+  const [selectedTeachingTeacherId, setSelectedTeachingTeacherId] = useState('');
+  const [selectedAssistantTeacherId, setSelectedAssistantTeacherId] = useState('');
 
   // ===== 课程信息 =====
   const now = useMemo(() => new Date(), []);
@@ -107,8 +115,19 @@ const LessonForm: React.FC = () => {
   // ===== 初始化加载 =====
   useEffect(() => {
     const loadData = async () => {
-      const classList = await fetchClassesByTeacher(teacherId);
+      const [classList, teacherList] = await Promise.all([
+        fetchClassesByTeacher(currentUserId),
+        teacherService.getList(),
+      ]);
       setClasses(classList);
+      setTeacherOptions(teacherList);
+      setSelectedTeachingTeacherId((prev) => {
+        if (prev) return prev;
+        const matchedTeacher =
+          teacherList.find((teacher) => teacher.id === currentTeacherId) ||
+          teacherList.find((teacher) => teacher.name === profile?.name);
+        return matchedTeacher?.id || currentTeacherId;
+      });
 
       if (studentIdParam) {
         const stu = await studentService.getById(studentIdParam);
@@ -128,8 +147,12 @@ const LessonForm: React.FC = () => {
       }
 
       if (classIdParam) {
+        const [classInfo, students] = await Promise.all([
+          classService.getById(classIdParam),
+          classService.getStudents(classIdParam),
+        ]);
         setSelectedClassId(classIdParam);
-        const students = await classService.getStudents(classIdParam);
+        applyClassTeacherDefaults(classInfo, teacherList);
         setClassStudents(students);
         setCheckedStudentIds(new Set(students.map((s) => s.id)));
         // 为每个学员匹配课包
@@ -154,7 +177,15 @@ const LessonForm: React.FC = () => {
     };
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在 URL 参数变化时初始化
-  }, [studentIdParam, classIdParam]);
+  }, [
+    classIdParam,
+    currentTeacherId,
+    currentUserId,
+    fetchClassesByTeacher,
+    applyClassTeacherDefaults,
+    profile?.name,
+    studentIdParam,
+  ]);
 
   // ===== 单人模式：自动匹配课包 =====
   const autoMatchPackage = useCallback(
@@ -183,11 +214,11 @@ const LessonForm: React.FC = () => {
   // ===== 单人模式：选择学生 =====
   const handleOpenStudentPicker = useCallback(async () => {
     if (allStudents.length === 0) {
-      const list = await fetchStudentsByTeacher(teacherId);
+      const list = await fetchStudentsByTeacher(currentUserId);
       setAllStudents(list);
     }
     setShowStudentPicker(true);
-  }, [allStudents.length, fetchStudentsByTeacher, teacherId]);
+  }, [allStudents.length, currentUserId, fetchStudentsByTeacher]);
 
   const handleSelectStudent = useCallback(
     async (stu: Student) => {
@@ -198,11 +229,79 @@ const LessonForm: React.FC = () => {
     [autoMatchPackage],
   );
 
+  const selectedTeachingTeacher = useMemo(
+    () => teacherOptions.find((teacher) => teacher.id === selectedTeachingTeacherId) || null,
+    [teacherOptions, selectedTeachingTeacherId],
+  );
+
+  const selectedTeachingTeacherIndex = useMemo(
+    () => Math.max(0, teacherOptions.findIndex((teacher) => teacher.id === selectedTeachingTeacherId)),
+    [teacherOptions, selectedTeachingTeacherId],
+  );
+
+  const assistantTeacherOptions = useMemo(
+    () =>
+      teacherOptions.filter(
+        (teacher) => teacher.role === 'assist' || teacher.id === selectedAssistantTeacherId,
+      ),
+    [selectedAssistantTeacherId, teacherOptions],
+  );
+
+  const selectedAssistantTeacher = useMemo(
+    () => assistantTeacherOptions.find((teacher) => teacher.id === selectedAssistantTeacherId) || null,
+    [assistantTeacherOptions, selectedAssistantTeacherId],
+  );
+
+  const selectedAssistantTeacherIndex = useMemo(
+    () =>
+      Math.max(
+        0,
+        assistantTeacherOptions.findIndex((teacher) => teacher.id === selectedAssistantTeacherId),
+      ),
+    [assistantTeacherOptions, selectedAssistantTeacherId],
+  );
+
+  const applyClassTeacherDefaults = useCallback(
+    (classInfo: Class | null, options: TeacherUIModel[]) => {
+      if (!classInfo) {
+        setSelectedTeachingTeacherId(currentTeacherId);
+        setSelectedAssistantTeacherId('');
+        return;
+      }
+
+      const configuredTeacherIds = classInfo.teachers?.length
+        ? classInfo.teachers
+        : classInfo.teacher_id
+          ? [classInfo.teacher_id]
+          : [];
+      const configuredTeachers = configuredTeacherIds
+        .map((id) => options.find((teacher) => teacher.id === id))
+        .filter((teacher): teacher is TeacherUIModel => Boolean(teacher));
+      const leadTeacher =
+        configuredTeachers.find((teacher) => teacher.role !== 'assist') ||
+        configuredTeachers[0] ||
+        options.find((teacher) => teacher.id === classInfo.teacher_id) ||
+        options.find((teacher) => teacher.id === currentTeacherId) ||
+        null;
+      const assistantTeacher =
+        configuredTeachers.find((teacher) => teacher.role === 'assist' && teacher.id !== leadTeacher?.id) ||
+        null;
+
+      setSelectedTeachingTeacherId(leadTeacher?.id || currentTeacherId);
+      setSelectedAssistantTeacherId(assistantTeacher?.id || '');
+    },
+    [currentTeacherId],
+  );
+
   // ===== 班级模式：加载班级学员 =====
   const loadClassStudents = useCallback(
     async (classId: string) => {
       setSelectedClassId(classId);
-      const students = await classService.getStudents(classId);
+      const [classInfo, students] = await Promise.all([
+        classService.getById(classId),
+        classService.getStudents(classId),
+      ]);
+      applyClassTeacherDefaults(classInfo, teacherOptions);
       setClassStudents(students);
       // 默认全部签到
       setCheckedStudentIds(new Set(students.map((s) => s.id)));
@@ -226,7 +325,7 @@ const LessonForm: React.FC = () => {
       setStudentPackages(pkgMap);
       setStudentSubjects(subMap);
     },
-    [hoursUsed],
+    [applyClassTeacherDefaults, hoursUsed, teacherOptions],
   );
 
   // ===== 班级模式：切换班级 =====
@@ -315,7 +414,8 @@ const LessonForm: React.FC = () => {
 
       // 真实后端会在创建消课时自动扣减课时，前端不能重复调用扣减接口。
       const createdRecord = await lessonRecordService.create({
-        teacher_id: teacherId,
+        teacher_id: selectedTeachingTeacherId || currentTeacherId,
+        operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
         student_id: selectedStudent.id,
         package_id: matchedPackage.id,
         lesson_date: lessonDateValue,
@@ -353,7 +453,7 @@ const LessonForm: React.FC = () => {
       }
 
       Taro.showToast({ title: '消课成功', icon: 'success' });
-      invalidateStudents(teacherId);
+      invalidateStudents(currentUserId);
       setTimeout(() => Taro.navigateBack(), 1500);
     } catch (err) {
       logError('submit lesson', err);
@@ -365,7 +465,9 @@ const LessonForm: React.FC = () => {
     selectedStudent,
     matchedPackage,
     hoursUsed,
-    teacherId,
+    selectedTeachingTeacherId,
+    currentTeacherId,
+    currentUserId,
     lessonDate,
     lessonTime,
     content,
@@ -452,6 +554,110 @@ const LessonForm: React.FC = () => {
     setShowPreviewSheet(true);
   }, [selectedClassId, presentStudents, studentPackages, hoursUsed]);
 
+  const handleClassCancelSubmit = useCallback(async () => {
+    if (!selectedClassId) {
+      Taro.showToast({ title: '请选择班级', icon: 'none' });
+      return;
+    }
+    if (classStudents.length === 0) {
+      Taro.showToast({ title: '当前班级没有学员', icon: 'none' });
+      return;
+    }
+
+    const reasonText = cancelReason.trim();
+    if (!reasonText) {
+      Taro.showToast({ title: '请填写取消原因', icon: 'none' });
+      return;
+    }
+
+    const selectedClass = classes.find((item) => item.id === selectedClassId);
+    const confirmResult = await Taro.showModal({
+      title: '确认取消本次课程',
+      content: `将为 ${classStudents.length} 名学员生成“已取消”记录，默认不扣课时。`,
+      confirmText: '确认取消',
+      confirmColor: '#ef4444',
+    });
+
+    if (!confirmResult.confirm) {
+      return;
+    }
+
+    setSubmitting(true);
+    const successList: string[] = [];
+    const failList: { name: string; reason: string }[] = [];
+
+    try {
+      for (const student of classStudents) {
+        const pkg = studentPackages.get(student.id);
+
+        try {
+          await lessonRecordService.create({
+            teacher_id: selectedTeachingTeacherId || currentTeacherId,
+            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
+            assistant_teacher_id: selectedAssistantTeacherId || undefined,
+            student_id: student.id,
+            package_id: pkg?.id || '',
+            class_id: selectedClassId,
+            lesson_date: lessonDate,
+            hours_used: 0,
+            status: 'cancelled',
+            content: `取消开课：${reasonText}`,
+          });
+
+          const parents = await studentService.getParents(student.id);
+          for (const binding of parents) {
+            await notificationService.send({
+              sender_id: profile?.id || '',
+              receiver_id: binding.parent_id,
+              title: `${selectedClass?.name || '班级课程'}已取消`,
+              content: `${lessonDate} ${lessonTime} 的课程已取消，原因：${reasonText}`,
+              related_id: student.id,
+            });
+          }
+
+          successList.push(student.name);
+        } catch (err) {
+          logError('class cancel single student', err);
+          failList.push({ name: student.name, reason: '生成取消记录失败' });
+        }
+      }
+
+      if (failList.length === 0) {
+        Taro.showToast({ title: `已取消 ${successList.length} 名学员课程`, icon: 'success' });
+      } else if (successList.length === 0) {
+        Taro.showToast({ title: '取消失败，请重试', icon: 'none' });
+      } else {
+        Taro.showToast({
+          title: `${successList.length}人已取消，${failList.length}人失败`,
+          icon: 'none',
+          duration: 3000,
+        });
+      }
+
+      invalidateStudents(currentUserId);
+      setTimeout(() => Taro.navigateBack(), 1800);
+    } catch (err) {
+      logError('class cancel submit', err);
+      Taro.showToast({ title: '取消失败，请重试', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    cancelReason,
+    classStudents,
+    classes,
+    currentTeacherId,
+    currentUserId,
+    invalidateStudents,
+    lessonDate,
+    lessonTime,
+    profile,
+    selectedAssistantTeacherId,
+    selectedClassId,
+    selectedTeachingTeacherId,
+    studentPackages,
+  ]);
+
   // ===== 班级模式：确认预览后执行消课 =====
   const handleConfirmPreview = useCallback(
     async (skippedIds: string[]) => {
@@ -481,9 +687,12 @@ const LessonForm: React.FC = () => {
               !!pkg.subject_id && !!studentSubject && pkg.subject_id !== studentSubject.id;
 
             const createdRecord = await lessonRecordService.create({
-              teacher_id: teacherId,
+              teacher_id: selectedTeachingTeacherId || currentTeacherId,
+              operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
+              assistant_teacher_id: selectedAssistantTeacherId || undefined,
               student_id: student.id,
               package_id: pkg.id,
+              class_id: selectedClassId,
               lesson_date: lessonDateValue,
               hours_used: hoursUsed,
               is_cross_subject: isCrossSubject || undefined,
@@ -537,7 +746,7 @@ const LessonForm: React.FC = () => {
           Taro.showToast({ title: parts.join('，'), icon: 'none', duration: 3000 });
         }
 
-        invalidateStudents(teacherId);
+        invalidateStudents(currentUserId);
         setTimeout(() => Taro.navigateBack(), 1800);
       } catch (err) {
         logError('class submit', err);
@@ -551,7 +760,10 @@ const LessonForm: React.FC = () => {
       studentPackages,
       studentSubjects,
       hoursUsed,
-      teacherId,
+      selectedTeachingTeacherId,
+      selectedAssistantTeacherId,
+      currentTeacherId,
+      currentUserId,
       lessonDate,
       lessonTime,
       content,
@@ -568,9 +780,13 @@ const LessonForm: React.FC = () => {
     if (mode === 'single') {
       handleSingleSubmit();
     } else {
-      handleClassSubmit();
+      if (classActionMode === 'cancel') {
+        handleClassCancelSubmit();
+      } else {
+        handleClassSubmit();
+      }
     }
-  }, [mode, handleSingleSubmit, handleClassSubmit]);
+  }, [classActionMode, handleClassCancelSubmit, handleClassSubmit, handleSingleSubmit, mode]);
 
   // ===== 提交按钮文案 =====
   const submitText = useMemo(() => {
@@ -579,9 +795,22 @@ const LessonForm: React.FC = () => {
       const isOwe = matchedPackage.remaining_hours < hoursUsed;
       return isOwe ? `确认消课（欠课${hoursUsed}课时）` : `确认消课 ${hoursUsed}课时`;
     }
+    if (classActionMode === 'cancel') {
+      if (!selectedClassId) return '确认取消本次课程';
+      return `确认取消本次课程（${classStudents.length}人）`;
+    }
     if (presentStudents.length === 0) return '确认消课';
     return `确认消课 ${presentStudents.length}人×${hoursUsed}课时`;
-  }, [mode, selectedStudent, matchedPackage, hoursUsed, presentStudents.length]);
+  }, [
+    classActionMode,
+    classStudents.length,
+    matchedPackage,
+    mode,
+    presentStudents.length,
+    selectedClassId,
+    selectedStudent,
+    hoursUsed,
+  ]);
 
   // ===== 班级学员签到列表数据 =====
   const checkinItems = useMemo(
@@ -681,6 +910,37 @@ const LessonForm: React.FC = () => {
             {/* 消课信息（选学员后显示） */}
             {selectedStudent && (
               <>
+                {/* 主讲老师 */}
+                <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
+                  <View className="flex items-center gap-1 mb-3">
+                    <Text className="text-lg text-foreground">主讲老师</Text>
+                    <Text className="text-lg text-destructive">*</Text>
+                  </View>
+                  <Picker
+                    mode="selector"
+                    range={teacherOptions.map((teacher) => teacher.name)}
+                    value={selectedTeachingTeacherIndex}
+                    onChange={(e) => {
+                      const nextTeacher = teacherOptions[Number(e.detail.value || 0)];
+                      if (nextTeacher?.id) {
+                        setSelectedTeachingTeacherId(nextTeacher.id);
+                      }
+                    }}
+                  >
+                    <View className="border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-lg text-foreground truncate block">
+                          {selectedTeachingTeacher?.name || profile?.name || '请选择主讲老师'}
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block truncate">
+                          默认当前操作人，可改为其他老师
+                        </Text>
+                      </View>
+                      <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                    </View>
+                  </Picker>
+                </View>
+
                 {/* 消课课时 */}
                 <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
                   <View className="flex items-center gap-1 mb-3">
@@ -795,19 +1055,134 @@ const LessonForm: React.FC = () => {
               />
             </View>
 
+            {/* 操作类型 */}
+            {selectedClassId && (
+              <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
+                <Text className="text-lg text-foreground mb-3 block">操作类型</Text>
+                <View className="flex gap-3">
+                  <View
+                    className={`flex-1 rounded-2xl border-2 px-4 py-3 items-center ${classActionMode === 'consume' ? 'border-primary bg-primary/5' : 'border-input bg-background'}`}
+                    onClick={() => setClassActionMode('consume')}
+                  >
+                    <Text
+                      className={`text-base font-medium ${classActionMode === 'consume' ? 'text-primary' : 'text-foreground'}`}
+                    >
+                      正常消课
+                    </Text>
+                  </View>
+                  <View
+                    className={`flex-1 rounded-2xl border-2 px-4 py-3 items-center ${classActionMode === 'cancel' ? 'border-destructive bg-destructive/5' : 'border-input bg-background'}`}
+                    onClick={() => setClassActionMode('cancel')}
+                  >
+                    <Text
+                      className={`text-base font-medium ${classActionMode === 'cancel' ? 'text-destructive' : 'text-foreground'}`}
+                    >
+                      取消本次课程
+                    </Text>
+                  </View>
+                </View>
+                <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] block">
+                  {classActionMode === 'cancel'
+                    ? '取消开课默认作用于全班，会生成已取消记录，但不会扣减课时'
+                    : '正常消课时按签到学员生成记录并扣减课时'}
+                </Text>
+              </View>
+            )}
+
+            {/* 主讲老师 */}
+            {selectedClassId && (
+              <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
+                <View className="flex items-center gap-1 mb-3">
+                  <Text className="text-lg text-foreground">主讲老师</Text>
+                  <Text className="text-lg text-destructive">*</Text>
+                </View>
+                <Picker
+                  mode="selector"
+                  range={teacherOptions.map((teacher) => teacher.name)}
+                  value={selectedTeachingTeacherIndex}
+                  onChange={(e) => {
+                    const nextTeacher = teacherOptions[Number(e.detail.value || 0)];
+                    if (nextTeacher?.id) {
+                      setSelectedTeachingTeacherId(nextTeacher.id);
+                    }
+                  }}
+                >
+                  <View className="border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-lg text-foreground truncate block">
+                        {selectedTeachingTeacher?.name || profile?.name || '请选择主讲老师'}
+                      </Text>
+                      <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block truncate">
+                        默认当前操作人，可改为其他老师
+                      </Text>
+                    </View>
+                    <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                  </View>
+                </Picker>
+              </View>
+            )}
+
+            {/* 助教老师 */}
+            {selectedClassId && (
+              <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
+                <Text className="text-lg text-foreground mb-3 block">助教老师</Text>
+                {assistantTeacherOptions.length > 0 ? (
+                  <Picker
+                    mode="selector"
+                    range={assistantTeacherOptions.map((teacher) => teacher.name)}
+                    value={selectedAssistantTeacherIndex}
+                    onChange={(e) => {
+                      const nextTeacher =
+                        assistantTeacherOptions[Number(e.detail.value || 0)];
+                      setSelectedAssistantTeacherId(nextTeacher?.id || '');
+                    }}
+                  >
+                    <View className="border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-lg text-foreground truncate block">
+                          {selectedAssistantTeacher?.name || '请选择助教老师'}
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block truncate">
+                          默认带出班级预设助教，可手动改为其他助教
+                        </Text>
+                      </View>
+                      <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                    </View>
+                  </Picker>
+                ) : (
+                  <View className="border-2 border-dashed border-input rounded-2xl py-3 px-5 bg-background">
+                    <Text className="text-base text-muted-foreground">
+                      当前班级未预设助教，可在班级配置中补充
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* 学员签到列表 */}
             {classStudents.length > 0 && (
               <View className="mx-8 mb-6">
+                {classActionMode === 'cancel' && (
+                  <View className="mb-3 px-4 py-3 rounded-2xl bg-destructive/5 border border-destructive/20">
+                    <Text className="text-[24rpx] text-destructive block">
+                      当前为取消开课，默认对全班生效，下方名单仅用于查看本次受影响学员
+                    </Text>
+                  </View>
+                )}
                 <StudentCheckinList
                   items={checkinItems}
-                  checkedIds={checkedStudentIds}
-                  onToggle={handleToggleCheckin}
+                  checkedIds={
+                    classActionMode === 'cancel'
+                      ? new Set(classStudents.map((student) => student.id))
+                      : checkedStudentIds
+                  }
+                  onToggle={classActionMode === 'cancel' ? () => {} : handleToggleCheckin}
                 />
               </View>
             )}
 
             {/* 消课课时 */}
-            {selectedClassId && (
+            {selectedClassId && classActionMode === 'consume' && (
               <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
                 <View className="flex items-center gap-1 mb-3">
                   <Text className="text-lg text-foreground">消课课时</Text>
@@ -847,7 +1222,7 @@ const LessonForm: React.FC = () => {
             )}
 
             {/* 教学内容 */}
-            {selectedClassId && (
+            {selectedClassId && classActionMode === 'consume' && (
               <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
                 <Text className="text-lg text-foreground">教学内容</Text>
                 <Textarea
@@ -855,6 +1230,22 @@ const LessonForm: React.FC = () => {
                   placeholder="选填"
                   value={content}
                   onInput={(e) => setContent(e.detail.value || '')}
+                />
+              </View>
+            )}
+
+            {/* 取消原因 */}
+            {selectedClassId && classActionMode === 'cancel' && (
+              <View className="mx-8 mb-6 bg-white rounded-2xl p-5 shadow-soft">
+                <View className="flex items-center gap-1 mb-3">
+                  <Text className="text-lg text-foreground">取消原因</Text>
+                  <Text className="text-lg text-destructive">*</Text>
+                </View>
+                <Textarea
+                  className="w-full mt-3 p-4 bg-background rounded-2xl text-base text-foreground min-h-[120rpx]"
+                  placeholder="请填写取消原因，如场地临时调整、老师请假等"
+                  value={cancelReason}
+                  onInput={(e) => setCancelReason(e.detail.value || '')}
                 />
               </View>
             )}
@@ -908,7 +1299,10 @@ const LessonForm: React.FC = () => {
           disabled={
             submitting ||
             (mode === 'single' && !selectedStudent) ||
-            (mode === 'class' && (!selectedClassId || presentStudents.length === 0))
+            (mode === 'class' &&
+              (classActionMode === 'cancel'
+                ? !selectedClassId || classStudents.length === 0 || !cancelReason.trim()
+                : !selectedClassId || presentStudents.length === 0))
           }
           onClick={handleSubmit}
         />

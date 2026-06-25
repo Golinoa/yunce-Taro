@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>外卖首页 - 设计稿还原</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+      background: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app {
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+      background: linear-gradient(180deg, #E5FF3D 0%, #D4F935 15%, #C8F560 35%, #F8F8F8 50%, #F8F8F8 100%);
+    }
+
+    /* ===== 顶部状态栏（模拟） ===== */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px 4px;
+      height: 44px;
+    }
+    .status-time {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a1a;
+      background: rgba(0,0,0,0.08);
+      padding: 2px 10px;
+      border-radius: 12px;
+    }
+    .status-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .signal-icon {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+    }
+    .signal-bar {
+      width: 3px;
+      background: #1a1a1a;
+      border-radius: 1px;
+    }
+    .signal-bar:nth-child(1) { height: 5px; }
+    .signal-bar:nth-child(2) { height: 8px; }
+    .signal-bar:nth-child(3) { height: 11px; }
+    .signal-bar:nth-child(4) { height: 14px; }
+    .status-5g {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .battery {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .battery-body {
+      width: 26px;
+      height: 13px;
+      border: 1.5px solid #1a1a1a;
+      border-radius: 3px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 1.5px;
+    }
+    .battery-body::after {
+      content: '';
+      position: absolute;
+      right: -3.5px;
+      width: 2px;
+      height: 6px;
+      background: #1a1a1a;
+      border-radius: 0 1px 1px 0;
+    }
+    .battery-level {
+      width: 70%;
+      height: 100%;
+      background: #C8F560;
+      border-radius: 1.5px;
+    }
+    .battery-num {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    /* ===== 导航栏 ===== */
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px 0;
+    }
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-back {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nav-back::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-left: 2.5px solid #1a1a1a;
+      border-bottom: 2.5px solid #1a1a1a;
+      transform: rotate(45deg);
+    }
+    .nav-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .nav-location {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 15px;
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+    .loc-pin {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #1a1a1a;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      position: relative;
+    }
+    .loc-pin::after {
+      content: '';
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background: #1a1a1a;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .loc-arrow {
+      font-size: 12px;
+      color: #666;
+    }
+    .nav-msg {
+      position: relative;
+      width: 28px;
+      height: 28px;
+    }
+    .msg-bubble {
+      position: absolute;
+      top: -6px;
+      right: -8px;
+      background: #FF4D4F;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 8px;
+      min-width: 18px;
+      text-align: center;
+      border: 1.5px solid #E5FF3D;
+    }
+
+    /* ===== 主标题区域 ===== */
+    .hero-section {
+      position: relative;
+      padding: 16px 20px 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .hero-text {
+      flex: 1;
+    }
+    .hero-arrow {
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 10px solid #1a1a1a;
+      margin-bottom: 4px;
+    }
+    .hero-title {
+      font-size: 40px;
+      font-weight: 900;
+      color: #1a1a1a;
+      line-height: 1.2;
+      letter-spacing: -1px;
+    }
+    .hero-ip {
+      width: 160px;
+      height: 120px;
+      position: relative;
+      flex-shrink: 0;
+      margin-top: -10px;
+    }
+    .hero-ip img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* ===== 搜索框 ===== */
+    .search-box {
+      margin: 16px 16px 0;
+      background: white;
+      border-radius: 28px;
+      display: flex;
+      align-items: center;
+      padding: 4px 4px 4px 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      height: 52px;
+    }
+    .search-icon {
+      width: 20px;
+      height: 20px;
+      border: 2.5px solid #999;
+      border-radius: 50%;
+      position: relative;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    .search-icon::after {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 2.5px;
+      background: #999;
+      bottom: -1px;
+      right: -4px;
+      transform: rotate(45deg);
+      border-radius: 1px;
+    }
+    .search-input {
+      flex: 1;
+      font-size: 15px;
+      color: #bbb;
+      border: none;
+      outline: none;
+      background: transparent;
+    }
+    .search-btn {
+      background: #FFD600;
+      color: #1a1a1a;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 0 22px;
+      height: 44px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      flex-shrink: 0;
+    }
+
+    /* ===== 分类卡片 ===== */
+    .category-card {
+      margin: 20px 16px 0;
+      background: white;
+      border-radius: 24px;
+      padding: 24px 12px 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    }
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px 4px;
+    }
+    .category-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .cat-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+    .cat-label {
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    /* 分类图标配色（模拟3D效果） */
+    .cat-food { background: linear-gradient(135deg, #FF8C42, #FFB347); }
+    .cat-drink { background: linear-gradient(135deg, #FF6B9D, #FFA07A); }
+    .cat-market { background: linear-gradient(135deg, #4ECDC4, #44A08D); }
+    .cat-fruit { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .cat-med { background: linear-gradient(135deg, #FF6B6B, #FFE66D); }
+    .cat-tea { background: linear-gradient(135deg, #A8E6CF, #DCEDC1); }
+    .cat-student { background: linear-gradient(135deg, #FFD93D, #FF8C42); }
+    .cat-run { background: linear-gradient(135deg, #6BCB77, #4D96FF); }
+    .cat-group { background: linear-gradient(135deg, #FF9F1C, #FFBF69); }
+    .cat-rice { background: linear-gradient(135deg, #FFE66D, #FF6B6B); }
+
+    /* ===== 分页指示器 ===== */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 16px;
+    }
+    .dot {
+      width: 16px;
+      height: 4px;
+      border-radius: 2px;
+      background: #ddd;
+    }
+    .dot.active {
+      background: #FFD600;
+    }
+
+    /* ===== 占位底部 ===== */
+    .bottom-space {
+      height: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- 状态栏 -->
+    <div class="status-bar">
+      <div class="status-time">16:38</div>
+      <div class="status-right">
+        <div class="signal-icon">
+          <div class="signal-bar"></div>
+          <div class="signal-bar"></div>
+          <div class="signal-bar"></div>
+          <div class="signal-bar"></div>
+        </div>
+        <span class="status-5g">5G</span>
+        <div class="battery">
+          <div class="battery-body">
+            <div class="battery-level"></div>
+          </div>
+          <span class="battery-num">61</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="nav-bar">
+      <div class="nav-left">
+        <div class="nav-back"></div>
+        <span class="nav-title">外卖</span>
+        <div class="nav-location">
+          <div class="loc-pin"></div>
+          <span>知行苑</span>
+          <span class="loc-arrow">›</span>
+        </div>
+      </div>
+      <div class="nav-msg">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <div class="msg-bubble">99+</div>
+      </div>
+    </div>
+
+    <!-- 主标题 -->
+    <div class="hero-section">
+      <div class="hero-text">
+        <div class="hero-arrow"></div>
+        <div class="hero-title">你好~ 同学</div>
+      </div>
+      <div class="hero-ip">
+        <img src="ipsmall.png" alt="云朵IP">
+      </div>
+    </div>
+
+    <!-- 搜索框 -->
+    <div class="search-box">
+      <div class="search-icon"></div>
+      <input class="search-input" type="text" placeholder="CHAGEE 霸土余姬" readonly>
+      <button class="search-btn">搜索</button>
+    </div>
+
+    <!-- 分类 -->
+    <div class="category-card">
+      <div class="category-grid">
+        <div class="category-item">
+          <div class="cat-icon cat-food">🍗</div>
+          <span class="cat-label">美食</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-drink">🧋</div>
+          <span class="cat-label">甜点饮品</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-market">🧺</div>
+          <span class="cat-label">超市便利</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-fruit">🍉</div>
+          <span class="cat-label">蔬菜水果</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-med">💊</div>
+          <span class="cat-label">看病买药</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-tea">☕</div>
+          <span class="cat-label">下午茶</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-student">🎓</div>
+          <span class="cat-label">学生价</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-run">⚡</div>
+          <span class="cat-label">跑腿</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-group">🍱</div>
+          <span class="cat-label">拼好饭</span>
+        </div>
+        <div class="category-item">
+          <div class="cat-icon cat-rice">🌾</div>
+          <span class="cat-label">领米粒</span>
+        </div>
+      </div>
+      <div class="pagination">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+
+    <div class="bottom-space"></div>
+  </div>
+</body>
+</html>

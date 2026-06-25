@@ -11,16 +11,55 @@ export {
   classService,
   scheduleService,
   notificationService,
-  subjectService,
   formatDateCN,
 } from './student';
 export type { FeeMethod } from './student';
-export { authService } from './auth';
+export { temporaryRescheduleService } from './temporary-reschedule';
+export {
+  login,
+  wechatLogin,
+  phoneLogin,
+  registerStep1,
+  registerStep2,
+  registerStep3,
+  signUp,
+  verifyCampusCode,
+  verifyStudentCode,
+  validateInviteCode,
+  getSession,
+  switchIdentity,
+  addIdentity,
+  restoreRegisterDrafts,
+  logout,
+} from './auth';
+export type { LoginResult, RegisterStep1Result, RegisterDraft } from './auth';
 export { homeService } from './home';
+export type {
+  StatsPeriod,
+  StatsData,
+  QuickEntry,
+  HomeOperationContent,
+  OperationActionConfig,
+  OperationActivityItem,
+  OperationBannerItem,
+} from './home';
 export { feedbackService } from './feedback';
+export { uploadService } from './upload';
+export type { UploadResult } from './upload';
 export {
   teacherService,
   salaryModelService,
   salarySettingsService,
   teacherScheduleService,
 } from './teacher';
+export {
+  campusService,
+  salaryModelCampusService,
+  payDaySettingsService,
+  holidayService,
+  businessHoursService,
+  notifyService,
+  campusDataService,
+  subjectService,
+} from './campus';
+export { statisticsService } from './statistics';

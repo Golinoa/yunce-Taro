@@ -16,16 +16,16 @@ export function getHoursColorStatus(remainingHours: number): 'normal' | 'warn' |
   return 'danger';
 }
 
-/** 根据剩余课时获取课时数字颜色 */
-export function getHoursColor(remainingHours: number): string {
+/** 根据剩余课时获取课时数字颜色类名 */
+export function getHoursColorClass(remainingHours: number): string {
   const status = getHoursColorStatus(remainingHours);
   switch (status) {
     case 'warn':
-      return '#d4a24e';
+      return 'text-amber';
     case 'danger':
-      return '#D94040';
+      return 'text-destructive';
     default:
-      return '#5EC8A8';
+      return 'text-success';
   }
 }
 
@@ -61,35 +61,35 @@ export function getStudentCardStatus(student: {
   return 'sufficient';
 }
 
-/** 获取卡片左边框颜色 */
-export function getCardBorderColor(status: StudentCardStatus): string {
+/** 获取卡片左边框颜色类名 */
+export function getCardBorderColorClass(status: StudentCardStatus): string {
   switch (status) {
     case 'sufficient':
-      return '#5EC8A8';
+      return 'border-success';
     case 'low':
-      return '#d4a24e';
+      return 'border-amber';
     case 'expiring':
-      return '#6ba3d6';
+      return 'border-info';
     case 'expired':
-      return '#D94040';
+      return 'border-destructive';
     case 'owe':
-      return '#e88aaa';
+      return 'border-accent';
   }
 }
 
-/** 获取进度条渐变样式 */
-export function getProgressGradient(status: StudentCardStatus): string {
+/** 获取进度条渐变类名 */
+export function getProgressGradientClass(status: StudentCardStatus): string {
   switch (status) {
     case 'sufficient':
-      return 'linear-gradient(90deg, #5EC8A8, #7dd8bc)';
+      return 'bg-progress-primary';
     case 'low':
-      return 'linear-gradient(90deg, #d4a24e, #e8c47a)';
+      return 'bg-gradient-amber';
     case 'expiring':
-      return 'linear-gradient(90deg, #6ba3d6, #93c5e8)';
+      return 'bg-class-info';
     case 'expired':
-      return 'linear-gradient(90deg, #D94040, #e87070)';
+      return 'bg-kpi-red';
     case 'owe':
-      return 'linear-gradient(90deg, #e88aaa, #f0b3c7)';
+      return 'bg-class-red';
   }
 }
 

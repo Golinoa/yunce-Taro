@@ -4,6 +4,7 @@
  */
 import {
   mockGetTeachers,
+  mockGetActiveTeachers,
   mockGetTeacherById,
   mockAddTeacher,
   mockUpdateTeacher,
@@ -27,8 +28,9 @@ import type { TeacherUIModel, SalaryModel, SalarySettings, Deduction } from '@/t
 export const teacherService = {
   /** 获取教师列表 */
   getList: () => mockGetTeachers(),
-  // 联调时替换为:
-  // getList: () => get<TeacherUIModel[]>('/api/teachers'),
+
+  /** 获取在职教师列表（用于班级表单选择器） */
+  getActiveList: () => mockGetActiveTeachers(),
 
   /** 获取教师详情 */
   getById: (id: string) => mockGetTeacherById(id),
@@ -66,8 +68,18 @@ export const salaryModelService = {
   /** 创建工资模型 */
   create: (model: SalaryModel) => mockCreateSalaryModel(model),
 
-  /** 更新工资模型 */
+  /** 更新工资模型（含历史一致性处理） */
   update: (id: string, updates: Partial<SalaryModel>) => mockUpdateSalaryModel(id, updates),
+
+  /** 切换工资模型 — 按薪资状态处理历史数据一致性
+   * 已发放 → 冻结不变
+   * 已确认未发放 → 可重算（标记需重算）
+   * 待确认 → 按新模型计算
+   */
+  switchModel: async (modelId: string, updates: Partial<SalaryModel>) => {
+    const result = await mockUpdateSalaryModel(modelId, updates);
+    return result;
+  },
 };
 
 // ============================================

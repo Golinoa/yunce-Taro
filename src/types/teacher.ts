@@ -19,6 +19,9 @@ export interface Teacher {
 /** 教师角色 */
 export type TeacherRole = 'lead' | 'assist' | 'parttime';
 
+/** 教师数据权限档位 */
+export type TeacherAccessScope = 'self' | 'subject' | 'org';
+
 /** 薪资状态流转：待确认 → 已确认 → 已发放 */
 export type SalaryStatus = 'pending' | 'confirmed' | 'paid';
 
@@ -53,6 +56,8 @@ export interface SalaryModel {
   perf: number; // 绩效奖金
   isDefault?: boolean;
   teacherCount?: number;
+  /** 班级差异化费率（二期实现） */
+  class_rates?: ClassRateOverride[];
 }
 
 /** 班级计费覆盖 */
@@ -76,6 +81,8 @@ export interface TeacherUIModel {
   name: string;
   role: TeacherRole;
   roleText: string;
+  accessScope: TeacherAccessScope;
+  accessScopeText: string;
   subject: string;
   phone: string;
   hours: number;

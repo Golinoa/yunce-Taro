@@ -8,11 +8,12 @@ interface ScheduleTimelineProps {
   schedules: Schedule[];
 }
 
+// 排课颜色主题（对齐 theme.ts scheduleColors，使用 hsla 引用 CSS 变量）
 const colorMap: Record<ScheduleColor, { bg: string; text: string }> = {
-  primary: { bg: 'rgba(94, 200, 168, 0.25)', text: 'rgba(94, 200, 168, 0.85)' },
-  info: { bg: 'rgba(107, 181, 212, 0.25)', text: 'rgba(107, 181, 212, 0.85)' },
-  accent: { bg: 'rgba(232, 155, 184, 0.25)', text: 'rgba(232, 155, 184, 0.85)' },
-  lavender: { bg: 'rgba(160, 140, 210, 0.25)', text: 'rgba(160, 140, 210, 0.85)' },
+  primary: { bg: 'hsl(var(--primary) / 0.25)', text: 'hsl(var(--primary) / 0.85)' },
+  info: { bg: 'hsl(var(--info) / 0.25)', text: 'hsl(var(--info) / 0.85)' },
+  accent: { bg: 'hsl(var(--accent) / 0.25)', text: 'hsl(var(--accent) / 0.85)' },
+  lavender: { bg: 'hsl(var(--petal-purple) / 0.25)', text: 'hsl(var(--petal-purple) / 0.85)' },
 };
 
 const ScheduleTimeline: React.FC<ScheduleTimelineProps> = ({ schedules }) => {
@@ -37,7 +38,9 @@ const ScheduleTimeline: React.FC<ScheduleTimelineProps> = ({ schedules }) => {
             key={item.id}
             className="flex items-start min-h-30 active:opacity-85"
             onClick={() =>
-              Taro.navigateTo({ url: `/pages/lesson-form/index?scheduleId=${item.id}` })
+              Taro.navigateTo({
+                url: `/package-course/pages/lesson-form/index?scheduleId=${item.id}`,
+              })
             }
           >
             <View className="w-6 min-w-6 flex flex-col items-end pt-1">

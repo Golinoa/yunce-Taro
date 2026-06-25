@@ -17,7 +17,7 @@ interface TimeSelectorProps {
   month: number;
   monthOptions: MonthOption[];
   monthIndex: number;
-  filterMode?: 'month' | 'year' | 'custom';
+  filterMode?: 'month' | 'quarter' | 'year' | 'custom';
   onMonthChange: (year: number, month: number) => void;
 }
 
@@ -29,7 +29,12 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
   filterMode = 'month',
   onMonthChange,
 }) => {
-  const displayText = filterMode === 'year' ? `${year}年全年` : `${year}年${month}月`;
+  const displayText =
+    filterMode === 'year'
+      ? `${year}年全年`
+      : filterMode === 'quarter'
+        ? `${year}年 Q${month}`
+        : `${year}年${month}月`;
 
   return (
     <Picker
@@ -42,9 +47,9 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
         if (opt) onMonthChange(opt.year, opt.month);
       }}
     >
-      <View className="bg-white/25 backdrop-blur-sm rounded-2xl px-5 py-3 flex items-center justify-between mb-4">
-        <Text className="text-white text-lg font-semibold">{displayText}</Text>
-        <Icon name="mdi-chevron-down" size="sm" color="white" />
+      <View className="bg-white rounded-2xl px-5 py-3 flex items-center justify-between mb-4 border border-solid border-border-light">
+        <Text className="text-foreground text-lg font-semibold">{displayText}</Text>
+        <Icon name="mdi-chevron-down" size="sm" color="muted" />
       </View>
     </Picker>
   );

@@ -6,6 +6,10 @@ import UnoCSS from '@unocss/webpack';
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
+  // 当前项目处于前端高频联调阶段，默认启用 mock。
+  // 正式联调或发版时，显式传入 VITE_USE_MOCK=false 即可切到真实接口。
+  const useMock = process.env.VITE_USE_MOCK ?? 'true';
+  const apiBaseUrl = process.env.TARO_API_BASE_URL ?? '/api/app/v1';
   const baseConfig: UserConfigExport<'webpack5'> = {
     projectName: 'yunce-edu',
     date: '2025-12-10',
@@ -19,9 +23,20 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
     sourceRoot: 'src',
     outputRoot: process.env.TARO_OUTPUT_DIR || 'dist',
     plugins: ['@tarojs/plugin-html'],
-    defineConstants: {},
+    defineConstants: {
+      'process.env.TARO_API_BASE_URL': JSON.stringify(apiBaseUrl),
+      'process.env.VITE_USE_MOCK': JSON.stringify(useMock),
+      'process.env.TARO_ENABLE_LOCAL_DEBUG': JSON.stringify(
+        process.env.TARO_ENABLE_LOCAL_DEBUG ?? 'false',
+      ),
+    },
     copy: {
-      patterns: [],
+      patterns: [
+        {
+          from: 'src/assets/images',
+          to: 'dist/assets/images',
+        },
+      ],
       options: {},
     },
     framework: 'react',
@@ -32,7 +47,7 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
       },
     },
     cache: {
-      enable: false,
+      enable: true,
     },
     mini: {
       miniCssExtractPluginOption: {

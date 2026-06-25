@@ -7,6 +7,7 @@ import type { ResignType } from '@/types/teacher';
 interface ResignSheetProps {
   visible: boolean;
   teacherName: string;
+  submitting?: boolean;
   onConfirm: (type: ResignType, reason?: string) => void;
   onClose: () => void;
 }
@@ -23,7 +24,13 @@ const RESIGN_OPTIONS: { label: string; value: ResignType }[] = [
  * 使用场景：教师详情页标记教师离职
  * 功能：选择离职类型 + 填写离职原因
  */
-const ResignSheet: React.FC<ResignSheetProps> = ({ visible, teacherName, onConfirm, onClose }) => {
+const ResignSheet: React.FC<ResignSheetProps> = ({
+  visible,
+  teacherName,
+  submitting = false,
+  onConfirm,
+  onClose,
+}) => {
   const [resignType, setResignType] = useState<ResignType>('quit');
   const [reason, setReason] = useState('');
 
@@ -36,6 +43,7 @@ const ResignSheet: React.FC<ResignSheetProps> = ({ visible, teacherName, onConfi
   }, [visible]);
 
   const handleConfirm = () => {
+    if (submitting) return;
     onConfirm(resignType, reason.trim() || undefined);
   };
 
@@ -78,15 +86,18 @@ const ResignSheet: React.FC<ResignSheetProps> = ({ visible, teacherName, onConfi
         <View className="flex gap-3">
           <View
             className="flex-1 py-3 rounded-xl text-center text-sm font-semibold bg-muted text-muted-foreground"
-            onClick={onClose}
+            onClick={submitting ? undefined : onClose}
           >
             取消
           </View>
           <View
-            className="flex-1 py-3 rounded-xl text-center text-sm font-semibold bg-destructive text-white"
-            onClick={handleConfirm}
+            className={cn(
+              'flex-1 py-3 rounded-xl text-center text-sm font-semibold',
+              submitting ? 'bg-muted text-muted-foreground' : 'bg-destructive text-white',
+            )}
+            onClick={submitting ? undefined : handleConfirm}
           >
-            确认离职
+            {submitting ? '处理中...' : '确认离职'}
           </View>
         </View>
       </View>

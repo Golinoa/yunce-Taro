@@ -7,6 +7,7 @@ interface ConfirmSalarySheetProps {
   visible: boolean;
   teacherName: string;
   amount: number;
+  submitting?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -22,6 +23,7 @@ const ConfirmSalarySheet: React.FC<ConfirmSalarySheetProps> = ({
   visible,
   teacherName,
   amount,
+  submitting = false,
   onConfirm,
   onClose,
 }) => {
@@ -43,15 +45,15 @@ const ConfirmSalarySheet: React.FC<ConfirmSalarySheetProps> = ({
         <View className="flex gap-3">
           <View
             className="flex-1 py-3 rounded-xl text-center text-sm font-semibold bg-muted text-muted-foreground"
-            onClick={onClose}
+            onClick={submitting ? undefined : onClose}
           >
             再想想
           </View>
           <View
-            className="flex-1 py-3 rounded-xl text-center text-sm font-semibold text-white bg-gradient-amber"
-            onClick={onConfirm}
+            className={`flex-1 py-3 rounded-xl text-center text-sm font-semibold ${submitting ? 'bg-muted text-muted-foreground' : 'text-white bg-gradient-amber'}`}
+            onClick={submitting ? undefined : onConfirm}
           >
-            确认工资
+            {submitting ? '确认中...' : '确认工资'}
           </View>
         </View>
       </View>
