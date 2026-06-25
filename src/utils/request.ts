@@ -5,9 +5,56 @@
  */
 import Taro from '@tarojs/taro';
 
-const BASE_URL = ''; // 联调时改为后端地址，如 'https://api.example.com/v1'
+// 小程序运行时没有 Node.js 的 process，全局访问前必须先做兼容判断。
+// 小程序端默认走 app 口径，避免与 admin 后台接口混用。
+const RAW_BASE_URL =
+  typeof process !== 'undefined' && typeof process.env !== 'undefined'
+    ? process.env.TARO_API_BASE_URL || '/api/app/v1'
+    : '/api/app/v1';
 const TIMEOUT = 10000;
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
+const BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
+const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_SESSION_ID = 'page-slow-nav';
+
+function reportRequestDebug(
+  location: string,
+  msg: string,
+  data: Record<string, unknown>,
+): void {
+  Taro.request({
+    url: DEBUG_SERVER_URL,
+    method: 'POST',
+    data: {
+      sessionId: DEBUG_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId: 'H1',
+      location,
+      msg,
+      data,
+      ts: Date.now(),
+    },
+  }).catch(() => {});
+}
+
+const buildRequestUrl = (url: string): string => {
+  const normalizedPath = url.startsWith('/') ? url : `/${url}`;
+  return `${BASE_URL}${normalizedPath}`;
+};
+
+function clearAuthSession(): void {
+  Taro.removeStorageSync(AUTH_TOKEN_KEY);
+}
+
+function redirectToLogin(): void {
+  const currentPages = Taro.getCurrentPages();
+  const currentRoute = currentPages[currentPages.length - 1]?.route;
+  if (currentRoute === 'pages/login/index') {
+    return;
+  }
+
+  Taro.redirectTo({ url: '/pages/login/index' });
+}
 
 /** API 统一响应格式 */
 export interface ApiResponse<T = unknown> {
@@ -22,8 +69,12 @@ function getToken(): string | null {
     const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw);
+    const expiresAt = Number(session.expires_at ?? 0);
     // 检查过期
-    if (session.expires_at * 1000 < Date.now()) return null;
+    if (!Number.isFinite(expiresAt) || expiresAt * 1000 < Date.now()) {
+      clearAuthSession();
+      return null;
+    }
     return session.access_token || null;
   } catch {
     return null;
@@ -43,6 +94,7 @@ interface RequestOptions {
 /** 核心请求函数 */
 export async function request<T = unknown>(options: RequestOptions): Promise<T> {
   const { url, method = 'GET', data, header = {}, skipAuth = false } = options;
+  const startAt = Date.now();
 
   // 注入 token
   if (!skipAuth) {
@@ -54,7 +106,7 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
 
   try {
     const res = await Taro.request({
-      url: `${BASE_URL}${url}`,
+      url: buildRequestUrl(url),
       method,
       data,
       header: {
@@ -64,6 +116,15 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
       timeout: TIMEOUT,
     });
 
+    // #region debug-point H1:request-success
+    reportRequestDebug('src/utils/request.ts:request', '[DEBUG] request success', {
+      method,
+      url,
+      durationMs: Date.now() - startAt,
+      statusCode: res.statusCode,
+    });
+    // #endregion
+
     // HTTP 状态码检查
     if (res.statusCode >= 200 && res.statusCode < 300) {
       // 如果后端返回 { code, data, message } 格式
@@ -71,6 +132,10 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
         const body = res.data as ApiResponse<T>;
         if (body.code === 0 || body.code === 200) {
           return body.data;
+        }
+        if (body.code === 401) {
+          clearAuthSession();
+          redirectToLogin();
         }
         throw new ApiError(body.code, body.message);
       }
@@ -80,13 +145,21 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
 
     // 401 未授权 → 跳转登录
     if (res.statusCode === 401) {
-      Taro.removeStorageSync(AUTH_TOKEN_KEY);
-      Taro.redirectTo({ url: '/pages/login/index' });
+      clearAuthSession();
+      redirectToLogin();
       throw new ApiError(401, '登录已过期，请重新登录');
     }
 
     throw new ApiError(res.statusCode, `请求失败 (${res.statusCode})`);
   } catch (err) {
+    // #region debug-point H1:request-fail
+    reportRequestDebug('src/utils/request.ts:request', '[DEBUG] request fail', {
+      method,
+      url,
+      durationMs: Date.now() - startAt,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    // #endregion
     if (err instanceof ApiError) throw err;
     // 网络错误
     throw new ApiError(-1, '网络异常，请检查网络连接');

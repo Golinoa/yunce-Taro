@@ -4,22 +4,72 @@
  * 未登录时自动跳转登录页，登录后回跳目标路径
  */
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import type { Profile } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
 
 // 无需登录即可访问的页面
 const PUBLIC_PAGES = [
   '/pages/login/index',
+  '/pages/login/forgot-account/index',
+  '/pages/login/forgot-password/index',
+  '/pages/login/contact-support/index',
   '/pages/register/index',
+  '/pages/register/role-select',
+  '/pages/register/role-info',
   '/pages/agreement/index',
-  '/pages/parent-bind/index',
+  '/package-settings/pages/feedback/index',
+  '/package-student/pages/parent-bind/index',
 ];
 const LOGIN_PAGE = '/pages/login/index';
 const REDIRECT_KEY = 'loginRedirectPath';
+const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
+const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_SESSION_ID = 'page-slow-nav';
+
+function reportRouteGuardDebug(
+  location: string,
+  msg: string,
+  data: Record<string, unknown>,
+): void {
+  Taro.request({
+    url: DEBUG_SERVER_URL,
+    method: 'POST',
+    data: {
+      sessionId: DEBUG_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId: 'H3',
+      location,
+      msg,
+      data,
+      ts: Date.now(),
+    },
+  }).catch(() => {});
+}
+
+function hasValidStoredSession(): boolean {
+  try {
+    const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
+    if (!raw) {
+      return false;
+    }
+
+    const session = JSON.parse(raw) as { expires_at?: number };
+    const expiresAt = Number(session?.expires_at ?? 0);
+    return Number.isFinite(expiresAt) && expiresAt * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
 
 /** 判断路径是否为 TabBar 页 */
 function isTabBarPage(path: string): boolean {
-  const tabBarPages = ['/pages/home/index', '/pages/statistics/index', '/pages/profile/index'];
+  const tabBarPages = [
+    '/pages/home/index',
+    '/pages/schedule/index',
+    '/pages/statistics/index',
+    '/pages/profile/index',
+  ];
   return tabBarPages.some((p) => path.includes(p));
 }
 
@@ -29,9 +79,10 @@ function redirectToLogin(fromPath: string) {
   if (isRedirecting) return;
   isRedirecting = true;
   Taro.setStorageSync(REDIRECT_KEY, fromPath);
-  // 与原代码对齐：TabBar 页面用 navigateTo，非 TabBar 页面用 redirectTo
+  // TabBar 页面不能用 navigateTo 压一个登录页，否则左滑返回会回到受保护页，
+  // 又被守卫重新打回登录页，形成“首页 <-> 登录页”来回跳。
   if (isTabBarPage(fromPath)) {
-    Taro.navigateTo({ url: LOGIN_PAGE });
+    Taro.reLaunch({ url: LOGIN_PAGE });
   } else {
     Taro.redirectTo({ url: LOGIN_PAGE });
   }
@@ -40,8 +91,14 @@ function redirectToLogin(fromPath: string) {
   }, 100);
 }
 
-/** 登录后跳转回原页面 */
-export function navigateAfterLogin() {
+/** 登录后跳转逻辑
+ * 优先级：
+ * 1. 若有 redirectPath，优先回原页面
+ * 2. 若用户无身份，进入注册流程
+ * 3. 若用户单身份，进入首页
+ * 4. 若用户多身份，进入角色切换页
+ */
+export function navigateAfterLogin(profile?: Profile | null) {
   const redirectPath = Taro.getStorageSync(REDIRECT_KEY) || '';
   Taro.removeStorageSync(REDIRECT_KEY);
 
@@ -52,9 +109,19 @@ export function navigateAfterLogin() {
     } else {
       Taro.redirectTo({ url: path });
     }
-  } else {
-    Taro.switchTab({ url: '/pages/home/index' });
+    return;
   }
+
+  const identities = profile?.identities || [];
+  if (identities.length === 0) {
+    Taro.redirectTo({ url: '/pages/register/index' });
+    return;
+  }
+  if (identities.length === 1) {
+    Taro.switchTab({ url: '/pages/home/index' });
+    return;
+  }
+  Taro.redirectTo({ url: '/pages/role-switch/index' });
 }
 
 // ============================================
@@ -63,6 +130,8 @@ export function navigateAfterLogin() {
 const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { profile, loading, refreshProfile } = useAuth();
   const [authorized, setAuthorized] = useState(false);
+  const hasRefreshed = useRef(false);
+  const guardStartAtRef = useRef(Date.now());
 
   const checkAuth = useCallback(() => {
     if (loading) {
@@ -76,6 +145,15 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
     // 已登录 或 在公开页面 → 放行
     if (profile || isPublicPage) {
+      // #region debug-point H3:route-guard-pass
+      reportRouteGuardDebug('src/utils/route-guard.tsx:checkAuth', '[DEBUG] route guard pass', {
+        currentPath,
+        loading,
+        hasProfile: Boolean(profile),
+        isPublicPage,
+        elapsedMs: Date.now() - guardStartAtRef.current,
+      });
+      // #endregion
       setAuthorized(true);
       return;
     }
@@ -87,19 +165,42 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setAuthorized(false);
   }, [profile, loading]);
 
-  // 页面显示时刷新会话（检测 token 过期）
-  useDidShow(() => {
-    refreshProfile()
-      .then(() => {
-        checkAuth();
-      })
-      .catch(() => {
-        checkAuth();
-      });
-  });
+  // 首次加载时 refreshProfile + checkAuth
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    guardStartAtRef.current = Date.now();
+    if (!hasRefreshed.current) {
+      hasRefreshed.current = true;
+      // #region debug-point H3:route-guard-refresh
+      reportRouteGuardDebug(
+        'src/utils/route-guard.tsx:useEffect',
+        '[DEBUG] route guard refresh start',
+        { hasProfile: Boolean(profile) },
+      );
+      // #endregion
+      refreshProfile()
+        .then(() => checkAuth())
+        .catch(() => checkAuth());
+    } else {
+      checkAuth();
+    }
+  }, [checkAuth, refreshProfile]);
+
+  // 后续 useDidShow 仅做本地 token 检查，不再 refreshProfile
+  useDidShow(() => {
+    if (hasRefreshed.current) {
+      const hasValidSession = hasValidStoredSession();
+      if (!hasValidSession && !profile) {
+        const currentInstance = Taro.getCurrentInstance();
+        const currentPath = currentInstance?.router?.path || '';
+        const isPublicPage = PUBLIC_PAGES.some((p) => currentPath.includes(p));
+        if (!isPublicPage && !currentPath.includes(LOGIN_PAGE)) {
+          redirectToLogin(currentPath);
+        }
+      } else {
+        setAuthorized(true);
+      }
+    }
+  });
 
   if (!authorized) return null;
   return <>{children}</>;
