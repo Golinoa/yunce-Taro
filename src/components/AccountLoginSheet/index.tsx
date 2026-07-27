@@ -69,7 +69,10 @@ const AccountLoginSheet: React.FC<AccountLoginSheetProps> = ({
       return;
     }
     if (!isPasswordValid(p)) {
-      Taro.showToast({ title: `密码长度应为${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH}位`, icon: 'none' });
+      Taro.showToast({
+        title: `密码长度应为${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH}位`,
+        icon: 'none',
+      });
       return;
     }
 
@@ -77,7 +80,13 @@ const AccountLoginSheet: React.FC<AccountLoginSheetProps> = ({
   }, [username, password, onLogin, isUsernameValid, isPasswordValid]);
 
   return (
-    <BottomSheet visible={visible} title="账号密码登录" onClose={onClose} maxHeight="72vh" scrollable={false}>
+    <BottomSheet
+      visible={visible}
+      title="账号密码登录"
+      onClose={onClose}
+      maxHeight="72vh"
+      scrollable={false}
+    >
       <View className="px-[40rpx] pt-[12rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))]">
         <FormInput
           label="账号"

@@ -1,6 +1,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, { useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
 import type { Schedule, CourseStatus } from '@/types/schedule';
@@ -166,11 +167,18 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                 getStatusBorderClass(status),
                 getCardOpacity(status),
               )}
-              onClick={() =>
+              onClick={() => {
+                if (item.tag) {
+                  Taro.navigateTo({
+                    url: `/pages/booking/index?date=${encodeURIComponent(dayjs().format('YYYY-MM-DD'))}`,
+                  });
+                  return;
+                }
+
                 Taro.navigateTo({
                   url: `/package-course/pages/lesson-form/index?scheduleId=${item.id}`,
-                })
-              }
+                });
+              }}
             >
               <View className="flex">
                 {/* 左侧时间区 - 设计稿统一橙色配色，仅状态覆盖背景 */}

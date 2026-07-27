@@ -1,31 +1,64 @@
-import { View, Text, Image, Input } from '@tarojs/components';
+import { View, Text, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import Avatar from '@/components/Avatar';
+import dayjs from 'dayjs';
+import React, { useState, useCallback, useEffect } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
-import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import { lessonRecordService } from '@/services';
+import PickerItem from '@/components/PickerItem';
+import { classService, lessonRecordService, scheduleService } from '@/services';
 import { useStudentStore } from '@/stores';
+import type { Class } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { Schedule } from '@/types/schedule';
+import type { Student } from '@/types/student';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
-/** 支付方式映射 */
-const FEE_METHOD_MAP: Record<string, string> = {
-  wechat: '微信',
-  alipay: '支付宝',
-  cash: '现金',
-  transfer: '转账',
-  other: '其他',
-};
-
 /** 教师 24h 内可撤销，校长 7 天内可撤销 */
 const REVOKE_LIMIT_HOURS_TEACHER = 24;
 const REVOKE_LIMIT_HOURS_PRINCIPAL = 24 * 7;
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
+const DETAIL_SECTION_TITLE_CLASS =
+  'mb-[10rpx] block px-[6rpx] text-[22rpx] font-medium text-[#98a2b3]';
+const DETAIL_CARD_CLASS = 'overflow-hidden rounded-[20rpx] border border-[#eceff3] bg-white';
+const DETAIL_ROW_CLASS = 'flex items-start gap-[24rpx] px-[24rpx] py-[18rpx]';
+const DETAIL_LABEL_CLASS = 'w-[132rpx] flex-shrink-0 text-[24rpx] leading-[34rpx] text-[#98a2b3]';
+const DETAIL_VALUE_CLASS = 'flex-1 text-right text-[26rpx] leading-[36rpx] text-[#111827]';
+
+interface DetailFieldProps {
+  label: string;
+  value: React.ReactNode;
+  multiline?: boolean;
+  tone?: 'default' | 'danger' | 'muted' | 'success';
+}
+
+const DETAIL_TONE_CLASS_MAP: Record<NonNullable<DetailFieldProps['tone']>, string> = {
+  default: 'text-[#111827]',
+  danger: 'text-destructive',
+  muted: 'text-[#6b7280]',
+  success: 'text-[#16a34a]',
+};
+
+const DetailField: React.FC<DetailFieldProps> = ({
+  label,
+  value,
+  multiline = false,
+  tone = 'default',
+}) => (
+  <View className={DETAIL_ROW_CLASS}>
+    <Text className={DETAIL_LABEL_CLASS}>{label}</Text>
+    <View className={`flex-1 ${multiline ? '' : 'min-w-0'}`}>
+      <Text
+        className={`${DETAIL_VALUE_CLASS} ${multiline ? 'text-left' : 'truncate'} ${DETAIL_TONE_CLASS_MAP[tone]}`}
+      >
+        {value}
+      </Text>
+    </View>
+  </View>
+);
 
 /** 判断消课记录是否可撤销 */
 function canRevoke(record: LessonRecord, role?: string): { allowed: boolean; reason?: string } {
@@ -54,28 +87,51 @@ function canRevoke(record: LessonRecord, role?: string): { allowed: boolean; rea
 const LessonDetail: React.FC = () => {
   const { profile } = useAuth();
   const isTeacher = isStaffRole(profile?.currentContext?.role);
+  const currentTeacherId = profile?.teacher_profile?.id || profile?.id || '';
   const invalidateStudents = useStudentStore((state) => state.invalidate);
+  const routeParams = Taro.getCurrentInstance().router?.params || {};
 
-  const recordId = useMemo(() => {
-    const instance = Taro.getCurrentInstance();
-    return decodeURIComponent(instance?.router?.params?.id || '');
-  }, []);
+  const recordId = routeParams.id ? decodeURIComponent(routeParams.id) : '';
+  const detailMode = routeParams.mode ? decodeURIComponent(routeParams.mode) : '';
+  const classIdParam = routeParams.classId ? decodeURIComponent(routeParams.classId) : '';
+  const classNameParam = routeParams.className ? decodeURIComponent(routeParams.className) : '';
+  const lessonDateParam = routeParams.lessonDate ? decodeURIComponent(routeParams.lessonDate) : '';
+  const lessonTimeParam = routeParams.lessonTime ? decodeURIComponent(routeParams.lessonTime) : '';
+  const leadTeacherNameParam = routeParams.leadTeacherName
+    ? decodeURIComponent(routeParams.leadTeacherName)
+    : '';
+  const assistantTeacherNameParam = routeParams.assistantTeacherName
+    ? decodeURIComponent(routeParams.assistantTeacherName)
+    : '';
+  const scheduleIdParam = routeParams.scheduleId ? decodeURIComponent(routeParams.scheduleId) : '';
+  const startTimeParam = routeParams.startTime ? decodeURIComponent(routeParams.startTime) : '';
+  const endTimeParam = routeParams.endTime ? decodeURIComponent(routeParams.endTime) : '';
+  const statusParam = routeParams.status ? decodeURIComponent(routeParams.status) : '';
+  const hasTrialStudentParam = routeParams.hasTrialStudent
+    ? decodeURIComponent(routeParams.hasTrialStudent)
+    : '';
+  const isCancelledDetailMode =
+    detailMode === 'cancelled' && Boolean(classIdParam && lessonDateParam);
+  const isPreviewMode = detailMode === 'preview' && Boolean(scheduleIdParam && lessonDateParam);
 
   const [record, setRecord] = useState<LessonRecord | null>(null);
+  const [relatedRecords, setRelatedRecords] = useState<LessonRecord[]>([]);
+  const [previewSchedule, setPreviewSchedule] = useState<Schedule | null>(null);
+  const [previewClass, setPreviewClass] = useState<Class | null>(null);
+  const [previewStudents, setPreviewStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [showRevokeSheet, setShowRevokeSheet] = useState(false);
   const [revokeReason, setRevokeReason] = useState('');
   const [revoking, setRevoking] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const loadRecord = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     setNotFound(false);
 
-    if (!recordId) {
+    if (!recordId && !isCancelledDetailMode && !isPreviewMode) {
       setRecord(null);
       setNotFound(true);
       setLoading(false);
@@ -83,6 +139,93 @@ const LessonDetail: React.FC = () => {
     }
 
     try {
+      if (isPreviewMode) {
+        const [schedule, records] = await Promise.all([
+          scheduleService.getById(scheduleIdParam),
+          currentTeacherId
+            ? lessonRecordService.getByTeacherAndRange(
+                currentTeacherId,
+                lessonDateParam,
+                lessonDateParam,
+              )
+            : lessonRecordService.getAll(),
+        ]);
+        const targetClassId = classIdParam || schedule?.class_id || '';
+        const [classInfo, students] = await Promise.all(
+          targetClassId
+            ? [classService.getById(targetClassId), classService.getStudents(targetClassId)]
+            : [Promise.resolve(null), Promise.resolve([])],
+        );
+
+        const lessonRecords = records.filter(
+          (item) => item.class_id === targetClassId && item.lesson_date === lessonDateParam,
+        );
+        const checkedRecords = lessonRecords.filter((item) =>
+          ['normal', 'makeup'].includes(item.status || 'normal'),
+        );
+        const cancelledRecords = lessonRecords.filter((item) => item.status === 'cancelled');
+
+        setPreviewSchedule(schedule);
+        setPreviewClass(classInfo);
+        setPreviewStudents(students);
+
+        // 若这节课已有消课或取消记录，优先展示详情；否则作为纯预览页
+        if (checkedRecords.length > 0) {
+          setRecord(checkedRecords[0]);
+          setRelatedRecords(checkedRecords);
+        } else if (cancelledRecords.length > 0) {
+          setRecord(cancelledRecords[0]);
+          setRelatedRecords(cancelledRecords);
+        } else {
+          setRecord(null);
+          setRelatedRecords([]);
+        }
+        return;
+      }
+
+      if (isCancelledDetailMode) {
+        const allRecords = currentTeacherId
+          ? await lessonRecordService.getByTeacher(currentTeacherId)
+          : await lessonRecordService.getAll();
+
+        let cancelledRecords = allRecords.filter((item) => {
+          if (item.class_id !== classIdParam) {
+            return false;
+          }
+          if (item.lesson_date !== lessonDateParam) {
+            return false;
+          }
+          if (item.status !== 'cancelled') {
+            return false;
+          }
+          if (lessonTimeParam && item.content?.includes(lessonTimeParam) === false) {
+            return false;
+          }
+          return true;
+        });
+
+        if (cancelledRecords.length === 0 && recordId) {
+          const singleRecord = await lessonRecordService.getById(recordId);
+          if (singleRecord?.status === 'cancelled') {
+            cancelledRecords = [singleRecord];
+          }
+        }
+
+        if (cancelledRecords.length === 0) {
+          setRecord(null);
+          setRelatedRecords([]);
+          setNotFound(true);
+          return;
+        }
+
+        const sortedRecords = [...cancelledRecords].sort((left, right) =>
+          (left.student?.name || '').localeCompare(right.student?.name || ''),
+        );
+        setRecord(sortedRecords[0]);
+        setRelatedRecords(sortedRecords);
+        return;
+      }
+
       const data = await lessonRecordService.getById(recordId);
       if (!data) {
         setRecord(null);
@@ -91,54 +234,45 @@ const LessonDetail: React.FC = () => {
       }
 
       setRecord(data);
+      setRelatedRecords([]);
     } catch (err) {
       logError('load record', err);
       setRecord(null);
-      setLoadError('消课详情加载失败，请稍后重试');
+      setRelatedRecords([]);
+      setLoadError(
+        isCancelledDetailMode || isPreviewMode
+          ? '课程详情加载失败，请稍后重试'
+          : '消课详情加载失败，请稍后重试',
+      );
     } finally {
       setLoading(false);
     }
-  }, [recordId]);
+  }, [
+    classIdParam,
+    currentTeacherId,
+    isCancelledDetailMode,
+    isPreviewMode,
+    lessonDateParam,
+    lessonTimeParam,
+    recordId,
+    scheduleIdParam,
+  ]);
 
   useEffect(() => {
     loadRecord();
   }, [loadRecord]);
 
-  // 图片预览
-  const handlePreviewImage = useCallback((urls: string[], current: string) => {
-    Taro.previewImage({ current, urls });
-  }, []);
+  const navigationTitle = isCancelledDetailMode
+    ? classNameParam || record?.class_name || '未命名班级'
+    : isPreviewMode
+      ? '课程预览'
+      : '消课详情';
 
-  // 编辑
-  const handleEdit = useCallback(() => {
-    Taro.navigateTo({
-      url: `/package-course/pages/lesson-form/index?recordId=${encodeURIComponent(recordId)}&mode=edit`,
-    });
-  }, [recordId]);
-
-  // 删除（二次确认）
-  const handleDelete = useCallback(async () => {
-    if (deleting) return;
-
-    const { confirm } = await Taro.showModal({
-      title: '确认删除',
-      content: '删除后不可恢复，确定要删除这条消课记录吗？',
-      confirmColor: '#ef4444',
-    });
-    if (!confirm) return;
-
-    setDeleting(true);
-    try {
-      await lessonRecordService.remove(recordId);
-      if (profile?.id) invalidateStudents(profile.id);
-      Taro.showToast({ title: '已删除', icon: 'success' });
-      setTimeout(() => Taro.navigateBack(), 1000);
-    } catch {
-      Taro.showToast({ title: '删除失败', icon: 'none' });
-    } finally {
-      setDeleting(false);
-    }
-  }, [deleting, recordId, profile, invalidateStudents]);
+  useEffect(() => {
+    Taro.setNavigationBarTitle({
+      title: navigationTitle,
+    }).catch(() => {});
+  }, [navigationTitle]);
 
   // 撤销消课
   const handleRevoke = useCallback(async () => {
@@ -188,13 +322,173 @@ const LessonDetail: React.FC = () => {
     );
   }
 
+  // 课程预览模式：尚未生成消课记录时展示课程信息和学员列表
+  if (isPreviewMode && !record) {
+    const previewClassName =
+      classNameParam || previewClass?.name || previewSchedule?.class_info?.name || '未命名班级';
+    const previewDateText = dayjs(lessonDateParam).isValid()
+      ? `${lessonDateParam}(${WEEKDAY_LABELS[dayjs(lessonDateParam).day()]})`
+      : lessonDateParam;
+    const previewTimeText =
+      startTimeParam && endTimeParam
+        ? `${startTimeParam}-${endTimeParam}`
+        : previewSchedule
+          ? `${previewSchedule.start_time}-${previewSchedule.end_time}`
+          : '-';
+    const previewTeacher = leadTeacherNameParam || previewSchedule?.teacher_name || '未分配';
+    const previewAssistant =
+      assistantTeacherNameParam || previewSchedule?.assistant_teacher_name || '无';
+    const previewStatus = statusParam || 'upcoming';
+    const statusLabelMap: Record<string, string> = {
+      urgent: '即将上课',
+      upcoming: '待上课',
+      active: '上课中',
+      done: '已完成',
+      ended: '已下课',
+      cancelled: '已取消',
+    };
+    const statusColorMap: Record<string, string> = {
+      urgent: 'text-warning bg-warning/10',
+      upcoming: 'text-primary bg-primary/10',
+      active: 'text-success bg-success/10',
+      done: 'text-success bg-success/10',
+      ended: 'text-muted-foreground bg-muted',
+      cancelled: 'text-destructive bg-destructive/10',
+    };
+
+    const handleGoCheckin = () => {
+      const url =
+        `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(scheduleIdParam)}` +
+        `&classId=${encodeURIComponent(classIdParam || previewSchedule?.class_id || '')}` +
+        `&lessonDate=${encodeURIComponent(lessonDateParam)}` +
+        `&hasTrialStudent=${hasTrialStudentParam === '1' ? '1' : '0'}`;
+      void Taro.navigateTo({ url });
+    };
+
+    const handleGoSupplement = () => {
+      const url =
+        `/package-course/pages/lesson-supplement/index?classId=${encodeURIComponent(classIdParam || previewSchedule?.class_id || '')}` +
+        `&scheduleId=${encodeURIComponent(scheduleIdParam)}` +
+        `&className=${encodeURIComponent(previewClassName)}` +
+        `&lessonDate=${encodeURIComponent(lessonDateParam)}` +
+        `&lessonTime=${encodeURIComponent(previewTimeText)}` +
+        `&leadTeacherName=${encodeURIComponent(previewTeacher)}` +
+        `&assistantTeacherName=${encodeURIComponent(previewAssistant)}`;
+      void Taro.navigateTo({ url });
+    };
+
+    const handleGoEditSchedule = () => {
+      const url = `/package-course/pages/schedule-form/index?id=${encodeURIComponent(scheduleIdParam)}`;
+      void Taro.navigateTo({ url });
+    };
+
+    return (
+      <PageContainer>
+        <View className="min-h-screen bg-[#f6f6f7] px-[24rpx] pt-[24rpx] pb-[220rpx]">
+          <View className="rounded-[20rpx] border border-[#dff3e8] bg-[#f4fffa] px-[24rpx] py-[22rpx]">
+            <View className="flex items-start justify-between gap-[16rpx]">
+              <View className="min-w-0 flex-1">
+                <Text className="block truncate text-[34rpx] font-semibold text-[#111827]">
+                  {previewClassName}
+                </Text>
+              </View>
+              <View
+                className={`rounded-full px-[18rpx] py-[10rpx] ${statusColorMap[previewStatus] || statusColorMap.upcoming}`}
+              >
+                <Text className="text-[24rpx] font-medium">
+                  {statusLabelMap[previewStatus] || '待上课'}
+                </Text>
+              </View>
+            </View>
+            <View className="mt-[16rpx] flex flex-col gap-[8rpx]">
+              <View className="flex items-center gap-[8rpx]">
+                <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">时间</Text>
+                <Text className="text-[24rpx] text-[#111827]">
+                  {previewDateText} {previewTimeText}
+                </Text>
+              </View>
+              <View className="flex items-center gap-[8rpx]">
+                <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">老师</Text>
+                <Text className="text-[24rpx] text-[#111827]">
+                  {previewTeacher}
+                  {previewAssistant && previewAssistant !== '无'
+                    ? ` / 助教 ${previewAssistant}`
+                    : ''}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View className="mt-[20rpx]">
+            <Text className={DETAIL_SECTION_TITLE_CLASS}>
+              学员列表
+              <Text className="ml-[8rpx] text-[20rpx]">({previewStudents.length}人)</Text>
+            </Text>
+            <View className={DETAIL_CARD_CLASS}>
+              {previewStudents.length > 0 ? (
+                previewStudents.map((student) => (
+                  <PickerItem
+                    key={student.id}
+                    iconType="avatar"
+                    avatarUrl={student.avatar_url}
+                    avatarChar={student.name || '学'}
+                    title={student.name || '未命名学员'}
+                  />
+                ))
+              ) : (
+                <View className="py-[40rpx] text-center">
+                  <Text className="text-[24rpx] text-foreground-secondary">暂无学员</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#eceff3] bg-white px-[24rpx] py-[24rpx] pb-[40rpx]">
+            <View className="flex gap-[16rpx]">
+              <View
+                className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] border border-border bg-muted"
+                onClick={handleGoEditSchedule}
+              >
+                <Text className="text-[28rpx] font-medium text-foreground">编辑排课</Text>
+              </View>
+              {(previewStatus === 'upcoming' ||
+                previewStatus === 'urgent' ||
+                previewStatus === 'active') && (
+                <View
+                  className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] bg-primary"
+                  onClick={handleGoCheckin}
+                >
+                  <Text className="text-[28rpx] font-semibold text-white">去点名</Text>
+                </View>
+              )}
+              {previewStatus === 'ended' && (
+                <View
+                  className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] bg-warning"
+                  onClick={handleGoSupplement}
+                >
+                  <Text className="text-[28rpx] font-semibold text-white">补录</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </PageContainer>
+    );
+  }
+
   if (notFound || !record) {
     return (
       <PageContainer>
         <View className="min-h-screen bg-gradient-subtle px-8 flex items-center justify-center">
           <Empty
             icon="mdi-clipboard-text"
-            description="记录不存在或已被删除"
+            description={
+              isCancelledDetailMode
+                ? '取消详情不存在或已被删除'
+                : isPreviewMode
+                  ? '课程信息不存在或已被删除'
+                  : '记录不存在或已被删除'
+            }
             actionText="返回上一页"
             onAction={() => Taro.navigateBack()}
           />
@@ -205,207 +499,180 @@ const LessonDetail: React.FC = () => {
 
   const studentName = record.student?.name || '学生';
   const packageName = record.course_package?.name || '课程';
+  const cancelledStudentCount = relatedRecords.length;
+  const cancelledOperatorTeacherName =
+    record.operator_teacher?.name || record.teacher?.name || profile?.name || '未记录';
+  const cancelledCreatedAt = record.created_at || '-';
+  const cancelledCreatedAtText = dayjs(cancelledCreatedAt).isValid()
+    ? dayjs(cancelledCreatedAt).format('YYYY-MM-DD HH:mm')
+    : cancelledCreatedAt;
+  const cancelRemarkText = `本次课已取消，不扣课时，取消原因：${cancelledOperatorTeacherName}手动取消开课，取消时间：${cancelledCreatedAtText}`;
+  const cancelledLeadTeacherName = leadTeacherNameParam || record.teacher?.name || '未记录';
+  const cancelledAssistantTeacherName =
+    assistantTeacherNameParam || record.assistant_teacher?.name || '无';
+  const cancelledDateWithWeekText = dayjs(lessonDateParam).isValid()
+    ? `${lessonDateParam}(${WEEKDAY_LABELS[dayjs(lessonDateParam).day()]})`
+    : lessonDateParam;
+  const cancelledTeacherSummary =
+    cancelledAssistantTeacherName && cancelledAssistantTeacherName !== '无'
+      ? `${cancelledLeadTeacherName} / 助教 ${cancelledAssistantTeacherName}`
+      : cancelledLeadTeacherName;
+
+  const lessonDateText = dayjs(record.lesson_date).isValid()
+    ? `${dayjs(record.lesson_date).format('YYYY-MM-DD')}(${WEEKDAY_LABELS[dayjs(record.lesson_date).day()]})`
+    : record.lesson_date || '-';
+  const checkinTimeText =
+    record.created_at && dayjs(record.created_at).isValid()
+      ? dayjs(record.created_at).format('YYYY-MM-DD HH:mm')
+      : record.created_at || '-';
+  const leadTeacherName = record.teacher?.name || '未记录';
+  const assistantTeacherName = record.assistant_teacher?.name || '无';
+  const operatorTeacherName = record.operator_teacher?.name || leadTeacherName;
+  const classNameText = record.class_name || '未关联班级';
+  const statusText = record.revoke_status === 'revoked' ? '已撤销' : '正常';
+  const statusTone: DetailFieldProps['tone'] =
+    record.revoke_status === 'revoked' ? 'danger' : 'success';
+  const courseContentText = record.content || '暂无';
+  const teacherReviewText = record.performance || '暂无';
+  const homeworkText = record.homework || '暂无';
+  const crossSubjectText = `班级科目 ${record.class_subject || '通用'} / 课包科目 ${record.package_subject || '通用'}`;
+
+  if (record?.status === 'cancelled') {
+    return (
+      <PageContainer>
+        <View className="min-h-screen bg-[#f6f6f7] px-[24rpx] pt-[24rpx] pb-[40rpx]">
+          <View className="relative overflow-hidden rounded-[18rpx] border border-[#ececef] bg-white px-[24rpx] pb-[24rpx] pt-[20rpx]">
+            <View className="absolute right-0 top-0 overflow-hidden rounded-tr-[18rpx]">
+              <View className="rounded-bl-[18rpx] bg-destructive px-[22rpx] py-[12rpx]">
+                <Text className="text-[22rpx] font-semibold tracking-[2rpx] text-white">取消</Text>
+              </View>
+            </View>
+
+            <Text className="block pr-[96rpx] text-[34rpx] font-semibold text-[#1f1f1f]">
+              {lessonTimeParam || `${startTimeParam}-${endTimeParam}`}
+            </Text>
+            <Text className="mt-[10rpx] block text-[26rpx] text-[#666666]">
+              {cancelledDateWithWeekText}
+            </Text>
+            <Text className="mt-[10rpx] block text-[26rpx] text-[#666666]">
+              老师:{cancelledTeacherSummary}
+            </Text>
+
+            <View className="mt-[24rpx]">
+              <Text className="text-[26rpx] font-medium text-[#1f1f1f]">备注:</Text>
+              <Text className="mt-[10rpx] text-[26rpx] leading-[40rpx] text-destructive">
+                {cancelRemarkText}
+              </Text>
+            </View>
+          </View>
+
+          <View className="mt-[28rpx] rounded-[20rpx] bg-white px-[24rpx] py-[24rpx] shadow-card">
+            <View className="mb-[16rpx] flex items-center justify-between">
+              <Text className="text-[30rpx] font-semibold text-foreground">取消学员</Text>
+              <Text className="text-[24rpx] text-foreground-secondary">
+                共 {cancelledStudentCount} 人
+              </Text>
+            </View>
+
+            <View className="flex flex-col gap-[8rpx]">
+              {relatedRecords.map((item) => (
+                <PickerItem
+                  key={item.id}
+                  iconType="avatar"
+                  avatarUrl={item.student?.avatar_url}
+                  avatarChar={item.student?.name || '学'}
+                  title={item.student?.name || '未命名学员'}
+                />
+              ))}
+              {relatedRecords.length === 0 ? (
+                <View className="py-[40rpx] text-center">
+                  <Text className="text-[24rpx] text-foreground-secondary">暂无学员记录</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
-      <View className="min-h-screen bg-gradient-subtle pb-12">
-        {/* ====== 1. 顶部信息卡片 ====== */}
-        <View className="bg-gradient-primary px-8 pt-12 pb-14 rounded-b-60rpx shadow-elegant">
-          <View className="flex items-center gap-6 mb-7">
-            <View className="w-28 h-28 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
-              <Avatar name={studentName} avatarUrl={record.student?.avatar_url} size="lg" />
+      <View className="min-h-screen bg-[#f6f6f7] px-[24rpx] pt-[24rpx] pb-[220rpx]">
+        <View className="rounded-[20rpx] border border-[#dff3e8] bg-[#f4fffa] px-[24rpx] py-[22rpx]">
+          <View className="flex items-start justify-between gap-[16rpx]">
+            <View className="min-w-0 flex-1">
+              <Text className="block truncate text-[34rpx] font-semibold text-[#111827]">
+                {classNameText}
+              </Text>
             </View>
-            <View className="flex-1">
-              <Text className="text-white text-2xl font-bold block">{studentName}</Text>
-              <Text className="text-white/80 text-base block mt-1">{packageName}</Text>
+            <View className="rounded-full bg-[#edfdf3] px-[18rpx] py-[10rpx]">
+              <Text className="text-[24rpx] font-medium text-[#16a34a]">
+                {record.hours_used} 课时
+              </Text>
             </View>
           </View>
-          <View className="bg-white/20 backdrop-blur-sm rounded-3xl py-5 px-7 flex items-center justify-between">
-            <Text className="text-white/80 text-base">上课时间</Text>
-            <Text className="text-white text-lg font-semibold">{record.lesson_date}</Text>
+          <View className="mt-[16rpx] flex flex-col gap-[8rpx]">
+            <View className="flex items-center gap-[8rpx]">
+              <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">学员</Text>
+              <Text className="text-[24rpx] text-[#111827]">{studentName}</Text>
+            </View>
+            <View className="flex items-center gap-[8rpx]">
+              <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">课包</Text>
+              <Text className="text-[24rpx] text-[#111827]">{packageName}</Text>
+            </View>
           </View>
         </View>
 
-        {/* ====== 2. 详细信息列表 ====== */}
-        <View className="px-8 -mt-6 flex flex-col gap-5">
-          {/* 课时消耗 */}
-          <View className="bg-white rounded-3xl p-7 shadow-soft">
-            <View className="flex items-center gap-4 mb-4">
-              <View className="w-18 h-18 rounded-2xl bg-gradient-subtle flex items-center justify-center flex-shrink-0">
-                <Icon name="mdi-timer" size="sm" color="primary" />
-              </View>
-              <Text className="text-lg font-medium text-foreground">课时消耗</Text>
-            </View>
-            <Text className="text-3xl font-bold text-primary">{record.hours_used} 课时</Text>
-          </View>
-
-          {/* 课程内容 */}
-          {record.content && (
-            <View className="bg-white rounded-3xl p-7 shadow-soft">
-              <View className="flex items-center gap-4 mb-4">
-                <View className="w-18 h-18 rounded-2xl bg-gradient-subtle flex items-center justify-center flex-shrink-0">
-                  <Icon name="mdi-note-text" size="sm" color="primary" />
-                </View>
-                <Text className="text-lg font-medium text-foreground">上课内容</Text>
-              </View>
-              <Text className="text-base text-muted-foreground leading-relaxed">
-                {record.content}
-              </Text>
-            </View>
-          )}
-
-          {/* 学生表现 */}
-          {record.performance && (
-            <View className="bg-white rounded-3xl p-7 shadow-soft">
-              <View className="flex items-center gap-4 mb-4">
-                <View className="w-18 h-18 rounded-2xl bg-gradient-subtle flex items-center justify-center flex-shrink-0">
-                  <Icon name="mdi-star" size="sm" color="warning" />
-                </View>
-                <Text className="text-lg font-medium text-foreground">课堂表现</Text>
-              </View>
-              <Text className="text-base text-muted-foreground leading-relaxed">
-                {record.performance}
-              </Text>
-            </View>
-          )}
-
-          {/* 跨科目提示 */}
-          {record.is_cross_subject && (
-            <View className="bg-warning/10 rounded-3xl p-7 shadow-soft border border-warning/30">
-              <View className="flex items-center gap-4 mb-3">
-                <View className="w-18 h-18 rounded-2xl bg-warning/20 flex items-center justify-center flex-shrink-0">
-                  <Icon name="mdi-swap-horizontal" size="sm" color="warning" />
-                </View>
-                <Text className="text-lg font-medium text-warning">跨科目消课</Text>
-              </View>
-              <Text className="text-base text-muted-foreground leading-relaxed">
-                本次消课为跨科目消课（班级：{record.class_subject || '通用'}，课包：
-                {record.package_subject || '通用'}）
-              </Text>
-            </View>
-          )}
-
-          {/* 课后作业 */}
-          {(record.homework || (record.homework_images && record.homework_images.length > 0)) && (
-            <View className="bg-white rounded-3xl p-7 shadow-soft">
-              <View className="flex items-center gap-4 mb-4">
-                <View className="w-18 h-18 rounded-2xl bg-gradient-subtle flex items-center justify-center flex-shrink-0">
-                  <Icon name="mdi-book-open" size="sm" color="primary" />
-                </View>
-                <Text className="text-lg font-medium text-foreground">课后作业</Text>
-              </View>
-              {record.homework && (
-                <Text className="text-base text-muted-foreground leading-relaxed">
-                  {record.homework}
-                </Text>
-              )}
-              {record.homework_images && record.homework_images.length > 0 && (
-                <View className="flex flex-wrap gap-3 mt-4">
-                  {record.homework_images.map((img, idx) => (
-                    <Image
-                      key={idx}
-                      src={img}
-                      mode="aspectFill"
-                      className="w-40 h-40 rounded-2xl"
-                      onClick={() => handlePreviewImage(record.homework_images!, img)}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* 费用信息 */}
-          {record.fee_amount != null && record.fee_amount > 0 && (
-            <View className="bg-white rounded-3xl p-7 shadow-soft">
-              <View className="flex items-center gap-4 mb-4">
-                <View className="w-18 h-18 rounded-2xl bg-gradient-subtle flex items-center justify-center flex-shrink-0">
-                  <Icon name="mdi-cash" size="sm" color="warning" />
-                </View>
-                <Text className="text-lg font-medium text-foreground">收费信息</Text>
-              </View>
-              <View className="flex items-center justify-between py-2">
-                <Text className="text-base text-muted-foreground">金额</Text>
-                <Text className="text-2xl font-bold text-primary">
-                  ¥{record.fee_amount.toFixed(2)}
-                </Text>
-              </View>
-              <View className="flex items-center justify-between py-2">
-                <Text className="text-base text-muted-foreground">支付方式</Text>
-                <Text className="text-base font-medium text-foreground">
-                  {FEE_METHOD_MAP[record.fee_method || ''] || record.fee_method || '-'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* 记录信息 */}
-          <View className="bg-white rounded-3xl p-7 shadow-soft">
-            <View className="flex items-center gap-4 mb-4">
-              <View className="w-18 h-18 rounded-2xl bg-gradient-subtle flex items-center justify-center flex-shrink-0">
-                <Icon name="mdi-information" size="sm" color="info" />
-              </View>
-              <Text className="text-lg font-medium text-foreground">记录信息</Text>
-            </View>
-            <View className="flex items-center justify-between py-2">
-              <Text className="text-base text-muted-foreground">记录编号</Text>
-              <Text className="text-base font-medium text-foreground">{record.id.slice(0, 8)}</Text>
-            </View>
-            {record.created_at && (
-              <View className="flex items-center justify-between py-2">
-                <Text className="text-base text-muted-foreground">创建时间</Text>
-                <Text className="text-base font-medium text-foreground">
-                  {record.created_at || '-'}
-                </Text>
-              </View>
-            )}
-            {/* 撤销状态 */}
-            {record.revoke_status === 'revoked' && (
-              <>
-                <View className="flex items-center justify-between py-2">
-                  <Text className="text-base text-muted-foreground">状态</Text>
-                  <Text className="text-base font-semibold text-danger">已撤销</Text>
-                </View>
-                {record.revoke_reason && (
-                  <View className="flex items-center justify-between py-2">
-                    <Text className="text-base text-muted-foreground">撤销原因</Text>
-                    <Text className="text-base font-medium text-foreground">
-                      {record.revoke_reason}
-                    </Text>
-                  </View>
-                )}
-                {record.revoked_at && (
-                  <View className="flex items-center justify-between py-2">
-                    <Text className="text-base text-muted-foreground">撤销时间</Text>
-                    <Text className="text-base font-medium text-foreground">
-                      {record.revoked_at}
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
+        <View className="mt-[20rpx]">
+          <Text className={DETAIL_SECTION_TITLE_CLASS}>基础信息</Text>
+          <View className={DETAIL_CARD_CLASS}>
+            <DetailField label="课时套餐" value={packageName} />
+            <DetailField label="记录状态" value={statusText} tone={statusTone} />
+            {record.is_cross_subject ? (
+              <DetailField label="跨科目消课" value={crossSubjectText} tone="danger" />
+            ) : null}
           </View>
         </View>
 
-        {/* ====== 3. 操作按钮（教师视图） ====== */}
-        {isTeacher && record.revoke_status !== 'revoked' && (
-          <View className="px-8 flex gap-5">
-            <View
-              className="flex-1 py-6 rounded-3xl bg-gradient-primary shadow-elegant flex items-center justify-center transition"
-              onClick={handleEdit}
-            >
-              <Text className="text-white text-lg font-semibold">编辑记录</Text>
-            </View>
-            <View
-              className="flex-1 py-6 rounded-3xl bg-white border border-destructive flex items-center justify-center transition"
-              onClick={!deleting ? handleDelete : undefined}
-            >
-              <Text className="text-destructive text-lg font-semibold">
-                {deleting ? '删除中...' : '删除记录'}
-              </Text>
-            </View>
+        <View className="mt-[20rpx]">
+          <Text className={DETAIL_SECTION_TITLE_CLASS}>老师与时间</Text>
+          <View className={DETAIL_CARD_CLASS}>
+            <DetailField label="授课老师" value={leadTeacherName} />
+            <DetailField
+              label="助教老师"
+              value={assistantTeacherName}
+              tone={assistantTeacherName === '无' ? 'muted' : 'default'}
+            />
+            <DetailField label="操作老师" value={operatorTeacherName} />
+            <DetailField label="上课时间" value={lessonDateText} />
+            <DetailField label="签到时间" value={checkinTimeText} />
           </View>
-        )}
+        </View>
+
+        <View className="mt-[20rpx]">
+          <Text className={DETAIL_SECTION_TITLE_CLASS}>课程记录</Text>
+          <View className={DETAIL_CARD_CLASS}>
+            <DetailField
+              label="教学内容"
+              value={courseContentText}
+              multiline
+              tone={record.content ? 'default' : 'muted'}
+            />
+            <DetailField
+              label="老师评价"
+              value={teacherReviewText}
+              multiline
+              tone={record.performance ? 'default' : 'muted'}
+            />
+            <DetailField
+              label="课后作业"
+              value={homeworkText}
+              multiline
+              tone={record.homework ? 'default' : 'muted'}
+            />
+          </View>
+        </View>
 
         {/* 撤销按钮 */}
         {isTeacher &&
@@ -413,9 +680,9 @@ const LessonDetail: React.FC = () => {
           (() => {
             const revokeCheck = canRevoke(record, profile?.currentContext?.role);
             return (
-              <View className="px-8 mt-5">
+              <View className="mt-[16rpx]">
                 <View
-                  className={`py-6 rounded-3xl flex items-center justify-center transition ${
+                  className={`rounded-[18rpx] py-[22rpx] flex items-center justify-center ${
                     revokeCheck.allowed ? 'bg-warning/10 border border-warning' : 'bg-border-light'
                   }`}
                   onClick={() => {

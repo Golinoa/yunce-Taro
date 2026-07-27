@@ -8,9 +8,7 @@
 import type { AlertItem } from '@/components/statistics/AlertSheet';
 import type { ChartDataItem } from '@/components/statistics/ChartContainer';
 import type { FinanceKpiItem } from '@/components/statistics/FinanceKpi';
-import type { InsightItem } from '@/components/statistics/InsightCard';
 import type { OperationKpiItem } from '@/components/statistics/OperationKpi';
-import { get } from '@/utils/request';
 import {
   computeOperationKpi,
   computeFinanceKpi,
@@ -30,13 +28,12 @@ import {
   mockGetExpenseRatios,
   mockGetFinanceAlerts,
   mockGetOperationAlerts,
-  mockGetInsights,
   MOCK_PARENT_TREND,
   MOCK_PAYMENT_RANK,
   MOCK_OPERATION_ALERTS,
   MOCK_FINANCE_ALERTS,
-  MOCK_INSIGHTS,
 } from '@/data/statistics';
+import { get } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -54,22 +51,6 @@ export interface AlertQueryParams {
   /** 年份 */
   year: number;
   /** 月份（quarter 模式下为季度 1-4） */
-  month: number;
-  /** 筛选模式 */
-  filterMode: 'month' | 'quarter' | 'year' | 'custom';
-  /** 自定义开始日期 */
-  startDate?: string;
-  /** 自定义结束日期 */
-  endDate?: string;
-}
-
-/** 洞察请求参数 */
-export interface InsightQueryParams {
-  /** 视图类型 */
-  viewType: 'operation' | 'finance';
-  /** 年份 */
-  year: number;
-  /** 月份 */
   month: number;
   /** 筛选模式 */
   filterMode: 'month' | 'quarter' | 'year' | 'custom';
@@ -98,14 +79,6 @@ interface BackendAlertItem {
   level: 'danger' | 'warning' | 'primary';
   targetId?: string;
   title: string;
-  type: string;
-}
-
-interface BackendInsightItem {
-  detail: string;
-  metric?: number;
-  title: string;
-  trend?: 'down' | 'stable' | 'up';
   type: string;
 }
 
@@ -139,8 +112,7 @@ function buildStatisticsQuery(params: {
   month?: number;
   year?: number;
 }): string {
-  const period =
-    params.filterMode === 'custom' ? 'month' : (params.filterMode || 'month');
+  const period = params.filterMode === 'custom' ? 'month' : params.filterMode || 'month';
   const search = new URLSearchParams();
   search.set('period', period);
   if (params.year) search.set('year', String(params.year));
@@ -148,7 +120,7 @@ function buildStatisticsQuery(params: {
   return search.toString();
 }
 
-function buildAlertQuery(params: AlertQueryParams | InsightQueryParams): string {
+function buildAlertQuery(params: AlertQueryParams): string {
   const search = new URLSearchParams();
   search.set('viewType', params.viewType);
   search.set('year', String(params.year));
@@ -175,21 +147,6 @@ function mapBackendAlertItem(alert: BackendAlertItem): AlertItem {
       },
     ],
   });
-}
-
-function mapBackendInsightItem(insight: BackendInsightItem): InsightItem {
-  return {
-    id: `${insight.type}-${insight.title}`,
-    type:
-      insight.trend === 'down'
-        ? 'warning'
-        : insight.trend === 'up'
-          ? 'success'
-          : 'info',
-    weight: insight.metric || 0,
-    title: insight.title,
-    desc: insight.detail,
-  };
 }
 
 function normalizeStudentRefId(refId?: string): string | undefined {
@@ -265,11 +222,6 @@ function getOperationAlertsFallback(): AlertItem[] {
 /** 财务视图预警 fallback */
 function getFinanceAlertsFallback(): AlertItem[] {
   return MOCK_FINANCE_ALERTS.map(normalizeAlertItem);
-}
-
-/** 洞察数据 fallback */
-function getInsightsFallback(): InsightItem[] {
-  return MOCK_INSIGHTS;
 }
 
 function getOperationKpiFallback(): OperationKpiItem {
@@ -381,9 +333,12 @@ export const statisticsService = {
           result.breakdown.map((item, index) => ({
             label: item.category,
             ratio: item.ratio / 100,
-            barClass: ['bg-progress-primary', 'bg-progress-purple', 'bg-progress-warning', 'bg-progress-info'][
-              index % 4
-            ],
+            barClass: [
+              'bg-progress-primary',
+              'bg-progress-purple',
+              'bg-progress-warning',
+              'bg-progress-info',
+            ][index % 4],
           })),
         ),
 
@@ -406,22 +361,6 @@ export const statisticsService = {
     );
   },
 
-  // ---------- 洞察数据（后端计算） ----------
-  /**
-   * 获取洞察列表
-   * 后端基于完整历史数据分析后生成
-   * @param params 视图类型 + 时间范围
-   */
-  getInsights: (params: InsightQueryParams): Promise<InsightItem[]> => {
-    if (USE_MOCK) {
-      return mockGetInsights();
-    }
-
-    return get<BackendInsightItem[]>(`/statistics/insights?${buildAlertQuery(params)}`).then(
-      (insights) => insights.map(mapBackendInsightItem),
-    );
-  },
-
   /**
    * 获取单条预警详情
    * 详情页统一走 Service，避免页面直接依赖 @/data/statistics
@@ -439,7 +378,6 @@ export const statisticsService = {
   getExpenseRatiosFallback,
   getOperationAlertsFallback,
   getFinanceAlertsFallback,
-  getInsightsFallback,
   getOperationKpiFallback,
   getFinanceKpiFallback,
   getTeacherRankFallback,

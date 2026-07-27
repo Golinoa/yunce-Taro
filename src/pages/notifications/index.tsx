@@ -40,6 +40,12 @@ function getNotificationFallbackUrl(
   notification: Notification,
   currentRole: string | null,
 ): { url: string; mode: 'navigateTo' | 'switchTab' } | null {
+  const isBookingNotice =
+    notification.type === 'general' &&
+    /预约|候补|上课提醒|课后回访|请假确认|失效提醒|课程完成|课程请假|预约恢复/.test(
+      notification.title,
+    );
+
   switch (notification.type) {
     case 'lesson_complete':
       return {
@@ -61,6 +67,14 @@ function getNotificationFallbackUrl(
         url: '/pages/schedule/index',
         mode: 'switchTab',
       };
+    case 'general':
+      if (isBookingNotice && notification.related_id) {
+        return {
+          url: `/package-course/pages/booking-record-detail/index?id=${notification.related_id}`,
+          mode: 'navigateTo',
+        };
+      }
+      return null;
     default:
       return null;
   }

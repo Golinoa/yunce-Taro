@@ -2,14 +2,6 @@
  * 校区设置模块 — Mock 数据适配层
  * 统一把 mock-database 映射成 types/campus.ts 约定的正式类型
  */
-import {
-  CAMPUSES,
-  CAMPUS_STATS,
-  CLASSES,
-  STUDENTS,
-  SUBJECTS,
-  TEACHERS,
-} from './mock-database';
 import type {
   BusinessHours,
   CampusFormData,
@@ -24,6 +16,7 @@ import type {
   Subject,
   SubjectFormData,
 } from '@/types/campus';
+import { CAMPUSES, CAMPUS_STATS, CLASSES, STUDENTS, SUBJECTS, TEACHERS } from './mock-database';
 
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,7 +36,12 @@ export const CAMPUS_TYPE_MAP: Record<
   CampusType,
   { label: string; tagBg: string; tagText: string; dotColor: string }
 > = {
-  self: { label: '自营校区', tagBg: 'bg-primary-bg', tagText: 'text-primary', dotColor: 'bg-primary' },
+  self: {
+    label: '自营校区',
+    tagBg: 'bg-primary-bg',
+    tagText: 'text-primary',
+    dotColor: 'bg-primary',
+  },
   partner: { label: '合作校区', tagBg: 'bg-info-bg', tagText: 'text-info', dotColor: 'bg-info' },
 };
 
@@ -106,9 +104,30 @@ let mockSalaryModels: SalaryModel[] = [
 ];
 let mockPayDaySettings: PayDaySettings = { mode: 'fixed', fixedDay: 15 };
 let mockHolidays: Holiday[] = [
-  { id: 'holiday-1', name: '元旦', icon: '🎉', startDate: '2026-01-01', endDate: '2026-01-01', status: 'rest' },
-  { id: 'holiday-2', name: '春节假期', icon: '🧧', startDate: '2026-01-28', endDate: '2026-02-03', status: 'rest' },
-  { id: 'holiday-3', name: '机构活动补课', icon: '📚', startDate: '2026-03-15', endDate: '2026-03-15', status: 'adjust' },
+  {
+    id: 'holiday-1',
+    name: '元旦',
+    icon: '🎉',
+    startDate: '2026-01-01',
+    endDate: '2026-01-01',
+    status: 'rest',
+  },
+  {
+    id: 'holiday-2',
+    name: '春节假期',
+    icon: '🧧',
+    startDate: '2026-01-28',
+    endDate: '2026-02-03',
+    status: 'rest',
+  },
+  {
+    id: 'holiday-3',
+    name: '机构活动补课',
+    icon: '📚',
+    startDate: '2026-03-15',
+    endDate: '2026-03-15',
+    status: 'adjust',
+  },
 ];
 let mockBusinessHours: BusinessHours = {
   weekdayStart: '09:00',
@@ -194,7 +213,10 @@ function buildPeriodData(campusId: string, scale: number) {
     campusId === 'all' ? true : item.campusIds.includes(campusId),
   );
 
-  const totalRevenue = students.reduce((sum, student) => sum + (student.totalHours - student.remainingHours) * 120, 0);
+  const totalRevenue = students.reduce(
+    (sum, student) => sum + (student.totalHours - student.remainingHours) * 120,
+    0,
+  );
   const totalExpense = teachers.reduce((sum, teacher) => sum + teacher.pendingSalary, 0);
   const totalHours = classes.reduce((sum, item) => sum + item.usedLessons, 0);
 
@@ -209,7 +231,9 @@ function buildPeriodData(campusId: string, scale: number) {
       total: teachers.length,
       fullTime: teachers.filter((item) => item.role !== 'parttime').length,
       partTime: teachers.filter((item) => item.role === 'parttime').length,
-      avgHours: teachers.length ? Math.round(teachers.reduce((sum, item) => sum + item.monthHours, 0) / teachers.length) : 0,
+      avgHours: teachers.length
+        ? Math.round(teachers.reduce((sum, item) => sum + item.monthHours, 0) / teachers.length)
+        : 0,
     },
     finance: {
       revenue: Math.round(totalRevenue * scale),
@@ -240,9 +264,9 @@ function ensureSubjects(): Subject[] {
     const classes = CLASSES.filter((item) => item.subjectId === subject.id);
     const teacherIds = new Set(classes.map((item) => item.teacherId));
     const studentIds = new Set(
-      STUDENTS.filter((student) => student.classIds.some((classId) => classes.some((cls) => cls.id === classId))).map(
-        (student) => student.id,
-      ),
+      STUDENTS.filter((student) =>
+        student.classIds.some((classId) => classes.some((cls) => cls.id === classId)),
+      ).map((student) => student.id),
     );
     const iconMeta = SUBJECT_ICONS[index % SUBJECT_ICONS.length];
 
@@ -343,7 +367,9 @@ export async function mockGetCampusData(id: string): Promise<CampusOperationalDa
     .map((subject) => ({
       name: subject.name,
       icon: subject.icon,
-      students: scopedClasses.some((cls) => cls.subjectId === subject.id) ? subject.studentCount : 0,
+      students: scopedClasses.some((cls) => cls.subjectId === subject.id)
+        ? subject.studentCount
+        : 0,
       revenue: scopedClasses
         .filter((cls) => cls.subjectId === subject.id)
         .reduce((sum, cls) => sum + cls.usedLessons * cls.pricePerLesson, 0),
@@ -353,9 +379,9 @@ export async function mockGetCampusData(id: string): Promise<CampusOperationalDa
     .slice(0, 5);
 
   const monthlyRevenue = Array.from({ length: 12 }, (_, index) => {
-    const base = CAMPUS_STATS
-      .filter((item) => campusId === 'all' || item.campusId === campusId)
-      .reduce((sum, item) => sum + item.monthAmount, 0);
+    const base = CAMPUS_STATS.filter(
+      (item) => campusId === 'all' || item.campusId === campusId,
+    ).reduce((sum, item) => sum + item.monthAmount, 0);
     return Math.round(base * (0.72 + index * 0.03));
   });
 

@@ -53,7 +53,9 @@ const LoginFlowPopover: React.FC<LoginFlowPopoverProps> = ({
   onSubmit,
   onClose,
 }) => {
-  const [closePhase, setClosePhase] = useState<'hidden' | 'closing-fade' | 'closing-collapse'>('hidden');
+  const [closePhase, setClosePhase] = useState<'hidden' | 'closing-fade' | 'closing-collapse'>(
+    'hidden',
+  );
   const [inputReady, setInputReady] = useState(false);
   const closeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,9 +205,7 @@ const LoginFlowPopover: React.FC<LoginFlowPopoverProps> = ({
   };
 
   return (
-    <View
-      className="fixed inset-0 z-200 pointer-events-none"
-    >
+    <View className="fixed inset-0 z-200 pointer-events-none">
       <View
         className={cn(
           'absolute inset-0 transition-opacity duration-[120ms] ease-linear',
@@ -217,7 +217,7 @@ const LoginFlowPopover: React.FC<LoginFlowPopoverProps> = ({
       />
       <View
         className={cn(
-            'absolute overflow-hidden will-change-transform',
+          'absolute overflow-hidden will-change-transform',
           'rounded-t-[36rpx]',
           visible ? 'shadow-[0_-18rpx_56rpx_rgba(25,45,89,0.14)]' : 'shadow-none',
         )}
@@ -235,7 +235,10 @@ const LoginFlowPopover: React.FC<LoginFlowPopoverProps> = ({
             className="relative h-[48rpx] flex items-center justify-center mb-[68rpx]"
             style={{ ...headerStyle, marginTop: `${HEADER_TOP}rpx` }}
           >
-            <View className="absolute left-0 top-1/2 -translate-y-1/2 active:opacity-70" onClick={onClose}>
+            <View
+              className="absolute left-0 top-1/2 -translate-y-1/2 active:opacity-70"
+              onClick={onClose}
+            >
               <Icon name="arrow-left" size={36} color="foreground" />
             </View>
             <Text className="text-[30rpx] font-semibold text-foreground">{title}</Text>
@@ -253,9 +256,7 @@ const LoginFlowPopover: React.FC<LoginFlowPopoverProps> = ({
                 ...hintStyle,
               }}
             >
-              <Text className="text-[22rpx] text-muted-foreground block leading-[1.6]">
-                {hint}
-              </Text>
+              <Text className="text-[22rpx] text-muted-foreground block leading-[1.6]">{hint}</Text>
             </View>
           ) : null}
         </View>

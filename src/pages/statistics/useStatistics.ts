@@ -112,26 +112,6 @@ export function useStatistics() {
   const [allRecords, setAllRecords] = useState<LessonRecord[]>([]);
   const [packages, setPackages] = useState<CoursePackage[]>([]);
 
-  // 预警和洞察数据（后端计算，前端只渲染）
-  const [alertList, setAlertList] = useState<
-    Array<{
-      id: string;
-      level: 'danger' | 'warning' | 'primary';
-      title: string;
-      desc: string;
-      count: number;
-      details: Array<{ id: string; name: string; info: string; refId?: string }>;
-    }>
-  >([]);
-  const [insights, setInsights] = useState<
-    Array<{
-      id: string;
-      type: 'success' | 'info' | 'warning';
-      weight: number;
-      title: string;
-      desc: string;
-    }>
-  >([]);
   const [remoteLessonTrend, setRemoteLessonTrend] = useState<ChartDataItem[]>([]);
   const [remoteIncomeTrend, setRemoteIncomeTrend] = useState<ChartDataItem[]>([]);
   const [remoteParentTrend, setRemoteParentTrend] = useState<ChartDataItem[]>([]);
@@ -262,29 +242,6 @@ export function useStatistics() {
     [profile?.id, isTeacher, fetchStudentsByTeacher],
   );
 
-  /** 加载预警和洞察数据（后端计算，前端只渲染） */
-  const loadAlertsAndInsights = useCallback(async () => {
-    if (!isTeacher) return;
-    try {
-      const params = { viewType, year, month, filterMode, startDate, endDate };
-      const [alerts, insightList] = await Promise.all([
-        statisticsService.getAlerts(params),
-        statisticsService.getInsights(params),
-      ]);
-      setAlertList(alerts);
-      setInsights(insightList);
-    } catch (err) {
-      console.error('[Statistics] load alerts/insights failed:', err);
-      // 失败时使用 fallback 数据，保证 UI 不空白
-      const fallbackAlerts =
-        viewType === 'finance'
-          ? statisticsService.getFinanceAlertsFallback()
-          : statisticsService.getOperationAlertsFallback();
-      setAlertList(fallbackAlerts);
-      setInsights(statisticsService.getInsightsFallback());
-    }
-  }, [isTeacher, viewType, year, month, filterMode, startDate, endDate]);
-
   const loadStatisticsPanels = useCallback(async () => {
     if (!profile?.id || filterMode === 'custom') {
       setRemoteLessonTrend([]);
@@ -299,27 +256,24 @@ export function useStatistics() {
     const params = { filterMode, year, month };
 
     if (isTeacher) {
-      const [lessonTrendResult, incomeTrendResult, lessonRankResult, paymentRankResult, expenseRatioResult] =
-        await Promise.allSettled([
-          statisticsService.getLessonTrend(params),
-          statisticsService.getIncomeTrend(params),
-          statisticsService.getLessonRank(params),
-          statisticsService.getPaymentRank(params),
-          statisticsService.getExpenseRatios(params),
-        ]);
+      const [
+        lessonTrendResult,
+        incomeTrendResult,
+        lessonRankResult,
+        paymentRankResult,
+        expenseRatioResult,
+      ] = await Promise.allSettled([
+        statisticsService.getLessonTrend(params),
+        statisticsService.getIncomeTrend(params),
+        statisticsService.getLessonRank(params),
+        statisticsService.getPaymentRank(params),
+        statisticsService.getExpenseRatios(params),
+      ]);
 
-      setRemoteLessonTrend(
-        lessonTrendResult.status === 'fulfilled' ? lessonTrendResult.value : [],
-      );
-      setRemoteIncomeTrend(
-        incomeTrendResult.status === 'fulfilled' ? incomeTrendResult.value : [],
-      );
-      setRemoteLessonRank(
-        lessonRankResult.status === 'fulfilled' ? lessonRankResult.value : [],
-      );
-      setRemotePaymentRank(
-        paymentRankResult.status === 'fulfilled' ? paymentRankResult.value : [],
-      );
+      setRemoteLessonTrend(lessonTrendResult.status === 'fulfilled' ? lessonTrendResult.value : []);
+      setRemoteIncomeTrend(incomeTrendResult.status === 'fulfilled' ? incomeTrendResult.value : []);
+      setRemoteLessonRank(lessonRankResult.status === 'fulfilled' ? lessonRankResult.value : []);
+      setRemotePaymentRank(paymentRankResult.status === 'fulfilled' ? paymentRankResult.value : []);
       setRemoteExpenseRatios(
         expenseRatioResult.status === 'fulfilled' ? expenseRatioResult.value : [],
       );
@@ -383,11 +337,6 @@ export function useStatistics() {
   useEffect(() => {
     loadBaseData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 筛选条件或视图变化时，加载预警和洞察（不依赖 baseDataLoaded，mock 数据始终可用）
-  useEffect(() => {
-    if (isTeacher) loadAlertsAndInsights();
-  }, [isTeacher, loadAlertsAndInsights]);
 
   useEffect(() => {
     void loadStatisticsPanels();
@@ -834,12 +783,6 @@ export function useStatistics() {
     });
   }, []);
 
-  // ========== 预警弹窗状态 ==========
-  const [alertSheetVisible, setAlertSheetVisible] = useState(false);
-
-  const handleOpenAlertSheet = useCallback(() => setAlertSheetVisible(true), []);
-  const handleCloseAlertSheet = useCallback(() => setAlertSheetVisible(false), []);
-
   // ========== 新增：运营 KPI 数据（对齐设计稿） ==========
   const operationKpiData = useMemo(() => {
     // 有真实数据时从 records/students 计算
@@ -967,16 +910,6 @@ export function useStatistics() {
     endDate,
   ]);
 
-  // ========== 预警摘要（从 alertList 派生，前端零计算） ==========
-  const alertSummaryData = useMemo(() => {
-    if (!isTeacher || alertList.length === 0) {
-      return { total: 0, detail: '暂无预警' };
-    }
-    const total = alertList.reduce((sum, a) => sum + a.count, 0);
-    const detail = alertList.map((a) => `${a.title} ${a.count}`).join(' · ');
-    return { total, detail: total > 0 ? detail : '暂无预警' };
-  }, [isTeacher, alertList]);
-
   // ========== 财务分析数据 ==========
   const financeAnalysisData = useMemo(() => {
     const totalRevenue = incomeData.totalIncome || 0;
@@ -1099,17 +1032,17 @@ export function useStatistics() {
           }))
         : lessonRank.length > 0
           ? lessonRank.slice(0, 10)
-        : statisticsService
-            .getLessonRankFallback()
-            .slice(0, 10)
-            .map((item, idx) => ({
-              id: `student-${idx}`,
-              name: item.label,
-              value: item.value,
-              unit: item.unit,
-              extra: '',
-              remain: 0,
-            }));
+          : statisticsService
+              .getLessonRankFallback()
+              .slice(0, 10)
+              .map((item, idx) => ({
+                id: `student-${idx}`,
+                name: item.label,
+                value: item.value,
+                unit: item.unit,
+                extra: '',
+                remain: 0,
+              }));
     const studentRank: RankItem[] = studentRankSource.map((item) => ({
       id: item.id,
       name: item.name,
@@ -1203,16 +1136,9 @@ export function useStatistics() {
     // 新增：视图切换
     viewType,
     setViewType,
-    // 新增：预警弹窗
-    alertSheetVisible,
-    handleOpenAlertSheet,
-    handleCloseAlertSheet,
     // 新增：设计稿数据
     operationKpiData,
     financeKpiData,
-    alertSummaryData,
-    alertList,
-    insights,
     financeAnalysisData,
     trendSectionData,
     rankTabsData,

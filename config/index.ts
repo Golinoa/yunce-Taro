@@ -1,4 +1,5 @@
 import { defineConfig, type UserConfigExport } from '@tarojs/cli';
+import path from 'node:path';
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
 import devConfig from './dev';
 import prodConfig from './prod';
@@ -69,6 +70,17 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
         },
       },
       webpackChain(chain) {
+        // 启用文件系统持久化缓存，减少重复编译耗时。
+        chain.merge({
+          cache: {
+            type: 'filesystem',
+            name: 'yunce-weapp-cache',
+            cacheDirectory: path.resolve(__dirname, '../node_modules/.cache/webpack/weapp'),
+            buildDependencies: {
+              config: [__filename, path.resolve(__dirname, './dev.ts'), path.resolve(__dirname, './prod.ts')],
+            },
+          },
+        });
         chain.resolve.plugin('tsconfig-paths').use(TsconfigPathsPlugin);
         chain.plugin('unocss').use(UnoCSS());
         // 关闭 source map，减少包体积（微信主包2MB限制）
@@ -109,6 +121,16 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
         },
       },
       webpackChain(chain) {
+        chain.merge({
+          cache: {
+            type: 'filesystem',
+            name: 'yunce-h5-cache',
+            cacheDirectory: path.resolve(__dirname, '../node_modules/.cache/webpack/h5'),
+            buildDependencies: {
+              config: [__filename, path.resolve(__dirname, './dev.ts'), path.resolve(__dirname, './prod.ts')],
+            },
+          },
+        });
         chain.resolve.plugin('tsconfig-paths').use(TsconfigPathsPlugin);
         chain.plugin('unocss').use(UnoCSS());
       },

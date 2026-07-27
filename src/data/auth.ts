@@ -4,7 +4,17 @@
  * 联调时替换为真实 API 调用即可
  */
 import Taro from '@tarojs/taro';
-import type { AuthSession, CurrentContext, Identity, ParentRoleInfo, PrincipalRoleInfo, Profile, RegisterDraft, TeacherRoleInfo, UserRole } from '@/types/profile';
+import type {
+  AuthSession,
+  CurrentContext,
+  Identity,
+  ParentRoleInfo,
+  PrincipalRoleInfo,
+  Profile,
+  RegisterDraft,
+  TeacherRoleInfo,
+  UserRole,
+} from '@/types/profile';
 import { ACCOUNT_RULE_TEXT, isAccountFormatValid } from '@/utils/account';
 import {
   USERS,
@@ -72,9 +82,7 @@ function findUserByAccount(account: string): User | null {
 
 function findUserByEmail(email: string): User | null {
   const normalizedEmail = normalizeValue(email);
-  return (
-    USERS.find((user) => user.email && normalizeValue(user.email) === normalizedEmail) || null
-  );
+  return USERS.find((user) => user.email && normalizeValue(user.email) === normalizedEmail) || null;
 }
 
 function saveSession(session: AuthSession, profile: Profile): void {
@@ -234,9 +242,10 @@ export async function mockCheckLoginAccount(account: string): Promise<{
 
   return {
     exists: true,
-    account: user.email && normalizeValue(user.email) === normalizeValue(trimmedAccount)
-      ? user.email
-      : user.username,
+    account:
+      user.email && normalizeValue(user.email) === normalizeValue(trimmedAccount)
+        ? user.email
+        : user.username,
     maskedEmail: user.email ? maskEmail(user.email) : undefined,
     hasBoundEmail: Boolean(user.email),
     error: null,
@@ -467,8 +476,8 @@ export async function mockWechatLogin(code: string): Promise<{
   if (!code) {
     return { session: null, profile: null, error: { message: '微信授权失败' } };
   }
-  // 模拟：使用 teacher1 账号
-  const user = USERS.find((u) => u.username === 'teacher1') || USERS[0];
+  // 模拟：使用 principal1 管理员账号
+  const user = USERS.find((u) => u.username === 'principal1') || USERS[0];
   return buildAuthResult(user);
 }
 

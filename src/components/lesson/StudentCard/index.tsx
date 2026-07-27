@@ -1,8 +1,9 @@
-import { View } from '@tarojs/components';
+import { View, Text } from '@tarojs/components';
 import React from 'react';
 import PickerItem from '@/components/PickerItem';
 import type { CoursePackage } from '@/types/course-package';
 import type { Subject } from '@/types/subject';
+import { isTrialPackage } from '@/utils/package-helper';
 
 interface StudentCardProps {
   name: string;
@@ -25,6 +26,7 @@ const StudentCard: React.FC<StudentCardProps> = ({
 }) => {
   const isOwe = matchedPackage && matchedPackage.remaining_hours < hoursNeeded;
   const noPackage = !matchedPackage;
+  const isTrial = isTrialPackage(matchedPackage);
 
   // 课包状态副标题
   const subtitle = noPackage
@@ -40,6 +42,13 @@ const StudentCard: React.FC<StudentCardProps> = ({
         avatarUrl={avatarUrl}
         avatarChar={name[0]}
         title={name}
+        titleExtra={
+          isTrial ? (
+            <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
+              <Text className="text-center text-[20rpx] font-medium text-error">试听</Text>
+            </View>
+          ) : undefined
+        }
         subtitle={nickname ? `${nickname} · ${subtitle}` : subtitle}
         selected
         right={{ type: 'change-btn', onChangeClick: onChange }}

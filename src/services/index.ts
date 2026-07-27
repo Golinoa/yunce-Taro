@@ -63,3 +63,8 @@ export {
   subjectService,
 } from './campus';
 export { statisticsService } from './statistics';
+export { leadService } from './lead';
+export type { TrialCourseSlot } from './lead';
+export { classBookingService } from './class-booking';
+export { onboardingService } from './onboarding';
+export type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';

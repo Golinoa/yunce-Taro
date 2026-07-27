@@ -14,7 +14,7 @@ export interface LessonRecord {
   package_id: string;
   lesson_date: string;
   hours_used: number;
-  status?: 'normal' | 'cancelled' | 'makeup';
+  status?: 'normal' | 'cancelled' | 'makeup' | 'leave' | 'absent';
   content?: string;
   performance?: string;
   homework?: string;

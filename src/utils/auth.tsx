@@ -103,17 +103,58 @@ export interface AuthState {
 const AuthContext = createContext<AuthState | null>(null);
 
 /**
- * 判断角色是否为机构端（校长或教师）
+ * 判断角色是否为管理员
+ * 过渡期 principal 同享管理员权限，正式期改为仅 admin
+ */
+export const isAdmin = (role: UserRole | null | undefined): boolean =>
+  role === 'admin' || role === 'principal';
+
+/**
+ * 判断角色是否为校长及以上（admin + principal）
+ * 用于数据范围控制（如校区级数据）
+ */
+export const isPrincipalOrAbove = (role: UserRole | null | undefined): boolean =>
+  role === 'admin' || role === 'principal';
+
+/**
+ * 判断角色是否为机构端（admin + principal + teacher + assistant）
  * 校长拥有教师全部权限，教师是校长的子集
  */
 export const isStaffRole = (role: UserRole | null | undefined): boolean => {
-  return role === 'teacher' || role === 'principal';
+  return role === 'admin' || role === 'principal' || role === 'teacher' || role === 'assistant';
 };
+
+/**
+ * 判断角色是否为教学角色（teacher + assistant，不含管理岗）
+ */
+export const isTeachingRole = (role: UserRole | null | undefined): boolean =>
+  role === 'teacher' || role === 'assistant';
+
+/**
+ * 判断角色是否为老师（不含助教）
+ */
+export const isTeacherRole = (role: UserRole | null | undefined): boolean => role === 'teacher';
+
+/**
+ * 判断角色是否为助教
+ */
+export const isAssistantRole = (role: UserRole | null | undefined): boolean => role === 'assistant';
+
+/**
+ * 判断角色是否为学生家长
+ */
+export const isParentRole = (role: UserRole | null | undefined): boolean => role === 'parent';
 
 // storage key
 const REGISTER_DRAFT_STORAGE_KEY = 'yunce-edu-register-draft-local';
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 const USER_PROFILE_KEY = 'yunce-edu-user-profile';
+
+/** 店铺管理 onboarding 引导是否已隐藏（true/false） */
+export const STORE_ONBOARDING_HIDDEN_KEY = 'store_onboarding_hidden';
+
+/** 店铺管理 onboarding 各步骤是否已访问过（JSON: { campus: true, venue: false, ... }） */
+export const STORE_ONBOARDING_VISITED_KEY = 'store_onboarding_visited';
 
 const clearPersistedAuth = (): void => {
   try {

@@ -50,7 +50,9 @@ const Loading: React.FC<LoadingProps> = ({
     <View className={wrapperClassName}>
       <View
         className={`w-full rounded-[36rpx] bg-white border-[2rpx] border-solid border-border-light shadow-card ${
-          fullScreen ? 'max-w-[560rpx] px-[40rpx] py-[56rpx]' : 'max-w-[520rpx] px-[32rpx] py-[40rpx]'
+          fullScreen
+            ? 'max-w-[560rpx] px-[40rpx] py-[56rpx]'
+            : 'max-w-[520rpx] px-[32rpx] py-[40rpx]'
         }`}
       >
         <View className="flex items-center justify-between gap-[24rpx]">

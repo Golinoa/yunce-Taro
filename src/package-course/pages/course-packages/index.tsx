@@ -247,84 +247,86 @@ const CoursePackagesPage: React.FC = () => {
         {/* 列表 - padding 移至内部 View，避免 webview 渲染模式下 scroll-view padding 警告 */}
         <ScrollView scrollY>
           <View className="p-6 px-page-padding">
-          {loading ? (
-            [1, 2, 3].map((i) => (
-              <View key={i} className="p-8 rounded-2xl bg-card mb-5 opacity-60">
-                <View className="h-8 w-1/2 bg-muted rounded-sm mb-4" />
-                <View className="h-6 w-[70%] bg-muted rounded-sm" />
+            {loading ? (
+              [1, 2, 3].map((i) => (
+                <View key={i} className="p-8 rounded-2xl bg-card mb-5 opacity-60">
+                  <View className="h-8 w-1/2 bg-muted rounded-sm mb-4" />
+                  <View className="h-6 w-[70%] bg-muted rounded-sm" />
+                </View>
+              ))
+            ) : templates.length === 0 ? (
+              <View className="py-[120rpx] text-center">
+                <Text className="text-5xl block mb-6">📦</Text>
+                <Text className="text-[30rpx] font-semibold text-foreground block mb-3">
+                  暂无课程包
+                </Text>
+                <Text className="text-[26rpx] text-muted-foreground block mb-10">
+                  创建课程包后可在创建班级时关联
+                </Text>
+                <View
+                  className="btn-primary px-12 text-base text-primary-foreground font-semibold"
+                  onClick={openCreate}
+                >
+                  创建课程包
+                </View>
               </View>
-            ))
-          ) : templates.length === 0 ? (
-            <View className="py-[120rpx] text-center">
-              <Text className="text-5xl block mb-6">📦</Text>
-              <Text className="text-[30rpx] font-semibold text-foreground block mb-3">
-                暂无课程包
-              </Text>
-              <Text className="text-[26rpx] text-muted-foreground block mb-10">
-                创建课程包后可在创建班级时关联
-              </Text>
-              <View
-                className="btn-primary px-12 text-base text-primary-foreground font-semibold"
-                onClick={openCreate}
-              >
-                创建课程包
-              </View>
-            </View>
-          ) : (
-            templates.map((pkg) => {
-              const typeLabel =
-                pkg.type === 'hour_package'
-                  ? '课时包'
-                  : pkg.type === 'term'
-                    ? '期课'
-                    : pkg.type === 'monthly'
-                      ? '月卡'
-                      : '体验课';
-              const validInfo = getValidInfo(pkg);
-              return (
-                <View key={pkg.id} className="p-8 rounded-2xl bg-card mb-5 shadow-card">
-                  <View className="flex items-center justify-between">
-                    <View className="flex-1">
-                      <View className="flex items-center gap-3 mb-3">
-                        <Text className="text-[30rpx] font-semibold text-foreground">
-                          {pkg.name}
-                        </Text>
-                        <View className="text-[20rpx] text-primary bg-primary-bg px-4 py-0_d5 rounded-sm font-medium">
-                          {typeLabel}
+            ) : (
+              templates.map((pkg) => {
+                const typeLabel =
+                  pkg.type === 'hour_package'
+                    ? '课时包'
+                    : pkg.type === 'term'
+                      ? '期课'
+                      : pkg.type === 'monthly'
+                        ? '月卡'
+                        : '体验课';
+                const validInfo = getValidInfo(pkg);
+                return (
+                  <View key={pkg.id} className="p-8 rounded-2xl bg-card mb-5 shadow-card">
+                    <View className="flex items-center justify-between">
+                      <View className="flex-1">
+                        <View className="flex items-center gap-3 mb-3">
+                          <Text className="text-[30rpx] font-semibold text-foreground">
+                            {pkg.name}
+                          </Text>
+                          <View className="text-[20rpx] text-primary bg-primary-bg px-4 py-0_d5 rounded-sm font-medium">
+                            {typeLabel}
+                          </View>
                         </View>
+                        <View className="flex gap-6 text-sm text-muted-foreground flex-wrap">
+                          <Text>¥{pkg.price}</Text>
+                          <Text>
+                            {pkg.lesson_count > 0 ? `${pkg.lesson_count}课时` : '不限课时'}
+                          </Text>
+                          <Text>{pkg.duration}分钟/节</Text>
+                          {validInfo && <Text>{validInfo}</Text>}
+                        </View>
+                        {pkg.description && (
+                          <Text className="text-xs text-muted-foreground mt-2 block">
+                            {pkg.description}
+                          </Text>
+                        )}
                       </View>
-                      <View className="flex gap-6 text-sm text-muted-foreground flex-wrap">
-                        <Text>¥{pkg.price}</Text>
-                        <Text>{pkg.lesson_count > 0 ? `${pkg.lesson_count}课时` : '不限课时'}</Text>
-                        <Text>{pkg.duration}分钟/节</Text>
-                        {validInfo && <Text>{validInfo}</Text>}
-                      </View>
-                      {pkg.description && (
-                        <Text className="text-xs text-muted-foreground mt-2 block">
-                          {pkg.description}
+                      {/* 操作按钮 */}
+                      <View className="flex flex-col gap-2 ml-4">
+                        <Text
+                          className="text-[26rpx] text-primary px-4 py-2"
+                          onClick={() => openEdit(pkg)}
+                        >
+                          编辑
                         </Text>
-                      )}
-                    </View>
-                    {/* 操作按钮 */}
-                    <View className="flex flex-col gap-2 ml-4">
-                      <Text
-                        className="text-[26rpx] text-primary px-4 py-2"
-                        onClick={() => openEdit(pkg)}
-                      >
-                        编辑
-                      </Text>
-                      <Text
-                        className="text-[26rpx] text-destructive px-4 py-2"
-                        onClick={() => handleDelete(pkg.id, pkg.name)}
-                      >
-                        删除
-                      </Text>
+                        <Text
+                          className="text-[26rpx] text-destructive px-4 py-2"
+                          onClick={() => handleDelete(pkg.id, pkg.name)}
+                        >
+                          删除
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              );
-            })
-          )}
+                );
+              })
+            )}
           </View>
         </ScrollView>
 
@@ -354,9 +356,7 @@ const CoursePackagesPage: React.FC = () => {
                   key={t.key}
                   className={cn(
                     'flex-1 py-[20rpx] px-4 rounded-2xl text-center border-2 border-solid',
-                    formType === t.key
-                      ? 'border-primary bg-primary-bg'
-                      : 'bg-f5faf8 border-d5e8e0',
+                    formType === t.key ? 'border-primary bg-primary-bg' : 'bg-f5faf8 border-d5e8e0',
                   )}
                   onClick={() => handleTypeChange(t.key)}
                 >
@@ -438,7 +438,9 @@ const CoursePackagesPage: React.FC = () => {
           <View
             className={cn(
               'w-full py-6 rounded-[28rpx] text-center text-[30rpx] font-semibold mt-4',
-              saving ? 'bg-muted text-muted-foreground' : 'bg-gradient-primary text-primary-foreground',
+              saving
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-gradient-primary text-primary-foreground',
             )}
             onClick={saving ? undefined : handleSubmit}
           >

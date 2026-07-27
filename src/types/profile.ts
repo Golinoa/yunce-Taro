@@ -1,10 +1,12 @@
 /**
  * 用户角色枚举
- * - principal: 校长/机构负责人
+ * - admin: 管理员（注册机构的人，最高权限）
+ * - principal: 校长（机构下的校区管理者）
  * - teacher: 教师
+ * - assistant: 助教（辅助老师，权限比老师略低）
  * - parent: 家长
  */
-export type UserRole = 'principal' | 'teacher' | 'parent';
+export type UserRole = 'admin' | 'principal' | 'teacher' | 'assistant' | 'parent';
 
 /**
  * 身份关系（一个账号可在多个机构拥有多个身份）

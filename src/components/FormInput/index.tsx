@@ -32,6 +32,8 @@ export interface FormInputProps {
   password?: boolean;
   /** 输入框视觉变体 */
   variant?: 'default' | 'capsule';
+  /** 前缀节点，适合搜索图标等场景 */
+  prefixNode?: React.ReactNode;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -54,6 +56,7 @@ const FormInput: React.FC<FormInputProps> = ({
   minHeight = '120rpx',
   password = false,
   variant = 'default',
+  prefixNode,
 }) => {
   const isCapsule = variant === 'capsule';
 
@@ -77,6 +80,7 @@ const FormInput: React.FC<FormInputProps> = ({
           disabled && 'opacity-60',
         )}
       >
+        {prefixNode}
         {prefix && (
           <Text className="text-base font-semibold text-muted-foreground mr-2 flex-shrink-0">
             {prefix}

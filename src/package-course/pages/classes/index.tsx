@@ -1,11 +1,12 @@
 import { View, Text, Input } from '@tarojs/components';
 import React from 'react';
+import ClassAvatar from '@/components/class/ClassAvatar';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { withRouteGuard } from '@/utils/route-guard';
 import CreateClassSheet from './CreateClassSheet';
-import { useClasses, CLASS_ICONS, CLASS_GRADIENT, TABS } from './useClasses';
+import { useClasses, TABS } from './useClasses';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -452,15 +453,13 @@ const ClassesPage: React.FC = () => {
                       key={cls.id}
                       className={`bg-white rounded-[28rpx] px-[28rpx] py-[24rpx] shadow-soft ${deletingClassId === cls.id ? 'opacity-60' : 'press-bg'}`}
                       onClick={deletingClassId ? undefined : () => goDetail(cls.id)}
-                      onLongPress={deletingClassId ? undefined : () => handleDelete(cls.id, cls.name)}
+                      onLongPress={
+                        deletingClassId ? undefined : () => handleDelete(cls.id, cls.name)
+                      }
                     >
                       <View className="flex items-center gap-[20rpx]">
-                        {/* 左侧图标 */}
-                        <View
-                          className={`w-[76rpx] h-[76rpx] rounded-[22rpx] ${CLASS_GRADIENT[cls.color || 'primary']} flex items-center justify-center flex-shrink-0`}
-                        >
-                          <Icon name={CLASS_ICONS[cls.icon || 'piano']} size={36} color="white" />
-                        </View>
+                        {/* 左侧班级头像 */}
+                        <ClassAvatar />
                         {/* 中间信息区 */}
                         <View className="flex-1 min-w-0">
                           {/* 名称行 */}

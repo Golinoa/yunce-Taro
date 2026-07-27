@@ -29,6 +29,8 @@ export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export interface Schedule {
   id: string;
   teacher_id: string;
+  operator_teacher_id?: string;
+  assistant_teacher_id?: string;
   student_id?: string;
   class_id?: string;
   day_of_week: DayOfWeek;
@@ -61,4 +63,8 @@ export interface Schedule {
   course_type?: CourseType;
   /** 授课老师名称 */
   teacher_name?: string;
+  /** 操作老师名称 */
+  operator_teacher_name?: string;
+  /** 助教老师名称 */
+  assistant_teacher_name?: string;
 }

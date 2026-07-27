@@ -7,3 +7,4 @@ export { usePackageTemplateStore } from './package-template';
 export { useTeacherStore } from './teacher';
 export { useCampusStore } from './campus';
 export { useAgreementStore } from './agreement';
+export { useLeadStore } from './lead';

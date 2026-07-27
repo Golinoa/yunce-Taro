@@ -79,7 +79,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, activeId, onToggle, onSe
                           />
                         )}
                         <Text className="flex-1">{opt.label}</Text>
-                        {filter.value === opt.value && <Text className="text-primary text-xs">✓</Text>}
+                        {filter.value === opt.value && (
+                          <Text className="text-primary text-xs">✓</Text>
+                        )}
                       </View>
                     ))}
                   </ScrollView>

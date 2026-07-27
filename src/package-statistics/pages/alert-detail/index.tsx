@@ -73,7 +73,7 @@ const AlertDetail: React.FC = () => {
       // 先标记已读
       handleMarkRead(detail.id);
       // 如果有关联学员ID，跳转学员详情
-      if (detail.refId?.startsWith('stu-')) {
+      if (detail.refId) {
         Taro.navigateTo({
           url: `/package-student/pages/student-detail/index?id=${detail.refId}`,
         });

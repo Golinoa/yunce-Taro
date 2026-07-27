@@ -28,7 +28,6 @@ import {
 } from '@/data/auth';
 import { TEST_ACCOUNTS, TEST_PASSWORD } from '@/data/mock-database';
 import type { TestAccount } from '@/data/mock-database';
-import { get, post } from '@/utils/request';
 import type {
   AuthSession,
   Profile,
@@ -38,8 +37,9 @@ import type {
   RegisterDraft,
   TeacherRoleInfo,
 } from '@/types/profile';
+import { get, post } from '@/utils/request';
 
-type BackendRole = 'PARENT' | 'PRINCIPAL' | 'TEACHER';
+type BackendRole = 'ADMIN' | 'ASSISTANT' | 'PARENT' | 'PRINCIPAL' | 'TEACHER';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -142,6 +142,10 @@ const clearStoredAuth = (): void => {
 
 const mapBackendRole = (role: BackendRole): UserRole => {
   switch (role) {
+    case 'ADMIN':
+      return 'admin';
+    case 'ASSISTANT':
+      return 'assistant';
     case 'PARENT':
       return 'parent';
     case 'TEACHER':
@@ -422,9 +426,7 @@ export async function loginByEmailCode(email: string, code: string): Promise<Log
   };
 }
 
-export async function prepareAccountRecovery(
-  email: string,
-): Promise<AccountRecoveryPrepareResult> {
+export async function prepareAccountRecovery(email: string): Promise<AccountRecoveryPrepareResult> {
   if (USE_MOCK) return mockPrepareAccountRecovery(email);
   return {
     status: 'email_not_found',
@@ -443,9 +445,7 @@ export async function recoverAccountByEmailCode(
   };
 }
 
-export async function preparePasswordReset(
-  account: string,
-): Promise<PasswordResetPrepareResult> {
+export async function preparePasswordReset(account: string): Promise<PasswordResetPrepareResult> {
   if (USE_MOCK) return mockPreparePasswordReset(account);
   return {
     status: 'account_not_found',

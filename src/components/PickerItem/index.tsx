@@ -46,6 +46,8 @@ interface PickerItemProps {
   iconColor?: string;
   /** 主标题 */
   title: string;
+  /** 主标题后缀 */
+  titleExtra?: React.ReactNode;
   /** 副标题 */
   subtitle?: string;
   /** 右侧配置 */
@@ -66,6 +68,7 @@ const PickerItem: React.FC<PickerItemProps> = ({
   iconName,
   iconColor = '#5EC8A8',
   title,
+  titleExtra,
   subtitle,
   right,
   selected = false,
@@ -128,7 +131,10 @@ const PickerItem: React.FC<PickerItemProps> = ({
     >
       {renderIcon()}
       <View className="flex-1 min-w-0">
-        <Text className="text-base font-medium text-foreground block">{title}</Text>
+        <View className="flex items-center gap-[8rpx]">
+          <Text className="text-base font-medium text-foreground block">{title}</Text>
+          {titleExtra}
+        </View>
         {subtitle && <Text className="text-sm text-muted-foreground block mt-0_5">{subtitle}</Text>}
       </View>
       {renderRight()}

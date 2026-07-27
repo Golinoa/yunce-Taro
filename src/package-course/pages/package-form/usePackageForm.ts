@@ -29,7 +29,12 @@ export const TYPE_ICON_MAP: Record<
   PackageType,
   { icon: string; colorClass: string; bgClass: string; label: string }
 > = {
-  hour_package: { icon: '📚', colorClass: 'text-success', bgClass: 'bg-success-bg', label: '课时包' },
+  hour_package: {
+    icon: '📚',
+    colorClass: 'text-success',
+    bgClass: 'bg-success-bg',
+    label: '课时包',
+  },
   term: { icon: '📅', colorClass: 'text-amber', bgClass: 'bg-warning-bg', label: '期课' },
   monthly: { icon: '🔄', colorClass: 'text-accent', bgClass: 'bg-accent-bg', label: '月卡' },
   trial: { icon: '🎁', colorClass: 'text-info', bgClass: 'bg-info-bg', label: '体验课' },
@@ -158,14 +163,15 @@ export function usePackageForm() {
           }
 
           setSelectedStudent(stu);
-          setTotalHours(pkg.total_hours);
+          const packageGiftHours = pkg.gift_hours || 0;
+          setTotalHours(Math.max(pkg.total_hours - packageGiftHours, 0));
           setValidDays(pkg.valid_days || 0);
           setEditRemainingHours(String(pkg.remaining_hours));
           setEditExpiryDate(pkg.expiry_date || '');
           setFeeAmount(pkg.fee_amount != null ? String(pkg.fee_amount) : '');
           setFeeMethod(pkg.fee_method || '');
           setNote(pkg.note || '');
-          setGiftHours(pkg.gift_hours || 0);
+          setGiftHours(packageGiftHours);
         } else {
           if (routeStudentId) {
             const stu = await studentService.getById(routeStudentId);

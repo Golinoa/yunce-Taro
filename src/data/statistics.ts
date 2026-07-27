@@ -4,7 +4,6 @@
  */
 import Taro from '@tarojs/taro';
 import type { AlertItem as StatisticsAlertItem } from '@/components/statistics/AlertSheet';
-import type { InsightItem as StatisticsInsightItem } from '@/components/statistics/InsightCard';
 import {
   MONTHLY_STATS,
   CAMPUS_STATS,
@@ -13,7 +12,11 @@ import {
   STUDENTS,
   COURSE_PACKAGES,
 } from './mock-database';
-import { filterLessonRecordsByActor, filterPackagesByActor, filterStudentsByActor } from './students';
+import {
+  filterLessonRecordsByActor,
+  filterPackagesByActor,
+  filterStudentsByActor,
+} from './students';
 
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -57,18 +60,15 @@ interface AlertItem extends StatisticsAlertItem {
   type: 'operation' | 'finance';
 }
 
-/** 洞察项目类型 */
-type InsightItem = StatisticsInsightItem;
-
 /** 课时趋势（近12个月） */
-export const MOCK_LESSON_TREND: ChartDataItem[] = MONTHLY_STATS.map(s => ({
+export const MOCK_LESSON_TREND: ChartDataItem[] = MONTHLY_STATS.map((s) => ({
   label: `${s.month}月`,
   value: s.lessonHours,
   unit: '课时',
 }));
 
 /** 收入趋势（近12个月） */
-export const MOCK_INCOME_TREND: ChartDataItem[] = MONTHLY_STATS.map(s => ({
+export const MOCK_INCOME_TREND: ChartDataItem[] = MONTHLY_STATS.map((s) => ({
   label: `${s.month}月`,
   value: s.lessonAmount,
   unit: '元',
@@ -84,14 +84,14 @@ export const MOCK_PAYMENT_RANK: ChartDataItem[] = [
 ];
 
 /** 教师上课排行 */
-export const MOCK_TEACHER_RANK: ChartDataItem[] = TEACHERS.map(t => ({
+export const MOCK_TEACHER_RANK: ChartDataItem[] = TEACHERS.map((t) => ({
   label: t.name,
   value: t.totalHours,
   unit: '课时',
 })).sort((a, b) => b.value - a.value);
 
 /** 校区业绩排行 */
-export const MOCK_CAMPUS_RANK: ChartDataItem[] = CAMPUS_STATS.map(c => {
+export const MOCK_CAMPUS_RANK: ChartDataItem[] = CAMPUS_STATS.map((c) => {
   const campusNames: Record<string, string> = {
     'campus-center': '中心校区',
     'campus-east': '城东校区',
@@ -105,7 +105,7 @@ export const MOCK_CAMPUS_RANK: ChartDataItem[] = CAMPUS_STATS.map(c => {
 }).sort((a, b) => b.value - a.value);
 
 /** 家长端课时趋势 */
-export const MOCK_PARENT_TREND: ChartDataItem[] = MONTHLY_STATS.slice(0, 6).map(s => ({
+export const MOCK_PARENT_TREND: ChartDataItem[] = MONTHLY_STATS.slice(0, 6).map((s) => ({
   label: `${s.month}月`,
   value: s.lessonHours,
   unit: '课时',
@@ -132,9 +132,7 @@ export const MOCK_OPERATION_ALERTS: AlertItem[] = [
     level: 'primary',
     desc: '本周末部分时段消课集中，建议提前排班',
     count: 1,
-    details: [
-      { id: 'd3', name: '周六 14:00-16:00', info: '预计消课 12 节' },
-    ],
+    details: [{ id: 'd3', name: '周六 14:00-16:00', info: '预计消课 12 节' }],
   },
 ];
 
@@ -147,27 +145,7 @@ export const MOCK_FINANCE_ALERTS: AlertItem[] = [
     level: 'primary',
     desc: '本月营收保持上升，可继续追踪高转化科目',
     count: 1,
-    details: [
-      { id: 'd4', name: '较上月', info: '+12.5%' },
-    ],
-  },
-];
-
-/** 洞察数据 */
-export const MOCK_INSIGHTS: InsightItem[] = [
-  {
-    id: 'i1',
-    title: '学员增长趋势',
-    type: 'success',
-    weight: 3,
-    desc: '本月新增学员较上月增长 20%',
-  },
-  {
-    id: 'i2',
-    title: '钢琴课程建议',
-    type: 'info',
-    weight: 2,
-    desc: '钢琴课程消课率最高，建议增加师资',
+    details: [{ id: 'd4', name: '较上月', info: '+12.5%' }],
   },
 ];
 
@@ -226,7 +204,7 @@ export async function mockGetLessonRank(): Promise<ChartDataItem[]> {
 
   // 学员课时消耗排行
   const studentHours: Record<string, number> = {};
-  visibleRecords.forEach(r => {
+  visibleRecords.forEach((r) => {
     if (r.status === 'checked') {
       studentHours[r.studentId] = (studentHours[r.studentId] || 0) + r.hours;
     }
@@ -347,42 +325,6 @@ export async function mockGetFinanceAlerts() {
         name: pkg.name,
         info: pkg.expireDate || '无到期时间',
       })),
-    },
-  ];
-}
-
-export async function mockGetInsights() {
-  await delay();
-  const visibleStudents = getVisibleStudents();
-  const visibleRecords = getVisibleLessonRecords().filter((record) => record.status === 'checked');
-
-  if (!visibleStudents.length) return MOCK_INSIGHTS;
-
-  const avgRemainingHours =
-    visibleStudents.reduce((sum, student) => sum + student.remainingHours, 0) /
-    Math.max(visibleStudents.length, 1);
-
-  return [
-    {
-      id: 'i-student-scale',
-      title: '当前服务规模',
-      type: 'success' as const,
-      weight: 3,
-      desc: `当前身份可查看 ${visibleStudents.length} 名学员，已形成稳定教学池`,
-    },
-    {
-      id: 'i-record-volume',
-      title: '消课活跃度',
-      type: 'info' as const,
-      weight: 2,
-      desc: `累计可查看 ${visibleRecords.length} 条有效消课记录`,
-    },
-    {
-      id: 'i-hours-health',
-      title: '续费关注建议',
-      type: 'warning' as const,
-      weight: 1,
-      desc: `建议优先跟进剩余课时较低的学员，当前平均剩余 ${avgRemainingHours.toFixed(1)} 课时`,
     },
   ];
 }

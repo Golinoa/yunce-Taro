@@ -3,10 +3,7 @@ import Taro from '@tarojs/taro';
 import React, { useCallback, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
-import {
-  prepareAccountRecovery,
-  recoverAccountByEmailCode,
-} from '@/services/auth';
+import { prepareAccountRecovery, recoverAccountByEmailCode } from '@/services/auth';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEMO_CODE_HINT = '演示环境验证码为 123456';
@@ -79,7 +76,7 @@ const ForgotAccountPage: React.FC = () => {
     <View className="min-h-screen bg-background px-[32rpx] py-[32rpx]">
       <View className="rounded-[32rpx] bg-white px-[32rpx] py-[36rpx] shadow-[0_16rpx_48rpx_rgba(59,110,245,0.08)] mb-[24rpx]">
         <View className="w-[96rpx] h-[96rpx] rounded-full bg-primary/10 flex items-center justify-center mb-[24rpx]">
-          <Icon name="account-search" size={52} className="text-primary" />
+          <Icon name="mdi-account-search" size={52} className="text-primary" />
         </View>
         <Text className="text-[36rpx] font-semibold text-foreground block mb-[10rpx]">
           忘记账号

@@ -19,12 +19,7 @@ interface LocalDebugPayload {
  * 本地调试上报统一入口。
  * 默认关闭，仅在显式传入 TARO_ENABLE_LOCAL_DEBUG=true 时启用。
  */
-export function reportLocalDebug({
-  hypothesisId,
-  location,
-  msg,
-  data,
-}: LocalDebugPayload): void {
+export function reportLocalDebug({ hypothesisId, location, msg, data }: LocalDebugPayload): void {
   if (!ENABLE_LOCAL_DEBUG) {
     return;
   }

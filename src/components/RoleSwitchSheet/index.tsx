@@ -10,6 +10,7 @@ import React, { useCallback, useMemo } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import RoleCard from '@/components/RoleCard';
 import { useAuth } from '@/utils/auth';
+import { safeReLaunch } from '@/utils/navigation';
 
 export interface RoleSwitchSheetProps {
   /** 是否显示 */
@@ -43,7 +44,7 @@ const RoleSwitchSheet: React.FC<RoleSwitchSheetProps> = ({ visible, onClose }) =
       onClose();
       Taro.showToast({ title: '切换成功', icon: 'success' });
       // 切换后刷新首页
-      Taro.reLaunch({ url: '/pages/home/index' });
+      await safeReLaunch('/pages/home/index');
     },
     [currentIdentity?.id, switchIdentity, onClose],
   );

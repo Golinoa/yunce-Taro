@@ -30,7 +30,9 @@ export interface BottomSheetProps {
   onClose?: () => void;
   /** 子内容 */
   children: React.ReactNode;
-  /** 内容区最大高度（默认 80vh） */
+  /** 内容面板高度（默认 70vh），支持固定高度如 70vh / 600rpx */
+  height?: string;
+  /** 内容区最大高度（已废弃，请使用 height） */
   maxHeight?: string;
   /** 额外内容区类名 */
   className?: string;
@@ -44,7 +46,8 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   title,
   onClose,
   children,
-  maxHeight = '80vh',
+  height,
+  maxHeight,
   className,
   scrollable = true,
 }) => {
@@ -90,31 +93,46 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
   if (!mounted) return null;
 
-  const content = (
-    <View className={cn('bg-white', className)}>
-      {children}
-    </View>
-  );
+  // 高度兼容：优先使用 height，其次 maxHeight，默认 70vh
+  // height="auto" 时内容自适应，不设固定高度
+  const isAutoHeight = height === 'auto';
+  const panelHeight = isAutoHeight ? undefined : height || maxHeight || '70vh';
+  const scrollAreaHeight = isAutoHeight ? undefined : `calc(${panelHeight} - 120rpx)`;
+
+  const content = <View className="bg-white">{children}</View>;
 
   return (
-    <View className="fixed inset-0 z-200">
-      {/* 遮罩 - catchMove 阻止触摸穿透到下层 */}
+    <View
+      className="fixed inset-0 z-200"
+      // 最外层也拦截点击，防止事件穿透到下层页面元素
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose?.();
+      }}
+      catchMove
+    >
+      {/* 遮罩层 — 始终保持可点击背景，bg-black/0 确保小程序中接收 tap 事件 */}
       <View
         className={cn(
           'absolute inset-0 transition-all duration-300',
-          animating ? 'bg-black/45' : 'bg-transparent',
+          animating ? 'bg-black/45' : 'bg-black/0',
         )}
-        onClick={onClose}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose?.();
+        }}
         catchMove
       />
-      {/* 内容面板 */}
+      {/* 内容面板 — 阻止点击冒泡到遮罩层 */}
       <View
         className={cn(
           'absolute bottom-0 left-0 right-0 rounded-t-[40rpx] bg-white overflow-hidden',
           'transition-transform duration-300 ease-in-out',
           animating ? 'translate-y-0' : 'translate-y-full',
+          className,
         )}
-        style={{ maxHeight }}
+        style={panelHeight ? { height: panelHeight, maxHeight: panelHeight } : undefined}
+        onClick={(e) => e.stopPropagation()}
         onTransitionEnd={handleTransitionEnd}
       >
         {/* 标题栏 */}
@@ -124,13 +142,13 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           </View>
         )}
         {/* 内容区 */}
-        {scrollable ? (
+        {scrollable && !isAutoHeight ? (
           <ScrollView
             scrollY
             className="bg-white"
-            style={{ maxHeight: `calc(${maxHeight} - 120rpx)` }}
+            style={{ height: scrollAreaHeight, maxHeight: scrollAreaHeight }}
           >
-            <View className={cn('bg-white', className)}>{children}</View>
+            <View className="bg-white">{children}</View>
           </ScrollView>
         ) : (
           content

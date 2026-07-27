@@ -19,6 +19,7 @@ export interface TodoListProps {
 
 /** 图标背景渐变映射（使用 theme token） */
 const ICON_BG_MAP: Record<string, string> = {
+  alert: 'linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--warning) / 0.85))',
   leave: 'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7))',
   hours: 'linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive) / 0.7))',
   checkin: 'linear-gradient(135deg, hsl(var(--success)), hsl(var(--success) / 0.7))',
@@ -29,7 +30,7 @@ const ICON_BG_MAP: Record<string, string> = {
  *
  * 对齐设计稿 index_v14.html todo-list：
  * - 图标 + 标题 + 描述 + 箭头
- * - 三种图标配色：leave(橙/warning)、hours(红/destructive)、checkin(绿/success)
+ * - 图标配色：alert(红橙预警)、leave(橙/warning)、hours(红/destructive)、checkin(绿/success)
  */
 const TodoList: React.FC<TodoListProps> = ({ items }) => {
   if (items.length === 0) {

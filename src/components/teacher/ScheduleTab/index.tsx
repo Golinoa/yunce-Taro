@@ -104,130 +104,132 @@ const ScheduleTab: React.FC<ScheduleTabProps> = ({
         }}
       />
 
-      <ScrollView className="flex-1 h-0 px-[32rpx] py-[24rpx] pb-[48rpx]" scrollY>
-        {/* 周导航 */}
-        <View className="flex items-center justify-between mb-[28rpx]">
-          <View
-            className="w-[64rpx] h-[64rpx] rounded-[20rpx] bg-card shadow-card flex items-center justify-center press-scale"
-            onClick={() => setWeekOffset((w) => w - 1)}
-          >
-            <Text className="text-[36rpx] text-muted-foreground">‹</Text>
-          </View>
-          <View className="text-center flex-1">
-            <Text className="text-[32rpx] font-bold text-foreground block">{weekTitle}</Text>
-            <Text className="text-[22rpx] text-muted-foreground mt-[2rpx] block">
-              本周 {Object.values(scheduleDataMap).reduce((s, v) => s + v.length, 0)} 节课
-            </Text>
-          </View>
-          <View
-            className="w-[64rpx] h-[64rpx] rounded-[20rpx] bg-card shadow-card flex items-center justify-center press-scale"
-            onClick={() => setWeekOffset((w) => w + 1)}
-          >
-            <Text className="text-[36rpx] text-muted-foreground">›</Text>
-          </View>
-        </View>
-
-        {/* 周视图 */}
-        <View className="flex gap-[8rpx] mb-[28rpx] bg-card rounded-xl py-[16rpx] px-[12rpx] shadow-card">
-          {weekDays.map((d) => (
+      <ScrollView className="flex-1 h-0" scrollY>
+        <View className="px-[32rpx] py-[24rpx] pb-[48rpx]">
+          {/* 周导航 */}
+          <View className="flex items-center justify-between mb-[28rpx]">
             <View
-              key={d.date}
-              className={cn(
-                'flex-1 text-center py-[12rpx] rounded-xl transition',
-                d.isToday && selectedDate !== d.date && 'bg-info-10',
-                selectedDate === d.date && 'bg-info',
-              )}
-              onClick={() => setSelectedDate(d.date)}
+              className="w-[64rpx] h-[64rpx] rounded-[20rpx] bg-card shadow-card flex items-center justify-center press-scale"
+              onClick={() => setWeekOffset((w) => w - 1)}
             >
-              <Text
-                className={cn(
-                  'text-[20rpx] block',
-                  selectedDate === d.date ? 'text-white/80' : 'text-muted-foreground',
-                )}
-              >
-                {d.weekday}
+              <Text className="text-[36rpx] text-muted-foreground">‹</Text>
+            </View>
+            <View className="text-center flex-1">
+              <Text className="text-[32rpx] font-bold text-foreground block">{weekTitle}</Text>
+              <Text className="text-[22rpx] text-muted-foreground mt-[2rpx] block">
+                本周 {Object.values(scheduleDataMap).reduce((s, v) => s + v.length, 0)} 节课
               </Text>
-              <Text
+            </View>
+            <View
+              className="w-[64rpx] h-[64rpx] rounded-[20rpx] bg-card shadow-card flex items-center justify-center press-scale"
+              onClick={() => setWeekOffset((w) => w + 1)}
+            >
+              <Text className="text-[36rpx] text-muted-foreground">›</Text>
+            </View>
+          </View>
+
+          {/* 周视图 */}
+          <View className="flex gap-[8rpx] mb-[28rpx] bg-card rounded-xl py-[16rpx] px-[12rpx] shadow-card">
+            {weekDays.map((d) => (
+              <View
+                key={d.date}
                 className={cn(
-                  'text-[28rpx] font-semibold mt-[4rpx] block',
-                  selectedDate === d.date
-                    ? 'text-white'
-                    : d.isToday
-                      ? 'text-info font-bold'
-                      : 'text-foreground',
+                  'flex-1 text-center py-[12rpx] rounded-xl transition',
+                  d.isToday && selectedDate !== d.date && 'bg-info-10',
+                  selectedDate === d.date && 'bg-info',
                 )}
+                onClick={() => setSelectedDate(d.date)}
               >
-                {d.day}
-              </Text>
-              {d.hasCourse && (
-                <View
+                <Text
                   className={cn(
-                    'w-[8rpx] h-[8rpx] rounded-full mx-auto mt-[6rpx]',
-                    selectedDate === d.date ? 'bg-white' : 'bg-info',
+                    'text-[20rpx] block',
+                    selectedDate === d.date ? 'text-white/80' : 'text-muted-foreground',
                   )}
-                />
-              )}
-            </View>
-          ))}
-        </View>
-
-        {/* 当日课表 */}
-        <View className="text-[28rpx] font-bold text-foreground mb-[24rpx] flex items-center gap-[16rpx]">
-          <Text>{dayjs(selectedDate).format('M月D日')} 课表</Text>
-          {dayjs(selectedDate).isSame(dayjs(), 'day') && (
-            <View className="py-[4rpx] px-[16rpx] rounded-[8rpx] bg-info-10 text-info text-[22rpx] font-semibold">
-              今天
-            </View>
-          )}
-        </View>
-
-        {daySchedule.length === 0 ? (
-          <View className="flex items-center justify-center py-[120rpx]">
-            <Text className="text-[28rpx] text-muted-foreground">当日无排课</Text>
-          </View>
-        ) : (
-          daySchedule.map((item, idx) => (
-            <View
-              className="flex gap-[24rpx] py-[24rpx] border-b border-border/50 last:border-b-0"
-              key={idx}
-            >
-              <Text className="w-[100rpx] text-[26rpx] font-semibold text-foreground flex-shrink-0 text-right pt-[4rpx]">
-                {item.time}
-              </Text>
-              <View className="w-[20rpx] flex flex-col items-center flex-shrink-0 pt-[8rpx]">
-                <View className="w-[16rpx] h-[16rpx] rounded-full bg-info" />
-                {idx < daySchedule.length - 1 && (
-                  <View className="w-[4rpx] flex-1 bg-border mt-[8rpx]" />
+                >
+                  {d.weekday}
+                </Text>
+                <Text
+                  className={cn(
+                    'text-[28rpx] font-semibold mt-[4rpx] block',
+                    selectedDate === d.date
+                      ? 'text-white'
+                      : d.isToday
+                        ? 'text-info font-bold'
+                        : 'text-foreground',
+                  )}
+                >
+                  {d.day}
+                </Text>
+                {d.hasCourse && (
+                  <View
+                    className={cn(
+                      'w-[8rpx] h-[8rpx] rounded-full mx-auto mt-[6rpx]',
+                      selectedDate === d.date ? 'bg-white' : 'bg-info',
+                    )}
+                  />
                 )}
               </View>
-              <View className="flex-1">
-                <Text className="text-[28rpx] font-semibold text-foreground block">
-                  {item.title}
+            ))}
+          </View>
+
+          {/* 当日课表 */}
+          <View className="text-[28rpx] font-bold text-foreground mb-[24rpx] flex items-center gap-[16rpx]">
+            <Text>{dayjs(selectedDate).format('M月D日')} 课表</Text>
+            {dayjs(selectedDate).isSame(dayjs(), 'day') && (
+              <View className="py-[4rpx] px-[16rpx] rounded-[8rpx] bg-info-10 text-info text-[22rpx] font-semibold">
+                今天
+              </View>
+            )}
+          </View>
+
+          {daySchedule.length === 0 ? (
+            <View className="flex items-center justify-center py-[120rpx]">
+              <Text className="text-[28rpx] text-muted-foreground">当日无排课</Text>
+            </View>
+          ) : (
+            daySchedule.map((item, idx) => (
+              <View
+                className="flex gap-[24rpx] py-[24rpx] border-b border-border/50 last:border-b-0"
+                key={idx}
+              >
+                <Text className="w-[100rpx] text-[26rpx] font-semibold text-foreground flex-shrink-0 text-right pt-[4rpx]">
+                  {item.time}
                 </Text>
-                <Text className="text-[24rpx] text-muted-foreground mt-[4rpx] block">
-                  {item.desc}
-                </Text>
-                <View className="flex gap-[8rpx] mt-[12rpx] flex-wrap">
-                  {item.teachers.map((t, ti) => (
-                    <View
-                      key={ti}
-                      className={cn(
-                        'py-[6rpx] px-[16rpx] rounded-[12rpx] text-[22rpx] font-medium press-scale',
-                        t.role === 'lead' ? 'bg-secondary text-primary' : 'bg-info-10 text-info',
-                      )}
-                      onClick={() => {
-                        const teacher = teachers.find((tt) => tt.name === t.name);
-                        if (teacher) onTeacherClick(teacher.id);
-                      }}
-                    >
-                      {t.name}
-                    </View>
-                  ))}
+                <View className="w-[20rpx] flex flex-col items-center flex-shrink-0 pt-[8rpx]">
+                  <View className="w-[16rpx] h-[16rpx] rounded-full bg-info" />
+                  {idx < daySchedule.length - 1 && (
+                    <View className="w-[4rpx] flex-1 bg-border mt-[8rpx]" />
+                  )}
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[28rpx] font-semibold text-foreground block">
+                    {item.title}
+                  </Text>
+                  <Text className="text-[24rpx] text-muted-foreground mt-[4rpx] block">
+                    {item.desc}
+                  </Text>
+                  <View className="flex gap-[8rpx] mt-[12rpx] flex-wrap">
+                    {item.teachers.map((t, ti) => (
+                      <View
+                        key={ti}
+                        className={cn(
+                          'py-[6rpx] px-[16rpx] rounded-[12rpx] text-[22rpx] font-medium press-scale',
+                          t.role === 'lead' ? 'bg-secondary text-primary' : 'bg-info-10 text-info',
+                        )}
+                        onClick={() => {
+                          const teacher = teachers.find((tt) => tt.name === t.name);
+                          if (teacher) onTeacherClick(teacher.id);
+                        }}
+                      >
+                        {t.name}
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
-            </View>
-          ))
-        )}
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );

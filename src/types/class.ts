@@ -11,6 +11,13 @@ export type ClassType = 'unlimited' | 'limited' | 'ended';
 export type TeachMode = 'one_on_one' | 'small_class' | 'large_class';
 
 /**
+ * 班级排课模式
+ * - fixed: 固定排课（校区提前排好班级上课时间）
+ * - open: 开放预约（只设置时段池，家长自行预约）
+ */
+export type ClassScheduleMode = 'fixed' | 'open';
+
+/**
  * 班级状态
  */
 export type ClassStatus = 'active' | 'ended';
@@ -36,6 +43,19 @@ export type ClassIcon =
   | 'music';
 
 /**
+ * 课程难度等级
+ */
+export type ClassLevel = 'all' | 'basic' | 'advanced' | 'expert';
+
+/** 课程难度显示文本 */
+export const CLASS_LEVEL_LABELS: Record<ClassLevel, string> = {
+  all: '所有人',
+  basic: '基础',
+  advanced: '进阶',
+  expert: '高级',
+};
+
+/**
  * 班级信息 (classes 表)
  */
 export interface Class {
@@ -49,6 +69,12 @@ export interface Class {
   // 扩展字段
   type: ClassType;
   teach_mode?: TeachMode; // 授课模式：一对一/小班/大班
+  /** 排课模式：fixed=固定排课, open=开放预约 */
+  schedule_mode?: ClassScheduleMode;
+  /** 自动开班条件：manual=手动, full=约满, time=到时间, full_or_time=约满或到时间 */
+  auto_open_type?: 'manual' | 'full' | 'time' | 'full_or_time';
+  /** 最少预约人数（仅 full/full_or_time 有效），默认等于 max_count */
+  min_open_count?: number;
   status: ClassStatus;
   schedule?: string; // 显示文本 "每周二、四 14:00-15:30"
   weekdays?: string[]; // 星期选择 ['一','二','四']
@@ -61,9 +87,13 @@ export interface Class {
   end_date?: string; // 结束日期（课时制）
   color: ClassColor; // 主题色标识
   icon?: ClassIcon; // 班级图标标识
+  /** 课程难度等级 */
+  level?: ClassLevel;
   student_count: number; // 学生数量
   campus_id?: string; // 关联校区ID
   campus_name?: string; // 关联校区名称
+  /** 科目 ID（用于匹配会员卡课程科目） */
+  subject_id?: string;
 }
 
 /**
@@ -109,4 +139,44 @@ export interface ClassStudentInfo {
   hours: number;
   remaining: number | null; // null 表示循环课
   records: { date: string; title: string; hours: number }[];
+}
+
+/**
+ * 班级开放预约时段
+ * 用于开放预约制班级：校区设置时段池，家长选择时段预约，约满后开班。
+ */
+export interface ClassBookingSlot {
+  id: string;
+  /** 关联班级 ID */
+  class_id: string;
+  /** 班级名称（冗余展示） */
+  class_name?: string;
+  /** 校区 ID */
+  campus_id: string;
+  /** 授课老师 ID */
+  teacher_id: string;
+  /** 授课老师名称（冗余展示） */
+  teacher_name?: string;
+  /** 预约日期 YYYY-MM-DD */
+  lesson_date: string;
+  /** 开始时间 HH:mm */
+  start_time: string;
+  /** 结束时间 HH:mm */
+  end_time: string;
+  /** 最大可约人数 */
+  max_count: number;
+  /** 当前已预约人数 */
+  current_count: number;
+  /** 状态：active=开放, rest=休息, full=已满 */
+  status: 'active' | 'rest' | 'full';
+  /** 已预约学员列表（卡片展示头像用） */
+  booking_students?: { id: string; name: string; avatar?: string }[];
+  /** 本时段自动开班条件，未设置时继承班级配置 */
+  auto_open_type?: 'manual' | 'full' | 'time' | 'full_or_time';
+  /** 已生成的排课 ID，避免重复开班 */
+  opened_schedule_id?: string;
+  /** 教室 */
+  room?: string;
+  created_at: string;
+  updated_at: string;
 }

@@ -13,8 +13,34 @@
   }
 }
 
+// 角标呼吸缩放（onboarding 引导序号）
+@keyframes badge-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+// 角标雷达扩散光圈（onboarding 引导序号）
+@keyframes radar-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
 // ============================================
-// 云策教务 - CSS 自定义属性（全局变量）
+// 松果排课 - CSS 自定义属性（全局变量）
 // 单一数据源：src/theme.ts，修改时请同步
 // 基于 HSL 色彩体系，所有色值通过 CSS 变量引用
 // 配色方案对齐设计稿 scheme-bc-fusion-v2.html（蓝色主题 + 花瓣五色）
@@ -285,11 +311,7 @@ page {
   left: 0;
   right: 0;
   height: 60%;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--primary-glow) / 0.35) 0%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg, hsl(var(--primary-glow) / 0.35) 0%, transparent 100%);
   pointer-events: none;
 }
 
@@ -301,11 +323,7 @@ page {
   right: -20%;
   width: 60%;
   height: 60%;
-  background: radial-gradient(
-    circle,
-    hsl(var(--primary-glow) / 0.4) 0%,
-    transparent 70%
-  );
+  background: radial-gradient(circle, hsl(var(--primary-glow) / 0.4) 0%, transparent 70%);
   filter: blur(40rpx);
   pointer-events: none;
 }
@@ -422,12 +440,7 @@ page {
   transform: translateX(-50%);
   width: 120rpx;
   height: 6rpx;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    hsl(var(--primary) / 0.3),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.3), transparent);
   border-radius: 3rpx;
   margin-top: 16rpx;
 }
@@ -541,7 +554,9 @@ page {
   margin-bottom: 20rpx;
   overflow: hidden;
   border: 2rpx solid hsl(var(--border));
-  transition: box-shadow 0.25s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.2s ease;
 }
 .recent-group-v14:active {
   box-shadow: 0 4rpx 20rpx hsl(var(--primary-dark) / 0.1);

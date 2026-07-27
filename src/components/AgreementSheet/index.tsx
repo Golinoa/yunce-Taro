@@ -30,13 +30,19 @@ const AgreementSheet: React.FC<AgreementSheetProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} title="服务协议及隐私保护" onClose={onClose} maxHeight="72vh" scrollable={false}>
+    <BottomSheet
+      visible={visible}
+      title="服务协议及隐私保护"
+      onClose={onClose}
+      maxHeight="72vh"
+      scrollable={false}
+    >
       <View className="px-[40rpx] pt-[12rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))]">
         <Text className="text-[28rpx] text-foreground leading-relaxed block mb-[32rpx]">
-          尊敬的用户，为了更好地保障您的合法权益，让您正常使用云策教务服务，我们需要依照相关法律法规收集并使用您的身份信息、联系方式等。
+          尊敬的用户，为了更好地保障您的合法权益，让您正常使用松果排课服务，我们需要依照相关法律法规收集并使用您的身份信息、联系方式等。
         </Text>
         <Text className="text-[28rpx] text-foreground leading-relaxed block mb-[48rpx]">
-          云策教务将严格保护您的个人信息，确保您的信息安全。请您务必审慎阅读并充分理解
+          松果排课将严格保护您的个人信息，确保您的信息安全。请您务必审慎阅读并充分理解
           <Text className="text-primary" onClick={handleAgreement}>
             《用户协议》
           </Text>

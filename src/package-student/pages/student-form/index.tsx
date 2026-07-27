@@ -613,11 +613,11 @@ const StudentForm: React.FC = () => {
               }
               onClick={canSubmit && !saving ? handleSave : undefined}
             >
-            <Text
-              className={`text-base font-semibold ${!canSubmit || saving ? 'text-muted-foreground' : 'text-white'}`}
-            >
-              {saving ? (isEdit ? '更新中...' : '保存中...') : isEdit ? '更新' : '保存学员'}
-            </Text>
+              <Text
+                className={`text-base font-semibold ${!canSubmit || saving ? 'text-muted-foreground' : 'text-white'}`}
+              >
+                {saving ? (isEdit ? '更新中...' : '保存中...') : isEdit ? '更新' : '保存学员'}
+              </Text>
             </View>
           </View>
         </View>

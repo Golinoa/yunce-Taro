@@ -12,6 +12,7 @@ import LessonConsumptionList, {
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
+import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { lessonRecordService } from '@/services';
 import { homeService } from '@/services/home';
 import type {
@@ -59,8 +60,10 @@ interface CampusOption {
  * - Tab切换：今日课表 / 待办事项 / 最近消课
  */
 const ROLE_LABEL: Record<string, string> = {
+  admin: '管理员',
   principal: '校长',
   teacher: '教师',
+  assistant: '助教',
   parent: '家长',
 };
 
@@ -161,7 +164,8 @@ const Home: React.FC = () => {
 
   // ---- 未读消息数 ----
   const [unreadCount, setUnreadCount] = useState(0);
-  const [operationContent, setOperationContent] = useState<HomeOperationContent>(EMPTY_OPERATION_CONTENT);
+  const [operationContent, setOperationContent] =
+    useState<HomeOperationContent>(EMPTY_OPERATION_CONTENT);
   const [operationLoading, setOperationLoading] = useState(true);
   const [operationError, setOperationError] = useState('');
 
@@ -381,54 +385,69 @@ const Home: React.FC = () => {
     [recentRecords],
   );
 
-  const measureHomeSwiperHeight = useCallback((targetTab?: HomeTab) => {
-    if (!isStaffRole(currentRole)) {
-      return;
-    }
+  const measureHomeSwiperHeight = useCallback(
+    (targetTab?: HomeTab) => {
+      if (!isStaffRole(currentRole)) {
+        return;
+      }
 
-    const nextTab = targetTab || getHomeTabByIndex(homeSwiperCurrent);
-    const targetId = `#home-tab-panel-${nextTab}`;
+      const nextTab = targetTab || getHomeTabByIndex(homeSwiperCurrent);
+      const targetId = `#home-tab-panel-${nextTab}`;
 
-    Taro.nextTick(() => {
-      const query = Taro.createSelectorQuery();
-      query.select(targetId).boundingClientRect();
-      query.exec((result) => {
-        const rect = result?.[0];
-        if (rect?.height) {
-          setHomeSwiperHeight(Math.max(320, Math.ceil(rect.height)));
-        }
+      Taro.nextTick(() => {
+        const query = Taro.createSelectorQuery();
+        query.select(targetId).boundingClientRect();
+        query.exec((result) => {
+          const rect = result?.[0];
+          if (rect?.height) {
+            setHomeSwiperHeight(Math.max(320, Math.ceil(rect.height)));
+          }
+        });
       });
-    });
-  }, [currentRole, homeSwiperCurrent]);
+    },
+    [currentRole, homeSwiperCurrent],
+  );
 
-  const scheduleHomeSwiperMeasure = useCallback((targetTab?: HomeTab) => {
-    if (homeTabMeasureTimerRef.current) {
-      clearTimeout(homeTabMeasureTimerRef.current);
-    }
+  const scheduleHomeSwiperMeasure = useCallback(
+    (targetTab?: HomeTab) => {
+      if (homeTabMeasureTimerRef.current) {
+        clearTimeout(homeTabMeasureTimerRef.current);
+      }
 
-    homeTabMeasureTimerRef.current = setTimeout(() => {
-      measureHomeSwiperHeight(targetTab);
-    }, HOME_TAB_SWIPER_DURATION + 40);
-  }, [measureHomeSwiperHeight]);
+      homeTabMeasureTimerRef.current = setTimeout(() => {
+        measureHomeSwiperHeight(targetTab);
+      }, HOME_TAB_SWIPER_DURATION + 40);
+    },
+    [measureHomeSwiperHeight],
+  );
 
-  const handleHomeTabChange = useCallback((tab: HomeTab) => {
-    setHomeSwiperCurrent(getHomeTabIndex(tab));
-    scheduleHomeSwiperMeasure(tab);
-  }, [scheduleHomeSwiperMeasure]);
+  const handleHomeTabChange = useCallback(
+    (tab: HomeTab) => {
+      setHomeSwiperCurrent(getHomeTabIndex(tab));
+      scheduleHomeSwiperMeasure(tab);
+    },
+    [scheduleHomeSwiperMeasure],
+  );
 
-  const handleHomeSwiperChange = useCallback((event: { detail?: { current?: number } }) => {
-    const current = event.detail?.current ?? 0;
-    const nextTab = getHomeTabByIndex(current);
-    setHomeSwiperCurrent(current);
-    scheduleHomeSwiperMeasure(nextTab);
-  }, [scheduleHomeSwiperMeasure]);
+  const handleHomeSwiperChange = useCallback(
+    (event: { detail?: { current?: number } }) => {
+      const current = event.detail?.current ?? 0;
+      const nextTab = getHomeTabByIndex(current);
+      setHomeSwiperCurrent(current);
+      scheduleHomeSwiperMeasure(nextTab);
+    },
+    [scheduleHomeSwiperMeasure],
+  );
 
-  const handleHomeSwiperFinish = useCallback((event: { detail?: { current?: number } }) => {
-    const current = event.detail?.current ?? homeSwiperCurrent;
-    const nextTab = getHomeTabByIndex(current);
-    setActiveTab(nextTab);
-    measureHomeSwiperHeight(nextTab);
-  }, [homeSwiperCurrent, measureHomeSwiperHeight]);
+  const handleHomeSwiperFinish = useCallback(
+    (event: { detail?: { current?: number } }) => {
+      const current = event.detail?.current ?? homeSwiperCurrent;
+      const nextTab = getHomeTabByIndex(current);
+      setActiveTab(nextTab);
+      measureHomeSwiperHeight(nextTab);
+    },
+    [homeSwiperCurrent, measureHomeSwiperHeight],
+  );
 
   useEffect(() => {
     setHomeSwiperCurrent(getHomeTabIndex(activeTab));
@@ -451,234 +470,260 @@ const Home: React.FC = () => {
 
   return (
     <>
-      <ScrollView scrollY showScrollbar={false} className="h-screen bg-[var(--muted)] no-scrollbar">
-        {/* ========== 渐变背景层 ========== */}
-        <View className="gradient-bg" />
-        <View className="gradient-fade" />
+      <View className="h-screen overflow-x-hidden bg-[var(--muted)]">
+        <ScrollView scrollY showScrollbar={false} className="h-full overflow-x-hidden no-scrollbar">
+          <View className="min-h-full">
+            {/* ========== 渐变背景层 ========== */}
+            <View className="gradient-bg" />
+            <View className="gradient-fade" />
 
-        {/* ========== 内容层 ========== */}
-        <View className="relative z-[200]">
-          {/* ===== 自定义导航栏：状态栏占位 + 机构/校区信息 + 胶囊安全区 ===== */}
-          <View
-            style={{ height: `${navSafeHeight}px` }}
-            className="flex items-end px-[32rpx] pb-[12rpx]"
-          >
-            <View className="flex items-center gap-[16rpx]">
-              {/* 机构名称 */}
-              <Text className="text-[32rpx] font-bold text-white truncate max-w-[200rpx]">
-                {orgName || currentIdentity?.organizationName || '云策教务'}
-              </Text>
-              {/* 校区选择器 - 点击展开下拉 */}
-              <View className="relative shrink-0">
-                <View
-                  className="flex items-center gap-[8rpx] py-[12rpx] pr-[12rpx] pl-[4rpx]"
-                  onClick={handleToggleCampusPicker}
-                >
-                  <Icon name="mdi-map-marker" size="xs" color="white" />
-                  <Text className="text-[28rpx] text-white/90 truncate max-w-[160rpx]">
-                    {mainCampus?.name || '主校区'}
+            {/* ========== 内容层 ========== */}
+            <View className="relative z-[200]">
+              {/* ===== 自定义导航栏：状态栏占位 + 机构/校区信息 + 胶囊安全区 ===== */}
+              <View
+                style={{ height: `${navSafeHeight}px` }}
+                className="flex items-end px-[32rpx] pb-[12rpx]"
+              >
+                <View className="flex items-center gap-[16rpx]">
+                  {/* 机构名称 */}
+                  <Text className="text-[32rpx] font-bold text-white truncate max-w-[200rpx]">
+                    {orgName || currentIdentity?.organizationName || BRAND_FALLBACK_ORG_NAME}
                   </Text>
-                  <Icon
-                    name={showCampusPicker ? 'mdi-chevron-down' : 'mdi-chevron-right'}
-                    size="md"
-                    color="white"
-                  />
+                  {/* 校区选择器 - 点击展开下拉 */}
+                  <View className="relative shrink-0">
+                    <View
+                      className="flex items-center gap-[8rpx] py-[12rpx] pr-[12rpx] pl-[4rpx]"
+                      onClick={handleToggleCampusPicker}
+                    >
+                      <Icon name="mdi-map-marker" size="xs" color="white" />
+                      <Text className="text-[28rpx] text-white/90 truncate max-w-[160rpx]">
+                        {mainCampus?.name || '主校区'}
+                      </Text>
+                      <Icon
+                        name={showCampusPicker ? 'mdi-chevron-down' : 'mdi-chevron-right'}
+                        size="md"
+                        color="white"
+                      />
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
 
-          {/* 通知铃铛 - 绝对定位，避免被胶囊按钮遮挡 */}
-          <View
-            className="absolute right-[32rpx]"
-            style={{ top: `${navSafeHeight - 4}px` }}
-            onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
-          >
-            <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
-              <Icon name="mdi-bell-outline" size={44} color="white" />
-              {unreadCount > 0 && (
-                <View className="absolute top-[10rpx] right-[10rpx] w-[18rpx] h-[18rpx] bg-destructive rounded-full border-[2rpx] border-[hsl(var(--primary))]" />
-              )}
-            </View>
-          </View>
-
-          {/* ===== 主标题 ===== */}
-          <View className="px-[40rpx] pt-[24rpx] pb-0">
-            <Text
-              className="font-black text-white leading-tight tracking-tight"
-              style={{ fontSize: `${greetingSize}rpx` }}
-            >
-              你好~ {nickname || ROLE_LABEL[currentRole || 'teacher']}
-            </Text>
-          </View>
-
-          {/* ===== 统计卡片 + IP 形象 ===== */}
-          {isStaffRole(currentRole) ? (
-            <View className="stats-ip-wrapper">
-              <Image className="ip-mascot" src="/assets/images/ip-mascot.png" mode="aspectFit" />
-              <StatsOverview
-                period={statsPeriod}
-                onPeriodChange={handleStatsPeriodChange}
-                data={statsData}
-              />
-            </View>
-          ) : (
-            <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
-              <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
-              <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">
-                {ROLE_LABEL[currentRole || 'parent']}端首页
-              </Text>
-              <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
-                当前联调阶段先展示通用运营内容{'\n'}
-                可从消息通知和个人中心继续使用家长侧能力
-              </Text>
-              <View className="mt-[24rpx] flex gap-[16rpx] w-full">
-                <View
-                  className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
-                  onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
-                >
-                  <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
-                </View>
-                <View
-                  className="flex-1 rounded-full border border-[hsl(var(--primary))] px-[24rpx] py-[18rpx] flex items-center justify-center"
-                  onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
-                >
-                  <Text className="text-[24rpx] font-medium text-primary">个人中心</Text>
+              {/* 通知铃铛 - 绝对定位，避免被胶囊按钮遮挡 */}
+              <View
+                className="absolute right-[32rpx]"
+                style={{ top: `${navSafeHeight - 4}px` }}
+                onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+              >
+                <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
+                  <Icon name="mdi-bell-outline" size={44} color="white" />
+                  {unreadCount > 0 && (
+                    <View className="absolute top-[10rpx] right-[10rpx] w-[18rpx] h-[18rpx] bg-destructive rounded-full border-[2rpx] border-[hsl(var(--primary))]" />
+                  )}
                 </View>
               </View>
-            </View>
-          )}
-        </View>
 
-        <View className="relative z-[120] px-[32rpx] mt-[24rpx]">
-          {operationLoading ? (
-            <View className="rounded-[32rpx] bg-white/80 px-[28rpx] py-[36rpx] text-center">
-              <Text className="text-[24rpx] text-muted-foreground">运营内容加载中...</Text>
-            </View>
-          ) : null}
-
-          {/* 广告位 - 圆形胶囊样式（默认隐藏，联调后由后端控制展示） */}
-          {!operationLoading && operationContent.placements.banners.length > 0 ? (
-            <View className="flex flex-wrap gap-[16rpx]">
-              {operationContent.placements.banners.map((banner) => (
-                <View
-                  key={banner.id}
-                  className="inline-flex items-center gap-[8rpx] rounded-full bg-[hsl(var(--primary)/0.1)] px-[24rpx] py-[14rpx] active:bg-[hsl(var(--primary)/0.15)] transition-colors duration-200"
-                  onClick={() => void handleOperationTap(banner)}
+              {/* ===== 主标题 ===== */}
+              <View className="px-[40rpx] pt-[24rpx] pb-0">
+                <Text
+                  className="font-black text-white leading-tight tracking-tight"
+                  style={{ fontSize: `${greetingSize}rpx` }}
                 >
-                  <Icon name="mdi-bullhorn-outline" size="xs" className="text-primary shrink-0" />
-                  <Text className="text-[24rpx] font-semibold text-primary whitespace-nowrap">
-                    {banner.title}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {!operationLoading && operationError ? (
-            <View className="mt-[16rpx] rounded-[24rpx] bg-card px-[24rpx] py-[20rpx] text-center">
-              <Text className="text-[24rpx] text-muted-foreground">{operationError}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* ===== 金刚区（校长+教师显示） ===== */}
-        {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
-
-        {/* ===== Tab 切换栏 + 内容区 - 合并为同一白色容器，避免缝隙透出蓝色背景 ===== */}
-        <View className="relative z-[100] bg-card px-[32rpx] pb-[200rpx]">
-          {noticeItem ? (
-            <View
-              className="mt-[24rpx] mb-[8rpx] rounded-[24rpx] bg-[hsl(var(--primary)/0.08)] px-[24rpx] py-[20rpx] flex items-start gap-[16rpx]"
-              onClick={() => void handleOperationTap(noticeItem)}
-            >
-              <Icon name="mdi-bullhorn-outline" size="sm" className="text-primary shrink-0" />
-              <View className="flex-1 min-w-0">
-                <Text className="text-[26rpx] font-semibold text-foreground block">{noticeItem.title}</Text>
-                <Text className="text-[22rpx] text-muted-foreground mt-[4rpx]">
-                  {getOperationSummary(noticeItem)}
+                  你好~ {nickname || ROLE_LABEL[currentRole || 'teacher']}
                 </Text>
               </View>
-            </View>
-          ) : null}
 
-          {operationContent.placements.cards.length > 0 ? (
-            <View className="mt-[24rpx] flex flex-col gap-[20rpx]">
-              {operationContent.placements.cards.map((card) => (
+              {/* ===== 统计卡片 + IP 形象 ===== */}
+              {isStaffRole(currentRole) ? (
+                <View className="stats-ip-wrapper">
+                  <Image
+                    className="ip-mascot"
+                    src="/assets/images/ip-mascot.png"
+                    mode="aspectFit"
+                  />
+                  <StatsOverview
+                    period={statsPeriod}
+                    onPeriodChange={handleStatsPeriodChange}
+                    data={statsData}
+                  />
+                </View>
+              ) : (
+                <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
+                  <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
+                  <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">
+                    {ROLE_LABEL[currentRole || 'parent']}端首页
+                  </Text>
+                  <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
+                    当前联调阶段先展示通用运营内容{'\n'}
+                    可从消息通知和个人中心继续使用家长侧能力
+                  </Text>
+                  <View className="mt-[24rpx] flex gap-[16rpx] w-full">
+                    <View
+                      className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
+                      onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+                    >
+                      <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
+                    </View>
+                    <View
+                      className="flex-1 rounded-full border border-[hsl(var(--primary))] px-[24rpx] py-[18rpx] flex items-center justify-center"
+                      onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
+                    >
+                      <Text className="text-[24rpx] font-medium text-primary">个人中心</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View className="relative z-[120] px-[32rpx] mt-[24rpx]">
+              {operationLoading ? (
+                <View className="rounded-[32rpx] bg-white/80 px-[28rpx] py-[36rpx] text-center">
+                  <Text className="text-[24rpx] text-muted-foreground">运营内容加载中...</Text>
+                </View>
+              ) : null}
+
+              {/* 广告位 - 圆形胶囊样式（默认隐藏，联调后由后端控制展示） */}
+              {!operationLoading && operationContent.placements.banners.length > 0 ? (
+                <View className="flex flex-wrap gap-[16rpx]">
+                  {operationContent.placements.banners.map((banner) => (
+                    <View
+                      key={banner.id}
+                      className="inline-flex items-center gap-[8rpx] rounded-full bg-[hsl(var(--primary)/0.1)] px-[24rpx] py-[14rpx] active:bg-[hsl(var(--primary)/0.15)] transition-colors duration-200"
+                      onClick={() => void handleOperationTap(banner)}
+                    >
+                      <Icon
+                        name="mdi-bullhorn-outline"
+                        size="xs"
+                        className="text-primary shrink-0"
+                      />
+                      <Text className="text-[24rpx] font-semibold text-primary whitespace-nowrap">
+                        {banner.title}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {!operationLoading && operationError ? (
+                <View className="mt-[16rpx] rounded-[24rpx] bg-card px-[24rpx] py-[20rpx] text-center">
+                  <Text className="text-[24rpx] text-muted-foreground">{operationError}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* ===== 金刚区（校长+教师显示） ===== */}
+            {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
+
+            {/* ===== Tab 切换栏 + 内容区 - 合并为同一白色容器，避免缝隙透出蓝色背景 ===== */}
+            <View className="relative z-[100] bg-card px-[32rpx] pb-[200rpx]">
+              {noticeItem ? (
                 <View
-                  key={card.id}
-                  className="rounded-[28rpx] bg-card shadow-card border-[2rpx] border-[hsl(var(--border))] overflow-hidden"
-                  onClick={() => void handleOperationTap(card)}
+                  className="mt-[24rpx] mb-[8rpx] rounded-[24rpx] bg-[hsl(var(--primary)/0.08)] px-[24rpx] py-[20rpx] flex items-start gap-[16rpx]"
+                  onClick={() => void handleOperationTap(noticeItem)}
                 >
-                  {card.coverImageUrl ? (
-                    <Image className="w-full h-[220rpx]" src={card.coverImageUrl} mode="aspectFill" />
-                  ) : null}
-                  <View className="px-[24rpx] py-[24rpx]">
-                    <Text className="text-[30rpx] font-bold text-foreground block">{card.title}</Text>
-                    <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] line-clamp-2">
-                      {getOperationSummary(card)}
+                  <Icon name="mdi-bullhorn-outline" size="sm" className="text-primary shrink-0" />
+                  <View className="flex-1 min-w-0">
+                    <Text className="text-[26rpx] font-semibold text-foreground block">
+                      {noticeItem.title}
+                    </Text>
+                    <Text className="text-[22rpx] text-muted-foreground mt-[4rpx]">
+                      {getOperationSummary(noticeItem)}
                     </Text>
                   </View>
                 </View>
-              ))}
-            </View>
-          ) : null}
+              ) : null}
 
-          <View className="flex items-baseline gap-[24rpx] -mx-[32rpx] px-[32rpx] py-[24rpx]">
-            {TAB_OPTIONS.map((tab) => (
-              <View
-                key={tab.key}
-                className={homeSwiperCurrent === getHomeTabIndex(tab.key) ? 'tab-item-v14 active' : 'tab-item-v14'}
-                onClick={() => handleHomeTabChange(tab.key)}
-              >
-                <Text>{tab.label}</Text>
-                {tab.badge && tab.badge > 0 && (
-                  <View className="inline-block bg-destructive text-white text-[18rpx] font-bold px-[8rpx] rounded-[16rpx] min-w-[28rpx] h-[28rpx] leading-[28rpx] text-center ml-[4rpx]">
-                    <Text className="text-white text-[18rpx]">{tab.badge}</Text>
+              {operationContent.placements.cards.length > 0 ? (
+                <View className="mt-[24rpx] flex flex-col gap-[20rpx]">
+                  {operationContent.placements.cards.map((card) => (
+                    <View
+                      key={card.id}
+                      className="rounded-[28rpx] bg-card shadow-card border-[2rpx] border-[hsl(var(--border))] overflow-hidden"
+                      onClick={() => void handleOperationTap(card)}
+                    >
+                      {card.coverImageUrl ? (
+                        <Image
+                          className="w-full h-[220rpx]"
+                          src={card.coverImageUrl}
+                          mode="aspectFill"
+                        />
+                      ) : null}
+                      <View className="px-[24rpx] py-[24rpx]">
+                        <Text className="text-[30rpx] font-bold text-foreground block">
+                          {card.title}
+                        </Text>
+                        <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] line-clamp-2">
+                          {getOperationSummary(card)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <View className="flex items-baseline gap-[24rpx] overflow-x-hidden py-[24rpx]">
+                {TAB_OPTIONS.map((tab) => (
+                  <View
+                    key={tab.key}
+                    className={
+                      homeSwiperCurrent === getHomeTabIndex(tab.key)
+                        ? 'tab-item-v14 active'
+                        : 'tab-item-v14'
+                    }
+                    onClick={() => handleHomeTabChange(tab.key)}
+                  >
+                    <Text>{tab.label}</Text>
+                    {tab.badge && tab.badge > 0 && (
+                      <View className="inline-block bg-destructive text-white text-[18rpx] font-bold px-[8rpx] rounded-[16rpx] min-w-[28rpx] h-[28rpx] leading-[28rpx] text-center ml-[4rpx]">
+                        <Text className="text-white text-[18rpx]">{tab.badge}</Text>
+                      </View>
+                    )}
                   </View>
-                )}
+                ))}
               </View>
-            ))}
-          </View>
 
-          {/* ===== Tab 内容区 ===== */}
-          {isStaffRole(currentRole) && (
-            <View onClick={() => scheduleHomeSwiperMeasure(getHomeTabByIndex(homeSwiperCurrent))}>
-              <Swiper
-                current={homeSwiperCurrent}
-                duration={HOME_TAB_SWIPER_DURATION}
-                easingFunction="easeOutCubic"
-                style={{ height: `${homeSwiperHeight}px` }}
-                onChange={handleHomeSwiperChange}
-                onAnimationFinish={handleHomeSwiperFinish}
-              >
-                <SwiperItem itemId="schedule">
-                  <View id="home-tab-panel-schedule">
-                    <TodayScheduleCard schedules={schedules} title="" />
-                  </View>
-                </SwiperItem>
-                <SwiperItem itemId="todo">
-                  <View id="home-tab-panel-todo" className="pt-[24rpx]">
-                    <TodoList items={todoItems} />
-                  </View>
-                </SwiperItem>
-                <SwiperItem itemId="recent">
-                  <View id="home-tab-panel-recent" className="pt-[24rpx]">
-                    <LessonConsumptionList
-                      sections={recentSections}
-                      emptyText="暂无消课记录"
-                      footerText="查看更多"
-                      onFooterClick={() =>
-                        Taro.navigateTo({ url: '/package-teacher/pages/attendance/index' })
-                      }
-                    />
-                  </View>
-                </SwiperItem>
-              </Swiper>
+              {/* ===== Tab 内容区 ===== */}
+              {isStaffRole(currentRole) && (
+                <View
+                  onClick={() => scheduleHomeSwiperMeasure(getHomeTabByIndex(homeSwiperCurrent))}
+                >
+                  <Swiper
+                    current={homeSwiperCurrent}
+                    duration={HOME_TAB_SWIPER_DURATION}
+                    easingFunction="easeOutCubic"
+                    style={{ height: `${homeSwiperHeight}px` }}
+                    onChange={handleHomeSwiperChange}
+                    onAnimationFinish={handleHomeSwiperFinish}
+                  >
+                    <SwiperItem itemId="schedule">
+                      <View id="home-tab-panel-schedule">
+                        <TodayScheduleCard schedules={schedules} title="" />
+                      </View>
+                    </SwiperItem>
+                    <SwiperItem itemId="todo">
+                      <View id="home-tab-panel-todo" className="pt-[24rpx]">
+                        <TodoList items={todoItems} />
+                      </View>
+                    </SwiperItem>
+                    <SwiperItem itemId="recent">
+                      <View id="home-tab-panel-recent" className="pt-[24rpx]">
+                        <LessonConsumptionList
+                          sections={recentSections}
+                          emptyText="暂无消课记录"
+                          footerText="查看更多"
+                          onFooterClick={() =>
+                            Taro.navigateTo({ url: '/package-teacher/pages/attendance/index' })
+                          }
+                        />
+                      </View>
+                    </SwiperItem>
+                  </Swiper>
+                </View>
+              )}
             </View>
-          )}
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </View>
 
       {/* ===== 校区下拉菜单（fixed 定位避免被 ScrollView 裁剪） ===== */}
       {showCampusPicker && (

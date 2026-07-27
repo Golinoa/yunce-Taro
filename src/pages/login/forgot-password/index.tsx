@@ -3,11 +3,8 @@ import Taro from '@tarojs/taro';
 import React, { useCallback, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
+import { preparePasswordReset, resetPasswordByEmailCode } from '@/services/auth';
 import { ACCOUNT_RULE_TEXT, isAccountFormatValid, sanitizeAccountInput } from '@/utils/account';
-import {
-  preparePasswordReset,
-  resetPasswordByEmailCode,
-} from '@/services/auth';
 
 const MIN_PASSWORD_LENGTH = 6;
 const DEMO_CODE_HINT = '演示环境验证码为 123456';

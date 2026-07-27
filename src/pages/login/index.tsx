@@ -11,7 +11,13 @@ import Icon from '@/components/Icon';
 import LoginDecisionDialog from '@/components/LoginDecisionDialog';
 import LoginFlowPopover from '@/components/LoginFlowPopover';
 import LoginIssueSheet from '@/components/LoginIssueSheet';
-import { authCapabilities, checkLoginAccount, prepareEmailLogin, testAccounts, testPassword } from '@/services/auth';
+import {
+  authCapabilities,
+  checkLoginAccount,
+  prepareEmailLogin,
+  testAccounts,
+  testPassword,
+} from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import { ACCOUNT_RULE_TEXT, isAccountFormatValid, sanitizeAccountInput } from '@/utils/account';
 import { useAuth } from '@/utils/auth';
@@ -107,12 +113,9 @@ const Login: React.FC = () => {
     setDialogState(INITIAL_DIALOG_STATE);
   }, []);
 
-  const openDialog = useCallback(
-    (nextState: Omit<DialogState, 'visible'>) => {
-      setDialogState({ visible: true, ...nextState });
-    },
-    [],
-  );
+  const openDialog = useCallback((nextState: Omit<DialogState, 'visible'>) => {
+    setDialogState({ visible: true, ...nextState });
+  }, []);
 
   const executeWechatLogin = useCallback(async () => {
     if (wechatSubmitting) return;
@@ -167,7 +170,9 @@ const Login: React.FC = () => {
 
     if (error) {
       Taro.showToast({
-        title: error.message || (authCapabilities.supportsEmailCodeLogin ? '验证码错误' : UNSUPPORTED_LOGIN_MESSAGE),
+        title:
+          error.message ||
+          (authCapabilities.supportsEmailCodeLogin ? '验证码错误' : UNSUPPORTED_LOGIN_MESSAGE),
         icon: 'none',
       });
       setActivePopover('code');
@@ -177,38 +182,38 @@ const Login: React.FC = () => {
     Taro.setStorageSync('justLoggedIn', 'true');
   }, [emailCodeValue, emailSubmitting, resolvedEmail, signInWithEmailCode]);
 
-  const measureLoginLayout = useCallback(
-    (): Promise<{ inputRect: LoginInputRect | null; buttonRect: LoginInputRect | null }> => {
-      return new Promise((resolve) => {
-        const query = Taro.createSelectorQuery();
-        query.select('#login-input-trigger').boundingClientRect();
-        query.select('#login-primary-trigger').boundingClientRect();
-        query.exec((res) => {
-          const nextInputRect = res?.[0]
-            ? {
-                left: res[0].left,
-                top: res[0].top,
-                width: res[0].width,
-                height: res[0].height,
-              }
-            : null;
-          const nextButtonRect = res?.[1]
-            ? {
-                left: res[1].left,
-                top: res[1].top,
-                width: res[1].width,
-                height: res[1].height,
-              }
-            : null;
-          resolve({
-            inputRect: nextInputRect,
-            buttonRect: nextButtonRect,
-          });
+  const measureLoginLayout = useCallback((): Promise<{
+    inputRect: LoginInputRect | null;
+    buttonRect: LoginInputRect | null;
+  }> => {
+    return new Promise((resolve) => {
+      const query = Taro.createSelectorQuery();
+      query.select('#login-input-trigger').boundingClientRect();
+      query.select('#login-primary-trigger').boundingClientRect();
+      query.exec((res) => {
+        const nextInputRect = res?.[0]
+          ? {
+              left: res[0].left,
+              top: res[0].top,
+              width: res[0].width,
+              height: res[0].height,
+            }
+          : null;
+        const nextButtonRect = res?.[1]
+          ? {
+              left: res[1].left,
+              top: res[1].top,
+              width: res[1].width,
+              height: res[1].height,
+            }
+          : null;
+        resolve({
+          inputRect: nextInputRect,
+          buttonRect: nextButtonRect,
         });
       });
-    },
-    [],
-  );
+    });
+  }, []);
 
   const handleOpenCurrentPopover = useCallback(async () => {
     const { inputRect: nextInputRect, buttonRect: nextButtonRect } = await measureLoginLayout();
@@ -520,14 +525,7 @@ const Login: React.FC = () => {
     }
     if (emailStep === 'email') return '下一步';
     return emailSubmitting ? '登录中...' : '登录';
-  }, [
-    accountStep,
-    accountSubmitting,
-    currentMethod,
-    emailStep,
-    emailSubmitting,
-    wechatSubmitting,
-  ]);
+  }, [accountStep, accountSubmitting, currentMethod, emailStep, emailSubmitting, wechatSubmitting]);
 
   const inputSummary = useMemo(() => {
     if (currentMethod === 'account') {
@@ -661,9 +659,7 @@ const Login: React.FC = () => {
           className={cn(
             'h-[104rpx] rounded-full flex items-center justify-center mb-[24rpx]',
             currentMethod === 'wechat' ? '-mt-[108rpx]' : 'mt-0',
-            currentMethod === 'wechat'
-              ? 'bg-gradient-wechat shadow-wechat-btn'
-              : '',
+            currentMethod === 'wechat' ? 'bg-gradient-wechat shadow-wechat-btn' : '',
             'active:opacity-90',
             currentMethod !== 'wechat' && 'pointer-events-none opacity-0',
             (wechatSubmitting || accountSubmitting || emailSubmitting) && 'opacity-60',
@@ -671,12 +667,7 @@ const Login: React.FC = () => {
           onClick={handlePrimaryAction}
         >
           {currentMethod === 'wechat' ? (
-            <Text
-              className={cn(
-                'text-[34rpx] font-semibold',
-                'text-white',
-              )}
-            >
+            <Text className={cn('text-[34rpx] font-semibold', 'text-white')}>
               {primaryButtonText}
             </Text>
           ) : null}
@@ -711,7 +702,7 @@ const Login: React.FC = () => {
           </Text>
         </View>
       </View>
-      
+
       {isMockMode ? (
         <View className="relative z-10 px-[48rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))]">
           <View className="bg-card/80 rounded-[20rpx] px-[24rpx] py-[20rpx]">

@@ -120,7 +120,10 @@ const Subjects: React.FC = () => {
       try {
         const success = await deleteSubject(id);
         if (!success) {
-          Taro.showToast({ title: useCampusStore.getState().error || '删除科目失败', icon: 'none' });
+          Taro.showToast({
+            title: useCampusStore.getState().error || '删除科目失败',
+            icon: 'none',
+          });
           return;
         }
         Taro.showToast({ title: '删除成功', icon: 'success' });
@@ -291,7 +294,12 @@ const Subjects: React.FC = () => {
             )}
             onClick={canSubmit ? () => void handleAddSubmit() : undefined}
           >
-            <Text className={cn('text-base font-semibold', canSubmit ? 'text-white' : 'text-muted-foreground')}>
+            <Text
+              className={cn(
+                'text-base font-semibold',
+                canSubmit ? 'text-white' : 'text-muted-foreground',
+              )}
+            >
               {saving ? '添加中...' : '确认添加'}
             </Text>
           </View>

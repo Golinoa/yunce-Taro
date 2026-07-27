@@ -10,6 +10,7 @@ import React, { useCallback, useMemo } from 'react';
 import Icon from '@/components/Icon';
 import RoleCard from '@/components/RoleCard';
 import { useAuth } from '@/utils/auth';
+import { safeReLaunch } from '@/utils/navigation';
 
 const ROLE_DESCRIPTION: Record<string, string> = {
   principal: '管理机构、校区与教师',
@@ -34,7 +35,7 @@ const RoleSwitch: React.FC = () => {
         return;
       }
       Taro.showToast({ title: '切换成功', icon: 'success' });
-      Taro.reLaunch({ url: '/pages/home/index' });
+      await safeReLaunch('/pages/home/index');
     },
     [currentIdentity?.id, switchIdentity],
   );
@@ -95,7 +96,7 @@ const RoleSwitch: React.FC = () => {
           )}
           onClick={handleAddIdentity}
         >
-          <Icon name="plus" size={32} className="text-primary mr-[12rpx]" />
+          <Icon name="mdi-plus" size={32} className="text-primary mr-[12rpx]" />
           <Text className="text-[30rpx] font-medium text-primary">添加新身份</Text>
         </View>
       </View>

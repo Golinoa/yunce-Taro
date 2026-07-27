@@ -53,7 +53,7 @@ export interface QuickEntry {
 export interface TodoItemData {
   id: string;
   title: string;
-  type: 'lesson' | 'recharge' | 'meeting';
+  type: 'alert' | 'lesson' | 'recharge' | 'meeting';
   time: string;
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
@@ -67,13 +67,7 @@ export interface RecentGroupData {
   status: 'normal' | 'warning';
 }
 
-export type OperationActionType =
-  | 'NONE'
-  | 'PAGE'
-  | 'TAB'
-  | 'WEBVIEW'
-  | 'ACTIVITY'
-  | 'MINI_PROGRAM';
+export type OperationActionType = 'NONE' | 'PAGE' | 'TAB' | 'WEBVIEW' | 'ACTIVITY' | 'MINI_PROGRAM';
 
 export interface OperationActionConfigData {
   type: OperationActionType;
@@ -120,14 +114,54 @@ export interface HomeOperationContentData {
 }
 
 export const HOME_QUICK_ENTRIES: QuickEntry[] = [
-  { label: '课时充值', icon: 'mdi-cash-plus', color: 'icon-glass-red', url: '/package-course/pages/package-form/index' },
-  { label: '添加学员', icon: 'mdi-account-plus', color: 'icon-glass-orange', url: '/package-student/pages/student-form/index' },
-  { label: '考勤记录', icon: 'mdi-clipboard-text', color: 'icon-glass-blue', url: '/package-teacher/pages/attendance/index' },
-  { label: '试听记录', icon: 'mdi-clock-outline', color: 'icon-glass-purple', url: '/package-student/pages/student-form/index' },
-  { label: '课时套餐', icon: 'mdi-package-variant', color: 'icon-glass-red', url: '/package-course/pages/course-packages/index' },
-  { label: '班级管理', icon: 'mdi-school', color: 'icon-glass-blue', url: '/package-course/pages/classes/index' },
-  { label: '教师管理', icon: 'mdi-account-supervisor', color: 'icon-glass-purple', url: '/package-teacher/pages/teacher-list/index' },
-  { label: '校区设置', icon: 'mdi-map-marker', color: 'icon-glass-violet', url: '/package-settings/pages/campus-settings/index' },
+  {
+    label: '课时充值',
+    icon: 'mdi-cash-plus',
+    color: 'icon-glass-red',
+    url: '/package-course/pages/package-form/index',
+  },
+  {
+    label: '添加学员',
+    icon: 'mdi-account-plus',
+    color: 'icon-glass-orange',
+    url: '/package-student/pages/student-form/index',
+  },
+  {
+    label: '考勤记录',
+    icon: 'mdi-clipboard-text',
+    color: 'icon-glass-blue',
+    url: '/package-teacher/pages/attendance/index',
+  },
+  {
+    label: '试听记录',
+    icon: 'mdi-clock-outline',
+    color: 'icon-glass-purple',
+    url: '/package-student/pages/student-form/index',
+  },
+  {
+    label: '课时套餐',
+    icon: 'mdi-package-variant',
+    color: 'icon-glass-red',
+    url: '/package-course/pages/course-packages/index',
+  },
+  {
+    label: '班级管理',
+    icon: 'mdi-school',
+    color: 'icon-glass-blue',
+    url: '/package-course/pages/classes/index',
+  },
+  {
+    label: '教师管理',
+    icon: 'mdi-account-supervisor',
+    color: 'icon-glass-purple',
+    url: '/package-teacher/pages/teacher-list/index',
+  },
+  {
+    label: '校区设置',
+    icon: 'mdi-map-marker',
+    color: 'icon-glass-violet',
+    url: '/package-settings/pages/campus-settings/index',
+  },
 ];
 
 const BASE_HOME_OPERATION_CONTENT: HomeOperationContentData = {
@@ -154,7 +188,8 @@ function buildHomeOperationContent(role?: string | null): HomeOperationContentDa
           {
             id: 'banner-parent-lessons',
             title: '本周上课提醒',
-            imageUrl: 'https://dummyimage.com/750x320/8bc6ec/ffffff&text=%E6%9C%AC%E5%91%A8%E4%B8%8A%E8%AF%BE%E6%8F%90%E9%86%92',
+            imageUrl:
+              'https://dummyimage.com/750x320/8bc6ec/ffffff&text=%E6%9C%AC%E5%91%A8%E4%B8%8A%E8%AF%BE%E6%8F%90%E9%86%92',
             summary: '查看孩子本周排课与到课情况',
             actionConfig: {
               type: 'TAB',
@@ -195,10 +230,10 @@ function buildHomeOperationContent(role?: string | null): HomeOperationContentDa
 }
 
 // 计算今日消课记录
-const todayLessons = LESSON_RECORDS.filter(r => r.date === todayStr && r.status === 'checked');
+const todayLessons = LESSON_RECORDS.filter((r) => r.date === todayStr && r.status === 'checked');
 const todayHours = todayLessons.reduce((sum, r) => sum + r.hours, 0);
 const todayAmount = todayLessons.reduce((sum, r) => {
-  const cls = CLASSES.find(c => c.id === r.classId);
+  const cls = CLASSES.find((c) => c.id === r.classId);
   return sum + (cls?.pricePerLesson || 0) * r.hours;
 }, 0);
 
@@ -208,22 +243,24 @@ weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
 const weekEnd = new Date(weekStart);
 weekEnd.setDate(weekEnd.getDate() + 7);
 
-const weekLessons = LESSON_RECORDS.filter(r => {
+const weekLessons = LESSON_RECORDS.filter((r) => {
   const d = new Date(r.date);
   return d >= weekStart && d < weekEnd && r.status === 'checked';
 });
 const weekHours = weekLessons.reduce((sum, r) => sum + r.hours, 0);
 const weekAmount = weekLessons.reduce((sum, r) => {
-  const cls = CLASSES.find(c => c.id === r.classId);
+  const cls = CLASSES.find((c) => c.id === r.classId);
   return sum + (cls?.pricePerLesson || 0) * r.hours;
 }, 0);
 
 // 计算本月消课记录
 const monthStart = `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}-01`;
-const monthLessons = LESSON_RECORDS.filter(r => r.date >= monthStart && r.date <= todayStr && r.status === 'checked');
+const monthLessons = LESSON_RECORDS.filter(
+  (r) => r.date >= monthStart && r.date <= todayStr && r.status === 'checked',
+);
 const monthHours = monthLessons.reduce((sum, r) => sum + r.hours, 0);
 const monthAmount = monthLessons.reduce((sum, r) => {
-  const cls = CLASSES.find(c => c.id === r.classId);
+  const cls = CLASSES.find((c) => c.id === r.classId);
   return sum + (cls?.pricePerLesson || 0) * r.hours;
 }, 0);
 
@@ -232,13 +269,13 @@ const lastWeekStart = new Date(weekStart);
 lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 const lastWeekEnd = new Date(weekStart);
 
-const lastWeekLessons = LESSON_RECORDS.filter(r => {
+const lastWeekLessons = LESSON_RECORDS.filter((r) => {
   const d = new Date(r.date);
   return d >= lastWeekStart && d < lastWeekEnd && r.status === 'checked';
 });
 const lastWeekHours = lastWeekLessons.reduce((sum, r) => sum + r.hours, 0);
 const lastWeekAmount = lastWeekLessons.reduce((sum, r) => {
-  const cls = CLASSES.find(c => c.id === r.classId);
+  const cls = CLASSES.find((c) => c.id === r.classId);
   return sum + (cls?.pricePerLesson || 0) * r.hours;
 }, 0);
 
@@ -259,13 +296,13 @@ function buildStatsFromRecords(records: LessonRecord[]): StatsData {
 const MOCK_STATS_BY_PERIOD: Record<StatsPeriod, StatsData> = {
   today: {
     checkinCount: todayLessons.length,
-    leaveCount: LESSON_RECORDS.filter(r => r.date === todayStr && r.status === 'leave').length,
+    leaveCount: LESSON_RECORDS.filter((r) => r.date === todayStr && r.status === 'leave').length,
     lessonHours: todayHours,
     lessonAmount: todayAmount,
   },
   week: {
     checkinCount: weekLessons.length,
-    leaveCount: LESSON_RECORDS.filter(r => {
+    leaveCount: LESSON_RECORDS.filter((r) => {
       const d = new Date(r.date);
       return d >= weekStart && d < weekEnd && r.status === 'leave';
     }).length,
@@ -274,7 +311,7 @@ const MOCK_STATS_BY_PERIOD: Record<StatsPeriod, StatsData> = {
   },
   lastWeek: {
     checkinCount: lastWeekLessons.length,
-    leaveCount: LESSON_RECORDS.filter(r => {
+    leaveCount: LESSON_RECORDS.filter((r) => {
       const d = new Date(r.date);
       return d >= lastWeekStart && d < lastWeekEnd && r.status === 'leave';
     }).length,
@@ -283,7 +320,9 @@ const MOCK_STATS_BY_PERIOD: Record<StatsPeriod, StatsData> = {
   },
   month: {
     checkinCount: monthLessons.length,
-    leaveCount: LESSON_RECORDS.filter(r => r.date >= monthStart && r.date <= todayStr && r.status === 'leave').length,
+    leaveCount: LESSON_RECORDS.filter(
+      (r) => r.date >= monthStart && r.date <= todayStr && r.status === 'leave',
+    ).length,
     lessonHours: monthHours,
     lessonAmount: monthAmount,
   },
@@ -292,10 +331,10 @@ const MOCK_STATS_BY_PERIOD: Record<StatsPeriod, StatsData> = {
 /** 根据用户ID获取教师信息 */
 export async function mockGetTeacher(userId: string) {
   await delay();
-  const user = USERS.find(u => u.id === userId);
+  const user = USERS.find((u) => u.id === userId);
   if (!user) return null;
 
-  const teacher = TEACHERS.find(t => t.userId === userId);
+  const teacher = TEACHERS.find((t) => t.userId === userId);
   if (!teacher) {
     const scope = getActorScope(userId);
     if (scope.role !== 'principal') return null;
@@ -352,7 +391,7 @@ export async function mockGetTodaySchedules(teacherId: string) {
 export async function mockGetRecentRecords(teacherId: string, limit = 5) {
   await delay();
   return filterLessonRecordsByActor(teacherId)
-    .filter(r => r.status === 'checked')
+    .filter((r) => r.status === 'checked')
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, limit);
 }
@@ -360,14 +399,13 @@ export async function mockGetRecentRecords(teacherId: string, limit = 5) {
 /** 获取学生的课时套餐 */
 export async function mockGetStudentPackages(studentId: string) {
   await delay();
-  return COURSE_PACKAGES.filter(pkg => pkg.studentId === studentId);
+  return COURSE_PACKAGES.filter((pkg) => pkg.studentId === studentId);
 }
 
 /** 获取教师所有学生的剩余课时总数 */
 export async function mockGetTotalRemainingHours(teacherId: string) {
   await delay();
-  return filterStudentsByActor(teacherId)
-    .reduce((sum, s) => sum + s.remainingHours, 0);
+  return filterStudentsByActor(teacherId).reduce((sum, s) => sum + s.remainingHours, 0);
 }
 
 /** 获取未读通知数 */
@@ -380,7 +418,9 @@ export async function mockGetUnreadCount(_userId: string) {
 /** 获取今日已消课数 */
 export async function mockGetTodayRecordCount(teacherId: string) {
   await delay();
-  const visibleRecordIds = new Set(filterLessonRecordsByActor(teacherId).map((record) => record.id));
+  const visibleRecordIds = new Set(
+    filterLessonRecordsByActor(teacherId).map((record) => record.id),
+  );
   return todayLessons.filter((record) => visibleRecordIds.has(record.id)).length;
 }
 
@@ -466,7 +506,10 @@ export async function mockGetRecentGroups(teacherId: string): Promise<RecentGrou
         name: cls.name,
         date: lastDate || '',
         count,
-        status: count < Math.max(1, Math.floor(cls.studentCount / 2)) ? 'warning' as const : 'normal' as const,
+        status:
+          count < Math.max(1, Math.floor(cls.studentCount / 2))
+            ? ('warning' as const)
+            : ('normal' as const),
       };
     })
     .sort((a, b) => b.count - a.count)
@@ -478,23 +521,23 @@ export async function mockGetRecentGroups(teacherId: string): Promise<RecentGrou
 /** 获取家长的学生列表 */
 export async function mockGetStudentsByParent(parentId: string) {
   await delay();
-  return STUDENTS.filter(s => s.parentId === parentId);
+  return STUDENTS.filter((s) => s.parentId === parentId);
 }
 
 /** 获取学生的排课 */
 export async function mockGetSchedulesByStudent(studentId: string) {
   await delay();
   // 找到学生的班级，然后找到排课
-  const student = STUDENTS.find(s => s.id === studentId);
+  const student = STUDENTS.find((s) => s.id === studentId);
   if (!student) return [];
-  
-  return SCHEDULES.filter(s => student.classIds.includes(s.classId || ''));
+
+  return SCHEDULES.filter((s) => student.classIds.includes(s.classId || ''));
 }
 
 /** 获取学生的消课记录 */
 export async function mockGetRecordsByStudent(studentId: string, limit?: number) {
   await delay();
-  let records = LESSON_RECORDS.filter(r => r.studentId === studentId);
+  let records = LESSON_RECORDS.filter((r) => r.studentId === studentId);
   if (limit) records = records.slice(0, limit);
   return records;
 }
@@ -513,12 +556,12 @@ export async function mockGetHomeStats(period: StatsPeriod): Promise<StatsData> 
 export async function mockGetTodaySchedule(): Promise<typeof SCHEDULES> {
   await delay();
   const todayWeekday = new Date().getDay() || 7;
-  return SCHEDULES.filter(s => s.dayOfWeek === todayWeekday && s.status === 'scheduled');
+  return SCHEDULES.filter((s) => s.dayOfWeek === todayWeekday && s.status === 'scheduled');
 }
 
 export async function mockGetPendingLeaves(): Promise<number> {
   await delay();
-  return LEAVE_REQUESTS.filter(r => r.status === 'pending').length;
+  return LEAVE_REQUESTS.filter((r) => r.status === 'pending').length;
 }
 
 export async function mockGetQuickEntries(): Promise<QuickEntry[]> {
@@ -526,7 +569,9 @@ export async function mockGetQuickEntries(): Promise<QuickEntry[]> {
   return HOME_QUICK_ENTRIES;
 }
 
-export async function mockGetOperationContent(role?: string | null): Promise<HomeOperationContentData> {
+export async function mockGetOperationContent(
+  role?: string | null,
+): Promise<HomeOperationContentData> {
   await delay();
   return buildHomeOperationContent(role);
 }

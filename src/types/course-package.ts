@@ -114,6 +114,48 @@ export interface RechargeFormData {
 }
 
 /**
+ * 退费表单数据
+ */
+export interface RefundFormData {
+  student_id: string;
+  package_id: string;
+  refund_amount: number;
+  reason: string;
+  operator_id?: string;
+  operator_name?: string;
+}
+
+/**
+ * 课包流水类型
+ */
+export type PackageTransactionType = 'recharge' | 'refund';
+
+/**
+ * 课包流水记录
+ * 统一承载充值和退费，便于学生详情与全局流水页共用
+ */
+export interface PackageTransaction {
+  id: string;
+  type: PackageTransactionType;
+  student_id: string;
+  student_name: string;
+  package_id?: string;
+  package_name?: string;
+  purchased_hours?: number;
+  gift_hours?: number;
+  fee_amount?: number;
+  fee_method?: FeeMethod;
+  refund_amount?: number;
+  reason?: string;
+  note?: string;
+  operator_id?: string;
+  operator_name?: string;
+  purchased_remaining_snapshot?: number;
+  bonus_remaining_snapshot?: number;
+  created_at: string;
+}
+
+/**
  * FIFO 扣减结果（消课时返回，记录购买/赠送分别扣减了多少）
  */
 export interface DeductResult {

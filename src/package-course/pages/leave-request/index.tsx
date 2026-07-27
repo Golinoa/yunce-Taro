@@ -46,7 +46,10 @@ const LeaveRequestPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   // 审批操作中状态：记录正在处理的请假 id 与动作
-  const [processingId, setProcessingId] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null);
+  const [processingId, setProcessingId] = useState<{
+    id: string;
+    action: 'approve' | 'reject';
+  } | null>(null);
 
   // ====== 家长视图状态 ======
   const [children, setChildren] = useState<Array<{ id: string; name: string }>>([]);
@@ -101,48 +104,54 @@ const LeaveRequestPage: React.FC = () => {
   const detailNotFound = isTeacher && Boolean(requestId) && !detailLeave && !loading && !errorMsg;
 
   // 教师审批
-  const handleApprove = useCallback(async (id: string) => {
-    // 防止重复点击
-    if (processingId) return;
-    const { confirm } = await Taro.showModal({
-      title: '确认同意',
-      content: '确认同意该请假申请？',
-    });
-    if (!confirm) return;
-    setProcessingId({ id, action: 'approve' });
-    try {
-      await leaveService.updateStatus(id, 'approved');
-      setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status: 'approved' } : l)));
-      Taro.showToast({ title: '已同意', icon: 'success' });
-    } catch (err) {
-      logError('approve leave', err);
-      Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
-    } finally {
-      setProcessingId(null);
-    }
-  }, [processingId]);
+  const handleApprove = useCallback(
+    async (id: string) => {
+      // 防止重复点击
+      if (processingId) return;
+      const { confirm } = await Taro.showModal({
+        title: '确认同意',
+        content: '确认同意该请假申请？',
+      });
+      if (!confirm) return;
+      setProcessingId({ id, action: 'approve' });
+      try {
+        await leaveService.updateStatus(id, 'approved');
+        setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status: 'approved' } : l)));
+        Taro.showToast({ title: '已同意', icon: 'success' });
+      } catch (err) {
+        logError('approve leave', err);
+        Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [processingId],
+  );
 
-  const handleReject = useCallback(async (id: string) => {
-    // 防止重复点击
-    if (processingId) return;
-    const { confirm } = await Taro.showModal({
-      title: '确认拒绝',
-      content: '确认拒绝该请假申请？',
-      confirmColor: '#ef4444',
-    });
-    if (!confirm) return;
-    setProcessingId({ id, action: 'reject' });
-    try {
-      await leaveService.updateStatus(id, 'rejected');
-      setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status: 'rejected' } : l)));
-      Taro.showToast({ title: '已拒绝', icon: 'success' });
-    } catch (err) {
-      logError('reject leave', err);
-      Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
-    } finally {
-      setProcessingId(null);
-    }
-  }, [processingId]);
+  const handleReject = useCallback(
+    async (id: string) => {
+      // 防止重复点击
+      if (processingId) return;
+      const { confirm } = await Taro.showModal({
+        title: '确认拒绝',
+        content: '确认拒绝该请假申请？',
+        confirmColor: '#ef4444',
+      });
+      if (!confirm) return;
+      setProcessingId({ id, action: 'reject' });
+      try {
+        await leaveService.updateStatus(id, 'rejected');
+        setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status: 'rejected' } : l)));
+        Taro.showToast({ title: '已拒绝', icon: 'success' });
+      } catch (err) {
+        logError('reject leave', err);
+        Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [processingId],
+  );
 
   // 家长提交请假
   const handleSubmit = useCallback(async () => {
@@ -250,7 +259,7 @@ const LeaveRequestPage: React.FC = () => {
       <PageContainer>
         <View className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center gap-[32rpx] px-8">
           <Empty
-            icon="mdi-calendar-remove-outline"
+            icon="mdi-close"
             description="未找到对应的请假申请"
             actionText="返回上一页"
             onAction={() => void Taro.navigateBack()}

@@ -86,7 +86,8 @@ const SubCampus: React.FC = () => {
   const submitBlockedReason = useMemo(() => {
     if (!form.name.trim()) return '请输入校区名称';
     if (form.name.trim().length > 30) return '校区名称最多 30 个字';
-    if (form.phone.trim() && !/^1[3-9]\d{9}$/.test(form.phone.trim())) return '请输入正确的联系电话';
+    if (form.phone.trim() && !/^1[3-9]\d{9}$/.test(form.phone.trim()))
+      return '请输入正确的联系电话';
     if (form.type === 'partner' && !form.partnerMode) return '请选择合作模式';
     if (form.monthlyRent.trim()) {
       const rent = Number(form.monthlyRent);
@@ -214,7 +215,10 @@ const SubCampus: React.FC = () => {
         setShowDeleteConfirm(false);
         Taro.showToast({ title: '删除成功', icon: 'success' });
       } else {
-        Taro.showToast({ title: useCampusStore.getState().error || '主校区不可删除', icon: 'none' });
+        Taro.showToast({
+          title: useCampusStore.getState().error || '主校区不可删除',
+          icon: 'none',
+        });
       }
     } finally {
       setDeleting(false);
@@ -241,7 +245,10 @@ const SubCampus: React.FC = () => {
     try {
       const success = await setMainCampus(settingMainId);
       if (!success) {
-        Taro.showToast({ title: useCampusStore.getState().error || '设置主校区失败', icon: 'none' });
+        Taro.showToast({
+          title: useCampusStore.getState().error || '设置主校区失败',
+          icon: 'none',
+        });
         return;
       }
       setShowSetMainConfirm(false);
@@ -506,7 +513,12 @@ const SubCampus: React.FC = () => {
             )}
             onClick={canSubmit ? () => void handleAddSubmit() : undefined}
           >
-            <Text className={cn('text-base font-semibold', canSubmit ? 'text-white' : 'text-muted-foreground')}>
+            <Text
+              className={cn(
+                'text-base font-semibold',
+                canSubmit ? 'text-white' : 'text-muted-foreground',
+              )}
+            >
               {saving ? '保存中...' : '确认添加'}
             </Text>
           </View>
@@ -671,7 +683,12 @@ const SubCampus: React.FC = () => {
             )}
             onClick={canSubmit ? () => void handleEditSubmit() : undefined}
           >
-            <Text className={cn('text-base font-semibold', canSubmit ? 'text-white' : 'text-muted-foreground')}>
+            <Text
+              className={cn(
+                'text-base font-semibold',
+                canSubmit ? 'text-white' : 'text-muted-foreground',
+              )}
+            >
               {saving ? '保存中...' : '保存修改'}
             </Text>
           </View>
@@ -712,7 +729,12 @@ const SubCampus: React.FC = () => {
               )}
               onClick={deleting ? undefined : () => void handleConfirmDelete()}
             >
-              <Text className={cn('text-sm font-medium', deleting ? 'text-muted-foreground' : 'text-white')}>
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  deleting ? 'text-muted-foreground' : 'text-white',
+                )}
+              >
                 {deleting ? '删除中...' : '确认删除'}
               </Text>
             </View>
@@ -755,7 +777,12 @@ const SubCampus: React.FC = () => {
               )}
               onClick={settingMain ? undefined : () => void handleConfirmSetMain()}
             >
-              <Text className={cn('text-sm font-medium', settingMain ? 'text-muted-foreground' : 'text-white')}>
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  settingMain ? 'text-muted-foreground' : 'text-white',
+                )}
+              >
                 {settingMain ? '设置中...' : '确认'}
               </Text>
             </View>

@@ -7,8 +7,9 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Loading from '@/components/Loading';
 import type { Profile } from '@/types/profile';
-import { reportLocalDebug } from '@/utils/local-debug';
 import { useAuth } from '@/utils/auth';
+import { reportLocalDebug } from '@/utils/local-debug';
+import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 
 // 无需登录即可访问的页面
 const PUBLIC_PAGES = [
@@ -41,17 +42,6 @@ function hasValidStoredSession(): boolean {
   }
 }
 
-/** 判断路径是否为 TabBar 页 */
-function isTabBarPage(path: string): boolean {
-  const tabBarPages = [
-    '/pages/home/index',
-    '/pages/schedule/index',
-    '/pages/statistics/index',
-    '/pages/profile/index',
-  ];
-  return tabBarPages.some((p) => path.includes(p));
-}
-
 /** 跳转到登录页并记录来源路径 */
 let isRedirecting = false;
 function redirectToLogin(fromPath: string) {
@@ -61,9 +51,9 @@ function redirectToLogin(fromPath: string) {
   // TabBar 页面不能用 navigateTo 压一个登录页，否则左滑返回会回到受保护页，
   // 又被守卫重新打回登录页，形成“首页 <-> 登录页”来回跳。
   if (isTabBarPage(fromPath)) {
-    Taro.reLaunch({ url: LOGIN_PAGE });
+    void safeReLaunch(LOGIN_PAGE);
   } else {
-    Taro.redirectTo({ url: LOGIN_PAGE });
+    void Taro.redirectTo({ url: LOGIN_PAGE });
   }
   setTimeout(() => {
     isRedirecting = false;

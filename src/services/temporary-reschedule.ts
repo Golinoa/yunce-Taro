@@ -1,7 +1,7 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import { get, post } from '@/utils/request';
 import type { Class, Schedule, TemporaryReschedule } from '@/types';
+import { get, post } from '@/utils/request';
 
 const STORAGE_KEY = 'yunce-temporary-reschedules';
 const USE_MOCK =
@@ -78,9 +78,7 @@ function writeStorage(list: TemporaryReschedule[]) {
   Taro.setStorageSync(STORAGE_KEY, JSON.stringify(list));
 }
 
-function mapBackendTemporaryReschedule(
-  item: BackendTemporaryRescheduleItem,
-): TemporaryReschedule {
+function mapBackendTemporaryReschedule(item: BackendTemporaryRescheduleItem): TemporaryReschedule {
   return {
     id: item.id,
     teacher_id: item.teacherId,
@@ -104,8 +102,10 @@ function toMinutes(time: string): number {
 }
 
 function isTimeOverlap(left: LessonSlot, right: LessonSlot): boolean {
-  return toMinutes(left.startTime) < toMinutes(right.endTime) &&
-    toMinutes(right.startTime) < toMinutes(left.endTime);
+  return (
+    toMinutes(left.startTime) < toMinutes(right.endTime) &&
+    toMinutes(right.startTime) < toMinutes(left.endTime)
+  );
 }
 
 function buildLessonSlot(
@@ -212,7 +212,9 @@ export const temporaryRescheduleService = {
       created_at: now,
       updated_at: now,
     }));
-    const replaceKeys = new Set(nextItems.map((item) => `${item.schedule_id}__${item.source_date}`));
+    const replaceKeys = new Set(
+      nextItems.map((item) => `${item.schedule_id}__${item.source_date}`),
+    );
     const preserved = readStorage().filter(
       (item) => !replaceKeys.has(`${item.schedule_id}__${item.source_date}`),
     );

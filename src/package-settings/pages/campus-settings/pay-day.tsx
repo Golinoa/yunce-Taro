@@ -158,13 +158,19 @@ const PayDay: React.FC = () => {
       if (editingModel) {
         const success = await updateSalaryModel(editingModel.id, data);
         if (!success) {
-          Taro.showToast({ title: useCampusStore.getState().error || '保存模板失败', icon: 'none' });
+          Taro.showToast({
+            title: useCampusStore.getState().error || '保存模板失败',
+            icon: 'none',
+          });
           return;
         }
       } else {
         const result = await createSalaryModel(data);
         if (!result) {
-          Taro.showToast({ title: useCampusStore.getState().error || '创建模板失败', icon: 'none' });
+          Taro.showToast({
+            title: useCampusStore.getState().error || '创建模板失败',
+            icon: 'none',
+          });
           return;
         }
       }
@@ -191,7 +197,10 @@ const PayDay: React.FC = () => {
         if (success) {
           Taro.showToast({ title: '删除成功', icon: 'success' });
         } else {
-          Taro.showToast({ title: useCampusStore.getState().error || '默认模板不可删除', icon: 'none' });
+          Taro.showToast({
+            title: useCampusStore.getState().error || '默认模板不可删除',
+            icon: 'none',
+          });
         }
       } finally {
         setDeletingModelId('');
@@ -297,10 +306,7 @@ const PayDay: React.FC = () => {
               </Text>
             </View>
             <View
-              className={cn(
-                'w-[88rpx] h-[52rpx] rounded-full relative transition-all',
-                'bg-muted',
-              )}
+              className={cn('w-[88rpx] h-[52rpx] rounded-full relative transition-all', 'bg-muted')}
             >
               <View
                 className={cn(
@@ -408,9 +414,10 @@ const PayDay: React.FC = () => {
               💰
             </View>
             <View className="flex-1">
-                <Text className="text-[28rpx] font-semibold text-foreground">发薪配置概览</Text>
+              <Text className="text-[28rpx] font-semibold text-foreground">发薪配置概览</Text>
               <Text className="text-[24rpx] text-muted-foreground">
-                  <Text className="font-bold text-foreground">{salaryModels.length}</Text> 个模板已配置
+                <Text className="font-bold text-foreground">{salaryModels.length}</Text>{' '}
+                个模板已配置
               </Text>
             </View>
           </View>
@@ -429,11 +436,15 @@ const PayDay: React.FC = () => {
               <Text className="text-[20rpx] text-muted-foreground mt-[4rpx]">已配置底薪</Text>
             </View>
             <View className="flex-1 bg-background rounded-[16rpx] py-[16rpx] flex flex-col items-center">
-              <Text className="text-[32rpx] font-extrabold text-foreground">{totalTeachersUsingModels}</Text>
+              <Text className="text-[32rpx] font-extrabold text-foreground">
+                {totalTeachersUsingModels}
+              </Text>
               <Text className="text-[20rpx] text-muted-foreground mt-[4rpx]">关联教师</Text>
             </View>
             <View className="flex-1 bg-background rounded-[16rpx] py-[16rpx] flex flex-col items-center">
-              <Text className="text-[32rpx] font-extrabold text-destructive">{defaultModelCount}</Text>
+              <Text className="text-[32rpx] font-extrabold text-destructive">
+                {defaultModelCount}
+              </Text>
               <Text className="text-[20rpx] text-muted-foreground mt-[4rpx]">默认模板</Text>
             </View>
           </View>
@@ -468,7 +479,7 @@ const PayDay: React.FC = () => {
             <View className="flex flex-row items-center gap-[24rpx] bg-primary/8 rounded-[24rpx] p-[28rpx]">
               <View
                 className="w-[72rpx] h-[72rpx] rounded-full border-[3rpx] border-border bg-white flex items-center justify-center"
-                  onClick={savingPayDay ? undefined : () => setPickerDay(Math.max(1, pickerDay - 1))}
+                onClick={savingPayDay ? undefined : () => setPickerDay(Math.max(1, pickerDay - 1))}
               >
                 <Text className="text-[32rpx] text-primary font-bold">−</Text>
               </View>
@@ -478,7 +489,7 @@ const PayDay: React.FC = () => {
               </View>
               <View
                 className="w-[72rpx] h-[72rpx] rounded-full border-[3rpx] border-border bg-white flex items-center justify-center"
-                  onClick={savingPayDay ? undefined : () => setPickerDay(Math.min(28, pickerDay + 1))}
+                onClick={savingPayDay ? undefined : () => setPickerDay(Math.min(28, pickerDay + 1))}
               >
                 <Text className="text-[32rpx] text-primary font-bold">＋</Text>
               </View>
@@ -529,7 +540,10 @@ const PayDay: React.FC = () => {
                       setFixedDay(pickerDay);
                       await updatePayDaySettings({ fixedDay: pickerDay });
                       if (useCampusStore.getState().error) {
-                        Taro.showToast({ title: useCampusStore.getState().error || '保存失败', icon: 'none' });
+                        Taro.showToast({
+                          title: useCampusStore.getState().error || '保存失败',
+                          icon: 'none',
+                        });
                         return;
                       }
                       setShowPayDaySheet(false);
@@ -540,7 +554,12 @@ const PayDay: React.FC = () => {
                   }
             }
           >
-            <Text className={cn('text-base font-semibold', savingPayDay ? 'text-muted-foreground' : 'text-white')}>
+            <Text
+              className={cn(
+                'text-base font-semibold',
+                savingPayDay ? 'text-muted-foreground' : 'text-white',
+              )}
+            >
               {savingPayDay ? '保存中...' : '保存'}
             </Text>
           </View>
@@ -651,7 +670,9 @@ const PayDay: React.FC = () => {
               'rounded-2xl py-4 flex items-center justify-center mt-4',
               !modelSubmitBlockedReason && !savingModel ? 'bg-primary' : 'bg-muted',
             )}
-            onClick={!modelSubmitBlockedReason && !savingModel ? () => void handleSaveModel() : undefined}
+            onClick={
+              !modelSubmitBlockedReason && !savingModel ? () => void handleSaveModel() : undefined
+            }
           >
             <Text
               className={cn(

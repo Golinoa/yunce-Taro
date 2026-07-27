@@ -263,7 +263,10 @@ export function useClassDetail(): UseClassDetailReturn {
             }
           }
         },
-      });
+        fail: () => {
+          // 用户主动取消菜单时不提示错误
+        },
+      }).catch(() => null);
     },
     [classId, loadData, currentUserId, handleOpenTransfer, invalidateStudents],
   );

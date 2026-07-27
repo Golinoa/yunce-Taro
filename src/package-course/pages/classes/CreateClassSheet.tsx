@@ -8,7 +8,13 @@ import type { ClassColor, ClassIcon, ClassType, TeachMode } from '@/types/class'
 import type { CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
-import { WEEKDAYS, TEACH_MODES, PACKAGE_TYPE_LABELS, CLASS_ICONS, CLASS_GRADIENT } from './useClasses';
+import {
+  WEEKDAYS,
+  TEACH_MODES,
+  PACKAGE_TYPE_LABELS,
+  CLASS_ICONS,
+  CLASS_GRADIENT,
+} from './useClasses';
 
 interface CreateClassSheetProps {
   show: boolean;
@@ -159,7 +165,11 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
                   className={`w-[88rpx] h-[88rpx] rounded-[20rpx] flex items-center justify-center border-[2rpx] border-transparent ${selected ? 'ring-[6rpx] ring-primary border-primary' : ''}`}
                   onClick={() => setIcon(key)}
                 >
-                  <Icon name={CLASS_ICONS[key]} size={40} color={selected ? 'primary' : 'mutedForeground'} />
+                  <Icon
+                    name={CLASS_ICONS[key]}
+                    size={40}
+                    color={selected ? 'primary' : 'mutedForeground'}
+                  />
                 </View>
               );
             })}
@@ -407,38 +417,40 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
                 }
               />
             </View>
-            <ScrollView scrollY className="flex-1 px-10 py-4 max-h-[50vh]">
-              {filteredStudents.map((stu) => {
-                const checked = pickerTempIds.includes(stu.id);
-                return (
-                  <View
-                    key={stu.id}
-                    className="flex items-center gap-5 py-5 border-b-e8e8e8"
-                    onClick={() => togglePickerStudent(stu.id)}
-                  >
-                    <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" />
-                    <View className="flex-1">
-                      <View className="text-[26rpx] font-medium text-foreground">{stu.name}</View>
-                      {stu.phone && (
-                        <View className="text-[20rpx] text-muted-foreground mt-0_d5">
-                          {stu.phone}
-                        </View>
-                      )}
-                    </View>
+            <ScrollView scrollY className="flex-1 max-h-[50vh]">
+              <View className="px-10 py-4">
+                {filteredStudents.map((stu) => {
+                  const checked = pickerTempIds.includes(stu.id);
+                  return (
                     <View
-                      className={`w-[44rpx] h-[44rpx] rounded-md border-[4rpx] flex items-center justify-center flex-shrink-0 ${checked ? 'border-primary bg-primary' : 'bg-transparent'}`}
-                      style={checked ? undefined : { borderColor: '#D5E8E0' }}
+                      key={stu.id}
+                      className="flex items-center gap-5 py-5 border-b-e8e8e8"
+                      onClick={() => togglePickerStudent(stu.id)}
                     >
-                      {checked && <Text className="text-[28rpx] text-white font-bold">✓</Text>}
+                      <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" />
+                      <View className="flex-1">
+                        <View className="text-[26rpx] font-medium text-foreground">{stu.name}</View>
+                        {stu.phone && (
+                          <View className="text-[20rpx] text-muted-foreground mt-0_d5">
+                            {stu.phone}
+                          </View>
+                        )}
+                      </View>
+                      <View
+                        className={`w-[44rpx] h-[44rpx] rounded-md border-[4rpx] flex items-center justify-center flex-shrink-0 ${checked ? 'border-primary bg-primary' : 'bg-transparent'}`}
+                        style={checked ? undefined : { borderColor: '#D5E8E0' }}
+                      >
+                        {checked && <Text className="text-[28rpx] text-white font-bold">✓</Text>}
+                      </View>
                     </View>
+                  );
+                })}
+                {filteredStudents.length === 0 && (
+                  <View className="py-20 text-center">
+                    <Text className="text-[26rpx] text-muted-foreground">暂无匹配学员</Text>
                   </View>
-                );
-              })}
-              {filteredStudents.length === 0 && (
-                <View className="py-20 text-center">
-                  <Text className="text-[26rpx] text-muted-foreground">暂无匹配学员</Text>
-                </View>
-              )}
+                )}
+              </View>
             </ScrollView>
             <View className="py-6 px-10 pb-[68rpx] flex items-center gap-5 border-t-d5e8e0">
               <Text className="text-[26rpx] text-muted-foreground flex-1">
@@ -482,54 +494,62 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
                 <Text className="text-sm text-muted-foreground">✕</Text>
               </View>
             </View>
-            <ScrollView scrollY className="flex-1 px-10 py-6 max-h-[50vh]">
-              {packageTemplates.map((pkg) => {
-                const selected = selectedPackageId === pkg.id;
-                const typeLabel = PACKAGE_TYPE_LABELS[pkg.type] || '课时包';
-                return (
-                  <View
-                    key={pkg.id}
-                    className={`py-6 rounded-[24rpx] mb-4 border-[4rpx] ${selected ? 'border-primary bg-primary-bg' : ''}`}
-                    style={
-                      selected ? undefined : { backgroundColor: '#f5faf8', borderColor: '#D5E8E0' }
-                    }
-                    onClick={() => setSelectedPackageId(selected ? '' : pkg.id)}
-                  >
-                    <View className="flex items-center justify-between">
-                      <View className="flex-1">
-                        <View className="flex items-center gap-3">
-                          <Text className="text-md font-semibold text-foreground">{pkg.name}</Text>
-                          <View className="text-[20rpx] text-primary bg-primary-bg py-0_d5 px-3 rounded-lg font-medium">
-                            {typeLabel}
+            <ScrollView scrollY className="flex-1 max-h-[50vh]">
+              <View className="px-10 py-6">
+                {packageTemplates.map((pkg) => {
+                  const selected = selectedPackageId === pkg.id;
+                  const typeLabel = PACKAGE_TYPE_LABELS[pkg.type] || '课时包';
+                  return (
+                    <View
+                      key={pkg.id}
+                      className={`py-6 rounded-[24rpx] mb-4 border-[4rpx] ${selected ? 'border-primary bg-primary-bg' : ''}`}
+                      style={
+                        selected
+                          ? undefined
+                          : { backgroundColor: '#f5faf8', borderColor: '#D5E8E0' }
+                      }
+                      onClick={() => setSelectedPackageId(selected ? '' : pkg.id)}
+                    >
+                      <View className="flex items-center justify-between">
+                        <View className="flex-1">
+                          <View className="flex items-center gap-3">
+                            <Text className="text-md font-semibold text-foreground">
+                              {pkg.name}
+                            </Text>
+                            <View className="text-[20rpx] text-primary bg-primary-bg py-0_d5 px-3 rounded-lg font-medium">
+                              {typeLabel}
+                            </View>
                           </View>
-                        </View>
-                        <View className="text-[22rpx] text-muted-foreground mt-2">
-                          ¥{pkg.price} · {pkg.lesson_count}课时 · {pkg.duration}分钟/节
-                        </View>
-                        {pkg.description && (
-                          <View className="text-[20rpx] text-muted-foreground mt-1">
-                            {pkg.description}
+                          <View className="text-[22rpx] text-muted-foreground mt-2">
+                            ¥{pkg.price} · {pkg.lesson_count}课时 · {pkg.duration}分钟/节
                           </View>
-                        )}
+                          {pkg.description && (
+                            <View className="text-[20rpx] text-muted-foreground mt-1">
+                              {pkg.description}
+                            </View>
+                          )}
+                        </View>
+                        {selected && <Text className="text-[32rpx] text-primary font-bold">✓</Text>}
                       </View>
-                      {selected && <Text className="text-[32rpx] text-primary font-bold">✓</Text>}
+                    </View>
+                  );
+                })}
+                {packageTemplates.length === 0 && (
+                  <View className="py-20 text-center">
+                    <Text className="text-[26rpx] text-muted-foreground block mb-6">
+                      暂无课程包
+                    </Text>
+                    <View
+                      className="text-[26rpx] text-primary font-medium py-4 px-8 rounded-[28rpx] bg-primary-bg inline-block"
+                      onClick={() =>
+                        Taro.navigateTo({ url: '/package-course/pages/course-packages/index' })
+                      }
+                    >
+                      去添加课程包
                     </View>
                   </View>
-                );
-              })}
-              {packageTemplates.length === 0 && (
-                <View className="py-20 text-center">
-                  <Text className="text-[26rpx] text-muted-foreground block mb-6">暂无课程包</Text>
-                  <View
-                    className="text-[26rpx] text-primary font-medium py-4 px-8 rounded-[28rpx] bg-primary-bg inline-block"
-                    onClick={() =>
-                      Taro.navigateTo({ url: '/package-course/pages/course-packages/index' })
-                    }
-                  >
-                    去添加课程包
-                  </View>
-                </View>
-              )}
+                )}
+              </View>
             </ScrollView>
             <View className="py-6 px-10 pb-[68rpx] flex gap-4 border-t-d5e8e0">
               <View

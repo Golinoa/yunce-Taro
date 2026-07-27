@@ -1,7 +1,7 @@
 /**
  * 学生信息 (students 表)
  */
-import type { FeeMethod, PackageStatus } from './course-package';
+import type { FeeMethod, PackageStatus, PackageType } from './course-package';
 
 export interface Student {
   id: string;
@@ -25,6 +25,7 @@ export interface Student {
   course_packages?: {
     id: string;
     name: string;
+    type?: PackageType;
     total_hours: number;
     remaining_hours: number;
     purchased_remaining: number;

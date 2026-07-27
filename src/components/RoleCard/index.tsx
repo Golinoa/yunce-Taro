@@ -37,6 +37,12 @@ const ROLE_META: Record<
     borderClass: string;
   }
 > = {
+  admin: {
+    icon: 'crown',
+    colorClass: 'text-principal',
+    bgClass: 'bg-principal-10',
+    borderClass: 'border-principal',
+  },
   principal: {
     icon: 'crown',
     colorClass: 'text-principal',
@@ -44,6 +50,12 @@ const ROLE_META: Record<
     borderClass: 'border-principal',
   },
   teacher: {
+    icon: 'book-open',
+    colorClass: 'text-teacher',
+    bgClass: 'bg-teacher-10',
+    borderClass: 'border-teacher',
+  },
+  assistant: {
     icon: 'book-open',
     colorClass: 'text-teacher',
     bgClass: 'bg-teacher-10',
@@ -58,8 +70,10 @@ const ROLE_META: Record<
 };
 
 const ROLE_LABEL: Record<UserRole, string> = {
+  admin: '管理员',
   principal: '校长',
   teacher: '教师',
+  assistant: '助教',
   parent: '家长',
 };
 

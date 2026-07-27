@@ -30,6 +30,7 @@
 
 | 模块 | 组件 | 用途 |
 |------|------|------|
+| schedule | `SwappableScheduleCard` | 可左滑露出操作按钮的卡片容器（排课/约课列表） |
 | teacher | `TeacherCard` | 教师卡片（含薪资状态标签） |
 | teacher | `AddTeacherSheet` | 添加教师弹窗 |
 | teacher | `EditTeacherSheet` | 编辑教师弹窗 |
@@ -96,3 +97,9 @@ src/components/
 ```
 
 > 当前为扁平结构，新组件按模块分目录。待组件数量超过 40 个时启动分层迁移。
+
+---
+
+## 五、专项交互指南
+
+- [SwappableScheduleCard 交互开发指南](./swappable-schedule-card.md) — 排课/约课列表卡片左滑按钮的完整设计规范与代码示例

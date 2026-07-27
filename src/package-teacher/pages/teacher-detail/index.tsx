@@ -5,8 +5,8 @@ import dayjs from 'dayjs';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import Avatar from '@/components/Avatar';
 import Empty from '@/components/Empty';
-import EditTeacherSheet from '@/components/teacher/EditTeacherSheet';
 import Loading from '@/components/Loading';
+import EditTeacherSheet from '@/components/teacher/EditTeacherSheet';
 import PayConfirmSheet from '@/components/teacher/PayConfirmSheet';
 import ResignSheet from '@/components/teacher/ResignSheet';
 import { SalaryStatusTag } from '@/components/teacher/TeacherCard';
@@ -32,15 +32,8 @@ const ROLE_TAG_MAP: Record<string, string> = {
 
 const TeacherDetailPage: React.FC = () => {
   const { id } = useRouter().params;
-  const {
-    teachers,
-    resignTeacher,
-    confirmSalary,
-    setPendingPayAction,
-    fetchAll,
-    loading,
-    error,
-  } = useTeacherStore();
+  const { teachers, resignTeacher, confirmSalary, setPendingPayAction, fetchAll, loading, error } =
+    useTeacherStore();
 
   const teacher = useMemo(() => teachers.find((t) => t.id === id), [teachers, id]);
 
@@ -332,8 +325,15 @@ const TeacherDetailPage: React.FC = () => {
                 : '确认发放'}
           </View>
           <View
-            className={cn('action-btn-danger', (confirming || paying || resigning || editing) && 'opacity-60')}
-            onClick={confirming || paying || resigning || editing ? undefined : () => setShowResignSheet(true)}
+            className={cn(
+              'action-btn-danger',
+              (confirming || paying || resigning || editing) && 'opacity-60',
+            )}
+            onClick={
+              confirming || paying || resigning || editing
+                ? undefined
+                : () => setShowResignSheet(true)
+            }
           >
             {resigning ? '处理中...' : '标记离职'}
           </View>

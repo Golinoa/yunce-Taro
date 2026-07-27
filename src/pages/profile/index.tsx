@@ -1,11 +1,14 @@
 /**
  * 个人中心页 pages/profile/index
  *
- *  redesign 后遵循"卡片分类 + 避免入口重复"原则：
- *  - 高频教务操作（消课、学员、班级等）集中在首页金刚区与 Tab，本页不再堆砌
- *  - 教师视图：常用工具（工资/请假/通知/统计）+ 系统服务（设置/协议/帮助）
- *  - 家长视图：孩子课时卡片 + 孩子学习 + 我的服务
- *  - 底部统一提供客服咨询、服务中心入口
+ * 按参考设计稿重构：
+ * - 顶部沉浸式渐变头部 +「个人中心」标题 + 头像/手机号/我的资料
+ * - 4 列核心数据卡片（累计出勤/剩余次数/剩余时长/剩余储值）
+ * - 公众号关注引导卡片
+ * - 「我的约课」「我的服务」「系统管理」图标网格
+ * - 底部品牌关于入口
+ *
+ * 未实现入口统一使用 Toast「功能开发中」占位。
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
@@ -16,86 +19,39 @@ import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import ProfileAbout from '@/components/profile/ProfileAbout';
+import ProfileFollowCard from '@/components/profile/ProfileFollowCard';
 import ProfileGrid from '@/components/profile/ProfileGrid';
 import ProfileHeader from '@/components/profile/ProfileHeader';
-import ProfileMenu from '@/components/profile/ProfileMenu';
 import ProfileStats from '@/components/profile/ProfileStats';
-import ProfileSupport from '@/components/profile/ProfileSupport';
+import StoreOnboarding from '@/components/profile/StoreOnboarding';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
-import { studentService } from '@/services';
+import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
+import { markStepVisited } from '@/data/onboarding';
+import { onboardingService, studentService } from '@/services';
+import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
-import { isStaffRole, useAuth } from '@/utils/auth';
+import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import { withRouteGuard } from '@/utils/route-guard';
 
 // ============================================
-// 教师视图：常用工具配置
-// 注意：学员/班级/课包/消课等高频入口已在首页金刚区，此处不再重复
+// 角色标签映射
 // ============================================
-const TEACHER_TOOLS = [
-  {
-    label: '工资查询',
-    icon: 'mdi-cash-multiple' as const,
-    color: 'warning' as const,
-    url: '/package-teacher/pages/salary-detail/index',
-  },
-  {
-    label: '请假审批',
-    icon: 'mdi-calendar-heart' as const,
-    color: 'accent' as const,
-    url: '/package-course/pages/leave-request/index',
-  },
-  {
-    label: '消息通知',
-    icon: 'mdi-bell-outline' as const,
-    color: 'primary' as const,
-    url: '/pages/notifications/index',
-  },
-  {
-    label: '数据统计',
-    icon: 'mdi-chart-bar' as const,
-    color: 'info' as const,
-    url: '/pages/statistics/index',
-  },
-];
-
-// ============================================
-// 家长视图：孩子学习配置
-// ============================================
-const PARENT_CHILD_TOOLS = [
-  {
-    label: '学习记录',
-    icon: 'mdi-history' as const,
-    color: 'primary' as const,
-    url: '/package-course/pages/records/index',
-  },
-  {
-    label: '孩子课表',
-    icon: 'mdi-calendar-blank' as const,
-    color: 'info' as const,
-    url: '/package-course/pages/records/index',
-  },
-  {
-    label: '请假申请',
-    icon: 'mdi-calendar-heart' as const,
-    color: 'accent' as const,
-    url: '/package-course/pages/leave-request/index',
-  },
-];
-
 const ROLE_LABEL: Record<string, string> = {
+  admin: '管理员',
   principal: '校长',
   teacher: '教师',
+  assistant: '助教',
   parent: '家长',
 };
 
-const BIND_STATUS_LABEL: Record<string, string> = {
-  BOUND: '已绑定',
-  PENDING: '待确认',
-  UNBOUND: '未绑定',
-};
+// ============================================
+// 占位提示：未实现入口统一提示
+// ============================================
+const PLACEHOLDER_TIP = '功能开发中，敬请期待';
 
 const Profile: React.FC = () => {
-  const { profile, currentRole, currentIdentity, signOut } = useAuth();
+  const { profile, currentRole, currentIdentity } = useAuth();
   const isTeacher = isStaffRole(currentRole);
 
   // 家长端：学生列表与当前选中
@@ -110,6 +66,11 @@ const Profile: React.FC = () => {
   const [showRoleSheet, setShowRoleSheet] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [binding, setBinding] = useState(false);
+
+  // 店铺管理 onboarding 进度
+  const [storeProgress, setStoreProgress] = useState<StoreOnboardingProgress | null>(null);
+  const [loadingStoreProgress, setLoadingStoreProgress] = useState(false);
+  const [storeOnboardingHidden, setStoreOnboardingHidden] = useState<boolean | null>(null);
 
   // 加载家长绑定的学生
   const loadStudents = useCallback(async () => {
@@ -129,97 +90,52 @@ const Profile: React.FC = () => {
     }
   }, [profile, isTeacher]);
 
+  // 读取本地存储的 onboarding 隐藏状态
+  const loadStoreOnboardingHidden = useCallback(() => {
+    try {
+      const raw = Taro.getStorageSync(STORE_ONBOARDING_HIDDEN_KEY);
+      setStoreOnboardingHidden(raw === true ? true : raw === false ? false : null);
+    } catch {
+      setStoreOnboardingHidden(null);
+    }
+  }, []);
+
+  // 加载店铺管理 onboarding 进度
+  const loadStoreProgress = useCallback(async () => {
+    if (!isTeacher) return;
+    setLoadingStoreProgress(true);
+    try {
+      const progress = await onboardingService.getStoreProgress();
+      setStoreProgress(progress);
+      // 首次完成全部步骤后，自动标记为已隐藏
+      if (progress.completed === progress.total && storeOnboardingHidden === null) {
+        Taro.setStorageSync(STORE_ONBOARDING_HIDDEN_KEY, true);
+        setStoreOnboardingHidden(true);
+      }
+    } catch {
+      // 异常时降级为正常态（不阻断用户）
+      setStoreProgress(null);
+    } finally {
+      setLoadingStoreProgress(false);
+    }
+  }, [isTeacher, storeOnboardingHidden]);
+
   React.useEffect(() => {
     loadStudents();
-  }, [loadStudents]);
+    loadStoreOnboardingHidden();
+    loadStoreProgress();
+  }, [loadStudents, loadStoreOnboardingHidden, loadStoreProgress]);
 
   useDidShow(() => {
     loadStudents();
+    loadStoreOnboardingHidden();
+    loadStoreProgress();
   });
 
   const activeStudent = useMemo(
     () => students.find((s) => s.id === activeStudentId),
     [students, activeStudentId],
   );
-
-  const profileDetailItems = useMemo(() => {
-    if (currentRole === 'teacher' && profile?.teacher_profile) {
-      return [
-        {
-          label: '机构名称',
-          value: profile.teacher_profile.institution || currentIdentity?.organizationName || '未设置',
-        },
-        {
-          label: '教师邀请码',
-          value: profile.teacher_profile.invite_code || '未生成',
-        },
-        {
-          label: '学员数量',
-          value: `${profile.teacher_profile.student_count ?? 0} 名`,
-        },
-        {
-          label: '班级数量',
-          value: `${profile.teacher_profile.class_count ?? 0} 个`,
-        },
-      ];
-    }
-
-    if (currentRole === 'parent' && profile?.parent_profile) {
-      return [
-        {
-          label: '绑定学生',
-          value: profile.parent_profile.student_name || '暂未绑定',
-        },
-        {
-          label: '家长关系',
-          value: profile.parent_profile.relation || '未设置',
-        },
-        {
-          label: '绑定状态',
-          value: BIND_STATUS_LABEL[profile.parent_profile.bind_status || ''] || '未知',
-        },
-        {
-          label: '手机号',
-          value: profile.phone || '未设置',
-        },
-      ];
-    }
-
-    const commonItems = [
-      {
-        label: '手机号',
-        value: profile?.phone || '未设置',
-      },
-      {
-        label: '邮箱',
-        value: profile?.email || '未设置',
-      },
-    ].filter((item) => item.value !== '未设置');
-
-    return commonItems;
-  }, [currentIdentity?.organizationName, currentRole, profile]);
-
-  const totalHours = useMemo(
-    () => (activeStudent?.course_packages || []).reduce((s, p) => s + (p.total_hours || 0), 0),
-    [activeStudent],
-  );
-  const remainingHours = useMemo(
-    () => (activeStudent?.course_packages || []).reduce((s, p) => s + (p.remaining_hours || 0), 0),
-    [activeStudent],
-  );
-  const usedHours = totalHours - remainingHours;
-
-  // 退出登录
-  const handleSignOut = useCallback(async () => {
-    const { confirm } = await Taro.showModal({
-      title: '确认退出',
-      content: '退出后需要重新登录，确认退出吗？',
-      confirmColor: '#D94040',
-    });
-    if (!confirm) return;
-    await signOut();
-    Taro.reLaunch({ url: '/pages/login/index' });
-  }, [signOut]);
 
   // 绑定学生
   const handleBind = useCallback(async () => {
@@ -266,166 +182,346 @@ const Profile: React.FC = () => {
   // 统一跳转：有 url 则跳转，否则提示入口未配置
   const handleNavigate = useCallback((url: string) => {
     if (!url) {
-      Taro.showToast({ title: '页面入口未配置', icon: 'none' });
+      Taro.showToast({ title: PLACEHOLDER_TIP, icon: 'none' });
       return;
     }
     Taro.navigateTo({ url });
   }, []);
 
-  // 教师：常用工具
-  const teacherToolItems = useMemo(
-    () =>
-      TEACHER_TOOLS.map(({ url, ...item }) => ({
-        ...item,
-        onClick: () => handleNavigate(url),
-      })),
-    [handleNavigate],
+  // 占位提示
+  const handlePlaceholder = useCallback(() => {
+    Taro.showToast({ title: PLACEHOLDER_TIP, icon: 'none' });
+  }, []);
+
+  // 店铺管理 onboarding 步骤点击
+  const handleStoreStepClick = useCallback(
+    (step: StoreOnboardingStep) => {
+      // 点击即视为"已访问"该配置页面，引导目的达成
+      markStepVisited(step.key);
+      if (!step.route) {
+        handlePlaceholder();
+        return;
+      }
+      Taro.navigateTo({ url: step.route });
+    },
+    [handlePlaceholder],
   );
 
-  // 教师：系统服务菜单
-  const teacherServiceItems = useMemo(
+  // 店铺管理 onboarding 非步骤入口点击
+  const handleStoreExtraClick = useCallback(() => {
+    handlePlaceholder();
+  }, [handlePlaceholder]);
+
+  // 打开我的孩子弹窗（未绑定则打开绑定弹窗）
+  const handleMyChildren = useCallback(() => {
+    if (students.length === 0) {
+      setShowBindSheet(true);
+    } else {
+      setShowSwitchSheet(true);
+    }
+  }, [students.length]);
+
+  // 我的资料（暂无独立页）
+  const handleProfile = useCallback(() => {
+    Taro.showToast({ title: '资料编辑页开发中', icon: 'none' });
+  }, []);
+
+  // 公众号关注（暂无接入）
+  const handleFollow = useCallback(() => {
+    Taro.showToast({ title: '请关注对应服务号以接收消息', icon: 'none' });
+  }, []);
+
+  // 关于品牌
+  const handleAbout = useCallback(() => {
+    Taro.showToast({ title: '关于页面开发中', icon: 'none' });
+  }, []);
+
+  // 续费（暂无接入）
+  const handleRenew = useCallback(() => {
+    Taro.showToast({ title: '续费功能开发中', icon: 'none' });
+  }, []);
+
+  // ============================================
+  // 教师视图：店铺管理
+  // ============================================
+  const teacherStoreItems = useMemo(
     () => [
       {
-        label: '校区设置',
+        label: '门店管理',
         icon: 'mdi-office-building' as const,
-        color: 'primary' as const,
-        onClick: () => handleNavigate('/package-settings/pages/campus-settings/index'),
+        color: 'warning' as const,
+        onClick: handlePlaceholder,
       },
       {
-        label: '帮助中心',
+        label: '场地管理',
+        icon: 'mdi-map-marker' as const,
+        color: 'accent' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '员工管理',
+        icon: 'mdi-account-group' as const,
+        color: 'primary' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '课程管理',
+        icon: 'mdi-book-open-variant' as const,
+        color: 'info' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '卡种管理',
+        icon: 'mdi-cash' as const,
+        color: 'success' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '薪资管理',
+        icon: 'mdi-cash-multiple' as const,
+        color: 'warning' as const,
+        onClick: () => handleNavigate('/package-teacher/pages/salary-detail/index'),
+      },
+      {
+        label: '学员信箱',
+        icon: 'mdi-email' as const,
+        color: 'accent' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '促销工具',
+        icon: 'mdi-bullhorn-outline' as const,
+        color: 'primary' as const,
+        onClick: handlePlaceholder,
+      },
+    ],
+    [handleNavigate, handlePlaceholder],
+  );
+
+  // 教师视图：系统管理
+  const teacherSystemItems = useMemo(() => {
+    type SystemItem = {
+      label: string;
+      icon: string;
+      color?: 'primary' | 'accent' | 'warning' | 'info' | 'success' | 'destructive';
+      onClick: () => void;
+    };
+    const items: SystemItem[] = [
+      {
+        label: '使用帮助',
+        icon: 'mdi-help-circle',
+        color: 'accent',
+        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+      },
+      {
+        label: '平台客服',
+        icon: 'mdi-headset',
+        color: 'info',
+        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+      },
+      {
+        label: '消息通知',
+        icon: 'mdi-message-text-outline',
+        color: 'primary',
+        onClick: () => handleNavigate('/pages/notifications/index'),
+      },
+    ];
+    // 系统设置：所有角色可见，内部设置项按权限过滤
+    items.push({
+      label: '系统设置',
+      icon: 'mdi-cog',
+      color: 'destructive',
+      onClick: () => handleNavigate('/package-settings/pages/system-settings/index'),
+    });
+    return items;
+  }, [handleNavigate]);
+
+  // 教师视图：4 列数据（已接入的取真实数据，其余占位 0）
+  const teacherStats = useMemo(
+    () => [
+      {
+        label: '学员数量',
+        value: profile?.teacher_profile?.student_count ?? 0,
+        unit: '名',
+      },
+      { label: '班级数量', value: profile?.teacher_profile?.class_count ?? 0, unit: '个' },
+      { label: '累计出勤', value: 0, unit: '次' },
+      { label: '剩余课时', value: 0, unit: '节' },
+    ],
+    [profile?.teacher_profile?.student_count, profile?.teacher_profile?.class_count],
+  );
+
+  // ============================================
+  // 家长视图：我的约课
+  // ============================================
+  const parentBookingItems = useMemo(
+    () => [
+      {
+        label: '已预约',
+        icon: 'mdi-calendar-check' as const,
+        color: 'primary' as const,
+        onClick: () => handleNavigate('/pages/booking/index'),
+      },
+      {
+        label: '排队中',
+        icon: 'mdi-account-group-outline' as const,
+        color: 'warning' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '待评价',
+        icon: 'mdi-star-outline' as const,
+        color: 'accent' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '已取消',
+        icon: 'mdi-calendar-blank' as const,
+        color: 'info' as const,
+        onClick: handlePlaceholder,
+      },
+    ],
+    [handleNavigate, handlePlaceholder],
+  );
+
+  // 家长视图：我的服务
+  const parentServiceItems = useMemo(
+    () => [
+      {
+        label: '我的卡包',
+        icon: 'mdi-package-variant' as const,
+        color: 'primary' as const,
+        onClick: () => handleNavigate('/package-course/pages/course-packages/index'),
+      },
+      {
+        label: '我的合同',
+        icon: 'mdi-file-document-outline' as const,
+        color: 'warning' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '排行榜',
+        icon: 'mdi-trophy' as const,
+        color: 'accent' as const,
+        onClick: handlePlaceholder,
+      },
+      {
+        label: '课程足迹',
+        icon: 'mdi-calendar' as const,
+        color: 'info' as const,
+        onClick: () => handleNavigate('/package-course/pages/records/index'),
+      },
+      {
+        label: '积分中心',
+        icon: 'mdi-star' as const,
+        color: 'success' as const,
+        onClick: handlePlaceholder,
+      },
+    ],
+    [handleNavigate, handlePlaceholder],
+  );
+
+  // 家长视图：系统管理
+  const parentSystemItems = useMemo(
+    () => [
+      {
+        label: '使用帮助',
         icon: 'mdi-help-circle' as const,
+        color: 'accent' as const,
+        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+      },
+      {
+        label: '平台客服',
+        icon: 'mdi-headset' as const,
         color: 'info' as const,
         onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
       },
       {
-        label: '意见反馈',
-        icon: 'mdi-message-text' as const,
-        color: 'warning' as const,
-        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
-      },
-      {
-        label: '用户协议',
-        icon: 'mdi-file-document-outline' as const,
-        color: 'accent' as const,
-        onClick: () => handleNavigate('/pages/agreement/index?type=user'),
-      },
-      {
-        label: '隐私政策',
-        icon: 'mdi-shield-check' as const,
-        color: 'success' as const,
-        onClick: () => handleNavigate('/pages/agreement/index?type=privacy'),
-      },
-    ],
-    [handleNavigate],
-  );
-
-  // 家长：孩子学习
-  const parentChildItems = useMemo(
-    () =>
-      PARENT_CHILD_TOOLS.map(({ url, ...item }) => ({
-        ...item,
-        onClick: () => handleNavigate(url),
-      })),
-    [handleNavigate],
-  );
-
-  // 家长：我的服务菜单
-  const parentServiceItems = useMemo(
-    () => [
-      {
         label: '消息通知',
-        icon: 'mdi-bell-outline' as const,
+        icon: 'mdi-message-text-outline' as const,
         color: 'primary' as const,
         onClick: () => handleNavigate('/pages/notifications/index'),
       },
       {
-        label: '我的孩子',
-        icon: 'mdi-account-child' as const,
-        color: 'accent' as const,
-        extra: students.length > 0 ? `共 ${students.length} 名` : undefined,
-        onClick: () => setShowSwitchSheet(true),
-      },
-      {
-        label: '帮助中心',
-        icon: 'mdi-help-circle' as const,
-        color: 'info' as const,
-        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
-      },
-      {
-        label: '用户协议',
-        icon: 'mdi-file-document-outline' as const,
-        color: 'warning' as const,
-        onClick: () => handleNavigate('/pages/agreement/index?type=user'),
-      },
-      {
-        label: '隐私政策',
-        icon: 'mdi-shield-check' as const,
-        color: 'success' as const,
-        onClick: () => handleNavigate('/pages/agreement/index?type=privacy'),
+        label: '系统设置',
+        icon: 'mdi-cog' as const,
+        color: 'destructive' as const,
+        onClick: () => handleNavigate('/package-settings/pages/system-settings/index'),
       },
     ],
-    [handleNavigate, students.length],
+    [handleNavigate],
   );
 
-  const handleSettings = useCallback(() => {
-    if (isTeacher) {
-      Taro.navigateTo({ url: '/package-settings/pages/campus-settings/index' });
-    } else {
-      // 家长端暂无独立设置页，引导至帮助中心
-      Taro.navigateTo({ url: '/package-settings/pages/feedback/index' });
-    }
-  }, [isTeacher]);
-
-  const handleCustomerService = useCallback(() => {
-    // 客服功能暂未接入，引导至意见反馈页
-    Taro.navigateTo({ url: '/package-settings/pages/feedback/index' });
-  }, []);
-
-  const handleServiceCenter = useCallback(() => {
-    Taro.navigateTo({ url: '/package-settings/pages/feedback/index' });
-  }, []);
+  // 家长视图：4 列核心数据
+  const parentStats = useMemo(
+    () => [
+      { label: '累计出勤', value: 0, unit: '次' },
+      { label: '剩余次数', value: 0, unit: '次' },
+      { label: '剩余时长', value: 0, unit: '天' },
+      { label: '剩余储值', value: 0, unit: '元' },
+    ],
+    [],
+  );
 
   return (
     <PageContainer safeBottom>
       <View className="min-h-screen bg-background pb-[40rpx]">
-        {/* ====== 顶部用户信息 ====== */}
+        {/* ====== 顶部渐变头部 ====== */}
         <ProfileHeader
+          variant="gradient"
           avatarUrl={profile?.avatar_url}
           name={profile?.name || '用户'}
-          role={ROLE_LABEL[currentRole || 'teacher']}
-          orgName={currentIdentity?.organizationName || '云策教务'}
-          onSettings={handleSettings}
+          role={isTeacher ? ROLE_LABEL[currentRole || 'teacher'] : undefined}
+          phone={profile?.phone}
+          orgName={currentIdentity?.organizationName || BRAND_FALLBACK_ORG_NAME}
+          onSettings={handleProfile}
         />
 
-        {/* ====== 当前身份卡片 ====== */}
-        <View
-          className="mx-[32rpx] mt-[24rpx] mb-[24rpx] rounded-[32rpx] bg-card shadow-soft p-[28rpx] flex items-center justify-between active:bg-primary-5 transition-colors"
-          onClick={() => setShowRoleSheet(true)}
-        >
-          <View>
-            <Text className="text-[24rpx] text-muted-foreground mb-[6rpx]">当前身份</Text>
-            <Text className="text-[32rpx] font-bold text-foreground">
-              {currentIdentity?.organizationName || '云策教务'}
-            </Text>
-            <Text className="text-[24rpx] text-muted-foreground mt-[4rpx]">
-              {ROLE_LABEL[currentRole || 'teacher']} · 点击切换身份
-            </Text>
+        {/* ====== 核心数据卡片（负边距叠在头部下方） ====== */}
+        <ProfileStats
+          className="relative z-10 mt-[-80rpx]"
+          items={isTeacher ? teacherStats : parentStats}
+          layout="label-top"
+        />
+
+        {/* ====== 试用版/续费卡片 ====== */}
+        <View className="mx-[32rpx] mt-[24rpx] px-[28rpx] py-[26rpx] rounded-[24rpx] bg-white shadow-soft flex items-center justify-between">
+          {isTeacher ? (
+            <View className="flex items-baseline gap-[8rpx]">
+              <Text className="text-[32rpx] font-bold text-foreground">试用版</Text>
+              <Text className="text-[24rpx] text-muted-foreground">剩余可用天数0天</Text>
+            </View>
+          ) : (
+            <View>
+              <Text className="text-[32rpx] font-bold text-foreground">试用版</Text>
+              <Text className="mt-[6rpx] text-[24rpx] text-muted-foreground">剩余可用天数0天</Text>
+            </View>
+          )}
+          <View
+            className="px-[32rpx] py-[12rpx] rounded-full bg-profile-orange-solid active:opacity-85"
+            onClick={handleRenew}
+          >
+            <Text className="text-[26rpx] font-medium text-white">续费</Text>
           </View>
-          <Icon name="arrow-right" size={32} className="text-muted-foreground" />
         </View>
 
-        {profileDetailItems.length > 0 && (
-          <View className="mx-[32rpx] mb-[24rpx] rounded-[32rpx] bg-card shadow-soft p-[28rpx]">
-            <Text className="text-[24rpx] text-muted-foreground mb-[16rpx] block">资料概览</Text>
-            <View className="flex flex-col gap-[18rpx]">
-              {profileDetailItems.map((item) => (
-                <View key={item.label} className="flex items-center justify-between gap-4">
-                  <Text className="text-[26rpx] text-muted-foreground">{item.label}</Text>
-                  <Text className="text-[28rpx] text-foreground font-medium text-right">
-                    {item.value}
-                  </Text>
-                </View>
-              ))}
+        {/* ====== 公众号关注卡片 ====== */}
+        <ProfileFollowCard className="mt-[24rpx]" onClick={handleFollow} />
+
+        {/* ====== 我的约课：压住公众号关注卡片 ====== */}
+        <ProfileGrid
+          className="relative z-10 mt-[-32rpx]"
+          title="我的约课"
+          variant="simple"
+          items={parentBookingItems}
+        />
+
+        {/* ====== 错误提示 ====== */}
+        {errorMsg && (
+          <View className="mx-[32rpx] mt-[24rpx] bg-destructive-10 border-2 border-destructive-20 rounded-[24rpx] p-5 flex items-center gap-3">
+            <Text className="flex-1 text-destructive text-lg">{errorMsg}</Text>
+            <View className="px-4 py-2 rounded-full bg-destructive" onClick={loadStudents}>
+              <Text className="text-white text-md font-medium">重试</Text>
             </View>
           </View>
         )}
@@ -433,80 +529,91 @@ const Profile: React.FC = () => {
         {/* ====== 教师视图 ====== */}
         {isTeacher && (
           <>
-            <ProfileGrid title="常用工具" items={teacherToolItems} />
-            <ProfileMenu title="系统服务" items={teacherServiceItems} />
+            {storeProgress &&
+            (storeProgress.completed < storeProgress.total || storeOnboardingHidden === false) ? (
+              <StoreOnboarding
+                className="mt-[24rpx]"
+                data={storeProgress}
+                loading={loadingStoreProgress}
+                onStepClick={handleStoreStepClick}
+                onExtraClick={handleStoreExtraClick}
+              />
+            ) : (
+              <ProfileGrid
+                className="mt-[24rpx]"
+                title="店铺管理"
+                variant="simple"
+                items={teacherStoreItems}
+              />
+            )}
+            <ProfileGrid
+              className="mt-[24rpx]"
+              title="系统管理"
+              variant="simple"
+              items={teacherSystemItems}
+            />
           </>
         )}
 
         {/* ====== 家长视图 ====== */}
         {!isTeacher && (
           <>
-            {/* 错误提示 */}
-            {errorMsg && (
-              <View className="mx-[32rpx] mb-[24rpx] bg-destructive-10 border-2 border-destructive-20 rounded-[32rpx] p-5 flex items-center gap-3">
-                <Text className="flex-1 text-destructive text-lg">{errorMsg}</Text>
-                <View className="px-4 py-2 rounded-full bg-destructive" onClick={loadStudents}>
-                  <Text className="text-white text-md font-medium">重试</Text>
+            {/* 当前学生卡片 */}
+            <View
+              className="mx-[32rpx] mt-[24rpx] px-[28rpx] py-[24rpx] rounded-[32rpx] bg-card shadow-soft flex items-center justify-between active:bg-muted"
+              onClick={handleMyChildren}
+            >
+              <View className="flex items-center gap-[20rpx]">
+                {activeStudent?.name ? (
+                  <Avatar
+                    name={activeStudent.name}
+                    avatarUrl={activeStudent.avatar_url}
+                    size="md"
+                  />
+                ) : (
+                  <View className="w-[68rpx] h-[68rpx] rounded-full bg-primary-10 flex items-center justify-center">
+                    <Icon name="mdi-account-child" size="sm" color="primary" />
+                  </View>
+                )}
+                <View>
+                  <Text className="text-[30rpx] font-bold text-foreground">
+                    {activeStudent?.name || '暂未绑定学生'}
+                  </Text>
+                  <Text className="text-[24rpx] text-muted-foreground mt-[4rpx]">
+                    {loadingStudents
+                      ? '加载中…'
+                      : students.length > 0
+                        ? `共 ${students.length} 名孩子 · 点击切换`
+                        : '绑定后查看课时与约课'}
+                  </Text>
                 </View>
               </View>
-            )}
+              <Icon name="mdi-chevron-right" size="xs" color="mutedForeground" />
+            </View>
 
-            {/* 加载中 */}
-            {loadingStudents && students.length === 0 && (
-              <View className="mx-[32rpx] mb-[24rpx] bg-white rounded-[32rpx] shadow-soft p-10 flex flex-col items-center gap-2">
-                <Text className="text-muted-foreground text-lg">加载学生信息…</Text>
-              </View>
-            )}
-
-            {/* 未绑定学生 */}
-            {!loadingStudents && !activeStudent?.name && (
-              <View className="mx-[32rpx] mb-[24rpx] bg-white rounded-[32rpx] shadow-soft p-10 flex flex-col items-center gap-4">
-                <View className="w-[128rpx] h-[128rpx] rounded-full bg-primary-10 flex items-center justify-center">
-                  <Text className="text-primary text-[48rpx]">?</Text>
-                </View>
-                <Text className="text-xl font-semibold text-foreground">暂未绑定学生</Text>
-                <Text className="text-md text-muted-foreground text-center">
-                  绑定后可查看孩子的课时与学习动态
-                </Text>
-                <View
-                  className="w-full rounded-lg p-3 bg-gradient-primary shadow-elegant flex items-center justify-center active:opacity-90"
-                  onClick={() => setShowBindSheet(true)}
-                >
-                  <Text className="text-white text-xl font-medium">立即绑定</Text>
-                </View>
-              </View>
-            )}
-
-            {/* 已绑定学生：课时概览 */}
-            {!loadingStudents && activeStudent?.name && (
-              <ProfileStats
-                items={[
-                  { value: totalHours, label: '总课时' },
-                  { value: usedHours, label: '已消课' },
-                  { value: remainingHours, label: '剩余课时' },
-                ]}
-                onClick={() => setShowSwitchSheet(true)}
-              />
-            )}
-
-            <ProfileGrid title="孩子学习" items={parentChildItems} />
-            <ProfileMenu title="我的服务" items={parentServiceItems} />
+            <ProfileGrid
+              className="mt-[24rpx]"
+              title="我的约课"
+              variant="simple"
+              items={parentBookingItems}
+            />
+            <ProfileGrid
+              className="mt-[24rpx]"
+              title="我的服务"
+              variant="simple"
+              items={parentServiceItems}
+            />
+            <ProfileGrid
+              className="mt-[24rpx]"
+              title="系统管理"
+              variant="simple"
+              items={parentSystemItems}
+            />
           </>
         )}
 
-        {/* ====== 底部服务入口 ====== */}
-        <ProfileSupport
-          onCustomerService={handleCustomerService}
-          onServiceCenter={handleServiceCenter}
-        />
-
-        {/* ====== 退出登录 ====== */}
-        <View
-          className="mx-[32rpx] rounded-[32rpx] py-[28rpx] bg-white shadow-soft flex items-center justify-center active:bg-muted"
-          onClick={handleSignOut}
-        >
-          <Text className="text-destructive text-xl font-medium">退出登录</Text>
-        </View>
+        {/* ====== 底部品牌关于 ====== */}
+        <ProfileAbout onClick={handleAbout} />
 
         {/* ====== 绑定学生弹窗 ====== */}
         <BottomSheet

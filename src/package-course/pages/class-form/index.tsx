@@ -194,7 +194,18 @@ const ClassForm: React.FC = () => {
     }
 
     return '';
-  }, [classType, currentUserId, endDate, endTime, name, startDate, startTime, teachers, totalLessons, weekdays]);
+  }, [
+    classType,
+    currentUserId,
+    endDate,
+    endTime,
+    name,
+    startDate,
+    startTime,
+    teachers,
+    totalLessons,
+    weekdays,
+  ]);
 
   const canSubmit = useMemo(
     () => !loading && !loadError && !notFound && !submitBlockedReason,
@@ -696,10 +707,16 @@ const ClassForm: React.FC = () => {
         ) : null}
         <View
           className={`w-full py-[30rpx] rounded-[48rpx] flex items-center justify-center gap-2 transition ${!canSubmit || saving ? 'bg-border' : 'bg-gradient-primary press-scale'}`}
-          style={!canSubmit || saving ? undefined : { background: 'linear-gradient(135deg, #5EC8A8, #4AB893)' }}
+          style={
+            !canSubmit || saving
+              ? undefined
+              : { background: 'linear-gradient(135deg, #5EC8A8, #4AB893)' }
+          }
           onClick={canSubmit && !saving ? handleSave : undefined}
         >
-          <Text className={`text-lg font-bold ${!canSubmit || saving ? 'text-muted-foreground' : 'text-white'}`}>
+          <Text
+            className={`text-lg font-bold ${!canSubmit || saving ? 'text-muted-foreground' : 'text-white'}`}
+          >
             {saving ? '保存中...' : isEdit ? '保存修改' : '确认创建'}
           </Text>
         </View>
@@ -727,35 +744,41 @@ const ClassForm: React.FC = () => {
           </View>
 
           {/* 列表 */}
-          <ScrollView scrollY className="flex-1 px-8 py-4 max-h-[50vh]">
-            {filteredStudents.map((stu) => {
-              const checked = pickerTempIds.includes(stu.id);
-              return (
-                <View
-                  key={stu.id}
-                  className={`flex items-center gap-5 py-5 border-b border-border press-scale ${checked ? 'bg-primary-5 -mx-4 px-4 rounded-2xl' : ''}`}
-                  onClick={() => togglePickerStudent(stu.id)}
-                >
-                  <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" />
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-base font-medium text-foreground block">{stu.name}</Text>
-                    {stu.phone && (
-                      <Text className="text-xs text-muted-foreground block mt-1">{stu.phone}</Text>
-                    )}
-                  </View>
+          <ScrollView scrollY className="flex-1 max-h-[50vh]">
+            <View className="px-8 py-4">
+              {filteredStudents.map((stu) => {
+                const checked = pickerTempIds.includes(stu.id);
+                return (
                   <View
-                    className={`w-[44rpx] h-[44rpx] rounded-md border-[4rpx] flex items-center justify-center flex-shrink-0 ${checked ? 'border-primary bg-primary' : 'border-border bg-transparent'}`}
+                    key={stu.id}
+                    className={`flex items-center gap-5 py-5 border-b border-border press-scale ${checked ? 'bg-primary-5 -mx-4 px-4 rounded-2xl' : ''}`}
+                    onClick={() => togglePickerStudent(stu.id)}
                   >
-                    {checked && <Text className="text-[28rpx] text-white font-bold">✓</Text>}
+                    <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" />
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-base font-medium text-foreground block">
+                        {stu.name}
+                      </Text>
+                      {stu.phone && (
+                        <Text className="text-xs text-muted-foreground block mt-1">
+                          {stu.phone}
+                        </Text>
+                      )}
+                    </View>
+                    <View
+                      className={`w-[44rpx] h-[44rpx] rounded-md border-[4rpx] flex items-center justify-center flex-shrink-0 ${checked ? 'border-primary bg-primary' : 'border-border bg-transparent'}`}
+                    >
+                      {checked && <Text className="text-[28rpx] text-white font-bold">✓</Text>}
+                    </View>
                   </View>
+                );
+              })}
+              {filteredStudents.length === 0 && (
+                <View className="py-10 text-center">
+                  <Text className="text-base text-muted-foreground">暂无匹配学员</Text>
                 </View>
-              );
-            })}
-            {filteredStudents.length === 0 && (
-              <View className="py-10 text-center">
-                <Text className="text-base text-muted-foreground">暂无匹配学员</Text>
-              </View>
-            )}
+              )}
+            </View>
           </ScrollView>
 
           {/* 底部确认 */}

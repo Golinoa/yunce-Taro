@@ -358,7 +358,12 @@ const Holidays: React.FC = () => {
             )}
             onClick={canSubmit ? () => void handleSave() : undefined}
           >
-            <Text className={cn('text-base font-semibold', canSubmit ? 'text-white' : 'text-muted-foreground')}>
+            <Text
+              className={cn(
+                'text-base font-semibold',
+                canSubmit ? 'text-white' : 'text-muted-foreground',
+              )}
+            >
               {saving ? '添加中...' : '确认添加'}
             </Text>
           </View>
@@ -399,7 +404,12 @@ const Holidays: React.FC = () => {
               )}
               onClick={deleting ? undefined : () => void handleConfirmDelete()}
             >
-              <Text className={cn('text-sm font-medium', deleting ? 'text-muted-foreground' : 'text-white')}>
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  deleting ? 'text-muted-foreground' : 'text-white',
+                )}
+              >
                 {deleting ? '删除中...' : '确认删除'}
               </Text>
             </View>

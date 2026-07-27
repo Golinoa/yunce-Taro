@@ -165,7 +165,9 @@ const NotificationSendPage: React.FC = () => {
                 <View
                   key={t.label}
                   className={`py-4 px-6 rounded-2xl border border-input bg-white flex items-center gap-2 transition ${
-                    selectedTypeLabel === t.label ? 'border-primary bg-gradient-primary shadow-elegant' : 'shadow-soft'
+                    selectedTypeLabel === t.label
+                      ? 'border-primary bg-gradient-primary shadow-elegant'
+                      : 'shadow-soft'
                   }`}
                   onClick={() => {
                     setNotifType(t.key);

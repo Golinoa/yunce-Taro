@@ -25,7 +25,7 @@ const HOME_GRID_GRADIENTS = [
   { from: '#22B8CF', to: '#51CF66', deg: 135 }, // 校区设置 - 青绿
 ];
 
-/** 三卡片配置：快速消课 / 约试听 / 查课时 */
+/** 三卡片配置：快速消课 / 预约课程 / 学员管理 */
 const TRIPLE_CARD_CONFIG = [
   {
     label: '快速消课',
@@ -35,13 +35,13 @@ const TRIPLE_CARD_CONFIG = [
     badge: 'HOT',
   },
   {
-    label: '约试听',
-    subLabel: '新增 试听预约',
+    label: '预约课程',
+    subLabel: '管理 预约制课程',
     icon: 'mdi-account-plus',
     url: '/pages/booking/index',
   },
   {
-    label: '查课时',
+    label: '学员管理',
     subLabel: '查看 全部学员',
     icon: 'mdi-account-group',
     url: '/package-student/pages/students/index',
@@ -83,7 +83,7 @@ const renderGradientIcon = (
  * KingKongSection - 金刚区 v14
  *
  * 对齐设计稿 index_v14.html kingkong-section：
- * - 三卡片布局：左侧大卡片（快速消课）+ 右侧两个小卡片（约试听、查课时）
+ * - 三卡片布局：左侧大卡片（快速消课）+ 右侧两个小卡片（预约课程、学员管理）
  * - 底部图标网格：两行四列，彩色渐变图标（无底色块）
  */
 const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {

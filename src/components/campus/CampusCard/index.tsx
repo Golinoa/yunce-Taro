@@ -94,6 +94,9 @@ const CampusCard: React.FC<CampusCardProps> = ({
       const { tapIndex } = await Taro.showActionSheet({
         itemList: items,
         itemColor: '#333',
+        fail: () => {
+          // 用户取消时忽略
+        },
       });
       actions[tapIndex]?.();
     } catch {

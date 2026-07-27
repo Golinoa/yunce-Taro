@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '充值记录',
+  navigationBarTitleText: '课包流水',
   navigationBarBackgroundColor: '#FAFDFB',
   navigationBarTextStyle: 'black',
 });

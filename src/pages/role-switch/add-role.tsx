@@ -12,6 +12,7 @@ import Icon from '@/components/Icon';
 import RoleCard from '@/components/RoleCard';
 import type { ParentRoleInfo, PrincipalRoleInfo, TeacherRoleInfo, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
+import { safeReLaunch } from '@/utils/navigation';
 
 const ROLE_OPTIONS: { role: UserRole; title: string; description: string }[] = [
   { role: 'principal', title: '我是校长/负责人', description: '创建并管理自己的培训机构' },
@@ -118,7 +119,7 @@ const AddRole: React.FC = () => {
 
     Taro.showToast({ title: '添加成功', icon: 'success' });
     setTimeout(() => {
-      Taro.reLaunch({ url: '/pages/home/index' });
+      void safeReLaunch('/pages/home/index');
     }, 800);
   }, [
     submitting,

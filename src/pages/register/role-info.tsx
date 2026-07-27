@@ -12,8 +12,8 @@ import Icon from '@/components/Icon';
 import RegisterStepper from '@/components/RegisterStepper';
 import type { ParentRoleInfo, PrincipalRoleInfo, TeacherRoleInfo, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
-import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { navigateAfterLogin } from '@/utils/route-guard';
+import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 /** 角色头部配置 */
 const ROLE_HEADER_META: Record<
@@ -27,6 +27,14 @@ const ROLE_HEADER_META: Record<
     pageSubtitle: string;
   }
 > = {
+  admin: {
+    title: '管理员',
+    subtitle: '机构管理员',
+    icon: 'crown',
+    gradientClass: 'bg-gradient-principal',
+    pageTitle: '完善管理员信息',
+    pageSubtitle: '创建您的机构，开始管理',
+  },
   principal: {
     title: '校长',
     subtitle: '机构负责人',
@@ -42,6 +50,14 @@ const ROLE_HEADER_META: Record<
     gradientClass: 'bg-gradient-teacher',
     pageTitle: '完善教师信息',
     pageSubtitle: '绑定校区，开始授课',
+  },
+  assistant: {
+    title: '助教',
+    subtitle: '辅助教学',
+    icon: 'book-open',
+    gradientClass: 'bg-gradient-teacher',
+    pageTitle: '完善助教信息',
+    pageSubtitle: '绑定校区，协助教学',
   },
   parent: {
     title: '家长',
@@ -314,7 +330,7 @@ const RegisterRoleInfo: React.FC = () => {
             className="flex items-center justify-center gap-[8rpx] w-full h-[80rpx] border-[2rpx] border-dashed border-border rounded-[24rpx] mt-[24rpx]"
             onClick={handleSkip}
           >
-            <Icon name="clock-outline" size={28} className="text-muted-foreground" />
+            <Icon name="mdi-clock-outline" size={28} className="text-muted-foreground" />
             <Text className="text-[26rpx] text-muted-foreground">稍后绑定</Text>
           </View>
         )}

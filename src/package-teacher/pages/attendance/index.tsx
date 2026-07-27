@@ -2,11 +2,11 @@ import { View, Text, Picker } from '@tarojs/components';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
-import Loading from '@/components/Loading';
-import PageContainer from '@/components/PageContainer';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
 } from '@/components/lesson/LessonConsumptionList';
+import Loading from '@/components/Loading';
+import PageContainer from '@/components/PageContainer';
 import FilterBar from '@/components/teacher/FilterBar';
 import { lessonRecordService, teacherService } from '@/services';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -95,7 +95,10 @@ const AttendancePage: React.FC = () => {
         map.set(r.class_id, r.class_name);
       }
     });
-    return [{ label: '全部班级', value: 'all' }, ...Array.from(map).map(([id, name]) => ({ label: name, value: id }))];
+    return [
+      { label: '全部班级', value: 'all' },
+      ...Array.from(map).map(([id, name]) => ({ label: name, value: id })),
+    ];
   }, [records]);
 
   const teacherOptions = useMemo(() => {
@@ -106,12 +109,20 @@ const AttendancePage: React.FC = () => {
   }, [teachers]);
 
   const teacherIndex = useMemo(
-    () => Math.max(0, teacherOptions.findIndex((o) => o.value === filterTeacherId)),
+    () =>
+      Math.max(
+        0,
+        teacherOptions.findIndex((o) => o.value === filterTeacherId),
+      ),
     [teacherOptions, filterTeacherId],
   );
 
   const classIndex = useMemo(
-    () => Math.max(0, classOptions.findIndex((o) => o.value === filterClassId)),
+    () =>
+      Math.max(
+        0,
+        classOptions.findIndex((o) => o.value === filterClassId),
+      ),
     [classOptions, filterClassId],
   );
 
@@ -302,7 +313,9 @@ const AttendancePage: React.FC = () => {
                   onChange={(e) => setTempCustomStart(e.detail.value)}
                 >
                   <View className="flex items-center justify-between px-4 py-3 bg-input rounded-2xl">
-                    <Text className="text-sm font-medium text-foreground">{tempCustomStart || '请选择'}</Text>
+                    <Text className="text-sm font-medium text-foreground">
+                      {tempCustomStart || '请选择'}
+                    </Text>
                     <Icon name="mdi-calendar" size={18} className="text-muted-foreground" />
                   </View>
                 </Picker>
@@ -316,7 +329,9 @@ const AttendancePage: React.FC = () => {
                   onChange={(e) => setTempCustomEnd(e.detail.value)}
                 >
                   <View className="flex items-center justify-between px-4 py-3 bg-input rounded-2xl">
-                    <Text className="text-sm font-medium text-foreground">{tempCustomEnd || '请选择'}</Text>
+                    <Text className="text-sm font-medium text-foreground">
+                      {tempCustomEnd || '请选择'}
+                    </Text>
                     <Icon name="mdi-calendar" size={18} className="text-muted-foreground" />
                   </View>
                 </Picker>

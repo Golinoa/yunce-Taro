@@ -89,15 +89,29 @@ export default defineConfig({
         float: '{0%, 100% { transform: translateY(0) } 50% { transform: translateY(-12rpx) }}',
         'pulse-ring':
           '{0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.35) } 70% { box-shadow: 0 0 0 20rpx hsl(var(--primary) / 0) } 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0) }}',
+        'radar-orange':
+          '{0% { box-shadow: 0 0 0 0 rgba(255,160,108,0.5) } 70% { box-shadow: 0 0 0 24rpx rgba(255,160,108,0) } 100% { box-shadow: 0 0 0 0 rgba(255,160,108,0) }}',
+        'radar-scale':
+          '{0% { transform: scale(1); opacity: 0.6 } 70% { transform: scale(2.2); opacity: 0 } 100% { transform: scale(2.2); opacity: 0 }}',
+        'badge-scale':
+          '{0%, 100% { transform: scale(1) } 50% { transform: scale(1.12) }}',
+        'radar-ring':
+          '{0% { transform: scale(1); opacity: 0 } 20% { opacity: 0.45 } 100% { transform: scale(2.4); opacity: 0 }}',
       },
       durations: {
         float: '3s',
+        'badge-scale': '2s',
+        'radar-ring': '2s',
       },
       timingFns: {
         float: 'ease-in-out',
+        'badge-scale': 'ease-in-out',
+        'radar-ring': 'ease-out',
       },
       counts: {
         float: 'infinite',
+        'badge-scale': 'infinite',
+        'radar-ring': 'infinite',
       },
     },
   },
@@ -175,6 +189,23 @@ export default defineConfig({
       { background: 'linear-gradient(160deg, #2a2a2a 0%, #1a1a1a 50%, #0f0f0f 100%)' },
     ],
 
+    // ===== 个人中心橙色主题（对齐参考设计稿，高亮橙渐变） =====
+    [
+      'bg-profile-orange',
+      { background: 'linear-gradient(135deg, #FF8A2A 0%, #FF8A2A 100%)' },
+    ],
+    ['text-profile-orange', { color: '#FCA45C' }],
+    ['text-profile-orange-soft', { color: '#FCA45C' }],
+    ['bg-profile-orange-soft', { background: 'rgba(255, 138, 76, 0.10)' }],
+    ['bg-profile-orange-solid', { background: '#FF8A2A' }],
+    ['bg-profile-follow', { background: 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%)' }],
+    ['text-profile-follow-muted', { color: 'rgba(255, 255, 255, 0.65)' }],
+    ['rounded-b-48rpx', { 'border-radius': '0 0 48rpx 48rpx' }],
+    ['shadow-profile-stats', { 'box-shadow': '0 12rpx 40rpx -16rpx rgba(255, 112, 67, 0.18)' }],
+    ['rotate-n12', { transform: 'rotate(-12deg)' }],
+    // 个人中心头像双层实线边框外层色值
+    ['border-profile-avatar-outer', { 'border-color': '#D8D2C7' }],
+
     // ===== 进度条渐变（使用 CSS 变量） =====
     [
       'bg-progress-primary',
@@ -186,6 +217,20 @@ export default defineConfig({
       { background: 'linear-gradient(90deg, hsl(var(--accent)), hsl(var(--accent-glow)))' },
     ],
     ['bg-progress-purple-track', { background: 'hsl(var(--accent) / 0.15)' }],
+
+    // ===== 店铺管理 onboarding 橙色进度条 =====
+    [
+      'bg-progress-orange',
+      { background: 'linear-gradient(90deg, #FF8A2A 0%, #FCA45C 100%)' },
+    ],
+    ['bg-progress-orange-track', { background: 'rgba(255, 138, 42, 0.15)' }],
+
+    // ===== 进度条 6 等分宽度兜底（确保微信小程序生成） =====
+    ['w-1/6', { width: '16.666667%' }],
+    ['w-2/6', { width: '33.333333%' }],
+    ['w-3/6', { width: '50%' }],
+    ['w-4/6', { width: '66.666667%' }],
+    ['w-5/6', { width: '83.333333%' }],
 
     // ===== 快捷入口图标渐变（使用 CSS 变量） =====
     [
@@ -263,6 +308,24 @@ export default defineConfig({
     ['border-destructive-30', { 'border-color': 'hsl(var(--destructive) / 0.3)' }],
     ['border-primary/30', { 'border-color': 'hsl(var(--primary) / 0.3)' }],
     ['border-destructive/50', { 'border-color': 'hsl(var(--destructive) / 0.5)' }],
+
+    // ===== 标题两侧渐变分隔线（卡片课程名居中装饰） =====
+    [
+      'title-divider-left',
+      {
+        height: '2rpx',
+        flex: '1',
+        background: 'linear-gradient(90deg, transparent 0%, hsl(var(--border)) 100%)',
+      },
+    ],
+    [
+      'title-divider-right',
+      {
+        height: '2rpx',
+        flex: '1',
+        background: 'linear-gradient(90deg, hsl(var(--border)) 0%, transparent 100%)',
+      },
+    ],
 
     // ===== 状态背景色（使用 CSS 变量） =====
     ['bg-amber-500/15', { background: 'hsl(var(--warning) / 0.15)' }],
@@ -488,6 +551,16 @@ export default defineConfig({
     // ===== 统计卡片毛玻璃白底 =====
     ['bg-white/92', { background: 'rgba(255, 255, 255, 0.92)' }],
 
+    // ===== 渐变头部白色半透明装饰（个人中心） =====
+    ['bg-white/8', { background: 'rgba(255, 255, 255, 0.08)' }],
+    ['bg-white/10', { background: 'rgba(255, 255, 255, 0.10)' }],
+    ['bg-white/15', { background: 'rgba(255, 255, 255, 0.15)' }],
+    ['bg-white/20', { background: 'rgba(255, 255, 255, 0.20)' }],
+    ['bg-white/25', { background: 'rgba(255, 255, 255, 0.25)' }],
+    ['bg-white/70', { background: 'rgba(255, 255, 255, 0.70)' }],
+    ['text-white/80', { color: 'rgba(255, 255, 255, 0.80)' }],
+    ['text-white/90', { color: 'rgba(255, 255, 255, 0.90)' }],
+
     // ===== 渐变头部圆角（设计稿 homepages 大圆角） =====
     ['rounded-b-80rpx', { 'border-radius': '0 0 80rpx 80rpx' }],
 
@@ -607,6 +680,10 @@ export default defineConfig({
 
     // 脉冲动画（urgent 状态按钮）
     ['animate-pulse-ring', { animation: 'pulse-ring 2s infinite' }],
+    ['animate-radar-orange', { animation: 'radar-orange 2s infinite' }],
+    ['animate-radar-scale', { animation: 'radar-scale 1.6s infinite' }],
+    ['animate-badge-scale', { animation: 'badge-scale 2s ease-in-out infinite' }],
+    ['animate-radar-ring', { animation: 'radar-ring 2s ease-out infinite' }],
   ],
   shortcuts: {
     center: 'flex items-center justify-center',

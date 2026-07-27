@@ -100,10 +100,10 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
       location: 'src/utils/request.ts:request',
       msg: '[DEBUG] request success',
       data: {
-      method,
-      url,
-      durationMs: Date.now() - startAt,
-      statusCode: res.statusCode,
+        method,
+        url,
+        durationMs: Date.now() - startAt,
+        statusCode: res.statusCode,
       },
     });
     // #endregion
@@ -141,10 +141,10 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
       location: 'src/utils/request.ts:request',
       msg: '[DEBUG] request fail',
       data: {
-      method,
-      url,
-      durationMs: Date.now() - startAt,
-      error: err instanceof Error ? err.message : String(err),
+        method,
+        url,
+        durationMs: Date.now() - startAt,
+        error: err instanceof Error ? err.message : String(err),
       },
     });
     // #endregion

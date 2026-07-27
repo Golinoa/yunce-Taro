@@ -84,16 +84,18 @@ const TeacherTab: React.FC<TeacherTabProps> = ({
         onToggle={handleFilterToggle}
         onSelect={handleFilterSelect}
       />
-      <ScrollView className="flex-1 h-0 px-[32rpx] py-[24rpx] pb-[48rpx]" scrollY>
-        {filteredTeachers.length === 0 ? (
-          <View className="flex items-center justify-center py-[120rpx]">
-            <Text className="text-[28rpx] text-muted-foreground">暂无教师数据</Text>
-          </View>
-        ) : (
-          filteredTeachers.map((t) => (
-            <TeacherCard key={t.id} teacher={t} onClick={() => onTeacherClick(t.id)} />
-          ))
-        )}
+      <ScrollView className="flex-1 h-0" scrollY>
+        <View className="px-[32rpx] py-[24rpx] pb-[48rpx]">
+          {filteredTeachers.length === 0 ? (
+            <View className="flex items-center justify-center py-[120rpx]">
+              <Text className="text-[28rpx] text-muted-foreground">暂无教师数据</Text>
+            </View>
+          ) : (
+            filteredTeachers.map((t) => (
+              <TeacherCard key={t.id} teacher={t} onClick={() => onTeacherClick(t.id)} />
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );

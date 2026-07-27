@@ -21,9 +21,7 @@ const ContactSupportPage: React.FC = () => {
         <View className="w-[320rpx] h-[320rpx] mx-auto rounded-[28rpx] border-[2rpx] border-dashed border-primary/35 bg-primary/4 flex items-center justify-center">
           <View className="flex flex-col items-center">
             <Icon name="mdi-qrcode-scan" size={72} className="text-primary" />
-            <Text className="text-[24rpx] text-muted-foreground mt-[16rpx]">
-              客服二维码占位图
-            </Text>
+            <Text className="text-[24rpx] text-muted-foreground mt-[16rpx]">客服二维码占位图</Text>
           </View>
         </View>
         <Text className="text-[24rpx] text-muted-foreground text-center block mt-[24rpx] leading-[1.7]">

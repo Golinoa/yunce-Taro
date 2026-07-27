@@ -2,7 +2,12 @@
  * Service 层 — 学员相关 API
  * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用
  */
-import { del, get, post, put } from '@/utils/request';
+import {
+  CLASSES as DB_CLASSES,
+  COURSE_PACKAGES as DB_PACKAGES,
+  STUDENTS as DB_STUDENTS,
+  TEACHERS as DB_TEACHERS,
+} from '@/data/mock-database';
 import {
   mockGetStudentsByTeacher,
   mockSearchStudents,
@@ -62,29 +67,28 @@ import {
   mockMarkAllNotificationsAsRead,
   mockSendNotification,
   mockCreateRecharge,
-  mockGetRechargeRecords,
+  mockCreateRefund,
+  mockGetPackageTransactions,
   pickBestPackage,
   formatDateCN,
 } from '@/data/students';
-import {
-  CLASSES as DB_CLASSES,
-  COURSE_PACKAGES as DB_PACKAGES,
-  STUDENTS as DB_STUDENTS,
-  TEACHERS as DB_TEACHERS,
-} from '@/data/mock-database';
 import type { Class } from '@/types/class';
 import type {
   CoursePackage,
   CoursePackageTemplate,
   DeductResult,
   FeeMethod,
+  PackageType,
+  PackageTransaction,
   RechargeFormData,
+  RefundFormData,
 } from '@/types/course-package';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Notification, NotificationType } from '@/types/notification';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
+import { del, get, post, put } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -131,6 +135,7 @@ interface BackendStudentDetailResponse {
     name: string;
     status?: string;
     totalHours: number;
+    type?: null | string;
     usedHours: number;
     validEnd?: null | string;
   }>;
@@ -223,8 +228,12 @@ interface BackendClassDetailResponse {
 
 interface BackendPackageListItem {
   createdAt: string;
+  feeAmount?: null | number;
+  feeMethod?: null | string;
+  giftHours?: null | number;
   id: string;
   name: string;
+  note?: null | string;
   remainingHours: number;
   status?: 'ACTIVE' | 'DEPLETED' | 'EXPIRED';
   studentId: string;
@@ -259,8 +268,10 @@ interface BackendPackageMutationResponse {
   createdAt?: string;
   feeAmount?: null | number;
   feeMethod?: null | string;
+  giftHours?: null | number;
   id: string;
   name?: string;
+  note?: null | string;
   remainingHours: number;
   status?: 'ACTIVE' | 'DEPLETED' | 'EXPIRED';
   studentId?: string;
@@ -280,6 +291,22 @@ interface BackendRechargeRecord {
   packageName?: null | string;
   studentId?: string;
   studentName?: string;
+}
+
+interface BackendPackageTransactionRecord {
+  amount?: number;
+  createdAt: string;
+  feeMethod?: null | string;
+  giftHours?: number;
+  id: string;
+  operatorName?: null | string;
+  packageId?: string;
+  packageName?: null | string;
+  purchasedHours?: number;
+  reason?: null | string;
+  studentId?: string;
+  studentName?: string;
+  type?: 'RECHARGE' | 'REFUND';
 }
 
 interface BackendLessonRecordListItem {
@@ -405,6 +432,12 @@ interface BackendScheduleListResponse {
 }
 
 interface BackendScheduleDetailResponse {
+  assistantTeacher?: {
+    id?: string;
+    name?: string;
+  } | null;
+  assistantTeacherId?: null | string;
+  assistantTeacherName?: null | string;
   class?: {
     id: string;
     name: string;
@@ -417,12 +450,24 @@ interface BackendScheduleDetailResponse {
   endTime: string;
   id: string;
   note?: null | string;
+  operatorTeacher?: {
+    id?: string;
+    name?: string;
+  } | null;
+  operatorTeacherId?: null | string;
+  operatorTeacherName?: null | string;
   reminderMinutes?: null | number;
   room?: null | string;
   startDate?: null | string;
   startTime: string;
   studentId?: null | string;
   tag?: null | string;
+  teacher?: {
+    id?: string;
+    name?: string;
+  } | null;
+  teacherId?: null | string;
+  teacherName?: null | string;
   updatedAt: string;
 }
 
@@ -508,6 +553,13 @@ const mapBackendStudentStatus = (
 const mapBackendClassStatus = (status?: 'ACTIVE' | 'DISBANDED'): Class['status'] =>
   status === 'ACTIVE' ? 'active' : 'ended';
 
+const mapBackendPackageType = (type?: string | null): PackageType | undefined => {
+  if (type === 'hour_package' || type === 'term' || type === 'monthly' || type === 'trial') {
+    return type;
+  }
+  return undefined;
+};
+
 const mapBackendPackageStatus = (
   status?: 'ACTIVE' | 'DEPLETED' | 'EXPIRED',
 ): CoursePackage['status'] => {
@@ -521,6 +573,27 @@ const buildInviteCode = (studentId: string): string => `INV-${studentId.slice(-4
 const normalizeLessonDate = (value?: null | string): string => {
   if (!value) return '';
   return value.includes('T') ? value.slice(0, 10) : value;
+};
+
+const derivePackageHourSplit = (
+  totalHoursInput?: number | null,
+  remainingHoursInput?: number | null,
+  giftHoursInput?: number | null,
+) => {
+  const totalHours = Math.max(Number(totalHoursInput ?? 0), 0);
+  const remainingHours = Math.min(Math.max(Number(remainingHoursInput ?? 0), 0), totalHours);
+  const giftHours = Math.min(Math.max(Number(giftHoursInput ?? 0), 0), totalHours);
+
+  const bonusRemaining = remainingHours > giftHours ? giftHours : remainingHours;
+  const purchasedRemaining = Math.max(remainingHours - bonusRemaining, 0);
+
+  return {
+    totalHours,
+    remainingHours,
+    giftHours,
+    purchasedRemaining,
+    bonusRemaining,
+  };
 };
 
 const mapBackendLessonRecordStatus = (
@@ -548,20 +621,21 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
     status: mapBackendStudentStatus(item.status),
     created_at: item.createdAt,
     updated_at: item.createdAt,
-    course_packages: totalHours > 0 || usedHours > 0
-      ? [
-          {
-            id: `${item.id}-aggregate-package`,
-            name: '课时汇总',
-            total_hours: totalHours,
-            remaining_hours: Math.max(totalHours - usedHours, 0),
-            purchased_remaining: Math.max(totalHours - usedHours, 0),
-            bonus_remaining: 0,
-            status: 'active',
-            created_at: item.createdAt,
-          },
-        ]
-      : [],
+    course_packages:
+      totalHours > 0 || usedHours > 0
+        ? [
+            {
+              id: `${item.id}-aggregate-package`,
+              name: '课时汇总',
+              total_hours: totalHours,
+              remaining_hours: Math.max(totalHours - usedHours, 0),
+              purchased_remaining: Math.max(totalHours - usedHours, 0),
+              bonus_remaining: 0,
+              status: 'active',
+              created_at: item.createdAt,
+            },
+          ]
+        : [],
   };
 }
 
@@ -582,11 +656,13 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
     course_packages: (item.coursePackages || []).map((pkg) => ({
       id: pkg.id,
       name: pkg.name,
+      type: 'type' in pkg ? mapBackendPackageType(pkg.type) : undefined,
       total_hours: pkg.totalHours,
       remaining_hours: Math.max(pkg.totalHours - pkg.usedHours, 0),
       purchased_remaining: Math.max(pkg.totalHours - pkg.usedHours, 0),
       bonus_remaining: 0,
-      status: pkg.status === 'ACTIVE' ? 'active' : pkg.status === 'EXPIRED' ? 'expired' : 'completed',
+      status:
+        pkg.status === 'ACTIVE' ? 'active' : pkg.status === 'EXPIRED' ? 'expired' : 'completed',
       created_at: pkg.validEnd || item.createdAt,
     })),
   };
@@ -642,32 +718,37 @@ function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
   };
 }
 
-function mapBackendPackage(item: BackendPackageListItem | BackendActivePackageItem | BackendPackageMutationResponse): CoursePackage {
+function mapBackendPackage(
+  item: BackendPackageListItem | BackendActivePackageItem | BackendPackageMutationResponse,
+): CoursePackage {
   const totalHours = Number(item.totalHours ?? 0);
   const usedHours = Number(item.usedHours ?? 0);
   const remainingHours = Number(item.remainingHours ?? Math.max(totalHours - usedHours, 0));
+  const giftHours = 'giftHours' in item ? (item.giftHours ?? 0) : 0;
+  const split = derivePackageHourSplit(totalHours, remainingHours, giftHours);
 
   return {
     id: item.id,
     teacher_id: '',
     student_id: 'studentId' in item && item.studentId ? item.studentId : '',
     name: item.name || '课时包',
-    total_hours: totalHours,
-    remaining_hours: remainingHours,
-    purchased_remaining: remainingHours,
-    bonus_remaining: 0,
+    type: 'type' in item ? mapBackendPackageType(item.type) : undefined,
+    total_hours: split.totalHours,
+    remaining_hours: split.remainingHours,
+    purchased_remaining: split.purchasedRemaining,
+    bonus_remaining: split.bonusRemaining,
     status: mapBackendPackageStatus(item.status),
     start_date: 'validStart' in item ? item.validStart || undefined : undefined,
     end_date: 'validEnd' in item ? item.validEnd || undefined : undefined,
     expiry_date: 'validEnd' in item ? item.validEnd || undefined : undefined,
-    fee_amount: 'feeAmount' in item ? item.feeAmount ?? undefined : undefined,
+    fee_amount: 'feeAmount' in item ? (item.feeAmount ?? undefined) : undefined,
     fee_method:
       'feeMethod' in item && item.feeMethod
-        ? ((item.feeMethod as FeeMethod) || undefined)
+        ? (item.feeMethod as FeeMethod) || undefined
         : undefined,
     note: 'note' in item ? item.note || undefined : undefined,
-    gift_hours: 'giftHours' in item ? item.giftHours ?? undefined : undefined,
-    valid_days: 'validDays' in item ? item.validDays ?? undefined : undefined,
+    gift_hours: split.giftHours || undefined,
+    valid_days: 'validDays' in item ? (item.validDays ?? undefined) : undefined,
     created_at: 'createdAt' in item && item.createdAt ? item.createdAt : new Date().toISOString(),
     updated_at: 'createdAt' in item && item.createdAt ? item.createdAt : new Date().toISOString(),
   };
@@ -705,6 +786,24 @@ function mapBackendLessonRecord(
           id: 'classId' in item ? item.classId || '' : '',
           name: 'className' in item ? item.className || '' : '',
         };
+  const teacherName =
+    'teacher' in item && item.teacher
+      ? item.teacher.name
+      : 'teacherName' in item
+        ? item.teacherName || undefined
+        : undefined;
+  const operatorTeacherName =
+    'operatorTeacher' in item && item.operatorTeacher
+      ? item.operatorTeacher.name
+      : 'operatorTeacherName' in item
+        ? item.operatorTeacherName || undefined
+        : undefined;
+  const assistantTeacherName =
+    'assistantTeacher' in item && item.assistantTeacher
+      ? item.assistantTeacher.name
+      : 'assistantTeacherName' in item
+        ? item.assistantTeacherName || undefined
+        : undefined;
 
   return {
     id: item.id,
@@ -728,16 +827,18 @@ function mapBackendLessonRecord(
     performance: 'performance' in item ? item.performance || undefined : undefined,
     homework: item.homework || undefined,
     homework_images: 'homeworkImages' in item ? item.homeworkImages || undefined : undefined,
-    fee_amount: 'feeAmount' in item ? item.feeAmount ?? undefined : undefined,
+    fee_amount: 'feeAmount' in item ? (item.feeAmount ?? undefined) : undefined,
     fee_method:
       'feeMethod' in item && item.feeMethod
-        ? ((item.feeMethod as FeeMethod) || undefined)
+        ? (item.feeMethod as FeeMethod) || undefined
         : undefined,
-    remaining_hours: 'remainingHours' in item ? item.remainingHours ?? undefined : undefined,
+    remaining_hours: 'remainingHours' in item ? (item.remainingHours ?? undefined) : undefined,
     revoke_status: status === 'cancelled' ? 'revoked' : 'none',
     revoked_at:
       status === 'cancelled'
-        ? ('updatedAt' in item && item.updatedAt ? item.updatedAt : item.createdAt)
+        ? 'updatedAt' in item && item.updatedAt
+          ? item.updatedAt
+          : item.createdAt
         : undefined,
     class_id: classInfo?.id || undefined,
     class_name: classInfo?.name || undefined,
@@ -778,8 +879,7 @@ function mapStudentPayload(data: Partial<Student>) {
   return {
     avatar: data.avatar_url,
     birthday: data.birthday,
-    gender:
-      data.gender === 'male' ? 'MALE' : data.gender === 'female' ? 'FEMALE' : undefined,
+    gender: data.gender === 'male' ? 'MALE' : data.gender === 'female' ? 'FEMALE' : undefined,
     name: data.name,
     phone: data.phone,
     remark: data.note,
@@ -800,10 +900,12 @@ function mapMockPackage(pkg: NonNullable<MockPackage>): CoursePackage {
     teacher_id: pkg.classId ? `teacher-from-${pkg.classId}` : '',
     student_id: pkg.studentId,
     name: pkg.name,
+    type: pkg.type,
     total_hours: pkg.totalHours,
     remaining_hours: pkg.remainingHours,
     purchased_remaining: pkg.purchasedHours,
     bonus_remaining: pkg.bonusHours,
+    gift_hours: pkg.bonusHours,
     status:
       pkg.status === 'finished' ? 'completed' : pkg.status === 'expired' ? 'expired' : 'active',
     subject_id: pkg.subjectId,
@@ -814,6 +916,63 @@ function mapMockPackage(pkg: NonNullable<MockPackage>): CoursePackage {
     start_date: pkg.purchaseDate,
     end_date: pkg.expireDate,
     expiry_date: pkg.expireDate,
+  };
+}
+
+function mapBackendPackageTransaction(item: BackendPackageTransactionRecord): PackageTransaction {
+  return {
+    id: item.id,
+    type: item.type === 'REFUND' ? 'refund' : 'recharge',
+    student_id: item.studentId || '',
+    student_name: item.studentName || '学员',
+    package_id: item.packageId || undefined,
+    package_name: item.packageName || undefined,
+    purchased_hours: item.purchasedHours,
+    gift_hours: item.giftHours ?? 0,
+    fee_amount: item.amount,
+    fee_method: item.feeMethod ? (item.feeMethod as FeeMethod) : undefined,
+    refund_amount: item.type === 'REFUND' ? item.amount : undefined,
+    reason: item.reason || undefined,
+    operator_name: item.operatorName || undefined,
+    created_at: item.createdAt,
+  };
+}
+
+function mapMockPackageTransaction(item: {
+  amount?: number;
+  createdAt: string;
+  feeAmount?: number;
+  feeMethod?: string;
+  giftHours?: number;
+  id: string;
+  operatorName?: string;
+  packageId?: string;
+  packageName?: string;
+  purchasedHours?: number;
+  purchasedRemainingSnapshot?: number;
+  bonusRemainingSnapshot?: number;
+  reason?: string;
+  studentId: string;
+  studentName: string;
+  type: 'recharge' | 'refund';
+}): PackageTransaction {
+  return {
+    id: item.id,
+    type: item.type,
+    student_id: item.studentId,
+    student_name: item.studentName,
+    package_id: item.packageId,
+    package_name: item.packageName,
+    purchased_hours: item.purchasedHours,
+    gift_hours: item.giftHours ?? 0,
+    fee_amount: item.feeAmount ?? item.amount,
+    fee_method: item.feeMethod ? (item.feeMethod as FeeMethod) : undefined,
+    refund_amount: item.type === 'refund' ? (item.feeAmount ?? item.amount) : undefined,
+    reason: item.reason,
+    operator_name: item.operatorName,
+    purchased_remaining_snapshot: item.purchasedRemainingSnapshot,
+    bonus_remaining_snapshot: item.bonusRemainingSnapshot,
+    created_at: item.createdAt,
   };
 }
 
@@ -837,6 +996,7 @@ function mapMockStudent(student: NonNullable<MockStudent>): Student {
     course_packages: packages.map((pkg) => ({
       id: pkg.id,
       name: pkg.name,
+      type: pkg.type,
       total_hours: pkg.total_hours,
       remaining_hours: pkg.remaining_hours,
       purchased_remaining: pkg.purchased_remaining,
@@ -870,8 +1030,13 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     end_date: cls.endDate,
     color: cls.color,
     icon: cls.icon,
+    level: cls.level,
     student_count: cls.studentCount,
     campus_id: cls.campusId,
+    schedule_mode: cls.scheduleMode,
+    auto_open_type: cls.autoOpenType,
+    min_open_count: cls.minOpenCount,
+    subject_id: cls.subjectId,
   };
 }
 
@@ -884,18 +1049,19 @@ function mapMockSchedule(schedule: NonNullable<MockSchedule>): Schedule {
     start_time: schedule.startTime,
     end_time: schedule.endTime,
     room: schedule.room,
+    assistant_teacher_id:
+      (schedule as { assistantTeacherId?: string }).assistantTeacherId || undefined,
+    note: (schedule as { note?: string }).note || undefined,
     status:
-      schedule.status === 'done'
-        ? 'done'
-        : schedule.status === 'cancelled'
-          ? 'ended'
-          : 'upcoming',
+      schedule.status === 'done' ? 'done' : schedule.status === 'cancelled' ? 'ended' : 'upcoming',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 }
 
-function mapScheduleInput(data: Omit<Schedule, 'id' | 'created_at' | 'updated_at'> | Partial<Schedule>) {
+function mapScheduleInput(
+  data: Omit<Schedule, 'id' | 'created_at' | 'updated_at'> | Partial<Schedule>,
+) {
   const status: 'done' | 'scheduled' | 'cancelled' =
     data.status === 'done' ? 'done' : data.status === 'ended' ? 'cancelled' : 'scheduled';
 
@@ -906,6 +1072,8 @@ function mapScheduleInput(data: Omit<Schedule, 'id' | 'created_at' | 'updated_at
     startTime: data.start_time,
     endTime: data.end_time,
     room: data.room,
+    assistantTeacherId: data.assistant_teacher_id || undefined,
+    note: data.note || undefined,
     status,
   };
 }
@@ -978,21 +1146,21 @@ function mapBackendSchedule(
     start_time: item.startTime,
     end_time: item.endTime,
     color:
-      'color' in item && item.color
-        ? ((item.color as Schedule['color']) || undefined)
-        : undefined,
+      'color' in item && item.color ? (item.color as Schedule['color']) || undefined : undefined,
     note: 'note' in item ? item.note || undefined : undefined,
-    reminder_minutes:
-      'reminderMinutes' in item ? item.reminderMinutes ?? undefined : undefined,
+    reminder_minutes: 'reminderMinutes' in item ? (item.reminderMinutes ?? undefined) : undefined,
     room: 'room' in item ? item.room || undefined : undefined,
     tag: 'tag' in item ? item.tag || undefined : undefined,
     course_type:
       'courseType' in item && item.courseType
-        ? ((item.courseType as Schedule['course_type']) || undefined)
+        ? (item.courseType as Schedule['course_type']) || undefined
         : undefined,
     created_at: item.createdAt,
     updated_at: 'updatedAt' in item ? item.updatedAt : item.createdAt,
     class_info: classInfo?.name ? { name: classInfo.name } : undefined,
+    teacher_name: teacherName,
+    operator_teacher_name: operatorTeacherName,
+    assistant_teacher_name: assistantTeacherName,
   };
 }
 
@@ -1134,14 +1302,19 @@ function mapMockLessonRecord(record: NonNullable<MockLessonRecord>): LessonRecor
     : undefined;
   const classInfo = DB_CLASSES.find((item) => item.id === record.classId);
   const pkg =
-    DB_PACKAGES.find((item) => item.studentId === record.studentId && item.classId === record.classId) ||
-    DB_PACKAGES.find((item) => item.studentId === record.studentId);
+    DB_PACKAGES.find(
+      (item) => item.studentId === record.studentId && item.classId === record.classId,
+    ) || DB_PACKAGES.find((item) => item.studentId === record.studentId);
   const mappedStatus =
     record.status === 'makeup'
       ? 'makeup'
       : record.status === 'cancelled'
         ? 'cancelled'
-        : 'normal';
+        : record.status === 'leave'
+          ? 'leave'
+          : record.status === 'absent'
+            ? 'absent'
+            : 'normal';
 
   return {
     id: record.id,
@@ -1173,13 +1346,19 @@ function mapMockLessonRecord(record: NonNullable<MockLessonRecord>): LessonRecor
 function mapLessonRecordInput(
   data: Omit<LessonRecord, 'id' | 'created_at' | 'updated_at'> | Partial<LessonRecord>,
 ) {
-  const classInfo = data.class_id ? DB_CLASSES.find((item) => item.id === data.class_id) : undefined;
+  const classInfo = data.class_id
+    ? DB_CLASSES.find((item) => item.id === data.class_id)
+    : undefined;
   const status =
     data.status === 'cancelled'
       ? 'cancelled'
       : data.status === 'makeup'
         ? 'makeup'
-        : 'checked';
+        : data.status === 'leave'
+          ? 'leave'
+          : data.status === 'absent'
+            ? 'absent'
+            : 'checked';
 
   return {
     studentId: data.student_id || '',
@@ -1229,6 +1408,7 @@ export const studentService = {
       mapped.course_packages = packagesByStudent.get(student.id)?.map((pkg) => ({
         id: pkg.id,
         name: pkg.name,
+        type: pkg.type,
         total_hours: pkg.total_hours,
         remaining_hours: pkg.remaining_hours,
         purchased_remaining: pkg.purchased_remaining,
@@ -1271,6 +1451,7 @@ export const studentService = {
       course_packages: packages.map((pkg) => ({
         id: pkg.id,
         name: pkg.name,
+        type: pkg.type,
         total_hours: pkg.total_hours,
         remaining_hours: pkg.remaining_hours,
         purchased_remaining: pkg.purchased_remaining,
@@ -1309,7 +1490,10 @@ export const studentService = {
   /** 更新学员 */
   update: async (studentId: string, data: Partial<Student>) => {
     if (!USE_MOCK) {
-      const updated = await put<BackendStudentListItem>(`/students/${studentId}`, mapStudentPayload(data));
+      const updated = await put<BackendStudentListItem>(
+        `/students/${studentId}`,
+        mapStudentPayload(data),
+      );
       return mapBackendStudentListItem(updated);
     }
 
@@ -1383,6 +1567,7 @@ export const packageService = {
         studentId: data.student_id,
         name: data.name,
         totalHours: data.total_hours,
+        giftHours: data.gift_hours,
         feeAmount: data.fee_amount,
         feeMethod: data.fee_method,
         validStart: data.start_date,
@@ -1401,11 +1586,15 @@ export const packageService = {
         name: data.name,
         totalHours:
           data.total_hours !== undefined
-            ? data.total_hours
+            ? data.total_hours + (data.gift_hours || 0)
             : data.remaining_hours !== undefined
               ? data.remaining_hours
               : undefined,
+        giftHours: data.gift_hours,
         validEnd: data.end_date || data.expiry_date,
+        feeAmount: data.fee_amount,
+        feeMethod: data.fee_method,
+        note: data.note,
       });
       return mapBackendPackage(updated);
     }
@@ -1466,9 +1655,56 @@ export const packageService = {
           studentId: data.student_id,
           name: data.name,
           totalHours: data.total_hours + (data.gift_hours || 0),
+          giftHours: data.gift_hours,
           feeAmount: data.fee_amount,
           feeMethod: data.fee_method,
+          note: data.note,
         }).then(mapBackendPackage),
+
+  /** 提交退费记录 */
+  createRefund: async (data: RefundFormData): Promise<PackageTransaction> => {
+    if (!USE_MOCK) {
+      const created = await post<BackendPackageTransactionRecord>('/course-package-refunds', {
+        studentId: data.student_id,
+        packageId: data.package_id,
+        amount: data.refund_amount,
+        reason: data.reason,
+        operatorId: data.operator_id,
+        operatorName: data.operator_name,
+      });
+      return mapBackendPackageTransaction(created);
+    }
+
+    return mockCreateRefund({
+      studentId: data.student_id,
+      packageId: data.package_id,
+      refundAmount: data.refund_amount,
+      reason: data.reason,
+      operatorId: data.operator_id,
+      operatorName: data.operator_name,
+    }).then(mapMockPackageTransaction);
+  },
+
+  /** 获取课包流水（充值 + 退费） */
+  getTransactions: async (teacherId: string, studentId?: string): Promise<PackageTransaction[]> => {
+    if (!USE_MOCK) {
+      const params = new URLSearchParams({
+        page: '1',
+        pageSize: '100',
+      });
+      if (studentId) {
+        params.set('studentId', studentId);
+      }
+
+      const data = await get<{ list: BackendPackageTransactionRecord[]; pagination: unknown }>(
+        `/package-transactions?${params.toString()}`,
+      );
+      return (data.list || []).map(mapBackendPackageTransaction);
+    }
+
+    const transactions = await mockGetPackageTransactions(teacherId, studentId);
+    return transactions.map(mapMockPackageTransaction);
+  },
 
   /** 获取教师的充值记录（按时间倒序） */
   getRechargeRecords: async (teacherId: string, studentId?: string) => {
@@ -1477,9 +1713,9 @@ export const packageService = {
         page: '1',
         pageSize: '100',
       });
-      const data = await get<BackendPackageListResponse | { list: BackendRechargeRecord[]; pagination: unknown }>(
-        `/recharges?${params.toString()}`,
-      );
+      const data = await get<
+        BackendPackageListResponse | { list: BackendRechargeRecord[]; pagination: unknown }
+      >(`/recharges?${params.toString()}`);
       const list = 'list' in data ? data.list : [];
       return (list as BackendRechargeRecord[])
         .filter((item) => !studentId || item.studentId === studentId)
@@ -1499,22 +1735,23 @@ export const packageService = {
         }));
     }
 
-    // Mock 分支：将 CoursePackage 转换为 RechargeRecord 兼容结构
-    const packages = await mockGetRechargeRecords(teacherId, studentId);
-    return packages.map((pkg) => ({
-      id: pkg.id,
-      packageId: pkg.id,
-      studentId: pkg.studentId,
-      studentName: '',
-      packageName: pkg.name,
-      totalHours: pkg.totalHours,
-      giftHours: pkg.bonusHours,
-      hours: pkg.purchasedHours,
-      feeAmount: pkg.totalAmount,
-      feeMethod: pkg.paymentMethod,
-      method: pkg.paymentMethod,
-      createdAt: pkg.purchaseDate,
-    }));
+    const transactions = await packageService.getTransactions(teacherId, studentId);
+    return transactions
+      .filter((item) => item.type === 'recharge')
+      .map((item) => ({
+        id: item.id,
+        packageId: item.package_id,
+        studentId: item.student_id,
+        studentName: item.student_name,
+        packageName: item.package_name || '',
+        totalHours: (item.purchased_hours || 0) + (item.gift_hours || 0),
+        giftHours: item.gift_hours || 0,
+        hours: item.purchased_hours || 0,
+        feeAmount: item.fee_amount,
+        feeMethod: item.fee_method,
+        method: item.fee_method || '',
+        createdAt: item.created_at,
+      }));
   },
 };
 
@@ -1556,7 +1793,9 @@ export const lessonRecordService = {
   /** 获取全部消课记录（校长/管理员视角） */
   getAll: async (): Promise<LessonRecord[]> => {
     if (!USE_MOCK) {
-      const data = await get<BackendLessonRecordListResponse>('/lesson-records?page=1&pageSize=100');
+      const data = await get<BackendLessonRecordListResponse>(
+        '/lesson-records?page=1&pageSize=100',
+      );
       return data.list.map(mapBackendLessonRecord);
     }
 
@@ -1566,7 +1805,9 @@ export const lessonRecordService = {
   /** 获取教师的消课记录 */
   getByTeacher: async (teacherId: string): Promise<LessonRecord[]> => {
     if (!USE_MOCK) {
-      const data = await get<BackendLessonRecordListResponse>('/lesson-records?page=1&pageSize=100');
+      const data = await get<BackendLessonRecordListResponse>(
+        '/lesson-records?page=1&pageSize=100',
+      );
       return data.list.map(mapBackendLessonRecord);
     }
 
@@ -1677,7 +1918,9 @@ export const leaveService = {
         pageSize: '100',
         studentId,
       });
-      const data = await get<BackendLeaveRequestListResponse>(`/leave-requests?${params.toString()}`);
+      const data = await get<BackendLeaveRequestListResponse>(
+        `/leave-requests?${params.toString()}`,
+      );
       return data.list.map(mapBackendLeave);
     }
 
@@ -1689,13 +1932,17 @@ export const leaveService = {
         page: '1',
         pageSize: '100',
       });
-      const data = await get<BackendLeaveRequestListResponse>(`/leave-requests?${params.toString()}`);
+      const data = await get<BackendLeaveRequestListResponse>(
+        `/leave-requests?${params.toString()}`,
+      );
       return data.list.map(mapBackendLeave);
     }
 
     return (await mockGetLeavesByTeacher(teacherId)).map(mapMockLeave);
   },
-  create: async (data: Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'>): Promise<LeaveRequest> => {
+  create: async (
+    data: Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<LeaveRequest> => {
     if (!USE_MOCK) {
       const created = await post<BackendLeaveRequestCreateResponse>('/leave-requests', {
         studentId: data.student_id,
@@ -1759,14 +2006,16 @@ export const classService = {
   },
   getStudents: async (classId: string): Promise<Student[]> => {
     if (!USE_MOCK) {
-      const list = await get<Array<{
-        avatar?: null | string;
-        gender?: null | 'FEMALE' | 'MALE';
-        id: string;
-        joinedAt: string;
-        name: string;
-        phone?: null | string;
-      }>>(`/classes/${classId}/students`);
+      const list = await get<
+        Array<{
+          avatar?: null | string;
+          gender?: null | 'FEMALE' | 'MALE';
+          id: string;
+          joinedAt: string;
+          name: string;
+          phone?: null | string;
+        }>
+      >(`/classes/${classId}/students`);
       return list.map((item) => ({
         id: item.id,
         name: item.name,
@@ -1816,7 +2065,9 @@ export const classService = {
     return mockDeleteClass(classId);
   },
   removeStudent: async (classId: string, studentId: string) =>
-    USE_MOCK ? mockRemoveStudentFromClass(classId, studentId) : del(`/classes/${classId}/students/${studentId}`),
+    USE_MOCK
+      ? mockRemoveStudentFromClass(classId, studentId)
+      : del(`/classes/${classId}/students/${studentId}`),
   addStudents: async (classId: string, studentIds: string[]) => {
     if (!USE_MOCK) {
       for (const studentId of studentIds) {
@@ -1977,10 +2228,12 @@ export const notificationService = {
         id: '',
         sender_id: data.sender_id,
         receiver_id: filteredReceiverIds[0],
-        type: data.type || mapBackendNotificationType({
-          type: mapFrontendNotificationType(data.type, data.title),
-          title: data.title,
-        }),
+        type:
+          data.type ||
+          mapBackendNotificationType({
+            type: mapFrontendNotificationType(data.type, data.title),
+            title: data.title,
+          }),
         title: data.title,
         content: data.content,
         related_id: data.related_id,

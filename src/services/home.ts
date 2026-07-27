@@ -1,6 +1,8 @@
 /**
  * Service 层 — 首页相关 API
  */
+import type { RecentGroup, RecentStudent } from '@/components/home/RecentLessonList';
+import type { TodoItem } from '@/components/home/TodoList';
 import {
   mockGetTeacher,
   mockGetStudents,
@@ -32,11 +34,10 @@ import type {
   OperationBannerItemData,
 } from '@/data/home';
 import { CLASSES, COURSE_PACKAGES, LESSON_RECORDS, STUDENTS, TEACHERS } from '@/data/mock-database';
-import type { RecentGroup, RecentStudent } from '@/components/home/RecentLessonList';
-import type { TodoItem } from '@/components/home/TodoList';
-import type { Schedule } from '@/types/schedule';
 import type { UserRole } from '@/types/profile';
+import type { Schedule } from '@/types/schedule';
 import { get } from '@/utils/request';
+import { statisticsService } from './statistics';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -174,6 +175,10 @@ const TODO_CONFIG_MAP: Record<
   TodoItemData['type'],
   { icon: string; iconBg: TodoItem['iconBg']; url?: string }
 > = {
+  alert: {
+    icon: 'mdi-alert-circle-outline',
+    iconBg: 'alert',
+  },
   lesson: {
     icon: 'mdi-book-open-variant',
     iconBg: 'checkin',
@@ -222,11 +227,13 @@ function mapTeacher(data: RawHomeTeacher): HomeTeacherSummary {
 function mapTodoItem(item: TodoItemData): HomeTodoItem {
   const config = TODO_CONFIG_MAP[item.type];
   const desc =
-    item.type === 'lesson'
-      ? `${item.time} 前完成备课确认`
-      : item.type === 'recharge'
-        ? `${item.time} 跟进续费提醒`
-        : `${item.time} 查看安排`;
+    item.type === 'alert'
+      ? `${item.time} 查看预警详情`
+      : item.type === 'lesson'
+        ? `${item.time} 前完成备课确认`
+        : item.type === 'recharge'
+          ? `${item.time} 跟进续费提醒`
+          : `${item.time} 查看安排`;
 
   return {
     id: item.id,
@@ -236,6 +243,76 @@ function mapTodoItem(item: TodoItemData): HomeTodoItem {
     iconBg: config.iconBg,
     url: config.url,
   };
+}
+
+function getCurrentAlertQueryParams(viewType: 'operation' | 'finance') {
+  const now = new Date();
+  return {
+    viewType,
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    filterMode: 'month' as const,
+  };
+}
+
+function mapAlertToHomeTodoItem(alert: {
+  id: string;
+  level: 'danger' | 'warning' | 'primary';
+  title: string;
+  desc: string;
+  count: number;
+}): HomeTodoItem {
+  return {
+    id: `todo-alert-${alert.id}`,
+    title: alert.count > 1 ? `${alert.title} (${alert.count})` : alert.title,
+    desc: alert.desc,
+    icon:
+      alert.level === 'primary'
+        ? 'mdi-information-outline'
+        : alert.level === 'danger'
+          ? 'mdi-alert-circle'
+          : 'mdi-alert-circle-outline',
+    iconBg: 'alert',
+    url: `/package-statistics/pages/alert-detail/index?alertId=${encodeURIComponent(alert.id)}`,
+  };
+}
+
+function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] {
+  const items: HomeTodoItem[] = [];
+
+  if (data.pendingLeaves > 0) {
+    items.push({
+      id: 'todo-pending-leaves',
+      title: `${data.pendingLeaves}条请假待处理`,
+      desc: '请及时处理待审批请假',
+      icon: 'mdi-calendar-check-outline',
+      iconBg: 'leave',
+    });
+  }
+
+  if (data.expiringPackages > 0) {
+    items.push({
+      id: 'todo-expiring-packages',
+      title: `${data.expiringPackages}个课包即将到期`,
+      desc: '请及时跟进续费提醒',
+      icon: 'mdi-cash-plus',
+      iconBg: 'hours',
+      url: '/package-course/pages/recharge-records/index',
+    });
+  }
+
+  if (data.lowHourStudents > 0) {
+    items.push({
+      id: 'todo-low-hour-students',
+      title: `${data.lowHourStudents}位学员剩余课时不足`,
+      desc: '请尽快安排续费或提醒',
+      icon: 'mdi-book-open-variant',
+      iconBg: 'checkin',
+      url: '/package-course/pages/classes/index',
+    });
+  }
+
+  return items;
 }
 
 function getScheduleStatus(
@@ -299,7 +376,10 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
   };
 }
 
-function mapBackendScheduleStatus(startTime: string, endTime: string): NonNullable<Schedule['status']> {
+function mapBackendScheduleStatus(
+  startTime: string,
+  endTime: string,
+): NonNullable<Schedule['status']> {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const startMinutes = getMinutesOfDay(startTime);
@@ -340,7 +420,7 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
       id: schedule.id,
       teacher_id: teacher.id,
       class_id: schedule.class?.id,
-      day_of_week: ((new Date().getDay() || 7) as Schedule['day_of_week']),
+      day_of_week: (new Date().getDay() || 7) as Schedule['day_of_week'],
       start_time: schedule.startTime,
       end_time: schedule.endTime,
       created_at: new Date().toISOString(),
@@ -387,8 +467,7 @@ function mapRecentStudent(
   );
   const remainingHours = pkg?.remainingHours ?? student.remainingHours;
   const totalHours = pkg?.totalHours ?? student.totalHours;
-  const tag =
-    remainingHours <= 8 ? '需续费' : remainingHours <= 16 ? '即将到期' : undefined;
+  const tag = remainingHours <= 8 ? '需续费' : remainingHours <= 16 ? '即将到期' : undefined;
 
   return {
     name: student.name,
@@ -404,7 +483,8 @@ function mapRecentStudent(
 function mapRecentGroup(group: RecentGroupData): HomeRecentGroup {
   const classInfo = CLASSES.find((item) => item.id === group.id);
   const latestRecords = LESSON_RECORDS.filter(
-    (record) => record.classId === group.id && record.date === group.date && record.status === 'checked',
+    (record) =>
+      record.classId === group.id && record.date === group.date && record.status === 'checked',
   );
   const fallbackStartTime = classInfo?.startTime || '--:--';
   const fallbackEndTime = classInfo?.endTime || '--:--';
@@ -416,7 +496,13 @@ function mapRecentGroup(group: RecentGroupData): HomeRecentGroup {
     totalHours: latestRecords.reduce((sum, item) => sum + item.hours, 0),
     students: latestRecords
       .map((record) =>
-        mapRecentStudent(record.studentId, group.date, group.id, fallbackStartTime, fallbackEndTime),
+        mapRecentStudent(
+          record.studentId,
+          group.date,
+          group.id,
+          fallbackStartTime,
+          fallbackEndTime,
+        ),
       )
       .filter((item): item is RecentStudent => Boolean(item)),
   };
@@ -517,7 +603,10 @@ function mapBackendOperationContent(data: BackendHomeOperationResponse): HomeOpe
 
 export const homeService = {
   /** 获取教师信息 */
-  getTeacher: async (userId: string, role?: UserRole | null): Promise<HomeTeacherSummary | null> => {
+  getTeacher: async (
+    userId: string,
+    role?: UserRole | null,
+  ): Promise<HomeTeacherSummary | null> => {
     if (!USE_MOCK && role === 'teacher') {
       try {
         const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');
@@ -535,7 +624,10 @@ export const homeService = {
   getStudents: (teacherId: string, limit?: number) => mockGetStudents(teacherId, limit),
 
   /** 获取今日排课 */
-  getTodaySchedules: async (teacherId: string, role?: UserRole | null): Promise<HomeScheduleItem[]> => {
+  getTodaySchedules: async (
+    teacherId: string,
+    role?: UserRole | null,
+  ): Promise<HomeScheduleItem[]> => {
     if (!USE_MOCK && role === 'teacher') {
       try {
         const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');
@@ -579,7 +671,9 @@ export const homeService = {
     if (!USE_MOCK) {
       const backendPeriod = period === 'today' ? 'week' : period === 'lastWeek' ? 'week' : period;
       try {
-        const data = await get<BackendTeacherStatsResponse>(`/home/teacher/stats?period=${backendPeriod}`);
+        const data = await get<BackendTeacherStatsResponse>(
+          `/home/teacher/stats?period=${backendPeriod}`,
+        );
         return {
           checkinCount: data.lessonCount,
           leaveCount: 0,
@@ -632,54 +726,29 @@ export const homeService = {
 
   /** 获取待办事项列表 */
   getTodoItems: async (teacherId: string, role?: UserRole | null): Promise<HomeTodoItem[]> => {
+    const [operationAlertList, financeAlertList] = await Promise.all([
+      statisticsService.getAlerts(getCurrentAlertQueryParams('operation')).catch(() => []),
+      statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch(() => []),
+    ]);
+    const alertTodoItems = [...operationAlertList, ...financeAlertList].map(mapAlertToHomeTodoItem);
+
     if (!USE_MOCK && role === 'teacher') {
       try {
         const data = await get<BackendTeacherTodosResponse>('/home/teacher/todos');
-        const items: HomeTodoItem[] = [];
-
-        if (data.pendingLeaves > 0) {
-          items.push({
-            id: 'todo-pending-leaves',
-            title: `${data.pendingLeaves}条请假待处理`,
-            desc: '请及时处理待审批请假',
-            icon: 'mdi-calendar-check-outline',
-            iconBg: 'leave',
-          });
-        }
-
-        if (data.expiringPackages > 0) {
-          items.push({
-            id: 'todo-expiring-packages',
-            title: `${data.expiringPackages}个课包即将到期`,
-            desc: '请及时跟进续费提醒',
-            icon: 'mdi-cash-plus',
-            iconBg: 'hours',
-            url: '/package-course/pages/recharge-records/index',
-          });
-        }
-
-        if (data.lowHourStudents > 0) {
-          items.push({
-            id: 'todo-low-hour-students',
-            title: `${data.lowHourStudents}位学员剩余课时不足`,
-            desc: '请尽快安排续费或提醒',
-            icon: 'mdi-book-open-variant',
-            iconBg: 'checkin',
-            url: '/package-course/pages/classes/index',
-          });
-        }
-
-        return items;
+        return [...alertTodoItems, ...mapBackendTodoItems(data)];
       } catch {
-        return [];
+        return alertTodoItems;
       }
     }
 
-    return (await mockGetTodoItems(teacherId)).map(mapTodoItem);
+    return [...alertTodoItems, ...(await mockGetTodoItems(teacherId)).map(mapTodoItem)];
   },
 
   /** 获取最近消课记录 */
-  getRecentGroups: async (teacherId: string, role?: UserRole | null): Promise<HomeRecentGroup[]> => {
+  getRecentGroups: async (
+    teacherId: string,
+    role?: UserRole | null,
+  ): Promise<HomeRecentGroup[]> => {
     if (!USE_MOCK && role === 'teacher') {
       try {
         const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');

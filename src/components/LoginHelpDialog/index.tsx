@@ -69,7 +69,7 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
         <View className="rounded-[28rpx] bg-primary/5 px-[28rpx] py-[24rpx] mb-[20rpx]">
           <View className="flex flex-row items-center gap-[16rpx] mb-[12rpx]">
             <View className="w-[56rpx] h-[56rpx] rounded-full bg-white flex items-center justify-center">
-              <Icon name="account-circle-outline" size={32} className="text-primary" />
+              <Icon name="mdi-account-outline" size={32} className="text-primary" />
             </View>
             <Text className="text-[30rpx] font-semibold text-foreground">忘记账号</Text>
           </View>
@@ -81,7 +81,7 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
         <View className="rounded-[28rpx] bg-primary/5 px-[28rpx] py-[24rpx] mb-[24rpx]">
           <View className="flex flex-row items-center gap-[16rpx] mb-[12rpx]">
             <View className="w-[56rpx] h-[56rpx] rounded-full bg-white flex items-center justify-center">
-              <Icon name="lock-outline" size={32} className="text-primary" />
+              <Icon name="mdi-lock" size={32} className="text-primary" />
             </View>
             <Text className="text-[30rpx] font-semibold text-foreground">忘记密码</Text>
           </View>
@@ -99,8 +99,10 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
           </Text>
           <View className="w-[240rpx] h-[240rpx] mx-auto rounded-[24rpx] border-[2rpx] border-dashed border-primary/45 bg-white flex items-center justify-center">
             <View className="flex flex-col items-center">
-              <Icon name="qrcode" size={56} className="text-primary/60" />
-              <Text className="text-[22rpx] text-muted-foreground mt-[12rpx]">客服二维码占位图</Text>
+              <Icon name="mdi-qrcode-scan" size={56} className="text-primary/60" />
+              <Text className="text-[22rpx] text-muted-foreground mt-[12rpx]">
+                客服二维码占位图
+              </Text>
             </View>
           </View>
         </View>

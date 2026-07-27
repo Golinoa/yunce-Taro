@@ -1,8 +1,11 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+/**
  * 学生管理 Mock 数据接口
  * 使用统一数据源 src/data/mock-database.ts
  */
 import Taro from '@tarojs/taro';
+import type { LeaveStatus } from '@/types/leave-request';
+import type { UserRole } from '@/types/profile';
+import type { StudentParent } from '@/types/student';
 import {
   STUDENTS as DB_STUDENTS,
   COURSE_PACKAGES as DB_PACKAGES,
@@ -19,7 +22,6 @@ import {
   type CoursePackage,
   type Class,
 } from './mock-database';
-import type { StudentParent } from '@/types/student';
 
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,7 +33,7 @@ function buildStudentInviteCode(studentId: string): string {
 
 interface StoredProfileIdentity {
   id: string;
-  role: 'principal' | 'teacher' | 'parent';
+  role: UserRole;
   campusIds?: string[];
 }
 
@@ -39,10 +41,51 @@ interface StoredProfile {
   id: string;
   currentContext?: {
     identityId?: string;
-    role?: 'principal' | 'teacher' | 'parent';
+    role?: UserRole;
     campusId?: string;
   };
   identities?: StoredProfileIdentity[];
+}
+
+interface PackageTransactionRecord {
+  id: string;
+  type: 'recharge' | 'refund';
+  studentId: string;
+  studentName: string;
+  packageId?: string;
+  packageName?: string;
+  purchasedHours?: number;
+  giftHours?: number;
+  feeAmount?: number;
+  feeMethod?: string;
+  refundAmount?: number;
+  reason?: string;
+  note?: string;
+  operatorId?: string;
+  operatorName?: string;
+  purchasedRemainingSnapshot?: number;
+  bonusRemainingSnapshot?: number;
+  createdAt: string;
+}
+
+function buildRechargeTransactionFromPackage(pkg: CoursePackage): PackageTransactionRecord {
+  const student = DB_STUDENTS.find((item) => item.id === pkg.studentId);
+  return {
+    id: `txn-recharge-${pkg.id}`,
+    type: 'recharge',
+    studentId: pkg.studentId,
+    studentName: student?.name || '学员',
+    packageId: pkg.id,
+    packageName: pkg.name,
+    purchasedHours: pkg.purchasedHours,
+    giftHours: pkg.bonusHours,
+    feeAmount: pkg.totalAmount,
+    feeMethod: pkg.paymentMethod,
+    note: pkg.note,
+    purchasedRemainingSnapshot: pkg.purchasedHours,
+    bonusRemainingSnapshot: pkg.bonusHours,
+    createdAt: pkg.purchaseDate,
+  };
 }
 
 function getStoredProfile(): StoredProfile | null {
@@ -56,10 +99,12 @@ function getStoredProfile(): StoredProfile | null {
 }
 
 export function getActorScope(actorId: string) {
-  const directTeacher = DB_TEACHERS.find((teacher) => teacher.id === actorId || teacher.userId === actorId);
+  const directTeacher = DB_TEACHERS.find(
+    (teacher) => teacher.id === actorId || teacher.userId === actorId,
+  );
   const storedProfile = getStoredProfile();
 
-  let role: 'principal' | 'teacher' | 'parent' | undefined;
+  let role: UserRole | undefined;
   let campusIds: string[] = [];
 
   if (storedProfile?.id === actorId) {
@@ -93,7 +138,9 @@ export function getActorScope(actorId: string) {
         ? directTeacher.accessScope === 'org'
           ? DB_TEACHERS.map((teacher) => teacher.id)
           : directTeacher.accessScope === 'subject'
-            ? DB_CLASSES.filter((cls) => managedSubjectIds.includes(cls.subjectId)).map((cls) => cls.teacherId)
+            ? DB_CLASSES.filter((cls) => managedSubjectIds.includes(cls.subjectId)).map(
+                (cls) => cls.teacherId,
+              )
             : [directTeacher.id]
         : role === 'teacher'
           ? DB_TEACHERS.filter((teacher) => teacher.userId === actorId).map((teacher) => teacher.id)
@@ -137,7 +184,9 @@ export function filterStudentsByActor(actorId: string): Student[] {
 
   if (scope.accessScope === 'subject' && scope.managedSubjectIds.length) {
     const allowedClassIds = new Set(
-      DB_CLASSES.filter((cls) => scope.managedSubjectIds.includes(cls.subjectId)).map((cls) => cls.id),
+      DB_CLASSES.filter((cls) => scope.managedSubjectIds.includes(cls.subjectId)).map(
+        (cls) => cls.id,
+      ),
     );
     return DB_STUDENTS.filter((student) =>
       student.classIds.some((classId) => allowedClassIds.has(classId)),
@@ -200,7 +249,9 @@ export function filterSchedulesByActor(actorId: string) {
 
   if (scope.accessScope === 'subject' && scope.managedSubjectIds.length) {
     const allowedClassIds = new Set(
-      DB_CLASSES.filter((cls) => scope.managedSubjectIds.includes(cls.subjectId)).map((cls) => cls.id),
+      DB_CLASSES.filter((cls) => scope.managedSubjectIds.includes(cls.subjectId)).map(
+        (cls) => cls.id,
+      ),
     );
     return SCHEDULES.filter((schedule) => allowedClassIds.has(schedule.classId || ''));
   }
@@ -229,21 +280,48 @@ export function filterLessonRecordsByActor(actorId: string) {
 
   if (scope.accessScope === 'subject' && scope.managedSubjectIds.length) {
     const allowedClassIds = new Set(
-      DB_CLASSES.filter((cls) => scope.managedSubjectIds.includes(cls.subjectId)).map((cls) => cls.id),
+      DB_CLASSES.filter((cls) => scope.managedSubjectIds.includes(cls.subjectId)).map(
+        (cls) => cls.id,
+      ),
     );
     return LESSON_RECORDS.filter((record) => allowedClassIds.has(record.classId));
   }
 
   if (scope.teacherIds.length) {
-    return LESSON_RECORDS.filter((record) => scope.teacherIds.includes(record.teacherId));
+    return LESSON_RECORDS.filter((record) => {
+      // 老师在课表页回看记录时，既要能看到自己主讲的消课，
+      // 也要能看到自己作为操作人或助教提交的记录，否则点名后返回课表不会立即变成已点名态。
+      const relatedTeacherIds = [
+        record.teacherId,
+        'operatorTeacherId' in record ? record.operatorTeacherId : undefined,
+        'assistantTeacherId' in record ? record.assistantTeacherId : undefined,
+      ].filter((id): id is string => Boolean(id));
+      return relatedTeacherIds.some((id) => scope.teacherIds.includes(id));
+    });
   }
 
-  return LESSON_RECORDS.filter((record) => record.teacherId === actorId);
+  return LESSON_RECORDS.filter((record) => {
+    const relatedTeacherIds = [
+      record.teacherId,
+      'operatorTeacherId' in record ? record.operatorTeacherId : undefined,
+      'assistantTeacherId' in record ? record.assistantTeacherId : undefined,
+    ].filter((id): id is string => Boolean(id));
+    return relatedTeacherIds.includes(actorId);
+  });
 }
 
 export function filterPackagesByActor(actorId: string): CoursePackage[] {
   const visibleStudentIds = new Set(filterStudentsByActor(actorId).map((student) => student.id));
   return DB_PACKAGES.filter((pkg) => visibleStudentIds.has(pkg.studentId));
+}
+
+const PACKAGE_TRANSACTIONS: PackageTransactionRecord[] = DB_PACKAGES.map(
+  buildRechargeTransactionFromPackage,
+);
+
+function filterPackageTransactionsByActor(actorId: string): PackageTransactionRecord[] {
+  const visibleStudentIds = new Set(filterStudentsByActor(actorId).map((student) => student.id));
+  return PACKAGE_TRANSACTIONS.filter((item) => visibleStudentIds.has(item.studentId));
 }
 
 // 兼容旧接口的类型别名
@@ -259,11 +337,14 @@ export function formatDateCN(dateStr: string): string {
 }
 
 // 获取学员列表
-export async function mockGetStudents(options?: { campusId?: string; teacherId?: string }): Promise<Student[]> {
+export async function mockGetStudents(options?: {
+  campusId?: string;
+  teacherId?: string;
+}): Promise<Student[]> {
   await delay();
   let students = options?.teacherId ? filterStudentsByActor(options.teacherId) : [...DB_STUDENTS];
   if (options?.campusId) {
-    students = students.filter(s => s.campusId === options.campusId);
+    students = students.filter((s) => s.campusId === options.campusId);
   }
   return students;
 }
@@ -271,21 +352,24 @@ export async function mockGetStudents(options?: { campusId?: string; teacherId?:
 // 获取学员详情
 export async function mockGetStudentById(id: string): Promise<Student | undefined> {
   await delay();
-  return DB_STUDENTS.find(s => s.id === id);
+  return DB_STUDENTS.find((s) => s.id === id);
 }
 
 // 获取学员课包
 export async function mockGetStudentPackages(studentId: string): Promise<CoursePackage[]> {
   await delay();
-  return DB_PACKAGES.filter(p => p.studentId === studentId);
+  return DB_PACKAGES.filter((p) => p.studentId === studentId);
 }
 
 // 获取班级列表
-export async function mockGetClasses(options?: { campusId?: string; teacherId?: string }): Promise<Class[]> {
+export async function mockGetClasses(options?: {
+  campusId?: string;
+  teacherId?: string;
+}): Promise<Class[]> {
   await delay();
   let classes = options?.teacherId ? filterClassesByActor(options.teacherId) : [...DB_CLASSES];
   if (options?.campusId) {
-    classes = classes.filter(c => c.campusId === options.campusId);
+    classes = classes.filter((c) => c.campusId === options.campusId);
   }
   return classes;
 }
@@ -293,46 +377,55 @@ export async function mockGetClasses(options?: { campusId?: string; teacherId?: 
 // 获取班级详情
 export async function mockGetClassById(id: string): Promise<Class | undefined> {
   await delay();
-  return DB_CLASSES.find(c => c.id === id);
+  return DB_CLASSES.find((c) => c.id === id);
 }
 
 // 获取班级学员
 export async function mockGetClassStudents(classId: string): Promise<Student[]> {
   await delay();
-  return DB_STUDENTS.filter(s => s.classIds.includes(classId));
+  return DB_STUDENTS.filter((s) => s.classIds.includes(classId));
 }
 
 // 获取消课记录
-export async function mockGetLessonRecords(options?: { studentId?: string; classId?: string; startDate?: string; endDate?: string }): Promise<typeof LESSON_RECORDS> {
+export async function mockGetLessonRecords(options?: {
+  studentId?: string;
+  classId?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<typeof LESSON_RECORDS> {
   await delay();
   let records = [...LESSON_RECORDS];
   if (options?.studentId) {
-    records = records.filter(r => r.studentId === options.studentId);
+    records = records.filter((r) => r.studentId === options.studentId);
   }
   if (options?.classId) {
-    records = records.filter(r => r.classId === options.classId);
+    records = records.filter((r) => r.classId === options.classId);
   }
   if (options?.startDate) {
-    records = records.filter(r => r.date >= options.startDate!);
+    records = records.filter((r) => r.date >= options.startDate!);
   }
   if (options?.endDate) {
-    records = records.filter(r => r.date <= options.endDate!);
+    records = records.filter((r) => r.date <= options.endDate!);
   }
   return records;
 }
 
 // 获取请假记录
-export async function mockGetLeaveRequests(options?: { studentId?: string; classId?: string; status?: string }): Promise<typeof LEAVE_REQUESTS> {
+export async function mockGetLeaveRequests(options?: {
+  studentId?: string;
+  classId?: string;
+  status?: string;
+}): Promise<typeof LEAVE_REQUESTS> {
   await delay();
   let requests = [...LEAVE_REQUESTS];
   if (options?.studentId) {
-    requests = requests.filter(r => r.studentId === options.studentId);
+    requests = requests.filter((r) => r.studentId === options.studentId);
   }
   if (options?.classId) {
-    requests = requests.filter(r => r.classId === options.classId);
+    requests = requests.filter((r) => r.classId === options.classId);
   }
   if (options?.status) {
-    requests = requests.filter(r => r.status === options.status);
+    requests = requests.filter((r) => r.status === options.status);
   }
   return requests;
 }
@@ -344,9 +437,9 @@ export async function mockGetTeachers(): Promise<typeof DB_TEACHERS> {
 }
 
 // 获取教师详情
-export async function mockGetTeacherById(id: string): Promise<typeof DB_TEACHERS[0] | undefined> {
+export async function mockGetTeacherById(id: string): Promise<(typeof DB_TEACHERS)[0] | undefined> {
   await delay();
-  return DB_TEACHERS.find(t => t.id === id);
+  return DB_TEACHERS.find((t) => t.id === id);
 }
 
 // 获取科目列表
@@ -371,15 +464,17 @@ export const MOCK_CLASSES = DB_CLASSES;
 // ============================================
 export async function mockGetScheduleByClassId(classId: string): Promise<typeof SCHEDULES> {
   await delay();
-  return SCHEDULES.filter(s => s.classId === classId);
+  return SCHEDULES.filter((s) => s.classId === classId);
 }
 
 export async function mockGetScheduleByTeacherId(teacherId: string): Promise<typeof SCHEDULES> {
   await delay();
-  return SCHEDULES.filter(s => s.teacherId === teacherId);
+  return SCHEDULES.filter((s) => s.teacherId === teacherId);
 }
 
-export async function mockCreateSchedule(data: Partial<typeof SCHEDULES[0]>): Promise<typeof SCHEDULES[0]> {
+export async function mockCreateSchedule(
+  data: Partial<(typeof SCHEDULES)[0]>,
+): Promise<(typeof SCHEDULES)[0]> {
   await delay();
   return {
     id: `schedule-${Date.now()}`,
@@ -397,9 +492,12 @@ export async function mockCreateSchedule(data: Partial<typeof SCHEDULES[0]>): Pr
   };
 }
 
-export async function mockUpdateSchedule(id: string, data: Partial<typeof SCHEDULES[0]>): Promise<typeof SCHEDULES[0] | undefined> {
+export async function mockUpdateSchedule(
+  id: string,
+  data: Partial<(typeof SCHEDULES)[0]>,
+): Promise<(typeof SCHEDULES)[0] | undefined> {
   await delay();
-  const schedule = SCHEDULES.find(s => s.id === id);
+  const schedule = SCHEDULES.find((s) => s.id === id);
   if (!schedule) return undefined;
   return { ...schedule, ...data };
 }
@@ -409,23 +507,32 @@ export async function mockDeleteSchedule(_id: string): Promise<boolean> {
   return true;
 }
 
-export async function mockCheckScheduleConflict(teacherId: string, dayOfWeek: number, startTime: string, endTime: string, excludeId?: string): Promise<boolean> {
+export async function mockCheckScheduleConflict(
+  teacherId: string,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string,
+  excludeId?: string,
+): Promise<boolean> {
   await delay();
-  return SCHEDULES.some(s =>
-    s.teacherId === teacherId &&
-    s.dayOfWeek === dayOfWeek &&
-    s.id !== excludeId &&
-    s.status === 'scheduled' &&
-    !(endTime <= s.startTime || startTime >= s.endTime)
+  return SCHEDULES.some(
+    (s) =>
+      s.teacherId === teacherId &&
+      s.dayOfWeek === dayOfWeek &&
+      s.id !== excludeId &&
+      s.status === 'scheduled' &&
+      !(endTime <= s.startTime || startTime >= s.endTime),
   );
 }
 
 // ============================================
 // 通知相关
 // ============================================
-export async function mockGetNotificationsByReceiver(receiverId: string): Promise<typeof NOTIFICATIONS> {
+export async function mockGetNotificationsByReceiver(
+  receiverId: string,
+): Promise<typeof NOTIFICATIONS> {
   await delay();
-  return NOTIFICATIONS.filter(n => n.receiverId === receiverId);
+  return NOTIFICATIONS.filter((n) => n.receiverId === receiverId);
 }
 
 export async function mockMarkNotificationAsRead(_id: string): Promise<boolean> {
@@ -438,7 +545,9 @@ export async function mockMarkAllNotificationsAsRead(_receiverId: string): Promi
   return true;
 }
 
-export async function mockSendNotification(data: Partial<typeof NOTIFICATIONS[0]>): Promise<typeof NOTIFICATIONS[0]> {
+export async function mockSendNotification(
+  data: Partial<(typeof NOTIFICATIONS)[0]>,
+): Promise<(typeof NOTIFICATIONS)[0]> {
   await delay();
   return {
     id: `notif-${Date.now()}`,
@@ -468,7 +577,7 @@ export async function mockSearchStudents(teacherId: string, query: string) {
 
 export async function mockGetStudentsByParent(parentId: string) {
   await delay();
-  return DB_STUDENTS.filter(s => s.parentId === parentId);
+  return DB_STUDENTS.filter((s) => s.parentId === parentId);
 }
 
 export async function mockCreateStudent(data: any) {
@@ -478,7 +587,7 @@ export async function mockCreateStudent(data: any) {
 
 export async function mockUpdateStudent(studentId: string, data: any) {
   await delay();
-  const student = DB_STUDENTS.find(s => s.id === studentId);
+  const student = DB_STUDENTS.find((s) => s.id === studentId);
   return student ? { ...student, ...data } : undefined;
 }
 
@@ -528,12 +637,48 @@ export async function mockBindParentToStudent(_studentId: string, _parentId: str
 
 export async function mockGetPackagesByStudent(studentId: string) {
   await delay();
-  return DB_PACKAGES.filter(p => p.studentId === studentId);
+  const packages = DB_PACKAGES.filter((p) => p.studentId === studentId);
+  if (packages.length > 0) {
+    return packages;
+  }
+
+  const student = DB_STUDENTS.find((item) => item.id === studentId);
+  if (!student || student.remainingHours <= 0) {
+    return [];
+  }
+
+  const firstClass = DB_CLASSES.find((cls) => student.classIds.includes(cls.id));
+  const subject = firstClass
+    ? SUBJECTS.find((item) => item.id === firstClass.subjectId)
+    : undefined;
+  const syntheticPackage: CoursePackage = {
+    id: `pkg-virtual-${student.id}`,
+    studentId: student.id,
+    classId: firstClass?.id || '',
+    name: `${subject?.name || '通用'}课包`,
+    subjectId: firstClass?.subjectId || '',
+    totalHours: Math.max(student.totalHours, student.remainingHours),
+    purchasedHours: Math.max(student.totalHours, student.remainingHours),
+    bonusHours: 0,
+    usedHours: Math.max(student.totalHours - student.remainingHours, 0),
+    remainingHours: student.remainingHours,
+    pricePerHour: firstClass?.pricePerLesson || 0,
+    totalAmount:
+      Math.max(student.totalHours, student.remainingHours) * (firstClass?.pricePerLesson || 0),
+    paymentMethod: 'transfer',
+    status: 'active',
+    purchaseDate: student.createdAt,
+    expireDate: undefined,
+    note: 'mock 自动生成的汇总课包',
+  };
+
+  DB_PACKAGES.push(syntheticPackage);
+  return [syntheticPackage];
 }
 
 export async function mockGetPackageById(packageId: string) {
   await delay();
-  return DB_PACKAGES.find(p => p.id === packageId);
+  return DB_PACKAGES.find((p) => p.id === packageId);
 }
 
 export async function mockCreatePackage(data: any) {
@@ -543,23 +688,24 @@ export async function mockCreatePackage(data: any) {
 
 export async function mockUpdatePackage(packageId: string, data: any) {
   await delay();
-  const pkg = DB_PACKAGES.find(p => p.id === packageId);
+  const pkg = DB_PACKAGES.find((p) => p.id === packageId);
   return pkg ? { ...pkg, ...data } : undefined;
 }
 
 export async function mockDeductPackageHours(packageId: string, hours: number) {
   await delay();
-  const pkg = DB_PACKAGES.find(p => p.id === packageId);
+  const pkg = DB_PACKAGES.find((p) => p.id === packageId);
   if (!pkg) throw new Error('Package not found');
   return {
     pkg,
-    deduct: { purchasedHours: hours, bonusHours: 0 }
+    deduct: { purchasedHours: hours, bonusHours: 0 },
   };
 }
 
 export async function mockGetActivePackagesByStudent(studentId: string) {
   await delay();
-  return DB_PACKAGES.filter(p => p.studentId === studentId && p.status === 'active');
+  const packages = await mockGetPackagesByStudent(studentId);
+  return packages.filter((p) => p.status === 'active');
 }
 
 export async function mockGetPackageTemplates(teacherId: string) {
@@ -613,7 +759,7 @@ export async function mockDeletePackageTemplate(_templateId: string) {
 
 export async function mockGetRecordsByStudent(studentId: string, limit?: number) {
   await delay();
-  let records = LESSON_RECORDS.filter(r => r.studentId === studentId);
+  let records = LESSON_RECORDS.filter((r) => r.studentId === studentId);
   if (limit) records = records.slice(0, limit);
   return records;
 }
@@ -623,15 +769,23 @@ export async function mockGetLessonRecordsByTeacher(teacherId: string) {
   return filterLessonRecordsByActor(teacherId);
 }
 
-export async function mockGetLessonRecordsByTeacherAndMonth(teacherId: string, year: number, month: number) {
+export async function mockGetLessonRecordsByTeacherAndMonth(
+  teacherId: string,
+  year: number,
+  month: number,
+) {
   await delay();
-  return filterLessonRecordsByActor(teacherId).filter(r => {
+  return filterLessonRecordsByActor(teacherId).filter((r) => {
     const d = new Date(r.date);
     return d.getFullYear() === year && d.getMonth() === month - 1;
   });
 }
 
-export async function mockGetLessonRecordsByTeacherAndRange(teacherId: string, startDate: string, endDate: string) {
+export async function mockGetLessonRecordsByTeacherAndRange(
+  teacherId: string,
+  startDate: string,
+  endDate: string,
+) {
   await delay();
   return filterLessonRecordsByActor(teacherId).filter(
     (record) => record.date >= startDate && record.date <= endDate,
@@ -640,7 +794,7 @@ export async function mockGetLessonRecordsByTeacherAndRange(teacherId: string, s
 
 export async function mockGetLessonRecordsByStudent(studentId: string) {
   await delay();
-  return LESSON_RECORDS.filter(r => r.studentId === studentId);
+  return LESSON_RECORDS.filter((r) => r.studentId === studentId);
 }
 
 export async function mockGetAllLessonRecords() {
@@ -659,24 +813,33 @@ export async function mockCreateLessonRecord(data: any) {
   return record;
 }
 
-export async function mockRevokeLessonRecord(_recordId: string, _operatorId: string, _reason: string) {
+export async function mockRevokeLessonRecord(
+  _recordId: string,
+  _operatorId: string,
+  _reason: string,
+) {
   await delay();
   return true;
 }
 
 export async function mockGetLessonRecordById(recordId: string) {
   await delay();
-  return LESSON_RECORDS.find(r => r.id === recordId);
+  return LESSON_RECORDS.find((r) => r.id === recordId);
 }
 
 export async function mockDeleteLessonRecord(_recordId: string) {
   await delay();
-  return true;
+  const index = LESSON_RECORDS.findIndex((record) => record.id === _recordId);
+  if (index >= 0) {
+    LESSON_RECORDS.splice(index, 1);
+    return true;
+  }
+  return false;
 }
 
 export async function mockGetLeavesByStudent(studentId: string) {
   await delay();
-  return LEAVE_REQUESTS.filter(r => r.studentId === studentId);
+  return LEAVE_REQUESTS.filter((r) => r.studentId === studentId);
 }
 
 export async function mockGetLeavesByTeacher(teacherId: string) {
@@ -691,11 +854,22 @@ export async function mockGetLeavesByTeacher(teacherId: string) {
 
 export async function mockCreateLeaveRequest(data: any) {
   await delay();
-  return { id: `leave-${Date.now()}`, ...data };
+  const record = {
+    id: `leave-${Date.now()}`,
+    ...data,
+  };
+  LEAVE_REQUESTS.unshift(record);
+  return record;
 }
 
-export async function mockUpdateLeaveRequestStatus(_leaveId: string, _status: string) {
+export async function mockUpdateLeaveRequestStatus(_leaveId: string, _status: LeaveStatus) {
   await delay();
+  const target = LEAVE_REQUESTS.find((leave) => leave.id === _leaveId);
+  if (!target) {
+    return false;
+  }
+  target.status = _status;
+  target.processedAt = new Date().toISOString();
   return true;
 }
 
@@ -706,12 +880,12 @@ export async function mockGetClassesByTeacher(teacherId: string) {
 
 export async function mockGetStudentsByClass(classId: string) {
   await delay();
-  return DB_STUDENTS.filter(s => s.classIds.includes(classId));
+  return DB_STUDENTS.filter((s) => s.classIds.includes(classId));
 }
 
 export async function mockGetClassStudentCount(classId: string) {
   await delay();
-  return DB_STUDENTS.filter(s => s.classIds.includes(classId)).length;
+  return DB_STUDENTS.filter((s) => s.classIds.includes(classId)).length;
 }
 
 export async function mockCreateClass(data: any) {
@@ -721,7 +895,7 @@ export async function mockCreateClass(data: any) {
 
 export async function mockUpdateClass(classId: string, data: any) {
   await delay();
-  const cls = DB_CLASSES.find(c => c.id === classId);
+  const cls = DB_CLASSES.find((c) => c.id === classId);
   return cls ? { ...cls, ...data } : undefined;
 }
 
@@ -740,7 +914,11 @@ export async function mockAddStudentsToClass(_classId: string, _studentIds: stri
   return true;
 }
 
-export async function mockTransferStudent(_classId: string, _targetClassId: string, _studentId: string) {
+export async function mockTransferStudent(
+  _classId: string,
+  _targetClassId: string,
+  _studentId: string,
+) {
   await delay();
   return true;
 }
@@ -757,7 +935,7 @@ export async function mockGetSchedulesByTeacher(teacherId: string) {
 
 export async function mockGetScheduleById(scheduleId: string) {
   await delay();
-  return SCHEDULES.find(s => s.id === scheduleId);
+  return SCHEDULES.find((s) => s.id === scheduleId);
 }
 
 export async function mockCreateScheduleFull(data: any) {
@@ -767,7 +945,7 @@ export async function mockCreateScheduleFull(data: any) {
 
 export async function mockUpdateScheduleFull(scheduleId: string, data: any) {
   await delay();
-  const schedule = SCHEDULES.find(s => s.id === scheduleId);
+  const schedule = SCHEDULES.find((s) => s.id === scheduleId);
   return schedule ? { ...schedule, ...data } : undefined;
 }
 
@@ -778,7 +956,49 @@ export async function mockDeleteScheduleFull(_scheduleId: string) {
 
 export async function mockCreateRecharge(data: any) {
   await delay();
-  return { id: `recharge-${Date.now()}`, ...data };
+  const student = DB_STUDENTS.find((item) => item.id === data.student_id);
+  if (!student) {
+    throw new Error('Student not found');
+  }
+
+  const relatedClass =
+    DB_CLASSES.find(
+      (cls) =>
+        student.classIds.includes(cls.id) &&
+        (!data.subject_id || cls.subjectId === data.subject_id),
+    ) || DB_CLASSES.find((cls) => student.classIds.includes(cls.id));
+  const now = new Date().toISOString();
+  const purchasedHours = Math.max(Number(data.total_hours || 0), 0);
+  const giftHours = Math.max(Number(data.gift_hours || 0), 0);
+  const totalHours = purchasedHours + giftHours;
+  const feeAmount = Number(data.fee_amount || 0);
+
+  const createdPackage: CoursePackage = {
+    id: `pkg-${Date.now()}`,
+    studentId: data.student_id,
+    classId: relatedClass?.id || student.classIds[0] || '',
+    name: data.name,
+    subjectId: data.subject_id || relatedClass?.subjectId || '',
+    totalHours,
+    purchasedHours,
+    bonusHours: giftHours,
+    usedHours: 0,
+    remainingHours: totalHours,
+    pricePerHour: purchasedHours > 0 ? Math.round((feeAmount / purchasedHours) * 100) / 100 : 0,
+    totalAmount: feeAmount,
+    paymentMethod: (data.fee_method || 'cash') as CoursePackage['paymentMethod'],
+    status: 'active',
+    purchaseDate: now,
+    expireDate: data.valid_days
+      ? new Date(Date.now() + Number(data.valid_days) * 24 * 60 * 60 * 1000).toISOString()
+      : undefined,
+    note: data.note,
+  };
+
+  DB_PACKAGES.unshift(createdPackage);
+  PACKAGE_TRANSACTIONS.unshift(buildRechargeTransactionFromPackage(createdPackage));
+
+  return createdPackage;
 }
 
 export async function mockGetRechargeRecords(teacherId: string, studentId?: string) {
@@ -787,7 +1007,59 @@ export async function mockGetRechargeRecords(teacherId: string, studentId?: stri
   if (studentId) {
     packages = packages.filter((pkg) => pkg.studentId === studentId);
   }
-  return packages.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+  return packages.sort(
+    (a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime(),
+  );
+}
+
+export async function mockCreateRefund(data: {
+  studentId: string;
+  packageId: string;
+  refundAmount: number;
+  reason: string;
+  operatorId?: string;
+  operatorName?: string;
+}) {
+  await delay();
+  const pkg = DB_PACKAGES.find((item) => item.id === data.packageId);
+  const student = DB_STUDENTS.find((item) => item.id === data.studentId);
+
+  if (!pkg || !student) {
+    throw new Error('Refund target not found');
+  }
+
+  const refundRecord: PackageTransactionRecord = {
+    id: `txn-refund-${Date.now()}`,
+    type: 'refund',
+    studentId: data.studentId,
+    studentName: student.name,
+    packageId: pkg.id,
+    packageName: pkg.name,
+    refundAmount: Number(data.refundAmount || 0),
+    reason: data.reason,
+    feeAmount: Number(data.refundAmount || 0),
+    feeMethod: pkg.paymentMethod,
+    operatorId: data.operatorId,
+    operatorName: data.operatorName,
+    purchasedRemainingSnapshot:
+      pkg.purchasedHours - pkg.bonusHours > 0
+        ? Math.max(pkg.remainingHours - Math.min(pkg.remainingHours, pkg.bonusHours), 0)
+        : 0,
+    bonusRemainingSnapshot: Math.min(pkg.remainingHours, pkg.bonusHours),
+    createdAt: new Date().toISOString(),
+  };
+
+  PACKAGE_TRANSACTIONS.unshift(refundRecord);
+  return refundRecord;
+}
+
+export async function mockGetPackageTransactions(teacherId: string, studentId?: string) {
+  await delay();
+  let records = filterPackageTransactionsByActor(teacherId);
+  if (studentId) {
+    records = records.filter((item) => item.studentId === studentId);
+  }
+  return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function pickBestPackage(packages: any[], _hoursNeeded: number, _subjectId?: string) {
@@ -796,7 +1068,7 @@ export function pickBestPackage(packages: any[], _hoursNeeded: number, _subjectI
 
 export async function mockGetSchedulesByStudent(studentId: string) {
   await delay();
-  const student = DB_STUDENTS.find(s => s.id === studentId);
+  const student = DB_STUDENTS.find((s) => s.id === studentId);
   if (!student) return [];
-  return SCHEDULES.filter(s => student.classIds.includes(s.classId || ''));
+  return SCHEDULES.filter((s) => student.classIds.includes(s.classId || ''));
 }

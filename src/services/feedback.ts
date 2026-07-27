@@ -1,9 +1,9 @@
 /**
  * Service 层 — 意见反馈 API
  */
-import { post } from '@/utils/request';
 import { mockCreateFeedback } from '@/data/feedback';
 import type { UserRole } from '@/types/profile';
+import { post } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'

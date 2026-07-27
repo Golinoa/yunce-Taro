@@ -1,15 +1,14 @@
 /**
  * ChartContainer - 纵向柱状图组件
- * 使用微信小程序 Canvas API 手动绘制柱状图
- * 绘制完成后转为图片显示，避免原生 Canvas 滚动时浮出容器
+ * 使用 Canvas 2D 同层渲染柱状图，减少旧版 canvas -> 图片 的转换开销
  *
  * 支持不同页面展示不同数据：
  * - 运营页：课时消耗趋势（蓝色柱）
  * - 财务页：收入趋势（紫色柱）
  */
-import { View, Text, Canvas, Image } from '@tarojs/components';
+import { View, Text, Canvas } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { hexColors } from '@/theme';
 
 export interface ChartDataItem {
@@ -63,6 +62,16 @@ const THEME_MAP: Record<ChartTheme, { bar: string; barLight: string; barFill: st
 const GRID_COLOR = hexColors.border;
 const LABEL_COLOR = hexColors.mutedForeground;
 
+interface Canvas2DNode {
+  width: number;
+  height: number;
+  getContext: (contextId: '2d') => CanvasRenderingContext2D | null;
+}
+
+interface CanvasNodeQueryResult {
+  node?: Canvas2DNode;
+}
+
 /**
  * 格式化Y轴数值：长数字截断
  */
@@ -76,22 +85,30 @@ function formatAxisValue(n: number): string {
   return `${w % 1 === 0 ? w.toFixed(0) : w.toFixed(1)}w`;
 }
 
-function drawBarChart(
-  canvasId: string,
-  data: ChartDataItem[],
-  _unit: string,
-  theme: ChartTheme,
-  onDrawComplete: (tempFilePath: string) => void,
+function drawRoundedTopBar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  bottomY: number,
+  radius: number,
 ) {
-  const instance = Taro.getCurrentInstance();
-  const page = instance?.page as unknown as Parameters<typeof Taro.canvasToTempFilePath>[1];
-  const ctx = Taro.createCanvasContext(canvasId, page);
-  if (!ctx) return;
+  ctx.beginPath();
+  ctx.moveTo(x, bottomY);
+  ctx.lineTo(x, y + radius);
+  ctx.arcTo(x, y, x + radius, y, radius);
+  ctx.arcTo(x + width, y, x + width, y + radius, radius);
+  ctx.lineTo(x + width, bottomY);
+  ctx.closePath();
+}
 
+function drawBarChart(ctx: CanvasRenderingContext2D, data: ChartDataItem[], theme: ChartTheme) {
   const maxVal = Math.max(...data.map((d) => d.value), 1);
   const colors = THEME_MAP[theme];
+  const bottomY = PAD_TOP + CHART_H;
 
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.save();
 
   // 绘制Y轴网格线 + 标签
   const ySteps = [0, 0.25, 0.5, 0.75, 1];
@@ -100,17 +117,17 @@ function drawBarChart(
     ctx.beginPath();
     ctx.moveTo(PAD_LEFT, y);
     ctx.lineTo(PAD_LEFT + CHART_W, y);
-    ctx.setStrokeStyle(GRID_COLOR);
-    ctx.setLineDash(step === 0 || step === 1 ? [] : [3, 3], 0);
-    ctx.setLineWidth(1);
+    ctx.strokeStyle = GRID_COLOR;
+    ctx.setLineDash(step === 0 || step === 1 ? [] : [3, 3]);
+    ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.setLineDash([], 0);
+    ctx.setLineDash([]);
 
     const val = Math.round(maxVal * step);
-    ctx.setFillStyle(LABEL_COLOR);
+    ctx.fillStyle = LABEL_COLOR;
     ctx.font = '10px sans-serif';
-    ctx.setTextAlign('right');
-    ctx.setTextBaseline('middle');
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     ctx.fillText(formatAxisValue(val), PAD_LEFT - 6, y);
   });
 
@@ -125,46 +142,24 @@ function drawBarChart(
     const x = PAD_LEFT + groupWidth * i + (groupWidth - barWidth) / 2;
     const y = PAD_TOP + CHART_H - barH;
 
-    // 绘制圆角柱子（用矩形+圆角顶部模拟）
-    ctx.beginPath();
-    ctx.moveTo(x, y + barRadius);
-    ctx.arcTo(x, y, x + barRadius, y, barRadius);
-    ctx.arcTo(x + barWidth, y, x + barWidth, y + barRadius, barRadius);
-    ctx.lineTo(x + barWidth, PAD_TOP + CHART_H);
-    ctx.lineTo(x, PAD_TOP + CHART_H);
-    ctx.closePath();
+    // 绘制顶部圆角柱子，底部与坐标轴贴合
+    drawRoundedTopBar(ctx, x, y, barWidth, bottomY, barRadius);
 
     // 渐变填充
-    const gradient = ctx.createLinearGradient(x, y, x, PAD_TOP + CHART_H);
+    const gradient = ctx.createLinearGradient(x, y, x, bottomY);
     gradient.addColorStop(0, colors.barFill);
     gradient.addColorStop(1, colors.bar);
-    ctx.setFillStyle(gradient);
+    ctx.fillStyle = gradient;
     ctx.fill();
 
     // X轴标签
-    ctx.setFillStyle(LABEL_COLOR);
+    ctx.fillStyle = LABEL_COLOR;
     ctx.font = '10px sans-serif';
-    ctx.setTextAlign('center');
-    ctx.setTextBaseline('top');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
     ctx.fillText(item.label, x + barWidth / 2, CANVAS_H - 18);
   });
-
-  ctx.draw(false, () => {
-    setTimeout(() => {
-      Taro.canvasToTempFilePath(
-        {
-          canvasId,
-          success: (res) => {
-            if (res.tempFilePath) onDrawComplete(res.tempFilePath);
-          },
-          fail: (err) => {
-            console.warn('ChartContainer: canvasToTempFilePath failed', err);
-          },
-        },
-        page,
-      );
-    }, 200);
-  });
+  ctx.restore();
 }
 
 const ChartContainer: React.FC<ChartContainerProps> = ({
@@ -174,16 +169,53 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   theme = 'primary',
 }) => {
   const canvasIdRef = useRef(`bc-${Math.random().toString(36).slice(2, 9)}`);
-  const [imageUrl, setImageUrl] = useState('');
 
   useEffect(() => {
-    if (!data || data.length === 0) return;
-    setImageUrl('');
-    setTimeout(() => {
-      drawBarChart(canvasIdRef.current, data, unit, theme, (tempFilePath) =>
-        setImageUrl(tempFilePath),
-      );
-    }, 300);
+    if (!data || data.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const query = Taro.createSelectorQuery();
+      query
+        .select(`#${canvasIdRef.current}`)
+        .fields({ node: true, size: true })
+        .exec((res) => {
+          if (cancelled) {
+            return;
+          }
+
+          const target = res?.[0] as CanvasNodeQueryResult | undefined;
+          const canvas = target?.node;
+          if (!canvas) {
+            console.warn('ChartContainer: Canvas 2D 节点未找到');
+            return;
+          }
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            console.warn('ChartContainer: Canvas 2D 上下文获取失败');
+            return;
+          }
+
+          const dpr = Taro.getWindowInfo().pixelRatio || 1;
+          canvas.width = CANVAS_W * dpr;
+          canvas.height = CANVAS_H * dpr;
+          if (typeof ctx.setTransform === 'function') {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.scale(dpr, dpr);
+
+          drawBarChart(ctx, data, theme);
+        });
+    }, 80);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [data, unit, theme]);
 
   if (!data || data.length === 0) {
@@ -202,20 +234,13 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       {title && <Text className="text-lg font-semibold text-foreground block mb-4">{title}</Text>}
       <View className="flex justify-center">
         <Canvas
-          canvasId={canvasIdRef.current}
+          id={canvasIdRef.current}
+          type="2d"
           style={{
             width: `${CANVAS_W}px`,
             height: `${CANVAS_H}px`,
-            position: 'fixed',
-            left: '-9999px',
-            top: '-9999px',
           }}
         />
-        {imageUrl ? (
-          <Image src={imageUrl} mode="widthFix" style={{ width: `${CANVAS_W}px` }} />
-        ) : (
-          <View style={{ width: `${CANVAS_W}px`, height: `${CANVAS_H}px` }} />
-        )}
       </View>
     </View>
   );

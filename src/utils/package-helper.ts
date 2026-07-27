@@ -3,6 +3,8 @@
  */
 import type { CoursePackage } from '@/types/course-package';
 
+type TrialLikePackage = Pick<CoursePackage, 'type' | 'name' | 'note'>;
+
 /**
  * 从多个课包中选择最优课包
  * 优先级：科目匹配+余额充足 > 通用课包+余额充足 > 任意有余额 > 第一个（欠课）
@@ -40,4 +42,18 @@ export function pickBestPackage(
 
   // 优先级4：第一个课包（欠课状态）
   return sorted[0];
+}
+
+export function isTrialPackage(pkg?: TrialLikePackage | null): boolean {
+  if (!pkg) return false;
+  if (pkg.type === 'trial') return true;
+  const text = `${pkg.name || ''} ${pkg.note || ''}`;
+  return /试听|体验/.test(text);
+}
+
+export function hasTrialPackage(
+  packages?: Array<TrialLikePackage | null | undefined> | null,
+): boolean {
+  if (!packages?.length) return false;
+  return packages.some((pkg) => isTrialPackage(pkg || null));
 }

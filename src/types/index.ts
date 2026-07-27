@@ -1,5 +1,5 @@
 /**
- * 云策教务 - 类型定义统一导出
+ * 松果排课 - 类型定义统一导出
  */
 
 // 用户与认证
@@ -28,7 +28,14 @@ export type {
 export type { Student, StudentParent } from './student';
 
 // 课时套餐
-export type { PackageStatus, FeeMethod, CoursePackage } from './course-package';
+export type {
+  PackageStatus,
+  FeeMethod,
+  CoursePackage,
+  RefundFormData,
+  PackageTransaction,
+  PackageTransactionType,
+} from './course-package';
 
 // 科目
 export type { Subject } from './subject';
@@ -60,6 +67,37 @@ export type { NotificationType, Notification } from './notification';
 
 // 反馈
 export type { Feedback } from './feedback';
+
+// 试听线索
+export type {
+  LeadStatus,
+  LeadSourceType,
+  OwnerLockStatus,
+  OwnerLockReason,
+  Lead,
+  LeadBookingStatus,
+  TrialMode,
+  LeadBooking,
+  TrialSlotStatus,
+  TrialSlotConfig,
+  FollowUpAction,
+  IntentLevel,
+  LeadFollowUp,
+  ConversionType,
+  LeadConversion,
+  LeadFilterTab,
+  LeadSort,
+  LeadSummary,
+  LeadCardModel,
+  LeadFormData,
+} from './lead';
+export {
+  LEAD_STATUS_META,
+  LEAD_SOURCE_META,
+  LEAD_FILTER_TAB_OPTIONS,
+  FOLLOW_UP_ACTION_META,
+  INTENT_LEVEL_META,
+} from '../constants/lead';
 
 // 校区设置
 export type {

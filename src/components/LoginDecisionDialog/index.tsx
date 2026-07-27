@@ -96,9 +96,7 @@ const LoginDecisionDialog: React.FC<LoginDecisionDialogProps> = ({
             )}
             onClick={onPrimary}
           >
-            <Text className="text-[30rpx] text-primary font-semibold">
-              {primaryText}
-            </Text>
+            <Text className="text-[30rpx] text-primary font-semibold">{primaryText}</Text>
           </View>
         </View>
       </View>

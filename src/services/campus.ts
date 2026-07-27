@@ -3,7 +3,6 @@
  * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用
  * 所有方法统一返回 Promise<T>，保证联调切换后类型一致
  */
-import { get, put } from '@/utils/request';
 import {
   mockGetCampuses,
   mockGetCampusById,
@@ -43,6 +42,7 @@ import type {
   Subject,
   SubjectFormData,
 } from '@/types/campus';
+import { get, put } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -106,7 +106,8 @@ export const campusService = {
   // getList: () => get<CampusUIModel[]>('/api/campuses'),
 
   /** 获取校区详情 */
-  getById: async (id: string): Promise<CampusUIModel | null> => (await mockGetCampusById(id)) ?? null,
+  getById: async (id: string): Promise<CampusUIModel | null> =>
+    (await mockGetCampusById(id)) ?? null,
 
   /** 添加校区 */
   add: (data: CampusFormData): Promise<CampusUIModel> => mockAddCampus(data),
@@ -201,7 +202,9 @@ export const notifyService = {
   toggle: async (itemId: string): Promise<NotifyGroup[]> => {
     if (!USE_MOCK) {
       const currentGroups = await notifyService.getList();
-      const target = currentGroups.flatMap((group) => group.items).find((item) => item.id === itemId);
+      const target = currentGroups
+        .flatMap((group) => group.items)
+        .find((item) => item.id === itemId);
       if (!target) {
         throw new Error('通知设置不存在');
       }

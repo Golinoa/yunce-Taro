@@ -384,7 +384,17 @@ export function useClasses() {
       return '结束日期不能早于开始日期';
     }
     return null;
-  }, [classType, endDate, endTime, name, selectedPackageId, startDate, startTime, teachers, weekdays]);
+  }, [
+    classType,
+    endDate,
+    endTime,
+    name,
+    selectedPackageId,
+    startDate,
+    startTime,
+    teachers,
+    weekdays,
+  ]);
 
   const submitBlockedReason = useMemo(() => validate() || '', [validate]);
   const canCreate = useMemo(() => !submitBlockedReason && !saving, [saving, submitBlockedReason]);

@@ -71,11 +71,7 @@ const PaymentSettingsSheet: React.FC<PaymentSettingsSheetProps> = ({
   };
 
   return (
-    <BottomSheet
-      visible={visible}
-      title="发放设置"
-      onClose={submitting ? () => {} : onClose}
-    >
+    <BottomSheet visible={visible} title="发放设置" onClose={submitting ? () => {} : onClose}>
       <View className="px-4 pb-6">
         {/* 发薪日 */}
         <View className="mb-5">

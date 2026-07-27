@@ -1,8 +1,9 @@
 /**
  * ProfileGrid - 个人中心图标网格卡片
  *
- * 按卡片聚合同类功能入口，以 4 列图标网格展示。
- * 参考电商"我的订单/我的服务"布局，避免与首页金刚区重复。
+ * 按卡片聚合同类功能入口，支持两种展示风格：
+ * - default: 4 列彩色图标背景（金刚区风格）
+ * - simple: 简洁图标 + 文字，无背景色块，对齐参考设计稿「我的约课/我的服务」
  */
 import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
@@ -11,13 +12,14 @@ import Icon from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
 
 export type GridIconColor = 'primary' | 'accent' | 'warning' | 'info' | 'success' | 'destructive';
+export type GridVariant = 'default' | 'simple';
 
 export interface GridItem {
   /** 图标名称 */
   icon: IconName;
   /** 入口文案 */
   label: string;
-  /** 图标主题色 */
+  /** 图标主题色（default 模式下控制背景与图标色） */
   color?: GridIconColor;
   /** 点击跳转 */
   onClick?: () => void;
@@ -28,6 +30,8 @@ export interface ProfileGridProps {
   title: string;
   /** 入口列表 */
   items: GridItem[];
+  /** 展示风格 */
+  variant?: GridVariant;
   /** 额外类名 */
   className?: string;
 }
@@ -41,19 +45,42 @@ const COLOR_STYLES: Record<GridIconColor, { bg: string; icon: string }> = {
   destructive: { bg: 'bg-destructive-10', icon: 'text-destructive' },
 };
 
-const ProfileGrid: React.FC<ProfileGridProps> = ({ title, items, className }) => {
+const ProfileGrid: React.FC<ProfileGridProps> = ({
+  title,
+  items,
+  variant = 'default',
+  className,
+}) => {
+  const isSimple = variant === 'simple';
+
   return (
     <View
       className={cn(
-        'mx-[32rpx] mb-[24rpx] px-[24rpx] pt-[28rpx] pb-[20rpx] rounded-[32rpx] bg-white shadow-soft',
+        'mx-[32rpx] px-[24rpx] pt-[28rpx] pb-[20rpx] rounded-[24rpx] bg-white shadow-soft',
         className,
       )}
     >
-      <Text className="text-[32rpx] font-bold text-foreground block mb-[24rpx]">{title}</Text>
-      <View className="grid grid-cols-4 gap-y-[24rpx]">
+      <Text className="text-[32rpx] font-bold text-foreground block mb-[28rpx]">{title}</Text>
+      <View className={cn('grid gap-y-[24rpx]', isSimple ? 'grid-cols-4' : 'grid-cols-4')}>
         {items.map((item) => {
           const color = item.color || 'primary';
           const styles = COLOR_STYLES[color];
+
+          if (isSimple) {
+            return (
+              <View
+                key={item.label}
+                className="flex flex-col items-center gap-[12rpx] active:opacity-70"
+                onClick={item.onClick}
+              >
+                <Icon name={item.icon} size="xl" color="#ffa06c" />
+                <Text className="text-[24rpx] text-foreground-secondary font-medium whitespace-nowrap">
+                  {item.label}
+                </Text>
+              </View>
+            );
+          }
+
           return (
             <View
               key={item.label}
@@ -66,7 +93,7 @@ const ProfileGrid: React.FC<ProfileGridProps> = ({ title, items, className }) =>
                   styles.bg,
                 )}
               >
-                <Icon name={item.icon} size="sm" color={styles.icon} />
+                <Icon name={item.icon} size="xl" color={styles.icon} />
               </View>
               <Text className="text-[24rpx] text-foreground-secondary font-medium whitespace-nowrap">
                 {item.label}

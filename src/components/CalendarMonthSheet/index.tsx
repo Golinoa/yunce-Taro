@@ -1,10 +1,10 @@
 import { View, Text } from '@tarojs/components';
 import dayjs from 'dayjs';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import BottomSheet from '@/components/BottomSheet';
 import ActionButton from '@/components/ActionButton';
-import Icon from '@/components/Icon';
+import BottomSheet from '@/components/BottomSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
+import Icon from '@/components/Icon';
 
 interface CalendarMonthSheetProps {
   visible: boolean;
@@ -118,10 +118,10 @@ const CalendarMonthSheet: React.FC<CalendarMonthSheetProps> = ({
                       backgroundColor: isDisabled
                         ? 'transparent'
                         : isSelected
-                        ? '#ef4444'
-                        : isToday
-                          ? 'rgba(239, 68, 68, 0.08)'
-                          : 'transparent',
+                          ? '#ef4444'
+                          : isToday
+                            ? 'rgba(239, 68, 68, 0.08)'
+                            : 'transparent',
                       opacity: isDisabled ? 0.45 : 1,
                     }}
                   >
@@ -131,12 +131,12 @@ const CalendarMonthSheet: React.FC<CalendarMonthSheetProps> = ({
                         color: isDisabled
                           ? '#c8ced8'
                           : isSelected
-                          ? '#ffffff'
-                          : inCurrentMonth
-                            ? isToday
-                              ? '#ef4444'
-                              : '#111827'
-                            : '#c8ced8',
+                            ? '#ffffff'
+                            : inCurrentMonth
+                              ? isToday
+                                ? '#ef4444'
+                                : '#111827'
+                              : '#c8ced8',
                       }}
                     >
                       {date.date()}

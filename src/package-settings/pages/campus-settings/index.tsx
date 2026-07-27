@@ -259,131 +259,131 @@ const CampusSettings: React.FC = () => {
       {/* 主校区卡片 — 对齐设计稿 .campus-card */}
       {/* ============================================ */}
       <View className="mx-[32rpx] mt-[32rpx] bg-white rounded-[40rpx] shadow-soft p-[44rpx] relative overflow-hidden border-[2rpx] border-border">
-          {/* 右上角三角装饰 + 小圆点 */}
-          <View
-            className="absolute top-0 right-0 w-[160rpx] h-[160rpx] rounded-br-[40rpx]"
-            style={{
-              background: 'linear-gradient(135deg, transparent 50%, hsl(168 55% 58% / 0.08) 50%)',
-            }}
-          />
-          <View className="absolute top-[24rpx] right-[24rpx] w-[16rpx] h-[16rpx] rounded-full bg-primary/40" />
+        {/* 右上角三角装饰 + 小圆点 */}
+        <View
+          className="absolute top-0 right-0 w-[160rpx] h-[160rpx] rounded-br-[40rpx]"
+          style={{
+            background: 'linear-gradient(135deg, transparent 50%, hsl(168 55% 58% / 0.08) 50%)',
+          }}
+        />
+        <View className="absolute top-[24rpx] right-[24rpx] w-[16rpx] h-[16rpx] rounded-full bg-primary/40" />
 
-          {/* Header：校区信息 + 切换按钮 */}
-          <View className="flex flex-row items-center justify-between mb-[36rpx] relative z-1">
-            <View className="flex flex-row items-center gap-[28rpx]">
-              {/* 校区图标 — 设计稿：48px/圆角14px/字号24px */}
-              <View
-                className="w-[96rpx] h-[96rpx] rounded-[28rpx] flex items-center justify-center"
-                style={{
-                  background: currentCampus.iconGradient,
-                  boxShadow: '0 8rpx 24rpx hsl(168 55% 58% / 0.3)',
-                }}
-              >
-                <Text className="text-[48rpx] text-white">{currentCampus.icon}</Text>
-              </View>
-              {/* 名称+类型标签 */}
-              <View>
-                <Text className="text-[36rpx] font-bold text-foreground">{currentCampus.name}</Text>
-                {/* 铭牌 — 主校区暗金色，其他主题色淡色 / 设计稿：.campus-type-tag */}
-                <View className="flex flex-row items-center gap-[8rpx] mt-[6rpx]">
+        {/* Header：校区信息 + 切换按钮 */}
+        <View className="flex flex-row items-center justify-between mb-[36rpx] relative z-1">
+          <View className="flex flex-row items-center gap-[28rpx]">
+            {/* 校区图标 — 设计稿：48px/圆角14px/字号24px */}
+            <View
+              className="w-[96rpx] h-[96rpx] rounded-[28rpx] flex items-center justify-center"
+              style={{
+                background: currentCampus.iconGradient,
+                boxShadow: '0 8rpx 24rpx hsl(168 55% 58% / 0.3)',
+              }}
+            >
+              <Text className="text-[48rpx] text-white">{currentCampus.icon}</Text>
+            </View>
+            {/* 名称+类型标签 */}
+            <View>
+              <Text className="text-[36rpx] font-bold text-foreground">{currentCampus.name}</Text>
+              {/* 铭牌 — 主校区暗金色，其他主题色淡色 / 设计稿：.campus-type-tag */}
+              <View className="flex flex-row items-center gap-[8rpx] mt-[6rpx]">
+                <View
+                  className={cn(
+                    'flex flex-row items-center gap-[8rpx] px-[16rpx] py-[4rpx] rounded-[12rpx]',
+                    currentCampus.isMain ? 'bg-amber-600/15' : 'bg-primary/15',
+                  )}
+                >
                   <View
                     className={cn(
-                      'flex flex-row items-center gap-[8rpx] px-[16rpx] py-[4rpx] rounded-[12rpx]',
-                      currentCampus.isMain ? 'bg-amber-600/15' : 'bg-primary/15',
+                      'w-[10rpx] h-[10rpx] rounded-full',
+                      currentCampus.isMain ? 'bg-amber-600' : 'bg-primary',
+                    )}
+                  />
+                  <Text
+                    className={cn(
+                      'text-[20rpx] font-semibold',
+                      currentCampus.isMain ? 'text-amber-700' : 'text-primary',
                     )}
                   >
-                    <View
-                      className={cn(
-                        'w-[10rpx] h-[10rpx] rounded-full',
-                        currentCampus.isMain ? 'bg-amber-600' : 'bg-primary',
-                      )}
-                    />
-                    <Text
-                      className={cn(
-                        'text-[20rpx] font-semibold',
-                        currentCampus.isMain ? 'text-amber-700' : 'text-primary',
-                      )}
-                    >
-                      {currentCampus.isMain
-                        ? '主校区'
-                        : currentCampus.type === 'self'
-                          ? '自营校区'
-                          : '合作机构'}
-                    </Text>
-                  </View>
+                    {currentCampus.isMain
+                      ? '主校区'
+                      : currentCampus.type === 'self'
+                        ? '自营校区'
+                        : '合作机构'}
+                  </Text>
                 </View>
               </View>
             </View>
-            {/* 切换校区按钮 — 设计稿：padding 9px 16px / 圆角12px */}
-            {campuses.length > 1 && (
-              <View
-                className="bg-primary px-[32rpx] py-[18rpx] rounded-[24rpx]"
-                style={{ boxShadow: '0 8rpx 24rpx hsl(168 55% 58% / 0.3)' }}
-                onClick={() => setShowCampusPicker(true)}
-              >
-                <Text className="text-[26rpx] text-white font-semibold">切换校区</Text>
-              </View>
-            )}
           </View>
+          {/* 切换校区按钮 — 设计稿：padding 9px 16px / 圆角12px */}
+          {campuses.length > 1 && (
+            <View
+              className="bg-primary px-[32rpx] py-[18rpx] rounded-[24rpx]"
+              style={{ boxShadow: '0 8rpx 24rpx hsl(168 55% 58% / 0.3)' }}
+              onClick={() => setShowCampusPicker(true)}
+            >
+              <Text className="text-[26rpx] text-white font-semibold">切换校区</Text>
+            </View>
+          )}
+        </View>
 
-          {/* 统计行 — 设计稿：grid 3列 */}
-          <View className="grid grid-cols-3 gap-[20rpx] mb-[32rpx]">
-            <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
+        {/* 统计行 — 设计稿：grid 3列 */}
+        <View className="grid grid-cols-3 gap-[20rpx] mb-[32rpx]">
+          <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
+            <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
+              {currentCampus.stats.students}
+            </Text>
+            <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">学生</Text>
+          </View>
+          <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
+            <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
+              {currentCampus.stats.teachers}
+            </Text>
+            <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">教师</Text>
+          </View>
+          <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
+            <View className="flex flex-row items-baseline justify-center">
               <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
-                {currentCampus.stats.students}
+                {revenueDisplay.val}
               </Text>
-              <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">学生</Text>
-            </View>
-            <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
-              <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
-                {currentCampus.stats.teachers}
-              </Text>
-              <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">教师</Text>
-            </View>
-            <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
-              <View className="flex flex-row items-baseline justify-center">
-                <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
-                  {revenueDisplay.val}
+              {revenueDisplay.unit && (
+                <Text className="text-[24rpx] text-muted-foreground ml-[4rpx]">
+                  {revenueDisplay.unit}
                 </Text>
-                {revenueDisplay.unit && (
-                  <Text className="text-[24rpx] text-muted-foreground ml-[4rpx]">
-                    {revenueDisplay.unit}
-                  </Text>
-                )}
-              </View>
-              <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">月营收</Text>
+              )}
             </View>
+            <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">月营收</Text>
           </View>
+        </View>
 
-          {/* 地址 — 设计稿：12px + svg icon 16px */}
-          {currentCampus.address && (
-            <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
-              <Icon name="mdi-map-marker" size="sm" color="primary" />
-              <Text className="text-[24rpx] text-muted-foreground flex-1">
-                {currentCampus.address}
-              </Text>
-            </View>
-          )}
-
-          {/* 电话 — 设计稿：12px + phone svg icon 16px */}
-          {currentCampus.phone && (
-            <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
-              <Icon name="mdi-phone" size="sm" color="primary" />
-              <Text className="text-[24rpx] text-muted-foreground">{currentCampus.phone}</Text>
-            </View>
-          )}
-
-          {/* 运营数据入口 — 设计稿：.campus-detail-row.link / margin-top:10px / padding-top:10px / border-top / gap:6px / font-size:12px / primary */}
-          <View
-            className="flex flex-row items-center gap-[12rpx] pt-[20rpx] mt-[20rpx] border-t-d5e8e0"
-            onClick={handleCampusData}
-          >
-            <Icon name="mdi-chart-bar" size="sm" color="primary" />
-            <Text className="text-[24rpx] text-primary">查看运营数据</Text>
-            <View className="ml-auto">
-              <Icon name="mdi-chevron-right" size={28} color="muted" />
-            </View>
+        {/* 地址 — 设计稿：12px + svg icon 16px */}
+        {currentCampus.address && (
+          <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
+            <Icon name="mdi-map-marker" size="sm" color="primary" />
+            <Text className="text-[24rpx] text-muted-foreground flex-1">
+              {currentCampus.address}
+            </Text>
           </View>
+        )}
+
+        {/* 电话 — 设计稿：12px + phone svg icon 16px */}
+        {currentCampus.phone && (
+          <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
+            <Icon name="mdi-phone" size="sm" color="primary" />
+            <Text className="text-[24rpx] text-muted-foreground">{currentCampus.phone}</Text>
+          </View>
+        )}
+
+        {/* 运营数据入口 — 设计稿：.campus-detail-row.link / margin-top:10px / padding-top:10px / border-top / gap:6px / font-size:12px / primary */}
+        <View
+          className="flex flex-row items-center gap-[12rpx] pt-[20rpx] mt-[20rpx] border-t-d5e8e0"
+          onClick={handleCampusData}
+        >
+          <Icon name="mdi-chart-bar" size="sm" color="primary" />
+          <Text className="text-[24rpx] text-primary">查看运营数据</Text>
+          <View className="ml-auto">
+            <Icon name="mdi-chevron-right" size={28} color="muted" />
+          </View>
+        </View>
       </View>
 
       {/* ============================================ */}
@@ -444,7 +444,9 @@ const CampusSettings: React.FC = () => {
             className={`rounded-[48rpx] py-[28rpx] flex items-center justify-center mt-[32rpx] ${savingOrgName ? 'bg-muted' : 'bg-primary press-scale'}`}
             onClick={savingOrgName ? undefined : handleSaveOrgName}
           >
-            <Text className={`text-[30rpx] font-semibold ${savingOrgName ? 'text-muted-foreground' : 'text-white'}`}>
+            <Text
+              className={`text-[30rpx] font-semibold ${savingOrgName ? 'text-muted-foreground' : 'text-white'}`}
+            >
               {savingOrgName ? '保存中...' : '保存'}
             </Text>
           </View>

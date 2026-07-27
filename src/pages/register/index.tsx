@@ -9,6 +9,7 @@ import React, { useCallback, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
+import { BRAND_NAME_ZH } from '@/constants/brand';
 import { useAgreementStore } from '@/stores/agreement';
 import {
   ACCOUNT_MAX_LENGTH,
@@ -112,7 +113,7 @@ const RegisterStep1: React.FC = () => {
       <View className="relative z-10 px-[48rpx] pt-[80rpx]">
         <View className="mb-[120rpx] flex items-center justify-center">
           <Text className="text-[40rpx] font-semibold text-foreground text-center">
-            你好，欢迎注册云策教务
+            你好，欢迎注册{BRAND_NAME_ZH}
           </Text>
         </View>
         <FormInput

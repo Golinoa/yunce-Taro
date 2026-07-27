@@ -3,12 +3,12 @@ import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ActionButton from '@/components/ActionButton';
-import type { CalendarDotType } from '@/components/CalendarWeekSelector';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
+import type { CalendarDotType } from '@/components/CalendarWeekSelector';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
-import QuestionHint from '@/components/QuestionHint';
+import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
 import {
   classService,
   notificationService,
@@ -17,12 +17,15 @@ import {
   teacherService,
   temporaryRescheduleService,
 } from '@/services';
+import type { TemporaryReschedule } from '@/types';
 import type { Class } from '@/types/class';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { withRouteGuard } from '@/utils/route-guard';
+import { buildVisibleSchedulesForDate } from '@/utils/visible-schedules';
 
 function parseTimeToMinutes(time: string): number {
   const [hour, minute] = time.split(':').map(Number);
@@ -54,7 +57,10 @@ const BatchRescheduleConfirmPage: React.FC = () => {
     const instance = Taro.getCurrentInstance();
     return instance?.router?.params || {};
   }, []);
-  const sourceDate = useMemo(() => decodeURIComponent(routerParams.sourceDate || ''), [routerParams]);
+  const sourceDate = useMemo(
+    () => decodeURIComponent(routerParams.sourceDate || ''),
+    [routerParams],
+  );
   const selectedClassIds = useMemo<string[]>(() => {
     try {
       const raw = decodeURIComponent(routerParams.classIds || '[]');
@@ -69,10 +75,10 @@ const BatchRescheduleConfirmPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [classes, setClasses] = useState<Class[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [temporaryReschedules, setTemporaryReschedules] = useState<TemporaryReschedule[]>([]);
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
   const [targetDate, setTargetDate] = useState(() => {
-    const nextDate = dayjs(sourceDate).add(1, 'day');
-    return nextDate.isBefore(dayjs(), 'day') ? dayjs() : nextDate;
+    return getDefaultRescheduleTargetDate(sourceDate);
   });
   const [calendarVisible, setCalendarVisible] = useState(false);
 
@@ -108,6 +114,34 @@ const BatchRescheduleConfirmPage: React.FC = () => {
     void loadData();
   }, [loadData]);
 
+  const loadTemporaryReschedules = useCallback(async () => {
+    if (!currentUserId || !sourceDate || !dayjs(sourceDate).isValid()) {
+      return;
+    }
+    try {
+      const sourceDay = dayjs(sourceDate);
+      const rangeStart = (sourceDay.isBefore(targetDate, 'day') ? sourceDay : targetDate)
+        .startOf('month')
+        .subtract(7, 'day');
+      const rangeEnd = (sourceDay.isAfter(targetDate, 'day') ? sourceDay : targetDate)
+        .endOf('month')
+        .add(7, 'day');
+      const list = await temporaryRescheduleService.getByTeacherAndRange(
+        currentUserId,
+        rangeStart.format('YYYY-MM-DD'),
+        rangeEnd.format('YYYY-MM-DD'),
+      );
+      setTemporaryReschedules(list);
+    } catch (err) {
+      logError('BatchRescheduleConfirmPage loadTemporaryReschedules', err);
+      Taro.showToast({ title: '临时调课加载失败', icon: 'none' });
+    }
+  }, [currentUserId, sourceDate, targetDate]);
+
+  useEffect(() => {
+    void loadTemporaryReschedules();
+  }, [loadTemporaryReschedules]);
+
   const classById = useMemo(
     () =>
       classes.reduce<Record<string, Class>>((acc, item) => {
@@ -126,15 +160,16 @@ const BatchRescheduleConfirmPage: React.FC = () => {
   );
 
   const affectedSchedules = useMemo(() => {
-    return schedules
-      .filter(
-        (item) =>
-          Boolean(item.class_id) &&
-          selectedClassIds.includes(item.class_id || '') &&
-          item.day_of_week === sourceWeekday,
-      )
-      .sort((left, right) => parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time));
-  }, [schedules, selectedClassIds, sourceWeekday]);
+    return buildVisibleSchedulesForDate({
+      date: dayjs(sourceDate),
+      schedules,
+      temporaryReschedules,
+    })
+      .filter((item) => Boolean(item.class_id) && selectedClassIds.includes(item.class_id || ''))
+      .sort(
+        (left, right) => parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time),
+      );
+  }, [schedules, selectedClassIds, sourceDate, temporaryReschedules]);
 
   const selectedClasses = useMemo(() => {
     return selectedClassIds
@@ -155,19 +190,23 @@ const BatchRescheduleConfirmPage: React.FC = () => {
       });
   }, [affectedSchedules, classById, selectedClassIds, teacherById]);
 
-  const sourceWeekdayText = useMemo(() => `周${'一二三四五六日'[sourceWeekday - 1]}`, [sourceWeekday]);
-  const scheduleWeekdaySet = useMemo(() => {
-    return new Set(schedules.map((item) => item.day_of_week));
-  }, [schedules]);
+  const sourceWeekdayText = useMemo(
+    () => `周${'一二三四五六日'[sourceWeekday - 1]}`,
+    [sourceWeekday],
+  );
   const getDateDotType = useCallback(
     (date: dayjs.Dayjs): CalendarDotType => {
-      const weekday = (date.day() || 7) as Schedule['day_of_week'];
-      if (!scheduleWeekdaySet.has(weekday)) {
+      const visibleSchedules = buildVisibleSchedulesForDate({
+        date,
+        schedules,
+        temporaryReschedules,
+      });
+      if (visibleSchedules.length === 0) {
         return 'none';
       }
       return date.isBefore(dayjs(), 'day') ? 'past' : 'active';
     },
-    [scheduleWeekdaySet],
+    [schedules, temporaryReschedules],
   );
 
   const notifyStudentAndParents = useCallback(
@@ -288,59 +327,48 @@ const BatchRescheduleConfirmPage: React.FC = () => {
       <View className="min-h-screen">
         <ScrollView scrollY className="h-screen" showScrollbar={false}>
           <View className="px-[24rpx] pb-[200rpx] pt-[24rpx]">
-            <View className="overflow-hidden rounded-[30rpx] bg-white shadow-card">
-              <View className="bg-[linear-gradient(135deg,#17b26a_0%,#36c28d_100%)] px-[24rpx] py-[26rpx]">
+            <WorkflowHeaderCard
+              eyebrow="批量调课"
+              title="第二步 确认调课"
+              tone="green"
+              hintLines={[
+                '仅调整选中日期当天的课程，不改变长期排课规则',
+                '确认后会自动通知相关班级学员和家长',
+              ]}
+            >
+              <View className="flex items-center gap-[12rpx] rounded-[20rpx] bg-[#f4fffa] px-[18rpx] py-[18rpx]">
+                <View className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-[#e8f7ee]">
+                  <Icon name="mdi-swap-horizontal" size="xs" color="#16a34a" />
+                </View>
+                <Text className="text-[24rpx] font-medium text-foreground-secondary">
+                  {dayjs(sourceDate).format('MM月DD日')} {sourceWeekdayText}
+                </Text>
+                <Icon name="mdi-arrow-right" size="xs" color="mutedForeground" />
+                <Text className="text-[24rpx] font-semibold text-[#16a34a]">
+                  {targetDate.format('MM月DD日')}
+                </Text>
+              </View>
+
+              <View
+                className="mt-[14rpx] rounded-[24rpx] border border-[#dff3e8] bg-[#f4fffa] px-[22rpx] py-[22rpx]"
+                onClick={() => setCalendarVisible(true)}
+              >
                 <View className="flex items-center justify-between">
-                  <View>
-                    <Text className="block text-[24rpx] text-white/75">批量调课</Text>
-                    <Text className="mt-[8rpx] block text-[36rpx] font-semibold text-white">
-                      第二步 确认调课
+                  <View className="flex items-center gap-[14rpx]">
+                    <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-[20rpx] bg-[#e4fff1]">
+                      <Icon name="mdi-calendar-check" size="md" color="#16a34a" />
+                    </View>
+                    <Text className="text-[34rpx] font-semibold text-foreground">
+                      {targetDate.format('YYYY年MM月DD日')}
                     </Text>
                   </View>
-                  <QuestionHint
-                    lines={[
-                      '仅调整选中日期当天的课程，不改变长期排课规则',
-                      '确认后会自动通知相关班级学员和家长',
-                    ]}
-                  />
-                </View>
-              </View>
-
-              <View className="px-[24rpx] py-[24rpx]">
-                <View className="flex items-center gap-[12rpx] rounded-[20rpx] bg-[#f4fffa] px-[18rpx] py-[18rpx]">
-                  <View className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-[#e8f7ee]">
-                    <Icon name="mdi-swap-horizontal" size="xs" color="#16a34a" />
-                  </View>
-                  <Text className="text-[24rpx] font-medium text-foreground-secondary">
-                    {dayjs(sourceDate).format('MM月DD日')} {sourceWeekdayText}
-                  </Text>
-                  <Icon name="mdi-arrow-right" size="xs" color="mutedForeground" />
-                  <Text className="text-[24rpx] font-semibold text-[#16a34a]">
-                    {targetDate.format('MM月DD日')}
-                  </Text>
-                </View>
-
-                <View
-                  className="mt-[14rpx] rounded-[24rpx] border border-[#dff3e8] bg-[#f4fffa] px-[22rpx] py-[22rpx]"
-                  onClick={() => setCalendarVisible(true)}
-                >
-                  <View className="flex items-center justify-between">
-                    <View className="flex items-center gap-[14rpx]">
-                      <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-[20rpx] bg-[#e4fff1]">
-                        <Icon name="mdi-calendar-check" size="md" color="#16a34a" />
-                      </View>
-                      <Text className="text-[34rpx] font-semibold text-foreground">
-                        {targetDate.format('YYYY年MM月DD日')}
-                      </Text>
-                    </View>
-                    <View className="flex items-center gap-[8rpx]">
-                      <Text className="text-[24rpx] font-medium text-[#16a34a]">点击选择</Text>
-                      <Icon name="mdi-chevron-right" size="sm" color="#16a34a" />
-                    </View>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[24rpx] font-medium text-[#16a34a]">点击选择</Text>
+                    <Icon name="mdi-chevron-right" size="sm" color="#16a34a" />
                   </View>
                 </View>
               </View>
-            </View>
+            </WorkflowHeaderCard>
 
             <View className="mt-[24rpx] rounded-[28rpx] bg-white px-[24rpx] py-[22rpx] shadow-card">
               <View className="flex items-center justify-between">
@@ -373,9 +401,14 @@ const BatchRescheduleConfirmPage: React.FC = () => {
 
               {!loading &&
                 selectedClasses.map((item) => (
-                  <View key={item.id} className="rounded-[26rpx] bg-white px-[24rpx] py-[24rpx] shadow-card">
+                  <View
+                    key={item.id}
+                    className="rounded-[26rpx] bg-white px-[24rpx] py-[24rpx] shadow-card"
+                  >
                     <View className="flex items-center justify-between gap-[16rpx]">
-                      <Text className="truncate text-[32rpx] font-semibold text-foreground">{item.name}</Text>
+                      <Text className="truncate text-[32rpx] font-semibold text-foreground">
+                        {item.name}
+                      </Text>
                       <View className="rounded-full bg-[#f4f7fb] px-[14rpx] py-[8rpx]">
                         <Text className="flex-shrink-0 text-[22rpx] text-muted-foreground">
                           {item.studentCount}人
@@ -388,7 +421,9 @@ const BatchRescheduleConfirmPage: React.FC = () => {
                     </View>
                     <View className="mt-[10rpx] flex items-center gap-[10rpx]">
                       <Icon name="mdi-clock-outline" size="xs" color="mutedForeground" />
-                      <Text className="text-[25rpx] text-muted-foreground">{item.scheduleText}</Text>
+                      <Text className="text-[25rpx] text-muted-foreground">
+                        {item.scheduleText}
+                      </Text>
                     </View>
                   </View>
                 ))}

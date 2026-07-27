@@ -74,6 +74,8 @@ function getWeekDay(dateStr: string): string {
 function getAttendanceStatusLabel(status?: LessonRecord['status']): string {
   if (status === 'cancelled') return '已取消';
   if (status === 'makeup') return '补课';
+  if (status === 'leave') return '请假';
+  if (status === 'absent') return '缺勤';
   return '';
 }
 
@@ -83,6 +85,12 @@ function getAttendanceStatusClass(status?: LessonRecord['status']): string {
   }
   if (status === 'makeup') {
     return 'bg-[hsl(var(--warning)/0.1)] text-[hsl(var(--warning))]';
+  }
+  if (status === 'leave') {
+    return 'bg-[hsl(var(--info)/0.1)] text-[hsl(var(--info))]';
+  }
+  if (status === 'absent') {
+    return 'bg-[hsl(var(--warning)/0.08)] text-[hsl(var(--warning))]';
   }
   return 'bg-[hsl(var(--primary)/0.08)] text-[hsl(var(--primary))]';
 }
@@ -116,8 +124,7 @@ function getTeacherDisplayText(
   record: LessonRecord,
   teacherNameMap: Record<string, string>,
 ): string {
-  const teacherName =
-    teacherNameMap[record.teacher_id] || record.teacher?.name || '未知教师';
+  const teacherName = teacherNameMap[record.teacher_id] || record.teacher?.name || '未知教师';
   const assistantName =
     teacherNameMap[record.assistant_teacher_id || ''] || record.assistant_teacher?.name || '';
   const operatorName =
@@ -205,7 +212,8 @@ export function buildLessonConsumptionSections(
       const title = isClassCard
         ? firstRecord.class_name || firstRecord.course_package?.name || '班级消课'
         : firstRecord.student?.name || '个人消课';
-      const subtitleBase = firstRecord.course_package?.name || (isClassCard ? '班级消课' : '个人消课');
+      const subtitleBase =
+        firstRecord.course_package?.name || (isClassCard ? '班级消课' : '个人消课');
       const subtitle = [teacherDisplayText, subtitleBase].filter(Boolean).join(' · ');
 
       return {

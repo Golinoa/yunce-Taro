@@ -52,9 +52,12 @@ const SIZE_MAP: Record<Exclude<IconSize, number>, number> = {
 const COLOR_MAP: Record<string, string> = {
   primary: hexColors.primary, // #3B6EF5
   primaryLight: hexColors.primaryLight, // #6B95F5
+  'primary-light': hexColors.primaryLight,
   primaryDark: hexColors.primaryDark, // #2563EB
+  'primary-dark': hexColors.primaryDark,
   accent: hexColors.accent, // #8B5CF6
   accentLight: hexColors.accentLight, // #A78BFA
+  'accent-light': hexColors.accentLight,
   purple: hexColors.accent, // #8B5CF6（语义同 accent）
   success: hexColors.success, // #10b981
   warning: hexColors.warning, // #f59e0b
@@ -64,8 +67,10 @@ const COLOR_MAP: Record<string, string> = {
   white: '#FFFFFF',
   foreground: hexColors.foreground, // #1a1a1a
   foregroundSecondary: hexColors.foregroundSecondary, // #555555
+  'foreground-secondary': hexColors.foregroundSecondary,
   muted: hexColors.mutedForeground, // #8a8a8a（语义同 mutedForeground）
   mutedForeground: hexColors.mutedForeground, // #8a8a8a
+  'muted-foreground': hexColors.mutedForeground,
   destructive: hexColors.destructive, // #ef4444
 };
 

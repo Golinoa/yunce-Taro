@@ -189,7 +189,6 @@ const SilkRibbonCanvas: React.FC = () => {
   return (
     <View className="silk-ribbon-canvas-wrapper">
       <Canvas
-        canvasId={CANVAS_ID}
         id={CANVAS_ID}
         type="2d"
         className="silk-ribbon-canvas"

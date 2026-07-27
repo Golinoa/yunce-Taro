@@ -3,16 +3,12 @@ import React, { useCallback } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
-import AlertSheet from '@/components/statistics/AlertSheet';
-import AlertSummaryBar from '@/components/statistics/AlertSummaryBar';
 import DateRangeSheet from '@/components/statistics/DateRangeSheet';
 import FinanceAnalysis from '@/components/statistics/FinanceAnalysis';
 import FinanceKpi from '@/components/statistics/FinanceKpi';
-import InsightCard from '@/components/statistics/InsightCard';
 import OperationKpi from '@/components/statistics/OperationKpi';
 import RankTabs from '@/components/statistics/RankTabs';
 import TrendSection from '@/components/statistics/TrendSection';
-import { markInsightRead, dismissInsight, filterActiveInsights } from '@/utils/alert-read';
 import IncomeTab from './IncomeTab';
 import LessonTab from './LessonTab';
 import { useStatistics } from './useStatistics';
@@ -72,21 +68,12 @@ const Statistics: React.FC = () => {
     // 新增：设计稿数据
     viewType,
     setViewType,
-    alertSheetVisible,
-    handleOpenAlertSheet,
-    handleCloseAlertSheet,
     operationKpiData,
     financeKpiData,
-    alertSummaryData,
-    alertList,
-    insights,
     financeAnalysisData,
     rankTabsData,
   } = useStatistics();
 
-  /** 洞察已读/不再提示后强制刷新 */
-  const [refreshKey, setRefreshKey] = React.useState(0);
-  const [isInsightSwipeActive, setIsInsightSwipeActive] = React.useState(false);
   const [teacherSwiperCurrent, setTeacherSwiperCurrent] = React.useState(
     viewType === 'finance' ? 1 : 0,
   );
@@ -110,7 +97,9 @@ const Statistics: React.FC = () => {
   const handleTeacherSwiperChange = useCallback(
     (event: { detail?: { current?: number } }) => {
       if (!isTeacher) return;
-      setTeacherSwiperCurrent(event.detail?.current ?? 0);
+
+      const nextCurrent = event.detail?.current ?? 0;
+      setTeacherSwiperCurrent(nextCurrent);
     },
     [isTeacher],
   );
@@ -157,9 +146,7 @@ const Statistics: React.FC = () => {
             }`}
             onClick={() => handleViewChange('operation')}
           >
-            <Text
-              className={teacherSwiperCurrent === 0 ? 'text-white' : 'text-muted-foreground'}
-            >
+            <Text className={teacherSwiperCurrent === 0 ? 'text-white' : 'text-muted-foreground'}>
               运营
             </Text>
           </View>
@@ -171,9 +158,7 @@ const Statistics: React.FC = () => {
             }`}
             onClick={() => handleViewChange('finance')}
           >
-            <Text
-              className={teacherSwiperCurrent === 1 ? 'text-white' : 'text-muted-foreground'}
-            >
+            <Text className={teacherSwiperCurrent === 1 ? 'text-white' : 'text-muted-foreground'}>
               财务
             </Text>
           </View>
@@ -319,57 +304,11 @@ const Statistics: React.FC = () => {
     );
   };
 
-  /** 渲染运营视图主体（预警 + 洞察 + 排行） */
+  /** 渲染运营视图主体（排行） */
   const renderOperationContent = () => {
-    // 过滤已读和不再提示的洞察
-    const activeInsights = filterActiveInsights(insights);
-    const hasAlerts = alertSummaryData.total > 0;
-    const hasInsights = activeInsights.length > 0;
-
-    /** 洞察已读回调 */
-    const handleInsightRead = (id: string) => {
-      markInsightRead(id);
-      // 强制刷新：通过修改 state 触发重渲染
-      setRefreshKey((k) => k + 1);
-    };
-
-    /** 洞察不再提示回调 */
-    const handleInsightDismiss = (id: string) => {
-      dismissInsight(id);
-      setRefreshKey((k) => k + 1);
-    };
-
     return (
       <View className="px-[24rpx] pb-[32rpx]">
-        {/* 预警摘要条（有数据才显示，无数据不留空白） */}
-        {hasAlerts && (
-          <View className="mt-[24rpx] mb-[16rpx]">
-            <AlertSummaryBar data={alertSummaryData} onClick={handleOpenAlertSheet} />
-          </View>
-        )}
-
-        {/* 关键洞察（有数据才显示标题和卡片，无数据不渲染任何内容） */}
-        {hasInsights && (
-          <>
-            <Text className="text-[24rpx] text-muted-foreground font-medium px-[8rpx] block mt-[16rpx] mb-[8rpx]">
-              关键洞察
-            </Text>
-            <View className="flex flex-col gap-[16rpx] mb-[24rpx]" key={`insights-${refreshKey}`}>
-              {activeInsights.map((item) => (
-                <InsightCard
-                  key={item.id}
-                  item={item}
-                  onRead={handleInsightRead}
-                  onDismiss={handleInsightDismiss}
-                  onSwipeStateChange={setIsInsightSwipeActive}
-                />
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* 无预警且无洞察时，给排行区域一个顶部间距 */}
-        {!hasAlerts && !hasInsights && <View className="h-[24rpx]" />}
+        <View className="h-[24rpx]" />
 
         {/* 排行明细（学员/教师/校区 Tab 切换） */}
         {rankTabsData.length > 0 && <RankTabs tabs={rankTabsData} periodLabel="本月" />}
@@ -377,18 +316,11 @@ const Statistics: React.FC = () => {
     );
   };
 
-  /** 渲染财务视图主体（预警 + 财务分析） */
+  /** 渲染财务视图主体（财务分析） */
   const renderFinanceContent = () => {
     return (
       <View className="px-[24rpx] pb-[32rpx]">
-        {/* 预警摘要条（有数据才显示） */}
-        {alertSummaryData.total > 0 ? (
-          <View className="mt-[24rpx] mb-[16rpx]">
-            <AlertSummaryBar data={alertSummaryData} onClick={handleOpenAlertSheet} />
-          </View>
-        ) : (
-          <View className="h-[24rpx]" />
-        )}
+        <View className="h-[24rpx]" />
 
         {/* 财务分析（收支概览 + 收入/支出构成 Tab） */}
         <FinanceAnalysis data={financeAnalysisData} />
@@ -499,18 +431,6 @@ const Statistics: React.FC = () => {
     );
   };
 
-  /** 渲染预警弹窗 */
-  const renderAlertSheet = () => {
-    return (
-      <AlertSheet
-        visible={alertSheetVisible}
-        total={alertSummaryData.total}
-        alerts={alertList}
-        onClose={handleCloseAlertSheet}
-      />
-    );
-  };
-
   if (status === 'loading') {
     return (
       <View className="min-h-screen bg-gradient-subtle">
@@ -552,66 +472,68 @@ const Statistics: React.FC = () => {
           duration={TEACHER_TAB_SWIPER_DURATION}
           easingFunction="easeOutCubic"
           skipHiddenItemLayout
-          disableTouch={isInsightSwipeActive}
           onChange={handleTeacherSwiperChange}
           onAnimationFinish={handleTeacherSwiperFinish}
         >
           <SwiperItem itemId="operation">
-            <ScrollView
-              className="h-full"
-              scrollY
-              refresherEnabled
-              refresherTriggered={refreshing && teacherSwiperCurrent === 0}
-              onRefresherRefresh={handleRefresh}
-            >
-              {renderTeacherPanel('operation')}
-            </ScrollView>
+            <View className="h-full bg-gradient-subtle">
+              <ScrollView
+                className="h-full"
+                scrollY
+                refresherEnabled
+                refresherTriggered={refreshing && teacherSwiperCurrent === 0}
+                onRefresherRefresh={handleRefresh}
+              >
+                <View className="min-h-full">{renderTeacherPanel('operation')}</View>
+              </ScrollView>
+            </View>
           </SwiperItem>
           <SwiperItem itemId="finance">
-            <ScrollView
-              className="h-full"
-              scrollY
-              refresherEnabled
-              refresherTriggered={refreshing && teacherSwiperCurrent === 1}
-              onRefresherRefresh={handleRefresh}
-            >
-              {renderTeacherPanel('finance')}
-            </ScrollView>
+            <View className="h-full bg-gradient-subtle">
+              <ScrollView
+                className="h-full"
+                scrollY
+                refresherEnabled
+                refresherTriggered={refreshing && teacherSwiperCurrent === 1}
+                onRefresherRefresh={handleRefresh}
+              >
+                <View className="min-h-full">{renderTeacherPanel('finance')}</View>
+              </ScrollView>
+            </View>
           </SwiperItem>
         </Swiper>
       ) : (
-        <ScrollView
-          className="bg-gradient-subtle h-calc-nav"
-          scrollY
-          refresherEnabled
-          refresherTriggered={refreshing}
-          onRefresherRefresh={handleRefresh}
-        >
-          <>
-            {/* L1: 核心决策区（时段 + KPI + 快捷筛选） */}
-            {renderPeriodFilter(viewType)}
+        <View className="bg-gradient-subtle h-calc-nav">
+          <ScrollView
+            className="h-full"
+            scrollY
+            refresherEnabled
+            refresherTriggered={refreshing}
+            onRefresherRefresh={handleRefresh}
+          >
+            <View className="min-h-full">
+              {/* L1: 核心决策区（时段 + KPI + 快捷筛选） */}
+              {renderPeriodFilter(viewType)}
 
-            {/* 主体区域 */}
-            {renderParentContent()}
+              {/* 主体区域 */}
+              {renderParentContent()}
 
-            {/* 分隔带 */}
-            <View className="h-[16rpx] bg-muted" />
+              {/* 分隔带 */}
+              <View className="h-[16rpx] bg-muted" />
 
-            {/* L5: 趋势分析（默认收起） */}
-            {renderTrendSection(viewType)}
+              {/* L5: 趋势分析（默认收起） */}
+              {renderTrendSection(viewType)}
 
-            {/* 底部更新时间 */}
-            <View className="text-center py-[32rpx]">
-              <Text className="text-[24rpx] text-muted-foreground">
-                数据更新时间：{new Date().toLocaleString('zh-CN')}
-              </Text>
+              {/* 底部更新时间 */}
+              <View className="text-center py-[32rpx]">
+                <Text className="text-[24rpx] text-muted-foreground">
+                  数据更新时间：{new Date().toLocaleString('zh-CN')}
+                </Text>
+              </View>
             </View>
-          </>
-        </ScrollView>
+          </ScrollView>
+        </View>
       )}
-
-      {/* 弹窗必须放在 ScrollView 外部，否则小程序中 fixed 定位会随滚动移动 */}
-      {renderAlertSheet()}
     </>
   );
 };

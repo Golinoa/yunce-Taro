@@ -1,24 +1,21 @@
 import { View, Text, Input, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
+import LeadCard from '@/components/lead/LeadCard';
+import MemberActionSheet from '@/components/student/MemberActionSheet';
+import StudentAvatar from '@/components/student/StudentAvatar';
+import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
 import { studentService } from '@/services';
-import { subjectService } from '@/services/campus';
 import { useStudentStore } from '@/stores';
-import type {
-  Student,
-  StudentSort,
-  StudentFilter,
-  SubjectFilter,
-  StudentSummary,
-  PackageTag,
-} from '@/types/student';
-import { SORT_OPTIONS, FILTER_OPTIONS } from '@/types/student';
-import type { Subject } from '@/types/subject';
+import { useLeadStore } from '@/stores/lead';
+import type { LeadFilterTab } from '@/types/lead';
+import type { Student, StudentSort, PackageTag } from '@/types/student';
+import { SORT_OPTIONS } from '@/types/student';
 import { isStaffRole, useAuth } from '@/utils/auth';
-import { getAvatarGradientByName } from '@/utils/avatar-color';
 import {
   getStudentCardStatus,
   getCardBorderColorClass,
@@ -26,10 +23,36 @@ import {
   getHoursColorClass,
   calcStudentProgress,
   generatePackageTags,
-  calcStudentSummary,
 } from '@/utils/hours-status';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+
+/** 顶部 Tab 类型 */
+type MainTab = 'member' | 'lead';
+
+/** 会员子筛选 Tab */
+type MemberSubTab =
+  | 'all'
+  | 'active'
+  | 'private'
+  | 'renew'
+  | 'silent'
+  | 'frozen'
+  | 'birthday'
+  | 'lost';
+
+/** 会员子筛选选项（减轻视觉权重） */
+const MEMBER_SUB_TAB_OPTIONS: { key: MemberSubTab; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'active', label: '在籍' },
+  { key: 'private', label: '私教' },
+  { key: 'renew', label: '续卡' },
+  { key: 'silent', label: '沉默' },
+  { key: 'frozen', label: '冻卡' },
+  { key: 'birthday', label: '生日' },
+  { key: 'lost', label: '流失' },
+];
 
 /** 计算学生剩余课时汇总 */
 function calcRemainingHours(packages?: Student['course_packages']): number {
@@ -48,19 +71,39 @@ const TAG_COLOR_MAP: Record<PackageTag['color'], { bg: string; text: string }> =
 };
 
 const Students: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const isTeacher = isStaffRole(profile?.currentContext?.role);
 
+  // ====== 导航栏高度 ======
+  const navSafeHeight = useNavSafeHeight();
+  const [statusBarHeight, setStatusBarHeight] = useState(44);
+  const [navPaddingRight, setNavPaddingRight] = useState(0);
+  useEffect(() => {
+    const windowInfo = Taro.getWindowInfo();
+    setStatusBarHeight(windowInfo.statusBarHeight || 44);
+    // 计算右侧留白：屏幕宽度 - 胶囊左边界 = 搜索框右侧需预留的空间
+    try {
+      const menuButton = Taro.getMenuButtonBoundingClientRect();
+      const screenWidth = windowInfo.windowWidth || 375;
+      const rightSpace = screenWidth - menuButton.left + 4; // 4px额外间距
+      setNavPaddingRight(Math.max(rightSpace, 0));
+    } catch {
+      setNavPaddingRight(0);
+    }
+  }, []);
+  const canGoBack = Taro.getCurrentPages().length > 1;
+  const NAV_BAR_HEIGHT = 40; // 紧凑导航栏高度
+
+  // ====== 主 Tab 状态 ======
+  const [mainTab, setMainTab] = useState<MainTab>('member');
+
+  // ====== 会员 Tab 状态 ======
   const [students, setStudents] = useState<Student[]>([]);
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [sortBy, setSortBy] = useState<StudentSort>('default');
-  const [filterStatus, setFilterStatus] = useState<StudentFilter>('all');
-  const [filterSubject, setFilterSubject] = useState<SubjectFilter>('all');
-  const [subjectList, setSubjectList] = useState<Subject[]>([]);
+  const [memberSubTab, setMemberSubTab] = useState<MemberSubTab>('all');
   const [sortOpen, setSortOpen] = useState(false);
-  const [filterStatusOpen, setFilterStatusOpen] = useState(false);
-  const [filterSubjectOpen, setFilterSubjectOpen] = useState(false);
 
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
 
@@ -84,28 +127,70 @@ const Students: React.FC = () => {
     }
   }, [profile, isTeacher, fetchStudentsByTeacher]);
 
-  const loadRef = useRef(loadStudents);
+  // ====== 线索 Tab 状态 ======
+  const teacherId = session?.user.id || '';
+  const {
+    cache: leadCache,
+    loading: leadLoading,
+    activeFilterTab,
+    fetchCards,
+    fetchSummary,
+    setActiveFilterTab,
+    invalidate,
+  } = useLeadStore();
+
+  // 当前 tab 的缓存 key
+  const leadCacheKey = `${teacherId}::${activeFilterTab}`;
+  const leadList = leadCache[leadCacheKey] || [];
+  const isLeadLoading = leadLoading[leadCacheKey];
+
+  // 加载线索数据
+  const loadLeads = useCallback(async () => {
+    if (!teacherId) return;
+    fetchCards(teacherId, activeFilterTab);
+    fetchSummary(teacherId);
+  }, [teacherId, activeFilterTab, fetchCards, fetchSummary]);
+
+  // ====== 公共生命周期 ======
+  const loadStudentsRef = useRef(loadStudents);
   useEffect(() => {
-    loadRef.current = loadStudents;
+    loadStudentsRef.current = loadStudents;
   }, [loadStudents]);
+
   useEffect(() => {
     loadStudents();
-    subjectService
-      .getList()
-      .then(setSubjectList)
-      .catch(() => {});
   }, [loadStudents]);
+
   useDidShow(() => {
-    loadRef.current();
+    if (mainTab === 'member') {
+      loadStudentsRef.current();
+    } else {
+      loadLeads();
+    }
   });
 
   // 下拉刷新
   usePullDownRefresh(async () => {
-    await loadStudents();
+    if (mainTab === 'member') {
+      await loadStudents();
+    } else {
+      if (teacherId) {
+        invalidate(teacherId);
+        await Promise.all([
+          fetchCards(teacherId, activeFilterTab, true),
+          fetchSummary(teacherId, true),
+        ]);
+      }
+    }
     Taro.stopPullDownRefresh();
   });
 
-  // 搜索防抖
+  // 关闭所有下拉
+  const closeAllDropdowns = useCallback(() => {
+    setSortOpen(false);
+  }, []);
+
+  // ====== 搜索防抖（会员/线索共用 keyword） ======
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
@@ -113,6 +198,26 @@ const Students: React.FC = () => {
     debounceTimer.current = setTimeout(() => setDebouncedKeyword(keyword), 300);
     return () => clearTimeout(debounceTimer.current);
   }, [keyword]);
+
+  // Tab 切换时清空搜索和子筛选
+  const handleMainTabChange = useCallback(
+    (tab: MainTab) => {
+      setMainTab(tab);
+      setKeyword('');
+      setDebouncedKeyword('');
+      setMemberSubTab('all');
+      closeAllDropdowns();
+      if (tab === 'lead') {
+        loadLeads();
+      }
+    },
+    [loadLeads, closeAllDropdowns],
+  );
+
+  // 会员子 Tab 切换
+  const handleMemberSubTabChange = useCallback((tab: MemberSubTab) => {
+    setMemberSubTab(tab);
+  }, []);
 
   // 后端搜索（大数据量时使用）
   const [remoteResults, setRemoteResults] = useState<Student[]>([]);
@@ -139,11 +244,9 @@ const Students: React.FC = () => {
     // 搜索过滤
     if (debouncedKeyword) {
       if (useRemoteSearch) {
-        // 大数据量：使用后端搜索结果
         const remoteIds = new Set(remoteResults.map((r) => r.id));
         result = result.filter((s) => remoteIds.has(s.id));
       } else {
-        // 小数据量：本地即时过滤
         const kw = debouncedKeyword.toLowerCase();
         result = result.filter(
           (s) => (s.name || '').toLowerCase().includes(kw) || (s.phone || '').includes(kw),
@@ -151,16 +254,37 @@ const Students: React.FC = () => {
       }
     }
 
-    // 课时状态筛选
-    if (filterStatus !== 'all') {
-      result = result.filter((s) => getStudentCardStatus(s) === filterStatus);
-    }
+    // 会员子 Tab 筛选（基于现有数据做简化映射）
+    if (memberSubTab !== 'all') {
+      const today = dayjs();
+      result = result.filter((s) => {
+        const packages = s.course_packages || [];
+        const hasActive = packages.some((p) => p.status === 'active');
+        const hasFrozen = packages.some((p) => p.status === 'frozen');
+        const cardStatus = getStudentCardStatus(s);
+        const isBirthdayMonth = s.birthday ? dayjs(s.birthday).month() === today.month() : false;
 
-    // 科目筛选：按课包 subject_id 匹配
-    if (filterSubject !== 'all') {
-      result = result.filter((s) =>
-        (s.course_packages || []).some((pkg) => pkg.subject_id === filterSubject),
-      );
+        switch (memberSubTab) {
+          case 'active':
+            return hasActive;
+          case 'private':
+            // 私教课包：通过课包名称关键词识别（数据完善后可改用类型字段）
+            return packages.some((p) => (p.name || '').includes('私教'));
+          case 'renew':
+            return cardStatus === 'low' || cardStatus === 'expiring' || cardStatus === 'owe';
+          case 'silent':
+            // 沉默会员：有有效课包且剩余课时较多（数据完善后可改用最近消课时间）
+            return hasActive && calcRemainingHours(packages) >= 10;
+          case 'frozen':
+            return hasFrozen;
+          case 'birthday':
+            return isBirthdayMonth;
+          case 'lost':
+            return !hasActive && !hasFrozen;
+          default:
+            return true;
+        }
+      });
     }
 
     // 排序
@@ -182,41 +306,51 @@ const Students: React.FC = () => {
     }
 
     return result;
-  }, [students, debouncedKeyword, filterStatus, filterSubject, sortBy]);
+  }, [students, debouncedKeyword, memberSubTab, sortBy]);
 
-  // 统计摘要
-  const summary: StudentSummary = useMemo(() => calcStudentSummary(students), [students]);
+  // ====== 线索 Tab：搜索过滤 ======
+  const filteredLeads = useMemo(() => {
+    if (!debouncedKeyword) return leadList;
+    const kw = debouncedKeyword.toLowerCase();
+    return leadList.filter(
+      (item) =>
+        (item.child_name || '').toLowerCase().includes(kw) ||
+        (item.parent_phone || '').includes(kw),
+    );
+  }, [leadList, debouncedKeyword]);
 
-  // 关闭所有下拉
-  const closeAllDropdowns = useCallback(() => {
-    setSortOpen(false);
-    setFilterStatusOpen(false);
-    setFilterSubjectOpen(false);
-  }, []);
-
+  // ====== 会员 Tab：下拉菜单 ======
   const goToDetail = (id: string) => {
     Taro.navigateTo({
       url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(id)}`,
     });
   };
 
-  const goToAdd = () => {
+  const [memberActionVisible, setMemberActionVisible] = useState(false);
+
+  const handleOpenMemberAction = useCallback(() => {
+    setMemberActionVisible(true);
+  }, []);
+
+  const handleCloseMemberAction = useCallback(() => {
+    setMemberActionVisible(false);
+  }, []);
+
+  const handleNewCard = useCallback(() => {
     Taro.navigateTo({ url: '/package-student/pages/student-form/index' });
-  };
+  }, []);
+
+  const handleBatchExtend = useCallback(() => {
+    Taro.showToast({ title: '批量延期功能开发中', icon: 'none' });
+  }, []);
+
+  const handleBlacklist = useCallback(() => {
+    Taro.showToast({ title: '门店黑名单功能开发中', icon: 'none' });
+  }, []);
 
   const handleSortSelect = (value: StudentSort) => {
     setSortBy(value);
     setSortOpen(false);
-  };
-
-  const handleFilterStatusSelect = (value: StudentFilter) => {
-    setFilterStatus(value);
-    setFilterStatusOpen(false);
-  };
-
-  const handleFilterSubjectSelect = (value: SubjectFilter) => {
-    setFilterSubject(value);
-    setFilterSubjectOpen(false);
   };
 
   const toggleSort = () => {
@@ -225,93 +359,104 @@ const Students: React.FC = () => {
     setSortOpen(next);
   };
 
-  const toggleFilterStatus = () => {
-    const next = !filterStatusOpen;
-    closeAllDropdowns();
-    setFilterStatusOpen(next);
-  };
+  // ====== 线索 Tab：事件处理 ======
+  const handleLeadTabChange = useCallback(
+    (tab: LeadFilterTab) => {
+      setActiveFilterTab(tab);
+      if (teacherId) {
+        fetchCards(teacherId, tab);
+      }
+    },
+    [teacherId, setActiveFilterTab, fetchCards],
+  );
 
-  const toggleFilterSubject = () => {
-    const next = !filterSubjectOpen;
-    closeAllDropdowns();
-    setFilterSubjectOpen(next);
-  };
+  const handleAddLead = useCallback(() => {
+    Taro.navigateTo({ url: '/package-lead/pages/lead-form/index' });
+  }, []);
 
   return (
-    <View className="min-h-screen bg-background flex flex-col">
-      {/* ====== 渐变头部 ====== */}
-      <View className="bg-gradient-primary px-5 pt-10 pb-5 flex-shrink-0">
-        {/* 标题行 */}
-        <View className="flex items-center justify-between">
-          <Text className="text-2xl font-bold text-white">学员管理</Text>
+    <View className="min-h-screen bg-[#f3f2ed] flex flex-col">
+      {/* ====== 固定自定义导航栏（紧凑：仅返回 + 标题） ====== */}
+      <View
+        className="fixed top-0 left-0 right-0 z-50 bg-gradient-primary"
+        style={{ paddingTop: `${statusBarHeight}px` }}
+      >
+        <View
+          className="flex items-center justify-center relative"
+          style={{
+            height: `${NAV_BAR_HEIGHT}px`,
+            paddingRight: navPaddingRight ? `${navPaddingRight}px` : undefined,
+          }}
+        >
+          {/* 返回按钮 */}
+          {canGoBack && (
+            <View
+              className="absolute left-0 flex items-center justify-center w-[44px] h-full"
+              onClick={() => Taro.navigateBack()}
+            >
+              <Icon name="mdi-chevron-left" size={32} className="text-white" />
+            </View>
+          )}
+          <Text className="text-[32rpx] font-semibold text-white">会员</Text>
         </View>
+      </View>
 
-        {/* 统计摘要 */}
-        <View className="mt-3 rounded-xl px-4 py-3 flex bg-white/20">
-          <View className="flex-1 center-col">
-            <Text className="text-white text-xl font-bold">{summary.total}</Text>
-            <Text className="text-white/90 text-xs mt-[2rpx]">总学员</Text>
-          </View>
-          <View className="w-px h-10 bg-white/25" />
-          <View className="flex-1 center-col">
-            <Text className="text-white text-xl font-bold">{summary.sufficient}</Text>
-            <Text className="text-white/90 text-xs mt-[2rpx]">课时充足</Text>
-          </View>
-          <View className="w-px h-10 bg-white/25" />
-          <View className="flex-1 center-col">
-            <Text className="text-xl font-bold text-gold">{summary.low}</Text>
-            <Text className="text-xs mt-[2rpx] text-gold-soft">课时不足</Text>
-          </View>
-          <View className="w-px h-10 bg-white/25" />
-          <View className="flex-1 center-col">
-            <Text className="text-xl font-bold text-pink-soft">{summary.owe}</Text>
-            <Text className="text-xs mt-[2rpx] text-pink-light">欠课</Text>
-          </View>
-        </View>
-
-        {/* 搜索栏 + 筛选按钮 + 添加按钮 */}
-        <View className="flex items-center gap-2 mt-3">
-          <View className="flex-1 rounded-xl px-4 py-2_d5 flex items-center gap-2 bg-glass-25">
-            <Icon name="mdi-magnify" size="xs" color="white" />
+      {/* ====== 渐变头部（仅搜索框 + 排序） ====== */}
+      <View
+        className="bg-gradient-primary px-[32rpx] py-[18rpx] flex-shrink-0"
+        style={{ paddingTop: `${navSafeHeight + NAV_BAR_HEIGHT + 18}px` }}
+      >
+        {/* 搜索框 + 排序按钮 */}
+        <View className="flex items-center gap-[16rpx]">
+          <View className="flex-1 rounded-full px-[24rpx] py-[12rpx] flex items-center gap-[10rpx] bg-white/90">
+            <Icon name="mdi-magnify" size={20} color="#9ca3af" />
             <Input
-              className="flex-1 text-sm text-white"
-              placeholder="搜索姓名或手机号"
-              placeholderStyle="color:rgba(255,255,255,0.65)"
+              className="flex-1 text-[26rpx] text-foreground"
+              placeholder={mainTab === 'member' ? '搜索会员姓名或手机号' : '搜索线索姓名或手机号'}
+              placeholderStyle="color:#9ca3af"
               value={keyword}
               onInput={(e) => setKeyword(e.detail.value || '')}
               confirmType="search"
             />
             {keyword && (
               <View
-                className="w-[36rpx] h-[36rpx] rounded-full bg-white/40 center"
+                className="w-[36rpx] h-[36rpx] rounded-full bg-muted center"
                 onClick={() => setKeyword('')}
               >
                 <Icon name="mdi-close" size="xxs" color="white" />
               </View>
             )}
           </View>
-          {/* 筛选按钮 */}
-          <View className="relative">
+          {/* 排序 */}
+          <View className="relative flex-shrink-0">
             <View
-              className={`w-10 h-10 rounded-xl center press-scale ${sortOpen ? 'bg-white/40' : 'bg-glass-25'}`}
+              className={cn(
+                'flex items-center gap-[6rpx] px-[20rpx] py-[14rpx] rounded-full bg-white/20',
+                sortBy !== 'default' ? 'text-white font-semibold' : 'text-white/90',
+              )}
               onClick={toggleSort}
             >
-              <Icon
-                name="mdi-filter-variant"
-                size="sm"
-                color={sortOpen ? 'white' : 'rgba(255,255,255,0.85)'}
-              />
+              <Text className="text-[24rpx]">
+                {SORT_OPTIONS.find((o) => o.value === sortBy)?.label || '排序'}
+              </Text>
+              <Icon name="mdi-chevron-down" size={24} color="white" />
             </View>
             {sortOpen && (
-              <View className="absolute top-full right-0 mt-[12rpx] bg-white rounded-[24rpx] shadow-float py-[12rpx] min-w-[280rpx] z-100">
+              <View className="absolute top-full right-0 mt-[12rpx] bg-white rounded-[24rpx] shadow-float py-[12rpx] min-w-[240rpx] z-100">
                 {SORT_OPTIONS.map((opt) => (
                   <View
                     key={opt.value}
-                    className={`flex items-center px-[24rpx] py-[20rpx] mx-[12rpx] rounded-[16rpx] ${sortBy === opt.value ? 'bg-primary-bg text-primary' : 'text-foreground'}`}
+                    className={cn(
+                      'flex items-center px-[24rpx] py-[20rpx] mx-[12rpx] rounded-[16rpx]',
+                      sortBy === opt.value ? 'bg-primary-bg text-primary' : 'text-foreground',
+                    )}
                     onClick={() => handleSortSelect(opt.value)}
                   >
                     <Text
-                      className={`text-[26rpx] flex-1 ${sortBy === opt.value ? 'font-semibold text-primary' : ''}`}
+                      className={cn(
+                        'text-[26rpx] flex-1',
+                        sortBy === opt.value ? 'font-semibold text-primary' : '',
+                      )}
                     >
                       {opt.label}
                     </Text>
@@ -321,279 +466,350 @@ const Students: React.FC = () => {
               </View>
             )}
           </View>
-          {/* 添加学员按钮 */}
-          {isTeacher && (
-            <View className="w-10 h-10 rounded-xl bg-white/25 center press-scale" onClick={goToAdd}>
-              <Icon name="mdi-plus" size="sm" color="white" />
-            </View>
-          )}
         </View>
       </View>
 
-      {/* ====== 筛选栏 ====== */}
-      <View className="flex bg-white relative z-10">
-        {/* 课时状态筛选 */}
-        <View className="flex-1 relative">
-          <View
-            className={`flex items-center justify-center gap-[8rpx] py-[22rpx] px-[24rpx] ${filterStatus !== 'all' ? 'text-primary font-semibold' : 'text-muted-foreground font-medium'}`}
-            onClick={toggleFilterStatus}
-          >
-            <Text className="text-[26rpx]">
-              {FILTER_OPTIONS.find((o) => o.value === filterStatus)?.label || '课时状态'}
-            </Text>
-            <Icon
-              name="mdi-chevron-down"
-              size={28}
-              color={filterStatus !== 'all' ? 'success' : 'mutedForeground'}
-            />
+      {/* ====== Tab 切换：会员 / 客资（白色背景区域） ====== */}
+      <View className="bg-white flex-shrink-0 px-[32rpx] pt-[20rpx] pb-[16rpx]">
+        <View className="flex justify-center">
+          <View className="flex items-center gap-[8rpx] bg-muted/40 rounded-full p-[6rpx]">
+            <View
+              className={cn(
+                'px-[48rpx] py-[12rpx] rounded-full',
+                mainTab === 'member' ? 'bg-primary shadow-elegant' : '',
+              )}
+              onClick={() => handleMainTabChange('member')}
+            >
+              <Text
+                className={cn(
+                  'text-[28rpx] font-medium',
+                  mainTab === 'member' ? 'text-white' : 'text-muted-foreground',
+                )}
+              >
+                会员
+              </Text>
+            </View>
+            <View
+              className={cn(
+                'px-[48rpx] py-[12rpx] rounded-full',
+                mainTab === 'lead' ? 'bg-primary shadow-elegant' : '',
+              )}
+              onClick={() => handleMainTabChange('lead')}
+            >
+              <Text
+                className={cn(
+                  'text-[28rpx] font-medium',
+                  mainTab === 'lead' ? 'text-white' : 'text-muted-foreground',
+                )}
+              >
+                客资
+              </Text>
+            </View>
           </View>
-          {filterStatusOpen && (
-            <View className="absolute top-full left-0 right-0 bg-white rounded-b-[24rpx] shadow-float py-[12rpx] z-100">
-              {FILTER_OPTIONS.map((opt) => (
+        </View>
+      </View>
+
+      {/* ====== 会员 Tab：轻量子筛选标签 + 统计 ====== */}
+      {mainTab === 'member' && (
+        <View className="bg-white flex-shrink-0">
+          <ScrollView scrollX className="whitespace-nowrap px-[24rpx] pb-[16rpx]">
+            <View className="inline-flex gap-[12rpx]">
+              {MEMBER_SUB_TAB_OPTIONS.map((tab) => (
                 <View
-                  key={opt.value}
-                  className={`flex items-center gap-[16rpx] px-[24rpx] py-[20rpx] mx-[12rpx] rounded-[16rpx] ${filterStatus === opt.value ? 'bg-primary-bg' : ''}`}
-                  onClick={() => handleFilterStatusSelect(opt.value)}
-                >
-                  <View
-                    className="w-[12rpx] h-[12rpx] rounded-full"
-                    style={{ background: opt.dotColor }}
-                  />
-                  <Text
-                    className={`text-[26rpx] flex-1 ${filterStatus === opt.value ? 'text-primary font-semibold' : 'text-foreground'}`}
-                  >
-                    {opt.label}
-                  </Text>
-                  {filterStatus === opt.value && (
-                    <Icon name="mdi-check" size="xs" color="success" />
+                  key={tab.key}
+                  className={cn(
+                    'px-[20rpx] py-[10rpx] rounded-full',
+                    memberSubTab === tab.key
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted/50 text-muted-foreground',
                   )}
+                  onClick={() => handleMemberSubTabChange(tab.key)}
+                >
+                  <Text
+                    className={cn(
+                      'text-[24rpx]',
+                      memberSubTab === tab.key ? 'font-semibold text-primary' : 'font-medium',
+                    )}
+                  >
+                    {tab.label}
+                  </Text>
                 </View>
               ))}
             </View>
-          )}
-        </View>
-        {/* 分隔线 */}
-        <View className="w-[2rpx] bg-border-light" />
-        {/* 科目筛选 */}
-        <View className="flex-1 relative">
-          <View
-            className={`flex items-center justify-center gap-[8rpx] py-[22rpx] px-[24rpx] ${filterSubject !== 'all' ? 'text-primary font-semibold' : 'text-muted-foreground font-medium'}`}
-            onClick={toggleFilterSubject}
-          >
-            <Text className="text-[26rpx]">
-              {filterSubject === 'all'
-                ? '科目'
-                : subjectList.find((s) => s.id === filterSubject)?.name || '科目'}
+          </ScrollView>
+          <View className="px-[32rpx] pb-[16rpx]">
+            <Text className="text-[24rpx] text-muted-foreground">
+              共{' '}
+              <Text className="text-[28rpx] font-bold text-foreground">
+                {filteredStudents.length}
+              </Text>{' '}
+              位会员
             </Text>
-            <Icon
-              name="mdi-chevron-down"
-              size={28}
-              color={filterSubject !== 'all' ? 'success' : 'mutedForeground'}
-            />
           </View>
-          {filterSubjectOpen && (
-            <View className="absolute top-full left-0 right-0 bg-white rounded-b-[24rpx] shadow-float py-[12rpx] z-100">
-              {/* 全部科目 */}
+        </View>
+      )}
+
+      {/* ====== 线索 Tab：筛选标签（下划线样式，平均分布） ====== */}
+      {mainTab === 'lead' && (
+        <View className="px-[32rpx] pt-[24rpx] pb-[16rpx] flex-shrink-0 bg-white">
+          <View className="flex">
+            {LEAD_FILTER_TAB_OPTIONS.map((tab) => (
               <View
-                className={`flex items-center gap-[16rpx] px-[24rpx] py-[20rpx] mx-[12rpx] rounded-[16rpx] ${filterSubject === 'all' ? 'bg-primary-bg' : ''}`}
-                onClick={() => handleFilterSubjectSelect('all')}
+                key={tab.key}
+                className="flex-1 relative pb-[12rpx] center"
+                onClick={() => handleLeadTabChange(tab.key)}
               >
                 <Text
-                  className={`text-[26rpx] flex-1 ${filterSubject === 'all' ? 'text-primary font-semibold' : 'text-foreground'}`}
+                  className={cn(
+                    'text-[28rpx]',
+                    activeFilterTab === tab.key
+                      ? 'text-primary font-semibold'
+                      : 'text-muted-foreground font-medium',
+                  )}
                 >
-                  全部科目
+                  {tab.label}
                 </Text>
-                {filterSubject === 'all' && <Icon name="mdi-check" size="xs" color="success" />}
+                {activeFilterTab === tab.key && (
+                  <View className="absolute bottom-0 left-[20%] right-[20%] h-[4rpx] rounded-full bg-primary" />
+                )}
               </View>
-              {/* 动态科目列表 */}
-              {subjectList.map((sub) => (
-                <View
-                  key={sub.id}
-                  className={`flex items-center gap-[16rpx] px-[24rpx] py-[20rpx] mx-[12rpx] rounded-[16rpx] ${filterSubject === sub.id ? 'bg-primary-bg' : ''}`}
-                  onClick={() => handleFilterSubjectSelect(sub.id)}
-                >
-                  <Text
-                    className={`text-[26rpx] flex-1 ${filterSubject === sub.id ? 'text-primary font-semibold' : 'text-foreground'}`}
-                  >
-                    {sub.name}
-                  </Text>
-                  {filterSubject === sub.id && <Icon name="mdi-check" size="xs" color="success" />}
-                </View>
-              ))}
-            </View>
-          )}
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
-      {/* ====== 学员卡片列表 ====== */}
-      <ScrollView scrollY className="px-[32rpx] pt-[24rpx] pb-[24rpx] flex-1">
-        {filteredStudents.map((student) => {
-          const cardStatus = getStudentCardStatus(student);
-          const borderColorClass = getCardBorderColorClass(cardStatus);
-          const progress = calcStudentProgress(student);
-          const tags = generatePackageTags(student);
-          const remainingHours = calcRemainingHours(student.course_packages);
-          const hoursColorClass = getHoursColorClass(remainingHours);
-          const avatarGradient = getAvatarGradientByName(student.name);
-
-          return (
-            <View
-              key={student.id}
-              className={cn(
-                'bg-white rounded-[32rpx] p-[32rpx] shadow-soft mb-[24rpx] press-scale',
-                'border-l-[6rpx] border-solid',
-                borderColorClass,
-              )}
-              onClick={() => goToDetail(student.id)}
-            >
-              {/* 上部：头像 + 信息 + 课时 */}
-              <View className="flex items-center gap-[24rpx]">
-                {/* 头像 */}
+      {/* ====== 会员 Tab：学员卡片列表 ====== */}
+      {mainTab === 'member' && (
+        <ScrollView scrollY className="flex-1">
+          <View className="px-[32rpx] pt-[24rpx] pb-[24rpx]">
+            {filteredStudents.map((student) => {
+              const cardStatus = getStudentCardStatus(student);
+              const borderColorClass = getCardBorderColorClass(cardStatus);
+              const progress = calcStudentProgress(student);
+              const tags = generatePackageTags(student);
+              const remainingHours = calcRemainingHours(student.course_packages);
+              const hoursColorClass = getHoursColorClass(remainingHours);
+              return (
                 <View
-                  className="w-[96rpx] h-[96rpx] rounded-full center flex-shrink-0"
-                  style={{ background: avatarGradient }}
+                  key={student.id}
+                  className={cn(
+                    'bg-white rounded-[32rpx] p-[32rpx] shadow-soft mb-[24rpx] press-scale',
+                    'border-l-[6rpx] border-solid',
+                    borderColorClass,
+                  )}
+                  onClick={() => goToDetail(student.id)}
                 >
-                  <Text className="text-[36rpx] font-bold text-white">{student.name[0]}</Text>
-                </View>
-                {/* 信息 */}
-                <View className="flex-1 min-w-0">
-                  <Text className="text-[32rpx] font-bold text-foreground">{student.name}</Text>
-                  <View className="flex items-center gap-[12rpx] mt-[4rpx]">
-                    {student.phone && (
-                      <>
-                        <Text className="text-[24rpx] text-muted-foreground">{student.phone}</Text>
-                        <View className="w-[6rpx] h-[6rpx] rounded-full bg-muted-foreground/40" />
-                      </>
-                    )}
-                    <Text className="text-[24rpx] text-muted-foreground">
-                      {student.birthday || '暂无生日'}
-                    </Text>
+                  {/* 上部：头像 + 信息 + 课时 */}
+                  <View className="flex items-center gap-[24rpx]">
+                    {/* 头像 */}
+                    <StudentAvatar name={student.name} size="md" />
+                    {/* 信息 */}
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-[32rpx] font-bold text-foreground">{student.name}</Text>
+                      <View className="flex items-center gap-[12rpx] mt-[4rpx]">
+                        {student.phone && (
+                          <>
+                            <Text className="text-[24rpx] text-muted-foreground">
+                              {student.phone}
+                            </Text>
+                            <View className="w-[6rpx] h-[6rpx] rounded-full bg-muted-foreground/40" />
+                          </>
+                        )}
+                        <Text className="text-[24rpx] text-muted-foreground">
+                          {student.birthday || '暂无生日'}
+                        </Text>
+                      </View>
+                    </View>
+                    {/* 课时 */}
+                    <View className="flex items-center gap-[16rpx] flex-shrink-0">
+                      <View className="text-right">
+                        <Text className={cn('text-[40rpx] font-bold block', hoursColorClass)}>
+                          {remainingHours}
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground">课时</Text>
+                      </View>
+                      <Icon name="mdi-chevron-right" size="sm" color="mutedForeground" />
+                    </View>
                   </View>
-                </View>
-                {/* 课时 */}
-                <View className="flex items-center gap-[16rpx] flex-shrink-0">
-                  <View className="text-right">
-                    <Text className={cn('text-[40rpx] font-bold block', hoursColorClass)}>
-                      {remainingHours}
-                    </Text>
-                    <Text className="text-[22rpx] text-muted-foreground">课时</Text>
-                  </View>
-                  <Icon name="mdi-chevron-right" size="sm" color="mutedForeground" />
-                </View>
-              </View>
 
-              {/* 课包标签行 */}
-              {tags.length > 0 && (
-                <View className="flex gap-[12rpx] mt-[20rpx] flex-wrap">
-                  {tags.map((tag, i) => (
+                  {/* 课包标签行 */}
+                  {tags.length > 0 && (
+                    <View className="flex gap-[12rpx] mt-[20rpx] flex-wrap">
+                      {tags.map((tag, i) => (
+                        <View
+                          key={i}
+                          className={cn(
+                            'py-[6rpx] px-[16rpx] rounded-[12rpx]',
+                            TAG_COLOR_MAP[tag.color].bg,
+                          )}
+                        >
+                          <Text
+                            className={cn(
+                              'text-[22rpx] font-medium',
+                              TAG_COLOR_MAP[tag.color].text,
+                            )}
+                          >
+                            {tag.name} {tag.remainingHours}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* 进度条 */}
+                  {progress.total > 0 && (
+                    <View className="mt-[20rpx]">
+                      <View className="h-[8rpx] bg-border rounded-[4rpx] overflow-hidden">
+                        <View
+                          className={cn(
+                            'h-full rounded-[4rpx]',
+                            getProgressGradientClass(cardStatus),
+                          )}
+                          style={{
+                            width: `${Math.min(progress.percentage, 100)}%`,
+                          }}
+                        />
+                      </View>
+                      <View className="flex justify-between mt-[8rpx]">
+                        <Text className="text-[22rpx] text-muted-foreground">
+                          已用 {progress.used} 课时
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground">
+                          共 {progress.total} 课时
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* 课时不足/欠课 → 去充值 */}
+                  {(cardStatus === 'low' || cardStatus === 'owe') && (
                     <View
-                      key={i}
-                      className={cn('py-[6rpx] px-[16rpx] rounded-[12rpx]', TAG_COLOR_MAP[tag.color].bg)}
+                      className="mt-[20rpx] flex items-center justify-between px-[20rpx] py-[16rpx] rounded-[16rpx] bg-warning/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        Taro.navigateTo({
+                          url: `/package-course/pages/package-form/index?studentId=${student.id}`,
+                        });
+                      }}
                     >
-                      <Text
-                        className={cn('text-[22rpx] font-medium', TAG_COLOR_MAP[tag.color].text)}
-                      >
-                        {tag.name} {tag.remainingHours}
+                      <Text className="text-[24rpx] text-warning">
+                        {cardStatus === 'owe' ? '课时透支，请尽快充值' : '课时不足，建议充值'}
+                      </Text>
+                      <View className="px-[20rpx] py-[8rpx] rounded-full bg-warning/20">
+                        <Text className="text-[24rpx] text-warning font-medium">去充值</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            {/* 空状态 */}
+            {filteredStudents.length === 0 && !loading && (
+              <>
+                <Empty
+                  description={
+                    debouncedKeyword
+                      ? '未找到匹配的学员'
+                      : isTeacher
+                        ? '暂无学员，点击上方添加'
+                        : '暂无关联学员'
+                  }
+                />
+                {/* 本地无结果 + 未启用远程搜索 → 显示"搜索更多" */}
+                {debouncedKeyword &&
+                  !useRemoteSearch &&
+                  debouncedKeyword.length >= 2 &&
+                  profile?.id && (
+                    <View
+                      className="mt-4 py-3 px-6 rounded-full bg-primary/10 self-center"
+                      onClick={() => {
+                        setRemoteSearching(true);
+                        studentService
+                          .search(profile.id, debouncedKeyword)
+                          .then((results) => {
+                            if (results.length > 0) {
+                              setStudents((prev) => {
+                                const existingIds = new Set(prev.map((s) => s.id));
+                                const newStudents = results.filter((r) => !existingIds.has(r.id));
+                                return [...prev, ...newStudents];
+                              });
+                            }
+                          })
+                          .catch(() => {})
+                          .finally(() => setRemoteSearching(false));
+                      }}
+                    >
+                      <Text className="text-[26rpx] text-primary font-medium">
+                        {remoteSearching ? '搜索中...' : '搜索更多学员'}
                       </Text>
                     </View>
-                  ))}
-                </View>
-              )}
+                  )}
+              </>
+            )}
+          </View>
+        </ScrollView>
+      )}
 
-              {/* 进度条 */}
-              {progress.total > 0 && (
-                <View className="mt-[20rpx]">
-                  <View className="h-[8rpx] bg-border rounded-[4rpx] overflow-hidden">
-                    <View
-                      className={cn('h-full rounded-[4rpx]', getProgressGradientClass(cardStatus))}
-                      style={{
-                        width: `${Math.min(progress.percentage, 100)}%`,
-                      }}
-                    />
-                  </View>
-                  <View className="flex justify-between mt-[8rpx]">
-                    <Text className="text-[22rpx] text-muted-foreground">
-                      已用 {progress.used} 课时
-                    </Text>
-                    <Text className="text-[22rpx] text-muted-foreground">
-                      共 {progress.total} 课时
-                    </Text>
-                  </View>
-                </View>
-              )}
+      {/* ====== 线索 Tab：线索卡片列表 ====== */}
+      {mainTab === 'lead' && (
+        <ScrollView scrollY className="flex-1">
+          <View className="px-[32rpx] pt-[24rpx] pb-[200rpx]">
+            {/* 加载中 */}
+            {isLeadLoading && filteredLeads.length === 0 && (
+              <View className="py-20 center">
+                <Text className="text-[26rpx] text-muted-foreground">加载中...</Text>
+              </View>
+            )}
 
-              {/* 课时不足/欠课 → 去充值 */}
-              {(cardStatus === 'low' || cardStatus === 'owe') && (
-                <View
-                  className="mt-[20rpx] flex items-center justify-between px-[20rpx] py-[16rpx] rounded-[16rpx] bg-warning/10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    Taro.navigateTo({
-                      url: `/package-course/pages/package-form/index?studentId=${student.id}`,
-                    });
-                  }}
-                >
-                  <Text className="text-[24rpx] text-warning">
-                    {cardStatus === 'owe' ? '课时透支，请尽快充值' : '课时不足，建议充值'}
-                  </Text>
-                  <View className="px-[20rpx] py-[8rpx] rounded-full bg-warning/20">
-                    <Text className="text-[24rpx] text-warning font-medium">去充值</Text>
-                  </View>
-                </View>
-              )}
+            {/* 空状态 */}
+            {!isLeadLoading && filteredLeads.length === 0 && (
+              <View className="py-20 center flex-col gap-3">
+                <Icon name="mdi-account-search" size={64} className="text-muted-foreground" />
+                <Text className="text-[28rpx] text-muted-foreground">
+                  {debouncedKeyword ? '未找到匹配的线索' : '暂无线索'}
+                </Text>
+              </View>
+            )}
+
+            {/* 线索卡片 */}
+            <View className="flex flex-col gap-3">
+              {filteredLeads.map((item) => (
+                <LeadCard key={item.id} data={item} />
+              ))}
             </View>
-          );
-        })}
+          </View>
+        </ScrollView>
+      )}
 
-        {/* 空状态 */}
-        {filteredStudents.length === 0 && !loading && (
-          <>
-            <Empty
-              description={
-                debouncedKeyword
-                  ? '未找到匹配的学员'
-                  : isTeacher
-                    ? '暂无学员，点击上方添加'
-                    : '暂无关联学员'
-              }
-            />
-            {/* 本地无结果 + 未启用远程搜索 → 显示"搜索更多" */}
-            {debouncedKeyword &&
-              !useRemoteSearch &&
-              debouncedKeyword.length >= 2 &&
-              profile?.id && (
-                <View
-                  className="mt-4 py-3 px-6 rounded-full bg-primary/10 self-center"
-                  onClick={() => {
-                    setRemoteSearching(true);
-                    studentService
-                      .search(profile.id, debouncedKeyword)
-                      .then((results) => {
-                        if (results.length > 0) {
-                          setStudents((prev) => {
-                            const existingIds = new Set(prev.map((s) => s.id));
-                            const newStudents = results.filter((r) => !existingIds.has(r.id));
-                            return [...prev, ...newStudents];
-                          });
-                        }
-                      })
-                      .catch(() => {})
-                      .finally(() => setRemoteSearching(false));
-                  }}
-                >
-                  <Text className="text-[26rpx] text-primary font-medium">
-                    {remoteSearching ? '搜索中...' : '搜索更多学员'}
-                  </Text>
-                </View>
-              )}
-          </>
-        )}
-      </ScrollView>
-
-      {/* 点击空白关闭下拉 */}
-      {(sortOpen || filterStatusOpen || filterSubjectOpen) && (
+      {/* 点击空白关闭排序下拉 */}
+      {sortOpen && (
         <View className="fixed inset-0 z-50 bg-transparent" onClick={closeAllDropdowns} />
       )}
+
+      {/* 悬浮添加按钮 - 参考图片胶囊风格 */}
+      {isTeacher && (
+        <View
+          className="fixed bottom-[160rpx] right-[32rpx] z-100"
+          onClick={mainTab === 'member' ? handleOpenMemberAction : handleAddLead}
+        >
+          <View className="flex items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-gradient-primary shadow-schedule-fab">
+            <Icon name="mdi-plus" size="sm" color="white" />
+            <Text className="text-[28rpx] text-white font-medium">
+              {mainTab === 'member' ? '会员操作' : '客资录入'}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* 会员操作弹窗 */}
+      <MemberActionSheet
+        visible={memberActionVisible}
+        onClose={handleCloseMemberAction}
+        onNewCard={handleNewCard}
+        onBatchExtend={handleBatchExtend}
+        onBlacklist={handleBlacklist}
+      />
     </View>
   );
 };

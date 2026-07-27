@@ -29,7 +29,7 @@ import { logError } from '@/utils/logger';
 
 /** 机构名称本地存储键 */
 const ORG_NAME_KEY = 'yunce_org_name';
-const DEFAULT_ORG_NAME = '云策艺术';
+const DEFAULT_ORG_NAME = '松果排课';
 
 interface CampusState {
   // 数据

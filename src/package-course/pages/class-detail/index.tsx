@@ -1,13 +1,13 @@
 import { View, Text } from '@tarojs/components';
 import React from 'react';
 import Avatar from '@/components/Avatar';
+import ClassAvatar from '@/components/class/ClassAvatar';
 import Empty from '@/components/Empty';
-import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { withRouteGuard } from '@/utils/route-guard';
 import AddStudentSheet from './AddStudentSheet';
-import { CLASS_ICONS, CLASS_GRADIENT, formatDateCN } from './constants';
+import { CLASS_GRADIENT, formatDateCN } from './constants';
 import TransferSheet from './TransferSheet';
 import { useClassDetail } from './useClassDetail';
 
@@ -69,7 +69,9 @@ const ClassDetail: React.FC = () => {
         <View className="min-h-screen bg-gradient-subtle px-8 flex items-center justify-center">
           <Empty
             icon={notFound ? 'mdi-school-outline' : 'mdi-alert-circle'}
-            description={notFound ? '未找到对应班级信息' : loadError || '班级详情加载失败，请稍后重试'}
+            description={
+              notFound ? '未找到对应班级信息' : loadError || '班级详情加载失败，请稍后重试'
+            }
             actionText={notFound ? '返回上一页' : '重新加载'}
             onAction={notFound ? () => void Taro.navigateBack() : () => void reload()}
           />
@@ -79,7 +81,6 @@ const ClassDetail: React.FC = () => {
   }
 
   const color = isEnded ? 'purple' : classInfo.color || 'primary';
-  const icon = classInfo.icon || 'piano';
 
   return (
     <PageContainer safeBottom>
@@ -87,9 +88,7 @@ const ClassDetail: React.FC = () => {
         {/* ====== 1. 头部区域 ====== */}
         <View className={`${CLASS_GRADIENT[color]} px-6 pt-10 pb-8`}>
           <View className="flex items-center gap-4">
-            <View className="w-14 h-14 rounded-2xl bg-white/25 flex items-center justify-center flex-shrink-0">
-              <Icon name={CLASS_ICONS[icon]} size={28} color="white" />
-            </View>
+            <ClassAvatar size="lg" />
             <View className="flex-1 min-w-0">
               <Text className="text-white text-xl font-bold block truncate">{classInfo.name}</Text>
               <View className="flex items-center gap-2 mt-1">
@@ -370,7 +369,9 @@ const ClassDetail: React.FC = () => {
                 className={`btn-primary flex-1 ${addingStudents || transferring || endingClass ? 'bg-border' : 'shadow-elegant bg-gradient-primary'}`}
                 onClick={addingStudents || transferring || endingClass ? undefined : goLessonForm}
               >
-                <Text className={`text-base font-semibold ${addingStudents || transferring || endingClass ? 'text-muted-foreground' : 'text-white'}`}>
+                <Text
+                  className={`text-base font-semibold ${addingStudents || transferring || endingClass ? 'text-muted-foreground' : 'text-white'}`}
+                >
                   消课
                 </Text>
               </View>
@@ -384,7 +385,9 @@ const ClassDetail: React.FC = () => {
                 className={`btn-primary flex-1 border ${addingStudents || transferring || endingClass ? 'border-border bg-muted' : 'border-purple bg-white'}`}
                 onClick={addingStudents || transferring || endingClass ? undefined : handleEndClass}
               >
-                <Text className={`text-base font-semibold ${addingStudents || transferring || endingClass ? 'text-muted-foreground' : 'text-purple'}`}>
+                <Text
+                  className={`text-base font-semibold ${addingStudents || transferring || endingClass ? 'text-muted-foreground' : 'text-purple'}`}
+                >
                   {endingClass ? '结课中...' : '结课'}
                 </Text>
               </View>
