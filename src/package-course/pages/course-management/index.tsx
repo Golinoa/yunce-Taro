@@ -1,0 +1,348 @@
+/**
+ * 课程管理列表页
+ *
+ * 按课程类型（班课 / 团课 / 私教）展示课程模板列表，
+ * 支持新增课程，首次进入展示「第 4 步：建课程」引导弹窗。
+ */
+import { View, Text, ScrollView } from '@tarojs/components';
+import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
+import React, { useCallback, useMemo, useState } from 'react';
+import Empty from '@/components/Empty';
+import Icon from '@/components/Icon';
+import Loading from '@/components/Loading';
+import PageContainer from '@/components/PageContainer';
+import PageIntroSheet from '@/components/PageIntroSheet';
+import { DEFAULT_COURSE_CATEGORIES } from '@/data/course-template';
+import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
+import { useCourseCategoryStore } from '@/stores/course-category';
+import { useCourseTemplateStore } from '@/stores/course-template';
+import type { CourseTemplate } from '@/types/course-template';
+
+const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.course;
+const CATEGORY_TIP_KEY = 'course_management_category_tip_hidden';
+
+/** 课程管理列表页 */
+const CourseManagementPage: React.FC = () => {
+  const {
+    templates,
+    loading,
+    error,
+    activeCategoryId: activeTemplateCategoryId,
+    fetchByCategoryId,
+    setActiveCategoryId: setActiveTemplateCategoryId,
+    remove,
+  } = useCourseTemplateStore();
+  const { categories, activeCategoryId, fetchList, setActiveCategoryId } = useCourseCategoryStore();
+
+  // 删除确认弹窗
+  const [deleteTarget, setDeleteTarget] = useState<CourseTemplate | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // 引导弹窗
+  const [showIntro, setShowIntro] = useState(false);
+
+  // 分类标签编辑提示条
+  const [showCategoryTip, setShowCategoryTip] = useState(false);
+
+  // 当前激活的分类对象
+  const activeCategoryItem = useMemo(
+    () => categories.find((item) => item.id === activeCategoryId) ?? categories[0],
+    [categories, activeCategoryId],
+  );
+
+  // 显示的分类标签：优先使用 store 中的动态分类，兜底用默认分类
+  const tabs = useMemo(() => {
+    if (categories.length > 0) {
+      return categories.map((item) => ({ key: item.id, mode: item.mode, label: item.name }));
+    }
+    return DEFAULT_COURSE_CATEGORIES.map((item) => ({
+      key: item.key,
+      mode: item.key,
+      label: item.label,
+    }));
+  }, [categories]);
+
+  useDidShow(() => {
+    void fetchList().then(() => {
+      // 确保激活分类有效：如果当前 activeCategoryId 不在列表中，自动选第一个
+      const { categories: latestCategories, activeCategoryId: currentId } =
+        useCourseCategoryStore.getState();
+      const isValid = latestCategories.some((c) => c.id === currentId);
+      if (!isValid && latestCategories.length > 0) {
+        const firstId = latestCategories[0].id;
+        setActiveCategoryId(firstId);
+        setActiveTemplateCategoryId(firstId);
+        void fetchByCategoryId(firstId);
+      } else if (isValid) {
+        setActiveTemplateCategoryId(currentId);
+        void fetchByCategoryId(currentId);
+      }
+    });
+    try {
+      const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
+      setShowIntro(hidden !== true);
+    } catch {
+      setShowIntro(true);
+    }
+
+    try {
+      const tipHidden = Taro.getStorageSync(CATEGORY_TIP_KEY);
+      setShowCategoryTip(tipHidden !== true);
+    } catch {
+      setShowCategoryTip(true);
+    }
+  });
+
+  const handleCategoryChange = useCallback(
+    (id: string) => {
+      setActiveCategoryId(id);
+      setActiveTemplateCategoryId(id);
+      void fetchByCategoryId(id);
+    },
+    [fetchByCategoryId, setActiveCategoryId, setActiveTemplateCategoryId],
+  );
+
+  const handleAdd = useCallback(() => {
+    Taro.navigateTo({ url: '/package-course/pages/course-form/index' });
+  }, []);
+
+  const handleCategoryLongPress = useCallback((id: string) => {
+    Taro.navigateTo({ url: `/package-course/pages/category-form/index?id=${id}` });
+  }, []);
+
+  const handleDismissCategoryTip = useCallback(() => {
+    setShowCategoryTip(false);
+    try {
+      Taro.setStorageSync(CATEGORY_TIP_KEY, true);
+    } catch {
+      // 忽略写入失败
+    }
+  }, []);
+
+  const handleEdit = useCallback((id: string) => {
+    Taro.navigateTo({ url: `/package-course/pages/course-form/index?id=${id}` });
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await remove(deleteTarget.id);
+      Taro.showToast({ title: '已删除', icon: 'success' });
+      setDeleteTarget(null);
+    } catch {
+      Taro.showToast({ title: '删除失败', icon: 'none' });
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, remove]);
+
+  const countText = useMemo(() => {
+    const label = activeCategoryItem?.name ?? '课程';
+    return `${templates.length} 个${label}课程`;
+  }, [templates.length, activeCategoryItem]);
+
+  if (loading && templates.length === 0) {
+    return (
+      <PageContainer safeBottom>
+        <View className="min-h-screen flex items-center justify-center">
+          <Loading text="加载课程数据中..." />
+        </View>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer safeBottom>
+      <ScrollView
+        scrollY
+        enhanced
+        scrollWithAnimation
+        className="h-screen"
+        style={{ paddingBottom: 'calc(160rpx + env(safe-area-inset-bottom))' }}
+      >
+        {/* Tab 分类栏 */}
+        <View className="sticky top-0 z-10 bg-background py-[24rpx] px-[32rpx]">
+          <View className="flex flex-row items-center">
+            {/* 分类标签滚动区 */}
+            <ScrollView
+              scrollX
+              enhanced
+              showScrollbar={false}
+              scrollWithAnimation
+              className="flex-1 min-w-0"
+              style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
+            >
+              <View className="flex flex-row items-center" style={{ display: 'inline-flex' }}>
+                {tabs.map((tab) => {
+                  const isActive = activeCategoryId === tab.key;
+                  return (
+                    <View
+                      key={tab.key}
+                      className={cn(
+                        'shrink-0 min-w-[120rpx] flex flex-col items-center justify-center mr-[32rpx] py-[8rpx] press-scale',
+                      )}
+                      onClick={() => handleCategoryChange(tab.key)}
+                      onLongPress={() => handleCategoryLongPress(tab.key)}
+                    >
+                      <Text
+                        className={cn(
+                          'text-[30rpx] font-medium leading-none',
+                          isActive ? 'text-primary' : 'text-muted-foreground',
+                        )}
+                      >
+                        {tab.label}
+                      </Text>
+                      {/* 下划线始终占位，未选中时透明 */}
+                      <View
+                        className={cn(
+                          'mt-[12rpx] w-[40rpx] h-[6rpx] rounded-full',
+                          isActive ? 'bg-primary' : 'bg-transparent',
+                        )}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* 新增分类按钮 - 固定右侧 */}
+            <View
+              className="shrink-0 ml-[16rpx] px-[24rpx] py-[12rpx] rounded-[12rpx] bg-primary press-scale"
+              onClick={() => Taro.navigateTo({ url: '/package-course/pages/category-form/index' })}
+            >
+              <Text className="text-[26rpx] font-medium text-white">新增分类</Text>
+            </View>
+          </View>
+
+          {/* 分类编辑轻提示 - 靠近标签、可关闭、不遮挡列表 */}
+          {showCategoryTip && (
+            <View className="mt-[20rpx] py-[16rpx] px-[20rpx] rounded-[12rpx] bg-primary/5 flex flex-row items-center justify-between">
+              <View className="flex flex-row items-center gap-[12rpx] flex-1 min-w-0">
+                <Icon name="mdi-information-outline" size={24} color="primary" />
+                <Text className="text-[24rpx] text-primary leading-[34rpx]">
+                  小提示：长按分类标签可编辑
+                </Text>
+              </View>
+              <View className="shrink-0 p-[8rpx] press-scale" onClick={handleDismissCategoryTip}>
+                <Icon name="mdi-close" size={24} color="primary" />
+              </View>
+            </View>
+          )}
+
+          {/* 统计文案 */}
+          <View className="mt-[24rpx]">
+            <Text className="text-[26rpx] text-muted-foreground">{countText}</Text>
+          </View>
+        </View>
+
+        {/* 课程列表 */}
+        <View className="px-[32rpx] pb-[40rpx]">
+          {error && templates.length === 0 ? (
+            <Empty
+              description={error}
+              actionText="重新加载"
+              onAction={() => void fetchByCategoryId(activeTemplateCategoryId)}
+            />
+          ) : templates.length === 0 ? (
+            <Empty description={`暂无${activeCategoryItem?.name ?? '课程'}课程，点击底部添加`} />
+          ) : (
+            <View className="flex flex-col gap-[20rpx]">
+              {templates.map((template) => (
+                <View
+                  key={template.id}
+                  className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
+                  onClick={() => handleEdit(template.id)}
+                >
+                  <View className="flex-1 min-w-0 flex flex-row items-center gap-[20rpx]">
+                    {/* 颜色标识 */}
+                    <View
+                      className="w-[16rpx] h-[60rpx] rounded-full shrink-0"
+                      style={{ backgroundColor: template.color || 'hsl(var(--primary))' }}
+                    />
+                    <Text className="text-[32rpx] font-medium text-foreground truncate">
+                      {template.name}
+                    </Text>
+                  </View>
+
+                  <View className="flex flex-row items-center shrink-0">
+                    <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* 底部新增课程按钮 */}
+      <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))]">
+        <View
+          className="w-full py-[26rpx] rounded-full bg-card border-[2rpx] border-primary flex items-center justify-center gap-[12rpx] press-scale shadow-soft"
+          onClick={handleAdd}
+        >
+          <Icon name="mdi-plus" size={28} color="primary" />
+          <Text className="text-[30rpx] font-semibold text-primary">新增课程</Text>
+        </View>
+      </View>
+
+      {/* 删除确认弹窗 */}
+      {deleteTarget && (
+        <View className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <View className="w-[560rpx] bg-card rounded-[32rpx] px-[40rpx] py-[48rpx]">
+            <Text className="text-[36rpx] font-semibold text-foreground text-center">确认删除</Text>
+            <Text className="mt-[24rpx] text-[28rpx] text-muted-foreground text-center leading-relaxed">
+              删除后「{deleteTarget.name}」将不可恢复，是否确认删除？
+            </Text>
+            <View className="mt-[40rpx] flex flex-row gap-[24rpx]">
+              <View
+                className="flex-1 py-[22rpx] rounded-full bg-muted flex items-center justify-center press-scale"
+                onClick={() => setDeleteTarget(null)}
+              >
+                <Text className="text-[28rpx] font-medium text-foreground">取消</Text>
+              </View>
+              <View
+                className={cn(
+                  'flex-1 py-[22rpx] rounded-full bg-destructive flex items-center justify-center press-scale',
+                  deleting && 'opacity-50 pointer-events-none',
+                )}
+                onClick={() => void handleDeleteConfirm()}
+              >
+                <Text className="text-[28rpx] font-medium text-white">
+                  {deleting ? '删除中...' : '删除'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 页面引导弹窗 */}
+      <PageIntroSheet
+        visible={showIntro}
+        onClose={() => setShowIntro(false)}
+        storageKey={INTRO_STORAGE_KEY}
+        currentStep={4}
+        totalSteps={6}
+        title="第 4 步：建课程"
+        description="创建课程模板（如「拳击体验课」「私教 1v1」），定好时长、人数、价格，排课时直接选用。"
+        bulletPoints={[
+          '至少有 1 个启用课程才算完成',
+          '小技巧：课程列表上方的「分类标签」上长按可以编辑课程分类',
+          '课程分类支持「线上课」模式：用腾讯会议直播授课（如线上瑜伽）。约课方式同团课，排课时填腾讯会议号，会员约课成功后才能看到会议号进入上课',
+        ]}
+      />
+    </PageContainer>
+  );
+};
+
+// 页面配置：白色导航栏 + 黑色标题
+// eslint-disable-next-line import/no-named-as-default-member
+definePageConfig({
+  navigationBarTitleText: '课程管理',
+  navigationBarBackgroundColor: '#FFFFFF',
+  navigationBarTextStyle: 'black',
+});
+
+export default CourseManagementPage;

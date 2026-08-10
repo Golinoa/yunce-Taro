@@ -2,7 +2,7 @@
  * 点名编辑课节
  *
  * 从 lesson-form 头部「编辑」进入，用于编辑单次课节信息：
- * 日期、时间、授课老师、助教、教室、上课内容、备注等。
+ * 日期、时间、授课老师、助教、校区、教室、上课内容、备注等。
  */
 import { View, Text, Picker, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -12,26 +12,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
-import { scheduleService } from '@/services';
+import { scheduleService, roomService } from '@/services';
 import { teacherService } from '@/services/teacher';
+import { useCampusStore } from '@/stores/campus';
+import type { Room } from '@/types/campus';
 import type { DayOfWeek } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
 const LESSON_EDIT_RESULT_KEY = 'yunce:lesson-form:edit-result';
-
-const ROOM_OPTIONS = [
-  '101',
-  '102',
-  '201',
-  '202',
-  '301',
-  '舞蹈教室1',
-  '声乐教室1',
-  '美术教室1',
-  '书法教室1',
-];
 
 interface FormFieldProps {
   label: string;
@@ -50,6 +40,8 @@ const FormField: React.FC<FormFieldProps> = ({ label, required, children }) => (
 );
 
 const LessonEdit: React.FC = () => {
+  const { campuses, currentCampusId, allowedCampusIds, fetchCampuses } = useCampusStore();
+
   const [saving, setSaving] = useState(false);
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
 
@@ -61,6 +53,8 @@ const LessonEdit: React.FC = () => {
   const [teacherId, setTeacherId] = useState('');
   const [assistantTeacherId, setAssistantTeacherId] = useState('');
   const [teacherHours, setTeacherHours] = useState('0');
+  const [campusId, setCampusId] = useState('');
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [room, setRoom] = useState('');
   const [content, setContent] = useState('');
   const [remark, setRemark] = useState('');
@@ -75,12 +69,35 @@ const LessonEdit: React.FC = () => {
     setEndTime(decodeURIComponent(params.endTime || ''));
     setTeacherId(decodeURIComponent(params.leadTeacherId || ''));
     setAssistantTeacherId(decodeURIComponent(params.assistantTeacherId || ''));
+    setCampusId(decodeURIComponent(params.campusId || '') || currentCampusId);
     setRoom(decodeURIComponent(params.room || ''));
     setContent(decodeURIComponent(params.content || ''));
     setRemark(decodeURIComponent(params.homework || ''));
     const hoursParam = decodeURIComponent(params.teacherHours || '');
     setTeacherHours(hoursParam || '0');
-  }, []);
+  }, [currentCampusId]);
+
+  // 校区数据兜底：未加载时自动拉取
+  useEffect(() => {
+    if (campuses.length === 0) {
+      fetchCampuses().catch((err) => logError('lesson-edit fetch campuses', err));
+    }
+  }, [campuses.length, fetchCampuses]);
+
+  // 按权限过滤可选校区
+  const campusOptions = useMemo(() => {
+    const allowedSet = allowedCampusIds.length > 0 ? new Set(allowedCampusIds) : null;
+    return campuses.filter((item) => (allowedSet ? allowedSet.has(item.id) : true));
+  }, [campuses, allowedCampusIds]);
+
+  // 当前校区未命中时，按「store 当前校区 → 第一个可用校区」兜底
+  useEffect(() => {
+    if (campusId) return;
+    const fallbackId = currentCampusId || campusOptions[0]?.id;
+    if (fallbackId) {
+      setCampusId(fallbackId);
+    }
+  }, [campusId, currentCampusId, campusOptions]);
 
   // 加载教师列表
   useEffect(() => {
@@ -94,6 +111,34 @@ const LessonEdit: React.FC = () => {
     };
     loadTeachers();
   }, []);
+
+  // 根据选中校区加载教室列表
+  useEffect(() => {
+    const loadRooms = async () => {
+      if (!campusId) {
+        setRooms([]);
+        return;
+      }
+      try {
+        const list = await roomService.getList({ campusId });
+        setRooms(list);
+      } catch (err) {
+        logError('lesson-edit load rooms', err);
+        setRooms([]);
+      }
+    };
+    loadRooms();
+  }, [campusId]);
+
+  const campusPickerOptions = useMemo(
+    () => ['请选择校区', ...campusOptions.map((item) => item.name)],
+    [campusOptions],
+  );
+
+  const campusIndex = useMemo(() => {
+    const index = campusOptions.findIndex((item) => item.id === campusId);
+    return Math.max(0, index + 1);
+  }, [campusOptions, campusId]);
 
   const teacherOptions = useMemo(
     () => [{ id: '', name: '请选择' }, ...teachers.map((t) => ({ id: t.id, name: t.name }))],
@@ -124,12 +169,13 @@ const LessonEdit: React.FC = () => {
   );
 
   const roomOptions = useMemo(() => {
-    const options = [...ROOM_OPTIONS];
+    const activeNames = rooms.filter((item) => item.status === 'active').map((item) => item.name);
+    const options = [...activeNames];
     if (room && !options.includes(room)) {
       options.unshift(room);
     }
     return ['请选择', ...options];
-  }, [room]);
+  }, [rooms, room]);
 
   const roomIndex = useMemo(
     () => Math.max(0, roomOptions.indexOf(room || '请选择')),
@@ -141,8 +187,9 @@ const LessonEdit: React.FC = () => {
     if (!startTime || !endTime) return '请选择上课时间';
     if (startTime >= endTime) return '结束时间必须晚于开始时间';
     if (!teacherId) return '请选择上课老师';
+    if (campusOptions.length > 0 && !campusId) return '请选择上课校区';
     return '';
-  }, [selectedDate, startTime, endTime, teacherId]);
+  }, [campusOptions.length, campusId, selectedDate, startTime, endTime, teacherId]);
 
   const handleSave = useCallback(async () => {
     const error = validate();
@@ -176,6 +223,7 @@ const LessonEdit: React.FC = () => {
           endTime,
           leadTeacherId: teacherId,
           assistantTeacherId,
+          campusId,
           room,
           content,
           remark,
@@ -193,6 +241,7 @@ const LessonEdit: React.FC = () => {
     }
   }, [
     assistantTeacherId,
+    campusId,
     content,
     endTime,
     remark,
@@ -276,7 +325,10 @@ const LessonEdit: React.FC = () => {
               mode="selector"
               range={teacherOptions.map((t) => t.name)}
               value={teacherIndex}
-              onChange={(e) => setTeacherId(teacherOptions[e.detail.value]?.id || '')}
+              onChange={(e) => {
+                const index = Number(e.detail.value);
+                setTeacherId(teacherOptions[index]?.id || '');
+              }}
             >
               <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
                 <Text
@@ -298,9 +350,10 @@ const LessonEdit: React.FC = () => {
               mode="selector"
               range={assistantTeacherOptions.map((t) => t.name)}
               value={assistantTeacherIndex}
-              onChange={(e) =>
-                setAssistantTeacherId(assistantTeacherOptions[e.detail.value]?.id || '')
-              }
+              onChange={(e) => {
+                const index = Number(e.detail.value);
+                setAssistantTeacherId(assistantTeacherOptions[index]?.id || '');
+              }}
             >
               <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
                 <Text
@@ -328,6 +381,38 @@ const LessonEdit: React.FC = () => {
             />
           </FormField>
 
+          {/* 上课校区 */}
+          {campusOptions.length > 0 && (
+            <FormField label="上课校区">
+              <Picker
+                mode="selector"
+                range={campusPickerOptions}
+                value={campusIndex}
+                onChange={(e) => {
+                  const index = Number(e.detail.value);
+                  if (index === 0) {
+                    setCampusId('');
+                  } else {
+                    setCampusId(campusOptions[index - 1]?.id || '');
+                  }
+                  setRoom('');
+                }}
+              >
+                <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
+                  <Text
+                    className={cn(
+                      'text-base',
+                      campusId ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {campusOptions.find((item) => item.id === campusId)?.name || '请选择上课校区'}
+                  </Text>
+                  <Icon name="mdi-chevron-down" size="sm" color="muted" />
+                </View>
+              </Picker>
+            </FormField>
+          )}
+
           {/* 上课教室 */}
           <FormField label="上课教室">
             <Picker
@@ -335,7 +420,8 @@ const LessonEdit: React.FC = () => {
               range={roomOptions}
               value={roomIndex}
               onChange={(e) => {
-                const value = roomOptions[e.detail.value];
+                const index = Number(e.detail.value);
+                const value = roomOptions[index];
                 setRoom(value === '请选择' ? '' : value);
               }}
             >

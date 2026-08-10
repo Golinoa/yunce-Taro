@@ -417,6 +417,7 @@ const Login: React.FC = () => {
     executeEmailLogin,
     executeWechatLogin,
     openDialog,
+    passwordValue,
   ]);
 
   const handleConfirmAgreement = useCallback(() => {

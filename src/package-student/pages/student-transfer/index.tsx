@@ -9,6 +9,7 @@ import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { classService, studentService } from '@/services';
 import { useClassStore, useStudentStore } from '@/stores';
+import { useCampusStore } from '@/stores/campus';
 import type { Class } from '@/types/class';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -18,6 +19,7 @@ import { withRouteGuard } from '@/utils/route-guard';
 const StudentTransferPage: React.FC = () => {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const fetchClassesByTeacher = useClassStore((state) => state.fetchByTeacher);
   const invalidateClasses = useClassStore((state) => state.invalidate);
   const invalidateStudents = useStudentStore((state) => state.invalidate);
@@ -65,7 +67,7 @@ const StudentTransferPage: React.FC = () => {
     try {
       const [studentInfo, classList] = await Promise.all([
         studentService.getById(studentId),
-        fetchClassesByTeacher(currentUserId, true),
+        fetchClassesByTeacher(currentUserId, currentCampusId, true),
       ]);
 
       if (!studentInfo) {
@@ -113,7 +115,7 @@ const StudentTransferPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, fetchClassesByTeacher, studentId]);
+  }, [currentUserId, currentCampusId, fetchClassesByTeacher, studentId]);
 
   useEffect(() => {
     loadData();

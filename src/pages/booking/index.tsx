@@ -10,6 +10,7 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import SegmentedControl from '@/components/SegmentedControl';
 import { scheduleService, teacherService } from '@/services';
+import { useCampusStore } from '@/stores/campus';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -118,6 +119,7 @@ function buildCoursesForDate(
  */
 const BookingPage: React.FC = () => {
   const { profile } = useAuth();
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const navSafeHeight = useNavSafeHeight();
 
   const [activeTab, setActiveTab] = useState<MainTab>('booking');
@@ -143,27 +145,30 @@ const BookingPage: React.FC = () => {
     onDateChange: setSelectedDate,
   });
 
-  const loadSchedules = useCallback(async () => {
-    if (!profile?.id) return;
-    setLoading(true);
-    try {
-      const [scheduleList, teacherList] = await Promise.all([
-        scheduleService.getByTeacher(profile.id),
-        teacherService.getList().catch(() => [] as TeacherUIModel[]),
-      ]);
-      setSchedules(scheduleList);
-      setTeachers(teacherList);
-    } catch (err) {
-      logError('BookingPage loadSchedules', err);
-      Taro.showToast({ title: '加载失败', icon: 'none' });
-    } finally {
-      setLoading(false);
-    }
-  }, [profile?.id]);
+  const loadSchedules = useCallback(
+    async (campusId?: string) => {
+      if (!profile?.id) return;
+      setLoading(true);
+      try {
+        const [scheduleList, teacherList] = await Promise.all([
+          scheduleService.getByTeacher(profile.id, campusId),
+          teacherService.getList(campusId).catch(() => [] as TeacherUIModel[]),
+        ]);
+        setSchedules(scheduleList);
+        setTeachers(teacherList);
+      } catch (err) {
+        logError('BookingPage loadSchedules', err);
+        Taro.showToast({ title: '加载失败', icon: 'none' });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [profile?.id],
+  );
 
   useEffect(() => {
-    loadSchedules();
-  }, [loadSchedules]);
+    loadSchedules(currentCampusId);
+  }, [loadSchedules, currentCampusId]);
 
   const handleCourseTypeChange = useCallback((value: string) => {
     if (!USE_MOCK && value === 'oneOnOne') {
@@ -192,7 +197,7 @@ const BookingPage: React.FC = () => {
             teacherId,
             teacherName: teacher?.name || '未知老师',
             subject: teacher?.subject,
-            campusId: profile?.currentContext?.campusId,
+            campusId: currentCampusId,
             status: newStatus,
           });
         }
@@ -201,7 +206,7 @@ const BookingPage: React.FC = () => {
         return next;
       });
     },
-    [teachers, profile?.currentContext?.campusId],
+    [teachers, currentCampusId],
   );
 
   const scheduleWeekdaySet = useMemo(() => {

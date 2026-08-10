@@ -1,15 +1,17 @@
 import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
+import Icon from '@/components/Icon';
+import { useCampusStore } from '@/stores/campus';
 import type { TeacherRole, SalaryModelType } from '@/types/teacher';
 
 /**
  * AddTeacherSheet - 添加教师弹窗
  *
  * 使用场景：教师列表页顶部"添加教师"按钮触发
- * 功能：填写姓名/手机号/科目/角色/工资模型，提交后新增教师
+ * 功能：填写姓名/手机号/科目/角色/工资模型/可授课校区/跨校区上课开关，提交后新增教师
  * 相关组件：EditTeacherSheet（编辑教师，结构类似）
  */
 
@@ -23,6 +25,10 @@ interface AddTeacherSheetProps {
     subject: string;
     role: TeacherRole;
     modelType: SalaryModelType;
+    /** 可授课校区ID列表 */
+    campusIds: string[];
+    /** 是否允许跨校区上课 */
+    canCrossCampus: boolean;
   }) => void;
 }
 
@@ -56,33 +62,53 @@ const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const campuses = useCampusStore((state) => state.campuses);
+  const campusOptions = useMemo(() => campuses.filter((campus) => campus.id), [campuses]);
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState('钢琴');
   const [role, setRole] = useState<TeacherRole>('lead');
   const [modelType, setModelType] = useState<SalaryModelType>('standard');
+  const [selectedCampusIds, setSelectedCampusIds] = useState<string[]>([]);
+  const [canCrossCampus, setCanCrossCampus] = useState(false);
+
+  const toggleCampus = (campusId: string) => {
+    setSelectedCampusIds((prev) =>
+      prev.includes(campusId) ? prev.filter((id) => id !== campusId) : [...prev, campusId],
+    );
+  };
+
+  const resetForm = () => {
+    setName('');
+    setPhone('');
+    setSubject('钢琴');
+    setRole('lead');
+    setModelType('standard');
+    setSelectedCampusIds([]);
+    setCanCrossCampus(false);
+  };
 
   const handleSubmit = () => {
     if (submitting) return;
     if (!name.trim()) {
       return;
     }
-    onSubmit({ name: name.trim(), phone: phone.trim(), subject, role, modelType });
-    // 重置表单
-    setName('');
-    setPhone('');
-    setSubject('钢琴');
-    setRole('lead');
-    setModelType('standard');
+    onSubmit({
+      name: name.trim(),
+      phone: phone.trim(),
+      subject,
+      role,
+      modelType,
+      campusIds: selectedCampusIds,
+      canCrossCampus,
+    });
+    resetForm();
   };
 
   const handleClose = () => {
     if (submitting) return;
-    setName('');
-    setPhone('');
-    setSubject('钢琴');
-    setRole('lead');
-    setModelType('standard');
+    resetForm();
     onClose();
   };
 
@@ -181,6 +207,72 @@ const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({
             ))}
           </View>
         </View>
+
+        {/* 可授课校区 */}
+        {campusOptions.length > 0 && (
+          <View className="mb-4">
+            <View className="flex items-center justify-between mb-2">
+              <Text className="text-sm font-semibold text-foreground">可授课校区</Text>
+              <Text className="text-xs text-muted-foreground">可多选</Text>
+            </View>
+            <View className="flex flex-wrap gap-2">
+              {campusOptions.map((campus) => {
+                const selected = selectedCampusIds.includes(campus.id);
+                return (
+                  <View
+                    key={campus.id}
+                    className={cn(
+                      'flex items-center gap-[8rpx] py-[12rpx] px-[24rpx] rounded-[16rpx] border-[2rpx] border-solid text-sm font-medium',
+                      selected
+                        ? 'border-primary bg-primary-bg text-primary'
+                        : 'border-border bg-background text-muted-foreground',
+                    )}
+                    onClick={() => toggleCampus(campus.id)}
+                  >
+                    <Icon
+                      name={selected ? 'mdi-check-circle' : 'mdi-checkbox-blank-circle-outline'}
+                      size={16}
+                      color={selected ? 'primary' : 'muted'}
+                    />
+                    <Text className={cn('text-sm', selected ? 'text-primary' : 'text-foreground')}>
+                      {campus.name}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* 跨校区上课开关 */}
+        {selectedCampusIds.length > 1 && (
+          <View className="mb-6">
+            <View
+              className="flex items-center justify-between py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light"
+              onClick={() => setCanCrossCampus((prev) => !prev)}
+            >
+              <View>
+                <Text className="text-sm font-semibold text-foreground">允许跨校区上课</Text>
+                <Text className="text-xs text-muted-foreground mt-1">
+                  开启后该老师可在所选校区间排课
+                </Text>
+              </View>
+              <View
+                className={cn(
+                  'w-[96rpx] h-[52rpx] rounded-full relative transition-colors duration-200',
+                  canCrossCampus ? 'bg-primary' : 'bg-muted',
+                )}
+              >
+                <View
+                  className={cn(
+                    'absolute top-[4rpx] w-[44rpx] h-[44rpx] rounded-full bg-white shadow-sm transition-all duration-200',
+                    canCrossCampus ? 'left-[48rpx]' : 'left-[4rpx]',
+                  )}
+                />
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* 提交按钮 */}
         <View

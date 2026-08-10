@@ -22,11 +22,12 @@ const REVOKE_LIMIT_HOURS_TEACHER = 24;
 const REVOKE_LIMIT_HOURS_PRINCIPAL = 24 * 7;
 const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
 const DETAIL_SECTION_TITLE_CLASS =
-  'mb-[10rpx] block px-[6rpx] text-[22rpx] font-medium text-[#98a2b3]';
-const DETAIL_CARD_CLASS = 'overflow-hidden rounded-[20rpx] border border-[#eceff3] bg-white';
+  'mb-[10rpx] block px-[6rpx] text-[22rpx] font-medium text-muted-foreground';
+const DETAIL_CARD_CLASS = 'overflow-hidden rounded-[20rpx] border border-border bg-card';
 const DETAIL_ROW_CLASS = 'flex items-start gap-[24rpx] px-[24rpx] py-[18rpx]';
-const DETAIL_LABEL_CLASS = 'w-[132rpx] flex-shrink-0 text-[24rpx] leading-[34rpx] text-[#98a2b3]';
-const DETAIL_VALUE_CLASS = 'flex-1 text-right text-[26rpx] leading-[36rpx] text-[#111827]';
+const DETAIL_LABEL_CLASS =
+  'w-[132rpx] flex-shrink-0 text-[24rpx] leading-[34rpx] text-muted-foreground';
+const DETAIL_VALUE_CLASS = 'flex-1 text-right text-[26rpx] leading-[36rpx] text-foreground';
 
 interface DetailFieldProps {
   label: string;
@@ -36,10 +37,10 @@ interface DetailFieldProps {
 }
 
 const DETAIL_TONE_CLASS_MAP: Record<NonNullable<DetailFieldProps['tone']>, string> = {
-  default: 'text-[#111827]',
+  default: 'text-foreground',
   danger: 'text-destructive',
-  muted: 'text-[#6b7280]',
-  success: 'text-[#16a34a]',
+  muted: 'text-muted-foreground',
+  success: 'text-success',
 };
 
 const DetailField: React.FC<DetailFieldProps> = ({
@@ -384,11 +385,11 @@ const LessonDetail: React.FC = () => {
 
     return (
       <PageContainer>
-        <View className="min-h-screen bg-[#f6f6f7] px-[24rpx] pt-[24rpx] pb-[220rpx]">
-          <View className="rounded-[20rpx] border border-[#dff3e8] bg-[#f4fffa] px-[24rpx] py-[22rpx]">
+        <View className="min-h-screen bg-background px-[24rpx] pt-[24rpx] pb-[220rpx]">
+          <View className="rounded-[20rpx] border border-mint-border bg-mint px-[24rpx] py-[22rpx]">
             <View className="flex items-start justify-between gap-[16rpx]">
               <View className="min-w-0 flex-1">
-                <Text className="block truncate text-[34rpx] font-semibold text-[#111827]">
+                <Text className="block truncate text-[34rpx] font-semibold text-foreground">
                   {previewClassName}
                 </Text>
               </View>
@@ -402,14 +403,14 @@ const LessonDetail: React.FC = () => {
             </View>
             <View className="mt-[16rpx] flex flex-col gap-[8rpx]">
               <View className="flex items-center gap-[8rpx]">
-                <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">时间</Text>
-                <Text className="text-[24rpx] text-[#111827]">
+                <Text className="flex-shrink-0 text-[24rpx] text-muted-foreground">时间</Text>
+                <Text className="text-[24rpx] text-foreground">
                   {previewDateText} {previewTimeText}
                 </Text>
               </View>
               <View className="flex items-center gap-[8rpx]">
-                <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">老师</Text>
-                <Text className="text-[24rpx] text-[#111827]">
+                <Text className="flex-shrink-0 text-[24rpx] text-muted-foreground">老师</Text>
+                <Text className="text-[24rpx] text-foreground">
                   {previewTeacher}
                   {previewAssistant && previewAssistant !== '无'
                     ? ` / 助教 ${previewAssistant}`
@@ -443,10 +444,10 @@ const LessonDetail: React.FC = () => {
             </View>
           </View>
 
-          <View className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#eceff3] bg-white px-[24rpx] py-[24rpx] pb-[40rpx]">
+          <View className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-white px-[24rpx] py-[24rpx] pb-[40rpx] safe-area-bottom">
             <View className="flex gap-[16rpx]">
               <View
-                className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] border border-border bg-muted"
+                className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] border border-border bg-muted press-scale"
                 onClick={handleGoEditSchedule}
               >
                 <Text className="text-[28rpx] font-medium text-foreground">编辑排课</Text>
@@ -455,7 +456,7 @@ const LessonDetail: React.FC = () => {
                 previewStatus === 'urgent' ||
                 previewStatus === 'active') && (
                 <View
-                  className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] bg-primary"
+                  className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] bg-primary press-scale"
                   onClick={handleGoCheckin}
                 >
                   <Text className="text-[28rpx] font-semibold text-white">去点名</Text>
@@ -463,7 +464,7 @@ const LessonDetail: React.FC = () => {
               )}
               {previewStatus === 'ended' && (
                 <View
-                  className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] bg-warning"
+                  className="flex h-[84rpx] flex-1 items-center justify-center rounded-[14rpx] bg-warning press-scale"
                   onClick={handleGoSupplement}
                 >
                   <Text className="text-[28rpx] font-semibold text-white">补录</Text>
@@ -540,33 +541,33 @@ const LessonDetail: React.FC = () => {
   if (record?.status === 'cancelled') {
     return (
       <PageContainer>
-        <View className="min-h-screen bg-[#f6f6f7] px-[24rpx] pt-[24rpx] pb-[40rpx]">
-          <View className="relative overflow-hidden rounded-[18rpx] border border-[#ececef] bg-white px-[24rpx] pb-[24rpx] pt-[20rpx]">
+        <View className="min-h-screen bg-background px-[24rpx] pt-[24rpx] pb-[40rpx]">
+          <View className="relative overflow-hidden rounded-[18rpx] border border-border bg-card px-[24rpx] pb-[24rpx] pt-[20rpx]">
             <View className="absolute right-0 top-0 overflow-hidden rounded-tr-[18rpx]">
               <View className="rounded-bl-[18rpx] bg-destructive px-[22rpx] py-[12rpx]">
                 <Text className="text-[22rpx] font-semibold tracking-[2rpx] text-white">取消</Text>
               </View>
             </View>
 
-            <Text className="block pr-[96rpx] text-[34rpx] font-semibold text-[#1f1f1f]">
+            <Text className="block pr-[96rpx] text-[34rpx] font-semibold text-foreground">
               {lessonTimeParam || `${startTimeParam}-${endTimeParam}`}
             </Text>
-            <Text className="mt-[10rpx] block text-[26rpx] text-[#666666]">
+            <Text className="mt-[10rpx] block text-[26rpx] text-muted-foreground">
               {cancelledDateWithWeekText}
             </Text>
-            <Text className="mt-[10rpx] block text-[26rpx] text-[#666666]">
+            <Text className="mt-[10rpx] block text-[26rpx] text-muted-foreground">
               老师:{cancelledTeacherSummary}
             </Text>
 
             <View className="mt-[24rpx]">
-              <Text className="text-[26rpx] font-medium text-[#1f1f1f]">备注:</Text>
+              <Text className="text-[26rpx] font-medium text-foreground">备注:</Text>
               <Text className="mt-[10rpx] text-[26rpx] leading-[40rpx] text-destructive">
                 {cancelRemarkText}
               </Text>
             </View>
           </View>
 
-          <View className="mt-[28rpx] rounded-[20rpx] bg-white px-[24rpx] py-[24rpx] shadow-card">
+          <View className="mt-[28rpx] rounded-[20rpx] bg-card px-[24rpx] py-[24rpx] shadow-card">
             <View className="mb-[16rpx] flex items-center justify-between">
               <Text className="text-[30rpx] font-semibold text-foreground">取消学员</Text>
               <Text className="text-[24rpx] text-foreground-secondary">
@@ -598,28 +599,28 @@ const LessonDetail: React.FC = () => {
 
   return (
     <PageContainer>
-      <View className="min-h-screen bg-[#f6f6f7] px-[24rpx] pt-[24rpx] pb-[220rpx]">
-        <View className="rounded-[20rpx] border border-[#dff3e8] bg-[#f4fffa] px-[24rpx] py-[22rpx]">
+      <View className="min-h-screen bg-background px-[24rpx] pt-[24rpx] pb-[220rpx]">
+        <View className="rounded-[20rpx] border border-mint-border bg-mint px-[24rpx] py-[22rpx]">
           <View className="flex items-start justify-between gap-[16rpx]">
             <View className="min-w-0 flex-1">
-              <Text className="block truncate text-[34rpx] font-semibold text-[#111827]">
+              <Text className="block truncate text-[34rpx] font-semibold text-foreground">
                 {classNameText}
               </Text>
             </View>
-            <View className="rounded-full bg-[#edfdf3] px-[18rpx] py-[10rpx]">
-              <Text className="text-[24rpx] font-medium text-[#16a34a]">
+            <View className="rounded-full bg-mint-foreground/10 px-[18rpx] py-[10rpx]">
+              <Text className="text-[24rpx] font-medium text-mint-foreground">
                 {record.hours_used} 课时
               </Text>
             </View>
           </View>
           <View className="mt-[16rpx] flex flex-col gap-[8rpx]">
             <View className="flex items-center gap-[8rpx]">
-              <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">学员</Text>
-              <Text className="text-[24rpx] text-[#111827]">{studentName}</Text>
+              <Text className="flex-shrink-0 text-[24rpx] text-muted-foreground">学员</Text>
+              <Text className="text-[24rpx] text-foreground">{studentName}</Text>
             </View>
             <View className="flex items-center gap-[8rpx]">
-              <Text className="flex-shrink-0 text-[24rpx] text-[#6b7280]">课包</Text>
-              <Text className="text-[24rpx] text-[#111827]">{packageName}</Text>
+              <Text className="flex-shrink-0 text-[24rpx] text-muted-foreground">课包</Text>
+              <Text className="text-[24rpx] text-foreground">{packageName}</Text>
             </View>
           </View>
         </View>
@@ -682,8 +683,10 @@ const LessonDetail: React.FC = () => {
             return (
               <View className="mt-[16rpx]">
                 <View
-                  className={`rounded-[18rpx] py-[22rpx] flex items-center justify-center ${
-                    revokeCheck.allowed ? 'bg-warning/10 border border-warning' : 'bg-border-light'
+                  className={`rounded-[18rpx] py-[22rpx] flex items-center justify-center press-scale ${
+                    revokeCheck.allowed
+                      ? 'bg-warning/10 border border-warning'
+                      : 'bg-muted border border-border'
                   }`}
                   onClick={() => {
                     if (revokeCheck.allowed) {
@@ -694,8 +697,8 @@ const LessonDetail: React.FC = () => {
                   }}
                 >
                   <Text
-                    className={`text-lg font-semibold ${
-                      revokeCheck.allowed ? 'text-warning' : 'text-muted'
+                    className={`text-[30rpx] font-semibold ${
+                      revokeCheck.allowed ? 'text-warning' : 'text-muted-foreground'
                     }`}
                   >
                     {revokeCheck.allowed ? '撤销消课' : '已超过撤销时限'}
@@ -711,16 +714,18 @@ const LessonDetail: React.FC = () => {
           title="撤销消课"
           onClose={() => setShowRevokeSheet(false)}
         >
-          <View className="px-6 py-4">
-            <Text className="text-base text-muted-foreground leading-relaxed">
+          <View className="px-[32rpx] py-[32rpx]">
+            <Text className="text-[28rpx] text-muted-foreground leading-relaxed">
               撤销后将恢复课包余额（购买{record.purchased_deduct || 0}课时 + 赠送
               {record.bonus_deduct || 0}课时），该操作不可逆。
             </Text>
-            <View className="mt-4">
-              <Text className="text-sm text-muted-foreground mb-2 block">撤销原因 *</Text>
-              <View className="bg-border-light/50 rounded-2xl p-4">
+            <View className="mt-[32rpx]">
+              <Text className="text-[26rpx] text-muted-foreground mb-[16rpx] block">
+                撤销原因 *
+              </Text>
+              <View className="bg-muted rounded-[24rpx] px-[24rpx] py-[24rpx]">
                 <Input
-                  className="text-base text-foreground"
+                  className="text-[28rpx] text-foreground"
                   placeholder="请填写撤销原因"
                   value={revokeReason}
                   onInput={(e) => setRevokeReason(e.detail.value)}
@@ -728,22 +733,22 @@ const LessonDetail: React.FC = () => {
                 />
               </View>
             </View>
-            <View className="flex gap-3 mt-6">
+            <View className="flex gap-[24rpx] mt-[48rpx]">
               <View
-                className="flex-1 py-3 rounded-xl bg-border-light items-center"
+                className="flex-1 py-[22rpx] rounded-[24rpx] bg-muted items-center press-scale"
                 onClick={() => setShowRevokeSheet(false)}
               >
                 <Text className="text-[30rpx] text-foreground">取消</Text>
               </View>
               <View
-                className={`flex-1 py-3 rounded-xl items-center ${
-                  revokeReason.trim() ? 'bg-warning' : 'bg-border-light'
+                className={`flex-1 py-[22rpx] rounded-[24rpx] items-center press-scale ${
+                  revokeReason.trim() && !revoking ? 'bg-warning' : 'bg-muted'
                 }`}
                 onClick={revokeReason.trim() && !revoking ? handleRevoke : undefined}
               >
                 <Text
                   className={`text-[30rpx] font-semibold ${
-                    revokeReason.trim() ? 'text-white' : 'text-muted'
+                    revokeReason.trim() && !revoking ? 'text-white' : 'text-muted-foreground'
                   }`}
                 >
                   {revoking ? '撤销中...' : '确认撤销'}

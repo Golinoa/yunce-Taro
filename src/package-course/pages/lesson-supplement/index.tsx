@@ -262,7 +262,7 @@ const LessonSupplementPage: React.FC = () => {
         return next;
       });
     },
-    [matchedPackageByStudent, recordByStudentId],
+    [recordByStudentId],
   );
 
   const handleOpenAddStudentSheet = useCallback(() => {
@@ -439,6 +439,7 @@ const LessonSupplementPage: React.FC = () => {
     invalidateStudents,
     lessonDate,
     lessonTime,
+    matchedPackageByStudent,
     note,
     profile?.id,
     scheduleInfo?.assistant_teacher_id,

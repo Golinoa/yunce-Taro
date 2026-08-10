@@ -4,6 +4,7 @@
  * 所有 Mock 数据的单一数据源，保证数据一致性和关联性
  * 数据时间跨度：2025年7月 - 2026年6月（共12个月）
  */
+import type { Venue, Room } from '@/types/campus';
 import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
 import type { UserRole } from '@/types/profile';
 import type { DayOfWeek } from '@/types/schedule';
@@ -50,9 +51,25 @@ export interface Campus {
   name: string;
   code: string;
   type: 'main' | 'self' | 'partner';
+  /** 校区 Logo URL */
+  logo?: string;
+  /** 营业执照名称 */
+  licenseName?: string;
+  /** 联系人 */
+  contactName?: string;
+  /** 所在地区 */
+  region?: string;
   address: string;
+  /** 营业时间 */
+  businessHours?: string;
   phone: string;
+  /** 门店介绍 */
+  intro?: string;
+  /** 场馆图片 URL 列表 */
+  venueImages?: string[];
   createdAt: string;
+  /** 主营业态 */
+  businessCategories?: { categoryId: string; subIds: string[] }[];
 }
 
 export const ORGANIZATIONS: Organization[] = [
@@ -73,8 +90,15 @@ export const CAMPUSES: Campus[] = [
     name: '中心校区',
     code: 'XC0001',
     type: 'main',
+    logo: '/assets/images/sgpk.png',
+    licenseName: '杭州云策教育科技有限公司',
+    contactName: '张校长',
+    region: '浙江省-杭州市-西湖区',
     address: '杭州市西湖区文三路168号云策大厦1-3层',
+    businessHours: '08:00:00至22:00:00',
     phone: '0571-88886666',
+    intro: '云策教育中心校区，专注艺术、体能、科创培训。',
+    venueImages: [],
     createdAt: '2024-01-15T08:00:00Z',
   },
   {
@@ -83,8 +107,15 @@ export const CAMPUSES: Campus[] = [
     name: '城东校区',
     code: 'XC0002',
     type: 'self',
+    logo: '/assets/images/sgpk.png',
+    licenseName: '杭州云策教育科技有限公司城东分公司',
+    contactName: '李老师',
+    region: '浙江省-杭州市-上城区',
     address: '杭州市上城区钱江新城丹桂街88号',
+    businessHours: '08:00:00至22:00:00',
     phone: '0571-88887777',
+    intro: '',
+    venueImages: [],
     createdAt: '2024-06-01T08:00:00Z',
   },
   {
@@ -93,9 +124,206 @@ export const CAMPUSES: Campus[] = [
     name: '城西校区',
     code: 'XC0003',
     type: 'self',
+    logo: '/assets/images/sgpk.png',
+    licenseName: '杭州云策教育科技有限公司城西分公司',
+    contactName: '王老师',
+    region: '浙江省-杭州市-余杭区',
     address: '杭州市余杭区未来科技城EFC欧美金融城',
+    businessHours: '08:00:00至22:00:00',
     phone: '0571-88889999',
+    intro: '',
+    venueImages: [],
     createdAt: '2024-09-01T08:00:00Z',
+  },
+];
+
+// ============================================
+// 1.1 场地 / 教室
+// ============================================
+
+export const VENUES: Venue[] = [
+  {
+    id: 'venue-center-001',
+    campusId: 'campus-center',
+    name: '云策大厦主馆',
+    address: '杭州市西湖区文三路168号云策大厦1-3层',
+    status: 'active',
+    createdAt: '2024-01-15T08:00:00Z',
+    updatedAt: '2024-01-15T08:00:00Z',
+  },
+  {
+    id: 'venue-east-001',
+    campusId: 'campus-east',
+    name: '城东艺术馆',
+    address: '杭州市上城区钱江新城丹桂街88号',
+    status: 'active',
+    createdAt: '2024-06-01T08:00:00Z',
+    updatedAt: '2024-06-01T08:00:00Z',
+  },
+  {
+    id: 'venue-west-001',
+    campusId: 'campus-west',
+    name: '城西文创中心',
+    address: '杭州市余杭区未来科技城EFC欧美金融城',
+    status: 'active',
+    createdAt: '2024-09-01T08:00:00Z',
+    updatedAt: '2024-09-01T08:00:00Z',
+  },
+];
+
+export const ROOMS: Room[] = [
+  // 中心校区 - 云策大厦主馆
+  {
+    id: 'room-center-101',
+    venueId: 'venue-center-001',
+    campusId: 'campus-center',
+    name: '钢琴教室101',
+    capacity: 8,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-01-15T08:00:00Z',
+    updatedAt: '2024-01-15T08:00:00Z',
+  },
+  {
+    id: 'room-center-102',
+    venueId: 'venue-center-001',
+    campusId: 'campus-center',
+    name: '钢琴教室102',
+    capacity: 6,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-01-15T08:00:00Z',
+    updatedAt: '2024-01-15T08:00:00Z',
+  },
+  {
+    id: 'room-center-201',
+    venueId: 'venue-center-001',
+    campusId: 'campus-center',
+    name: '乐理教室201',
+    capacity: 12,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-01-15T08:00:00Z',
+    updatedAt: '2024-01-15T08:00:00Z',
+  },
+  {
+    id: 'room-center-301',
+    venueId: 'venue-center-001',
+    campusId: 'campus-center',
+    name: '声乐教室301',
+    capacity: 15,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-01-15T08:00:00Z',
+    updatedAt: '2024-01-15T08:00:00Z',
+  },
+  {
+    id: 'room-center-302',
+    venueId: 'venue-center-001',
+    campusId: 'campus-center',
+    name: '合唱教室302',
+    capacity: 20,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-01-15T08:00:00Z',
+    updatedAt: '2024-01-15T08:00:00Z',
+  },
+  // 城东校区 - 城东艺术馆
+  {
+    id: 'room-east-dance1',
+    venueId: 'venue-east-001',
+    campusId: 'campus-east',
+    name: '舞蹈教室1',
+    capacity: 18,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-06-01T08:00:00Z',
+    updatedAt: '2024-06-01T08:00:00Z',
+  },
+  {
+    id: 'room-east-dance2',
+    venueId: 'venue-east-001',
+    campusId: 'campus-east',
+    name: '舞蹈教室2',
+    capacity: 15,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-06-01T08:00:00Z',
+    updatedAt: '2024-06-01T08:00:00Z',
+  },
+  {
+    id: 'room-east-vocal',
+    venueId: 'venue-east-001',
+    campusId: 'campus-east',
+    name: '声乐教室1',
+    capacity: 12,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-06-01T08:00:00Z',
+    updatedAt: '2024-06-01T08:00:00Z',
+  },
+  // 城西校区 - 城西文创中心
+  {
+    id: 'room-west-calligraphy',
+    venueId: 'venue-west-001',
+    campusId: 'campus-west',
+    name: '书法教室1',
+    capacity: 14,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-09-01T08:00:00Z',
+    updatedAt: '2024-09-01T08:00:00Z',
+  },
+  {
+    id: 'room-west-art',
+    venueId: 'venue-west-001',
+    campusId: 'campus-west',
+    name: '美术教室1',
+    capacity: 16,
+    status: 'active',
+    bookingEnabled: false,
+    openTimeStart: '09:00',
+    openTimeEnd: '22:00',
+    pricePerSession: 0,
+    timeBasedPricing: false,
+    createdAt: '2024-09-01T08:00:00Z',
+    updatedAt: '2024-09-01T08:00:00Z',
   },
 ];
 
@@ -285,6 +513,8 @@ export interface Teacher {
   phone: string;
   subjects: string[];
   campusIds: string[];
+  /** 是否允许跨校区上课，默认 false */
+  canCrossCampus: boolean;
   accessScope: 'self' | 'subject' | 'org';
   managedSubjectIds?: string[];
   role: 'lead' | 'assist' | 'parttime';
@@ -303,6 +533,7 @@ export const TEACHERS: Teacher[] = [
     phone: '138****0011',
     subjects: ['钢琴', '乐理'],
     campusIds: ['campus-center'],
+    canCrossCampus: false,
     accessScope: 'self',
     managedSubjectIds: ['sub-piano', 'sub-theory'],
     role: 'lead',
@@ -319,6 +550,7 @@ export const TEACHERS: Teacher[] = [
     phone: '138****0012',
     subjects: ['声乐', '合唱'],
     campusIds: ['campus-center', 'campus-east'],
+    canCrossCampus: true,
     accessScope: 'subject',
     managedSubjectIds: ['sub-vocal'],
     role: 'lead',
@@ -335,6 +567,7 @@ export const TEACHERS: Teacher[] = [
     phone: '138****0013',
     subjects: ['舞蹈', '形体'],
     campusIds: ['campus-east'],
+    canCrossCampus: false,
     accessScope: 'self',
     managedSubjectIds: ['sub-dance'],
     role: 'lead',
@@ -351,6 +584,7 @@ export const TEACHERS: Teacher[] = [
     phone: '138****0014',
     subjects: ['书法', '国画'],
     campusIds: ['campus-west'],
+    canCrossCampus: false,
     accessScope: 'org',
     managedSubjectIds: ['sub-calligraphy', 'sub-art'],
     role: 'lead',
@@ -2331,6 +2565,8 @@ export interface LessonRecord {
   status: 'checked' | 'leave' | 'absent' | 'cancelled' | 'makeup';
   checkinTime?: string;
   note?: string;
+  /** 上课教室 */
+  room?: string;
   createdAt: string;
 }
 

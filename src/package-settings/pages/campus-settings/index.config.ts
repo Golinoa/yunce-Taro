@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '校区设置',
-  navigationBarBackgroundColor: '#5EC8A8',
-  navigationBarTextStyle: 'white',
+  navigationBarTitleText: '门店管理',
+  navigationBarBackgroundColor: '#FFFFFF',
+  navigationBarTextStyle: 'black',
 });

@@ -13,6 +13,8 @@ export {
   notificationService,
   formatDateCN,
 } from './student';
+export { courseTemplateService } from './course-template';
+export { cardTypeService } from './card-type';
 export type { FeeMethod } from './student';
 export { temporaryRescheduleService } from './temporary-reschedule';
 export {
@@ -61,6 +63,8 @@ export {
   notifyService,
   campusDataService,
   subjectService,
+  venueService,
+  roomService,
 } from './campus';
 export { statisticsService } from './statistics';
 export { leadService } from './lead';

@@ -1,178 +1,162 @@
-import { View, Text } from '@tarojs/components';
+/**
+ * 老师管理列表页
+ *
+ * 简洁的员工列表：
+ * - 顶部「在职 / 已离职」切换
+ * - 老师卡片：头像、姓名、身份标签
+ * - 卡片左滑露出「离职」「删除」操作按钮
+ * - 底部统计文案
+ * - 右下角悬浮「新增员工」按钮
+ */
+import { View, Text, ScrollView, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import Empty from '@/components/Empty';
+import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
-import AddTeacherSheet from '@/components/teacher/AddTeacherSheet';
-import ConfirmSalarySheet from '@/components/teacher/ConfirmSalarySheet';
-import MonthPicker from '@/components/teacher/MonthPicker';
-import PayConfirmSheet from '@/components/teacher/PayConfirmSheet';
-import PaymentSettingsSheet from '@/components/teacher/PaymentSettingsSheet';
-import SalaryModelSheet from '@/components/teacher/SalaryModelSheet';
-import SalaryTab from '@/components/teacher/SalaryTab';
-import ScheduleTab from '@/components/teacher/ScheduleTab';
-import TeacherTab from '@/components/teacher/TeacherTab';
-import { AVATAR_COLORS } from '@/data/teacher';
-import { teacherScheduleService } from '@/services/teacher';
-import { useTeacherStore, calcTotal } from '@/stores/teacher';
-import type { SalaryModel } from '@/types/teacher';
-import { TAB_CONFIG, useTeacherList } from './useTeacherList';
+import PageIntroSheet from '@/components/PageIntroSheet';
+import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
+import ResignSheet from '@/components/teacher/ResignSheet';
+import { BRAND_LOGO } from '@/constants/brand';
+import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
+import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
+import { useTeacherStore } from '@/stores/teacher';
+import type { ResignType, TeacherStatus, TeacherUIModel } from '@/types/teacher';
 
-/** 教师管理页面 - 教师列表/薪资/排课三Tab */
+type StatusTab = Extract<TeacherStatus, 'active' | 'resigned'>;
+
+const TAB_LIST: { key: StatusTab; label: string }[] = [
+  { key: 'active', label: '在职' },
+  { key: 'resigned', label: '已离职' },
+];
+
+const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.staff;
+
 const TeacherListPage: React.FC = () => {
-  const {
-    // Store 数据
-    filter,
-    setFilter,
-    teachers,
-    loading,
-    error,
-    reload,
-    filteredTeachers,
-    salaryTeachers,
-    selectedIds,
-    toggleSelect,
-    toggleSelectAll,
-    settings,
-    updateSettings,
-    salaryModels,
-    createSalaryModel,
-    updateSalaryModel,
+  const { teachers, loading, error, fetchAll, resignTeacher, updateTeacher } = useTeacherStore();
+  const [activeTab, setActiveTab] = useState<StatusTab>('active');
 
-    // Tab 状态
-    mainTab,
-    setMainTab,
-    salarySubTab,
-    setSalarySubTab,
+  // 左滑卡片互斥管理
+  const [openCardId, setOpenCardId] = useState<string | null>(null);
 
-    // 筛选
-    activeFilterId,
-    setActiveFilterId,
+  // 离职弹窗
+  const [resignTarget, setResignTarget] = useState<TeacherUIModel | null>(null);
+  const [resignSubmitting, setResignSubmitting] = useState(false);
 
-    // 统计
-    pendingCount,
-    totalHours,
-    totalSalary,
-    activeCount,
+  // 删除确认弹窗
+  const [deleteTarget, setDeleteTarget] = useState<TeacherUIModel | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-    // 薪资操作
-    paySheetVisible,
-    setPaySheetVisible,
-    pendingPayAction,
-    setPendingPayAction,
-    payTargetTeacher,
-    batchPayTotal,
-    confirmSalaryVisible,
-    setConfirmSalaryVisible,
-    confirmSalaryTarget,
-    setConfirmSalaryTarget,
-    handleSalaryAction,
-    handleConfirmSalary,
-    handleBatchAction,
-    handlePayConfirm,
-    handleSalaryDetail,
+  // 恢复确认弹窗
+  const [restoreTarget, setRestoreTarget] = useState<TeacherUIModel | null>(null);
+  const [restoreSubmitting, setRestoreSubmitting] = useState(false);
 
-    // 添加教师
-    addTeacherVisible,
-    setAddTeacherVisible,
+  // 页面引导弹窗
+  const [introVisible, setIntroVisible] = useState(false);
 
-    // 发放设置
-    paymentSettingsVisible,
-    setPaymentSettingsVisible,
-
-    // 工资模型
-    salaryModelSheetVisible,
-    setSalaryModelSheetVisible,
-    editingModel,
-    setEditingModel,
-
-    // 月份选择
-    monthPickerVisible,
-    setMonthPickerVisible,
-    historyYear,
-    historyMonth,
-    historyRecords,
-    historyTotalAmount,
-    historyTotalHours,
-    handleMonthSelect,
-
-    // 排课
-    weekOffset,
-    setWeekOffset,
-    selectedDate,
-    setSelectedDate,
-    scheduleDataMap,
-    setScheduleDataMap,
-    scheduleCampusFilter,
-    setScheduleCampusFilter,
-    scheduleSubjectFilter,
-    setScheduleSubjectFilter,
-    scheduleTeacherFilter,
-    setScheduleTeacherFilter,
-    scheduleFilterId,
-    setScheduleFilterId,
-    weekDays,
-    weekTitle,
-    daySchedule,
-
-    // 导航
-    handleTeacherClick,
-
-    // 设置
-    pushEnabled,
-    setPushEnabled,
-  } = useTeacherList();
-
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [scheduleError, setScheduleError] = useState('');
-  const [addingTeacher, setAddingTeacher] = useState(false);
-  const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
-  const [savingSalaryModel, setSavingSalaryModel] = useState(false);
-  const [confirmingSalary, setConfirmingSalary] = useState(false);
-  const [payingSalary, setPayingSalary] = useState(false);
-
-  // ===== 初始化数据 =====
   useDidShow(() => {
-    void reload();
+    void fetchAll();
+    try {
+      const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
+      if (hidden !== true) {
+        setIntroVisible(true);
+      }
+    } catch {
+      setIntroVisible(true);
+    }
   });
 
-  useEffect(() => {
-    setPushEnabled(settings.pushEnabled);
-  }, [settings.pushEnabled, setPushEnabled]);
+  const list = useMemo(() => teachers.filter((t) => t.status === activeTab), [teachers, activeTab]);
 
-  // 加载排课数据
-  useEffect(() => {
-    let mounted = true;
+  const countText = useMemo(() => {
+    const label = activeTab === 'active' ? '在职员工' : '已离职员工';
+    return `共${list.length}位${label}`;
+  }, [list.length, activeTab]);
 
-    const loadScheduleData = async () => {
-      setScheduleLoading(true);
-      setScheduleError('');
+  const handleAdd = useCallback(() => {
+    Taro.navigateTo({ url: '/package-teacher/pages/teacher-form/index' });
+  }, []);
+
+  const handleEdit = useCallback((id: string) => {
+    Taro.navigateTo({ url: `/package-teacher/pages/teacher-form/index?id=${id}` });
+  }, []);
+
+  // 切换 Tab 时收起所有已展开的滑动按钮
+  const handleTabChange = useCallback((tab: StatusTab) => {
+    setActiveTab(tab);
+    setOpenCardId(null);
+  }, []);
+
+  // 离职确认
+  const handleResignConfirm = useCallback(
+    async (type: ResignType, reason?: string) => {
+      if (!resignTarget) return;
+      setResignSubmitting(true);
       try {
-        const data = await teacherScheduleService.getList();
-        if (!mounted) return;
-        setScheduleDataMap(data);
+        await resignTeacher(resignTarget.id, type, reason);
+        Taro.showToast({ title: '已标记离职', icon: 'success' });
+        setResignTarget(null);
+        // 切换到已离职 Tab，避免在职列表闪烁空态
+        setActiveTab('resigned');
       } catch {
-        if (!mounted) return;
-        setScheduleError('教师排课加载失败，请稍后重试');
+        Taro.showToast({ title: '操作失败', icon: 'none' });
       } finally {
-        if (mounted) {
-          setScheduleLoading(false);
-        }
+        setResignSubmitting(false);
       }
-    };
+    },
+    [resignTarget, resignTeacher],
+  );
 
-    void loadScheduleData();
+  // 删除确认
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleteSubmitting(true);
+    try {
+      // 将教师标记为已删除（通过 updateTeacher 将 status 设为 resigned 并添加备注）
+      // 当前 mock 无物理删除，采用"标记删除"策略：更新名称为"已删除"
+      await updateTeacher(deleteTarget.id, {
+        status: 'resigned',
+        resignType: 'dismiss',
+        resignReason: '管理员删除',
+        resignDate: new Date().toISOString().slice(0, 10),
+      });
+      Taro.showToast({ title: '已删除', icon: 'success' });
+      setDeleteTarget(null);
+    } catch {
+      Taro.showToast({ title: '删除失败', icon: 'none' });
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  }, [deleteTarget, updateTeacher]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [setScheduleDataMap]);
+  // 恢复在职
+  const handleRestoreConfirm = useCallback(async () => {
+    if (!restoreTarget) return;
+    setRestoreSubmitting(true);
+    try {
+      await updateTeacher(restoreTarget.id, {
+        status: 'active',
+        resignType: undefined,
+        resignReason: undefined,
+        resignDate: undefined,
+      });
+      Taro.showToast({ title: '已恢复在职', icon: 'success' });
+      setRestoreTarget(null);
+      // 切换到在职 Tab，避免已离职列表闪烁空态
+      setActiveTab('active');
+    } catch {
+      Taro.showToast({ title: '恢复失败', icon: 'none' });
+    } finally {
+      setRestoreSubmitting(false);
+    }
+  }, [restoreTarget, updateTeacher]);
 
   if (loading && !teachers.length) {
     return (
       <View className="flex flex-col h-screen bg-background items-center justify-center">
-        <Loading text="加载教师数据中..." />
+        <Loading text="加载老师数据中..." />
       </View>
     );
   }
@@ -180,340 +164,204 @@ const TeacherListPage: React.FC = () => {
   if (error && !teachers.length) {
     return (
       <View className="flex flex-col h-screen bg-background px-[32rpx] items-center justify-center">
-        <Empty
-          icon="mdi-alert-circle"
-          description={error}
-          actionText="重新加载"
-          onAction={() => void reload()}
-        />
+        <Empty description={error} actionText="重新加载" onAction={() => void fetchAll()} />
       </View>
     );
   }
 
   return (
     <View className="flex flex-col h-screen bg-background">
-      {/* 渐变头部 */}
-      <View className="bg-gradient-primary pt-[96rpx] px-[40rpx] sticky top-0 z-10">
-        <View className="flex items-center justify-between">
-          <Text className="text-[40rpx] font-bold text-white">教师管理</Text>
-          <View className="header-glass-btn" onClick={() => setAddTeacherVisible(true)}>
-            <Text className="text-[32rpx] mr-[4rpx]">+</Text>
-            <Text className="text-[26rpx]">添加教师</Text>
-          </View>
-        </View>
-
-        {error ? (
-          <View className="mt-[16rpx] py-[16rpx] px-[20rpx] rounded-[20rpx] bg-white/15">
-            <Text className="text-[22rpx] text-white/90">{error}</Text>
-          </View>
-        ) : null}
-
-        {/* 统计Chips */}
-        <View className="flex gap-[16rpx] py-[28rpx] pb-[24rpx]">
-          <View className="stat-chip">
-            <Text className="text-[32rpx] font-bold text-white block">{activeCount}</Text>
-            <Text className="text-[20rpx] text-white/80 mt-[2rpx] block">在职教师</Text>
-          </View>
-          <View className="stat-chip">
-            <Text className="text-[32rpx] font-bold text-white block">{totalHours}</Text>
-            <Text className="text-[20rpx] text-white/80 mt-[2rpx] block">本月课时</Text>
-          </View>
-          <View className="stat-chip">
-            <Text className="text-[32rpx] font-bold text-amber-200 block">{pendingCount}</Text>
-            <Text className="text-[20rpx] text-white/80 mt-[2rpx] block">待处理</Text>
-          </View>
-        </View>
-
-        {/* 胶囊式三Tab */}
-        <View className="pb-[16rpx]">
-          <View className="flex gap-[8rpx] bg-white/15 backdrop-blur rounded-[28rpx] p-[8rpx]">
-            {TAB_CONFIG.map((tab) => (
-              <View
-                key={tab.key}
-                className={cn('capsule-tab', mainTab === tab.key && 'capsule-tab-active')}
-                onClick={() => setMainTab(tab.key)}
-              >
-                <Text className="text-[32rpx]">{tab.icon}</Text>
-                <Text className="text-[26rpx]">{tab.label}</Text>
-                {tab.key === 'salary' && pendingCount > 0 && (
-                  <View className="min-w-[32rpx] h-[32rpx] px-[8rpx] rounded-[16rpx] bg-amber text-[18rpx] font-bold inline-flex items-center justify-center ml-[4rpx]">
-                    <Text className="text-white text-[18rpx]">{pendingCount}</Text>
-                  </View>
+      {/* 状态切换 Tab */}
+      <View className="flex flex-row items-center justify-center py-[24rpx]">
+        <View className="flex flex-row items-center bg-muted rounded-full p-[6rpx]">
+          {TAB_LIST.map((tab) => (
+            <View
+              key={tab.key}
+              className={cn(
+                'px-[40rpx] py-[14rpx] rounded-full transition-all',
+                activeTab === tab.key ? 'bg-primary shadow-soft' : 'bg-transparent',
+              )}
+              onClick={() => handleTabChange(tab.key)}
+            >
+              <Text
+                className={cn(
+                  'text-[28rpx] font-medium',
+                  activeTab === tab.key ? 'text-white' : 'text-muted-foreground',
                 )}
-              </View>
-            ))}
-          </View>
+              >
+                {tab.label}
+              </Text>
+            </View>
+          ))}
         </View>
       </View>
 
-      {/* 教师Tab */}
-      {mainTab === 'teacher' && (
-        <TeacherTab
-          filter={filter}
-          setFilter={setFilter}
-          filteredTeachers={filteredTeachers}
-          activeFilterId={activeFilterId}
-          setActiveFilterId={setActiveFilterId}
-          onTeacherClick={handleTeacherClick}
-        />
-      )}
+      {/* 老师列表 */}
+      <ScrollView
+        scrollY
+        enhanced
+        scrollWithAnimation
+        className="flex-1 px-[32rpx] pb-[200rpx]"
+        onScroll={() => setOpenCardId(null)}
+      >
+        {list.length === 0 ? (
+          <View className="pt-[120rpx]">
+            <Empty description={`暂无${activeTab === 'active' ? '在职' : '已离职'}员工`} />
+          </View>
+        ) : (
+          <View className="flex flex-col gap-[20rpx]">
+            {list.map((teacher) => (
+              <SwappableTeacherCard
+                key={teacher.id}
+                teacher={teacher}
+                openCardId={openCardId}
+                onOpenChange={setOpenCardId}
+                onClick={() => handleEdit(teacher.id)}
+                onResign={() => setResignTarget(teacher)}
+                onRestore={() => setRestoreTarget(teacher)}
+                onDelete={() => setDeleteTarget(teacher)}
+              />
+            ))}
+          </View>
+        )}
 
-      {/* 薪资Tab */}
-      {mainTab === 'salary' && (
-        <SalaryTab
-          salarySubTab={salarySubTab}
-          setSalarySubTab={setSalarySubTab}
-          salaryTeachers={salaryTeachers}
-          selectedIds={selectedIds}
-          toggleSelect={toggleSelect}
-          toggleSelectAll={toggleSelectAll}
-          pendingCount={pendingCount}
-          totalHours={totalHours}
-          totalSalary={totalSalary}
-          settings={settings}
-          pushEnabled={pushEnabled}
-          setPushEnabled={setPushEnabled}
-          updateSettings={updateSettings}
-          salaryModels={salaryModels}
-          teachers={teachers}
-          onBatchAction={handleBatchAction}
-          onSalaryAction={handleSalaryAction}
-          onSalaryDetail={handleSalaryDetail}
-          onPaymentSettingsOpen={() => setPaymentSettingsVisible(true)}
-          onSalaryModelOpen={(model) => {
-            setEditingModel(model);
-            setSalaryModelSheetVisible(true);
-          }}
-          historyYear={historyYear}
-          historyMonth={historyMonth}
-          historyRecords={historyRecords}
-          historyTotalAmount={historyTotalAmount}
-          historyTotalHours={historyTotalHours}
-          onMonthPickerOpen={() => setMonthPickerVisible(true)}
-          onHistoryMonthChange={(year, month) => {
-            handleMonthSelect(year, month);
-          }}
-        />
-      )}
+        {/* 底部统计 */}
+        {list.length > 0 && (
+          <View className="flex flex-row items-center justify-center py-[40rpx]">
+            <Text className="text-[26rpx] text-muted-foreground">{countText}</Text>
+          </View>
+        )}
+      </ScrollView>
 
-      {/* 排课Tab */}
-      {mainTab === 'schedule' && (
-        <>
-          {scheduleError ? (
-            <View className="mx-[32rpx] mt-[24rpx] py-[20rpx] px-[24rpx] rounded-[24rpx] bg-destructive/10">
-              <Text className="text-[24rpx] text-destructive">{scheduleError}</Text>
-            </View>
-          ) : null}
-          {scheduleLoading && !Object.keys(scheduleDataMap).length ? (
-            <View className="flex-1 items-center justify-center">
-              <Loading text="加载教师排课中..." />
-            </View>
-          ) : (
-            <ScheduleTab
-              weekOffset={weekOffset}
-              setWeekOffset={setWeekOffset}
-              selectedDate={selectedDate}
-              setSelectedDate={setSelectedDate}
-              weekDays={weekDays}
-              weekTitle={weekTitle}
-              daySchedule={daySchedule}
-              scheduleCampusFilter={scheduleCampusFilter}
-              setScheduleCampusFilter={setScheduleCampusFilter}
-              scheduleSubjectFilter={scheduleSubjectFilter}
-              setScheduleSubjectFilter={setScheduleSubjectFilter}
-              scheduleTeacherFilter={scheduleTeacherFilter}
-              setScheduleTeacherFilter={setScheduleTeacherFilter}
-              scheduleFilterId={scheduleFilterId}
-              setScheduleFilterId={setScheduleFilterId}
-              scheduleDataMap={scheduleDataMap}
-              teachers={teachers}
-              onTeacherClick={handleTeacherClick}
-            />
-          )}
-        </>
-      )}
+      {/* 新增员工悬浮按钮 */}
+      <View
+        className="fixed right-[32rpx] bottom-[calc(64rpx+env(safe-area-inset-bottom))] flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-primary shadow-float press-scale"
+        onClick={handleAdd}
+      >
+        <Icon name="mdi-plus" size={28} color="white" />
+        <Text className="text-[28rpx] font-medium text-white">新增员工</Text>
+      </View>
 
-      {/* 年月选择器 */}
-      <MonthPicker
-        visible={monthPickerVisible}
-        currentYear={historyYear}
-        currentMonth={historyMonth}
-        onSelect={handleMonthSelect}
-        onClose={() => setMonthPickerVisible(false)}
+      {/* 离职确认弹窗 */}
+      <ResignSheet
+        visible={!!resignTarget}
+        teacherName={resignTarget?.name || ''}
+        submitting={resignSubmitting}
+        onConfirm={handleResignConfirm}
+        onClose={() => setResignTarget(null)}
       />
 
-      {/* 发放确认弹窗 */}
-      <PayConfirmSheet
-        visible={paySheetVisible}
-        action={pendingPayAction}
-        teacherName={payTargetTeacher?.name}
-        amount={payTargetTeacher ? calcTotal(payTargetTeacher) : batchPayTotal}
-        submitting={payingSalary}
-        onConfirm={async (remark) => {
-          if (payingSalary) return;
-          setPayingSalary(true);
-          try {
-            await handlePayConfirm(remark);
-          } finally {
-            setPayingSalary(false);
-          }
-        }}
-        onClose={() => {
-          if (payingSalary) return;
-          setPaySheetVisible(false);
-          setPendingPayAction(null);
-        }}
+      {/* 删除确认弹窗 */}
+      <ConfirmDialog
+        visible={!!deleteTarget}
+        title="确认删除"
+        description={`删除后「${deleteTarget?.name || ''}」将从列表中消失，且不可恢复。确认删除？`}
+        confirmText="删除"
+        tone="danger"
+        confirmLoading={deleteSubmitting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
       />
 
-      {/* 添加教师弹窗 */}
-      <AddTeacherSheet
-        visible={addTeacherVisible}
-        submitting={addingTeacher}
-        onClose={() => setAddTeacherVisible(false)}
-        onSubmit={async (data) => {
-          if (addingTeacher) return;
-          setAddingTeacher(true);
-          const { addTeacher } = useTeacherStore.getState();
-          try {
-            const colorIdx = Math.floor(Math.random() * AVATAR_COLORS.length);
-            const roleTextMap = { lead: '主讲', assist: '助教', parttime: '兼职' };
-            const modelMap: Record<
-              string,
-              { base: number; rate: number; attend: number; perf: number }
-            > = {
-              standard: { base: 3000, rate: 100, attend: 500, perf: 700 },
-              hourly: { base: 0, rate: 80, attend: 0, perf: 0 },
-              custom: { base: 0, rate: 0, attend: 0, perf: 0 },
-            };
-            const m = modelMap[data.modelType] || modelMap.standard;
-            await addTeacher({
-              id: `t${Date.now()}`,
-              name: data.name,
-              role: data.role,
-              roleText: roleTextMap[data.role],
-              accessScope: 'self',
-              accessScopeText: '本人',
-              subject: data.subject,
-              phone: data.phone || '未填写',
-              hours: 0,
-              students: 0,
-              classes: 0,
-              base: m.base,
-              rate: m.rate,
-              attend: m.attend,
-              perf: m.perf,
-              salaryStatus: 'pending',
-              modelIdx: data.modelType === 'standard' ? 0 : 1,
-              color: AVATAR_COLORS[colorIdx],
-              initial: data.name[0],
-              deductions: [],
-              status: 'active',
-            });
-            setAddTeacherVisible(false);
-            Taro.showToast({ title: '添加成功', icon: 'success' });
-          } catch {
-            Taro.showToast({ title: '添加教师失败', icon: 'none' });
-          } finally {
-            setAddingTeacher(false);
-          }
-        }}
+      {/* 恢复在职确认弹窗 */}
+      <ConfirmDialog
+        visible={!!restoreTarget}
+        title="确认恢复"
+        description={`将「${restoreTarget?.name || ''}」恢复为在职状态？`}
+        confirmText="恢复"
+        tone="primary"
+        confirmLoading={restoreSubmitting}
+        onClose={() => setRestoreTarget(null)}
+        onConfirm={handleRestoreConfirm}
       />
 
-      {/* 发放设置弹窗 */}
-      <PaymentSettingsSheet
-        visible={paymentSettingsVisible}
-        settings={settings}
-        submitting={savingPaymentSettings}
-        onClose={() => setPaymentSettingsVisible(false)}
-        onSubmit={async (updates) => {
-          if (savingPaymentSettings) return;
-          setSavingPaymentSettings(true);
-          try {
-            await updateSettings(updates);
-            if (updates.pushEnabled !== undefined) setPushEnabled(Boolean(updates.pushEnabled));
-            setPaymentSettingsVisible(false);
-            Taro.showToast({ title: '设置已保存', icon: 'success' });
-          } catch {
-            Taro.showToast({ title: '设置保存失败', icon: 'none' });
-          } finally {
-            setSavingPaymentSettings(false);
-          }
-        }}
-      />
-
-      {/* 工资模型弹窗 */}
-      <SalaryModelSheet
-        visible={salaryModelSheetVisible}
-        model={editingModel}
-        submitting={savingSalaryModel}
-        onClose={() => {
-          if (savingSalaryModel) return;
-          setSalaryModelSheetVisible(false);
-          setEditingModel(null);
-        }}
-        onSubmit={async (data) => {
-          if (savingSalaryModel) return;
-          setSavingSalaryModel(true);
-          try {
-            if (editingModel) {
-              await updateSalaryModel(editingModel.id, {
-                name: data.name,
-                type: data.type,
-                base: data.base,
-                rate: data.rate,
-                attend: data.attend,
-                perf: data.perf,
-              });
-            } else {
-              const newModel: SalaryModel = {
-                id: `m${Date.now()}`,
-                name: data.name,
-                type: data.type,
-                base: data.base,
-                rate: data.rate,
-                attend: data.attend,
-                perf: data.perf,
-                teacherCount: 0,
-              };
-              await createSalaryModel(newModel);
-            }
-            setSalaryModelSheetVisible(false);
-            setEditingModel(null);
-            Taro.showToast({ title: editingModel ? '修改成功' : '创建成功', icon: 'success' });
-          } catch {
-            Taro.showToast({ title: editingModel ? '修改失败' : '创建失败', icon: 'none' });
-          } finally {
-            setSavingSalaryModel(false);
-          }
-        }}
-      />
-
-      {/* 确认工资弹窗 */}
-      <ConfirmSalarySheet
-        visible={confirmSalaryVisible}
-        teacherName={
-          confirmSalaryTarget ? teachers.find((t) => t.id === confirmSalaryTarget)?.name || '' : ''
-        }
-        amount={
-          confirmSalaryTarget ? calcTotal(teachers.find((t) => t.id === confirmSalaryTarget)!) : 0
-        }
-        submitting={confirmingSalary}
-        onConfirm={async () => {
-          if (confirmingSalary) return;
-          setConfirmingSalary(true);
-          try {
-            await handleConfirmSalary();
-          } finally {
-            setConfirmingSalary(false);
-          }
-        }}
-        onClose={() => {
-          if (confirmingSalary) return;
-          setConfirmSalaryVisible(false);
-          setConfirmSalaryTarget(null);
-        }}
+      {/* 页面引导弹窗 */}
+      <PageIntroSheet
+        visible={introVisible}
+        onClose={() => setIntroVisible(false)}
+        storageKey={INTRO_STORAGE_KEY}
+        currentStep={3}
+        totalSteps={6}
+        title="第 3 步：添加员工 / 授课人员"
+        description="员工分 3 种角色，绑定手机号后即可用该号码登录小程序处理工作。"
+        bulletPoints={[
+          '授课人员：只能看自己排到的课、签到 / 取消签到、查自己的工资',
+          '前台：可帮所有会员预约 / 签到、开卡续费收银，但看不到工资 / 门店设置',
+          '店长：拥有门店全部权限，包括员工、卡种、营销、财务',
+          '一个手机号只能绑 1 个员工身份，不能既当授课人员又当前台 —— 同一人多角色请用不同手机号',
+        ]}
       />
     </View>
+  );
+};
+
+/** 可左滑操作的老师卡片 */
+const SwappableTeacherCard: React.FC<{
+  teacher: TeacherUIModel;
+  openCardId: string | null;
+  onOpenChange: (id: string | null) => void;
+  onClick: () => void;
+  onResign: () => void;
+  onRestore: () => void;
+  onDelete: () => void;
+}> = ({ teacher, openCardId, onOpenChange, onClick, onResign, onRestore, onDelete }) => {
+  const identityKey = teacher.identity || 'teacher';
+  const identityOption = TEACHER_IDENTITY_OPTIONS.find((o) => o.value === identityKey);
+  const identityLabel = identityOption?.label || '老师';
+  const tagStyle = IDENTITY_TAG_MAP[identityKey];
+  const isActive = teacher.status === 'active';
+
+  /** 左滑操作按钮：在职显示「离职+删除」，已离职显示「恢复+删除」 */
+  const actions = useMemo(() => {
+    const items: Array<{
+      label: string;
+      onClick: () => void;
+      disabled?: boolean;
+      variant?: 'default' | 'danger' | 'warning';
+    }> = [];
+    if (isActive) {
+      items.push({ label: '离职', onClick: onResign, variant: 'warning' });
+    } else {
+      items.push({ label: '恢复', onClick: onRestore, variant: 'default' });
+    }
+    items.push({ label: '删除', onClick: onDelete, variant: 'danger' });
+    return items;
+  }, [isActive, onResign, onRestore, onDelete]);
+
+  return (
+    <SwappableScheduleCard
+      cardId={teacher.id}
+      openCardId={openCardId}
+      onOpenChange={onOpenChange}
+      actions={actions}
+      onClick={onClick}
+      radiusClassName="rounded-[24rpx]"
+    >
+      <View className="bg-card px-[28rpx] py-[24rpx] flex flex-row items-center gap-[24rpx]">
+        <View className="w-[100rpx] h-[100rpx] rounded-full p-[4rpx] border-[2rpx] border-primary bg-white shrink-0">
+          <Image
+            className="w-full h-full rounded-full"
+            src={BRAND_LOGO}
+            mode="aspectFill"
+            lazyLoad
+          />
+        </View>
+
+        <View className="flex-1 min-w-0 flex flex-col gap-[8rpx]">
+          <View className="flex flex-row items-center gap-[12rpx]">
+            <Text className="text-[32rpx] font-medium text-foreground">{teacher.name}</Text>
+            <View className={cn('px-[12rpx] py-[4rpx] rounded-[8rpx]', tagStyle.bg)}>
+              <Text className={cn('text-[22rpx] font-medium leading-none', tagStyle.text)}>
+                {identityLabel}
+              </Text>
+            </View>
+          </View>
+          <Text className="text-[26rpx] text-muted-foreground">{teacher.classes} 个班级</Text>
+        </View>
+
+        <Icon name="mdi-chevron-right" size={32} color="muted" />
+      </View>
+    </SwappableScheduleCard>
   );
 };
 

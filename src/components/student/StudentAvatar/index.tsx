@@ -1,10 +1,12 @@
-import { Text, View } from '@tarojs/components';
+import { Image, Text, View } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
+import { BRAND_LOGO } from '@/constants/brand';
 import { getAvatarGradientByName } from '@/utils/avatar-color';
 
 interface StudentAvatarProps {
-  name: string;
+  name?: string;
+  src?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   textClassName?: string;
@@ -26,20 +28,31 @@ const TEXT_CLASS_MAP: Record<NonNullable<StudentAvatarProps['size']>, string> = 
 
 const StudentAvatar: React.FC<StudentAvatarProps> = ({
   name,
+  src,
   size = 'md',
   className,
   textClassName,
 }) => {
   const avatarName = name || '?';
+  const avatarSrc = src || BRAND_LOGO;
+  const showImage = Boolean(avatarSrc);
 
   return (
     <View
-      className={cn('rounded-full center flex-shrink-0', SIZE_CLASS_MAP[size], className)}
-      style={{ background: getAvatarGradientByName(avatarName) }}
+      className={cn(
+        'rounded-full center flex-shrink-0 overflow-hidden',
+        SIZE_CLASS_MAP[size],
+        className,
+      )}
+      style={!showImage ? { background: getAvatarGradientByName(avatarName) } : undefined}
     >
-      <Text className={cn('font-bold text-white', TEXT_CLASS_MAP[size], textClassName)}>
-        {avatarName[0]}
-      </Text>
+      {showImage ? (
+        <Image src={avatarSrc} className="h-full w-full" mode="aspectFill" lazyLoad />
+      ) : (
+        <Text className={cn('font-bold text-white', TEXT_CLASS_MAP[size], textClassName)}>
+          {avatarName[0]}
+        </Text>
+      )}
     </View>
   );
 };

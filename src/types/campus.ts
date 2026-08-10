@@ -4,6 +4,8 @@
  * 包含校区、薪资模板、节假日、营业时间等数据模型
  */
 
+import type { SelectedBusinessCategory } from '@/constants/business-categories';
+
 // ============================================
 // 校区类型
 // ============================================
@@ -19,6 +21,12 @@ export interface CampusUIModel {
   id: string;
   /** 校区名称 */
   name: string;
+  /** 校区 Logo URL */
+  logo?: string;
+  /** 营业执照名称 */
+  licenseName?: string;
+  /** 联系人 */
+  contactName?: string;
   /** 经营类型 */
   type: CampusType;
   /** 合作模式（仅合作校区） */
@@ -27,8 +35,12 @@ export interface CampusUIModel {
   partnerTags?: string[];
   /** 联系电话 */
   phone: string;
+  /** 所在地区（如：河南省-郑州市-惠济区） */
+  region?: string;
   /** 校区地址 */
   address: string;
+  /** 营业时间（如：08:00:00至22:00:00） */
+  businessHours?: string;
   /** 图标 emoji */
   icon: string;
   /** 图标背景渐变色 */
@@ -39,8 +51,14 @@ export interface CampusUIModel {
   monthlyRent: number;
   /** 租金到期日（每月几号），1-28 */
   rentDueDay: number;
+  /** 门店介绍 */
+  intro?: string;
+  /** 场馆图片 URL 列表 */
+  venueImages?: string[];
   /** 统计数据 */
   stats: CampusStats;
+  /** 主营业态 */
+  businessCategories: SelectedBusinessCategory[];
 }
 
 /** 校区统计数据 */
@@ -58,16 +76,34 @@ export interface CampusStats {
 /** 校区表单数据（添加/编辑） */
 export interface CampusFormData {
   name: string;
+  /** 校区 Logo URL */
+  logo?: string;
+  /** 营业执照名称 */
+  licenseName?: string;
+  /** 联系人 */
+  contactName?: string;
   type: CampusType;
+  /** 是否主校区 */
+  isMain?: boolean;
   partnerMode?: PartnerMode;
   phone: string;
+  /** 所在地区 */
+  region?: string;
   address: string;
+  /** 营业时间 */
+  businessHours?: string;
   icon: string;
   iconGradient: string;
   /** 月租金（元） */
   monthlyRent?: number;
   /** 租金到期日（每月几号） */
   rentDueDay?: number;
+  /** 门店介绍 */
+  intro?: string;
+  /** 场馆图片 URL 列表 */
+  venueImages?: string[];
+  /** 主营业态 */
+  businessCategories?: SelectedBusinessCategory[];
 }
 
 // ============================================
@@ -321,4 +357,93 @@ export interface CampusOperationalData {
   monthlyRevenue: number[];
   /** 科目排行 */
   subjectRank: SubjectRankItem[];
+}
+
+// ============================================
+// 场地 / 教室
+// ============================================
+
+/** 场地状态 */
+export type VenueStatus = 'active' | 'inactive';
+
+/** 场地（场馆） */
+export interface Venue {
+  /** 场地ID */
+  id: string;
+  /** 所属校区ID */
+  campusId: string;
+  /** 场地名称 */
+  name: string;
+  /** 场地地址（可选） */
+  address?: string;
+  /** 场地状态 */
+  status: VenueStatus;
+  /** 创建时间 */
+  createdAt: string;
+  /** 更新时间 */
+  updatedAt: string;
+}
+
+/** 教室状态 */
+export type RoomStatus = 'active' | 'inactive';
+
+/** 教室 */
+export interface Room {
+  /** 教室ID */
+  id: string;
+  /** 所属场地ID */
+  venueId: string;
+  /** 所属校区ID（冗余，方便按校区过滤） */
+  campusId: string;
+  /** 教室名称 */
+  name: string;
+  /** 容纳人数（可选） */
+  capacity?: number;
+  /** 教室状态 */
+  status: RoomStatus;
+  /** 是否开启场地预约模式 */
+  bookingEnabled?: boolean;
+  /** 场地照片 URL */
+  photo?: string;
+  /** 开放开始时间（HH:mm） */
+  openTimeStart?: string;
+  /** 开放结束时间（HH:mm） */
+  openTimeEnd?: string;
+  /** 单次付费金额（元），0 表示免费 */
+  pricePerSession?: number;
+  /** 是否开启分时段收费 */
+  timeBasedPricing?: boolean;
+  /** 创建时间 */
+  createdAt: string;
+  /** 更新时间 */
+  updatedAt: string;
+}
+
+/** 场地表单数据 */
+export interface VenueFormData {
+  campusId: string;
+  name: string;
+  address?: string;
+  status: VenueStatus;
+}
+
+/** 教室表单数据 */
+export interface RoomFormData {
+  venueId: string;
+  campusId: string;
+  name: string;
+  capacity?: number;
+  status: RoomStatus;
+  /** 是否开启场地预约模式 */
+  bookingEnabled?: boolean;
+  /** 场地照片 URL */
+  photo?: string;
+  /** 开放开始时间（HH:mm） */
+  openTimeStart?: string;
+  /** 开放结束时间（HH:mm） */
+  openTimeEnd?: string;
+  /** 单次付费金额（元），0 表示免费 */
+  pricePerSession?: number;
+  /** 是否开启分时段收费 */
+  timeBasedPricing?: boolean;
 }

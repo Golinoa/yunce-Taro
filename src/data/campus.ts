@@ -12,11 +12,25 @@ import type {
   NotifyGroup,
   PartnerMode,
   PayDaySettings,
+  Room,
+  RoomFormData,
   SalaryModel,
   Subject,
   SubjectFormData,
+  Venue,
+  VenueFormData,
 } from '@/types/campus';
-import { CAMPUSES, CAMPUS_STATS, CLASSES, STUDENTS, SUBJECTS, TEACHERS } from './mock-database';
+import { isTempImagePath, uploadImage } from '@/utils/image-upload';
+import {
+  CAMPUSES,
+  CAMPUS_STATS,
+  CLASSES,
+  ROOMS,
+  STUDENTS,
+  SUBJECTS,
+  TEACHERS,
+  VENUES,
+} from './mock-database';
 
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -153,6 +167,8 @@ let mockNotifyGroups: NotifyGroup[] = [
   },
 ];
 let mockSubjects: Subject[] | null = null;
+let mockVenues: Venue[] = [...VENUES];
+let mockRooms: Room[] = [...ROOMS];
 
 function getCampusIcon(index: number) {
   return CAMPUS_ICONS[index % CAMPUS_ICONS.length];
@@ -180,22 +196,30 @@ function mapCampusToUI(index: number, campus = CAMPUSES[index]): CampusUIModel {
   return {
     id: campus.id,
     name: campus.name,
+    logo: campus.logo,
+    licenseName: campus.licenseName,
+    contactName: campus.contactName,
     type,
     partnerMode,
     partnerTags: partnerMode ? getPartnerTags(partnerMode) : undefined,
     phone: campus.phone,
+    region: campus.region,
     address: campus.address,
+    businessHours: campus.businessHours,
     icon: iconMeta.icon,
     iconGradient: iconMeta.gradient,
     isMain,
     monthlyRent: isMain ? 12000 : type === 'partner' ? 0 : 8000,
     rentDueDay: isMain ? 28 : 15 + (index % 10),
+    intro: campus.intro,
+    venueImages: campus.venueImages,
     stats: {
       students: stats?.studentCount || 0,
       teachers: stats?.teacherCount || 0,
       revenue: stats?.monthAmount || 0,
       revenueUnit: stats && stats.monthAmount >= 10000 ? '万' : '',
     },
+    businessCategories: campus.businessCategories || [],
   };
 }
 
@@ -299,17 +323,25 @@ export async function mockAddCampus(data: CampusFormData): Promise<CampusUIModel
   const campus: CampusUIModel = {
     id: `campus-${Date.now()}`,
     name: data.name,
+    logo: data.logo,
+    licenseName: data.licenseName,
+    contactName: data.contactName,
     type: data.type,
     partnerMode: data.partnerMode,
     partnerTags: data.partnerMode ? getPartnerTags(data.partnerMode) : undefined,
     phone: data.phone,
+    region: data.region,
     address: data.address,
+    businessHours: data.businessHours,
     icon: data.icon,
     iconGradient: data.iconGradient,
-    isMain: false,
+    isMain: data.isMain ?? false,
     monthlyRent: data.monthlyRent ?? 0,
     rentDueDay: data.rentDueDay ?? 15,
+    intro: data.intro,
+    venueImages: data.venueImages,
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
+    businessCategories: data.businessCategories || [],
   };
   mockCampusOverrides = [...getCampusList(), campus];
   return campus;
@@ -324,6 +356,21 @@ export async function mockUpdateCampus(
   const current = campuses.find((item) => item.id === id);
   if (!current) return undefined;
 
+  // mock 后端接收临时路径后执行上传，转换为可持久化的 base64 URL
+  const logo =
+    data.logo !== undefined
+      ? isTempImagePath(data.logo)
+        ? await uploadImage(data.logo)
+        : data.logo || undefined
+      : current.logo;
+
+  const venueImages =
+    data.venueImages !== undefined
+      ? await Promise.all(
+          data.venueImages.map((url) => (isTempImagePath(url) ? uploadImage(url) : url)),
+        )
+      : current.venueImages;
+
   const updated: CampusUIModel = {
     ...current,
     ...data,
@@ -334,6 +381,10 @@ export async function mockUpdateCampus(
         : undefined,
     monthlyRent: data.monthlyRent ?? current.monthlyRent,
     rentDueDay: data.rentDueDay ?? current.rentDueDay,
+    logo,
+    intro: data.intro ?? current.intro,
+    venueImages,
+    businessCategories: data.businessCategories ?? current.businessCategories,
   };
 
   mockCampusOverrides = campuses.map((item) => (item.id === id ? updated : item));
@@ -535,5 +586,129 @@ export async function mockAddSubject(data: SubjectFormData): Promise<Subject> {
 export async function mockDeleteSubject(id: string): Promise<boolean> {
   await delay();
   mockSubjects = ensureSubjects().filter((item) => item.id !== id);
+  return true;
+}
+
+// ============================================
+// 场地 / 教室
+// ============================================
+
+export async function mockGetVenues(campusId?: string): Promise<Venue[]> {
+  await delay();
+  let venues = [...mockVenues];
+  if (campusId) {
+    venues = venues.filter((item) => item.campusId === campusId);
+  }
+  return venues;
+}
+
+export async function mockGetVenueById(id: string): Promise<Venue | undefined> {
+  await delay();
+  return mockVenues.find((item) => item.id === id);
+}
+
+export async function mockAddVenue(data: VenueFormData): Promise<Venue> {
+  await delay();
+  const now = new Date().toISOString();
+  const venue: Venue = {
+    id: `venue-${Date.now()}`,
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  };
+  mockVenues = [...mockVenues, venue];
+  return venue;
+}
+
+export async function mockUpdateVenue(
+  id: string,
+  data: Partial<VenueFormData>,
+): Promise<Venue | undefined> {
+  await delay();
+  const current = mockVenues.find((item) => item.id === id);
+  if (!current) return undefined;
+  const updated: Venue = {
+    ...current,
+    ...data,
+    updatedAt: new Date().toISOString(),
+  };
+  mockVenues = mockVenues.map((item) => (item.id === id ? updated : item));
+  return updated;
+}
+
+export async function mockDeleteVenue(id: string): Promise<boolean> {
+  await delay();
+  const hasRooms = mockRooms.some((item) => item.venueId === id);
+  if (hasRooms) return false;
+  mockVenues = mockVenues.filter((item) => item.id !== id);
+  return true;
+}
+
+export async function mockGetRooms(options?: {
+  campusId?: string;
+  venueId?: string;
+}): Promise<Room[]> {
+  await delay();
+  let rooms = [...mockRooms];
+  if (options?.campusId) {
+    rooms = rooms.filter((item) => item.campusId === options.campusId);
+  }
+  if (options?.venueId) {
+    rooms = rooms.filter((item) => item.venueId === options.venueId);
+  }
+  return rooms;
+}
+
+export async function mockGetRoomById(id: string): Promise<Room | undefined> {
+  await delay();
+  return mockRooms.find((item) => item.id === id);
+}
+
+export async function mockAddRoom(data: RoomFormData): Promise<Room> {
+  await delay();
+  const now = new Date().toISOString();
+  const room: Room = {
+    id: `room-${Date.now()}`,
+    ...data,
+    bookingEnabled: data.bookingEnabled ?? false,
+    openTimeStart: data.openTimeStart ?? '09:00',
+    openTimeEnd: data.openTimeEnd ?? '22:00',
+    pricePerSession: data.pricePerSession ?? 0,
+    timeBasedPricing: data.timeBasedPricing ?? false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  mockRooms = [...mockRooms, room];
+  return room;
+}
+
+export async function mockUpdateRoom(
+  id: string,
+  data: Partial<RoomFormData>,
+): Promise<Room | undefined> {
+  await delay();
+  const current = mockRooms.find((item) => item.id === id);
+  if (!current) return undefined;
+
+  const photo =
+    data.photo !== undefined
+      ? isTempImagePath(data.photo)
+        ? await uploadImage(data.photo)
+        : data.photo || undefined
+      : current.photo;
+
+  const updated: Room = {
+    ...current,
+    ...data,
+    photo,
+    updatedAt: new Date().toISOString(),
+  };
+  mockRooms = mockRooms.map((item) => (item.id === id ? updated : item));
+  return updated;
+}
+
+export async function mockDeleteRoom(id: string): Promise<boolean> {
+  await delay();
+  mockRooms = mockRooms.filter((item) => item.id !== id);
   return true;
 }

@@ -120,7 +120,7 @@ const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
         {/* 老师列表 */}
         {switchTeachers.length === 0 ? (
           <View className="center flex-col gap-[16rpx] py-[100rpx]">
-            <Icon name="mdi-account-off-outline" size={56} className="text-muted-foreground" />
+            <Icon name="mdi-account-off" size={56} className="text-muted-foreground" />
             <Text className="text-[26rpx] text-muted-foreground">暂无可预约的老师</Text>
           </View>
         ) : (

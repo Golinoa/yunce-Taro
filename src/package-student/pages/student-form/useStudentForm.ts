@@ -2,8 +2,9 @@ import Taro from '@tarojs/taro';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
-import { studentService, packageService } from '@/services';
+import { studentService, packageService, campusService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
+import type { CampusUIModel } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -106,6 +107,11 @@ export interface UseStudentFormReturn {
   showPackagePicker: boolean;
   setShowPackagePicker: React.Dispatch<React.SetStateAction<boolean>>;
 
+  // 所属校区
+  campusId: string;
+  setCampusId: React.Dispatch<React.SetStateAction<string>>;
+  campusOptions: CampusUIModel[];
+
   // 计算值
   remainingHours: number;
 
@@ -176,6 +182,10 @@ export function useStudentForm(): UseStudentFormReturn {
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [showPackagePicker, setShowPackagePicker] = useState(false);
 
+  // 所属校区
+  const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
+  const [campusId, setCampusId] = useState('');
+
   // Store 实例
   const updateStudentInCache = useStudentStore((state) => state.updateInCache);
   const fetchPackageTemplatesByTeacher = usePackageTemplateStore((state) => state.fetchByTeacher);
@@ -221,6 +231,10 @@ export function useStudentForm(): UseStudentFormReturn {
     }
 
     try {
+      const campusList = await campusService.getList();
+      setCampusOptions(campusList);
+      const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
+
       if (isEdit) {
         const stu = await studentService.getById(studentId);
         if (!stu) {
@@ -238,11 +252,13 @@ export function useStudentForm(): UseStudentFormReturn {
         setAvatarUrl(stu.avatar_url || '');
         setFeeAmount(stu.fee_amount ? String(stu.fee_amount) : '');
         setFeeMethod(stu.fee_method || '');
+        setCampusId(stu.campus_id || mainCampusId);
         return;
       }
 
       const list = await fetchPackageTemplatesByTeacher(currentUserId, true);
       setPackageTemplates(list);
+      setCampusId(mainCampusId);
     } catch (error) {
       logError('init student form', error);
       setLoadError('学员表单初始化失败，请稍后重试');
@@ -262,7 +278,7 @@ export function useStudentForm(): UseStudentFormReturn {
       // #endregion
       setLoading(false);
     }
-  }, [currentUserId, isEdit, studentId, fetchPackageTemplatesByTeacher]);
+  }, [currentUserId, isEdit, studentId, fetchPackageTemplatesByTeacher, initStartAtRef]);
 
   useEffect(() => {
     void loadFormData();
@@ -478,6 +494,8 @@ export function useStudentForm(): UseStudentFormReturn {
           avatar_url: avatarUrl || undefined,
           fee_amount: feeAmount ? parseFloat(feeAmount) : undefined,
           fee_method: (feeMethod || undefined) as FeeMethod | undefined,
+          campus_id: campusId || undefined,
+          campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
         });
         // 更新 Store 缓存
         if (updated) updateStudentInCache(currentUserId, updated);
@@ -497,6 +515,8 @@ export function useStudentForm(): UseStudentFormReturn {
           avatar_url: avatarUrl || undefined,
           fee_amount: feeAmount ? parseFloat(feeAmount) : undefined,
           fee_method: (feeMethod || undefined) as FeeMethod | undefined,
+          campus_id: campusId || undefined,
+          campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
         });
 
         if (newStudent) {
@@ -606,6 +626,8 @@ export function useStudentForm(): UseStudentFormReturn {
     currentUserId,
     updateStudentInCache,
     hoursComposition,
+    campusId,
+    campusOptions,
   ]);
 
   // 重置表单
@@ -628,6 +650,7 @@ export function useStudentForm(): UseStudentFormReturn {
     setSchedule([]);
     setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
     setSelectedPackageId('');
+    setCampusId('');
     setErrors({});
   }, []);
 
@@ -683,6 +706,9 @@ export function useStudentForm(): UseStudentFormReturn {
     selectedPackage,
     showPackagePicker,
     setShowPackagePicker,
+    campusId,
+    setCampusId,
+    campusOptions,
     remainingHours,
     errors,
     saving,

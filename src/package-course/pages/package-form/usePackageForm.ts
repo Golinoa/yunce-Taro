@@ -211,6 +211,7 @@ export function usePackageForm() {
     currentUserId,
     fetchStudentsByTeacher,
     fetchPackageTemplatesByTeacher,
+    initStartAtRef,
   ]);
 
   // ============================================
@@ -502,6 +503,7 @@ export function usePackageForm() {
     note,
     giftHours,
     customName,
+    customSubjectId,
     effectiveValidDays,
     effectiveFeeAmount,
     installmentEnabled,

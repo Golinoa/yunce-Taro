@@ -15,6 +15,19 @@ import type {
 } from '@/types/onboarding';
 import { STORE_ONBOARDING_VISITED_KEY } from '@/utils/auth';
 
+// ============================================
+// 店铺配置 6 步骤页面「页面介绍弹框 - 不再提醒」存储 Key
+// 统一维护，便于重置引导流程时一并清除
+// ============================================
+export const PAGE_INTRO_STORAGE_KEYS: Record<StoreOnboardingStepKey, string> = {
+  campus: 'campus_settings_intro_hidden',
+  venue: 'venue_list_intro_hidden',
+  staff: 'teacher_list_intro_hidden',
+  course: 'course_management_intro_hidden',
+  package: 'card_management_intro_hidden',
+  salary: 'salary_home_intro_hidden',
+};
+
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -35,7 +48,7 @@ const STEP_META_LIST: Array<{
     key: 'venue',
     label: '场地管理',
     icon: 'mdi-map-marker',
-    route: '/package-settings/pages/campus-settings/index',
+    route: '/package-settings/pages/venue-list/index',
   },
   {
     key: 'staff',
@@ -47,19 +60,19 @@ const STEP_META_LIST: Array<{
     key: 'course',
     label: '课程管理',
     icon: 'mdi-book-open-variant',
-    route: '/package-course/pages/classes/index',
+    route: '/package-course/pages/course-management/index',
   },
   {
     key: 'package',
     label: '卡种管理',
     icon: 'mdi-cash',
-    route: '/package-course/pages/course-packages/index',
+    route: '/package-course/pages/card-management/index',
   },
   {
     key: 'salary',
     label: '薪资管理',
     icon: 'mdi-cash-multiple',
-    route: '/package-teacher/pages/salary-detail/index',
+    route: '/package-teacher/pages/salary-home/index',
   },
 ];
 
@@ -89,9 +102,12 @@ export function markStepVisited(key: StoreOnboardingStepKey): void {
   Taro.setStorageSync(STORE_ONBOARDING_VISITED_KEY, JSON.stringify(visited));
 }
 
-/** 清除全部访问记录（重置新手引导时调用） */
+/** 清除全部访问记录及 6 个配置页面的「不再提醒」弹框状态（重置新手引导时调用） */
 export function clearVisitedMap(): void {
   Taro.removeStorageSync(STORE_ONBOARDING_VISITED_KEY);
+  Object.values(PAGE_INTRO_STORAGE_KEYS).forEach((key) => {
+    Taro.removeStorageSync(key);
+  });
 }
 
 // ============================================

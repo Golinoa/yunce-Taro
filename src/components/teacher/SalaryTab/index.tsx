@@ -74,7 +74,7 @@ const SalaryTab: React.FC<SalaryTabProps> = ({
   onMonthPickerOpen,
   onHistoryMonthChange,
 }) => {
-  const unpaidTeachers = salaryTeachers.filter((t) => t.salaryStatus !== 'paid');
+  const unpaidTeachers = salaryTeachers.filter((t) => t.salaryStatus !== 'archived');
 
   return (
     <View className="flex-1 flex flex-col overflow-hidden h-0">

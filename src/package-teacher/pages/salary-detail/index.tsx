@@ -1,62 +1,198 @@
-import { View, Text } from '@tarojs/components';
+/**
+ * 工资明细页面
+ *
+ * 使用场景：薪资核对完成后，以工资单视图展示教师薪资明细。
+ * 仅保留工资单视图，调整工资功能已迁移至 salary-adjust 页面。
+ */
+import { View, Text, Image } from '@tarojs/components';
 import Taro, { useRouter } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useMemo, useState, useCallback } from 'react';
-import Avatar from '@/components/Avatar';
-import DeductionSheet from '@/components/teacher/DeductionSheet';
+import Icon from '@/components/Icon';
 import PayConfirmSheet from '@/components/teacher/PayConfirmSheet';
-import { SalaryStatusTag } from '@/components/teacher/TeacherCard';
+import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
 import { useTeacherStore, calcTotal } from '@/stores/teacher';
-import type { SalaryStatus, DeductionType } from '@/types/teacher';
+import {
+  normalizeSalaryStatus,
+  SALARY_STATUS_META,
+  PAY_METHOD_TEXT,
+  type PayMethod,
+} from '@/types/teacher';
 
-/** 状态流转步骤 */
-const STATUS_STEPS: { key: SalaryStatus; label: string; icon: string }[] = [
-  { key: 'pending', label: '待确认', icon: '⏳' },
-  { key: 'confirmed', label: '已确认', icon: '✓' },
-  { key: 'paid', label: '已发放', icon: '¥' },
-];
+/** 页面背景色：按产品要求使用 #EFEFEF */
+const PAGE_BACKGROUND = '#EFEFEF';
+
+/** 生成本地模拟课时费流水 */
+function genMockLessonRecords(teacher: { subject: string; rate: number }) {
+  const courses = teacher.subject
+    ? [`${teacher.subject}基础班`, `${teacher.subject}进阶班`, `${teacher.subject}小组课`]
+    : ['行政班', '值班', '前台班'];
+  return [
+    {
+      date: '08-01',
+      course: courses[0] ?? '基础班',
+      hours: 2,
+      amount: Math.round(teacher.rate * 2),
+    },
+    {
+      date: '08-05',
+      course: courses[1] ?? '进阶班',
+      hours: 1.5,
+      amount: Math.round(teacher.rate * 1.5),
+    },
+    { date: '08-12', course: courses[2] ?? '小组课', hours: 1, amount: Math.round(teacher.rate) },
+  ];
+}
+
+/** 生成本地模拟提成流水 */
+function genMockCommissionRecords(teacher: { attend: number; perf: number }) {
+  const baseAmount = Math.max(100, Math.round((teacher.attend + teacher.perf) / 3));
+  return [
+    { name: '新生推荐奖', amount: baseAmount },
+    { name: '续费提成', amount: Math.round(baseAmount * 0.8) },
+    { name: '全勤奖励', amount: Math.round(baseAmount * 0.6) },
+  ];
+}
+
+/** 紧凑信息行：固定宽度标签 + 左对齐值 */
+const InfoRow: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  valueClassName?: string;
+  border?: boolean;
+}> = ({ label, value, valueClassName, border = true }) => (
+  <View className={cn('flex items-start py-[16rpx]', border && 'border-b border-border/30')}>
+    <Text className="w-[160rpx] text-[26rpx] text-muted-foreground shrink-0 leading-[40rpx]">
+      {label}
+    </Text>
+    <View className="flex items-center gap-[8rpx] flex-1 min-w-0 pl-[16rpx]">
+      {value ? (
+        <Text
+          className={cn('text-[26rpx] text-foreground leading-[40rpx] truncate', valueClassName)}
+        >
+          {value}
+        </Text>
+      ) : null}
+    </View>
+  </View>
+);
+
+/** 工资明细网格项：标签 + 金额 */
+const SalaryGridItem: React.FC<{
+  label: string;
+  amount: string;
+  amountClassName?: string;
+  onClick?: () => void;
+  expandable?: boolean;
+  expanded?: boolean;
+}> = ({ label, amount, amountClassName, onClick, expandable, expanded }) => (
+  <View className={cn('flex flex-col gap-[8rpx]', onClick && 'press-scale')} onClick={onClick}>
+    <View className="flex items-center gap-[8rpx]">
+      <Text className="text-[24rpx] text-muted-foreground">{label}</Text>
+      {expandable && (
+        <Icon
+          name={expanded ? 'mdi-chevron-down' : 'mdi-chevron-right'}
+          size={18}
+          className="text-muted-foreground"
+        />
+      )}
+    </View>
+    <Text
+      className={cn('text-[32rpx] font-bold leading-[44rpx]', amountClassName || 'text-foreground')}
+    >
+      {amount}
+    </Text>
+  </View>
+);
+
+/** 展开的记录行 */
+const RecordRow: React.FC<{ name: string; amount: string; amountClassName?: string }> = ({
+  name,
+  amount,
+  amountClassName,
+}) => (
+  <View className="flex items-center justify-between py-[12rpx]">
+    <Text className="text-[24rpx] text-muted-foreground truncate flex-1 mr-[16rpx]">{name}</Text>
+    <Text className={cn('text-[24rpx] font-medium', amountClassName || 'text-foreground')}>
+      {amount}
+    </Text>
+  </View>
+);
 
 const SalaryDetailPage: React.FC = () => {
   const { id } = useRouter().params;
-  const { teachers, confirmSalary, setPendingPayAction } = useTeacherStore();
+  const { teachers, setPendingPayAction } = useTeacherStore();
 
   const teacher = useMemo(() => teachers.find((t) => t.id === id), [teachers, id]);
 
   const [paySheetVisible, setPaySheetVisible] = useState(false);
-  const [deductionSheetVisible, setDeductionSheetVisible] = useState(false);
+  const [slipExpanded, setSlipExpanded] = useState<{
+    lesson: boolean;
+    commission: boolean;
+    bonus: boolean;
+    deduct: boolean;
+  }>({
+    lesson: false,
+    commission: false,
+    bonus: false,
+    deduct: false,
+  });
 
   const total = useMemo(() => (teacher ? calcTotal(teacher) : 0), [teacher]);
   const lessonFee = useMemo(() => (teacher ? teacher.hours * teacher.rate : 0), [teacher]);
+  const totalFine = useMemo(
+    () => (teacher ? (teacher.lateFine || 0) + (teacher.otherFine || 0) : 0),
+    [teacher],
+  );
+  const bonusTotal = useMemo(
+    () =>
+      (teacher?.bonusAmount || 0) +
+      (teacher?.deductions || [])
+        .filter((d) => d.type === 'bonus')
+        .reduce((s, d) => s + d.amount, 0),
+    [teacher],
+  );
+  const deductTotal = useMemo(
+    () =>
+      totalFine +
+      (teacher?.deductions || [])
+        .filter((d) => d.type === 'deduct')
+        .reduce((s, d) => s + d.amount, 0),
+    [teacher, totalFine],
+  );
 
-  const handleAction = useCallback(() => {
-    if (!teacher) return;
-    if (teacher.salaryStatus === 'pending') {
-      confirmSalary(teacher.id);
-      Taro.showToast({ title: '工资已确认', icon: 'success' });
-    } else if (teacher.salaryStatus === 'confirmed') {
-      setPendingPayAction({ type: 'single', ids: [teacher.id] });
-      setPaySheetVisible(true);
-    }
-  }, [teacher, confirmSalary, setPendingPayAction]);
+  const currentStatus = useMemo(
+    () => (teacher ? normalizeSalaryStatus(teacher.salaryStatus) : 'pending'),
+    [teacher],
+  );
+  const statusMeta = SALARY_STATUS_META[currentStatus];
 
-  const handlePayConfirm = useCallback((remark: string) => {
-    useTeacherStore.getState().executePay(remark);
-    setPaySheetVisible(false);
-    Taro.showToast({ title: '发放成功', icon: 'success' });
+  const lessonRecords = useMemo(() => (teacher ? genMockLessonRecords(teacher) : []), [teacher]);
+  const commissionRecords = useMemo(
+    () => (teacher ? genMockCommissionRecords(teacher) : []),
+    [teacher],
+  );
+
+  const toggleSlipExpand = useCallback((key: 'lesson' | 'commission' | 'bonus' | 'deduct') => {
+    setSlipExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  const handleDeductionSubmit = useCallback(
-    (data: { reason: string; amount: number; type: DeductionType }) => {
+  const handlePayConfirm = useCallback(
+    async ({ remark, payMethod }: { remark: string; payMethod: PayMethod }) => {
       if (!teacher) return;
-      useTeacherStore.getState().addDeduction(teacher.id, {
-        id: `d${Date.now()}`,
-        reason: data.reason,
-        amount: data.amount,
-        type: data.type,
-      });
-      setDeductionSheetVisible(false);
-      Taro.showToast({ title: data.type === 'deduct' ? '扣款成功' : '补发成功', icon: 'success' });
+      try {
+        await useTeacherStore.getState().executePay(remark, payMethod);
+        setPaySheetVisible(false);
+        Taro.showToast({ title: '发放成功', icon: 'success' });
+        setTimeout(() => {
+          void Taro.redirectTo({
+            url: `/package-teacher/pages/salary-detail/index?id=${teacher.id}&mode=slip`,
+          });
+        }, 500);
+      } catch {
+        Taro.showToast({ title: '发放失败', icon: 'none' });
+      }
     },
     [teacher],
   );
@@ -71,200 +207,194 @@ const SalaryDetailPage: React.FC = () => {
     );
   }
 
-  // 当前状态索引
-  const currentStepIdx = STATUS_STEPS.findIndex((s) => s.key === teacher.salaryStatus);
-
   return (
-    <View className="min-h-screen bg-background pb-safe-bar">
-      {/* 教师信息头 */}
-      <View className="flex items-center gap-[24rpx] pt-[96rpx] px-[32rpx] pb-[32rpx] bg-card relative">
-        <View
-          className="absolute top-[96rpx] left-[32rpx] w-[72rpx] h-[72rpx] rounded-full bg-muted flex items-center justify-center"
-          onClick={() => Taro.navigateBack()}
-        >
-          <Text className="text-foreground text-[44rpx] font-light">‹</Text>
-        </View>
-        <Avatar name={teacher.name} size="lg" />
-        <View className="flex-1 min-w-0 ml-[88rpx]">
-          <Text className="text-[36rpx] font-bold text-foreground block">{teacher.name}</Text>
-          <Text className="text-[26rpx] text-muted-foreground mt-[8rpx] block">
-            {teacher.subject} · {teacher.hours}课时
+    <View className="min-h-screen pb-[140rpx]" style={{ backgroundColor: PAGE_BACKGROUND }}>
+      {/* 顶部：白色背景，居中头像/名称/金额，底部带分割线 */}
+      <View className="bg-white pt-[48rpx] pb-[40rpx] px-[64rpx] border-b border-border/30">
+        <View className="flex flex-col items-center">
+          <Image
+            src={teacher.avatar || BRAND_LOGO}
+            className="w-[120rpx] h-[120rpx] rounded-full mb-[24rpx]"
+            mode="aspectFill"
+          />
+          <Text className="text-[30rpx] text-foreground mb-[8rpx]">
+            {teacher.name}
+            <Text className="text-muted-foreground"> · {teacher.campus || BRAND_NAME_ZH}</Text>
           </Text>
-        </View>
-        <SalaryStatusTag status={teacher.salaryStatus} />
-      </View>
-
-      {/* 状态流转 */}
-      <View className="flex items-center justify-center py-[40rpx] px-[48rpx] mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] shadow-card">
-        {STATUS_STEPS.map((step, idx) => {
-          const isCompleted = idx <= currentStepIdx;
-          const isCurrent = idx === currentStepIdx;
-          return (
-            <View key={step.key} className="flex flex-col items-center gap-[12rpx] relative flex-1">
-              <View
-                className={cn(
-                  'w-[64rpx] h-[64rpx] rounded-full flex items-center justify-center transition-all',
-                  isCompleted ? 'bg-primary' : 'bg-muted',
-                  isCurrent && 'shadow-flow-dot',
-                )}
-              >
-                <Text
-                  className={cn(
-                    'text-[28rpx]',
-                    isCompleted ? 'text-white' : 'text-muted-foreground',
-                  )}
-                >
-                  {isCompleted ? step.icon : idx + 1}
-                </Text>
-              </View>
-              <Text
-                className={cn(
-                  'text-[22rpx]',
-                  isCompleted ? 'text-primary font-semibold' : 'text-muted-foreground',
-                )}
-              >
-                {step.label}
-              </Text>
-              {idx < STATUS_STEPS.length - 1 && (
-                <View
-                  className={cn(
-                    'absolute top-[32rpx] left-[calc(50%+40rpx)] right-[calc(-50%+40rpx)] h-[4rpx] z-0',
-                    idx < currentStepIdx ? 'bg-primary' : 'bg-border',
-                  )}
-                />
-              )}
-            </View>
-          );
-        })}
-      </View>
-
-      {/* 金额总览 */}
-      <View className="bg-class-amber rounded-[32rpx] py-[40rpx] px-[32rpx] mx-[32rpx] mb-[24rpx] text-center text-white relative overflow-hidden">
-        <View className="absolute -top-[40rpx] -right-[40rpx] w-[160rpx] h-[160rpx] rounded-full bg-white/10" />
-        <Text className="text-[26rpx] opacity-90 block">{dayjs().month() + 1}月应发总额</Text>
-        <Text className="text-[64rpx] font-extrabold mt-[8rpx] block">
-          ¥{total.toLocaleString()}
-        </Text>
-        <View className="flex justify-center gap-[32rpx] mt-[16rpx]">
-          <Text className="text-[22rpx] opacity-80">课时费 ¥{lessonFee}</Text>
-          {teacher.base > 0 && (
-            <Text className="text-[22rpx] opacity-80">底薪 ¥{teacher.base}</Text>
-          )}
-          {(teacher.attend > 0 || teacher.perf > 0) && (
-            <Text className="text-[22rpx] opacity-80">奖金 ¥{teacher.attend + teacher.perf}</Text>
-          )}
-        </View>
-      </View>
-
-      {/* 薪资构成明细 */}
-      <View className="bg-card rounded-[28rpx] p-[32rpx] mx-[32rpx] mb-[24rpx] shadow-card">
-        <Text className="text-[28rpx] font-semibold text-foreground mb-[24rpx] block">
-          薪资构成
-        </Text>
-        {teacher.base > 0 && (
-          <View className="flex justify-between items-center py-[16rpx]">
-            <Text className="text-[26rpx] text-muted-foreground">底薪</Text>
-            <Text className="text-[26rpx] font-semibold text-foreground">¥{teacher.base}</Text>
-          </View>
-        )}
-        <View className="flex justify-between items-center py-[16rpx]">
-          <Text className="text-[26rpx] text-muted-foreground">
-            课时费 ({teacher.hours}课时 × ¥{teacher.rate})
-          </Text>
-          <Text className="text-[26rpx] font-semibold text-foreground">¥{lessonFee}</Text>
-        </View>
-        {teacher.attend > 0 && (
-          <View className="flex justify-between items-center py-[16rpx]">
-            <Text className="text-[26rpx] text-muted-foreground">全勤奖</Text>
-            <Text className="text-[26rpx] font-semibold text-foreground">¥{teacher.attend}</Text>
-          </View>
-        )}
-        {teacher.perf > 0 && (
-          <View className="flex justify-between items-center py-[16rpx]">
-            <Text className="text-[26rpx] text-muted-foreground">绩效奖金</Text>
-            <Text className="text-[26rpx] font-semibold text-foreground">¥{teacher.perf}</Text>
-          </View>
-        )}
-
-        {/* 按班级计费 */}
-        {teacher.classRateOverrides && teacher.classRateOverrides.length > 0 && (
-          <>
-            <View className="h-[2rpx] bg-border my-[24rpx]" />
-            <Text className="text-[28rpx] font-semibold text-foreground mb-[24rpx] block">
-              课时明细
+          <View className="flex items-baseline mt-[16rpx]">
+            <Text className="text-[32rpx] font-bold text-foreground mr-[6rpx]">¥</Text>
+            <Text className="text-[56rpx] font-extrabold text-foreground leading-tight">
+              {total.toFixed(2)}
             </Text>
-            {teacher.classRateOverrides.map((ov) => (
-              <View className="flex justify-between items-center py-[16rpx]" key={ov.className}>
-                <Text className="text-[26rpx] text-muted-foreground">{ov.className}</Text>
-                <Text className="text-[26rpx] font-semibold text-foreground">¥{ov.rate}/课时</Text>
-              </View>
+          </View>
+        </View>
+      </View>
+
+      {/* 基本信息：当前状态 / 确认时间 / 发放方式 / 流水单号 */}
+      <View className="bg-white px-[64rpx] mb-[36rpx]">
+        <InfoRow label="当前状态" value={statusMeta.label} valueClassName={statusMeta.textClass} />
+        <InfoRow
+          label="确认时间"
+          value={teacher.paidAt ? dayjs(teacher.paidAt).format('YYYY年M月D日 HH:mm:ss') : '-'}
+        />
+        <InfoRow
+          label="发放方式"
+          value={teacher.payMethod ? PAY_METHOD_TEXT[teacher.payMethod as PayMethod] : '-'}
+        />
+        <InfoRow label="流水单号" value={teacher.serialNo || '-'} border={false} />
+      </View>
+
+      {/* 工资明细卡片：双排紧凑布局 */}
+      <View className="bg-white px-[64rpx] py-[32rpx] mb-[36rpx]">
+        <Text className="text-[28rpx] text-foreground font-bold mb-[32rpx]">工资明细</Text>
+
+        <View className="grid grid-cols-2 gap-x-[24rpx] gap-y-[32rpx]">
+          {/* 底薪 */}
+          <SalaryGridItem label="底薪" amount={teacher.base.toFixed(0)} />
+
+          {/* 课时费（可展开） */}
+          <SalaryGridItem
+            label="课时费"
+            amount={lessonFee.toFixed(0)}
+            onClick={() => toggleSlipExpand('lesson')}
+            expandable
+            expanded={slipExpanded.lesson}
+          />
+
+          {/* 提成（可展开） */}
+          <SalaryGridItem
+            label="提成"
+            amount={(teacher.attend + teacher.perf).toFixed(0)}
+            onClick={() => toggleSlipExpand('commission')}
+            expandable
+            expanded={slipExpanded.commission}
+          />
+
+          {/* 奖金（可展开） */}
+          <SalaryGridItem
+            label="奖金"
+            amount={`+${bonusTotal.toFixed(0)}`}
+            amountClassName={bonusTotal > 0 ? 'text-success' : 'text-foreground'}
+            onClick={() => toggleSlipExpand('bonus')}
+            expandable
+            expanded={slipExpanded.bonus}
+          />
+
+          {/* 扣款（可展开） */}
+          <SalaryGridItem
+            label="扣款"
+            amount={`-${deductTotal.toFixed(0)}`}
+            amountClassName={deductTotal > 0 ? 'text-destructive' : 'text-foreground'}
+            onClick={() => toggleSlipExpand('deduct')}
+            expandable
+            expanded={slipExpanded.deduct}
+          />
+
+          {/* 个人社保 */}
+          <SalaryGridItem label="个人社保" amount={(teacher.socialInsurance || 0).toFixed(0)} />
+
+          {/* 公司社保 */}
+          <SalaryGridItem
+            label="公司社保"
+            amount={(teacher.companySocialInsurance || 0).toFixed(0)}
+          />
+        </View>
+
+        {/* 课时费流水 */}
+        {slipExpanded.lesson && (
+          <View className="mt-[24rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]">
+            {lessonRecords.map((rec, idx) => (
+              <RecordRow
+                key={idx}
+                name={`${rec.date} ${rec.course} ${rec.hours}课时`}
+                amount={`+${rec.amount.toFixed(2)}`}
+              />
             ))}
-          </>
+          </View>
         )}
 
-        {/* 扣款/补发 */}
-        {teacher.deductions.length > 0 && (
-          <>
-            <View className="h-[2rpx] bg-border my-[24rpx]" />
-            <View className="flex items-center justify-between mb-[24rpx]">
-              <Text className="text-[28rpx] font-semibold text-foreground">扣款/补发</Text>
-              <Text
-                className="text-[26rpx] font-medium text-primary"
-                onClick={() => setDeductionSheetVisible(true)}
-              >
-                + 添加
-              </Text>
-            </View>
-            {teacher.deductions.map((d) => (
-              <View className="flex justify-between items-center py-[16rpx]" key={d.id}>
-                <View className="flex items-center gap-[16rpx]">
-                  <View
-                    className={cn(
-                      'w-[12rpx] h-[12rpx] rounded-full flex-shrink-0',
-                      d.type === 'deduct' ? 'bg-destructive' : 'bg-success',
-                    )}
-                  />
-                  <Text className="text-[26rpx] text-muted-foreground">{d.reason}</Text>
-                </View>
-                <Text
-                  className={cn(
-                    'text-[26rpx] font-semibold',
-                    d.type === 'deduct' ? 'text-destructive' : 'text-success',
-                  )}
-                >
-                  {d.type === 'deduct' ? '-' : '+'}¥{d.amount}
-                </Text>
-              </View>
+        {/* 提成流水 */}
+        {slipExpanded.commission && (
+          <View className="mt-[24rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]">
+            {commissionRecords.map((rec, idx) => (
+              <RecordRow key={idx} name={rec.name} amount={`+${rec.amount.toFixed(2)}`} />
             ))}
-          </>
+          </View>
         )}
 
-        {teacher.payRemark && (
-          <>
-            <View className="h-[2rpx] bg-border my-[24rpx]" />
-            <View className="py-[20rpx] px-[24rpx] bg-muted rounded-xl">
-              <Text className="text-[24rpx] font-medium text-muted-foreground block mb-[8rpx]">
-                备注
-              </Text>
-              <Text className="text-[26rpx] text-foreground">{teacher.payRemark}</Text>
-            </View>
-          </>
+        {/* 奖金明细 */}
+        {slipExpanded.bonus && (
+          <View className="mt-[24rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]">
+            {(teacher.bonusAmount || 0) > 0 && (
+              <RecordRow name="奖金金额" amount={`+${(teacher.bonusAmount || 0).toFixed(2)}`} />
+            )}
+            {teacher.deductions
+              .filter((d) => d.type === 'bonus')
+              .map((d) => (
+                <RecordRow key={d.id} name={d.reason} amount={`+${d.amount.toFixed(2)}`} />
+              ))}
+            {bonusTotal === 0 && (
+              <Text className="text-[24rpx] text-muted-foreground py-[12rpx]">暂无奖金</Text>
+            )}
+          </View>
+        )}
+
+        {/* 扣款明细 */}
+        {slipExpanded.deduct && (
+          <View className="mt-[24rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]">
+            {(teacher.lateFine || 0) > 0 && (
+              <RecordRow
+                name="迟到罚款"
+                amount={`-${(teacher.lateFine || 0).toFixed(2)}`}
+                amountClassName="text-destructive"
+              />
+            )}
+            {(teacher.otherFine || 0) > 0 && (
+              <RecordRow
+                name="其他罚款"
+                amount={`-${(teacher.otherFine || 0).toFixed(2)}`}
+                amountClassName="text-destructive"
+              />
+            )}
+            {teacher.deductions
+              .filter((d) => d.type === 'deduct')
+              .map((d) => (
+                <RecordRow
+                  key={d.id}
+                  name={d.reason}
+                  amount={`-${d.amount.toFixed(2)}`}
+                  amountClassName="text-destructive"
+                />
+              ))}
+            {deductTotal === 0 && (
+              <Text className="text-[24rpx] text-muted-foreground py-[12rpx]">暂无扣款</Text>
+            )}
+          </View>
         )}
       </View>
 
-      {/* 底部操作按钮 */}
-      {teacher.salaryStatus !== 'paid' && (
-        <View className="fixed bottom-0 left-0 right-0 px-[32rpx] py-[24rpx] pb-safe-bar bg-card border-t border-border z-10">
+      {/* 底部操作 */}
+      <View className="fixed bottom-0 left-0 right-0 px-[64rpx] py-[24rpx] pb-safe-bar bg-white border-t border-border z-20">
+        {(currentStatus === 'sending' || currentStatus === 'teacher_confirmed') && (
           <View
-            className={cn(
-              teacher.salaryStatus === 'confirmed' ? 'action-btn-primary' : 'action-btn-secondary',
-            )}
-            onClick={handleAction}
+            className="w-full py-[26rpx] rounded-full bg-primary text-white text-center text-[30rpx] font-semibold press-scale"
+            onClick={() => {
+              setPendingPayAction({ type: 'single', ids: [teacher.id] });
+              setPaySheetVisible(true);
+            }}
           >
-            {teacher.salaryStatus === 'pending' ? '确认工资' : '确认发放'}
+            确认发放
           </View>
-        </View>
-      )}
+        )}
+        {currentStatus === 'archived' && (
+          <View
+            className="w-full py-[26rpx] rounded-full bg-primary text-white text-center text-[30rpx] font-semibold press-scale"
+            onClick={() => void Taro.navigateBack()}
+          >
+            返回
+          </View>
+        )}
+      </View>
 
       {/* 发放确认弹窗 */}
       <PayConfirmSheet
@@ -277,14 +407,6 @@ const SalaryDetailPage: React.FC = () => {
           setPaySheetVisible(false);
           setPendingPayAction(null);
         }}
-      />
-
-      {/* 扣款/补发弹窗 */}
-      <DeductionSheet
-        visible={deductionSheetVisible}
-        teacherName={teacher.name}
-        onClose={() => setDeductionSheetVisible(false)}
-        onSubmit={handleDeductionSubmit}
       />
     </View>
   );

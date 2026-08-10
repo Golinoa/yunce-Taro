@@ -23,7 +23,10 @@ import {
   teacherService,
   leadService,
 } from '@/services';
+import { campusService, roomService } from '@/services/campus';
 import { useStudentStore, useClassStore } from '@/stores';
+import { useCampusStore } from '@/stores/campus';
+import type { CampusUIModel, Room } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
@@ -442,6 +445,13 @@ const LessonForm: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // ===== 校区 / 教室 =====
+  const { currentCampusId } = useCampusStore();
+  const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
+  const [campusId, setCampusId] = useState(currentCampusId);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [room, setRoom] = useState('');
+
   // ===== 班级模式：搜索/扣费/筛选 =====
   const [studentSearchKeyword, setStudentSearchKeyword] = useState('');
   const [feeAmount, setFeeAmount] = useState<string>('0');
@@ -628,12 +638,16 @@ const LessonForm: React.FC = () => {
     }
 
     const loadData = async () => {
-      const [classList, teacherList] = await Promise.all([
+      const [classList, teacherList, campusList] = await Promise.all([
         fetchClassesByTeacher(currentUserId),
         teacherService.getList(),
+        campusService.getList(),
       ]);
       setClasses(classList);
       setTeacherOptions(teacherList);
+      setCampusOptions(campusList);
+      const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
+      setCampusId((prev) => prev || mainCampusId);
       setSelectedTeachingTeacherId((prev) => {
         if (prev) return prev;
         const matchedTeacher =
@@ -646,6 +660,7 @@ const LessonForm: React.FC = () => {
         const stu = await studentService.getById(studentIdParam);
         if (stu) {
           setSelectedStudent(stu);
+          setCampusId(stu.campus_id || mainCampusId);
           // 内联匹配逻辑，避免依赖 autoMatchPackage
           const pkgs = await packageService.getActiveByStudent(stu.id);
           const best = pickBestPackage(pkgs, hoursUsed);
@@ -665,6 +680,7 @@ const LessonForm: React.FC = () => {
           classService.getStudents(classIdParam),
         ]);
         setSelectedClassId(classIdParam);
+        setCampusId(classInfo?.campus_id || mainCampusId);
         applyClassTeacherDefaults(classInfo, teacherList);
         setClassStudents(students);
         await loadApprovedLeaveStudentIds(students);
@@ -707,6 +723,24 @@ const LessonForm: React.FC = () => {
   useEffect(() => {
     void loadTrialBookings();
   }, [loadTrialBookings]);
+
+  // 根据选中校区加载教室列表
+  useEffect(() => {
+    const loadRooms = async () => {
+      if (!campusId) {
+        setRooms([]);
+        return;
+      }
+      try {
+        const list = await roomService.getList({ campusId });
+        setRooms(list);
+      } catch (err) {
+        logError('lesson-form load rooms', err);
+        setRooms([]);
+      }
+    };
+    loadRooms();
+  }, [campusId]);
 
   // ===== 单人模式：自动匹配课包 =====
   const autoMatchPackage = useCallback(
@@ -753,10 +787,11 @@ const LessonForm: React.FC = () => {
   const handleSelectStudent = useCallback(
     async (stu: Student) => {
       setSelectedStudent(stu);
+      setCampusId(stu.campus_id || campusId);
       setShowStudentPicker(false);
       await autoMatchPackage(stu.id);
     },
-    [autoMatchPackage],
+    [autoMatchPackage, campusId],
   );
 
   const selectedTeachingTeacher = useMemo(
@@ -800,6 +835,27 @@ const LessonForm: React.FC = () => {
     return mode === 'class' ? '班级消课' : '课时消课';
   }, [mode]);
 
+  const campusPickerOptions = useMemo(
+    () => ['请选择校区', ...campusOptions.map((item) => item.name)],
+    [campusOptions],
+  );
+  const campusIndex = useMemo(() => {
+    const index = campusOptions.findIndex((item) => item.id === campusId);
+    return Math.max(0, index + 1);
+  }, [campusOptions, campusId]);
+  const roomOptions = useMemo(() => {
+    const activeNames = rooms.filter((item) => item.status === 'active').map((item) => item.name);
+    const options = [...activeNames];
+    if (room && !options.includes(room)) {
+      options.unshift(room);
+    }
+    return ['请选择', ...options];
+  }, [rooms, room]);
+  const roomIndex = useMemo(() => {
+    const index = roomOptions.findIndex((item) => item === room);
+    return Math.max(0, index);
+  }, [roomOptions, room]);
+
   // ===== 班级模式：加载班级学员 =====
   const loadClassStudents = useCallback(
     async (classId: string) => {
@@ -808,6 +864,12 @@ const LessonForm: React.FC = () => {
         classService.getById(classId),
         classService.getStudents(classId),
       ]);
+      if (classInfo?.campus_id) {
+        setCampusId(classInfo.campus_id);
+      }
+      if (classInfo?.room) {
+        setRoom(classInfo.room);
+      }
       applyClassTeacherDefaults(classInfo, teacherOptions);
       setClassStudents(students);
       await loadApprovedLeaveStudentIds(students);
@@ -1244,6 +1306,8 @@ const LessonForm: React.FC = () => {
         performance: performance > 0 ? `${performance}星` : undefined,
         homework: homework.trim() || undefined,
         homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
+        campus_id: campusId || undefined,
+        room: room || undefined,
       });
 
       // 跨科目消课通知校长
@@ -1294,9 +1358,11 @@ const LessonForm: React.FC = () => {
     handleSubmitSuccessReturn,
     matchedSubject,
     studentSubjects,
+    campusId,
+    room,
   ]);
 
-  // ===== 班级模式：轻量确认后直接执行消课 =====
+  // ===== 班级模式：提交点名 =====
   const handleClassSubmit = useCallback(async () => {
     if (!selectedClassId) {
       Taro.showToast({ title: '请选择班级', icon: 'none' });
@@ -1385,6 +1451,8 @@ const LessonForm: React.FC = () => {
             performance: performance > 0 ? `${performance}星` : undefined,
             homework: homework.trim() || undefined,
             homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
+            campus_id: campusId || undefined,
+            room: room || undefined,
           });
 
           if (isCrossSubject) {
@@ -1428,6 +1496,8 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'leave',
             content: '家长已请假，本节课自动记为请假',
+            campus_id: campusId || undefined,
+            room: room || undefined,
           });
           successCount += 1;
         } catch (err) {
@@ -1449,6 +1519,8 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'absent',
             content: '点名未到，待老师后续补录签到',
+            campus_id: campusId || undefined,
+            room: room || undefined,
           });
           successCount += 1;
         } catch (err) {
@@ -1472,6 +1544,8 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'normal',
             content: `试听签到${booking.note ? `（${booking.note}）` : ''}`,
+            campus_id: campusId || undefined,
+            room: room || undefined,
           });
           successCount += 1;
         } catch (err) {
@@ -1494,6 +1568,8 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'leave',
             content: '试听学员请假',
+            campus_id: campusId || undefined,
+            room: room || undefined,
           });
           successCount += 1;
         } catch (err) {
@@ -1516,6 +1592,8 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'absent',
             content: '试听预约未到',
+            campus_id: campusId || undefined,
+            room: room || undefined,
           });
           successCount += 1;
         } catch (err) {
@@ -1574,6 +1652,8 @@ const LessonForm: React.FC = () => {
     leaveTrialBookings,
     absentTrialBookings,
     trialLeadMap,
+    campusId,
+    room,
   ]);
 
   // ===== 统一提交 =====
@@ -1867,6 +1947,49 @@ const LessonForm: React.FC = () => {
                       <View className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
                         <Text className="text-lg text-foreground">{lessonTime}</Text>
                         <Icon name="mdi-clock-outline" size="sm" color="muted" />
+                      </View>
+                    </Picker>
+                  </View>
+                </View>
+
+                {/* 上课地点 */}
+                <View className="mx-[24rpx] mb-6 bg-white rounded-2xl p-5 shadow-soft">
+                  <Text className="text-lg text-foreground">上课地点</Text>
+                  <View className="flex flex-col gap-5 mt-3">
+                    <Picker
+                      mode="selector"
+                      range={campusPickerOptions}
+                      value={campusIndex}
+                      onChange={(e) => {
+                        const index = Number(e.detail.value);
+                        if (index === 0) {
+                          setCampusId('');
+                        } else {
+                          setCampusId(campusOptions[index - 1]?.id || '');
+                        }
+                        setRoom('');
+                      }}
+                    >
+                      <View className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
+                        <Text className="text-lg text-foreground">
+                          {campusOptions.find((item) => item.id === campusId)?.name || '请选择校区'}
+                        </Text>
+                        <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                      </View>
+                    </Picker>
+                    <Picker
+                      mode="selector"
+                      range={roomOptions}
+                      value={roomIndex}
+                      onChange={(e) => {
+                        const index = Number(e.detail.value);
+                        const value = roomOptions[index];
+                        setRoom(value === '请选择' ? '' : value);
+                      }}
+                    >
+                      <View className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
+                        <Text className="text-lg text-foreground">{room || '请选择教室'}</Text>
+                        <Icon name="mdi-chevron-right" size="sm" color="muted" />
                       </View>
                     </Picker>
                   </View>

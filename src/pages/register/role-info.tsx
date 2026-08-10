@@ -294,7 +294,7 @@ const RegisterRoleInfo: React.FC = () => {
                   className="text-primary flex-shrink-0 mt-[2rpx]"
                 />
                 <Text className="text-[24rpx] text-muted-foreground leading-normal">
-                  校区码由校长在校区设置中生成，一个校区一个码。如暂无校区码，可点击下方"稍后绑定"跳过。
+                  校区码由校长在校区设置中生成，一个校区一个码。如暂无校区码，可点击下方“稍后绑定”跳过。
                 </Text>
               </View>
             </>
@@ -317,7 +317,7 @@ const RegisterRoleInfo: React.FC = () => {
                   className="text-accent flex-shrink-0 mt-[2rpx]"
                 />
                 <Text className="text-[24rpx] text-muted-foreground leading-normal">
-                  学生邀请码由教师在学员详情中生成，一个学员一个码，一次性使用。如暂无邀请码，可点击下方"稍后绑定"跳过。
+                  学生邀请码由教师在学员详情中生成，一个学员一个码，一次性使用。如暂无邀请码，可点击下方“稍后绑定”跳过。
                 </Text>
               </View>
             </>

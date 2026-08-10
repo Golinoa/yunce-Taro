@@ -996,6 +996,7 @@ export function useStatistics() {
     month,
     startDate,
     endDate,
+    remoteExpenseRatios,
   ]);
 
   // ========== 新增：趋势分析数据 ==========

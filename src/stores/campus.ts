@@ -31,10 +31,17 @@ import { logError } from '@/utils/logger';
 const ORG_NAME_KEY = 'yunce_org_name';
 const DEFAULT_ORG_NAME = '松果排课';
 
+/** 当前选中校区本地存储键 */
+const CURRENT_CAMPUS_ID_KEY = 'yunce_current_campus_id';
+
 interface CampusState {
   // 数据
   orgName: string;
   campuses: CampusUIModel[];
+  /** 当前用户有权限访问的校区ID列表 */
+  allowedCampusIds: string[];
+  /** 当前选中的校区ID */
+  currentCampusId: string;
   salaryModels: SalaryModel[];
   payDaySettings: PayDaySettings;
   holidays: Holiday[];
@@ -85,6 +92,11 @@ interface CampusState {
   // 机构名称
   setOrgName: (name: string) => void;
 
+  // 当前校区
+  setCurrentCampusId: (id: string) => void;
+  initCurrentCampus: (identityCampusIds?: string[]) => void;
+  setAllowedCampusIds: (ids: string[]) => void;
+
   // 全量加载
   fetchAll: () => Promise<void>;
 }
@@ -92,6 +104,8 @@ interface CampusState {
 export const useCampusStore = create<CampusState>((set) => ({
   orgName: Taro.getStorageSync(ORG_NAME_KEY) || DEFAULT_ORG_NAME,
   campuses: [],
+  allowedCampusIds: [],
+  currentCampusId: Taro.getStorageSync(CURRENT_CAMPUS_ID_KEY) || '',
   salaryModels: [],
   payDaySettings: { mode: 'fixed', fixedDay: 15 },
   holidays: [],
@@ -415,6 +429,53 @@ export const useCampusStore = create<CampusState>((set) => ({
   setOrgName: (name: string) => {
     Taro.setStorageSync(ORG_NAME_KEY, name);
     set({ orgName: name });
+  },
+
+  // ============================================
+  // 当前校区
+  // ============================================
+  setCurrentCampusId: (id: string) => {
+    if (!id) return;
+    Taro.setStorageSync(CURRENT_CAMPUS_ID_KEY, id);
+    set({ currentCampusId: id });
+  },
+
+  initCurrentCampus: (identityCampusIds) => {
+    set((state) => {
+      const allowedIds = identityCampusIds?.length ? identityCampusIds : state.allowedCampusIds;
+      const storedId = Taro.getStorageSync(CURRENT_CAMPUS_ID_KEY) as string | undefined;
+      const validStoredId = storedId && allowedIds.includes(storedId) ? storedId : undefined;
+      const firstAllowedId = allowedIds[0] || '';
+      const nextCurrentCampusId = validStoredId || firstAllowedId;
+
+      if (nextCurrentCampusId) {
+        Taro.setStorageSync(CURRENT_CAMPUS_ID_KEY, nextCurrentCampusId);
+      }
+
+      return {
+        allowedCampusIds: allowedIds,
+        currentCampusId: nextCurrentCampusId,
+      };
+    });
+  },
+
+  setAllowedCampusIds: (ids: string[]) => {
+    set((state) => {
+      const nextAllowedIds = ids;
+      const nextCurrentCampusId =
+        state.currentCampusId && nextAllowedIds.includes(state.currentCampusId)
+          ? state.currentCampusId
+          : nextAllowedIds[0] || '';
+
+      if (nextCurrentCampusId) {
+        Taro.setStorageSync(CURRENT_CAMPUS_ID_KEY, nextCurrentCampusId);
+      }
+
+      return {
+        allowedCampusIds: nextAllowedIds,
+        currentCampusId: nextCurrentCampusId,
+      };
+    });
   },
 
   fetchAll: async () => {

@@ -141,7 +141,7 @@ const Students: React.FC = () => {
 
   // 当前 tab 的缓存 key
   const leadCacheKey = `${teacherId}::${activeFilterTab}`;
-  const leadList = leadCache[leadCacheKey] || [];
+  const leadList = useMemo(() => leadCache[leadCacheKey] || [], [leadCache, leadCacheKey]);
   const isLeadLoading = leadLoading[leadCacheKey];
 
   // 加载线索数据
@@ -306,7 +306,7 @@ const Students: React.FC = () => {
     }
 
     return result;
-  }, [students, debouncedKeyword, memberSubTab, sortBy]);
+  }, [students, debouncedKeyword, memberSubTab, sortBy, remoteResults, useRemoteSearch]);
 
   // ====== 线索 Tab：搜索过滤 ======
   const filteredLeads = useMemo(() => {

@@ -53,7 +53,7 @@ export interface QuickEntry {
 export interface TodoItemData {
   id: string;
   title: string;
-  type: 'alert' | 'lesson' | 'recharge' | 'meeting';
+  type: 'alert' | 'lesson' | 'recharge' | 'meeting' | 'salary';
   time: string;
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
@@ -379,21 +379,28 @@ export async function mockGetStudents(teacherId: string, limit?: number) {
 }
 
 /** 获取今日排课 */
-export async function mockGetTodaySchedules(teacherId: string) {
+export async function mockGetTodaySchedules(teacherId: string, campusId?: string) {
   await delay();
   const todayWeekday = new Date().getDay() || 7; // 周日是0，转为7
-  return filterSchedulesByActor(teacherId).filter(
+  let schedules = filterSchedulesByActor(teacherId).filter(
     (schedule) => schedule.dayOfWeek === todayWeekday && schedule.status === 'scheduled',
   );
+  if (campusId) {
+    schedules = schedules.filter((schedule) => schedule.campusId === campusId);
+  }
+  return schedules;
 }
 
 /** 获取最近消课记录 */
-export async function mockGetRecentRecords(teacherId: string, limit = 5) {
+export async function mockGetRecentRecords(teacherId: string, limit = 5, campusId?: string) {
   await delay();
-  return filterLessonRecordsByActor(teacherId)
+  let records = filterLessonRecordsByActor(teacherId)
     .filter((r) => r.status === 'checked')
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, limit);
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  if (campusId) {
+    records = records.filter((record) => record.campusId === campusId);
+  }
+  return records.slice(0, limit);
 }
 
 /** 获取学生的课时套餐 */
@@ -416,18 +423,27 @@ export async function mockGetUnreadCount(_userId: string) {
 }
 
 /** 获取今日已消课数 */
-export async function mockGetTodayRecordCount(teacherId: string) {
+export async function mockGetTodayRecordCount(teacherId: string, campusId?: string) {
   await delay();
-  const visibleRecordIds = new Set(
-    filterLessonRecordsByActor(teacherId).map((record) => record.id),
-  );
+  let records = filterLessonRecordsByActor(teacherId);
+  if (campusId) {
+    records = records.filter((record) => record.campusId === campusId);
+  }
+  const visibleRecordIds = new Set(records.map((record) => record.id));
   return todayLessons.filter((record) => visibleRecordIds.has(record.id)).length;
 }
 
 /** 按时段获取统计数据 */
-export async function mockGetStatsByPeriod(teacherId: string, period: StatsPeriod) {
+export async function mockGetStatsByPeriod(
+  teacherId: string,
+  period: StatsPeriod,
+  campusId?: string,
+) {
   await delay();
-  const visibleRecords = filterLessonRecordsByActor(teacherId);
+  let visibleRecords = filterLessonRecordsByActor(teacherId);
+  if (campusId) {
+    visibleRecords = visibleRecords.filter((record) => record.campusId === campusId);
+  }
   const filteredRecords = visibleRecords.filter((record) => {
     const date = new Date(record.date);
     if (period === 'today') {
@@ -446,10 +462,17 @@ export async function mockGetStatsByPeriod(teacherId: string, period: StatsPerio
 }
 
 /** 获取待办事项列表 */
-export async function mockGetTodoItems(teacherId: string): Promise<TodoItemData[]> {
+export async function mockGetTodoItems(
+  teacherId: string,
+  campusId?: string,
+): Promise<TodoItemData[]> {
   await delay();
-  const students = filterStudentsByActor(teacherId);
-  const classes = filterClassesByActor(teacherId);
+  let students = filterStudentsByActor(teacherId);
+  let classes = filterClassesByActor(teacherId);
+  if (campusId) {
+    students = students.filter((student) => student.campusId === campusId);
+    classes = classes.filter((cls) => cls.campusId === campusId);
+  }
   const scope = getActorScope(teacherId);
   const lowHoursStudent = [...students]
     .sort((a, b) => a.remainingHours - b.remainingHours)
@@ -457,6 +480,38 @@ export async function mockGetTodoItems(teacherId: string): Promise<TodoItemData[
   const nextClass = [...classes].sort((a, b) => a.startTime.localeCompare(b.startTime))[0];
 
   return [
+    // 发薪日提醒：提前 pushDaysBefore 天提醒（使用真实日期，与 mock 时间基准无关）
+    (() => {
+      const payDay = 15; // mock 默认发薪日
+      const pushDaysBefore = 1; // mock 默认提前1天
+      const realNow = new Date();
+      const realMonth = realNow.getMonth() + 1;
+      const realDay = realNow.getDate();
+      const remindDay = payDay - pushDaysBefore;
+      // 当月提醒（发薪日前 pushDaysBefore 天）
+      if (realDay >= remindDay && realDay < payDay) {
+        return {
+          id: 'todo-salary-remind',
+          title: `${realMonth}月工资即将发放`,
+          type: 'salary' as const,
+          time: `${payDay}日`,
+          priority: 'high' as const,
+          completed: false,
+        };
+      }
+      // 发薪日当天
+      if (realDay === payDay) {
+        return {
+          id: 'todo-salary-today',
+          title: `今日发放${realMonth}月工资`,
+          type: 'salary' as const,
+          time: '今天',
+          priority: 'high' as const,
+          completed: false,
+        };
+      }
+      return null;
+    })(),
     nextClass
       ? {
           id: `todo-lesson-${nextClass.id}`,
@@ -489,9 +544,16 @@ export async function mockGetTodoItems(teacherId: string): Promise<TodoItemData[
 }
 
 /** 获取最近消课记录 */
-export async function mockGetRecentGroups(teacherId: string): Promise<RecentGroupData[]> {
+export async function mockGetRecentGroups(
+  teacherId: string,
+  campusId?: string,
+): Promise<RecentGroupData[]> {
   await delay();
-  const visibleClassIds = new Set(filterClassesByActor(teacherId).map((cls) => cls.id));
+  let visibleClasses = filterClassesByActor(teacherId);
+  if (campusId) {
+    visibleClasses = visibleClasses.filter((cls) => cls.campusId === campusId);
+  }
+  const visibleClassIds = new Set(visibleClasses.map((cls) => cls.id));
   const groups = CLASSES.filter((cls) => visibleClassIds.has(cls.id))
     .map((cls) => {
       const recentChecked = LESSON_RECORDS.filter(

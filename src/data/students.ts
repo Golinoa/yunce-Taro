@@ -563,14 +563,22 @@ export async function mockSendNotification(
 // ============================================
 // Service 层需要的兼容接口
 // ============================================
-export async function mockGetStudentsByTeacher(teacherId: string) {
+export async function mockGetStudentsByTeacher(teacherId: string, campusId?: string) {
   await delay();
-  return filterStudentsByActor(teacherId);
+  let students = filterStudentsByActor(teacherId);
+  if (campusId) {
+    students = students.filter((student) => student.campusId === campusId);
+  }
+  return students;
 }
 
-export async function mockSearchStudents(teacherId: string, query: string) {
+export async function mockSearchStudents(teacherId: string, query: string, campusId?: string) {
   await delay();
-  return filterStudentsByActor(teacherId).filter(
+  let students = filterStudentsByActor(teacherId);
+  if (campusId) {
+    students = students.filter((student) => student.campusId === campusId);
+  }
+  return students.filter(
     (student) => student.name.includes(query) || student.phone.includes(query),
   );
 }
@@ -764,32 +772,46 @@ export async function mockGetRecordsByStudent(studentId: string, limit?: number)
   return records;
 }
 
-export async function mockGetLessonRecordsByTeacher(teacherId: string) {
+export async function mockGetLessonRecordsByTeacher(teacherId: string, campusId?: string) {
   await delay();
-  return filterLessonRecordsByActor(teacherId);
+  let records = filterLessonRecordsByActor(teacherId);
+  if (campusId) {
+    records = records.filter((record) => record.campusId === campusId);
+  }
+  return records;
 }
 
 export async function mockGetLessonRecordsByTeacherAndMonth(
   teacherId: string,
   year: number,
   month: number,
+  campusId?: string,
 ) {
   await delay();
-  return filterLessonRecordsByActor(teacherId).filter((r) => {
+  let records = filterLessonRecordsByActor(teacherId).filter((r) => {
     const d = new Date(r.date);
     return d.getFullYear() === year && d.getMonth() === month - 1;
   });
+  if (campusId) {
+    records = records.filter((record) => record.campusId === campusId);
+  }
+  return records;
 }
 
 export async function mockGetLessonRecordsByTeacherAndRange(
   teacherId: string,
   startDate: string,
   endDate: string,
+  campusId?: string,
 ) {
   await delay();
-  return filterLessonRecordsByActor(teacherId).filter(
+  let records = filterLessonRecordsByActor(teacherId).filter(
     (record) => record.date >= startDate && record.date <= endDate,
   );
+  if (campusId) {
+    records = records.filter((record) => record.campusId === campusId);
+  }
+  return records;
 }
 
 export async function mockGetLessonRecordsByStudent(studentId: string) {
@@ -873,9 +895,13 @@ export async function mockUpdateLeaveRequestStatus(_leaveId: string, _status: Le
   return true;
 }
 
-export async function mockGetClassesByTeacher(teacherId: string) {
+export async function mockGetClassesByTeacher(teacherId: string, campusId?: string) {
   await delay();
-  return filterClassesByActor(teacherId);
+  let classes = filterClassesByActor(teacherId);
+  if (campusId) {
+    classes = classes.filter((cls) => cls.campusId === campusId);
+  }
+  return classes;
 }
 
 export async function mockGetStudentsByClass(classId: string) {
@@ -928,9 +954,13 @@ export async function mockEndClass(_classId: string) {
   return true;
 }
 
-export async function mockGetSchedulesByTeacher(teacherId: string) {
+export async function mockGetSchedulesByTeacher(teacherId: string, campusId?: string) {
   await delay();
-  return filterSchedulesByActor(teacherId);
+  let schedules = filterSchedulesByActor(teacherId);
+  if (campusId) {
+    schedules = schedules.filter((schedule) => schedule.campusId === campusId);
+  }
+  return schedules;
 }
 
 export async function mockGetScheduleById(scheduleId: string) {

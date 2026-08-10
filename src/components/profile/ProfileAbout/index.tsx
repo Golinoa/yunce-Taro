@@ -8,21 +8,20 @@ import cn from 'classnames';
 import React from 'react';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
+import { APP_VERSION } from '@/constants/version';
 
 export interface ProfileAboutProps {
   /** 点击跳转关于页 */
   onClick?: () => void;
-  /** 版本号 */
+  /** 版本号，默认读取 package.json */
   version?: string;
   /** 额外类名 */
   className?: string;
 }
 
-const DEFAULT_VERSION = '2.6.7';
-
 const ProfileAbout: React.FC<ProfileAboutProps> = ({
   onClick,
-  version = DEFAULT_VERSION,
+  version = APP_VERSION,
   className,
 }) => {
   return (

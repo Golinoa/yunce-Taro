@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { classService } from '@/services';
 import { teacherService } from '@/services/teacher';
 import { useStudentStore, useClassStore, usePackageTemplateStore } from '@/stores';
+import { useCampusStore } from '@/stores/campus';
 import type { Class, ClassColor, ClassIcon, ClassType, TeachMode } from '@/types/class';
 import type { CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
@@ -67,6 +68,7 @@ export const PACKAGE_TYPE_LABELS: Record<string, string> = {
 export function useClasses() {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const fetchClassesByTeacher = useClassStore((state) => state.fetchByTeacher);
   const invalidateClasses = useClassStore((state) => state.invalidate);
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
@@ -138,7 +140,7 @@ export function useClasses() {
     setLoading(true);
     setLoadError('');
     try {
-      const list = await fetchClassesByTeacher(currentUserId);
+      const list = await fetchClassesByTeacher(currentUserId, currentCampusId);
       setClasses(list);
     } catch (err) {
       logError('load classes', err);
@@ -151,17 +153,24 @@ export function useClasses() {
         msg: '[DEBUG] classes list end',
         data: {
           currentUserId,
+          currentCampusId,
           durationMs: Date.now() - loadClassesStartAtRef.current,
         },
       });
       // #endregion
       setLoading(false);
     }
-  }, [profile, currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile, currentUserId, currentCampusId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadClasses();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 当前校区变化时重新加载班级列表
+  useEffect(() => {
+    if (!currentCampusId) return;
+    loadClasses();
+  }, [currentCampusId, loadClasses]);
 
   // 页面显示时刷新（非首次加载）
   const hasLoaded = useRef(false);
@@ -184,7 +193,7 @@ export function useClasses() {
       data: { currentUserId },
     });
     // #endregion
-    const studentsPromise = fetchStudentsByTeacher(currentUserId)
+    const studentsPromise = fetchStudentsByTeacher(currentUserId, currentCampusId)
       .then((list) => setAllStudents(list))
       .catch((err) => {
         logError('load class students', err);
@@ -195,7 +204,7 @@ export function useClasses() {
         logError('load class package templates', err);
       });
     const teachersPromise = teacherService
-      .getActiveList()
+      .getActiveList(currentCampusId)
       .then(setTeacherOptions)
       .catch((err) => {
         logError('load class teachers', err);
@@ -213,7 +222,13 @@ export function useClasses() {
       });
     });
     // #endregion
-  }, [profile, currentUserId, fetchPackageTemplatesByTeacher, fetchStudentsByTeacher]);
+  }, [
+    profile,
+    currentUserId,
+    currentCampusId,
+    fetchPackageTemplatesByTeacher,
+    fetchStudentsByTeacher,
+  ]);
 
   // 筛选后的班级列表
   const filteredClasses = useMemo(() => {
@@ -427,6 +442,7 @@ export function useClasses() {
         icon,
         used_lessons: 0,
         student_count: selectedStudentIds.length,
+        campus_id: currentCampusId,
         ...(classType === 'limited' && selectedPkg
           ? {
               total_lessons: selectedPkg.lesson_count,
@@ -464,6 +480,7 @@ export function useClasses() {
     color,
     icon,
     currentUserId,
+    currentCampusId,
     submitBlockedReason,
     saving,
     closeCreateSheet,

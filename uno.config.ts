@@ -45,6 +45,10 @@ export default defineConfig({
       warning: 'hsl(var(--warning))',
       error: 'hsl(var(--error))',
       info: 'hsl(var(--info))',
+      // 薄荷绿（课程/消课详情头部卡片）
+      mint: 'hsl(var(--mint))',
+      'mint-foreground': 'hsl(var(--mint-foreground))',
+      'mint-border': 'hsl(var(--mint-border))',
       // 花瓣五色（对齐设计稿 petal 配色）
       'petal-blue': 'hsl(var(--petal-blue))',
       'petal-purple': 'hsl(var(--petal-purple))',
@@ -97,16 +101,20 @@ export default defineConfig({
           '{0%, 100% { transform: scale(1) } 50% { transform: scale(1.12) }}',
         'radar-ring':
           '{0% { transform: scale(1); opacity: 0 } 20% { opacity: 0.45 } 100% { transform: scale(2.4); opacity: 0 }}',
+        'popover-in':
+          '{0% { opacity: 0; transform: translateY(-8rpx) scale(0.96) } 100% { opacity: 1; transform: translateY(0) scale(1) }}',
       },
       durations: {
         float: '3s',
         'badge-scale': '2s',
         'radar-ring': '2s',
+        'popover-in': '200ms',
       },
       timingFns: {
         float: 'ease-in-out',
         'badge-scale': 'ease-in-out',
         'radar-ring': 'ease-out',
+        'popover-in': 'ease-out',
       },
       counts: {
         float: 'infinite',
@@ -122,6 +130,20 @@ export default defineConfig({
       {
         background:
           'linear-gradient(135deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 50%, hsl(var(--primary-dark)) 100%)',
+      },
+    ],
+    [
+      'bg-gradient-primary-soft',
+      {
+        background:
+          'linear-gradient(135deg, hsl(var(--primary-glow) / 0.82) 0%, hsl(var(--primary) / 0.78) 50%, hsl(var(--primary-dark) / 0.85) 100%)',
+      },
+    ],
+    [
+      'bg-gradient-diffuse',
+      {
+        background:
+          'radial-gradient(ellipse 170% 150% at 24% -16%, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 40%, hsl(var(--primary-dark)) 88%)',
       },
     ],
     [
@@ -187,6 +209,18 @@ export default defineConfig({
     [
       'bg-finance-dark',
       { background: 'linear-gradient(160deg, #2a2a2a 0%, #1a1a1a 50%, #0f0f0f 100%)' },
+    ],
+
+    // ===== 卡种管理会员卡橙色卡片背景 =====
+    [
+      'bg-card-orange',
+      { background: 'linear-gradient(135deg, #FCA45C 0%, #FF8A2A 50%, #F57C00 100%)' },
+    ],
+
+    // ===== 会员卡灰色背景（暂停卡） =====
+    [
+      'bg-card-gray',
+      { background: 'linear-gradient(135deg, #9CA3AF 0%, #6B7280 50%, #4B5563 100%)' },
     ],
 
     // ===== 个人中心橙色主题（对齐参考设计稿，高亮橙渐变） =====
@@ -267,6 +301,8 @@ export default defineConfig({
     ['shadow-soft', { 'box-shadow': '0 8rpx 40rpx -8rpx hsl(var(--primary) / 0.08)' }],
     ['shadow-card', { 'box-shadow': '0 2rpx 12rpx hsl(var(--primary) / 0.06)' }],
     ['shadow-float', { 'box-shadow': '0 4rpx 16rpx hsl(var(--primary) / 0.08)' }],
+    ['shadow-top', { 'box-shadow': '0 -4rpx 20rpx hsl(var(--foreground) / 0.06)' }],
+    ['shadow-top-soft', { 'box-shadow': '0 -4rpx 20rpx hsl(var(--foreground) / 0.08)' }],
 
     // ===== 动画 =====
     ['animate-float', { animation: 'float 3s ease-in-out infinite' }],
@@ -475,6 +511,17 @@ export default defineConfig({
     // ===== z-index =====
     ['z-100', { 'z-index': '100' }],
     ['z-200', { 'z-index': '200' }],
+
+    // ===== 阴影 =====
+    ['shadow-popup', { 'box-shadow': '0 8rpx 32rpx rgba(0, 0, 0, 0.12)' }],
+
+    // ===== 弹窗入场动画 =====
+    [
+      'popover-in',
+      {
+        animation: 'popover-in 200ms ease-out forwards',
+      },
+    ],
 
     // ===== 边框 =====
     ['border-t', { 'border-top-width': '2rpx', 'border-top-style': 'solid' }],

@@ -1,222 +1,194 @@
 /**
- * 校区设置首页 pages/campus-settings/index
+ * 校区设置页 package-settings/pages/campus-settings/index
  *
- * 顶部主校区卡片（含统计、地址、电话、运营数据入口）
- * + 通知管理分组 + 校区管理分组
- * 使用原生导航栏，不覆盖小程序头部
- *
- * 对齐设计稿 campus-settings.html：
- * - 卡片：margin:16px + border:1px + 圆角20px + padding:22px
- * - icon：48px/圆角14px/字号24px
- * - 统计行：grid 3列 / 值22px 800 / 标签11px / 上下排列
- * - 地址/电话：12px + svg icon
- * - 运营数据：左对齐 + chart icon + 右箭头
+ * 以干净表单管理当前校区信息。
+ * 支持编辑：门店名称、营业执照名称、联系人、联系方式、所在地区、
+ * 详细地址、营业时间、主营业态、门店介绍、场馆图片。
  */
-import { View, Text } from '@tarojs/components';
+import { View, Text, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
-import BottomSheet from '@/components/BottomSheet';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import BusinessCategoryPicker from '@/components/business/BusinessCategoryPicker';
 import Empty from '@/components/Empty';
+import FormCell from '@/components/FormCell';
 import FormInput from '@/components/FormInput';
-import Icon from '@/components/Icon';
+import ImageUploader from '@/components/ImageUploader';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import PageIntroSheet from '@/components/PageIntroSheet';
+import TimeRangePicker from '@/components/TimeRangePicker';
+import {
+  formatBusinessCategories,
+  type SelectedBusinessCategory,
+} from '@/constants/business-categories';
+import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCampusStore } from '@/stores/campus';
-import type { CampusUIModel } from '@/types/campus';
+import type { CampusType, PartnerMode } from '@/types/campus';
+import { logError } from '@/utils/logger';
 
-/** 设置项配置 */
-interface SettingItem {
-  icon: string;
-  iconBg: string;
-  iconColor: string;
-  title: string;
-  desc: string;
-  route: string;
+/** 校区类型展示文本 */
+const CAMPUS_TYPE_TEXT: Record<CampusType, string> = {
+  self: '自营校区',
+  partner: '合作机构',
+};
+
+interface FormState {
+  name: string;
+  logo?: string;
+  licenseName: string;
+  contactName: string;
+  type: CampusType;
+  isMain: boolean;
+  partnerMode?: PartnerMode;
+  phone: string;
+  region: string;
+  address: string;
+  businessHours: string;
+  intro: string;
+  businessCategories: SelectedBusinessCategory[];
+  venueImages: string[];
 }
 
-/** 通知管理组 */
-const NOTIFY_ITEMS: SettingItem[] = [
-  {
-    icon: 'mdi-bell-outline',
-    iconBg: 'bg-purple-bg',
-    iconColor: 'purple',
-    title: '通知设置',
-    desc: '学员与教师消息推送',
-    route: '/package-settings/pages/campus-settings/notify',
-  },
-];
-
-/** 校区管理组 */
-const CAMPUS_ITEMS: SettingItem[] = [
-  {
-    icon: 'mdi-office-building-cog',
-    iconBg: 'bg-success-bg',
-    iconColor: 'success',
-    title: '机构名称',
-    desc: '设置机构名称',
-    route: '__org_name__',
-  },
-  {
-    icon: 'mdi-office-building',
-    iconBg: 'bg-primary-bg',
-    iconColor: 'primary',
-    title: '分校区管理',
-    desc: '管理自营校区与合作机构',
-    route: '/package-settings/pages/campus-settings/sub-campus',
-  },
-  {
-    icon: 'mdi-cash',
-    iconBg: 'bg-info-bg',
-    iconColor: 'info',
-    title: '发薪日设置',
-    desc: '每月15日发薪',
-    route: '/package-settings/pages/campus-settings/pay-day',
-  },
-  {
-    icon: 'mdi-book-open-variant',
-    iconBg: 'bg-accent-bg',
-    iconColor: 'accent',
-    title: '校区科目',
-    desc: '钢琴、舞蹈、美术等',
-    route: '/package-settings/pages/campus-settings/subjects',
-  },
-  {
-    icon: 'mdi-calendar-clock',
-    iconBg: 'bg-amber-10',
-    iconColor: 'amber',
-    title: '节假日设置',
-    desc: '法定节假日与自定义休息日',
-    route: '/package-settings/pages/campus-settings/holidays',
-  },
-];
-
-/** 格式化营收金额 */
-const formatRevenue = (revenue: number, unit?: string): { val: string; unit: string } => {
-  if (unit) return { val: String(revenue), unit };
-  if (revenue >= 10000) {
-    const wan = revenue / 10000;
-    return { val: wan >= 10 ? wan.toFixed(0) : wan.toFixed(1), unit: '万' };
-  }
-  return { val: String(revenue), unit: '' };
+const EMPTY_FORM: FormState = {
+  name: '',
+  logo: undefined,
+  licenseName: '',
+  contactName: '',
+  type: 'self',
+  isMain: false,
+  phone: '',
+  region: '',
+  address: '',
+  businessHours: '',
+  intro: '',
+  businessCategories: [],
+  venueImages: [],
 };
 
 const CampusSettings: React.FC = () => {
-  const { campuses, orgName, setOrgName, fetchCampuses, loading, error } = useCampusStore();
-  const [showCampusPicker, setShowCampusPicker] = useState(false);
-  const [selectedCampusId, setSelectedCampusId] = useState('');
-  const [showOrgNameSheet, setShowOrgNameSheet] = useState(false);
-  const [editOrgName, setEditOrgName] = useState('');
-  const [savingOrgName, setSavingOrgName] = useState(false);
+  const { campuses, currentCampusId, fetchCampuses, loading, error } = useCampusStore();
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [isEditingCategory, setIsEditingCategory] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
+  /** 标记表单是否已初始化，避免 useEffect 反复覆盖用户输入 */
+  const formInitializedRef = React.useRef(false);
 
-  // 页面显示时加载数据
+  const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.campus;
+
+  const currentCampus = useMemo(
+    () =>
+      campuses.find((c) => c.id === currentCampusId) ||
+      campuses.find((c) => c.isMain) ||
+      campuses[0] ||
+      null,
+    [campuses, currentCampusId],
+  );
+
+  // 首次加载校区数据后回填表单（仅初始化一次，避免覆盖用户编辑）
+  useEffect(() => {
+    if (currentCampus && !formInitializedRef.current) {
+      formInitializedRef.current = true;
+      setForm({
+        name: currentCampus.name,
+        logo: currentCampus.logo,
+        licenseName: currentCampus.licenseName || '',
+        contactName: currentCampus.contactName || '',
+        type: currentCampus.type,
+        isMain: currentCampus.isMain,
+        partnerMode: currentCampus.partnerMode,
+        phone: currentCampus.phone,
+        region: currentCampus.region || '',
+        address: currentCampus.address,
+        businessHours: currentCampus.businessHours || '',
+        intro: currentCampus.intro || '',
+        businessCategories: currentCampus.businessCategories || [],
+        venueImages: currentCampus.venueImages || [],
+      });
+    }
+  }, [currentCampus]);
+
   const reload = useCallback(async () => {
     await fetchCampuses();
   }, [fetchCampuses]);
 
   Taro.useDidShow(() => {
     void reload();
+    try {
+      const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
+      setShowIntro(hidden !== true);
+    } catch {
+      setShowIntro(true);
+    }
   });
 
-  // 当前选中的校区（默认主校区）
-  const currentCampus = useMemo(
-    () =>
-      campuses.find((c) => c.id === selectedCampusId) ||
-      campuses.find((c) => c.isMain) ||
-      campuses[0] ||
-      null,
-    [campuses, selectedCampusId],
-  );
-
-  // 营收格式化
-  const revenueDisplay = useMemo(() => {
-    if (!currentCampus) return { val: '0', unit: '' };
-    return formatRevenue(currentCampus.stats.revenue, currentCampus.stats.revenueUnit);
-  }, [currentCampus]);
-
-  const handleSelectCampus = useCallback((id: string) => {
-    setSelectedCampusId(id);
-    setShowCampusPicker(false);
+  /** 更新单个字段 */
+  const updateField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const handleNavigate = useCallback(
-    (route: string) => {
-      if (route === '__org_name__') {
-        setEditOrgName(orgName);
-        setShowOrgNameSheet(true);
-        return;
-      }
-      if (!route) {
-        Taro.showToast({ title: '页面入口未配置', icon: 'none' });
-        return;
-      }
-      Taro.navigateTo({ url: route });
-    },
-    [orgName],
-  );
+  /** 表单是否有变更 */
+  const hasChanged = useMemo(() => {
+    if (!currentCampus) return false;
+    const origin: FormState = {
+      name: currentCampus.name,
+      logo: currentCampus.logo,
+      licenseName: currentCampus.licenseName || '',
+      contactName: currentCampus.contactName || '',
+      type: currentCampus.type,
+      isMain: currentCampus.isMain,
+      partnerMode: currentCampus.partnerMode,
+      phone: currentCampus.phone,
+      region: currentCampus.region || '',
+      address: currentCampus.address,
+      businessHours: currentCampus.businessHours || '',
+      intro: currentCampus.intro || '',
+      businessCategories: currentCampus.businessCategories || [],
+      venueImages: currentCampus.venueImages || [],
+    };
+    return JSON.stringify(form) !== JSON.stringify(origin);
+  }, [form, currentCampus]);
 
-  const handleCampusData = useCallback(() => {
-    if (!currentCampus) {
-      Taro.showToast({ title: '未找到校区信息', icon: 'none' });
-      return;
-    }
-    Taro.navigateTo({
-      url: `/package-settings/pages/campus-settings/campus-data/index?id=${currentCampus.id}&name=${encodeURIComponent(currentCampus.name)}`,
-    });
-  }, [currentCampus]);
-
-  const handleSaveOrgName = useCallback(() => {
-    if (savingOrgName) return;
-    if (!editOrgName.trim()) {
-      Taro.showToast({ title: '请输入机构名称', icon: 'none' });
+  const handleSave = useCallback(async () => {
+    if (!currentCampus || !hasChanged) return;
+    if (!form.name.trim()) {
+      Taro.showToast({ title: '请输入门店名称', icon: 'none' });
       return;
     }
 
-    setSavingOrgName(true);
+    setSaving(true);
     try {
-      setOrgName(editOrgName.trim());
-      setShowOrgNameSheet(false);
+      await useCampusStore.getState().updateCampus(currentCampus.id, {
+        name: form.name.trim(),
+        logo: form.logo,
+        licenseName: form.licenseName.trim() || undefined,
+        contactName: form.contactName.trim() || undefined,
+        phone: form.phone.trim(),
+        region: form.region.trim() || undefined,
+        address: form.address.trim(),
+        businessHours: form.businessHours.trim() || undefined,
+        intro: form.intro.trim() || undefined,
+        businessCategories: form.businessCategories,
+        venueImages: form.venueImages,
+      });
+      await reload();
+      // 保存成功后重新初始化表单（用最新数据回填）
+      formInitializedRef.current = false;
       Taro.showToast({ title: '保存成功', icon: 'success' });
+    } catch (err) {
+      logError('CampusSettings save', err);
+      Taro.showToast({ title: '保存失败', icon: 'none' });
     } finally {
-      setSavingOrgName(false);
+      setSaving(false);
     }
-  }, [editOrgName, savingOrgName, setOrgName]);
-
-  /** 渲染设置项 — 设计稿：.card-e / border-radius:14px / padding:12px 14px / gap:10px */
-  const renderSettingItem = (item: SettingItem) => {
-    const desc = item.route === '__org_name__' ? orgName : item.desc;
-    return (
-      <View
-        key={item.title}
-        className="flex flex-row items-center bg-white rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx] press-bg"
-        onClick={() => handleNavigate(item.route)}
-      >
-        {/* 图标 — 设计稿：.icon-sm / 38px/圆角11px/svg 19px */}
-        <View
-          className={cn(
-            'w-[76rpx] h-[76rpx] rounded-[22rpx] flex items-center justify-center mr-[20rpx] flex-shrink-0',
-            item.iconBg,
-          )}
-        >
-          <Icon name={item.icon} size={38} color={item.iconColor} />
-        </View>
-        {/* 文字 — 设计稿：.info / flex:1 / .name 14px/600 / .desc 11px/mt:2px 上下排列 */}
-        <View className="flex-1 min-w-0 flex flex-col">
-          <Text className="text-[28rpx] font-semibold text-foreground">{item.title}</Text>
-          <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] truncate">{desc}</Text>
-        </View>
-        {/* 箭头 — 设计稿：.btn-arrow / 28px/圆角8px/primary-bg/svg 14px */}
-        <View className="w-[56rpx] h-[56rpx] rounded-[16rpx] bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Icon name="mdi-chevron-right" size={28} color="primary" />
-        </View>
-      </View>
-    );
-  };
+  }, [currentCampus, form, hasChanged, reload]);
 
   if (loading && !campuses.length) {
     return (
       <PageContainer safeBottom>
-        <View className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <View className="min-h-screen flex items-center justify-center">
           <Loading text="加载校区设置中..." />
         </View>
       </PageContainer>
@@ -226,7 +198,7 @@ const CampusSettings: React.FC = () => {
   if (error && !campuses.length) {
     return (
       <PageContainer safeBottom>
-        <View className="min-h-screen bg-gradient-subtle px-[32rpx] flex items-center justify-center">
+        <View className="min-h-screen px-[32rpx] flex items-center justify-center">
           <Empty
             icon="mdi-alert-circle"
             description={error}
@@ -241,7 +213,7 @@ const CampusSettings: React.FC = () => {
   if (!currentCampus) {
     return (
       <PageContainer safeBottom>
-        <View className="min-h-screen bg-gradient-subtle px-[32rpx] flex items-center justify-center">
+        <View className="min-h-screen px-[32rpx] flex items-center justify-center">
           <Empty
             icon="mdi-office-building-outline"
             description="暂无校区信息"
@@ -255,247 +227,211 @@ const CampusSettings: React.FC = () => {
 
   return (
     <PageContainer safeBottom>
-      {/* ============================================ */}
-      {/* 主校区卡片 — 对齐设计稿 .campus-card */}
-      {/* ============================================ */}
-      <View className="mx-[32rpx] mt-[32rpx] bg-white rounded-[40rpx] shadow-soft p-[44rpx] relative overflow-hidden border-[2rpx] border-border">
-        {/* 右上角三角装饰 + 小圆点 */}
-        <View
-          className="absolute top-0 right-0 w-[160rpx] h-[160rpx] rounded-br-[40rpx]"
-          style={{
-            background: 'linear-gradient(135deg, transparent 50%, hsl(168 55% 58% / 0.08) 50%)',
-          }}
-        />
-        <View className="absolute top-[24rpx] right-[24rpx] w-[16rpx] h-[16rpx] rounded-full bg-primary/40" />
+      <View className="px-[32rpx] pt-[24rpx] pb-[180rpx]">
+        {/* 基础信息表单 */}
+        <View className="bg-white rounded-[32rpx] px-[32rpx] py-[8rpx] mb-[24rpx]">
+          <FormCell
+            label="门店名称"
+            placeholder="请输入"
+            value={form.name}
+            onChange={(value) => updateField('name', value)}
+          />
+          <FormCell
+            label="营业执照名称"
+            placeholder="请输入"
+            value={form.licenseName}
+            onChange={(value) => updateField('licenseName', value)}
+          />
+          <FormCell
+            label="类型"
+            value={form.isMain ? '总店' : CAMPUS_TYPE_TEXT[form.type]}
+            editable={false}
+          />
+          <FormCell
+            label="联系人"
+            placeholder="请输入"
+            value={form.contactName}
+            onChange={(value) => updateField('contactName', value)}
+          />
+          <FormCell
+            label="联系方式"
+            placeholder="请输入"
+            value={form.phone}
+            onChange={(value) => updateField('phone', value)}
+            type="number"
+            divider={false}
+          />
+        </View>
 
-        {/* Header：校区信息 + 切换按钮 */}
-        <View className="flex flex-row items-center justify-between mb-[36rpx] relative z-1">
-          <View className="flex flex-row items-center gap-[28rpx]">
-            {/* 校区图标 — 设计稿：48px/圆角14px/字号24px */}
-            <View
-              className="w-[96rpx] h-[96rpx] rounded-[28rpx] flex items-center justify-center"
-              style={{
-                background: currentCampus.iconGradient,
-                boxShadow: '0 8rpx 24rpx hsl(168 55% 58% / 0.3)',
-              }}
+        {/* 地址信息 */}
+        <View className="bg-white rounded-[32rpx] px-[32rpx] py-[8rpx] mb-[24rpx]">
+          <Picker
+            mode="region"
+            value={form.region ? form.region.split('-') : []}
+            onChange={(e) => {
+              const [province, city, district] = e.detail.value as string[];
+              updateField('region', `${province}-${city}-${district}`);
+            }}
+          >
+            <FormCell
+              label="所在地区"
+              placeholder="请选择"
+              value={form.region}
+              editable={false}
+              showArrow
+            />
+          </Picker>
+          <FormCell
+            label="详细地址"
+            placeholder="请输入"
+            value={form.address}
+            onChange={(value) => updateField('address', value)}
+          />
+          <FormCell
+            label="营业时间"
+            placeholder="请选择"
+            value={form.businessHours}
+            editable={false}
+            showArrow
+            onClick={() => setShowTimePicker(true)}
+            divider={false}
+          />
+        </View>
+
+        {/* 主营业态 */}
+        <View className="bg-white rounded-[32rpx] p-[32rpx] mb-[24rpx]">
+          <View className="flex flex-row items-center justify-between mb-[16rpx]">
+            <Text className="text-[32rpx] font-semibold text-foreground">主营业态</Text>
+            <Text
+              className="text-[28rpx] text-primary font-medium press-bg"
+              onClick={() => setIsEditingCategory((prev) => !prev)}
             >
-              <Text className="text-[48rpx] text-white">{currentCampus.icon}</Text>
-            </View>
-            {/* 名称+类型标签 */}
-            <View>
-              <Text className="text-[36rpx] font-bold text-foreground">{currentCampus.name}</Text>
-              {/* 铭牌 — 主校区暗金色，其他主题色淡色 / 设计稿：.campus-type-tag */}
-              <View className="flex flex-row items-center gap-[8rpx] mt-[6rpx]">
-                <View
-                  className={cn(
-                    'flex flex-row items-center gap-[8rpx] px-[16rpx] py-[4rpx] rounded-[12rpx]',
-                    currentCampus.isMain ? 'bg-amber-600/15' : 'bg-primary/15',
-                  )}
-                >
-                  <View
-                    className={cn(
-                      'w-[10rpx] h-[10rpx] rounded-full',
-                      currentCampus.isMain ? 'bg-amber-600' : 'bg-primary',
-                    )}
-                  />
-                  <Text
-                    className={cn(
-                      'text-[20rpx] font-semibold',
-                      currentCampus.isMain ? 'text-amber-700' : 'text-primary',
-                    )}
-                  >
-                    {currentCampus.isMain
-                      ? '主校区'
-                      : currentCampus.type === 'self'
-                        ? '自营校区'
-                        : '合作机构'}
-                  </Text>
-                </View>
-              </View>
-            </View>
+              {isEditingCategory ? '完成' : '修改'}
+            </Text>
           </View>
-          {/* 切换校区按钮 — 设计稿：padding 9px 16px / 圆角12px */}
-          {campuses.length > 1 && (
-            <View
-              className="bg-primary px-[32rpx] py-[18rpx] rounded-[24rpx]"
-              style={{ boxShadow: '0 8rpx 24rpx hsl(168 55% 58% / 0.3)' }}
-              onClick={() => setShowCampusPicker(true)}
-            >
-              <Text className="text-[26rpx] text-white font-semibold">切换校区</Text>
-            </View>
+          {!isEditingCategory ? (
+            <Text className="text-[28rpx] text-foreground leading-relaxed">
+              {formatBusinessCategories(form.businessCategories) || '未设置'}
+            </Text>
+          ) : (
+            <BusinessCategoryPicker
+              value={form.businessCategories}
+              onChange={(value) => updateField('businessCategories', value)}
+            />
           )}
         </View>
 
-        {/* 统计行 — 设计稿：grid 3列 */}
-        <View className="grid grid-cols-3 gap-[20rpx] mb-[32rpx]">
-          <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
-            <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
-              {currentCampus.stats.students}
-            </Text>
-            <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">学生</Text>
-          </View>
-          <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
-            <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
-              {currentCampus.stats.teachers}
-            </Text>
-            <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">教师</Text>
-          </View>
-          <View className="bg-campus-card border-[2rpx] border-solid border-campus-card rounded-[24rpx] py-[28rpx] px-[20rpx] flex flex-col items-center">
-            <View className="flex flex-row items-baseline justify-center">
-              <Text className="text-[44rpx] font-extrabold text-foreground leading-tight">
-                {revenueDisplay.val}
-              </Text>
-              {revenueDisplay.unit && (
-                <Text className="text-[24rpx] text-muted-foreground ml-[4rpx]">
-                  {revenueDisplay.unit}
-                </Text>
-              )}
-            </View>
-            <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">月营收</Text>
-          </View>
-        </View>
-
-        {/* 地址 — 设计稿：12px + svg icon 16px */}
-        {currentCampus.address && (
-          <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
-            <Icon name="mdi-map-marker" size="sm" color="primary" />
-            <Text className="text-[24rpx] text-muted-foreground flex-1">
-              {currentCampus.address}
-            </Text>
-          </View>
-        )}
-
-        {/* 电话 — 设计稿：12px + phone svg icon 16px */}
-        {currentCampus.phone && (
-          <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
-            <Icon name="mdi-phone" size="sm" color="primary" />
-            <Text className="text-[24rpx] text-muted-foreground">{currentCampus.phone}</Text>
-          </View>
-        )}
-
-        {/* 运营数据入口 — 设计稿：.campus-detail-row.link / margin-top:10px / padding-top:10px / border-top / gap:6px / font-size:12px / primary */}
-        <View
-          className="flex flex-row items-center gap-[12rpx] pt-[20rpx] mt-[20rpx] border-t-d5e8e0"
-          onClick={handleCampusData}
-        >
-          <Icon name="mdi-chart-bar" size="sm" color="primary" />
-          <Text className="text-[24rpx] text-primary">查看运营数据</Text>
-          <View className="ml-auto">
-            <Icon name="mdi-chevron-right" size={28} color="muted" />
-          </View>
-        </View>
-      </View>
-
-      {/* ============================================ */}
-      {/* 通知管理分组 */}
-      {/* ============================================ */}
-      <View className="px-[32rpx] mt-[36rpx]">
-        <Text className="text-[24rpx] font-semibold text-muted-foreground uppercase tracking-wide ml-[8rpx] mb-[16rpx]">
-          通知管理
-        </Text>
-        {NOTIFY_ITEMS.map(renderSettingItem)}
-      </View>
-
-      {/* ============================================ */}
-      {/* 校区管理分组 */}
-      {/* ============================================ */}
-      <View className="px-[32rpx] mt-[36rpx]">
-        <Text className="text-[24rpx] font-semibold text-muted-foreground uppercase tracking-wide ml-[8rpx] mb-[16rpx]">
-          校区管理
-        </Text>
-        {CAMPUS_ITEMS.map(renderSettingItem)}
-      </View>
-
-      {/* ============================================ */}
-      {/* 校区选择弹窗 */}
-      {/* ============================================ */}
-      <BottomSheet
-        visible={showCampusPicker}
-        title="选择校区"
-        onClose={() => setShowCampusPicker(false)}
-      >
-        {campuses.map((campus) => (
-          <CampusPickerItem
-            key={campus.id}
-            campus={campus}
-            active={campus.id === (currentCampus?.id || '')}
-            onSelect={handleSelectCampus}
-          />
-        ))}
-      </BottomSheet>
-
-      {/* 机构名称编辑弹窗 */}
-      <BottomSheet
-        visible={showOrgNameSheet}
-        title="机构名称"
-        onClose={() => setShowOrgNameSheet(false)}
-      >
-        <View className="px-[32rpx] py-[32rpx]">
-          <FormInput
-            label="机构名称"
-            placeholder="请输入机构名称"
-            value={editOrgName}
-            onInput={(e) => setEditOrgName(e.detail.value)}
-          />
-          <Text className="text-[22rpx] text-muted-foreground mt-[16rpx] block">
-            机构名称将显示在校区名称前缀、分享卡片等位置
+        {/* 门店介绍 */}
+        <View className="bg-white rounded-[32rpx] p-[32rpx] mb-[24rpx]">
+          <Text className="text-[32rpx] font-semibold text-foreground mb-[16rpx]">
+            {form.name || currentCampus.name}的介绍
           </Text>
-          <View
-            className={`rounded-[48rpx] py-[28rpx] flex items-center justify-center mt-[32rpx] ${savingOrgName ? 'bg-muted' : 'bg-primary press-scale'}`}
-            onClick={savingOrgName ? undefined : handleSaveOrgName}
-          >
-            <Text
-              className={`text-[30rpx] font-semibold ${savingOrgName ? 'text-muted-foreground' : 'text-white'}`}
-            >
-              {savingOrgName ? '保存中...' : '保存'}
-            </Text>
+          <FormInput
+            label=""
+            placeholder="请输入门店介绍"
+            value={form.intro}
+            onInput={(e) => updateField('intro', e.detail.value)}
+            multiline
+            minHeight="200rpx"
+          />
+        </View>
+
+        {/* 门店图片：Logo + 场馆图片 */}
+        <View className="bg-white rounded-[32rpx] p-[32rpx]">
+          <View className="flex flex-row items-center justify-between mb-[8rpx]">
+            <Text className="text-[32rpx] font-semibold text-foreground">门店图片</Text>
+            <Text className="text-[24rpx] text-muted-foreground">场馆图最多 5 张</Text>
+          </View>
+          <Text className="text-[22rpx] text-muted-foreground mb-[20rpx]">
+            Logo 建议 200×200px · 场馆图建议 750×420px · 单张不超过 2M
+          </Text>
+          <View className="flex flex-row flex-wrap gap-[20rpx]">
+            <ImageUploader
+              value={form.logo}
+              placeholder="logo"
+              maxSizeMB={2}
+              onChange={(value) => updateField('logo', value)}
+            />
+            {form.venueImages.map((url, index) => (
+              <ImageUploader
+                key={`${url}-${index}`}
+                value={url}
+                placeholder="场馆图片"
+                maxSizeMB={2}
+                onChange={(value) => {
+                  const next = [...form.venueImages];
+                  if (value) {
+                    next[index] = value;
+                  } else {
+                    next.splice(index, 1);
+                  }
+                  updateField('venueImages', next);
+                }}
+              />
+            ))}
+            {form.venueImages.length < 5 && (
+              <ImageUploader
+                placeholder="场馆图片"
+                maxSizeMB={2}
+                onChange={(value) => {
+                  if (value) {
+                    updateField('venueImages', [...form.venueImages, value]);
+                  }
+                }}
+              />
+            )}
           </View>
         </View>
-      </BottomSheet>
+      </View>
+
+      {/* 营业时间选择器 */}
+      <TimeRangePicker
+        visible={showTimePicker}
+        value={form.businessHours}
+        onConfirm={(value) => {
+          updateField('businessHours', value);
+          setShowTimePicker(false);
+        }}
+        onCancel={() => setShowTimePicker(false)}
+      />
+
+      {/* 页面介绍弹窗 */}
+      <PageIntroSheet
+        visible={showIntro}
+        onClose={() => setShowIntro(false)}
+        storageKey={INTRO_STORAGE_KEY}
+        currentStep={1}
+        totalSteps={6}
+        title="完善门店信息"
+        description="会员在小程序看到的门店首页即此处配置，包含标识、场馆图、联系方式与门店二维码。"
+        bulletPoints={[
+          'Logo + 至少 1 张场馆图，首页展示更完整',
+          '下载门店二维码用于前台/海报/朋友圈',
+          '电话与地址用于会员导航咨询',
+        ]}
+      />
+
+      {/* 底部保存按钮 */}
+      <View className="fixed left-0 right-0 bottom-0 bg-white px-[32rpx] pt-[16rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] border-t-[2rpx] border-border">
+        <View
+          className={cn(
+            'rounded-[48rpx] py-[28rpx] flex items-center justify-center',
+            hasChanged && !saving ? 'bg-primary press-scale' : 'bg-muted',
+          )}
+          onClick={hasChanged && !saving ? handleSave : undefined}
+        >
+          <Text
+            className={cn(
+              'text-[30rpx] font-semibold',
+              hasChanged && !saving ? 'text-white' : 'text-muted-foreground',
+            )}
+          >
+            {saving ? '保存中...' : '保存'}
+          </Text>
+        </View>
+      </View>
     </PageContainer>
   );
 };
-
-/** 校区选择项 — 对齐设计稿：方形勾选框+彩色图标 */
-interface CampusPickerItemProps {
-  campus: CampusUIModel;
-  active: boolean;
-  onSelect: (id: string) => void;
-}
-
-const CampusPickerItem: React.FC<CampusPickerItemProps> = ({ campus, active, onSelect }) => (
-  <View
-    className={cn(
-      'flex flex-row items-center mx-4 my-2 p-[28rpx] rounded-[28rpx] border-[2rpx]',
-      active ? 'border-primary bg-primary/5' : 'border-border bg-white',
-    )}
-    onClick={() => onSelect(campus.id)}
-  >
-    {/* 彩色图标 — 设计稿：38px/圆角10px */}
-    <View
-      className="w-[76rpx] h-[76rpx] rounded-[20rpx] flex items-center justify-center mr-[28rpx]"
-      style={{ background: campus.iconGradient }}
-    >
-      <Text className="text-[36rpx]">{campus.icon}</Text>
-    </View>
-    {/* 信息 */}
-    <View className="flex-1">
-      <Text className="text-[28rpx] font-semibold text-foreground">{campus.name}</Text>
-      <Text className="text-[22rpx] text-muted-foreground mt-[4rpx]">
-        {campus.stats.students}学生 ·{' '}
-        {campus.isMain ? '主校区' : campus.type === 'self' ? '分校区' : '合作机构'}
-      </Text>
-    </View>
-    {/* 方形勾选框 — 设计稿：20px/圆角6px */}
-    <View
-      className={cn(
-        'w-[40rpx] h-[40rpx] rounded-[12rpx] flex items-center justify-center border-[3rpx]',
-        active ? 'bg-primary border-primary' : 'border-border',
-      )}
-    >
-      {active && <Icon name="mdi-check" size={28} color="white" />}
-    </View>
-  </View>
-);
 
 export default CampusSettings;

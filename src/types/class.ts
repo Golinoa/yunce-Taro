@@ -92,6 +92,8 @@ export interface Class {
   student_count: number; // 学生数量
   campus_id?: string; // 关联校区ID
   campus_name?: string; // 关联校区名称
+  /** 默认上课教室 */
+  room?: string;
   /** 科目 ID（用于匹配会员卡课程科目） */
   subject_id?: string;
 }

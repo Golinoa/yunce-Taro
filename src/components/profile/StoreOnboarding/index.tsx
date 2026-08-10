@@ -9,7 +9,7 @@
  */
 import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import Icon from '@/components/Icon';
 import type { StoreOnboardingStep } from '@/types/onboarding';
 import type { StoreOnboardingProps } from './types';
@@ -22,12 +22,6 @@ const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-email' | 'mdi-bullhorn-outl
 
 // 进度条宽度映射（6 等分，避免内联 style）
 const PROGRESS_WIDTH_CLASSES = ['w-0', 'w-1/6', 'w-2/6', 'w-3/6', 'w-4/6', 'w-5/6', 'w-full'];
-
-/** 单步闪烁持续时间（ms），与 CSS animation-duration 2s 对齐 */
-const PULSE_DURATION = 2000;
-
-/** 6 步全部闪烁一轮后停顿一会再开始 */
-const ROUND_GAP = 1000;
 
 const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
   data,
@@ -45,10 +39,7 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
   // 引导闪烁：始终只高亮「第一个未完成步骤」
   // 用户配置完成后自动推进到下一个未完成步骤
   // ============================================
-  const firstPendingIndex = useMemo(
-    () => data.steps.findIndex((s) => !s.completed),
-    [data.steps],
-  );
+  const firstPendingIndex = useMemo(() => data.steps.findIndex((s) => !s.completed), [data.steps]);
 
   const handleStepClick = useCallback(
     (step: StoreOnboardingStep) => () => {

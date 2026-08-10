@@ -193,6 +193,26 @@ const Profile: React.FC = () => {
     Taro.showToast({ title: PLACEHOLDER_TIP, icon: 'none' });
   }, []);
 
+  // 进入场地管理页
+  const handleVenueManage = useCallback(() => {
+    Taro.navigateTo({ url: '/package-settings/pages/venue-list/index' });
+  }, []);
+
+  // 进入员工管理页
+  const handleTeacherManage = useCallback(() => {
+    Taro.navigateTo({ url: '/package-teacher/pages/teacher-list/index' });
+  }, []);
+
+  // 进入课程管理页
+  const handleCourseManage = useCallback(() => {
+    Taro.navigateTo({ url: '/package-course/pages/course-management/index' });
+  }, []);
+
+  // 进入卡种管理页
+  const handleCardManage = useCallback(() => {
+    Taro.navigateTo({ url: '/package-course/pages/card-management/index' });
+  }, []);
+
   // 店铺管理 onboarding 步骤点击
   const handleStoreStepClick = useCallback(
     (step: StoreOnboardingStep) => {
@@ -256,31 +276,31 @@ const Profile: React.FC = () => {
         label: '场地管理',
         icon: 'mdi-map-marker' as const,
         color: 'accent' as const,
-        onClick: handlePlaceholder,
+        onClick: handleVenueManage,
       },
       {
         label: '员工管理',
         icon: 'mdi-account-group' as const,
         color: 'primary' as const,
-        onClick: handlePlaceholder,
+        onClick: handleTeacherManage,
       },
       {
         label: '课程管理',
         icon: 'mdi-book-open-variant' as const,
         color: 'info' as const,
-        onClick: handlePlaceholder,
+        onClick: handleCourseManage,
       },
       {
         label: '卡种管理',
         icon: 'mdi-cash' as const,
         color: 'success' as const,
-        onClick: handlePlaceholder,
+        onClick: handleCardManage,
       },
       {
         label: '薪资管理',
         icon: 'mdi-cash-multiple' as const,
         color: 'warning' as const,
-        onClick: () => handleNavigate('/package-teacher/pages/salary-detail/index'),
+        onClick: () => handleNavigate('/package-teacher/pages/salary-home/index'),
       },
       {
         label: '学员信箱',
@@ -295,7 +315,14 @@ const Profile: React.FC = () => {
         onClick: handlePlaceholder,
       },
     ],
-    [handleNavigate, handlePlaceholder],
+    [
+      handleNavigate,
+      handlePlaceholder,
+      handleVenueManage,
+      handleTeacherManage,
+      handleCourseManage,
+      handleCardManage,
+    ],
   );
 
   // 教师视图：系统管理

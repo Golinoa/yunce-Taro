@@ -12,6 +12,10 @@
  * - 按钮点击加入滑动保护期，避免右滑收起时误触按钮操作；
  * - 支持卡片互斥：传入 cardId/openCardId/onOpenChange 后，同一时间只能打开一张卡片的按钮。
  *
+ * z-index 分层（修复操作按钮无法点击的问题）：
+ * - 收起时：按钮 z-0（隐藏在内容层下方），触发条 z-20（拦截滑动手势）
+ * - 打开时：按钮 z-30（提升到最顶层，可接收点击），触发条 z-20（仅处理滑动）
+ *
  * 注意：微信小程序中 style 属性不支持 rpx 单位，
  * 因此 translateX 使用 px 值。操作按钮宽度也使用 px。
  */
@@ -211,9 +215,10 @@ const SwappableScheduleCard: React.FC<SwappableScheduleCardProps> = ({
   return (
     <View className={cn('relative overflow-hidden', radiusClassName, className)}>
       {/* 操作按钮层：绝对定位在卡片右侧，不参与正常文档流；
-          外层 overflow-hidden + 圆角保证收起时不会露出直角底色 */}
+          外层 overflow-hidden + 圆角保证收起时不会露出直角底色；
+          打开时提升 z-index 到 30，确保按钮在触发条之上可接收点击 */}
       <View
-        className="absolute right-0 top-0 z-0 flex h-full items-stretch"
+        className={cn('absolute right-0 top-0 flex h-full items-stretch', isOpen ? 'z-30' : 'z-0')}
         style={{ width: `${actionTotalWidth}px` }}
       >
         {actions.map((action, index) => (
@@ -243,7 +248,8 @@ const SwappableScheduleCard: React.FC<SwappableScheduleCardProps> = ({
 
       {/* 右侧滑动触发条：动态宽度，覆盖按钮区域；
           只在该区域内左滑/右滑控制按钮显示/隐藏，其余区域事件冒泡；
-          使用 catchMove 才能阻止原生 Swiper 切换日期（stopPropagation 对原生组件无效） */}
+          使用 catchMove 才能阻止原生 Swiper 切换日期（stopPropagation 对原生组件无效）；
+          z-20 始终在内容层之下但在收起时的按钮层之上；打开时按钮层提升到 z-30 越过触发条 */}
       <View
         className="absolute right-0 top-0 z-20 h-full"
         style={{ width: `${triggerWidth}px` }}

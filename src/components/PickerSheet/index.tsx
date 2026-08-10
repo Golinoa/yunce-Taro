@@ -87,10 +87,7 @@ const PickerSheet: React.FC<PickerSheetProps> = ({
               {cancelText}
             </Text>
             {title && <Text className="text-[34rpx] font-medium text-foreground">{title}</Text>}
-            <Text
-              className="text-[32rpx] text-schedule-attend active:opacity-70"
-              onClick={handleConfirm}
-            >
+            <Text className="text-[32rpx] text-primary active:opacity-70" onClick={handleConfirm}>
               {confirmText}
             </Text>
           </View>

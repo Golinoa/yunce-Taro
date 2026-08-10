@@ -30,6 +30,7 @@ import {
   teacherService,
   temporaryRescheduleService,
 } from '@/services';
+import { useCampusStore } from '@/stores/campus';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import { CLASS_LEVEL_LABELS } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -334,6 +335,7 @@ function isBookingSchedule(schedule: Schedule): boolean {
  */
 const SchedulePage: React.FC = () => {
   const { profile, currentRole } = useAuth();
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
 
   // 家长角色进入课表页时重定向到约课页
   React.useEffect(() => {
@@ -522,7 +524,7 @@ const SchedulePage: React.FC = () => {
           const startDate = date.startOf('month').subtract(7, 'day').format('YYYY-MM-DD');
           const endDate = date.endOf('month').add(7, 'day').format('YYYY-MM-DD');
           void lessonRecordService
-            .getByTeacherAndRange(currentUserId, startDate, endDate)
+            .getByTeacherAndRange(currentUserId, startDate, endDate, currentCampusId)
             .then(setLessonRecords)
             .catch((err) => {
               logError('SchedulePage refreshDateData records', err);
@@ -538,7 +540,7 @@ const SchedulePage: React.FC = () => {
         }
       }, 150);
     },
-    [currentUserId, loadOpenClassSlots, scheduleSubMode, viewMode],
+    [currentUserId, loadOpenClassSlots, scheduleSubMode, viewMode, currentCampusId],
   );
 
   /** 日历切换时同步刷新目标日期数据 */
@@ -569,12 +571,12 @@ const SchedulePage: React.FC = () => {
     setLoading(true);
     try {
       const [scheduleList, classList, teacherList, leadBookings] = await Promise.all([
-        scheduleService.getByTeacher(currentUserId),
-        classService.getByTeacher(currentUserId),
-        teacherService.getList(),
+        scheduleService.getByTeacher(currentUserId, currentCampusId),
+        classService.getByTeacher(currentUserId, currentCampusId),
+        teacherService.getList(currentCampusId),
         leadService.getLeadBookingsByTeacher(currentUserId, { status: 'confirmed' }),
       ]);
-      await studentService.getByTeacher(currentUserId);
+      await studentService.getByTeacher(currentUserId, currentCampusId);
       const classStudentsList = await Promise.all(
         classList.map(async (classItem) => ({
           classId: classItem.id,
@@ -604,7 +606,7 @@ const SchedulePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentCampusId]);
 
   const loadMonthRecords = useCallback(async () => {
     if (!currentUserId) {
@@ -617,13 +619,14 @@ const SchedulePage: React.FC = () => {
         currentUserId,
         startDate,
         endDate,
+        currentCampusId,
       );
       setLessonRecords(list);
     } catch (err) {
       logError('SchedulePage loadMonthRecords', err);
       Taro.showToast({ title: '课表记录加载失败', icon: 'none' });
     }
-  }, [currentUserId, selectedDate]);
+  }, [currentUserId, currentCampusId, selectedDate]);
 
   const loadTemporaryReschedules = useCallback(async () => {
     if (!currentUserId) {

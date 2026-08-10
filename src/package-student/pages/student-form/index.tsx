@@ -68,6 +68,9 @@ const StudentForm: React.FC = () => {
     selectedPackage,
     showPackagePicker,
     setShowPackagePicker,
+    campusId,
+    setCampusId,
+    campusOptions,
     remainingHours,
     loading,
     loadError,
@@ -290,6 +293,20 @@ const StudentForm: React.FC = () => {
               </View>
             </View>
           </Card>
+
+          {/* ── 2.5 所属校区卡 ── */}
+          {campusOptions.length > 0 && (
+            <Card shadow="soft" padding="lg">
+              <CardHeader title="所属校区" dotColor="accent" />
+              <View className="flex flex-col gap-[16rpx]">
+                <ChipPicker
+                  options={campusOptions.map((c) => ({ label: c.name, value: c.id }))}
+                  value={campusId}
+                  onChange={(val) => setCampusId(val as string)}
+                />
+              </View>
+            </Card>
+          )}
 
           {/* ── 3. 课时设置卡（仅新建模式） ── */}
           {!isEdit && (

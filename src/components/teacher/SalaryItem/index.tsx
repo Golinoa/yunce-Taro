@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import React from 'react';
 import Avatar from '@/components/Avatar';
 import { calcTotal } from '@/stores/teacher';
+import { SALARY_STATUS_META, normalizeSalaryStatus } from '@/types/teacher';
 import type { TeacherUIModel } from '@/types/teacher';
 
 interface SalaryItemProps {
@@ -101,7 +102,9 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
           <Text
             className={cn(
               'text-lg font-extrabold leading-tight',
-              teacher.salaryStatus === 'paid' ? 'text-success' : 'text-amber',
+              normalizeSalaryStatus(teacher.salaryStatus) === 'archived'
+                ? 'text-success'
+                : 'text-amber',
             )}
           >
             ¥{total.toLocaleString()}
@@ -142,8 +145,8 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
           查看工资单
         </View>
 
-        {/* 确认/发放/已完成 */}
-        {teacher.salaryStatus === 'pending' && (
+        {/* 确认/发放/中间态/已完成 */}
+        {normalizeSalaryStatus(teacher.salaryStatus) === 'pending' && (
           <View
             className="flex-1 py-2 rounded-xl text-center text-xs font-semibold text-white shadow-sm"
             style={{
@@ -155,7 +158,7 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
             确认
           </View>
         )}
-        {teacher.salaryStatus === 'confirmed' && (
+        {normalizeSalaryStatus(teacher.salaryStatus) === 'confirmed' && (
           <View
             className="flex-1 py-2 rounded-xl text-center text-xs font-semibold text-white shadow-sm"
             style={{
@@ -167,7 +170,12 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
             发放
           </View>
         )}
-        {teacher.salaryStatus === 'paid' && (
+        {['sending', 'teacher_confirmed'].includes(normalizeSalaryStatus(teacher.salaryStatus)) && (
+          <View className="flex-1 py-2 rounded-xl text-center text-xs font-semibold bg-muted text-muted-foreground">
+            {SALARY_STATUS_META[normalizeSalaryStatus(teacher.salaryStatus)].label}
+          </View>
+        )}
+        {normalizeSalaryStatus(teacher.salaryStatus) === 'archived' && (
           <View className="flex-1 py-2 rounded-xl text-center text-xs font-semibold bg-muted text-muted-foreground">
             已完成
           </View>
@@ -204,19 +212,18 @@ const BreakdownChip: React.FC<{
 );
 
 /** 薪资状态标签 */
-const STATUS_MAP: Record<string, { cls: string; text: string }> = {
-  pending: { cls: 'bg-amber-bg text-amber', text: '待确认' },
-  confirmed: { cls: 'bg-purple-bg text-purple', text: '已确认' },
-  paid: { cls: 'bg-success-bg text-success', text: '已发放' },
-};
-
 const SalaryStatusTag: React.FC<{ status: string }> = ({ status }) => {
-  const s = STATUS_MAP[status] || STATUS_MAP.pending;
+  const key = normalizeSalaryStatus(status);
+  const meta = SALARY_STATUS_META[key];
   return (
     <View
-      className={cn('px-2 py-[2rpx] rounded-tag text-xs font-semibold whitespace-nowrap', s.cls)}
+      className={cn(
+        'px-2 py-[2rpx] rounded-tag text-xs font-semibold whitespace-nowrap',
+        meta.bgClass,
+        meta.textClass,
+      )}
     >
-      {s.text}
+      {meta.label}
     </View>
   );
 };

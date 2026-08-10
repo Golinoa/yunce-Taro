@@ -5,6 +5,8 @@ import devConfig from './dev';
 import prodConfig from './prod';
 import UnoCSS from '@unocss/webpack';
 
+const packageJson = require('../package.json') as { version: string };
+
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
   // 当前项目处于前端高频联调阶段，默认启用 mock。
@@ -30,6 +32,7 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
       'process.env.TARO_ENABLE_LOCAL_DEBUG': JSON.stringify(
         process.env.TARO_ENABLE_LOCAL_DEBUG ?? 'false',
       ),
+      'process.env.TARO_APP_VERSION': JSON.stringify(packageJson.version),
     },
     copy: {
       patterns: [

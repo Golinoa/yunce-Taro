@@ -12,10 +12,10 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import SegmentedControl from '@/components/SegmentedControl';
 import { classService } from '@/services';
-import { campusService } from '@/services/campus';
+import { campusService, roomService } from '@/services/campus';
 import { teacherService } from '@/services/teacher';
 import { useStudentStore, useClassStore } from '@/stores';
-import type { CampusUIModel } from '@/types/campus';
+import type { CampusUIModel, Room } from '@/types/campus';
 import type { Class, ClassType } from '@/types/class';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
@@ -64,6 +64,8 @@ const ClassForm: React.FC = () => {
   const [teacherOptions, setTeacherOptions] = useState<TeacherUIModel[]>([]);
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
   const [campusId, setCampusId] = useState('');
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [room, setRoom] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [currentClass, setCurrentClass] = useState<Class | null>(null);
@@ -128,6 +130,7 @@ const ClassForm: React.FC = () => {
         setEndDate(cls.end_date || '');
         setTeachers(cls.teachers?.length ? cls.teachers : currentUserId ? [currentUserId] : []);
         setCampusId(cls.campus_id || mainCampusId);
+        setRoom(cls.room || '');
         setSelectedStudentIds(classStudents.map((student) => student.id));
         return;
       }
@@ -143,6 +146,7 @@ const ClassForm: React.FC = () => {
       setEndDate('');
       setTeachers(currentUserId ? [currentUserId] : []);
       setCampusId(mainCampusId);
+      setRoom('');
       setSelectedStudentIds([]);
     } catch (error) {
       logError('init class form', error);
@@ -155,6 +159,24 @@ const ClassForm: React.FC = () => {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // 根据选中校区加载教室列表
+  useEffect(() => {
+    const loadRooms = async () => {
+      if (!campusId) {
+        setRooms([]);
+        return;
+      }
+      try {
+        const list = await roomService.getList({ campusId });
+        setRooms(list);
+      } catch (err) {
+        logError('class-form load rooms', err);
+        setRooms([]);
+      }
+    };
+    loadRooms();
+  }, [campusId]);
 
   // 进入动画
   useEffect(() => {
@@ -325,6 +347,7 @@ const ClassForm: React.FC = () => {
         student_count: selectedStudentIds.length,
         campus_id: campusId || undefined,
         campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
+        room: room || undefined,
         ...(classType === 'limited'
           ? { total_lessons: parseInt(totalLessons), start_date: startDate, end_date: endDate }
           : {}),
@@ -377,6 +400,7 @@ const ClassForm: React.FC = () => {
     currentClass,
     campusId,
     campusOptions,
+    room,
     saving,
     invalidateClasses,
     invalidateStudents,
@@ -674,7 +698,26 @@ const ClassForm: React.FC = () => {
               <ChipPicker
                 options={campusOptions.map((c) => ({ label: c.name, value: c.id }))}
                 value={campusId}
-                onChange={(val) => setCampusId(val as string)}
+                onChange={(val) => {
+                  setCampusId(val as string);
+                  setRoom('');
+                }}
+              />
+            </View>
+          </Card>
+        )}
+
+        {/* ===== 3.6 默认教室卡片 ===== */}
+        {campusId && (
+          <Card shadow="soft" padding="lg" className="mb-6">
+            <CardHeader title="默认教室" subtitle="选填" dotColor="accent" />
+            <View className="flex flex-col gap-[16rpx]">
+              <ChipPicker
+                options={rooms
+                  .filter((item) => item.status === 'active')
+                  .map((item) => ({ label: item.name, value: item.name }))}
+                value={room}
+                onChange={(val) => setRoom(val as string)}
               />
             </View>
           </Card>

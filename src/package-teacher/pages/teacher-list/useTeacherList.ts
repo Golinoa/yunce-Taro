@@ -102,7 +102,7 @@ export function useTeacherList() {
   const filteredTeachers = useMemo(() => getFilteredTeachers(), [getFilteredTeachers]);
 
   const salaryTeachers = useMemo(
-    () => teachers.filter((t) => t.status === 'active' || t.salaryStatus !== 'paid'),
+    () => teachers.filter((t) => t.status === 'active' || t.salaryStatus !== 'archived'),
     [teachers],
   );
 
@@ -219,7 +219,7 @@ export function useTeacherList() {
 
   // ===== 事件处理 =====
   const handleTeacherClick = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-teacher/pages/teacher-detail/index?id=${id}` });
+    Taro.navigateTo({ url: `/package-teacher/pages/teacher-form/index?id=${id}` });
   }, []);
 
   const handleSalaryAction = useCallback(

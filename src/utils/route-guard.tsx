@@ -158,7 +158,7 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     } else {
       checkAuth();
     }
-  }, [checkAuth, refreshProfile]);
+  }, [checkAuth, refreshProfile, profile]);
 
   // 后续 useDidShow 仅做本地 token 检查，不再 refreshProfile
   useDidShow(() => {

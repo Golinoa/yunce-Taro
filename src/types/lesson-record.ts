@@ -44,6 +44,10 @@ export interface LessonRecord {
   class_id?: string;
   /** 班级名称（考勤管理用） */
   class_name?: string;
+  /** 上课校区 ID */
+  campus_id?: string;
+  /** 上课教室 */
+  room?: string;
   created_at: string;
   updated_at: string;
   // 关联查询字段

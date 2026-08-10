@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import React from 'react';
 import Avatar from '@/components/Avatar';
 import { calcTotal } from '@/stores/teacher';
+import { SALARY_STATUS_META, normalizeSalaryStatus } from '@/types/teacher';
 import type { TeacherUIModel } from '@/types/teacher';
 
 interface TeacherCardProps {
@@ -11,16 +12,16 @@ interface TeacherCardProps {
   onClick?: () => void;
 }
 
-const ROLE_TAG_MAP: Record<string, string> = {
-  lead: 'bg-primary-bg text-primary',
-  assist: 'bg-info-bg text-info',
-  parttime: 'bg-amber-10 text-amber',
+const ROLE_TAG_MAP: Record<string, { bg: string; text: string }> = {
+  lead: { bg: 'bg-primary-bg', text: 'text-primary' },
+  assist: { bg: 'bg-info-bg', text: 'text-info' },
+  parttime: { bg: 'bg-amber-10', text: 'text-amber' },
 };
 
-const ACCESS_SCOPE_TAG_MAP: Record<string, string> = {
-  self: 'bg-muted text-muted-foreground',
-  subject: 'bg-purple-10 text-purple',
-  org: 'bg-destructive-10 text-destructive',
+const ACCESS_SCOPE_TAG_MAP: Record<string, { bg: string; text: string }> = {
+  self: { bg: 'bg-muted', text: 'text-muted-foreground' },
+  subject: { bg: 'bg-purple-10', text: 'text-purple' },
+  org: { bg: 'bg-destructive-10', text: 'text-destructive' },
 };
 
 const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
@@ -43,29 +44,34 @@ const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
         <View className="flex-1 min-w-0">
           <View className="flex items-center gap-2">
             <Text className="text-base font-bold text-foreground truncate">{teacher.name}</Text>
-            <View
-              className={cn(
-                'px-2 py-[2rpx] rounded-tag text-xs font-medium whitespace-nowrap',
-                ROLE_TAG_MAP[teacher.role],
-              )}
-            >
-              {teacher.roleText}
-            </View>
+            {(() => {
+              const roleTag = ROLE_TAG_MAP[teacher.role];
+              return (
+                <View className={cn('px-2 py-[2rpx] rounded-tag whitespace-nowrap', roleTag.bg)}>
+                  <Text className={cn('text-xs font-medium', roleTag.text)}>
+                    {teacher.roleText}
+                  </Text>
+                </View>
+              );
+            })()}
             {isResigned && (
-              <View className="px-2 py-[2rpx] rounded-tag text-xs font-medium bg-gray-100 text-gray-500 whitespace-nowrap">
-                已离职
+              <View className="px-2 py-[2rpx] rounded-tag bg-muted whitespace-nowrap">
+                <Text className="text-xs font-medium text-muted-foreground">已离职</Text>
               </View>
             )}
           </View>
           <View className="flex items-center gap-2 mt-2 flex-wrap">
-            <View
-              className={cn(
-                'px-2 py-[2rpx] rounded-tag text-xs font-medium whitespace-nowrap',
-                ACCESS_SCOPE_TAG_MAP[teacher.accessScope] || ACCESS_SCOPE_TAG_MAP.self,
-              )}
-            >
-              {teacher.accessScopeText}
-            </View>
+            {(() => {
+              const scopeTag =
+                ACCESS_SCOPE_TAG_MAP[teacher.accessScope] || ACCESS_SCOPE_TAG_MAP.self;
+              return (
+                <View className={cn('px-2 py-[2rpx] rounded-tag whitespace-nowrap', scopeTag.bg)}>
+                  <Text className={cn('text-xs font-medium', scopeTag.text)}>
+                    {teacher.accessScopeText}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
           <View className="flex items-center gap-2 mt-1">
             <Text className="text-xs text-muted-foreground">{teacher.subject}</Text>
@@ -99,7 +105,7 @@ const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
             'text-sm font-bold',
             isResigned
               ? 'text-muted-foreground'
-              : teacher.salaryStatus === 'paid'
+              : normalizeSalaryStatus(teacher.salaryStatus) === 'archived'
                 ? 'text-success'
                 : 'text-amber',
           )}
@@ -131,19 +137,12 @@ const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
 };
 
 /** 薪资状态标签 */
-const STATUS_MAP: Record<string, { cls: string; text: string }> = {
-  pending: { cls: 'bg-amber-10 text-amber', text: '待确认' },
-  confirmed: { cls: 'bg-purple-10 text-purple', text: '已确认' },
-  paid: { cls: 'bg-success-bg text-success', text: '已发放' },
-};
-
 const SalaryStatusTag: React.FC<{ status: string }> = ({ status }) => {
-  const s = STATUS_MAP[status] || STATUS_MAP.pending;
+  const key = normalizeSalaryStatus(status);
+  const meta = SALARY_STATUS_META[key];
   return (
-    <View
-      className={cn('px-2 py-[4rpx] rounded-tag text-xs font-semibold whitespace-nowrap', s.cls)}
-    >
-      {s.text}
+    <View className={cn('px-2 py-[4rpx] rounded-tag whitespace-nowrap', meta.bgClass)}>
+      <Text className={cn('text-xs font-semibold', meta.textClass)}>{meta.label}</Text>
     </View>
   );
 };

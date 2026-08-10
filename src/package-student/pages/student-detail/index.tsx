@@ -1,5 +1,7 @@
-import { View, Text, ScrollView, Swiper, SwiperItem, Button, Textarea } from '@tarojs/components';
-import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
+import { View, Text, ScrollView, Swiper, SwiperItem, Textarea } from '@tarojs/components';
+import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
@@ -8,42 +10,36 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { studentService, packageService, lessonRecordService, leaveService } from '@/services';
-import { useStudentStore } from '@/stores';
-import type { CoursePackage, PackageStatus, PackageTransaction } from '@/types/course-package';
+import { followRecordService } from '@/services/follow-record';
+import { memberCardService } from '@/services/member-card';
+import type { CoursePackage, PackageTransaction } from '@/types/course-package';
+import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest, LeaveStatus } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail, MemberCardStatus } from '@/types/member-card';
 import type { Student, StudentParent } from '@/types/student';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import { formatDateCN } from '@/utils/format';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
-type TabKey = 'records' | 'packages' | 'leaves' | 'parents';
+type TabKey = 'profile' | 'packages' | 'records' | 'follow';
 
 const STUDENT_DETAIL_TABS: { key: TabKey; label: string }[] = [
-  { key: 'records', label: '课时记录' },
-  { key: 'packages', label: '课时套餐' },
-  { key: 'leaves', label: '请假记录' },
-  { key: 'parents', label: '家长绑定' },
+  { key: 'profile', label: '资料' },
+  { key: 'packages', label: '卡包' },
+  { key: 'records', label: '出勤' },
+  { key: 'follow', label: '跟进' },
 ];
 
 const STUDENT_DETAIL_TAB_INDEX_MAP: Record<TabKey, number> = {
-  records: 0,
+  profile: 0,
   packages: 1,
-  leaves: 2,
-  parents: 3,
+  records: 2,
+  follow: 3,
 };
 
 const STUDENT_DETAIL_SWIPER_DURATION = 280;
-
-/** 支付方式映射 */
-const FEE_METHOD_MAP: Record<string, string> = {
-  wechat: '微信',
-  alipay: '支付宝',
-  cash: '现金',
-  transfer: '转账',
-  other: '其他',
-};
 
 /** 请假状态映射 */
 const LEAVE_STATUS_MAP: Record<LeaveStatus, { label: string; className: string }> = {
@@ -52,27 +48,42 @@ const LEAVE_STATUS_MAP: Record<LeaveStatus, { label: string; className: string }
   rejected: { label: '已拒绝', className: 'bg-destructive-10 text-destructive' },
 };
 
-/** 套餐状态映射 */
-const PKG_STATUS_MAP: Record<PackageStatus, { label: string; bg: string; text: string }> = {
-  active: { label: '进行中', bg: '#f0faf5', text: '#5EC8A8' },
-  completed: { label: '已完成', bg: '#f0f0f0', text: '#999' },
-  expired: { label: '已过期', bg: '#fef2f2', text: '#D94040' },
-  frozen: { label: '已冻结', bg: '#fff7ed', text: '#f59e0b' },
+/** 会员卡状态映射 */
+const MEMBER_CARD_STATUS_MAP: Record<MemberCardStatus, { label: string; color: string }> = {
+  active: { label: '使用中', color: 'text-primary' },
+  inactive: { label: '无效卡', color: 'text-muted-foreground' },
+  usedUp: { label: '无效卡', color: 'text-muted-foreground' },
+  notActivated: { label: '未开卡', color: 'text-warning' },
+  frozen: { label: '暂停卡', color: 'text-warning' },
 };
 
-/** 课包进度条渐变 */
-function getPkgProgressGradient(status: PackageStatus): string {
-  switch (status) {
-    case 'expired':
-      return 'linear-gradient(90deg, #D94040, #e87070)';
-    case 'frozen':
-      return 'linear-gradient(90deg, #f59e0b, #fbbf24)';
-    case 'completed':
-      return '#ccc';
-    default:
-      return 'linear-gradient(90deg, #5EC8A8, #7dd8bc)';
-  }
-}
+/** 会员卡高对比度背景色（用于卡包列表卡片） */
+const MEMBER_CARD_BG_MAP: Record<MemberCardStatus, string> = {
+  active: 'bg-gradient-primary',
+  notActivated: 'bg-class-info',
+  frozen: 'bg-card-gray',
+  inactive: 'bg-kpi-red',
+  usedUp: 'bg-finance-dark',
+};
+
+/** 会员卡状态蒙层（在背景上加一层，强化视觉区分） */
+const MEMBER_CARD_OVERLAY_MAP: Record<MemberCardStatus, string> = {
+  active: '',
+  notActivated: '',
+  frozen: 'bg-black/10',
+  inactive: 'bg-black/10',
+  usedUp: 'bg-black/15',
+};
+
+/** 卡包二级 Tab */
+type CardSubTabKey = 'active' | 'frozen' | 'notActivated' | 'inactive';
+
+const CARD_SUB_TABS: { key: CardSubTabKey; label: string }[] = [
+  { key: 'active', label: '使用中' },
+  { key: 'frozen', label: '暂停卡' },
+  { key: 'notActivated', label: '未开卡' },
+  { key: 'inactive', label: '无效卡' },
+];
 
 function getPackageGiftHours(pkg: CoursePackage): number {
   return Math.max(0, Math.min(pkg.gift_hours || 0, pkg.total_hours || 0));
@@ -134,8 +145,6 @@ const StudentDetail: React.FC = () => {
   const isTeacher = isStaffRole(profile?.currentContext?.role);
   const currentUserId = profile?.id || '';
 
-  const invalidateStudents = useStudentStore((state) => state.invalidate);
-
   const studentId = useMemo(() => {
     const instance = Taro.getCurrentInstance();
     return decodeURIComponent(instance?.router?.params?.id || '');
@@ -146,13 +155,16 @@ const StudentDetail: React.FC = () => {
   const [packages, setPackages] = useState<CoursePackage[]>([]);
   const [packageTransactions, setPackageTransactions] = useState<PackageTransaction[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
-  const [parents, setParents] = useState<StudentParent[] | null>(null);
+  const [memberCards, setMemberCards] = useState<MemberCardDetail[]>([]);
+  const [followRecords, setFollowRecords] = useState<FollowRecord[]>([]);
+  const [parents, setParents] = useState<StudentParent[]>([]);
+  const [cardSubTab, setCardSubTab] = useState<CardSubTabKey>('active');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('records');
+  const [activeTab, setActiveTab] = useState<TabKey>('profile');
   const [studentSwiperCurrent, setStudentSwiperCurrent] = useState(
-    STUDENT_DETAIL_TAB_INDEX_MAP.records,
+    STUDENT_DETAIL_TAB_INDEX_MAP.profile,
   );
 
   // 退费弹窗状态
@@ -161,9 +173,6 @@ const StudentDetail: React.FC = () => {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [refundSubmitting, setRefundSubmitting] = useState(false);
-
-  // 一次性邀请token，每次点击"邀请家长"时生成，分享后失效
-  const inviteTokenRef = useRef<string>('');
 
   // 状态栏高度
   const [statusBarHeight, setStatusBarHeight] = useState(44);
@@ -214,6 +223,7 @@ const StudentDetail: React.FC = () => {
       setPackages([]);
       setPackageTransactions([]);
       setLeaves([]);
+      setMemberCards([]);
       setParents([]);
       setNotFound(true);
       setLoading(false);
@@ -221,11 +231,13 @@ const StudentDetail: React.FC = () => {
     }
 
     try {
-      const [stu, recs, pkgs, lvs, pars] = await Promise.all([
+      const [stu, recs, pkgs, lvs, cards, follows, parentList] = await Promise.all([
         studentService.getById(studentId),
         lessonRecordService.getByStudent(studentId),
         packageService.getByStudent(studentId),
         leaveService.getByStudent(studentId),
+        memberCardService.getByStudent(studentId),
+        followRecordService.getByStudent(studentId),
         studentService.getParents(studentId),
       ]);
       const txns = currentUserId
@@ -238,6 +250,8 @@ const StudentDetail: React.FC = () => {
         setPackages([]);
         setPackageTransactions([]);
         setLeaves([]);
+        setMemberCards([]);
+        setFollowRecords([]);
         setParents([]);
         setNotFound(true);
         return;
@@ -248,7 +262,9 @@ const StudentDetail: React.FC = () => {
       setPackages(pkgs);
       setPackageTransactions(txns);
       setLeaves(lvs);
-      setParents(pars);
+      setMemberCards(cards);
+      setFollowRecords(follows);
+      setParents(parentList);
     } catch (error) {
       logError('StudentDetail loadData', error);
       setStudent(null);
@@ -256,6 +272,8 @@ const StudentDetail: React.FC = () => {
       setPackages([]);
       setPackageTransactions([]);
       setLeaves([]);
+      setMemberCards([]);
+      setFollowRecords([]);
       setParents([]);
       setLoadError('学员详情加载失败，请稍后重试');
     } finally {
@@ -281,16 +299,32 @@ const StudentDetail: React.FC = () => {
     () => (student?.course_packages || []).reduce((s, p) => s + (p.remaining_hours || 0), 0),
     [student],
   );
-  const totalUsedHours = useMemo(
-    () => records.reduce((s, r) => s + (r.hours_used || 0), 0),
-    [records],
-  );
-  const yearUsedHours = useMemo(() => {
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
-    return records
-      .filter((r) => r.lesson_date >= yearStart)
-      .reduce((s, r) => s + (r.hours_used || 0), 0);
-  }, [records]);
+
+  /** 会员卡课时/金额汇总 */
+  const memberCardStats = useMemo(() => {
+    let totalCount = 0;
+    let remainingCount = 0;
+    let totalAmount = 0;
+    let remainingAmount = 0;
+    memberCards.forEach((card) => {
+      if (card.cardTypeKind === 'count') {
+        totalCount += card.cardTypeCount || 0;
+        remainingCount += card.remainingCount || 0;
+      }
+      if (card.cardTypeKind === 'stored') {
+        totalAmount += card.purchasePrice || 0;
+        remainingAmount += card.remainingAmount || 0;
+      }
+    });
+    return {
+      totalCount,
+      usedCount: totalCount - remainingCount,
+      remainingCount,
+      totalAmount,
+      usedAmount: totalAmount - remainingAmount,
+      remainingAmount,
+    };
+  }, [memberCards]);
 
   const refundedAmountByPackage = useMemo(() => {
     return packageTransactions.reduce<Record<string, number>>((acc, item) => {
@@ -302,11 +336,6 @@ const StudentDetail: React.FC = () => {
       return acc;
     }, {});
   }, [packageTransactions]);
-
-  const recentPackageTransactions = useMemo(
-    () => packageTransactions.slice(0, 5),
-    [packageTransactions],
-  );
 
   const refundablePackages = useMemo(
     () =>
@@ -338,95 +367,134 @@ const StudentDetail: React.FC = () => {
     [refundedAmountByPackage, selectedRefundPackage],
   );
 
-  // 复制邀请码
-  const copyInviteCode = useCallback(() => {
-    const code = student?.invite_code;
-    if (!code) {
-      Taro.showToast({ title: '暂无邀请码', icon: 'none' });
+  /** 出勤时间线：合并上课记录与请假申请，并按月份分组 */
+  const timelineGroups = useMemo(() => {
+    const items: (
+      | { type: 'record'; id: string; date: string; data: LessonRecord }
+      | { type: 'leave'; id: string; date: string; data: LeaveRequest }
+    )[] = [
+      ...records.map((record) => ({
+        type: 'record' as const,
+        id: record.id,
+        date: record.lesson_date,
+        data: record,
+      })),
+      ...leaves.map((leave) => ({
+        type: 'leave' as const,
+        id: leave.id,
+        date: leave.original_date,
+        data: leave,
+      })),
+    ].sort((a, b) => (dayjs(a.date).isAfter(dayjs(b.date)) ? -1 : 1));
+
+    const groups: Record<string, typeof items> = {};
+    items.forEach((item) => {
+      const monthKey = dayjs(item.date).format('YYYY年M月');
+      if (!groups[monthKey]) {
+        groups[monthKey] = [];
+      }
+      groups[monthKey].push(item);
+    });
+    return groups;
+  }, [records, leaves]);
+
+  /** 月份展开/收起状态，默认仅展开第一个月份 */
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const expandedMonthsInitRef = useRef(false);
+  useEffect(() => {
+    if (expandedMonthsInitRef.current) return;
+    const monthKeys = Object.keys(timelineGroups);
+    if (monthKeys.length > 0) {
+      expandedMonthsInitRef.current = true;
+      setExpandedMonths(new Set([monthKeys[0]]));
+    }
+  }, [timelineGroups]);
+
+  const handleToggleMonth = useCallback((month: string) => {
+    setExpandedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(month)) {
+        next.delete(month);
+      } else {
+        next.add(month);
+      }
+      return next;
+    });
+  }, []);
+
+  /** 按月份统计签到/请假次数 */
+  const monthStats = useMemo(() => {
+    const stats: Record<string, { checkIn: number; leave: number }> = {};
+    Object.entries(timelineGroups).forEach(([month, items]) => {
+      let checkIn = 0;
+      let leave = 0;
+      items.forEach((item) => {
+        if (item.type === 'record') checkIn += 1;
+        else leave += 1;
+      });
+      stats[month] = { checkIn, leave };
+    });
+    return stats;
+  }, [timelineGroups]);
+
+  // 复制手机号
+  const handleCopyPhone = useCallback(() => {
+    const phone = student?.phone;
+    if (!phone) {
+      Taro.showToast({ title: '暂无手机号', icon: 'none' });
       return;
     }
     Taro.setClipboardData({
-      data: code,
-      success: () => Taro.showToast({ title: '邀请码已复制', icon: 'success' }),
-      fail: () => Taro.showToast({ title: `邀请码：${code}`, icon: 'none' }),
+      data: phone,
+      success: () => Taro.showToast({ title: '手机号已复制', icon: 'success' }),
+      fail: () => Taro.showToast({ title: `手机号：${phone}`, icon: 'none' }),
     });
-  }, [student]);
+  }, [student?.phone]);
 
-  // 生成一次性邀请token（时间戳+随机数，模拟服务端生成）
-  const generateInviteToken = useCallback(() => {
-    const token = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    inviteTokenRef.current = token;
-    return token;
-  }, []);
+  // 拨打电话
+  const handleCallPhone = useCallback(() => {
+    const phone = student?.phone;
+    if (!phone) {
+      Taro.showToast({ title: '暂无手机号', icon: 'none' });
+      return;
+    }
+    Taro.makePhoneCall({ phoneNumber: phone });
+  }, [student?.phone]);
 
-  // 邀请家长 - 触发小程序转发
+  // 发送短信
+  const handleSendMessage = useCallback(() => {
+    const phone = student?.phone;
+    if (!phone) {
+      Taro.showToast({ title: '暂无手机号', icon: 'none' });
+      return;
+    }
+    Taro.sendSms({
+      phoneNumber: phone,
+      fail: () => Taro.showToast({ title: '短信打开失败', icon: 'none' }),
+    });
+  }, [student?.phone]);
+
+  // 邀请家长绑定 - 生成一次性链接并复制到剪贴板
   const handleInviteParent = useCallback(() => {
     if (!student) return;
-    // 生成一次性token
-    generateInviteToken();
-    Taro.showToast({ title: '请选择要转发的家长', icon: 'none', duration: 1500 });
-  }, [student, generateInviteToken]);
-
-  // 注册分享回调 - 转发小程序卡片给家长
-  useShareAppMessage((_res) => {
-    if (!student) return { title: '邀请您绑定学生', path: '/pages/index/index' };
-    const token = inviteTokenRef.current;
-    // 分享后立即清空token，确保一次性使用
-    inviteTokenRef.current = '';
-    return {
-      title: `邀请您绑定学员「${student.name}」`,
-      path: `/package-student/pages/parent-bind/index?studentId=${encodeURIComponent(student.id)}&token=${encodeURIComponent(token)}`,
-      imageUrl: '', // 使用默认截图
-    };
-  });
-
-  // 删除学生（软删除 + 级联提示）
-  const handleDelete = useCallback(async () => {
-    if (!studentId) return;
-    try {
-      const deps = await studentService.getDependencies(studentId);
-      const parts: string[] = [];
-      if (deps.activePackages > 0) parts.push(`${deps.activePackages} 个进行中课包`);
-      if (deps.frozenPackages > 0) parts.push(`${deps.frozenPackages} 个冻结课包`);
-      if (deps.lessonRecords > 0) parts.push(`${deps.lessonRecords} 条消课记录`);
-      if (deps.boundParents > 0) parts.push(`${deps.boundParents} 位绑定家长`);
-      const depText = parts.length > 0 ? `该学员有 ${parts.join('、')}，` : '';
-      Taro.showModal({
-        title: '确认删除',
-        content: `${depText}删除后课包将冻结、家长绑定将解除，消课记录保留。确认删除？`,
-        confirmColor: '#ef4444',
-        success: async (res) => {
-          if (res.confirm) {
-            await studentService.remove(studentId);
-            if (profile?.id) invalidateStudents(profile.id);
-            Taro.showToast({ title: '删除成功', icon: 'success' });
-            setTimeout(() => Taro.navigateBack(), 1500);
-          }
-        },
-      });
-    } catch {
-      Taro.showToast({ title: '操作失败', icon: 'none' });
-    }
-  }, [studentId, profile, invalidateStudents]);
-
-  // 解绑家长
-  const handleUnbind = useCallback((bindingId: string) => {
-    Taro.showModal({
-      title: '解除绑定',
-      content: '确认解除该家长的绑定？解除后该家长将无法查看学生课时信息。',
-      success: async (res) => {
-        if (res.confirm) {
-          try {
-            await studentService.removeParent(bindingId);
-            setParents((prev) => prev?.filter((p) => p.id !== bindingId) ?? []);
-            Taro.showToast({ title: '解绑成功', icon: 'success' });
-          } catch {
-            Taro.showToast({ title: '解绑失败，请重试', icon: 'none' });
-          }
-        }
+    const token = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const path = `/package-student/pages/parent-bind/index?studentId=${encodeURIComponent(student.id)}&token=${encodeURIComponent(token)}`;
+    // 实际环境可替换为短链接或 H5 中转页；开发/测试阶段复制小程序路径
+    const link = `pages/index/index?redirect=${encodeURIComponent(path)}`;
+    void Taro.setClipboardData({
+      data: link,
+      success: () => {
+        Taro.showToast({
+          title: '邀请链接已复制，请发送给家长',
+          icon: 'none',
+          duration: 2500,
+        });
+      },
+      fail: () => {
+        Taro.showToast({ title: '复制失败，请重试', icon: 'none' });
       },
     });
-  }, []);
+  }, [student]);
 
   // 跳转上课记录详情
   const goToRecordDetail = useCallback((recordId: string) => {
@@ -435,29 +503,39 @@ const StudentDetail: React.FC = () => {
     });
   }, []);
 
-  // 跳转课时充值
-  const goToRecharge = useCallback(() => {
+  // 发会员卡
+  const handleIssueCard = useCallback(() => {
+    if (!student) return;
     Taro.navigateTo({
-      url: `/package-course/pages/package-form/index?studentId=${encodeURIComponent(studentId)}`,
+      url: `/package-student/pages/member-card-issue/index?studentId=${encodeURIComponent(student.id)}`,
     });
-  }, [studentId]);
+  }, [student]);
 
-  const goToPackageTransactions = useCallback(() => {
+  // 写跟进：进入独立表单页
+  const handleWriteFollow = useCallback(() => {
+    if (!student) return;
     Taro.navigateTo({
-      url: `/package-course/pages/recharge-records/index?studentId=${encodeURIComponent(studentId)}`,
+      url: `/package-student/pages/follow-record-form/index?studentId=${encodeURIComponent(student.id)}`,
     });
-  }, [studentId]);
+  }, [student]);
 
-  const goToTransfer = useCallback(() => {
-    if (!studentId) {
-      Taro.showToast({ title: '未获取到学员信息', icon: 'none' });
-      return;
-    }
-
+  // 查看会员卡详情
+  const handleMemberCardClick = useCallback((card: MemberCardDetail) => {
     Taro.navigateTo({
-      url: `/package-student/pages/student-transfer/index?id=${encodeURIComponent(studentId)}`,
+      url: `/package-student/pages/member-card-detail/index?id=${encodeURIComponent(card.id)}`,
     });
-  }, [studentId]);
+  }, []);
+
+  // 点击跟进卡片进入编辑页
+  const handleFollowClick = useCallback(
+    (record: FollowRecord) => {
+      if (!student) return;
+      Taro.navigateTo({
+        url: `/package-student/pages/follow-record-form/index?studentId=${encodeURIComponent(student.id)}&recordId=${encodeURIComponent(record.id)}`,
+      });
+    },
+    [student],
+  );
 
   // 审批请假
   const handleApproveLeave = useCallback(async (id: string) => {
@@ -496,23 +574,6 @@ const StudentDetail: React.FC = () => {
   }, []);
 
   // 退费操作
-  const handleOpenRefund = useCallback(() => {
-    const defaultPackage = refundablePackages[0];
-    setSelectedRefundPackageId(defaultPackage?.id || '');
-    setRefundAmount(
-      defaultPackage
-        ? String(
-            getPackageRefundableAmount(
-              defaultPackage,
-              refundedAmountByPackage[defaultPackage.id] || 0,
-            ),
-          )
-        : '',
-    );
-    setRefundReason('');
-    setShowRefundSheet(true);
-  }, [refundablePackages, refundedAmountByPackage]);
-
   const handleSelectRefundPackage = useCallback(
     (pkg: CoursePackage) => {
       setSelectedRefundPackageId(pkg.id);
@@ -593,7 +654,7 @@ const StudentDetail: React.FC = () => {
     refundReason,
     selectedRefundMaxAmount,
     selectedRefundPackage,
-    student?.id,
+    student,
   ]);
 
   // 返回
@@ -639,8 +700,8 @@ const StudentDetail: React.FC = () => {
     <View className="min-h-screen bg-background">
       {/* ====== 渐变头部 ====== */}
       <View
-        className="bg-gradient-primary px-[40rpx] rounded-b-[48rpx] relative overflow-hidden"
-        style={{ paddingTop: `${statusBarHeight + 8}px`, paddingBottom: '48rpx' }}
+        className="bg-gradient-primary px-[40rpx] rounded-b-[48rpx] relative overflow-hidden pb-[72rpx]"
+        style={{ paddingTop: `${statusBarHeight + 8}px` }}
       >
         {/* 装饰圆 */}
         <View className="absolute -top-[60rpx] -right-[60rpx] w-[240rpx] h-[240rpx] rounded-full bg-white/8" />
@@ -654,66 +715,51 @@ const StudentDetail: React.FC = () => {
         </View>
 
         {/* 头像 + 信息 */}
-        <View className="flex items-center gap-[32rpx] mt-[24rpx] relative z-1">
-          <StudentAvatar name={student.name} size="lg" className="border-[6rpx] border-white/40" />
+        <View className="flex items-center gap-[24rpx] mt-[24rpx] relative z-1">
+          <StudentAvatar
+            name={student.name}
+            src={student.avatar_url}
+            size="xl"
+            className="border-[6rpx] border-white/40"
+          />
           <View className="flex-1 min-w-0">
-            <View className="flex items-center justify-between gap-[16rpx]">
-              <Text className="text-[44rpx] font-bold text-white block flex-1 min-w-0">
-                {student.name}
-              </Text>
-              {isTeacher && (
-                <View
-                  className="h-[56rpx] px-[20rpx] rounded-full bg-white/18 flex items-center gap-[6rpx] press-scale flex-shrink-0"
-                  onClick={goToTransfer}
-                >
-                  <Icon name="mdi-swap-horizontal" size={20} color="white" />
-                  <Text className="text-[22rpx] text-white">调班</Text>
+            <View className="flex items-center gap-[12rpx]">
+              <Text className="text-[40rpx] font-bold text-white leading-none">{student.name}</Text>
+              {student.gender && (
+                <Icon
+                  name={student.gender === 'male' ? 'mdi-gender-male' : 'mdi-gender-female'}
+                  size={24}
+                  color="white"
+                />
+              )}
+            </View>
+            <View className="flex items-center gap-[16rpx] mt-[16rpx]">
+              {student.phone && (
+                <Text className="text-[28rpx] text-white font-medium">{student.phone}</Text>
+              )}
+              {student.phone && (
+                <View className="flex items-center gap-[12rpx]">
+                  <View
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-white/20 center press-scale"
+                    onClick={handleCopyPhone}
+                  >
+                    <Icon name="mdi-content-copy" size={20} color="white" />
+                  </View>
+                  <View
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-white/20 center press-scale"
+                    onClick={handleCallPhone}
+                  >
+                    <Icon name="mdi-phone" size={20} color="white" />
+                  </View>
+                  <View
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-white/20 center press-scale"
+                    onClick={handleSendMessage}
+                  >
+                    <Icon name="mdi-message-text" size={20} color="white" />
+                  </View>
                 </View>
               )}
             </View>
-            {student.nickname && (
-              <Text className="text-[26rpx] text-white/80 block mt-[4rpx]">{student.nickname}</Text>
-            )}
-            <Text className="text-[24rpx] text-white/70 font-mono tracking-[4rpx] block mt-[4rpx]">
-              {student.invite_code}
-            </Text>
-            {student.phone && (
-              <Text className="text-[26rpx] text-white/80 block mt-[4rpx]">{student.phone}</Text>
-            )}
-          </View>
-        </View>
-
-        {/* 地址/备注 */}
-        {(student.address || student.note) && (
-          <View className="flex gap-[24rpx] mt-[24rpx] relative z-1 flex-wrap">
-            {student.address && (
-              <View className="flex items-center gap-[8rpx]">
-                <Icon name="mdi-map-marker" size={28} color="white" />
-                <Text className="text-[24rpx] text-white/70">{student.address}</Text>
-              </View>
-            )}
-            {student.note && (
-              <View className="flex items-center gap-[8rpx]">
-                <Icon name="mdi-note-text" size={28} color="white" />
-                <Text className="text-[24rpx] text-white/70">{student.note}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* 统计三栏 */}
-        <View className="flex gap-[20rpx] mt-[40rpx] relative z-1">
-          <View className="flex-1 bg-white/20 backdrop-blur-sm rounded-[24rpx] py-[28rpx] text-center">
-            <Text className="text-[48rpx] font-bold text-white block">{remainingHours}</Text>
-            <Text className="text-[22rpx] text-white/70 block mt-[4rpx]">剩余课时</Text>
-          </View>
-          <View className="flex-1 bg-white/20 backdrop-blur-sm rounded-[24rpx] py-[28rpx] text-center">
-            <Text className="text-[48rpx] font-bold text-white block">{totalUsedHours}</Text>
-            <Text className="text-[22rpx] text-white/70 block mt-[4rpx]">总已消课时</Text>
-          </View>
-          <View className="flex-1 bg-white/20 backdrop-blur-sm rounded-[24rpx] py-[28rpx] text-center">
-            <Text className="text-[48rpx] font-bold text-white block">{yearUsedHours}</Text>
-            <Text className="text-[22rpx] text-white/70 block mt-[4rpx]">今年消耗</Text>
           </View>
         </View>
       </View>
@@ -755,403 +801,544 @@ const StudentDetail: React.FC = () => {
         onChange={handleStudentSwiperChange}
         onAnimationFinish={handleStudentSwiperFinish}
       >
-        <SwiperItem itemId="records">
+        {/* 资料 */}
+        <SwiperItem itemId="profile">
           <ScrollView scrollY className="h-full">
-            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
-              <View className="flex flex-col gap-[20rpx]">
-                {records.map((record) => (
-                  <View
-                    key={record.id}
-                    className="bg-white rounded-[32rpx] p-[28rpx] shadow-soft flex gap-[24rpx] press-scale"
-                    onClick={() => goToRecordDetail(record.id)}
-                  >
-                    {/* 时间轴 */}
-                    <View className="flex flex-col items-center w-[24rpx] flex-shrink-0 pt-[8rpx]">
-                      <View className="w-[16rpx] h-[16rpx] rounded-full bg-gradient-primary flex-shrink-0" />
-                      <View className="w-[4rpx] flex-1 bg-border mt-[8rpx] min-h-[40rpx]" />
-                    </View>
-                    {/* 内容 */}
-                    <View className="flex-1 min-w-0">
-                      <View className="flex items-start justify-between">
-                        <View className="flex-1">
-                          <Text className="text-[28rpx] font-medium text-foreground block">
-                            {record.course_package?.name || '课程'}
-                          </Text>
-                          <Text className="text-[24rpx] text-muted-foreground block mt-[4rpx]">
-                            {formatDateCN(record.lesson_date)}
-                          </Text>
-                        </View>
-                        <Text className="text-[30rpx] font-semibold text-primary flex-shrink-0">
-                          -{record.hours_used}课时
-                        </Text>
-                      </View>
-                      {record.content && (
-                        <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-muted rounded-[16rpx]">
-                          <Text className="text-[24rpx] text-muted-foreground">
-                            课程内容：{record.content}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
+            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx] flex flex-col gap-[24rpx]">
+              {/* 基础信息 */}
+              <View className="bg-white rounded-[28rpx] p-[32rpx] shadow-soft">
+                <View className="flex items-center gap-[12rpx] mb-[28rpx]">
+                  <Icon name="mdi-account-outline" size={28} color="#3B6EF5" />
+                  <Text className="text-[30rpx] font-bold text-foreground">基础信息</Text>
+                </View>
+                <View className="flex flex-col gap-[24rpx]">
+                  <View className="flex items-center justify-between">
+                    <Text className="text-[26rpx] text-muted-foreground">昵称</Text>
+                    <Text className="text-[28rpx] text-foreground font-medium">
+                      {student.nickname || '未填写'}
+                    </Text>
                   </View>
-                ))}
-                {records.length === 0 && <Empty description="暂无上课记录" />}
-              </View>
-            </View>
-          </ScrollView>
-        </SwiperItem>
-
-        <SwiperItem itemId="packages">
-          <ScrollView scrollY className="h-full">
-            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
-              <View className="mb-[24rpx] flex items-center justify-between">
-                <Text className="text-[28rpx] font-semibold text-foreground">课包列表</Text>
-                <View
-                  className="rounded-full bg-primary/10 px-[20rpx] py-[10rpx]"
-                  onClick={goToPackageTransactions}
-                >
-                  <Text className="text-[22rpx] font-medium text-primary">查看流水</Text>
+                  <View className="h-[2rpx] bg-muted" />
+                  <View className="flex items-center justify-between">
+                    <Text className="text-[26rpx] text-muted-foreground">性别</Text>
+                    <Text className="text-[28rpx] text-foreground font-medium">
+                      {student.gender === 'male'
+                        ? '男'
+                        : student.gender === 'female'
+                          ? '女'
+                          : '未填写'}
+                    </Text>
+                  </View>
+                  <View className="h-[2rpx] bg-muted" />
+                  <View className="flex items-center justify-between">
+                    <Text className="text-[26rpx] text-muted-foreground">出生日期</Text>
+                    <Text className="text-[28rpx] text-foreground font-medium">
+                      {student.birthday ? formatDateCN(student.birthday) : '未填写'}
+                    </Text>
+                  </View>
+                  <View className="h-[2rpx] bg-muted" />
+                  <View className="flex items-center justify-between">
+                    <Text className="text-[26rpx] text-muted-foreground">手机号</Text>
+                    <Text className="text-[28rpx] text-foreground font-medium">
+                      {student.phone || '未填写'}
+                    </Text>
+                  </View>
+                  <View className="h-[2rpx] bg-muted" />
+                  <View className="flex items-center justify-between">
+                    <Text className="text-[26rpx] text-muted-foreground">家庭地址</Text>
+                    <Text className="text-[28rpx] text-foreground font-medium text-right max-w-[60%]">
+                      {student.address || '未填写'}
+                    </Text>
+                  </View>
+                  <View className="h-[2rpx] bg-muted" />
+                  <View className="flex items-start justify-between gap-[24rpx]">
+                    <Text className="text-[26rpx] text-muted-foreground flex-shrink-0">备注</Text>
+                    <Text className="text-[28rpx] text-foreground font-medium text-right flex-1">
+                      {student.note || '未填写'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-              <View className="flex flex-col gap-[24rpx]">
-                {packages.map((pkg) => {
-                  const progress =
-                    pkg.total_hours > 0
-                      ? ((pkg.total_hours - pkg.remaining_hours) / pkg.total_hours) * 100
-                      : 0;
-                  const statusInfo = PKG_STATUS_MAP[pkg.status] || PKG_STATUS_MAP.active;
-                  const isGift = pkg.package_tag === 'gift';
-                  const isShared = pkg.package_role === 'sharer';
-                  const giftHours = getPackageGiftHours(pkg);
-                  const refundedAmount = refundedAmountByPackage[pkg.id] || 0;
 
-                  return (
-                    <View key={pkg.id} className="bg-white rounded-[32rpx] p-[32rpx] shadow-soft">
-                      <View className="flex items-start justify-between gap-[20rpx]">
-                        <View className="min-w-0 flex-1">
-                          <Text className="text-[30rpx] font-bold text-foreground block">
-                            {pkg.name}
-                          </Text>
-                          <View className="mt-[8rpx] flex flex-wrap items-center gap-[10rpx]">
-                            <Text className="text-[24rpx] text-muted-foreground">
-                              {formatDateCN(pkg.created_at)} 充值
-                            </Text>
-                            {pkg.fee_amount != null && (
-                              <View className="rounded-[14rpx] bg-muted px-[16rpx] py-[6rpx]">
-                                <Text className="text-[22rpx] font-medium text-foreground">
-                                  ¥{pkg.fee_amount}
-                                </Text>
-                              </View>
-                            )}
-                            {pkg.fee_method && (
-                              <View className="rounded-[14rpx] bg-muted px-[16rpx] py-[6rpx]">
-                                <Text className="text-[22rpx] text-muted-foreground">
-                                  {FEE_METHOD_MAP[pkg.fee_method] || pkg.fee_method}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                        <View
-                          className="py-[8rpx] px-[20rpx] rounded-[24rpx] flex-shrink-0"
-                          style={{ background: statusInfo.bg }}
-                        >
-                          <Text
-                            className="text-[22rpx] font-semibold"
-                            style={{ color: statusInfo.text }}
-                          >
-                            {statusInfo.label}
-                          </Text>
-                        </View>
-                      </View>
+              {/* 家长绑定 */}
+              <View className="bg-white rounded-[28rpx] p-[32rpx] shadow-soft">
+                <View className="flex items-center justify-between mb-[28rpx]">
+                  <View className="flex items-center gap-[12rpx]">
+                    <Icon name="mdi-account-group" size={28} color="primary" />
+                    <Text className="text-[30rpx] font-bold text-foreground">家长绑定</Text>
+                  </View>
+                  <View
+                    className="flex items-center gap-[8rpx] rounded-[40rpx] bg-gradient-primary px-[28rpx] py-[12rpx] press-scale"
+                    onClick={handleInviteParent}
+                  >
+                    <Icon name="mdi-link-plus" size={24} color="white" />
+                    <Text className="text-[24rpx] text-white font-medium">邀请绑定</Text>
+                  </View>
+                </View>
 
-                      {/* 进度条 */}
-                      <View className="mt-[24rpx]">
-                        <View className="h-[12rpx] bg-border rounded-[6rpx] overflow-hidden">
-                          <View
-                            className="h-full rounded-[6rpx]"
-                            style={{
-                              width: `${Math.min(progress, 100)}%`,
-                              background: getPkgProgressGradient(pkg.status),
-                            }}
-                          />
-                        </View>
-                        <View className="flex justify-between mt-[8rpx]">
-                          <Text className="text-[24rpx] text-muted-foreground">
-                            剩余 {pkg.remaining_hours} 课时
-                          </Text>
-                          <Text className="text-[24rpx] text-muted-foreground">
-                            共 {pkg.total_hours} 课时
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* 标签行：共享 / 特殊标记 */}
-                      <View className="flex gap-[12rpx] mt-[20rpx] flex-wrap">
-                        {isGift && giftHours <= 0 && (
-                          <View className="py-[8rpx] px-[20rpx] rounded-[16rpx] bg-success-bg">
-                            <Text className="text-[24rpx] text-success font-medium">赠送</Text>
-                          </View>
-                        )}
-                        {isShared && (
-                          <View className="py-[8rpx] px-[20rpx] rounded-[16rpx] bg-info-bg">
-                            <Text className="text-[24rpx] text-info font-medium">共享</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {(pkg.bonus_remaining > 0 || refundedAmount > 0) && (
-                        <View className="mt-[18rpx] border-t border-border/50 pt-[16rpx]">
-                          <Text className="text-[22rpx] leading-[34rpx] text-[#D94040]">
-                            {pkg.bonus_remaining > 0
-                              ? `当前剩余课时中包含赠送 ${pkg.bonus_remaining} 课时`
-                              : ''}
-                            {refundedAmount > 0 ? `，已累计退费 ¥${refundedAmount.toFixed(2)}` : ''}
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* 续费入口：余额 ≤3 且活跃课包 */}
-                      {pkg.remaining_hours <= 3 && pkg.status === 'active' && (
-                        <View
-                          className="mt-[20rpx] flex items-center justify-end"
-                          onClick={() =>
-                            Taro.navigateTo({
-                              url: `/package-course/pages/package-form/index?studentId=${studentId}&packageId=${pkg.id}`,
-                            })
-                          }
-                        >
-                          <View className="px-[24rpx] py-[10rpx] rounded-full bg-primary/10">
-                            <Text className="text-[24rpx] text-primary font-medium">续费</Text>
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-                {packages.length === 0 && <Empty description="暂无课时套餐" />}
-              </View>
-              {recentPackageTransactions.length > 0 && (
-                <View className="mt-[32rpx]">
-                  <Text className="mb-[20rpx] block text-[28rpx] font-semibold text-foreground">
-                    最近流水
-                  </Text>
-                  <View className="flex flex-col gap-[16rpx]">
-                    {recentPackageTransactions.map((item) => (
+                {parents.length > 0 ? (
+                  <View className="flex flex-col gap-[20rpx]">
+                    {parents.map((parent) => (
                       <View
-                        key={item.id}
-                        className="rounded-[24rpx] bg-white px-[24rpx] py-[22rpx] shadow-soft"
+                        key={parent.id}
+                        className="flex items-center gap-[20rpx] py-[20rpx] px-[24rpx] bg-muted rounded-[20rpx]"
                       >
-                        <View className="flex items-center justify-between gap-[16rpx]">
-                          <View className="min-w-0 flex-1">
-                            <View className="flex items-center gap-[12rpx]">
-                              <View
-                                className={`rounded-full px-[14rpx] py-[6rpx] ${
-                                  item.type === 'refund' ? 'bg-warning-bg' : 'bg-primary-bg'
-                                }`}
-                              >
-                                <Text
-                                  className={`text-[20rpx] font-semibold ${
-                                    item.type === 'refund' ? 'text-warning' : 'text-primary'
-                                  }`}
-                                >
-                                  {item.type === 'refund' ? '退费' : '充值'}
-                                </Text>
-                              </View>
-                              <Text className="truncate text-[26rpx] font-medium text-foreground">
-                                {item.package_name || '课包流水'}
-                              </Text>
-                            </View>
-                            <Text className="mt-[8rpx] block text-[22rpx] text-muted-foreground">
-                              {item.type === 'refund'
-                                ? `退费 ¥${Number(item.refund_amount || item.fee_amount || 0).toFixed(2)}`
-                                : `充值 ${item.purchased_hours || 0} 课时${
-                                    item.gift_hours ? ` · 赠送 ${item.gift_hours} 课时` : ''
-                                  }`}
-                            </Text>
-                            {item.reason && (
-                              <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
-                                原因：{item.reason}
-                              </Text>
-                            )}
-                          </View>
-                          <Text className="flex-shrink-0 text-[22rpx] text-muted-foreground">
-                            {formatDateCN(item.created_at)}
+                        <View className="w-[72rpx] h-[72rpx] rounded-full bg-gradient-primary center flex-shrink-0">
+                          <Icon name="mdi-account" size={32} color="white" />
+                        </View>
+                        <View className="flex-1 min-w-0">
+                          <Text className="text-[28rpx] font-medium text-foreground block">
+                            {parent.parent?.name || '家长'}
+                          </Text>
+                          <Text className="text-[24rpx] text-muted-foreground mt-[4rpx] block">
+                            {parent.parent?.phone || '未绑定手机号'}
                           </Text>
                         </View>
                       </View>
                     ))}
                   </View>
+                ) : (
+                  <View className="py-[40rpx] center-col gap-[16rpx]">
+                    <Icon name="mdi-account-plus" size={56} color="#c7ced9" />
+                    <Text className="text-[26rpx] text-muted-foreground">
+                      暂无家长绑定，点击「邀请绑定」分享给家长
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </SwiperItem>
+
+        {/* 卡包 */}
+        <SwiperItem itemId="packages">
+          <ScrollView scrollY className="h-full">
+            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
+              {/* 卡包汇总 */}
+              <View className="bg-white rounded-[24rpx] p-[24rpx] shadow-soft mb-[24rpx]">
+                <View className="flex flex-row gap-[24rpx]">
+                  <View className="flex-1 center-col">
+                    <Text className="text-[32rpx] font-bold text-foreground leading-none">
+                      {memberCardStats.totalCount}
+                    </Text>
+                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">总计课时</Text>
+                  </View>
+                  <View className="w-[2rpx] bg-border-light" />
+                  <View className="flex-1 center-col">
+                    <Text className="text-[32rpx] font-bold text-foreground leading-none">
+                      {memberCardStats.usedCount}
+                    </Text>
+                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">消耗课时</Text>
+                  </View>
+                  <View className="w-[2rpx] bg-border-light" />
+                  <View className="flex-1 center-col">
+                    <Text className="text-[32rpx] font-bold text-foreground leading-none">
+                      {memberCardStats.remainingCount}
+                    </Text>
+                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">剩余课时</Text>
+                  </View>
+                </View>
+                <View className="h-[2rpx] bg-border-light my-[20rpx]" />
+                <View className="flex flex-row gap-[24rpx]">
+                  <View className="flex-1 center-col">
+                    <Text className="text-[28rpx] font-bold text-foreground leading-none">
+                      ¥{(memberCardStats.totalAmount / 100).toFixed(0)}
+                    </Text>
+                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">总储余额</Text>
+                  </View>
+                  <View className="w-[2rpx] bg-border-light" />
+                  <View className="flex-1 center-col">
+                    <Text className="text-[28rpx] font-bold text-foreground leading-none">
+                      ¥{(memberCardStats.usedAmount / 100).toFixed(0)}
+                    </Text>
+                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">消耗金额</Text>
+                  </View>
+                  <View className="w-[2rpx] bg-border-light" />
+                  <View className="flex-1 center-col">
+                    <Text className="text-[28rpx] font-bold text-foreground leading-none">
+                      ¥{(memberCardStats.remainingAmount / 100).toFixed(0)}
+                    </Text>
+                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">剩余金额</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* 二级 Tab */}
+              <View className="flex flex-row items-center justify-between mb-[28rpx]">
+                {CARD_SUB_TABS.map((tab) => {
+                  const isActive = cardSubTab === tab.key;
+                  return (
+                    <View
+                      key={tab.key}
+                      className="flex-1 center py-[16rpx]"
+                      onClick={() => setCardSubTab(tab.key)}
+                    >
+                      <Text
+                        className={cn(
+                          'text-[26rpx] font-medium transition-colors',
+                          isActive ? 'text-primary' : 'text-muted-foreground',
+                        )}
+                      >
+                        {tab.label}
+                      </Text>
+                      {isActive && (
+                        <View className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[40rpx] h-[6rpx] rounded-full bg-primary" />
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View className="flex flex-col gap-[24rpx]">
+                {memberCards
+                  .filter((card) => {
+                    switch (cardSubTab) {
+                      case 'active':
+                        return card.status === 'active';
+                      case 'frozen':
+                        return card.status === 'frozen';
+                      case 'notActivated':
+                        return card.status === 'notActivated';
+                      case 'inactive':
+                        return card.status === 'inactive' || card.status === 'usedUp';
+                      default:
+                        return true;
+                    }
+                  })
+                  .map((card) => {
+                    const statusInfo = MEMBER_CARD_STATUS_MAP[card.status];
+                    const cardBgClass = MEMBER_CARD_BG_MAP[card.status];
+                    const cardOverlayClass = MEMBER_CARD_OVERLAY_MAP[card.status];
+                    const kindText =
+                      card.cardTypeKind === 'count'
+                        ? '次卡'
+                        : card.cardTypeKind === 'time'
+                          ? '时间卡'
+                          : '储值卡';
+                    const remainingText =
+                      card.cardTypeKind === 'count'
+                        ? `${card.remainingCount ?? 0}次`
+                        : card.cardTypeKind === 'time'
+                          ? `${card.remainingDays ?? 0}天`
+                          : `¥${((card.remainingAmount ?? 0) / 100).toFixed(2)}`;
+                    const totalText =
+                      card.cardTypeKind === 'count'
+                        ? `共 ${card.cardTypeCount ?? 0} 次`
+                        : card.cardTypeKind === 'time'
+                          ? `共 ${card.cardTypeValidDays} 天`
+                          : `充值 ¥${(card.purchasePrice / 100).toFixed(2)}`;
+                    return (
+                      <View
+                        key={card.id}
+                        className={cn(
+                          'rounded-[28rpx] p-[28rpx] relative overflow-hidden shadow-soft press-scale',
+                          cardBgClass,
+                        )}
+                        onClick={() => handleMemberCardClick(card)}
+                      >
+                        {cardOverlayClass && (
+                          <View
+                            className={cn('absolute inset-0 pointer-events-none', cardOverlayClass)}
+                          />
+                        )}
+                        <View className="absolute -right-[40rpx] -bottom-[40rpx] w-[180rpx] h-[180rpx] rounded-full bg-white/10" />
+                        <View className="absolute top-[16rpx] right-[20rpx] text-[72rpx] font-bold text-white/15 leading-none">
+                          {kindText}
+                        </View>
+                        <View className="relative z-1">
+                          <View className="flex items-start justify-between gap-[16rpx]">
+                            <View className="flex-1 min-w-0">
+                              <Text className="text-[32rpx] font-bold text-white">
+                                {card.cardTypeName}
+                              </Text>
+                              <Text className="text-[22rpx] text-white/80 mt-[8rpx]">
+                                有效{card.cardTypeKind === 'time' ? '天数' : '次数'} {remainingText}
+                              </Text>
+                            </View>
+                            <View className="py-[6rpx] px-[16rpx] rounded-full bg-white/20">
+                              <Text className="text-[20rpx] text-white font-medium">
+                                {statusInfo.label}
+                              </Text>
+                            </View>
+                          </View>
+                          <View className="mt-[32rpx] flex items-end justify-between">
+                            <View>
+                              <Text className="text-[48rpx] font-bold text-white leading-none">
+                                {remainingText}
+                              </Text>
+                              <Text className="text-[22rpx] text-white/80 mt-[8rpx]">
+                                剩余{card.cardTypeKind === 'time' ? '天数' : '次数'}
+                              </Text>
+                            </View>
+                            <Text className="text-[22rpx] text-white/80">{totalText}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                {memberCards.filter((card) => {
+                  switch (cardSubTab) {
+                    case 'active':
+                      return card.status === 'active';
+                    case 'frozen':
+                      return card.status === 'frozen';
+                    case 'notActivated':
+                      return card.status === 'notActivated';
+                    case 'inactive':
+                      return card.status === 'inactive' || card.status === 'usedUp';
+                    default:
+                      return true;
+                  }
+                }).length === 0 && <Empty description="暂无卡包" />}
+              </View>
+            </View>
+          </ScrollView>
+        </SwiperItem>
+
+        {/* 出勤 */}
+        <SwiperItem itemId="records">
+          <ScrollView scrollY className="h-full">
+            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
+              {records.length === 0 && leaves.length === 0 ? (
+                <Empty description="暂无出勤记录" />
+              ) : (
+                <View className="flex flex-col gap-[24rpx]">
+                  {/* 顶部总结 */}
+                  <View className="bg-white rounded-[24rpx] p-[20rpx] shadow-soft">
+                    <View className="flex items-center gap-[8rpx] mb-[16rpx]">
+                      <Icon name="mdi-chart-bar" size={24} color="primary" />
+                      <Text className="text-[26rpx] font-bold text-foreground">出勤总结</Text>
+                    </View>
+                    <View className="flex flex-row gap-[12rpx]">
+                      <View className="flex-1 center-col py-[14rpx] rounded-[16rpx] bg-primary/8">
+                        <Text className="text-[36rpx] font-bold text-primary leading-none">
+                          {records.length}
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground mt-[6rpx]">
+                          签到次数
+                        </Text>
+                      </View>
+                      <View className="flex-1 center-col py-[14rpx] rounded-[16rpx] bg-warning/10">
+                        <Text className="text-[36rpx] font-bold text-warning leading-none">
+                          {leaves.length}
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground mt-[6rpx]">
+                          请假次数
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 按月分组（可展开/收起） */}
+                  {Object.entries(timelineGroups).map(([month, items]) => {
+                    const isExpanded = expandedMonths.has(month);
+                    const stat = monthStats[month] || { checkIn: 0, leave: 0 };
+                    return (
+                      <View key={month} className="bg-white rounded-[28rpx] p-[28rpx] shadow-soft">
+                        {/* 月份标题行（点击展开/收起） */}
+                        <View
+                          className="flex items-center justify-between"
+                          onClick={() => handleToggleMonth(month)}
+                        >
+                          <View className="flex items-center gap-[16rpx]">
+                            <Text className="text-[28rpx] font-bold text-foreground">{month}</Text>
+                            <Text className="text-[24rpx] text-muted-foreground">
+                              签到 {stat.checkIn} · 请假 {stat.leave}
+                            </Text>
+                          </View>
+                          <Icon
+                            name={isExpanded ? 'mdi-chevron-down' : 'mdi-chevron-right'}
+                            size={32}
+                            color="#999999"
+                          />
+                        </View>
+
+                        {/* 展开内容 */}
+                        {isExpanded && (
+                          <View className="flex flex-col gap-[20rpx] mt-[24rpx]">
+                            {items.map((item, index) => {
+                              const isLast = index === items.length - 1;
+                              if (item.type === 'record') {
+                                const record = item.data;
+                                return (
+                                  <View
+                                    key={record.id}
+                                    className="bg-muted rounded-[20rpx] p-[24rpx] flex gap-[24rpx] press-scale"
+                                    onClick={() => goToRecordDetail(record.id)}
+                                  >
+                                    {/* 时间轴 */}
+                                    <View className="flex flex-col items-center w-[24rpx] flex-shrink-0 pt-[8rpx]">
+                                      <View className="w-[16rpx] h-[16rpx] rounded-full bg-gradient-primary flex-shrink-0" />
+                                      {!isLast && (
+                                        <View className="w-[4rpx] flex-1 bg-border mt-[8rpx] min-h-[40rpx]" />
+                                      )}
+                                    </View>
+                                    {/* 内容 */}
+                                    <View className="flex-1 min-w-0">
+                                      <View className="flex items-start justify-between">
+                                        <View className="flex-1">
+                                          <Text className="text-[28rpx] font-medium text-foreground block">
+                                            {record.course_package?.name || '上课'}
+                                          </Text>
+                                          <Text className="text-[24rpx] text-muted-foreground block mt-[4rpx]">
+                                            {formatDateCN(record.lesson_date)}
+                                          </Text>
+                                        </View>
+                                        <Text className="text-[30rpx] font-semibold text-primary flex-shrink-0">
+                                          -{record.hours_used}课时
+                                        </Text>
+                                      </View>
+                                      {record.content && (
+                                        <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-white rounded-[16rpx]">
+                                          <Text className="text-[24rpx] text-muted-foreground">
+                                            课程内容：{record.content}
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                  </View>
+                                );
+                              }
+                              const leave = item.data;
+                              const statusInfo = LEAVE_STATUS_MAP[leave.status];
+                              return (
+                                <View
+                                  key={leave.id}
+                                  className="bg-muted rounded-[20rpx] p-[24rpx] flex gap-[24rpx]"
+                                >
+                                  {/* 时间轴 */}
+                                  <View className="flex flex-col items-center w-[24rpx] flex-shrink-0 pt-[8rpx]">
+                                    <View className="w-[16rpx] h-[16rpx] rounded-full bg-warning flex-shrink-0" />
+                                    {!isLast && (
+                                      <View className="w-[4rpx] flex-1 bg-border mt-[8rpx] min-h-[40rpx]" />
+                                    )}
+                                  </View>
+                                  {/* 内容 */}
+                                  <View className="flex-1 min-w-0">
+                                    <View className="flex items-start justify-between">
+                                      <View className="flex-1">
+                                        <Text className="text-[28rpx] font-medium text-foreground block">
+                                          {leave.type === 'reschedule' ? '调课' : '请假'}
+                                        </Text>
+                                        <Text className="text-[24rpx] text-muted-foreground block mt-[4rpx]">
+                                          {formatDateCN(leave.original_date)}
+                                          {leave.new_date && ` → ${formatDateCN(leave.new_date)}`}
+                                        </Text>
+                                      </View>
+                                      <View
+                                        className={cn(
+                                          'py-[8rpx] px-[20rpx] rounded-[24rpx] text-[24rpx] font-medium flex-shrink-0',
+                                          statusInfo.className,
+                                        )}
+                                      >
+                                        <Text>{statusInfo.label}</Text>
+                                      </View>
+                                    </View>
+                                    {leave.reason && (
+                                      <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-white rounded-[16rpx]">
+                                        <Text className="text-[24rpx] text-muted-foreground">
+                                          原因：{leave.reason}
+                                        </Text>
+                                      </View>
+                                    )}
+                                    {leave.status === 'pending' && isTeacher && (
+                                      <View className="flex gap-[16rpx] mt-[20rpx]">
+                                        <View
+                                          className="flex-1 py-[16rpx] rounded-[24rpx] bg-gradient-primary center press-scale"
+                                          onClick={() => handleApproveLeave(leave.id)}
+                                        >
+                                          <Text className="text-white text-[26rpx] font-medium">
+                                            同意
+                                          </Text>
+                                        </View>
+                                        <View
+                                          className="flex-1 py-[16rpx] rounded-[24rpx] border-[3rpx] border-destructive center press-scale"
+                                          onClick={() => handleRejectLeave(leave.id)}
+                                        >
+                                          <Text className="text-destructive text-[26rpx] font-medium">
+                                            拒绝
+                                          </Text>
+                                        </View>
+                                      </View>
+                                    )}
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </View>
           </ScrollView>
         </SwiperItem>
 
-        <SwiperItem itemId="leaves">
+        {/* 跟进 */}
+        <SwiperItem itemId="follow">
           <ScrollView scrollY className="h-full">
             <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
-              <View className="flex flex-col gap-[20rpx]">
-                {leaves.map((leave) => {
-                  const statusInfo = LEAVE_STATUS_MAP[leave.status];
-                  return (
-                    <View key={leave.id} className="bg-white rounded-[32rpx] p-[32rpx] shadow-soft">
-                      <View className="flex items-center justify-between">
-                        <View className="flex-1">
-                          <Text className="text-[28rpx] font-medium text-foreground block">
-                            {leave.type === 'reschedule' ? '调课' : '请假'}
-                          </Text>
-                          <Text className="text-[24rpx] text-muted-foreground block mt-[4rpx]">
-                            {formatDateCN(leave.original_date)}
-                            {leave.new_date && ` → ${formatDateCN(leave.new_date)}`}
-                          </Text>
-                        </View>
-                        <View
-                          className={`py-[8rpx] px-[20rpx] rounded-[24rpx] text-[24rpx] font-medium flex-shrink-0 ${statusInfo.className}`}
-                        >
-                          <Text>{statusInfo.label}</Text>
-                        </View>
-                      </View>
-                      {leave.reason && (
-                        <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-muted rounded-[16rpx]">
-                          <Text className="text-[24rpx] text-muted-foreground">
-                            原因：{leave.reason}
-                          </Text>
-                        </View>
-                      )}
-                      {leave.status === 'pending' && isTeacher && (
-                        <View className="flex gap-[16rpx] mt-[20rpx]">
-                          <View
-                            className="flex-1 py-[16rpx] rounded-[24rpx] bg-gradient-primary center press-scale"
-                            onClick={() => handleApproveLeave(leave.id)}
-                          >
-                            <Text className="text-white text-[26rpx] font-medium">同意</Text>
-                          </View>
-                          <View
-                            className="flex-1 py-[16rpx] rounded-[24rpx] border-[3rpx] border-destructive center press-scale"
-                            onClick={() => handleRejectLeave(leave.id)}
-                          >
-                            <Text className="text-destructive text-[26rpx] font-medium">拒绝</Text>
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-                {leaves.length === 0 && <Empty description="暂无请假记录" />}
-              </View>
-            </View>
-          </ScrollView>
-        </SwiperItem>
-
-        <SwiperItem itemId="parents">
-          <ScrollView scrollY className="h-full">
-            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
-              <View className="flex flex-col gap-[20rpx]">
-                {/* 邀请码卡片 */}
-                <View className="bg-white rounded-[32rpx] py-[48rpx] px-[48rpx] shadow-soft text-center">
-                  <Text className="text-[24rpx] text-muted-foreground block mb-[16rpx]">
-                    学生邀请码
-                  </Text>
-                  <Text className="text-[56rpx] font-bold text-primary tracking-[12rpx] block font-mono">
-                    {student.invite_code}
-                  </Text>
-                  <View className="flex gap-[16rpx] mt-[32rpx]">
+              {followRecords.length === 0 ? (
+                <Empty description="暂无跟进记录" />
+              ) : (
+                <View className="flex flex-col gap-[20rpx]">
+                  {followRecords.map((record) => (
                     <View
-                      className="flex-1 py-[28rpx] rounded-[40rpx] bg-gradient-primary shadow-elegant text-[28rpx] font-medium text-white text-center press-scale flex items-center justify-center gap-[8rpx]"
-                      onClick={copyInviteCode}
+                      key={record.id}
+                      className="bg-white rounded-[24rpx] p-[24rpx] shadow-soft press-scale"
+                      onClick={() => handleFollowClick(record)}
                     >
-                      <Icon name="mdi-content-copy" size="sm" color="white" />
-                      <Text className="text-white">复制邀请码</Text>
+                      <View className="flex items-start justify-between gap-[12rpx]">
+                        <View className="flex-1 min-w-0">
+                          <View className="flex items-center gap-[8rpx]">
+                            <Icon name="mdi-text-box-outline" size={22} color="primary" />
+                            <Text className="text-[26rpx] font-semibold text-foreground">
+                              跟进记录
+                            </Text>
+                          </View>
+                          <Text className="text-[26rpx] text-foreground block mt-[10rpx]">
+                            {record.content}
+                          </Text>
+                          <Text className="text-[22rpx] text-muted-foreground block mt-[10rpx]">
+                            操作人：{record.operatorName || '-'}
+                          </Text>
+                        </View>
+                        <Text className="text-[20rpx] text-muted-foreground flex-shrink-0">
+                          {record.createdAt}
+                        </Text>
+                      </View>
                     </View>
-                    <Button
-                      className="flex-1 py-[28rpx] rounded-[40rpx] bg-accent shadow-elegant text-[28rpx] font-medium text-white text-center press-scale flex items-center justify-center gap-[8rpx] border-none after:border-none leading-none p-0"
-                      openType="share"
-                      onClick={handleInviteParent}
-                    >
-                      <Icon name="mdi-share-variant" size="sm" color="white" />
-                      <Text className="text-white">邀请家长</Text>
-                    </Button>
-                  </View>
-                  <Text className="text-[22rpx] text-muted-foreground block mt-[20rpx]">
-                    邀请卡片仅限使用一次，转发后即失效
-                  </Text>
+                  ))}
                 </View>
-
-                {/* 已绑定家长列表 */}
-                <Text className="text-[32rpx] font-medium text-foreground block mt-[16rpx]">
-                  已绑定家长
-                </Text>
-                {(parents || []).map((binding) => (
-                  <View
-                    key={binding.id}
-                    className="bg-white rounded-[32rpx] p-[32rpx] shadow-soft flex items-center justify-between"
-                  >
-                    <View className="flex items-center gap-[24rpx]">
-                      <View className="w-[80rpx] h-[80rpx] rounded-full bg-gradient-accent center">
-                        <Icon name="mdi-account" size="sm" color="white" />
-                      </View>
-                      <View>
-                        <Text className="text-[32rpx] font-medium block">
-                          {binding.parent?.name || '家长'}
-                        </Text>
-                        <Text className="text-[24rpx] text-muted-foreground block">
-                          {binding.parent?.phone || '暂无电话'}
-                        </Text>
-                      </View>
-                    </View>
-                    {isTeacher && (
-                      <View
-                        className="py-[12rpx] px-[24rpx] rounded-[16rpx] border-[3rpx] border-destructive/30 press-scale"
-                        onClick={() => handleUnbind(binding.id)}
-                      >
-                        <Text className="text-[24rpx] text-destructive">解绑</Text>
-                      </View>
-                    )}
-                  </View>
-                ))}
-                {(!parents || parents.length === 0) && <Empty description="暂无家长绑定" />}
-              </View>
+              )}
             </View>
           </ScrollView>
         </SwiperItem>
       </Swiper>
 
-      {/* ====== 底部操作栏 ====== */}
-      {isTeacher ? (
-        <View className="fixed bottom-0 left-0 right-0 bg-white px-[32rpx] pt-[24rpx] pb-safe-bar shadow-soft flex gap-[16rpx] z-10">
+      {/* ====== 悬浮操作按钮（按 Tab 分类） ====== */}
+      {activeTab === 'packages' && isTeacher && (
+        <View className="fixed right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] z-10">
           <View
-            className="flex-1 h-[96rpx] rounded-[48rpx] bg-gradient-primary center press-scale"
-            onClick={goToRecharge}
+            className="w-[120rpx] h-[120rpx] rounded-full bg-gradient-primary shadow-elegant center flex flex-col gap-[4rpx] press-scale"
+            onClick={handleIssueCard}
           >
-            <Text className="text-[28rpx] font-semibold text-white">充值</Text>
-          </View>
-          <View
-            className="flex-1 h-[96rpx] rounded-[48rpx] bg-primary-bg center press-scale"
-            onClick={goToTransfer}
-          >
-            <Text className="text-[28rpx] font-semibold text-primary">调班</Text>
-          </View>
-          <View
-            className="flex-1 h-[96rpx] rounded-[48rpx] bg-destructive/10 center press-scale"
-            onClick={handleOpenRefund}
-          >
-            <Text className="text-[28rpx] font-semibold text-destructive">退费</Text>
-          </View>
-          <View
-            className="flex-1 h-[96rpx] rounded-[48rpx] bg-white center press-scale border-[3rpx] border-border"
-            onClick={handleDelete}
-          >
-            <Text className="text-[28rpx] font-semibold text-muted-foreground">删除</Text>
+            <Icon name="mdi-plus" size={36} color="white" />
+            <Text className="text-[20rpx] text-white font-medium">发会员卡</Text>
           </View>
         </View>
-      ) : (
-        <View className="fixed bottom-0 left-0 right-0 bg-white px-[32rpx] pt-[24rpx] pb-safe-bar shadow-soft z-10">
+      )}
+
+      {activeTab === 'follow' && (
+        <View className="fixed right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] z-10">
           <View
-            className="h-[96rpx] rounded-[48rpx] bg-primary-bg center press-scale"
-            onClick={() => handleTabChange('parents')}
+            className="w-[120rpx] h-[120rpx] rounded-full bg-gradient-primary shadow-elegant center flex flex-col gap-[4rpx] press-scale"
+            onClick={handleWriteFollow}
           >
-            <Text className="text-[30rpx] font-semibold text-primary">家长绑定</Text>
+            <Icon name="mdi-pencil" size={32} color="white" />
+            <Text className="text-[20rpx] text-white font-medium">写跟进</Text>
           </View>
         </View>
       )}

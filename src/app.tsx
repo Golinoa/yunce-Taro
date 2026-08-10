@@ -16,6 +16,9 @@ import '@/components/lead/ConvertSheet';
 import '@/components/lead/FollowUpSheet';
 import '@/components/Card';
 import '@/components/CardHeader';
+import '@/components/FormRow';
+import '@/components/InlineSelector';
+import '@/components/InlineDropdown';
 import '@/components/ChipPicker';
 import '@/components/SegmentedControl';
 import '@/components/InstallmentPanel';
@@ -26,6 +29,16 @@ import '@/components/schedule/ScheduleCardMenu';
 import '@/components/lead/TrialBookingSkeleton';
 import '@/components/lead/TrialBookingView';
 import '@/components/lead/BookTrialByClassSheet';
+import '@/components/campus/CampusSwitcher';
+import '@/components/campus/CampusTrigger';
+import '@/stores/campus';
+import '@/services/member-card';
+import '@/services/card-type';
+import '@/services/student';
+import '@/services/follow-record';
+import '@/components/student/StudentAvatar';
+import '@/components/teacher/SalaryEditSheet';
+import '@/components/PageContainer';
 import './app.scss';
 
 const App: React.FC<{ children?: React.ReactNode }> = (props) => {

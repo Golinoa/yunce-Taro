@@ -16,15 +16,15 @@ interface StudentState {
   lastFetch: Record<string, number>;
 
   /** 获取教师的学员列表（优先缓存） */
-  fetchByTeacher: (teacherId: string, force?: boolean) => Promise<Student[]>;
+  fetchByTeacher: (teacherId: string, campusId?: string, force?: boolean) => Promise<Student[]>;
   /** 获取学员详情（从缓存中查找，未命中则请求） */
   fetchById: (studentId: string, teacherId?: string) => Promise<Student | null>;
   /** 创建学员后 invalidate 缓存 */
-  invalidate: (teacherId: string) => void;
+  invalidate: (teacherId: string, campusId?: string) => void;
   /** 更新缓存中的单条学员 */
-  updateInCache: (teacherId: string, student: Student) => void;
+  updateInCache: (teacherId: string, student: Student, campusId?: string) => void;
   /** 从缓存中移除学员 */
-  removeFromCache: (teacherId: string, studentId: string) => void;
+  removeFromCache: (teacherId: string, studentId: string, campusId?: string) => void;
 }
 
 /** 缓存有效期 5 分钟 */
@@ -35,34 +35,30 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   loading: {},
   lastFetch: {},
 
-  fetchByTeacher: async (teacherId, force = false) => {
+  fetchByTeacher: async (teacherId, campusId, force = false) => {
     const { cache, lastFetch } = get();
     const now = Date.now();
+    const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
 
     // 缓存有效且非强制刷新
-    if (
-      !force &&
-      cache[teacherId] &&
-      lastFetch[teacherId] &&
-      now - lastFetch[teacherId] < CACHE_TTL
-    ) {
-      return cache[teacherId];
+    if (!force && cache[cacheKey] && lastFetch[cacheKey] && now - lastFetch[cacheKey] < CACHE_TTL) {
+      return cache[cacheKey];
     }
 
-    set((s) => ({ loading: { ...s.loading, [teacherId]: true } }));
+    set((s) => ({ loading: { ...s.loading, [cacheKey]: true } }));
 
     try {
-      const list = await studentService.getByTeacher(teacherId);
+      const list = await studentService.getByTeacher(teacherId, campusId);
       set((s) => ({
-        cache: { ...s.cache, [teacherId]: list },
-        loading: { ...s.loading, [teacherId]: false },
-        lastFetch: { ...s.lastFetch, [teacherId]: now },
+        cache: { ...s.cache, [cacheKey]: list },
+        loading: { ...s.loading, [cacheKey]: false },
+        lastFetch: { ...s.lastFetch, [cacheKey]: now },
       }));
       return list;
     } catch (err) {
       logError('student fetchByTeacher', err);
-      set((s) => ({ loading: { ...s.loading, [teacherId]: false } }));
-      return cache[teacherId] || [];
+      set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
+      return cache[cacheKey] || [];
     }
   },
 
@@ -76,33 +72,48 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     return studentService.getById(studentId);
   },
 
-  invalidate: (teacherId) => {
-    set((s) => ({
-      cache: { ...s.cache, [teacherId]: undefined } as StudentState['cache'],
-      lastFetch: { ...s.lastFetch, [teacherId]: 0 },
-    }));
+  invalidate: (teacherId, campusId) => {
+    set((s) => {
+      const nextCache = { ...s.cache };
+      const nextLastFetch = { ...s.lastFetch };
+      if (campusId) {
+        const cacheKey = `${teacherId}:${campusId}`;
+        delete nextCache[cacheKey];
+        delete nextLastFetch[cacheKey];
+      } else {
+        Object.keys(nextCache).forEach((key) => {
+          if (key === teacherId || key.startsWith(`${teacherId}:`)) {
+            delete nextCache[key];
+            delete nextLastFetch[key];
+          }
+        });
+      }
+      return { cache: nextCache, lastFetch: nextLastFetch };
+    });
   },
 
-  updateInCache: (teacherId, student) => {
+  updateInCache: (teacherId, student, campusId) => {
     set((s) => {
-      const list = s.cache[teacherId];
+      const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
+      const list = s.cache[cacheKey];
       if (!list) return s;
       const idx = list.findIndex((item) => item.id === student.id);
       if (idx >= 0) {
         const newList = [...list];
         newList[idx] = student;
-        return { cache: { ...s.cache, [teacherId]: newList } };
+        return { cache: { ...s.cache, [cacheKey]: newList } };
       }
       // 新增的学员追加到列表
-      return { cache: { ...s.cache, [teacherId]: [...list, student] } };
+      return { cache: { ...s.cache, [cacheKey]: [...list, student] } };
     });
   },
 
-  removeFromCache: (teacherId, studentId) => {
+  removeFromCache: (teacherId, studentId, campusId) => {
     set((s) => {
-      const list = s.cache[teacherId];
+      const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
+      const list = s.cache[cacheKey];
       if (!list) return s;
-      return { cache: { ...s.cache, [teacherId]: list.filter((item) => item.id !== studentId) } };
+      return { cache: { ...s.cache, [cacheKey]: list.filter((item) => item.id !== studentId) } };
     });
   },
 }));

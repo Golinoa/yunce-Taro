@@ -13,12 +13,16 @@ import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
 import {
   classService,
   notificationService,
+  roomService,
+  campusService,
   scheduleService,
   studentService,
   teacherService,
   temporaryRescheduleService,
 } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
+import { useCampusStore } from '@/stores/campus';
+import type { CampusUIModel, Room } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { Schedule, ScheduleColor, DayOfWeek } from '@/types/schedule';
 import type { Student } from '@/types/student';
@@ -154,6 +158,7 @@ const ScheduleForm: React.FC = () => {
   const currentTeacherName = profile?.name || '当前老师';
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
   const fetchClassesByTeacher = useClassStore((state) => state.fetchByTeacher);
+  const { currentCampusId } = useCampusStore();
 
   const routerParams = useMemo(() => {
     const instance = Taro.getCurrentInstance();
@@ -180,6 +185,10 @@ const ScheduleForm: React.FC = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([]);
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
+  const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
+  const [campusId, setCampusId] = useState('');
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [room, setRoom] = useState('');
   const [calendarVisible, setCalendarVisible] = useState(false);
 
   const [mode, setMode] = useState<'student' | 'class'>('student');
@@ -207,16 +216,21 @@ const ScheduleForm: React.FC = () => {
     }
 
     try {
-      const [stuList, clsList, scheduleList, teacherList] = await Promise.all([
+      const [stuList, clsList, scheduleList, teacherList, campusList] = await Promise.all([
         fetchStudentsByTeacher(currentUserId),
         fetchClassesByTeacher(currentUserId),
         scheduleService.getByTeacher(currentUserId),
         teacherService.getList(),
+        campusService.getList(),
       ]);
       setStudents(stuList);
       setClasses(clsList);
       setAllSchedules(scheduleList);
       setTeachers(teacherList);
+      setCampusOptions(campusList);
+
+      const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
+      const fallbackCampusId = currentCampusId || mainCampusId || campusList[0]?.id || '';
 
       if (isEdit && scheduleId) {
         const sch = await scheduleService.getById(scheduleId);
@@ -257,6 +271,12 @@ const ScheduleForm: React.FC = () => {
         setColor(sch.color || 'primary');
         setNote(sch.note || '');
         setReminderMinutes(sch.reminder_minutes || 0);
+
+        const classCampusId = sch.class_id
+          ? clsList.find((c) => c.id === sch.class_id)?.campus_id
+          : undefined;
+        setCampusId(classCampusId || fallbackCampusId);
+        setRoom(sch.room || '');
       } else {
         setOriginalSchedule(null);
         if (stuList.length > 0) setStudentId(stuList[0].id);
@@ -265,6 +285,8 @@ const ScheduleForm: React.FC = () => {
         setSelectedDateValue(dayjs().format('YYYY-MM-DD'));
         setSelectedTeachingTeacherId(currentUserId);
         setSelectedAssistantTeacherId('');
+        setCampusId(fallbackCampusId);
+        setRoom('');
       }
     } catch (err) {
       logError('init schedule form', err);
@@ -274,6 +296,7 @@ const ScheduleForm: React.FC = () => {
     }
   }, [
     currentUserId,
+    currentCampusId,
     fetchClassesByTeacher,
     fetchStudentsByTeacher,
     isEdit,
@@ -286,6 +309,24 @@ const ScheduleForm: React.FC = () => {
     void loadFormData();
   }, [loadFormData]);
 
+  // 根据选中校区加载教室列表
+  useEffect(() => {
+    const loadRooms = async () => {
+      if (!campusId) {
+        setRooms([]);
+        return;
+      }
+      try {
+        const list = await roomService.getList({ campusId });
+        setRooms(list);
+      } catch (err) {
+        logError('schedule-form load rooms', err);
+        setRooms([]);
+      }
+    };
+    loadRooms();
+  }, [campusId]);
+
   const handleModeChange = useCallback((nextMode: 'student' | 'class') => {
     if (!USE_MOCK && nextMode === 'student') {
       Taro.showToast({ title: '真实联调阶段仅支持班级排课', icon: 'none' });
@@ -296,6 +337,26 @@ const ScheduleForm: React.FC = () => {
 
   const studentPickerData = useMemo(() => students.map((item) => item.name), [students]);
   const classPickerData = useMemo(() => classes.map((item) => item.name), [classes]);
+  const campusPickerOptions = useMemo(
+    () => ['请选择校区', ...campusOptions.map((item) => item.name)],
+    [campusOptions],
+  );
+  const campusIndex = useMemo(() => {
+    const index = campusOptions.findIndex((item) => item.id === campusId);
+    return Math.max(0, index + 1);
+  }, [campusOptions, campusId]);
+  const roomOptions = useMemo(() => {
+    const activeNames = rooms.filter((item) => item.status === 'active').map((item) => item.name);
+    const options = [...activeNames];
+    if (room && !options.includes(room)) {
+      options.unshift(room);
+    }
+    return ['请选择', ...options];
+  }, [rooms, room]);
+  const roomIndex = useMemo(
+    () => Math.max(0, roomOptions.indexOf(room || '请选择')),
+    [roomOptions, room],
+  );
   const teacherById = useMemo(
     () =>
       teachers.reduce<Record<string, TeacherUIModel>>((acc, item) => {
@@ -320,6 +381,17 @@ const ScheduleForm: React.FC = () => {
     () => classes.find((item) => item.id === classId) || null,
     [classId, classes],
   );
+
+  // 班级课程时，随班级切换同步校区并清空教室
+  useEffect(() => {
+    if (mode !== 'class') return;
+    const classCampusId = selectedClass?.campus_id;
+    if (classCampusId && classCampusId !== campusId) {
+      setCampusId(classCampusId);
+      setRoom('');
+    }
+  }, [mode, selectedClass, campusId]);
+
   const originalScheduleText = useMemo(() => {
     if (!originalSchedule) {
       return '';
@@ -642,6 +714,7 @@ const ScheduleForm: React.FC = () => {
           day_of_week: targetDayOfWeek,
           start_time: startTime,
           end_time: endTime,
+          room: room || undefined,
           color,
           note: note.trim() || undefined,
           reminder_minutes: reminderMinutes,
@@ -695,7 +768,6 @@ const ScheduleForm: React.FC = () => {
     classId,
     color,
     currentUserId,
-    dayOfWeek,
     endTime,
     handleNotifyStudentAndParents,
     isEdit,
@@ -705,6 +777,7 @@ const ScheduleForm: React.FC = () => {
     originalSchedule,
     originalScheduleText,
     reminderMinutes,
+    room,
     saving,
     scheduleId,
     selectedAssistantTeacherId,
@@ -1164,6 +1237,65 @@ const ScheduleForm: React.FC = () => {
                       </View>
                     </View>
                   )}
+                </View>
+              </View>
+
+              <View className="mb-[24rpx]">
+                <Text className={FORM_SECTION_TITLE_CLASS}>上课地点</Text>
+                <View className={FORM_CARD_CLASS}>
+                  <Picker
+                    mode="selector"
+                    range={campusPickerOptions}
+                    value={campusIndex}
+                    onChange={(e) => {
+                      const index = Number(e.detail.value);
+                      if (index === 0) {
+                        setCampusId('');
+                      } else {
+                        setCampusId(campusOptions[index - 1]?.id || '');
+                      }
+                      setRoom('');
+                    }}
+                  >
+                    <View className={FORM_CELL_CLASS}>
+                      <Text className={FORM_CELL_LABEL_CLASS}>上课校区</Text>
+                      <View className="flex items-center gap-[12rpx]">
+                        <Text
+                          className={
+                            campusId ? 'text-[28rpx] text-[#111827]' : FORM_CELL_VALUE_CLASS
+                          }
+                        >
+                          {campusOptions.find((item) => item.id === campusId)?.name || '请选择'}
+                        </Text>
+                        <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
+                      </View>
+                    </View>
+                  </Picker>
+
+                  <View className="border-t border-[#f1f5f9]">
+                    <Picker
+                      mode="selector"
+                      range={roomOptions}
+                      value={roomIndex}
+                      onChange={(e) => {
+                        const index = Number(e.detail.value);
+                        const value = roomOptions[index];
+                        setRoom(value === '请选择' ? '' : value);
+                      }}
+                    >
+                      <View className={FORM_CELL_CLASS}>
+                        <Text className={FORM_CELL_LABEL_CLASS}>上课教室</Text>
+                        <View className="flex items-center gap-[12rpx]">
+                          <Text
+                            className={room ? 'text-[28rpx] text-[#111827]' : FORM_CELL_VALUE_CLASS}
+                          >
+                            {room || '请选择'}
+                          </Text>
+                          <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
+                        </View>
+                      </View>
+                    </Picker>
+                  </View>
                 </View>
               </View>
 

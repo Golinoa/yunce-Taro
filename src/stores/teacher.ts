@@ -1,19 +1,35 @@
+import dayjs from 'dayjs';
 import { create } from 'zustand';
-import { teacherService, salaryModelService, salarySettingsService } from '@/services/teacher';
+import {
+  teacherService,
+  salaryModelService,
+  salarySettingsService,
+  salaryTemplateService,
+  teacherSalaryRuleService,
+} from '@/services/teacher';
 import type {
   TeacherUIModel,
   TeacherFilter,
   SalarySettings,
   Deduction,
   PendingPayAction,
+  PendingSendAction,
+  SendResult,
   SalaryModel,
+  SalaryTemplate,
+  SalaryRuleConfig,
 } from '@/types/teacher';
 import { logError } from '@/utils/logger';
 
 /** 计算教师薪资总额（含扣款/补发） */
 export function calcTotal(t: TeacherUIModel): number {
-  const lessonFee = t.hours * t.rate;
+  const lessonFee =
+    t.categoryLessonFees?.reduce((sum, item) => sum + item.amount, 0) ?? t.hours * t.rate;
   let total = t.base + lessonFee + t.attend + t.perf;
+  total -= t.socialInsurance || 0;
+  total -= t.lateFine || 0;
+  total -= t.otherFine || 0;
+  total += t.bonusAmount || 0;
   t.deductions.forEach((d) => {
     total += d.type === 'bonus' ? d.amount : -d.amount;
   });
@@ -23,28 +39,36 @@ export function calcTotal(t: TeacherUIModel): number {
 interface TeacherState {
   teachers: TeacherUIModel[];
   salaryModels: SalaryModel[];
+  salaryTemplates: SalaryTemplate[];
   filter: TeacherFilter;
   selectedIds: string[];
   settings: SalarySettings;
   pendingPayAction: PendingPayAction | null;
+  pendingSendAction: PendingSendAction | null;
   loading: boolean;
   error: string | null;
+  /** 当前查看/操作的薪资月份 YYYY-MM */
+  salaryMonth: string;
 
   // 数据加载
-  fetchTeachers: () => Promise<void>;
+  fetchTeachers: (month?: string) => Promise<void>;
   fetchSalaryModels: () => Promise<void>;
+  fetchSalaryTemplates: () => Promise<void>;
   fetchSettings: () => Promise<void>;
-  fetchAll: () => Promise<void>;
+  fetchAll: (month?: string) => Promise<void>;
 
   // 筛选
   setFilter: (filter: Partial<TeacherFilter>) => void;
   getFilteredTeachers: () => TeacherUIModel[];
+  setSalaryMonth: (month: string) => void;
 
   // 薪资操作
   confirmSalary: (id: string) => Promise<void>;
   batchConfirm: (ids: string[]) => Promise<void>;
   setPendingPayAction: (action: PendingPayAction | null) => void;
-  executePay: (remark?: string) => Promise<void>;
+  executePay: (remark?: string, payMethod?: string) => Promise<void>;
+  setPendingSendAction: (action: PendingSendAction | null) => void;
+  executeSend: (remark?: string) => Promise<SendResult>;
 
   // 选择
   toggleSelect: (id: string) => void;
@@ -56,6 +80,12 @@ interface TeacherState {
   updateTeacher: (id: string, updates: Partial<TeacherUIModel>) => Promise<void>;
   resignTeacher: (id: string, resignType: string, reason?: string) => Promise<void>;
   addDeduction: (teacherId: string, deduction: Deduction) => Promise<void>;
+  updateDeduction: (
+    teacherId: string,
+    deductionId: string,
+    updates: Partial<Pick<Deduction, 'reason' | 'amount' | 'type'>>,
+  ) => Promise<void>;
+  deleteDeduction: (teacherId: string, deductionId: string) => Promise<void>;
 
   // 设置
   updateSettings: (updates: Partial<SalarySettings>) => Promise<void>;
@@ -63,6 +93,26 @@ interface TeacherState {
   // 工资模型
   createSalaryModel: (model: SalaryModel) => Promise<void>;
   updateSalaryModel: (id: string, updates: Partial<SalaryModel>) => Promise<void>;
+
+  // 薪资模板
+  createSalaryTemplate: (
+    data: Omit<SalaryTemplate, 'id' | 'createdAt' | 'updatedAt'>,
+  ) => Promise<void>;
+  updateSalaryTemplate: (id: string, updates: Partial<Omit<SalaryTemplate, 'id'>>) => Promise<void>;
+  deleteSalaryTemplate: (id: string) => Promise<boolean>;
+  applySalaryTemplate: (templateId: string, teacherIds: string[]) => Promise<boolean>;
+
+  // 教师薪资规则
+  fetchTeacherSalaryRule: (teacherId: string) => Promise<SalaryRuleConfig | null>;
+  updateTeacherSalaryRule: (
+    teacherId: string,
+    config: SalaryRuleConfig,
+    templateId?: string,
+  ) => Promise<boolean>;
+  copySalaryRuleToTeachers: (
+    sourceTeacherId: string,
+    targetTeacherIds: string[],
+  ) => Promise<{ success: boolean; copiedIds: string[]; failedIds: string[]; message?: string }>;
 
   // 统计
   getActiveCount: () => number;
@@ -74,16 +124,20 @@ interface TeacherState {
 export const useTeacherStore = create<TeacherState>((set, get) => ({
   teachers: [],
   salaryModels: [],
+  salaryTemplates: [],
   filter: { role: 'all', subject: 'all', status: 'active' },
   selectedIds: [],
   settings: { payDay: 15, pushDaysBefore: 1, autoConfirm: false, pushEnabled: true },
   pendingPayAction: null,
+  pendingSendAction: null,
   loading: false,
   error: null,
+  salaryMonth: dayjs().format('YYYY-MM'),
 
   // ===== 数据加载 =====
-  fetchTeachers: async () => {
-    const teachers = await teacherService.getList();
+  fetchTeachers: async (month) => {
+    const targetMonth = month ?? get().salaryMonth;
+    const teachers = await teacherService.getList(undefined, targetMonth);
     set({ teachers });
   },
 
@@ -92,25 +146,34 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     set({ salaryModels });
   },
 
+  fetchSalaryTemplates: async () => {
+    const salaryTemplates = await salaryTemplateService.getList();
+    set({ salaryTemplates });
+  },
+
   fetchSettings: async () => {
     const settings = await salarySettingsService.get();
     set({ settings });
   },
 
-  fetchAll: async () => {
+  fetchAll: async (month) => {
     set({ loading: true, error: null });
     try {
-      const [teachers, salaryModels, settings] = await Promise.all([
-        teacherService.getList(),
+      const targetMonth = month ?? get().salaryMonth;
+      const [teachers, salaryModels, salaryTemplates, settings] = await Promise.all([
+        teacherService.getList(undefined, targetMonth),
         salaryModelService.getList(),
+        salaryTemplateService.getList(),
         salarySettingsService.get(),
       ]);
-      set({ teachers, salaryModels, settings, loading: false });
+      set({ teachers, salaryModels, salaryTemplates, settings, loading: false });
     } catch (err) {
       logError('teacher fetchAll', err);
       set({ loading: false, error: '教师数据加载失败，请重试' });
     }
   },
+
+  setSalaryMonth: (month) => set({ salaryMonth: month }),
 
   // ===== 筛选 =====
   setFilter: (partial) => set((s) => ({ filter: { ...s.filter, ...partial } })),
@@ -154,13 +217,25 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   setPendingPayAction: (action) => set({ pendingPayAction: action }),
 
-  executePay: async (remark) => {
+  executePay: async (remark, payMethod) => {
     const { pendingPayAction } = get();
     if (!pendingPayAction) return;
     const { ids } = pendingPayAction;
-    await teacherService.executePay(ids, remark);
+    await teacherService.executePay(ids, remark, payMethod);
     const teachers = await teacherService.getList();
     set({ teachers, pendingPayAction: null, selectedIds: [] });
+  },
+
+  setPendingSendAction: (action) => set({ pendingSendAction: action }),
+
+  executeSend: async (remark) => {
+    const { pendingSendAction } = get();
+    if (!pendingSendAction) return { success: [], failed: [] };
+    const { ids } = pendingSendAction;
+    const result = await teacherService.sendSalarySlip(ids, remark);
+    const teachers = await teacherService.getList();
+    set({ teachers, pendingSendAction: null });
+    return result;
   },
 
   // ===== 选择 =====
@@ -173,7 +248,9 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   toggleSelectAll: () => {
     const { selectedIds, teachers } = get();
-    const selectable = teachers.filter((t) => t.status === 'active' || t.salaryStatus !== 'paid');
+    const selectable = teachers.filter(
+      (t) => t.status === 'active' || t.salaryStatus !== 'archived',
+    );
     if (selectedIds.length === selectable.length) {
       set({ selectedIds: [] });
     } else {
@@ -204,7 +281,19 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   addDeduction: async (teacherId, deduction) => {
     await teacherService.addDeduction(teacherId, deduction);
-    const teachers = await teacherService.getList();
+    const teachers = await teacherService.getList(undefined, get().salaryMonth);
+    set({ teachers });
+  },
+
+  updateDeduction: async (teacherId, deductionId, updates) => {
+    await teacherService.updateDeduction(teacherId, deductionId, updates);
+    const teachers = await teacherService.getList(undefined, get().salaryMonth);
+    set({ teachers });
+  },
+
+  deleteDeduction: async (teacherId, deductionId) => {
+    await teacherService.deleteDeduction(teacherId, deductionId);
+    const teachers = await teacherService.getList(undefined, get().salaryMonth);
     set({ teachers });
   },
 
@@ -228,20 +317,73 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     set({ salaryModels });
   },
 
+  // ===== 薪资模板 =====
+  createSalaryTemplate: async (data) => {
+    await salaryTemplateService.create(data);
+    const salaryTemplates = await salaryTemplateService.getList();
+    set({ salaryTemplates });
+  },
+
+  updateSalaryTemplate: async (id, updates) => {
+    await salaryTemplateService.update(id, updates);
+    const salaryTemplates = await salaryTemplateService.getList();
+    set({ salaryTemplates });
+  },
+
+  deleteSalaryTemplate: async (id) => {
+    const ok = await salaryTemplateService.remove(id);
+    if (ok) {
+      const salaryTemplates = await salaryTemplateService.getList();
+      set({ salaryTemplates });
+    }
+    return ok;
+  },
+
+  applySalaryTemplate: async (templateId, teacherIds) => {
+    const result = await salaryTemplateService.apply(templateId, teacherIds);
+    if (result.success) {
+      const [teachers, salaryTemplates] = await Promise.all([
+        teacherService.getList(),
+        salaryTemplateService.getList(),
+      ]);
+      set({ teachers, salaryTemplates });
+    }
+    return result.success;
+  },
+
+  // ===== 教师薪资规则 =====
+  fetchTeacherSalaryRule: async (teacherId) => {
+    const rule = await teacherSalaryRuleService.get(teacherId);
+    return rule;
+  },
+
+  updateTeacherSalaryRule: async (teacherId, config, templateId) => {
+    const ok = await teacherSalaryRuleService.update(teacherId, config, templateId);
+    if (ok) {
+      const teachers = await teacherService.getList();
+      set({ teachers });
+    }
+    return ok;
+  },
+
+  copySalaryRuleToTeachers: async (sourceTeacherId, targetTeacherIds) => {
+    const result = await teacherSalaryRuleService.copyToTeachers(sourceTeacherId, targetTeacherIds);
+    if (result.success) {
+      const teachers = await teacherService.getList();
+      set({ teachers });
+    }
+    return result;
+  },
+
   // ===== 统计 =====
   getActiveCount: () => get().teachers.filter((t) => t.status === 'active').length,
-  getPendingCount: () =>
-    get().teachers.filter(
-      (t) =>
-        (t.salaryStatus as string) !== 'paid' &&
-        (t.status === 'active' || (t.salaryStatus as string) !== 'paid'),
-    ).length,
+  getPendingCount: () => get().teachers.filter((t) => t.salaryStatus !== 'archived').length,
   getTotalHours: () =>
     get()
       .teachers.filter((t) => t.status === 'active')
       .reduce((s, t) => s + t.hours, 0),
   getTotalSalary: () =>
     get()
-      .teachers.filter((t) => t.status === 'active' || t.salaryStatus !== 'paid')
+      .teachers.filter((t) => t.status === 'active' || t.salaryStatus !== 'archived')
       .reduce((s, t) => s + calcTotal(t), 0),
 }));

@@ -15,10 +15,10 @@ const UserAgreement: React.FC = () => (
     <View className="mb-5">
       <Text className="text-xl font-semibold text-foreground block mb-2">一、协议范围与接受</Text>
       <Text className="text-lg text-muted-foreground leading-loose block mb-2">
-        欢迎使用本微信小程序（以下简称"本小程序"）。本小程序由开发团队开发并运营。
+        欢迎使用本微信小程序（以下简称“本小程序”）。本小程序由开发团队开发并运营。
       </Text>
       <Text className="text-lg text-muted-foreground leading-loose block mb-2">
-        在您开始使用本小程序之前，请仔细阅读本《用户协议》（以下简称"本协议"）的全部内容。一旦您使用本小程序的任何功能，即视为您已充分理解并同意接受本协议所有条款的约束。如您不同意本协议的任何条款，请立即停止使用本小程序。
+        在您开始使用本小程序之前，请仔细阅读本《用户协议》（以下简称“本协议”）的全部内容。一旦您使用本小程序的任何功能，即视为您已充分理解并同意接受本协议所有条款的约束。如您不同意本协议的任何条款，请立即停止使用本小程序。
       </Text>
     </View>
 
@@ -87,7 +87,7 @@ const UserAgreement: React.FC = () => (
     <View className="mb-5">
       <Text className="text-xl font-semibold text-foreground block mb-2">六、免责声明</Text>
       <Text className="text-lg text-muted-foreground leading-loose block mb-2">
-        本小程序按"现状"和"可得到"的状态提供。我们不对服务的及时性、安全性、准确性作出任何明示或暗示的保证。因不可抗力（包括但不限于自然灾害、政府行为、网络故障等）导致服务中断或数据丢失的，我们不承担任何责任。
+        本小程序按“现状”和“可得到”的状态提供。我们不对服务的及时性、安全性、准确性作出任何明示或暗示的保证。因不可抗力（包括但不限于自然灾害、政府行为、网络故障等）导致服务中断或数据丢失的，我们不承担任何责任。
       </Text>
     </View>
 

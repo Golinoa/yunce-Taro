@@ -12,10 +12,10 @@ interface ClassState {
   loading: Record<string, boolean>;
   lastFetch: Record<string, number>;
 
-  fetchByTeacher: (teacherId: string, force?: boolean) => Promise<Class[]>;
-  invalidate: (teacherId: string) => void;
-  updateInCache: (teacherId: string, cls: Class) => void;
-  removeFromCache: (teacherId: string, classId: string) => void;
+  fetchByTeacher: (teacherId: string, campusId?: string, force?: boolean) => Promise<Class[]>;
+  invalidate: (teacherId: string, campusId?: string) => void;
+  updateInCache: (teacherId: string, cls: Class, campusId?: string) => void;
+  removeFromCache: (teacherId: string, classId: string, campusId?: string) => void;
 }
 
 const CACHE_TTL = 5 * 60 * 1000;
@@ -25,62 +25,73 @@ export const useClassStore = create<ClassState>((set, get) => ({
   loading: {},
   lastFetch: {},
 
-  fetchByTeacher: async (teacherId, force = false) => {
+  fetchByTeacher: async (teacherId, campusId, force = false) => {
     const { cache, lastFetch } = get();
     const now = Date.now();
+    const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
 
-    if (
-      !force &&
-      cache[teacherId] &&
-      lastFetch[teacherId] &&
-      now - lastFetch[teacherId] < CACHE_TTL
-    ) {
-      return cache[teacherId];
+    if (!force && cache[cacheKey] && lastFetch[cacheKey] && now - lastFetch[cacheKey] < CACHE_TTL) {
+      return cache[cacheKey];
     }
 
-    set((s) => ({ loading: { ...s.loading, [teacherId]: true } }));
+    set((s) => ({ loading: { ...s.loading, [cacheKey]: true } }));
 
     try {
-      const list = await classService.getByTeacher(teacherId);
+      const list = await classService.getByTeacher(teacherId, campusId);
       set((s) => ({
-        cache: { ...s.cache, [teacherId]: list },
-        loading: { ...s.loading, [teacherId]: false },
-        lastFetch: { ...s.lastFetch, [teacherId]: now },
+        cache: { ...s.cache, [cacheKey]: list },
+        loading: { ...s.loading, [cacheKey]: false },
+        lastFetch: { ...s.lastFetch, [cacheKey]: now },
       }));
       return list;
     } catch (err) {
       logError('class fetchByTeacher', err);
-      set((s) => ({ loading: { ...s.loading, [teacherId]: false } }));
-      return cache[teacherId] || [];
+      set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
+      return cache[cacheKey] || [];
     }
   },
 
-  invalidate: (teacherId) => {
-    set((s) => ({
-      cache: { ...s.cache, [teacherId]: undefined } as ClassState['cache'],
-      lastFetch: { ...s.lastFetch, [teacherId]: 0 },
-    }));
+  invalidate: (teacherId, campusId) => {
+    set((s) => {
+      const nextCache = { ...s.cache };
+      const nextLastFetch = { ...s.lastFetch };
+      if (campusId) {
+        const cacheKey = `${teacherId}:${campusId}`;
+        delete nextCache[cacheKey];
+        delete nextLastFetch[cacheKey];
+      } else {
+        Object.keys(nextCache).forEach((key) => {
+          if (key === teacherId || key.startsWith(`${teacherId}:`)) {
+            delete nextCache[key];
+            delete nextLastFetch[key];
+          }
+        });
+      }
+      return { cache: nextCache, lastFetch: nextLastFetch };
+    });
   },
 
-  updateInCache: (teacherId, cls) => {
+  updateInCache: (teacherId, cls, campusId) => {
     set((s) => {
-      const list = s.cache[teacherId];
+      const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
+      const list = s.cache[cacheKey];
       if (!list) return s;
       const idx = list.findIndex((item) => item.id === cls.id);
       if (idx >= 0) {
         const newList = [...list];
         newList[idx] = cls;
-        return { cache: { ...s.cache, [teacherId]: newList } };
+        return { cache: { ...s.cache, [cacheKey]: newList } };
       }
-      return { cache: { ...s.cache, [teacherId]: [...list, cls] } };
+      return { cache: { ...s.cache, [cacheKey]: [...list, cls] } };
     });
   },
 
-  removeFromCache: (teacherId, classId) => {
+  removeFromCache: (teacherId, classId, campusId) => {
     set((s) => {
-      const list = s.cache[teacherId];
+      const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
+      const list = s.cache[cacheKey];
       if (!list) return s;
-      return { cache: { ...s.cache, [teacherId]: list.filter((item) => item.id !== classId) } };
+      return { cache: { ...s.cache, [cacheKey]: list.filter((item) => item.id !== classId) } };
     });
   },
 }));

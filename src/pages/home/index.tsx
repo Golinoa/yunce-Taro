@@ -102,7 +102,8 @@ const getOperationSummary = (item: OperationActivityItem): string => {
 
 const Home: React.FC = () => {
   const { profile, currentRole, currentIdentity } = useAuth();
-  const { orgName, campuses, setMainCampus, fetchCampuses } = useCampusStore();
+  const { orgName, campuses, currentCampusId, setMainCampus, setCurrentCampusId, fetchCampuses } =
+    useCampusStore();
   const [roleSheetVisible, setRoleSheetVisible] = useState(false);
   const mainCampus = campuses.find((c) => c.isMain) || campuses[0];
   const navSafeHeight = useNavSafeHeight();
@@ -128,11 +129,12 @@ const Home: React.FC = () => {
   const handleCampusSelect = useCallback(
     async (campus: CampusOption) => {
       setShowCampusPicker(false);
+      setCurrentCampusId(campus.id);
       if (!campus.isMain) {
         await setMainCampus(campus.id);
       }
     },
-    [setMainCampus],
+    [setCurrentCampusId, setMainCampus],
   );
 
   // ---- 教师端状态 ----
@@ -177,58 +179,64 @@ const Home: React.FC = () => {
   // ============================================
   // 统计数据加载
   // ============================================
-  const loadStatsData = useCallback(async (teacherId: string, period: StatsPeriod) => {
-    try {
-      const data = await homeService.getStatsByPeriod(teacherId, period);
-      setStatsData(data);
-    } catch (err) {
-      logError('Home loadStatsData', err);
-    }
-  }, []);
+  const loadStatsData = useCallback(
+    async (teacherId: string, period: StatsPeriod, campusId?: string) => {
+      try {
+        const data = await homeService.getStatsByPeriod(teacherId, period, campusId);
+        setStatsData(data);
+      } catch (err) {
+        logError('Home loadStatsData', err);
+      }
+    },
+    [],
+  );
 
   // ============================================
   // 教师端数据加载
   // ============================================
-  const loadData = useCallback(async () => {
-    if (!profile?.id) return;
+  const loadData = useCallback(
+    async (campusId?: string) => {
+      if (!profile?.id) return;
 
-    if (!isStaffRole(currentRole)) {
-      try {
-        const unread = await homeService.getUnreadCount(profile.id, currentRole);
-        setUnreadCount(unread);
-      } catch (err) {
-        logError('Home loadUnreadCount', err);
-      }
-      return;
-    }
-
-    try {
-      const teacherData = await homeService.getTeacher(profile.id, currentRole);
-      if (!teacherData) {
+      if (!isStaffRole(currentRole)) {
+        try {
+          const unread = await homeService.getUnreadCount(profile.id, currentRole);
+          setUnreadCount(unread);
+        } catch (err) {
+          logError('Home loadUnreadCount', err);
+        }
         return;
       }
-      setTeacher(teacherData);
 
-      const recentLessonRequest =
-        currentRole === 'teacher'
-          ? lessonRecordService.getByTeacher(teacherData.id)
-          : lessonRecordService.getAll();
+      try {
+        const teacherData = await homeService.getTeacher(profile.id, currentRole);
+        if (!teacherData) {
+          return;
+        }
+        setTeacher(teacherData);
 
-      const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
-        homeService.getTodaySchedules(teacherData.id, currentRole),
-        homeService.getUnreadCount(profile.id, currentRole),
-        homeService.getTodoItems(teacherData.id, currentRole),
-        recentLessonRequest,
-      ]);
-      setSchedules(scheduleList);
-      setUnreadCount(unread);
-      setTodoItems(todoList);
-      setRecentRecords(lessonRecords);
-      await loadStatsData(teacherData.id, 'today');
-    } catch (err) {
-      logError('Home loadData', err);
-    }
-  }, [profile, currentRole, loadStatsData]);
+        const recentLessonRequest =
+          currentRole === 'teacher'
+            ? lessonRecordService.getByTeacher(teacherData.id, campusId)
+            : lessonRecordService.getAll();
+
+        const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
+          homeService.getTodaySchedules(teacherData.id, currentRole, campusId),
+          homeService.getUnreadCount(profile.id, currentRole),
+          homeService.getTodoItems(teacherData.id, currentRole, campusId),
+          recentLessonRequest,
+        ]);
+        setSchedules(scheduleList);
+        setUnreadCount(unread);
+        setTodoItems(todoList);
+        setRecentRecords(lessonRecords);
+        await loadStatsData(teacherData.id, 'today', campusId);
+      } catch (err) {
+        logError('Home loadData', err);
+      }
+    },
+    [profile, currentRole, loadStatsData],
+  );
 
   const executeOperationAction = useCallback(async (actionConfig?: OperationActionConfig) => {
     const { target, type } = getOperationTarget(actionConfig);
@@ -320,10 +328,10 @@ const Home: React.FC = () => {
     (period: StatsPeriod) => {
       setStatsPeriod(period);
       if (teacher?.id) {
-        loadStatsData(teacher.id, period);
+        loadStatsData(teacher.id, period, currentCampusId);
       }
     },
-    [teacher, loadStatsData],
+    [teacher, currentCampusId, loadStatsData],
   );
 
   // ============================================
@@ -335,10 +343,10 @@ const Home: React.FC = () => {
     fetchCampuses();
   }, [currentRole, fetchCampuses]);
 
-  // 当身份或登录状态变化时重新加载数据
+  // 当身份、登录状态或当前校区变化时重新加载数据
   useEffect(() => {
-    loadData();
-  }, [profile, currentRole, loadData]);
+    loadData(currentCampusId);
+  }, [profile, currentRole, currentCampusId, loadData]);
 
   useEffect(() => {
     loadOperationContent();
@@ -349,7 +357,7 @@ const Home: React.FC = () => {
       isFirstMount.current = false;
       return;
     }
-    loadData();
+    loadData(currentCampusId);
     loadOperationContent();
   });
 

@@ -86,7 +86,7 @@ const LeadDetailPage: React.FC = () => {
         Taro.showToast({ title: '操作失败', icon: 'none' });
       }
     },
-    [lead, userId, invalidate],
+    [lead, userId, invalidate, loadData],
   );
 
   const handleCloseLead = useCallback(async () => {
@@ -101,7 +101,7 @@ const LeadDetailPage: React.FC = () => {
       loadData(lead.id);
       Taro.showToast({ title: '已标记流失', icon: 'success' });
     }
-  }, [lead, userId, invalidate]);
+  }, [lead, userId, invalidate, loadData]);
 
   const handleFollowUpSubmit = useCallback(
     async (params: {
@@ -121,7 +121,7 @@ const LeadDetailPage: React.FC = () => {
         Taro.showToast({ title: '添加失败', icon: 'none' });
       }
     },
-    [lead, userId, invalidate],
+    [lead, userId, invalidate, loadData],
   );
 
   const handleConvertSubmit = useCallback(
@@ -150,7 +150,7 @@ const LeadDetailPage: React.FC = () => {
         Taro.showToast({ title: '开卡失败', icon: 'none' });
       }
     },
-    [lead, userId, invalidate],
+    [lead, userId, invalidate, loadData],
   );
 
   const handlePhone = useCallback(() => {
@@ -170,7 +170,7 @@ const LeadDetailPage: React.FC = () => {
     } catch {
       Taro.showToast({ title: '保存失败', icon: 'none' });
     }
-  }, [lead, noteValue, userId, invalidate]);
+  }, [lead, noteValue, userId, invalidate, loadData]);
 
   const openNoteEdit = useCallback(() => {
     setNoteValue(lead?.notes || '');

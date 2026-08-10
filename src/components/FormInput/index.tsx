@@ -9,6 +9,9 @@ import React from 'react';
  * - 标签: text-sm(28rpx) font-medium
  * - 输入框: text-base(32rpx)
  * - 错误/提示: text-xs(24rpx)
+ *
+ * 注意：受控模式下 onInput 必须返回 e.detail.value，否则 PC 端微信小程序
+ * 可能出现输入被重置的问题。
  */
 
 export interface FormInputProps {
@@ -30,10 +33,16 @@ export interface FormInputProps {
   multiline?: boolean;
   minHeight?: string;
   password?: boolean;
-  /** 输入框视觉变体 */
-  variant?: 'default' | 'capsule';
+  /** 输入框视觉变体
+   * - default: 带背景边框的独立输入框（标签在上方）
+   * - capsule: 胶囊搜索框
+   * - ghost: 无背景无边框，用于 FormCell 等左标签右输入场景
+   */
+  variant?: 'default' | 'capsule' | 'ghost';
   /** 前缀节点，适合搜索图标等场景 */
   prefixNode?: React.ReactNode;
+  /** 输入框 inline style，用于覆盖 disabled 等原生样式 */
+  inputStyle?: React.CSSProperties;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -57,13 +66,21 @@ const FormInput: React.FC<FormInputProps> = ({
   password = false,
   variant = 'default',
   prefixNode,
+  inputStyle,
 }) => {
   const isCapsule = variant === 'capsule';
+  const isGhost = variant === 'ghost';
+
+  const handleInput = (e: Parameters<NonNullable<InputProps['onInput']>>[0]) => {
+    onInput?.(e);
+    // 必须返回最新值，避免 PC 端受控输入框被重置
+    return e.detail.value;
+  };
 
   return (
-    <View className={cn(!isCapsule && 'mb-4', className)}>
+    <View className={cn(!isCapsule && !isGhost && 'mb-4', className)}>
       {/* 标签行（仅 default 变体显示） */}
-      {label && !isCapsule && (
+      {label && !isCapsule && !isGhost && (
         <View className="flex flex-row items-center gap-1 mb-[12rpx]">
           <Text className="text-sm text-muted-foreground font-medium">{label}</Text>
           {required && <Text className="text-base text-destructive">*</Text>}
@@ -75,9 +92,11 @@ const FormInput: React.FC<FormInputProps> = ({
           'relative w-full flex flex-row items-center',
           isCapsule
             ? 'py-[24rpx] px-[36rpx] rounded-full bg-white border-[2rpx] border-white/70 shadow-[0_12rpx_40rpx_rgba(59,110,245,0.10)]'
-            : 'py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light',
-          error && !isCapsule && 'border-destructive',
-          disabled && 'opacity-60',
+            : isGhost
+              ? 'bg-transparent py-0 px-0'
+              : 'py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light',
+          error && !isCapsule && !isGhost && 'border-destructive',
+          disabled && !inputStyle && 'opacity-60',
         )}
       >
         {prefixNode}
@@ -92,11 +111,11 @@ const FormInput: React.FC<FormInputProps> = ({
               'w-full text-base text-foreground bg-transparent leading-relaxed',
               inputClassName,
             )}
-            style={{ minHeight, height: minHeight }}
+            style={{ minHeight, height: minHeight, ...inputStyle }}
             placeholder={placeholder}
             placeholderClass={placeholderClass || 'input-placeholder'}
             value={value}
-            onInput={onInput}
+            onInput={handleInput}
             maxlength={maxlength}
             disabled={disabled}
           />
@@ -105,12 +124,14 @@ const FormInput: React.FC<FormInputProps> = ({
             className={cn(
               'w-full text-base text-foreground',
               isCapsule && 'text-center',
+              isGhost && 'text-right',
               inputClassName,
             )}
+            style={inputStyle}
             placeholder={placeholder}
             placeholderClass={placeholderClass || 'input-placeholder'}
             value={value}
-            onInput={onInput}
+            onInput={handleInput}
             type={type}
             maxlength={maxlength}
             disabled={disabled}

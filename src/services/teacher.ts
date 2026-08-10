@@ -11,26 +11,46 @@ import {
   mockConfirmSalary,
   mockBatchConfirm,
   mockExecutePay,
+  mockSendSalarySlip,
   mockResignTeacher,
   mockAddDeduction,
+  mockUpdateDeduction,
+  mockDeleteDeduction,
   mockGetSalaryModels,
   mockCreateSalaryModel,
   mockUpdateSalaryModel,
   mockGetSettings,
   mockUpdateSettings,
   mockGetScheduleData,
+  mockGetSalaryTemplates,
+  mockGetSalaryTemplateById,
+  mockCreateSalaryTemplate,
+  mockUpdateSalaryTemplate,
+  mockDeleteSalaryTemplate,
+  mockApplySalaryTemplate,
+  mockGetTeacherSalaryRule,
+  mockUpdateTeacherSalaryRule,
+  mockCopySalaryRuleToTeachers,
+  createDefaultSalaryRule,
 } from '@/data/teacher';
-import type { TeacherUIModel, SalaryModel, SalarySettings, Deduction } from '@/types/teacher';
+import type {
+  TeacherUIModel,
+  SalaryModel,
+  SalarySettings,
+  Deduction,
+  SalaryTemplate,
+  SalaryRuleConfig,
+} from '@/types/teacher';
 
 // ============================================
 // 教师 Service
 // ============================================
 export const teacherService = {
   /** 获取教师列表 */
-  getList: () => mockGetTeachers(),
+  getList: (campusId?: string, month?: string) => mockGetTeachers(campusId, month),
 
   /** 获取在职教师列表（用于班级表单选择器） */
-  getActiveList: () => mockGetActiveTeachers(),
+  getActiveList: (campusId?: string) => mockGetActiveTeachers(campusId),
 
   /** 获取教师详情 */
   getById: (id: string) => mockGetTeacherById(id),
@@ -48,7 +68,11 @@ export const teacherService = {
   batchConfirm: (ids: string[]) => mockBatchConfirm(ids),
 
   /** 发放薪资 */
-  executePay: (ids: string[], remark?: string) => mockExecutePay(ids, remark),
+  executePay: (ids: string[], remark?: string, payMethod?: string) =>
+    mockExecutePay(ids, remark, payMethod),
+
+  /** 发送工资单（供老师核对） */
+  sendSalarySlip: (ids: string[], remark?: string) => mockSendSalarySlip(ids, remark),
 
   /** 教师离职 */
   resign: (id: string, resignType: string, reason?: string) =>
@@ -56,6 +80,17 @@ export const teacherService = {
 
   /** 添加扣款/补发 */
   addDeduction: (teacherId: string, deduction: Deduction) => mockAddDeduction(teacherId, deduction),
+
+  /** 更新扣款/补发 */
+  updateDeduction: (
+    teacherId: string,
+    deductionId: string,
+    updates: Partial<Pick<Deduction, 'reason' | 'amount' | 'type'>>,
+  ) => mockUpdateDeduction(teacherId, deductionId, updates),
+
+  /** 删除扣款/补发 */
+  deleteDeduction: (teacherId: string, deductionId: string) =>
+    mockDeleteDeduction(teacherId, deductionId),
 };
 
 // ============================================
@@ -99,4 +134,41 @@ export const salarySettingsService = {
 export const teacherScheduleService = {
   /** 获取排课数据 */
   getList: () => mockGetScheduleData(),
+};
+
+// ============================================
+// 薪资模板 Service
+// ============================================
+export const salaryTemplateService = {
+  /** 获取薪资模板列表 */
+  getList: () => mockGetSalaryTemplates(),
+  /** 获取单个薪资模板 */
+  getById: (id: string) => mockGetSalaryTemplateById(id),
+  /** 创建薪资模板 */
+  create: (data: Omit<SalaryTemplate, 'id' | 'createdAt' | 'updatedAt'>) =>
+    mockCreateSalaryTemplate(data),
+  /** 更新薪资模板 */
+  update: (id: string, updates: Partial<Omit<SalaryTemplate, 'id'>>) =>
+    mockUpdateSalaryTemplate(id, updates),
+  /** 删除薪资模板 */
+  remove: (id: string) => mockDeleteSalaryTemplate(id),
+  /** 套用薪资模板到多个教师 */
+  apply: (templateId: string, teacherIds: string[]) =>
+    mockApplySalaryTemplate(templateId, teacherIds),
+  /** 创建默认空薪资规则配置 */
+  createDefaultRule: () => createDefaultSalaryRule(),
+};
+
+// ============================================
+// 教师薪资规则 Service
+// ============================================
+export const teacherSalaryRuleService = {
+  /** 获取教师薪资规则配置 */
+  get: (teacherId: string) => mockGetTeacherSalaryRule(teacherId),
+  /** 更新教师薪资规则配置 */
+  update: (teacherId: string, config: SalaryRuleConfig, templateId?: string) =>
+    mockUpdateTeacherSalaryRule(teacherId, config, templateId),
+  /** 把当前教师薪资规则配置复制给其他教师 */
+  copyToTeachers: (sourceTeacherId: string, targetTeacherIds: string[]) =>
+    mockCopySalaryRuleToTeachers(sourceTeacherId, targetTeacherIds),
 };

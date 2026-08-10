@@ -193,6 +193,11 @@ const TODO_CONFIG_MAP: Record<
     icon: 'mdi-calendar-check-outline',
     iconBg: 'leave',
   },
+  salary: {
+    icon: 'mdi-cash-multiple',
+    iconBg: 'alert',
+    url: '/package-teacher/pages/salary-payment/index',
+  },
 };
 
 function getTodayDateString(): string {
@@ -233,7 +238,9 @@ function mapTodoItem(item: TodoItemData): HomeTodoItem {
         ? `${item.time} 前完成备课确认`
         : item.type === 'recharge'
           ? `${item.time} 跟进续费提醒`
-          : `${item.time} 查看安排`;
+          : item.type === 'salary'
+            ? `${item.time} 前往薪资管理`
+            : `${item.time} 查看安排`;
 
   return {
     id: item.id,
@@ -627,21 +634,28 @@ export const homeService = {
   getTodaySchedules: async (
     teacherId: string,
     role?: UserRole | null,
+    campusId?: string,
   ): Promise<HomeScheduleItem[]> => {
     if (!USE_MOCK && role === 'teacher') {
       try {
-        const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');
+        const params = new URLSearchParams();
+        if (campusId) params.set('campusId', campusId);
+        const query = params.toString();
+        const aggregate = await get<BackendTeacherHomeResponse>(
+          `/home/teacher${query ? `?${query}` : ''}`,
+        );
         return mapBackendTeacherHome(aggregate).schedules;
       } catch {
         return [];
       }
     }
 
-    return (await mockGetTodaySchedules(teacherId)).map(mapTodaySchedule);
+    return (await mockGetTodaySchedules(teacherId, campusId)).map(mapTodaySchedule);
   },
 
   /** 获取最近消课记录 */
-  getRecentRecords: (teacherId: string, limit?: number) => mockGetRecentRecords(teacherId, limit),
+  getRecentRecords: (teacherId: string, limit?: number, campusId?: string) =>
+    mockGetRecentRecords(teacherId, limit, campusId),
 
   /** 获取学生的课时套餐 */
   getStudentPackages: (studentId: string) => mockGetStudentPackages(studentId),
@@ -664,15 +678,18 @@ export const homeService = {
   },
 
   /** 获取今日已消课数 */
-  getTodayRecordCount: (teacherId: string) => mockGetTodayRecordCount(teacherId),
+  getTodayRecordCount: (teacherId: string, campusId?: string) =>
+    mockGetTodayRecordCount(teacherId, campusId),
 
   /** 按时段获取统计数据 */
-  getStatsByPeriod: async (teacherId: string, period: StatsPeriod) => {
+  getStatsByPeriod: async (teacherId: string, period: StatsPeriod, campusId?: string) => {
     if (!USE_MOCK) {
       const backendPeriod = period === 'today' ? 'week' : period === 'lastWeek' ? 'week' : period;
       try {
+        const params = new URLSearchParams({ period: backendPeriod });
+        if (campusId) params.set('campusId', campusId);
         const data = await get<BackendTeacherStatsResponse>(
-          `/home/teacher/stats?period=${backendPeriod}`,
+          `/home/teacher/stats?${params.toString()}`,
         );
         return {
           checkinCount: data.lessonCount,
@@ -690,7 +707,7 @@ export const homeService = {
       }
     }
 
-    return mockGetStatsByPeriod(teacherId, period);
+    return mockGetStatsByPeriod(teacherId, period, campusId);
   },
 
   /** 获取首页快捷入口配置 */
@@ -725,7 +742,11 @@ export const homeService = {
   },
 
   /** 获取待办事项列表 */
-  getTodoItems: async (teacherId: string, role?: UserRole | null): Promise<HomeTodoItem[]> => {
+  getTodoItems: async (
+    teacherId: string,
+    role?: UserRole | null,
+    campusId?: string,
+  ): Promise<HomeTodoItem[]> => {
     const [operationAlertList, financeAlertList] = await Promise.all([
       statisticsService.getAlerts(getCurrentAlertQueryParams('operation')).catch(() => []),
       statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch(() => []),
@@ -734,31 +755,42 @@ export const homeService = {
 
     if (!USE_MOCK && role === 'teacher') {
       try {
-        const data = await get<BackendTeacherTodosResponse>('/home/teacher/todos');
+        const params = new URLSearchParams();
+        if (campusId) params.set('campusId', campusId);
+        const query = params.toString();
+        const data = await get<BackendTeacherTodosResponse>(
+          `/home/teacher/todos${query ? `?${query}` : ''}`,
+        );
         return [...alertTodoItems, ...mapBackendTodoItems(data)];
       } catch {
         return alertTodoItems;
       }
     }
 
-    return [...alertTodoItems, ...(await mockGetTodoItems(teacherId)).map(mapTodoItem)];
+    return [...alertTodoItems, ...(await mockGetTodoItems(teacherId, campusId)).map(mapTodoItem)];
   },
 
   /** 获取最近消课记录 */
   getRecentGroups: async (
     teacherId: string,
     role?: UserRole | null,
+    campusId?: string,
   ): Promise<HomeRecentGroup[]> => {
     if (!USE_MOCK && role === 'teacher') {
       try {
-        const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');
+        const params = new URLSearchParams();
+        if (campusId) params.set('campusId', campusId);
+        const query = params.toString();
+        const aggregate = await get<BackendTeacherHomeResponse>(
+          `/home/teacher${query ? `?${query}` : ''}`,
+        );
         return mapBackendTeacherHome(aggregate).recentGroups;
       } catch {
         return [];
       }
     }
 
-    return (await mockGetRecentGroups(teacherId)).map(mapRecentGroup);
+    return (await mockGetRecentGroups(teacherId, campusId)).map(mapRecentGroup);
   },
 
   // 家长端

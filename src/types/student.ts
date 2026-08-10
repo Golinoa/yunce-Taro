@@ -18,6 +18,10 @@ export interface Student {
   parent_id?: string;
   fee_amount?: number;
   fee_method?: FeeMethod;
+  /** 所属校区 ID */
+  campus_id?: string;
+  /** 所属校区名称（冗余展示） */
+  campus_name?: string;
   status?: 'active' | 'deleted';
   created_at: string;
   updated_at: string;

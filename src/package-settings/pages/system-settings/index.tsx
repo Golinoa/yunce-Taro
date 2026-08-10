@@ -11,7 +11,7 @@ import cn from 'classnames';
 import React, { useCallback, useMemo } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
-import { clearVisitedMap } from '@/data/onboarding';
+import { clearVisitedMap } from '@/services/onboarding';
 import { isAdmin, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 
 /** 设置项配置 */

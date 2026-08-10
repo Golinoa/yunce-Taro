@@ -60,6 +60,11 @@ export const colors = {
   error: '0 84% 60%', // #ef4444
   info: '199 89% 48%', // #0EA5E9
 
+  // 薄荷绿（用于课程/消课详情头部卡片等轻量成功场景）
+  mint: '160 100% 97%', // #f4fffa
+  mintForeground: '160 84% 39%', // #10b981
+  mintBorder: '160 60% 90%', // #dff3e8
+
   // 身份角色色（对齐注册流程设计稿）
   rolePrincipal: '38 92% 50%', // #F59E0B 校长
   rolePrincipalGlow: '45 91% 59%', // #FBBF24
@@ -108,6 +113,9 @@ export const hexColors = {
   warning: '#f59e0b',
   error: '#ef4444',
   info: '#0EA5E9',
+  mint: '#f4fffa',
+  mintForeground: '#10b981',
+  mintBorder: '#dff3e8',
   // 身份角色色
   rolePrincipal: '#F59E0B',
   rolePrincipalGlow: '#FBBF24',

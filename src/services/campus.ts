@@ -29,6 +29,16 @@ import {
   mockGetSubjectById,
   mockAddSubject,
   mockDeleteSubject,
+  mockGetVenues,
+  mockGetVenueById,
+  mockAddVenue,
+  mockUpdateVenue,
+  mockDeleteVenue,
+  mockGetRooms,
+  mockGetRoomById,
+  mockAddRoom,
+  mockUpdateRoom,
+  mockDeleteRoom,
 } from '@/data/campus';
 import type {
   CampusUIModel,
@@ -41,6 +51,10 @@ import type {
   CampusOperationalData,
   Subject,
   SubjectFormData,
+  Venue,
+  VenueFormData,
+  Room,
+  RoomFormData,
 } from '@/types/campus';
 import { get, put } from '@/utils/request';
 
@@ -245,4 +259,47 @@ export const subjectService = {
 
   /** 删除科目 */
   delete: (id: string): Promise<boolean> => mockDeleteSubject(id),
+};
+
+// ============================================
+// 场地 Service
+// ============================================
+export const venueService = {
+  /** 获取场地列表（可按校区过滤） */
+  getList: (campusId?: string): Promise<Venue[]> => mockGetVenues(campusId),
+
+  /** 获取场地详情 */
+  getById: async (id: string): Promise<Venue | null> => (await mockGetVenueById(id)) ?? null,
+
+  /** 添加场地 */
+  add: (data: VenueFormData): Promise<Venue> => mockAddVenue(data),
+
+  /** 更新场地 */
+  update: async (id: string, data: Partial<VenueFormData>): Promise<Venue | null> =>
+    (await mockUpdateVenue(id, data)) ?? null,
+
+  /** 删除场地（有关联教室时不可删除） */
+  delete: (id: string): Promise<boolean> => mockDeleteVenue(id),
+};
+
+// ============================================
+// 教室 Service
+// ============================================
+export const roomService = {
+  /** 获取教室列表（可按校区/场地过滤） */
+  getList: (options?: { campusId?: string; venueId?: string }): Promise<Room[]> =>
+    mockGetRooms(options),
+
+  /** 获取教室详情 */
+  getById: async (id: string): Promise<Room | null> => (await mockGetRoomById(id)) ?? null,
+
+  /** 添加教室 */
+  add: (data: RoomFormData): Promise<Room> => mockAddRoom(data),
+
+  /** 更新教室 */
+  update: async (id: string, data: Partial<RoomFormData>): Promise<Room | null> =>
+    (await mockUpdateRoom(id, data)) ?? null,
+
+  /** 删除教室 */
+  delete: (id: string): Promise<boolean> => mockDeleteRoom(id),
 };
