@@ -73,7 +73,7 @@ const ProfileGrid: React.FC<ProfileGridProps> = ({
                 className="flex flex-col items-center gap-[12rpx] active:opacity-70"
                 onClick={item.onClick}
               >
-                <Icon name={item.icon} size="xl" color="#ffa06c" />
+                <Icon name={item.icon} size="xl" color="primaryLight" />
                 <Text className="text-[24rpx] text-foreground-secondary font-medium whitespace-nowrap">
                   {item.label}
                 </Text>

@@ -132,7 +132,190 @@ export const hexColors = {
   petalOrange: '#F59E0B',
   petalRed: '#EF4444',
   petalCyan: '#06B6D4',
+  // 图表色板
+  chart1: '#3B6EF5',
+  chart2: '#8B5CF6',
+  chart3: '#06B6D4',
+  chart4: '#F59E0B',
+  chart5: '#EF4444',
 } as const;
+
+// ============================================
+// 多主题色板系统
+// ============================================
+// 从课表页/我的页提取的重要颜色，扩展为完整主题，支持后续切换。
+// 蓝色主题为默认主题，保留不变；新增珊瑚主题（课表页）和橙色主题（我的页）。
+
+/** 主题标识 */
+export type ThemeKey = 'blue' | 'coral' | 'orange';
+
+/** 可用主题列表 */
+export const THEME_KEYS: ThemeKey[] = ['blue', 'coral', 'orange'];
+
+/** 主题元数据 */
+export const THEME_META: Record<ThemeKey, { label: string; description: string; source: string }> =
+  {
+    blue: { label: '采集蓝', description: '默认蓝色主题', source: 'scheme-bc-fusion-v2' },
+    coral: { label: '珊瑚粉', description: '课表页提取主题', source: 'schedule-page' },
+    orange: { label: '活力橙', description: '我的页提取主题', source: 'profile-page' },
+  };
+
+/** 完整主题色板（每个主题拥有与 colors 相同的 Token 结构，值为 HSL 字符串） */
+export type ThemePalette = Record<keyof typeof colors, string>;
+
+/** 蓝色主题 — 当前默认主题 */
+export const blueTheme: ThemePalette = { ...colors };
+
+/** 珊瑚主题 — 提取自课表页 #f97768、#47c1b6 等关键色 */
+export const coralTheme: ThemePalette = {
+  ...colors,
+  primary: '6 92% 69%', // #f97768
+  primaryForeground: '0 0% 100%',
+  primaryGlow: '6 90% 77%', // #fb9b8f
+  primaryDark: '5 80% 60%', // #e85a4a
+  secondary: '6 100% 95%', // #ffe8e5
+  secondaryForeground: '5 50% 37%', // #8b3a30
+  accent: '174 50% 52%', // #47c1b6
+  accentForeground: '0 0% 100%',
+  accentGlow: '174 50% 67%', // #7dd9d0
+  background: '0 0% 96%', // #f5f5f5
+  foreground: '0 0% 10%',
+  card: '0 0% 100%',
+  cardForeground: '0 0% 10%',
+  muted: '0 0% 94%', // #f0f0f0
+  mutedForeground: '0 0% 54%',
+  border: '0 0% 93%', // #ededed
+  borderLight: '0 0% 93%',
+  input: '0 0% 93%',
+  ring: '6 92% 69%',
+  roleTeacher: '6 92% 69%',
+  roleTeacherGlow: '6 90% 77%',
+  roleTeacherDark: '5 80% 60%',
+  roleParent: '174 50% 52%',
+  roleParentGlow: '174 50% 67%',
+  roleParentDark: '174 45% 45%',
+  petalBlue: '6 92% 69%',
+  petalPurple: '174 50% 52%',
+  chart1: '6 92% 69%',
+  chart2: '174 50% 52%',
+  chart3: '189 94% 43%',
+  chart4: '38 92% 50%',
+  chart5: '0 84% 60%',
+};
+
+/** 橙色主题 — 提取自我的页 #FF8A2A、#FCA45C 等高亮橙 */
+export const orangeTheme: ThemePalette = {
+  ...colors,
+  primary: '27 100% 58%', // #FF8A2A
+  primaryForeground: '0 0% 100%',
+  primaryGlow: '27 96% 67%', // #FCA45C
+  primaryDark: '25 80% 50%', // #e66d1a
+  secondary: '27 100% 95%', // #fff0e5
+  secondaryForeground: '25 77% 28%', // #7a3d10
+  accent: '189 94% 43%', // #06B6D4
+  accentForeground: '0 0% 100%',
+  accentGlow: '187 92% 59%', // #38D5F0
+  background: '30 30% 97%', // #faf8f5
+  foreground: '0 0% 10%',
+  card: '0 0% 100%',
+  cardForeground: '0 0% 10%',
+  muted: '30 20% 96%', // #f5f3f0
+  mutedForeground: '0 0% 54%',
+  border: '30 20% 93%', // #f0ede9
+  borderLight: '30 20% 93%',
+  input: '30 20% 93%',
+  ring: '27 100% 58%',
+  roleTeacher: '27 100% 58%',
+  roleTeacherGlow: '27 96% 67%',
+  roleTeacherDark: '25 80% 50%',
+  roleParent: '189 94% 43%',
+  roleParentGlow: '187 92% 59%',
+  roleParentDark: '191 91% 36%',
+  petalBlue: '27 100% 58%',
+  petalPurple: '189 94% 43%',
+  chart1: '27 100% 58%',
+  chart2: '189 94% 43%',
+  chart3: '189 94% 43%',
+  chart4: '38 92% 50%',
+  chart5: '0 84% 60%',
+};
+
+/** 主题色板映射表 */
+export const themePalettes: Record<ThemeKey, ThemePalette> = {
+  blue: blueTheme,
+  coral: coralTheme,
+  orange: orangeTheme,
+};
+
+/** HEX 色板类型（允许每主题覆盖为任意色值） */
+export type HexColorPalette = Record<keyof typeof hexColors, string>;
+
+/** 按主题组织的 HEX 快捷引用 */
+export const hexThemeColors: Record<ThemeKey, HexColorPalette> = {
+  blue: { ...hexColors },
+  coral: {
+    ...hexColors,
+    primary: '#f97768',
+    primaryLight: '#fb9b8f',
+    primaryDark: '#e85a4a',
+    accent: '#47c1b6',
+    accentLight: '#7dd9d0',
+    background: '#f5f5f5',
+    muted: '#f0f0f0',
+    border: '#ededed',
+    roleTeacher: '#f97768',
+    roleTeacherGlow: '#fb9b8f',
+    roleTeacherDark: '#e85a4a',
+    roleParent: '#47c1b6',
+    roleParentGlow: '#7dd9d0',
+    roleParentDark: '#35a89e',
+    petalBlue: '#f97768',
+    petalPurple: '#47c1b6',
+    chart1: '#f97768',
+    chart2: '#47c1b6',
+  },
+  orange: {
+    ...hexColors,
+    primary: '#FF8A2A',
+    primaryLight: '#FCA45C',
+    primaryDark: '#e66d1a',
+    accent: '#06B6D4',
+    accentLight: '#38D5F0',
+    background: '#faf8f5',
+    muted: '#f5f3f0',
+    border: '#f0ede9',
+    roleTeacher: '#FF8A2A',
+    roleTeacherGlow: '#FCA45C',
+    roleTeacherDark: '#e66d1a',
+    roleParent: '#06B6D4',
+    roleParentGlow: '#38D5F0',
+    roleParentDark: '#0891B2',
+    petalBlue: '#FF8A2A',
+    petalPurple: '#06B6D4',
+    chart1: '#FF8A2A',
+    chart2: '#06B6D4',
+  },
+};
+
+/** 获取指定主题的色板 */
+export function getThemePalette(key: ThemeKey): ThemePalette {
+  return themePalettes[key] ?? blueTheme;
+}
+
+/** 获取指定主题的 HEX 快捷引用 */
+export function getThemeHexColors(key: ThemeKey): HexColorPalette {
+  return hexThemeColors[key] ?? hexColors;
+}
+
+/** 将主题色板转为 CSS 变量声明 */
+export function generateThemeCSSVars(palette: ThemePalette): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const [key, value] of Object.entries(palette)) {
+    const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+    vars[`--${cssKey}`] = value;
+  }
+  return vars;
+}
 
 // ============================================
 // 间距 Token（rpx）

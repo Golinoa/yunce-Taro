@@ -2,12 +2,12 @@
  * TeacherBookingSwitchSheet - 老师预约开关列表弹窗
  *
  * 使用场景：课表页「预约」视图右下角加号按钮触发。
- * 功能说明：展示当前有试听时段的老师列表，每位老师后带一个开关。
+ * 功能说明：展示「展示在私教老师列表」的老师，每位老师后带一个开关。
  * - 开关打开（status='open'）：该老师在日历下方的预约列表中显示，可被预约。
  * - 开关关闭（status='rest'）：该老师不在预约列表中显示，无法被预约。
  *
- * 数据来源：由父组件 TrialBookingView 传入同一份 slots + teachers，
- * 保证弹窗列表与日历下老师列表完全一致（数据来源统一）。
+ * 数据来源：由父组件 TrialBookingView 传入 teachers，
+ * 弹窗列表与日历下老师列表均按 showInPrivateList 过滤，保证数据来源一致。
  */
 import { View, Text, Switch } from '@tarojs/components';
 import cn from 'classnames';
@@ -16,7 +16,6 @@ import BottomSheet from '@/components/BottomSheet';
 import ClassAvatar from '@/components/class/ClassAvatar';
 import Icon from '@/components/Icon';
 import { hexColors } from '@/theme';
-import type { TrialSlotConfig } from '@/types/lead';
 import type { TeacherUIModel } from '@/types/teacher';
 import {
   createTeacherBookingConfig,
@@ -30,15 +29,13 @@ export interface TeacherBookingSwitchSheetProps {
   visible: boolean;
   /** 关闭回调 */
   onClose: () => void;
-  /** 试听时段数据（与日历下老师列表同源） */
-  slots: TrialSlotConfig[];
   /** 教师列表（用于补全老师姓名、科目等信息） */
   teachers: TeacherUIModel[];
   /** 开关变化后通知父组件刷新 */
   onChange?: () => void;
 }
 
-/** 弹窗中展示的老师条目（基于时段数据派生） */
+/** 弹窗中展示的老师条目（基于 showInPrivateList 派生） */
 interface SwitchTeacherItem {
   teacherId: string;
   teacherName: string;
@@ -48,7 +45,6 @@ interface SwitchTeacherItem {
 const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
   visible,
   onClose,
-  slots,
   teachers,
   onChange,
 }) => {
@@ -56,21 +52,16 @@ const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
     readTeacherBookingConfigs(),
   );
 
-  /** 从 slots 派生老师列表（与日历下老师列表数据来源完全一致） */
+  /** 从「展示在私教老师列表」的老师派生弹窗列表（与日历下老师列表同源） */
   const switchTeachers = useMemo<SwitchTeacherItem[]>(() => {
-    const map = new Map<string, SwitchTeacherItem>();
-    slots.forEach((slot) => {
-      if (map.has(slot.teacher_id)) return;
-      // 优先从 teachers 列表补全信息（保证 name/subject 一致）
-      const teacher = teachers.find((t) => t.id === slot.teacher_id);
-      map.set(slot.teacher_id, {
-        teacherId: slot.teacher_id,
-        teacherName: teacher?.name || slot.teacher_name || '未命名老师',
-        subject: teacher?.subject || slot.subject_name || '未配置课程',
-      });
-    });
-    return Array.from(map.values());
-  }, [slots, teachers]);
+    return teachers
+      .filter((t) => t.showInPrivateList === true)
+      .map((teacher) => ({
+        teacherId: teacher.id,
+        teacherName: teacher.name,
+        subject: teacher.subject,
+      }));
+  }, [teachers]);
 
   /** 判断某位老师是否开放预约 */
   const isTeacherOpen = useCallback(

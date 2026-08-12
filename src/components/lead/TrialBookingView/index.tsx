@@ -276,22 +276,22 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
       setSlots(slotList);
       setBookings(bookingList);
 
-      // 为有时段但未配置预约开关的老师自动初始化为 open，保证弹窗开关与日历列表初始一致
-      const teacherMap = new Map(teacherList.map((t) => [t.id, t]));
-      slotList.forEach((slot) => {
-        const teacher = teacherMap.get(slot.teacher_id);
-        if (!teacher) return;
-        if (!readTeacherBookingConfig(slot.teacher_id)) {
-          writeTeacherBookingConfig(
-            createTeacherBookingConfig({
-              teacherId: teacher.id,
-              teacherName: teacher.name,
-              subject: teacher.subject,
-              status: 'open',
-            }),
-          );
-        }
-      });
+      // 为「展示在私教老师列表」且未配置预约开关的老师自动初始化为 open，
+      // 保证详情页打开开关后老师立即出现在私教预约列表中
+      teacherList
+        .filter((t) => t.showInPrivateList === true)
+        .forEach((teacher) => {
+          if (!readTeacherBookingConfig(teacher.id)) {
+            writeTeacherBookingConfig(
+              createTeacherBookingConfig({
+                teacherId: teacher.id,
+                teacherName: teacher.name,
+                subject: teacher.subject,
+                status: 'open',
+              }),
+            );
+          }
+        });
     } finally {
       setLoading(false);
     }
@@ -323,20 +323,13 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
 
   /**
    * 获取指定日期下可展示的老师列表（含当日时段）
-   * 以所有时段中出现过的老师为全集（与弹窗开关列表同源），
+   * 以「展示在私教老师列表」的老师为全集（与详情页开关联动），
    * 再附加当日时段信息：当天有时段则展示具体时段，当天无时段则展示空时段（仍显示老师卡片）
    */
   const getTeachersWithSlots = useCallback(
     (date: dayjs.Dayjs): TeacherWithSlots[] => {
       const dateStr = date.format('YYYY-MM-DD');
       const daySlots = slots.filter((s) => s.lesson_date === dateStr);
-
-      const allTeacherSlotsMap = new Map<string, TrialSlotConfig[]>();
-      slots.forEach((slot) => {
-        const list = allTeacherSlotsMap.get(slot.teacher_id) || [];
-        list.push(slot);
-        allTeacherSlotsMap.set(slot.teacher_id, list);
-      });
 
       const dayTeacherSlotsMap = new Map<string, TrialSlotConfig[]>();
       daySlots.forEach((slot) => {
@@ -345,14 +338,13 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
         dayTeacherSlotsMap.set(slot.teacher_id, list);
       });
 
-      return Array.from(allTeacherSlotsMap.keys())
-        .map((teacherId) => {
-          const teacher = teachers.find((t) => t.id === teacherId);
-          if (!teacher) return null;
+      return teachers
+        .filter((t) => t.showInPrivateList === true)
+        .map((teacher) => {
           // 仅展示在「老师预约开关」中状态为 open 的老师（与弹窗开关完全联动）
-          const bookingConfig = readTeacherBookingConfig(teacherId);
+          const bookingConfig = readTeacherBookingConfig(teacher.id);
           if (!bookingConfig || bookingConfig.status !== 'open') return null;
-          const teacherDaySlots = dayTeacherSlotsMap.get(teacherId) || [];
+          const teacherDaySlots = dayTeacherSlotsMap.get(teacher.id) || [];
           return {
             teacher,
             slots: teacherDaySlots,
@@ -562,11 +554,10 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
         )}
       </CalendarSwiper>
 
-      {/* 老师预约开关弹窗：直接复用本组件已加载的 slots + teachers，保证数据来源统一 */}
+      {/* 老师预约开关弹窗：直接复用本组件已加载的 teachers，保证数据来源统一 */}
       <TeacherBookingSwitchSheet
         visible={switchSheetVisible}
         onClose={() => onSwitchSheetClose?.()}
-        slots={slots}
         teachers={teachers}
         onChange={() => setSwitchVersion((v) => v + 1)}
       />

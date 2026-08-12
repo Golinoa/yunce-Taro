@@ -253,7 +253,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         <Text
           className={cn(
             'text-[28rpx] leading-[40rpx]',
-            selected ? 'text-destructive font-bold' : 'text-muted-foreground',
+            selected ? 'text-schedule-calendar-today font-bold' : 'text-muted-foreground',
           )}
         >
           {WEEKDAY_LABELS[index]}
@@ -261,19 +261,21 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         <View
           className={cn(
             'mt-[8rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full',
-          )}
-          style={{
-            backgroundColor: selected
-              ? '#ef4444'
+            selected
+              ? 'bg-schedule-calendar-selected'
               : today
-                ? 'rgba(239, 68, 68, 0.12)'
-                : 'transparent',
-          }}
+                ? 'bg-schedule-calendar-today'
+                : 'bg-transparent',
+          )}
         >
           <Text
             className={cn(
               'text-[28rpx] font-semibold',
-              selected ? 'text-white' : today ? 'text-destructive' : 'text-foreground',
+              selected
+                ? 'text-schedule-calendar-selected'
+                : today
+                  ? 'text-schedule-calendar-today'
+                  : 'text-foreground',
             )}
           >
             {date.date()}
@@ -281,7 +283,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         </View>
         <View className="mt-[10rpx] h-[8rpx] w-[8rpx] rounded-full">
           {dotType === 'active' ? (
-            <View className="h-[8rpx] w-[8rpx] rounded-full bg-destructive" />
+            <View className="h-[8rpx] w-[8rpx] rounded-full bg-schedule-calendar-dot" />
           ) : null}
           {dotType === 'past' ? (
             <View className="h-[8rpx] w-[8rpx] rounded-full bg-muted-foreground" />
@@ -305,40 +307,46 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
       >
         <View className="flex items-center">
           <View
-            className="flex h-[84rpx] w-[84rpx] flex-col items-center justify-center rounded-full"
-            style={{
-              backgroundColor: isSelected
-                ? '#ef4444'
+            className={cn(
+              'flex h-[64rpx] w-[64rpx] flex-col items-center justify-center rounded-full',
+              isSelected
+                ? 'bg-schedule-calendar-selected'
                 : isToday
-                  ? 'rgba(239, 68, 68, 0.12)'
-                  : 'transparent',
-            }}
+                  ? 'bg-schedule-calendar-today'
+                  : 'bg-transparent',
+            )}
           >
             <Text
-              className="text-[28rpx] font-semibold"
-              style={{
-                color: isSelected
-                  ? '#ffffff'
+              className={cn(
+                'text-[28rpx] font-semibold',
+                isSelected
+                  ? 'text-schedule-calendar-selected'
                   : inCurrentMonth
                     ? isToday
-                      ? '#ef4444'
-                      : '#111827'
-                    : '#c8ced8',
-              }}
+                      ? 'text-schedule-calendar-today'
+                      : 'text-foreground'
+                    : 'text-schedule-calendar-outside',
+              )}
             >
               {date.date()}
             </Text>
-            <View className="mt-[6rpx] h-[8rpx] w-[8rpx] rounded-full">
-              {dotType === 'active' ? (
-                <View
-                  className="h-[8rpx] w-[8rpx] rounded-full"
-                  style={{ backgroundColor: isSelected ? '#ffffff' : '#ef4444' }}
-                />
-              ) : null}
-              {dotType === 'past' ? (
-                <View className="h-[8rpx] w-[8rpx] rounded-full bg-[#b7bfcc]" />
-              ) : null}
-            </View>
+            {dotType !== 'none' && (
+              <View className="mt-[6rpx] h-[8rpx] w-[8rpx] rounded-full">
+                {dotType === 'active' ? (
+                  <View
+                    className={cn(
+                      'h-[8rpx] w-[8rpx] rounded-full',
+                      isSelected
+                        ? 'bg-schedule-calendar-selected-text'
+                        : 'bg-schedule-calendar-dot',
+                    )}
+                  />
+                ) : null}
+                {dotType === 'past' ? (
+                  <View className="h-[8rpx] w-[8rpx] rounded-full bg-muted-foreground" />
+                ) : null}
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -370,11 +378,11 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
 
         {showTodayButton ? (
           <View
-            className="flex h-[64rpx] items-center justify-center gap-[8rpx] rounded-full border border-destructive/12 bg-destructive/8 px-[22rpx] shadow-[0_8rpx_20rpx_rgba(239,68,68,0.08)]"
+            className="flex h-[64rpx] items-center justify-center gap-[8rpx] rounded-full border border-primary/12 bg-primary/8 px-[22rpx] shadow-schedule-today"
             onClick={() => commitDateChange(dayjs())}
           >
-            <Icon name="mdi-calendar-check-outline" size="xs" color="destructive" />
-            <Text className="text-[24rpx] font-semibold text-destructive">回到今天</Text>
+            <Icon name="mdi-calendar-check-outline" size="xs" color="primary" />
+            <Text className="text-[24rpx] font-semibold text-primary">回到今天</Text>
           </View>
         ) : (
           <View />
@@ -464,7 +472,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             <Icon
               name={isMonthViewExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'}
               size="sm"
-              color="destructive"
+              color="primary"
             />
           </View>
         </View>

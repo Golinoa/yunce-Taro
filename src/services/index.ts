@@ -70,5 +70,7 @@ export { statisticsService } from './statistics';
 export { leadService } from './lead';
 export type { TrialCourseSlot } from './lead';
 export { classBookingService } from './class-booking';
+export { venueBookingService } from './venue-booking';
+export type { BookableVenue, VenueBookingRecord, VenueBookingSlot } from '@/types/venue-booking';
 export { onboardingService } from './onboarding';
 export type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';

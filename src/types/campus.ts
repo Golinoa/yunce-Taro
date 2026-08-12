@@ -403,8 +403,8 @@ export interface Room {
   status: RoomStatus;
   /** 是否开启场地预约模式 */
   bookingEnabled?: boolean;
-  /** 场地照片 URL */
-  photo?: string;
+  /** 场地照片 URL 列表（最多 3 张） */
+  photos?: string[];
   /** 开放开始时间（HH:mm） */
   openTimeStart?: string;
   /** 开放结束时间（HH:mm） */
@@ -436,8 +436,8 @@ export interface RoomFormData {
   status: RoomStatus;
   /** 是否开启场地预约模式 */
   bookingEnabled?: boolean;
-  /** 场地照片 URL */
-  photo?: string;
+  /** 场地照片 URL 列表（最多 3 张） */
+  photos?: string[];
   /** 开放开始时间（HH:mm） */
   openTimeStart?: string;
   /** 开放结束时间（HH:mm） */

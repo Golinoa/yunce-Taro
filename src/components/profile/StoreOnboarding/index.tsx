@@ -64,10 +64,10 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
       </View>
 
       {/* 进度条 */}
-      <View className="h-[12rpx] rounded-full bg-progress-orange-track overflow-hidden mb-[32rpx]">
+      <View className="h-[12rpx] rounded-full bg-primary-15 overflow-hidden mb-[32rpx]">
         <View
           className={cn(
-            'h-full rounded-full bg-progress-orange transition-all duration-300',
+            'h-full rounded-full bg-primary transition-all duration-300',
             progressClass,
           )}
         />
@@ -86,7 +86,7 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
             >
               <View className="relative">
                 {/* 图标加大：72rpx */}
-                <Icon name={step.icon} size={72} color="#ffa06c" />
+                <Icon name={step.icon} size={72} color="primaryLight" />
                 {step.completed ? (
                   /* 完成标记：悬浮在右上角，稍微接触一部分 */
                   <View className="absolute -top-[12rpx] -right-[12rpx] w-[36rpx] h-[36rpx] rounded-full bg-success center">
@@ -128,7 +128,7 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
             className="flex flex-col items-center gap-[14rpx] active:opacity-70"
             onClick={() => onExtraClick?.()}
           >
-            <Icon name={item.icon} size={72} color="#ffa06c" />
+            <Icon name={item.icon} size={72} color="primaryLight" />
             <Text className="text-[24rpx] text-foreground-secondary font-medium whitespace-nowrap">
               {item.label}
             </Text>

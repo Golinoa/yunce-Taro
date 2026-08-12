@@ -96,6 +96,8 @@ export interface Class {
   room?: string;
   /** 科目 ID（用于匹配会员卡课程科目） */
   subject_id?: string;
+  /** 课程分类 ID（决定约课首页 Tab 归属） */
+  category_id?: string;
 }
 
 /**

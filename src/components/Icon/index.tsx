@@ -4,8 +4,9 @@
  * 颜色映射对齐设计稿 scheme-bc-fusion-v2.html（蓝色主题）
  */
 import { View } from '@tarojs/components';
-import React from 'react';
-import { hexColors } from '@/theme';
+import React, { useMemo } from 'react';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import { MDI_ICONS } from './icons';
 
 export type IconName = keyof typeof MDI_ICONS;
@@ -48,31 +49,43 @@ const SIZE_MAP: Record<Exclude<IconSize, number>, number> = {
   xxxl: 80,
 };
 
-// 颜色映射：以 theme.ts 的 hexColors 为单一数据源
-const COLOR_MAP: Record<string, string> = {
-  primary: hexColors.primary, // #3B6EF5
-  primaryLight: hexColors.primaryLight, // #6B95F5
-  'primary-light': hexColors.primaryLight,
-  primaryDark: hexColors.primaryDark, // #2563EB
-  'primary-dark': hexColors.primaryDark,
-  accent: hexColors.accent, // #8B5CF6
-  accentLight: hexColors.accentLight, // #A78BFA
-  'accent-light': hexColors.accentLight,
-  purple: hexColors.accent, // #8B5CF6（语义同 accent）
-  success: hexColors.success, // #10b981
-  warning: hexColors.warning, // #f59e0b
-  amber: hexColors.warning, // 兼容旧用法
-  error: hexColors.error, // #ef4444
-  info: hexColors.info, // #0EA5E9
+// 基础颜色映射（保留兜底，主题未覆盖时使用）
+const BASE_COLOR_MAP: Record<string, string> = {
   white: '#FFFFFF',
-  foreground: hexColors.foreground, // #1a1a1a
-  foregroundSecondary: hexColors.foregroundSecondary, // #555555
-  'foreground-secondary': hexColors.foregroundSecondary,
-  muted: hexColors.mutedForeground, // #8a8a8a（语义同 mutedForeground）
-  mutedForeground: hexColors.mutedForeground, // #8a8a8a
-  'muted-foreground': hexColors.mutedForeground,
-  destructive: hexColors.destructive, // #ef4444
+  inherit: '',
 };
+
+/** 根据当前主题生成命名颜色映射 */
+function useThemeColorMap(): Record<string, string> {
+  const { activeTheme } = useThemeStore();
+  return useMemo(() => {
+    const hex = getThemeHexColors(activeTheme);
+    return {
+      ...BASE_COLOR_MAP,
+      primary: hex.primary,
+      primaryLight: hex.primaryLight,
+      'primary-light': hex.primaryLight,
+      primaryDark: hex.primaryDark,
+      'primary-dark': hex.primaryDark,
+      accent: hex.accent,
+      accentLight: hex.accentLight,
+      'accent-light': hex.accentLight,
+      purple: hex.accent,
+      success: hex.success,
+      warning: hex.warning,
+      amber: hex.warning,
+      error: hex.error,
+      info: hex.info,
+      foreground: hex.foreground,
+      foregroundSecondary: hex.foregroundSecondary,
+      'foreground-secondary': hex.foregroundSecondary,
+      muted: hex.mutedForeground,
+      mutedForeground: hex.mutedForeground,
+      'muted-foreground': hex.mutedForeground,
+      destructive: hex.destructive,
+    };
+  }, [activeTheme]);
+}
 
 const Icon: React.FC<IconProps> = ({
   name,
@@ -82,11 +95,12 @@ const Icon: React.FC<IconProps> = ({
   onClick,
 }) => {
   const sizeRpx = typeof size === 'number' ? size : SIZE_MAP[size];
+  const colorMap = useThemeColorMap();
   const fillColor =
-    color !== 'inherit' && !COLOR_MAP[color]
+    color !== 'inherit' && !colorMap[color]
       ? color
       : color !== 'inherit'
-        ? COLOR_MAP[color]
+        ? colorMap[color]
         : undefined;
 
   // 首先尝试直接查找

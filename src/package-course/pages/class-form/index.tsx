@@ -15,8 +15,9 @@ import { classService } from '@/services';
 import { campusService, roomService } from '@/services/campus';
 import { teacherService } from '@/services/teacher';
 import { useStudentStore, useClassStore } from '@/stores';
+import { useCourseCategoryStore } from '@/stores/course-category';
 import type { CampusUIModel, Room } from '@/types/campus';
-import type { Class, ClassType } from '@/types/class';
+import type { Class, ClassScheduleMode, ClassType } from '@/types/class';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -69,6 +70,11 @@ const ClassForm: React.FC = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [currentClass, setCurrentClass] = useState<Class | null>(null);
+
+  // 课程分类
+  const [categoryId, setCategoryId] = useState('');
+  const categories = useCourseCategoryStore((state) => state.categories);
+  const fetchCategories = useCourseCategoryStore((state) => state.fetchList);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
@@ -101,6 +107,8 @@ const ClassForm: React.FC = () => {
         campusService.getList(),
       ]);
 
+      await fetchCategories();
+
       setAllStudents(stuList);
       setTeacherOptions(activeTeachers);
       setCampusOptions(campusList);
@@ -131,6 +139,7 @@ const ClassForm: React.FC = () => {
         setTeachers(cls.teachers?.length ? cls.teachers : currentUserId ? [currentUserId] : []);
         setCampusId(cls.campus_id || mainCampusId);
         setRoom(cls.room || '');
+        setCategoryId(cls.category_id || '');
         setSelectedStudentIds(classStudents.map((student) => student.id));
         return;
       }
@@ -147,6 +156,7 @@ const ClassForm: React.FC = () => {
       setTeachers(currentUserId ? [currentUserId] : []);
       setCampusId(mainCampusId);
       setRoom('');
+      setCategoryId('');
       setSelectedStudentIds([]);
     } catch (error) {
       logError('init class form', error);
@@ -154,11 +164,18 @@ const ClassForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [classId, currentUserId, isEdit, fetchStudentsByTeacher]);
+  }, [classId, currentUserId, isEdit, fetchStudentsByTeacher, fetchCategories]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // 分类加载完成后自动填充默认值
+  useEffect(() => {
+    if (!categoryId && categories.length > 0) {
+      setCategoryId(categories[0]?.id || '');
+    }
+  }, [categories, categoryId]);
 
   // 根据选中校区加载教室列表
   useEffect(() => {
@@ -198,6 +215,20 @@ const ClassForm: React.FC = () => {
       (s) => s.name.toLowerCase().includes(kw) || (s.phone || '').includes(kw),
     );
   }, [allStudents, pickerSearch]);
+
+  /** 当前选中的课程分类 */
+  const currentCategory = useMemo(
+    () => categories.find((c) => c.id === categoryId),
+    [categories, categoryId],
+  );
+
+  /** 根据分类模式推导排课模式 */
+  const scheduleMode: ClassScheduleMode | undefined = useMemo(() => {
+    if (!currentCategory) return undefined;
+    if (currentCategory.mode === 'class') return 'fixed';
+    if (currentCategory.mode === 'group') return 'open';
+    return undefined;
+  }, [currentCategory]);
 
   const submitBlockedReason = useMemo(() => {
     if (!currentUserId) return '未获取到登录信息，请重新进入页面';
@@ -348,6 +379,8 @@ const ClassForm: React.FC = () => {
         campus_id: campusId || undefined,
         campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
         room: room || undefined,
+        category_id: categoryId || undefined,
+        schedule_mode: scheduleMode,
         ...(classType === 'limited'
           ? { total_lessons: parseInt(totalLessons), start_date: startDate, end_date: endDate }
           : {}),
@@ -402,6 +435,8 @@ const ClassForm: React.FC = () => {
     campusOptions,
     room,
     saving,
+    categoryId,
+    scheduleMode,
     invalidateClasses,
     invalidateStudents,
   ]);
@@ -501,6 +536,30 @@ const ClassForm: React.FC = () => {
               }}
               error={errors.name}
             />
+
+            {/* 课程分类 */}
+            <View className="flex flex-col">
+              <View className="flex items-center gap-1 mb-[12rpx]">
+                <Text className="text-sm text-muted-foreground font-medium">课程分类</Text>
+                <Text className="text-xs text-destructive">*</Text>
+              </View>
+              <ChipPicker
+                options={categories.map((c) => ({ label: c.name, value: c.id }))}
+                value={categoryId}
+                onChange={(val) => setCategoryId(val as string)}
+              />
+              {currentCategory && (
+                <View className="flex gap-[12rpx] mt-3">
+                  <View className="flex-1 py-2 px-3 rounded-xl bg-primary-5">
+                    <Text className="text-xs text-primary font-medium">
+                      {currentCategory.mode === 'class' && '固定排课模式'}
+                      {currentCategory.mode === 'group' && '开放预约模式'}
+                      {currentCategory.mode === 'private' && '老师预约模式'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
 
             {/* 上课类型 */}
             <View className="flex flex-col">

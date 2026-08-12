@@ -1052,6 +1052,7 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     auto_open_type: cls.autoOpenType,
     min_open_count: cls.minOpenCount,
     subject_id: cls.subjectId,
+    category_id: cls.categoryId,
   };
 }
 

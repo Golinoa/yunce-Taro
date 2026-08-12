@@ -223,21 +223,21 @@ export default defineConfig({
       { background: 'linear-gradient(135deg, #9CA3AF 0%, #6B7280 50%, #4B5563 100%)' },
     ],
 
-    // ===== 个人中心橙色主题（对齐参考设计稿，高亮橙渐变） =====
+    // ===== 个人中心橙色主题（接入主题系统，随 theme class 切换） =====
     [
       'bg-profile-orange',
-      { background: 'linear-gradient(135deg, #FF8A2A 0%, #FF8A2A 100%)' },
+      { background: 'linear-gradient(135deg, var(--profile-primary) 0%, var(--profile-primary) 100%)' },
     ],
-    ['text-profile-orange', { color: '#FCA45C' }],
-    ['text-profile-orange-soft', { color: '#FCA45C' }],
-    ['bg-profile-orange-soft', { background: 'rgba(255, 138, 76, 0.10)' }],
-    ['bg-profile-orange-solid', { background: '#FF8A2A' }],
+    ['text-profile-orange', { color: 'var(--profile-primary)' }],
+    ['text-profile-orange-soft', { color: 'var(--profile-primary-soft)' }],
+    ['bg-profile-orange-soft', { background: 'var(--profile-primary-10)' }],
+    ['bg-profile-orange-solid', { background: 'var(--profile-primary)' }],
     ['bg-profile-follow', { background: 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%)' }],
     ['text-profile-follow-muted', { color: 'rgba(255, 255, 255, 0.65)' }],
     ['rounded-b-48rpx', { 'border-radius': '0 0 48rpx 48rpx' }],
-    ['shadow-profile-stats', { 'box-shadow': '0 12rpx 40rpx -16rpx rgba(255, 112, 67, 0.18)' }],
+    ['shadow-profile-stats', { 'box-shadow': '0 12rpx 40rpx -16rpx hsl(var(--primary) / 0.18)' }],
     ['rotate-n12', { transform: 'rotate(-12deg)' }],
-    // 个人中心头像双层实线边框外层色值
+    // 个人中心头像双层实线边框外层色值（非主题色，保持固定）
     ['border-profile-avatar-outer', { 'border-color': '#D8D2C7' }],
 
     // ===== 进度条渐变（使用 CSS 变量） =====
@@ -896,22 +896,33 @@ export default defineConfig({
     // ===== 品牌色 =====
     'text-wechat': { color: '#07C160' },
 
-    // ===== 课表页复刻（设计图 bb7aaae86d5b28251be2140a59b943e.jpg） =====
-    'bg-schedule-page': { background: '#f5f5f5' },
-    'bg-schedule-header': { background: '#f97768' },
-    'text-schedule-header': { color: '#f97768' },
-    'border-schedule-header': { 'border-color': '#f4a396' },
-    'bg-schedule-selected-date': { background: '#59cfc6' },
-    'text-schedule-selected-date': { color: '#59cfc6' },
-    'bg-schedule-dot': { background: '#f0988b' },
-    'bg-schedule-attend': { background: '#f97768' },
-    'bg-schedule-adjust': { background: '#47c1b6' },
-    'bg-schedule-edit': { background: '#ffb000' },
-    'bg-schedule-delete': { background: '#9da0a8' },
-    'bg-schedule-cancel': { background: '#6f92ce' },
-    'text-schedule-link': { color: '#4a74ff' },
-    'shadow-schedule-fab': { 'box-shadow': '0 12rpx 30rpx rgba(249, 119, 104, 0.3)' },
-    'border-schedule-soft': { 'border-color': '#ececec' },
+    // ===== 课表页语义色（接入主题系统，随 theme class 切换） =====
+    'bg-schedule-page': { background: 'var(--schedule-page)' },
+    'bg-schedule-header': { background: 'var(--schedule-header)' },
+    'text-schedule-header': { color: 'var(--schedule-header)' },
+    'border-schedule-header': { 'border-color': 'var(--schedule-header-soft)' },
+    'bg-schedule-selected-date': { background: 'var(--schedule-selected-date)' },
+    'text-schedule-selected-date': { color: 'var(--schedule-selected-date)' },
+    'bg-schedule-dot': { background: 'var(--schedule-dot)' },
+    'bg-schedule-attend': { background: 'var(--schedule-attend)' },
+    'bg-schedule-adjust': { background: 'var(--schedule-adjust)' },
+    'bg-schedule-edit': { background: 'var(--schedule-edit)' },
+    'bg-schedule-delete': { background: 'var(--schedule-delete)' },
+    'bg-schedule-cancel': { background: 'var(--schedule-cancel)' },
+    'text-schedule-link': { color: 'var(--schedule-link)' },
+    'shadow-schedule-fab': { 'box-shadow': '0 12rpx 30rpx hsl(var(--primary) / 0.3)' },
+    'border-schedule-soft': { 'border-color': 'hsl(var(--border))' },
+    'bg-schedule-header-10': { background: 'hsl(var(--primary) / 0.1)' },
+    'bg-btn-disabled': { background: 'hsl(var(--muted-foreground))' },
+
+    // ===== 课表日历语义色（接入主题系统，随 theme class 切换） =====
+    'bg-schedule-calendar-selected': { background: 'var(--schedule-calendar-selected-bg)' },
+    'text-schedule-calendar-selected': { color: 'var(--schedule-calendar-selected-text)' },
+    'bg-schedule-calendar-today': { background: 'var(--schedule-calendar-today-bg)' },
+    'text-schedule-calendar-today': { color: 'var(--schedule-calendar-today-text)' },
+    'bg-schedule-calendar-dot': { background: 'var(--schedule-calendar-dot)' },
+    'text-schedule-calendar-outside': { color: 'var(--schedule-calendar-outside-text)' },
+    'shadow-schedule-today': { 'box-shadow': '0 8rpx 20rpx hsl(var(--primary) / 0.08)' },
 
     // ===== 注册页装饰效果 =====
     'bg-register-deco': {

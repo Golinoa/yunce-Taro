@@ -13,11 +13,9 @@ import BookTrialByClassSheet from '@/components/lead/BookTrialByClassSheet';
 import TrialBookingView from '@/components/lead/TrialBookingView';
 import PageContainer from '@/components/PageContainer';
 import ScheduleActionButton from '@/components/schedule/ScheduleActionButton';
-import ScheduleBookingSwitch, {
-  type ScheduleBookingTab,
-} from '@/components/schedule/ScheduleBookingSwitch';
 import ScheduleCard from '@/components/schedule/ScheduleCard';
 import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
+import VenueBookingCard from '@/components/schedule/VenueBookingCard';
 import { BRAND_LOGO } from '@/constants/brand';
 import {
   classBookingService,
@@ -29,24 +27,53 @@ import {
   studentService,
   teacherService,
   temporaryRescheduleService,
+  venueBookingService,
 } from '@/services';
 import { useCampusStore } from '@/stores/campus';
+import { useCourseCategoryStore } from '@/stores/course-category';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import { CLASS_LEVEL_LABELS } from '@/types/class';
+import type { CourseCategoryMode } from '@/types/course-category';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
+import type { BookableVenue } from '@/types/venue-booking';
 import { isParentRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { hasTrialPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
 
 type ScheduleCardStatus = 'urgent' | 'upcoming' | 'active' | 'done' | 'ended' | 'cancelled';
 type BatchActionType = 'reschedule' | 'delete';
 type ScheduleDangerActionType = 'cancel' | 'delete' | 'batch-delete';
+
+type ScheduleTabType = 'category' | 'venue';
+
+interface ScheduleTabItem {
+  /** Tab 唯一标识 */
+  key: string;
+  /** Tab 类型 */
+  type: ScheduleTabType;
+  /** 显示文案 */
+  label: string;
+  /** 分类模式（仅 category 类型） */
+  mode?: CourseCategoryMode;
+  /** 分类 ID（独立展示分类专用） */
+  categoryId?: string;
+  /** 排序序号，用于 Tab 排列 */
+  sortOrder: number;
+}
+
+/** 基础模式 Tab 默认文案 */
+const BASE_MODE_LABEL: Record<CourseCategoryMode, string> = {
+  class: '班课',
+  group: '团课',
+  private: '私教',
+};
 
 interface ScheduleCardItem {
   id: string;
@@ -79,8 +106,27 @@ const FULL_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '
 const FILTER_ALL_CLASS = '';
 const SCHEDULE_CARD_SWIPER_DURATION = 260;
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
+const NEW_CATEGORY_ACTIVE_KEY = 'yunce:schedule:new_category_active_id';
 /** 开放预约卡片最多展示的前 x 个已约学员头像 */
 const OPEN_BOOKING_MAX_VISIBLE_AVATARS = 5;
+/** Tab 区域右侧固定按钮区宽度（rpx） */
+const TAB_RIGHT_FIXED_WIDTH_RPX = 220;
+/** Tab 一屏显示数量（4 个完整 + 第 5 个露出一半） */
+const TAB_COUNT_PER_SCREEN = 4.5;
+/** Tab 之间的间隙（rpx） */
+const TAB_GAP_RPX = 16;
+/** 单个 Tab 宽度（rpx） */
+const TAB_WIDTH_RPX =
+  (750 - TAB_RIGHT_FIXED_WIDTH_RPX - (TAB_COUNT_PER_SCREEN - 1) * TAB_GAP_RPX) /
+  TAB_COUNT_PER_SCREEN;
+/** 计算 Tab 容器的总宽度（rpx） */
+const getTabContainerWidth = (tabCount: number): number =>
+  tabCount * TAB_WIDTH_RPX + (tabCount - 1) * TAB_GAP_RPX;
+/** 将 rpx 转换为当前屏幕 px */
+function rpxToPx(rpx: number): number {
+  const { windowWidth } = Taro.getWindowInfo();
+  return (rpx * windowWidth) / 750;
+}
 
 function parseTimeToMinutes(time: string): number {
   const [hour, minute] = time.split(':').map(Number);
@@ -392,9 +438,16 @@ const SchedulePage: React.FC = () => {
     type: null,
     item: null,
   });
-  /** 排课 / 预约 视图切换 */
-  const [viewMode, setViewMode] = useState<ScheduleBookingTab>('schedule');
-  /** 排课视图内二级模式：fixed=固定排课, open=开放预约 */
+  // 课程分类 Store
+  const { categories, fetchList: fetchCategories } = useCourseCategoryStore();
+  /** 当前激活的 Tab key */
+  const [activeTabKey, setActiveTabKey] = useState<string>('');
+  const [tabScrollLeft, setTabScrollLeft] = useState(0);
+  /** 场地预约功能开关 */
+  const [venueBookingEnabled, setVenueBookingEnabled] = useState(true);
+  /** 排课 / 预约 视图切换（由 activeTab 派生） */
+  const [viewMode, setViewMode] = useState<'schedule' | 'booking'>('schedule');
+  /** 排课视图内二级模式：fixed=固定排课, open=开放预约（由 activeTab 派生） */
   const [scheduleSubMode, setScheduleSubMode] = useState<'fixed' | 'open'>('fixed');
   /** 开放预约视图：各日期各开放班级的时段，key 为 YYYY-MM-DD */
   const [openClassSlots, setOpenClassSlots] = useState<
@@ -407,6 +460,10 @@ const SchedulePage: React.FC = () => {
   /** 开放预约视图：加载失败的日期集合 */
   const [errorOpenSlotDates, setErrorOpenSlotDates] = useState<Set<string>>(new Set());
 
+  /** 可预约场地列表 */
+  const [venues, setVenues] = useState<BookableVenue[]>([]);
+  const [loadingVenues, setLoadingVenues] = useState(false);
+
   /** 课表卡片快速预约弹框 */
   const [bookSheetVisible, setBookSheetVisible] = useState(false);
   const [bookSheetItem, setBookSheetItem] = useState<ScheduleCardItem | null>(null);
@@ -414,20 +471,175 @@ const SchedulePage: React.FC = () => {
   /** 预约视图：老师预约开关列表弹窗 */
   const [teacherSwitchSheetVisible, setTeacherSwitchSheetVisible] = useState(false);
 
-  const handleViewModeChange = useCallback((mode: ScheduleBookingTab) => {
-    setViewMode(mode);
-  }, []);
+  // ============================================
+  // 分类驱动 Tab
+  // ============================================
 
-  const handleScheduleSubModeChange = useCallback((mode: 'fixed' | 'open') => {
-    setScheduleSubMode(mode);
-  }, []);
+  /** 根据课程分类生成顶部 Tab：基础模式 Tab + 场地 + 独立展示分类，统一按 sortOrder 排序 */
+  const tabs = useMemo<ScheduleTabItem[]>(() => {
+    const result: ScheduleTabItem[] = [];
+    const modes: CourseCategoryMode[] = ['class', 'group', 'private'];
+
+    // 基础模式 Tab：同一模式下所有「独立展示=false」的分类聚合展示
+    modes.forEach((mode) => {
+      const mergedCategories = categories.filter((c) => c.mode === mode && !c.independentDisplay);
+      if (mergedCategories.length === 0) return;
+      const systemCategory = mergedCategories.find((c) => c.isSystem);
+      const minSortOrder = Math.min(...mergedCategories.map((c) => c.sortOrder));
+      result.push({
+        key: `mode-${mode}`,
+        type: 'category',
+        label: systemCategory?.name || BASE_MODE_LABEL[mode],
+        mode,
+        sortOrder: minSortOrder,
+      });
+    });
+
+    // 场地为特殊固定 Tab，默认排序 4，受系统设置开关控制
+    if (venueBookingEnabled) {
+      result.push({ key: 'venue', type: 'venue', label: '场地', sortOrder: 4 });
+    }
+
+    // 独立展示分类：使用自身 sortOrder 参与全局排序
+    const independentCategories = categories.filter((c) => c.independentDisplay);
+    independentCategories.forEach((category) => {
+      result.push({
+        key: `category-${category.id}`,
+        type: 'category',
+        label: category.name,
+        mode: category.mode,
+        categoryId: category.id,
+        sortOrder: category.sortOrder,
+      });
+    });
+
+    return result.sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [categories, venueBookingEnabled]);
+
+  const activeTab = useMemo(
+    () => tabs.find((item) => item.key === activeTabKey) || tabs[0],
+    [tabs, activeTabKey],
+  );
+
+  /** 初始化默认选中第一个 Tab；新增分类后默认选中该分类；分类变化导致当前 Tab 不存在时回退到第一个 */
+  useEffect(() => {
+    if (tabs.length === 0) return;
+
+    let newCategoryId = '';
+    try {
+      newCategoryId = (Taro.getStorageSync(NEW_CATEGORY_ACTIVE_KEY) as string) || '';
+      if (newCategoryId) {
+        Taro.removeStorageSync(NEW_CATEGORY_ACTIVE_KEY);
+      }
+    } catch (err) {
+      logError('SchedulePage read new category active key', err);
+    }
+
+    const newTabKey = newCategoryId ? `category-${newCategoryId}` : '';
+    const exists = tabs.some((tab) => tab.key === activeTabKey);
+    const newExists = newTabKey && tabs.some((tab) => tab.key === newTabKey);
+
+    if (newExists) {
+      setActiveTabKey(newTabKey);
+      const tabIndex = tabs.findIndex((tab) => tab.key === newTabKey);
+      const containerWidthPx = rpxToPx(750 - TAB_RIGHT_FIXED_WIDTH_RPX);
+      const tabWidthPx = rpxToPx(TAB_WIDTH_RPX);
+      const gapPx = rpxToPx(TAB_GAP_RPX);
+      const totalWidthPx = tabs.length * tabWidthPx + (tabs.length - 1) * gapPx;
+      const maxScrollLeftPx = Math.max(0, totalWidthPx - containerWidthPx);
+      const targetCenterPx = tabIndex * (tabWidthPx + gapPx) + tabWidthPx / 2;
+      const targetScrollLeftPx = targetCenterPx - containerWidthPx / 2;
+      setTabScrollLeft(Math.max(0, Math.min(targetScrollLeftPx, maxScrollLeftPx)));
+    } else if (!exists) {
+      setActiveTabKey(tabs[0]?.key || '');
+      setTabScrollLeft(0);
+    }
+  }, [tabs, activeTabKey]);
+
+  /** 当前 Tab 应包含的分类 ID 集合 */
+  const activeCategoryIds = useMemo(() => {
+    if (!activeTab || activeTab.type === 'venue') return new Set<string>();
+    if (activeTab.categoryId) return new Set<string>([activeTab.categoryId]);
+    return new Set<string>(
+      categories.filter((c) => c.mode === activeTab.mode && !c.independentDisplay).map((c) => c.id),
+    );
+  }, [activeTab, categories]);
+
+  /** 按当前 Tab 过滤后的班级列表 */
+  const filteredClasses = useMemo(() => {
+    if (!activeTab || activeTab.type === 'venue') return [];
+    return classes.filter((cls) => {
+      if (cls.category_id) return activeCategoryIds.has(cls.category_id);
+      // 兼容旧数据：无 category_id 时按 schedule_mode 回退推导
+      if (activeTab.mode === 'group') return cls.schedule_mode === 'open';
+      if (activeTab.mode === 'class') return !cls.schedule_mode || cls.schedule_mode === 'fixed';
+      return false;
+    });
+  }, [activeTab, activeCategoryIds, classes]);
+
+  /** 按当前 Tab 过滤后的排课规则 */
+  const filteredSchedules = useMemo(() => {
+    if (!activeTab || activeTab.type === 'venue') return [];
+    const classIds = new Set(filteredClasses.map((item) => item.id));
+    return schedules.filter((item) => !item.class_id || classIds.has(item.class_id));
+  }, [activeTab, filteredClasses, schedules]);
+
+  /** 加载可预约场地列表 */
+  const loadVenues = useCallback(async () => {
+    setLoadingVenues(true);
+    try {
+      const data = await venueBookingService.getBookableVenues(currentCampusId);
+      setVenues(data);
+    } catch (err) {
+      logError('SchedulePage loadVenues', err);
+      Taro.showToast({ title: '场地加载失败', icon: 'none' });
+    } finally {
+      setLoadingVenues(false);
+    }
+  }, [currentCampusId]);
+
+  const handleMainTabChange = useCallback(
+    (tabKey: string, tabIndex: number) => {
+      if (tabKey === activeTabKey) return;
+      const tab = tabs.find((item) => item.key === tabKey);
+      if (!tab) return;
+      setActiveTabKey(tabKey);
+      setOpenCardId(null);
+
+      // 选中 Tab 自动滚动到可视区域中间
+      const containerWidthPx = rpxToPx(750 - TAB_RIGHT_FIXED_WIDTH_RPX);
+      const tabWidthPx = rpxToPx(TAB_WIDTH_RPX);
+      const gapPx = rpxToPx(TAB_GAP_RPX);
+      const totalWidthPx = tabs.length * tabWidthPx + (tabs.length - 1) * gapPx;
+      const maxScrollLeftPx = Math.max(0, totalWidthPx - containerWidthPx);
+      const targetCenterPx = tabIndex * (tabWidthPx + gapPx) + tabWidthPx / 2;
+      const targetScrollLeftPx = targetCenterPx - containerWidthPx / 2;
+      setTabScrollLeft(Math.max(0, Math.min(targetScrollLeftPx, maxScrollLeftPx)));
+
+      if (tab.type === 'venue') {
+        setViewMode('schedule');
+        setScheduleSubMode('fixed');
+        void loadVenues();
+      } else if (tab.mode === 'class') {
+        setViewMode('schedule');
+        setScheduleSubMode('fixed');
+      } else if (tab.mode === 'group') {
+        setViewMode('schedule');
+        setScheduleSubMode('open');
+      } else if (tab.mode === 'private') {
+        setViewMode('booking');
+        setScheduleSubMode('fixed');
+      }
+    },
+    [activeTabKey, tabs, loadVenues],
+  );
 
   const loadOpenClassSlots = useCallback(
     async (targetDate: dayjs.Dayjs, force = false) => {
       if (viewMode !== 'schedule' || scheduleSubMode !== 'open') {
         return;
       }
-      const openClasses = classes.filter((item) => item.schedule_mode === 'open');
+      const openClasses = filteredClasses.filter((item) => item.schedule_mode === 'open');
       const dateStr = targetDate.format('YYYY-MM-DD');
 
       // 正在加载中，避免重复请求
@@ -487,11 +699,11 @@ const SchedulePage: React.FC = () => {
         setOpenClassSlots(openClassSlotsRef.current);
       }
     },
-    [classes, scheduleSubMode, viewMode],
+    [filteredClasses, scheduleSubMode, viewMode],
   );
 
   const loadOpenSlotDates = useCallback(async () => {
-    const openClasses = classes.filter((item) => item.schedule_mode === 'open');
+    const openClasses = filteredClasses.filter((item) => item.schedule_mode === 'open');
     if (openClasses.length === 0) {
       setOpenSlotDates(new Set());
       return;
@@ -502,7 +714,7 @@ const SchedulePage: React.FC = () => {
     } catch (err) {
       logError('SchedulePage loadOpenSlotDates', err);
     }
-  }, [classes]);
+  }, [filteredClasses]);
 
   /**
    * 按目标日期刷新数据，绑定到日历切换事件上
@@ -575,6 +787,7 @@ const SchedulePage: React.FC = () => {
         classService.getByTeacher(currentUserId, currentCampusId),
         teacherService.getList(currentCampusId),
         leadService.getLeadBookingsByTeacher(currentUserId, { status: 'confirmed' }),
+        fetchCategories(),
       ]);
       await studentService.getByTeacher(currentUserId, currentCampusId);
       const classStudentsList = await Promise.all(
@@ -606,7 +819,7 @@ const SchedulePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, currentCampusId]);
+  }, [currentUserId, currentCampusId, fetchCategories]);
 
   const loadMonthRecords = useCallback(async () => {
     if (!currentUserId) {
@@ -676,7 +889,9 @@ const SchedulePage: React.FC = () => {
 
   useDidShow(() => {
     setCurrentTime(dayjs());
+    setVenueBookingEnabled(getVenueBookingEnabled());
     let hasRefreshSignal = false;
+    let newCategoryId = '';
     try {
       hasRefreshSignal = Boolean(Taro.getStorageSync(SCHEDULE_REFRESH_SIGNAL_KEY));
       if (hasRefreshSignal) {
@@ -685,8 +900,13 @@ const SchedulePage: React.FC = () => {
     } catch (err) {
       logError('SchedulePage read refresh signal', err);
     }
+    try {
+      newCategoryId = (Taro.getStorageSync(NEW_CATEGORY_ACTIVE_KEY) as string) || '';
+    } catch (err) {
+      logError('SchedulePage read new category active key', err);
+    }
 
-    if (hasRefreshSignal) {
+    if (hasRefreshSignal || newCategoryId) {
       void loadBaseData();
     }
     void loadMonthRecords();
@@ -695,11 +915,11 @@ const SchedulePage: React.FC = () => {
 
   const classById = useMemo(
     () =>
-      classes.reduce<Record<string, Class>>((acc, item) => {
+      filteredClasses.reduce<Record<string, Class>>((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {}),
-    [classes],
+    [filteredClasses],
   );
 
   const teacherById = useMemo(
@@ -713,16 +933,16 @@ const SchedulePage: React.FC = () => {
 
   const scheduleById = useMemo(
     () =>
-      schedules.reduce<Record<string, Schedule>>((acc, item) => {
+      filteredSchedules.reduce<Record<string, Schedule>>((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {}),
-    [schedules],
+    [filteredSchedules],
   );
 
   const scheduleMapByClass = useMemo(
     () =>
-      schedules.reduce<Record<string, Schedule[]>>((acc, item) => {
+      filteredSchedules.reduce<Record<string, Schedule[]>>((acc, item) => {
         if (!item.class_id) {
           return acc;
         }
@@ -732,7 +952,7 @@ const SchedulePage: React.FC = () => {
         acc[item.class_id].push(item);
         return acc;
       }, {}),
-    [schedules],
+    [filteredSchedules],
   );
 
   const notifyStudentAndParents = useCallback(
@@ -798,7 +1018,7 @@ const SchedulePage: React.FC = () => {
           return acc;
         }, []);
       const visibleSchedules = [
-        ...schedules
+        ...filteredSchedules
           .filter((schedule) => schedule.day_of_week === weekday)
           .filter((schedule) => !movedOutScheduleIdSet.has(schedule.id)),
         ...movedInSchedules,
@@ -880,7 +1100,7 @@ const SchedulePage: React.FC = () => {
       currentTeacherName,
       lessonRecords,
       scheduleById,
-      schedules,
+      filteredSchedules,
       selectedClassId,
       teacherById,
       trialClassIds,
@@ -891,11 +1111,11 @@ const SchedulePage: React.FC = () => {
 
   const calendarWeekdaySet = useMemo(() => {
     return new Set(
-      schedules
+      filteredSchedules
         .filter((item) => !selectedClassId || item.class_id === selectedClassId)
         .map((item) => item.day_of_week),
     );
-  }, [schedules, selectedClassId]);
+  }, [filteredSchedules, selectedClassId]);
   const getDateDotType = useCallback(
     (date: dayjs.Dayjs): CalendarDotType => {
       const weekday = (date.day() || 7) as Schedule['day_of_week'];
@@ -905,7 +1125,7 @@ const SchedulePage: React.FC = () => {
           .filter((item) => item.source_date === dateStr)
           .map((item) => item.schedule_id),
       );
-      const fixedCount = schedules.filter(
+      const fixedCount = filteredSchedules.filter(
         (item) =>
           item.day_of_week === weekday &&
           (!selectedClassId || item.class_id === selectedClassId) &&
@@ -924,7 +1144,7 @@ const SchedulePage: React.FC = () => {
       }
       return date.isBefore(currentTime, 'day') ? 'past' : 'active';
     },
-    [calendarWeekdaySet, currentTime, schedules, selectedClassId, temporaryReschedules],
+    [calendarWeekdaySet, currentTime, filteredSchedules, selectedClassId, temporaryReschedules],
   );
 
   const getOpenDateDotType = useCallback(
@@ -939,7 +1159,7 @@ const SchedulePage: React.FC = () => {
   );
 
   const batchClassOptions = useMemo(() => {
-    return classes
+    return filteredClasses
       .filter((item) => item.status === 'active')
       .map((item) => {
         const relatedSchedules = [...(scheduleMapByClass[item.id] || [])].sort(
@@ -966,7 +1186,7 @@ const SchedulePage: React.FC = () => {
         };
       })
       .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
-  }, [classes, scheduleMapByClass]);
+  }, [filteredClasses, scheduleMapByClass]);
 
   const selectedBatchClasses = useMemo(
     () => batchClassOptions.filter((item) => batchSelectedClassIds.includes(item.id)),
@@ -1157,7 +1377,8 @@ const SchedulePage: React.FC = () => {
 
       const lessonDate = selectedDate.format('YYYY-MM-DD');
       const scheduleInfo = scheduleById[item.id];
-      const selectedClass = classes.find((classItem) => classItem.id === item.classId) || null;
+      const selectedClass =
+        filteredClasses.find((classItem) => classItem.id === item.classId) || null;
 
       setDangerActionSubmitting(true);
       try {
@@ -1289,7 +1510,7 @@ const SchedulePage: React.FC = () => {
       setDangerActionSubmitting(false);
     }
   }, [
-    classes,
+    filteredClasses,
     closeDangerActionDialog,
     currentTeacherId,
     currentUserId,
@@ -1501,7 +1722,7 @@ const SchedulePage: React.FC = () => {
       const time = encodeURIComponent(slot.start_time);
       const endTime = encodeURIComponent(slot.end_time || '');
       const className = encodeURIComponent(slot.class_name || '');
-      const subjectId = classes.find((item) => item.id === slot.class_id)?.subject_id || '';
+      const subjectId = filteredClasses.find((item) => item.id === slot.class_id)?.subject_id || '';
       void Taro.navigateTo({
         url:
           `/package-lead/pages/proxy-booking-form/index?teacherId=${encodeURIComponent(slot.teacher_id)}` +
@@ -1510,7 +1731,7 @@ const SchedulePage: React.FC = () => {
           `&subjectId=${encodeURIComponent(subjectId)}`,
       });
     },
-    [classes],
+    [filteredClasses],
   );
 
   /** 开放预约：左滑编辑时段 — 跳转到简约表单编辑页 */
@@ -1578,7 +1799,7 @@ const SchedulePage: React.FC = () => {
   const renderOpenClassList = useCallback(
     (date: dayjs.Dayjs) => {
       const dateStr = date.format('YYYY-MM-DD');
-      const openClasses = classes.filter((item) => item.schedule_mode === 'open');
+      const openClasses = filteredClasses.filter((item) => item.schedule_mode === 'open');
       const dateSlots = openClassSlots[dateStr] || {};
       const isDateLoading = loadingOpenSlotDates.has(dateStr);
       const isDateError = errorOpenSlotDates.has(dateStr);
@@ -1824,7 +2045,7 @@ const SchedulePage: React.FC = () => {
       );
     },
     [
-      classes,
+      filteredClasses,
       openClassSlots,
       loadingOpenSlotDates,
       errorOpenSlotDates,
@@ -1839,6 +2060,51 @@ const SchedulePage: React.FC = () => {
     ],
   );
 
+  /** 场地 Tab 内容渲染（按当前日期展示可预约场地） */
+  const renderVenueTab = useCallback(
+    (_date: dayjs.Dayjs) => {
+      if (loadingVenues) {
+        return (
+          <View className="py-[120rpx] flex items-center justify-center">
+            <Text className="text-[28rpx] text-muted-foreground">场地加载中...</Text>
+          </View>
+        );
+      }
+
+      if (venues.length === 0) {
+        return (
+          <View className="px-[24rpx]">
+            <View className="rounded-[16rpx] bg-white py-[80rpx] shadow-card">
+              <Empty icon="mdi-map-marker-outline" description="暂无可用场地" />
+            </View>
+          </View>
+        );
+      }
+
+      return (
+        <View className="flex flex-col gap-[14rpx] px-[24rpx] pb-[160rpx] pt-[12rpx]">
+          {venues.map((venue) => (
+            <VenueBookingCard
+              key={venue.id}
+              venue={venue}
+              onClick={() => {
+                Taro.navigateTo({
+                  url: `/pages/venue-booking/index?roomId=${encodeURIComponent(venue.id)}`,
+                });
+              }}
+              onBook={() => {
+                Taro.navigateTo({
+                  url: `/pages/venue-booking/index?roomId=${encodeURIComponent(venue.id)}`,
+                });
+              }}
+            />
+          ))}
+        </View>
+      );
+    },
+    [loadingVenues, venues],
+  );
+
   // 注意：不传 safeBottom — pb-safe-bottom 会给外层 View 增加安全区 padding，
   // 使得 PageContainer 总高度（min-h-screen + safe-area）超过视口，
   // 在 tabBar 页面中产生页面级背景滚动条，与 TrialBookingView 内的 ScrollView
@@ -1849,60 +2115,47 @@ const SchedulePage: React.FC = () => {
       <View className="relative h-screen bg-schedule-page flex flex-col overflow-hidden">
         <View className="bg-schedule-header flex-shrink-0">
           <View
-            className="flex items-end px-[18rpx] pb-[18rpx]"
+            className="flex items-end justify-end px-[18rpx] pb-[18rpx]"
             style={{ height: `${navSafeHeight}px` }}
-          >
-            <View className="flex items-center gap-[14rpx]">
-              <ScheduleBookingSwitch
-                active={viewMode}
-                variant="dark"
-                onChange={handleViewModeChange}
-              />
-              {viewMode === 'schedule' && (
-                <View
-                  className="flex h-[64rpx] items-center gap-[8rpx] px-[22rpx] active:opacity-80"
-                  onClick={handleBatchAction}
-                >
-                  <Icon name="mdi-clipboard-text" size="sm" color="white" />
-                  <Text className="text-[28rpx] font-medium text-white">批量</Text>
-                </View>
-              )}
-            </View>
-          </View>
+          />
         </View>
 
-        {viewMode === 'schedule' && (
-          <>
-            <View className="bg-schedule-page flex-shrink-0">
-              <CalendarWeekSelector
-                selectedDate={selectedDate}
-                onChange={handleScheduleDateChange}
-                getDateDotType={scheduleSubMode === 'fixed' ? getDateDotType : getOpenDateDotType}
-              />
-            </View>
-
-            <View className="flex items-center justify-center bg-schedule-page py-[16rpx]">
-              <View className="inline-flex items-center rounded-full bg-muted p-[6rpx]">
-                {[
-                  { key: 'fixed' as const, label: '固定排课' },
-                  { key: 'open' as const, label: '开放预约' },
-                ].map((tab) => {
-                  const isActive = scheduleSubMode === tab.key;
+        <View className="bg-schedule-page flex-shrink-0">
+          {/* 主分类 Tab：基础模式 + 场地 + 独立展示分类 */}
+          <View className="flex items-center px-[24rpx] py-[16rpx]">
+            <ScrollView
+              id="schedule-tab-scroll"
+              className="flex-1 min-w-0 overflow-hidden"
+              scrollX
+              scrollWithAnimation
+              showScrollbar={false}
+              enhanced
+              scrollLeft={tabScrollLeft}
+            >
+              <View
+                className="flex items-center"
+                style={{ width: `${getTabContainerWidth(tabs.length)}rpx` }}
+              >
+                {tabs.map((tab, index) => {
+                  const isActive = activeTabKey === tab.key;
+                  const isLast = index === tabs.length - 1;
                   return (
                     <View
                       key={tab.key}
                       className={cn(
-                        'center min-w-[160rpx] rounded-full border px-[28rpx] py-[12rpx] transition-colors active:scale-95',
+                        'flex items-center justify-center rounded-full border py-[12rpx] transition-colors active:scale-95 shrink-0',
+                        !isLast && 'mr-[16rpx]',
                         isActive
-                          ? 'border-primary bg-primary shadow-md'
-                          : 'border-transparent bg-transparent text-muted-foreground',
+                          ? 'border-schedule-header bg-schedule-header shadow-md'
+                          : 'border-border bg-white',
                       )}
-                      onClick={() => handleScheduleSubModeChange(tab.key)}
+                      style={{ width: `${TAB_WIDTH_RPX}rpx` }}
+                      onClick={() => handleMainTabChange(tab.key, index)}
                     >
                       <Text
                         className={cn(
                           'text-[28rpx] font-medium',
-                          isActive ? 'text-white' : 'text-muted-foreground',
+                          isActive ? 'text-white' : 'text-foreground-secondary',
                         )}
                       >
                         {tab.label}
@@ -1911,221 +2164,306 @@ const SchedulePage: React.FC = () => {
                   );
                 })}
               </View>
+            </ScrollView>
+            <View className="ml-[16rpx] flex flex-shrink-0 items-center gap-[16rpx]">
+              <View
+                className="flex items-center gap-[4rpx] active:opacity-70"
+                onClick={handleBatchAction}
+              >
+                <Text className="text-[28rpx] text-foreground-secondary">筛选</Text>
+                <Icon name="mdi-chevron-down" size={20} color="mutedForeground" />
+              </View>
+              {(activeTab?.mode === 'class' || activeTab?.mode === 'group') && (
+                <View
+                  className="flex h-[56rpx] w-[56rpx] items-center justify-center active:opacity-70"
+                  onClick={handleBatchAction}
+                >
+                  <Icon
+                    name="mdi-checkbox-multiple-marked-outline"
+                    size={28}
+                    color="mutedForeground"
+                  />
+                </View>
+              )}
             </View>
+          </View>
 
-            {scheduleSubMode === 'fixed' ? (
-              <Swiper
-                className="bg-schedule-page"
-                style={{ flex: 1, minHeight: 0 }}
-                current={swiperCurrent}
-                duration={SCHEDULE_CARD_SWIPER_DURATION}
-                easingFunction="easeOutCubic"
-                skipHiddenItemLayout
-                onChange={handleSwiperChange}
-                onAnimationFinish={handleSwiperFinish}
-              >
-                {scheduleDateWindow.map((date) => (
-                  <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-                    {renderSwiperItem(date)}
-                  </SwiperItem>
-                ))}
-              </Swiper>
-            ) : (
-              <Swiper
-                className="bg-schedule-page"
-                style={{ flex: 1, minHeight: 0 }}
-                current={swiperCurrent}
-                duration={SCHEDULE_CARD_SWIPER_DURATION}
-                easingFunction="easeOutCubic"
-                skipHiddenItemLayout
-                onChange={handleSwiperChange}
-                onAnimationFinish={handleSwiperFinish}
-              >
-                {scheduleDateWindow.map((date) => (
-                  <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-                    {renderOpenClassList(date)}
-                  </SwiperItem>
-                ))}
-              </Swiper>
-            )}
+          {activeTab?.mode !== 'private' && (
+            <CalendarWeekSelector
+              selectedDate={selectedDate}
+              onChange={handleScheduleDateChange}
+              getDateDotType={
+                activeTab?.type === 'venue'
+                  ? undefined
+                  : scheduleSubMode === 'fixed'
+                    ? getDateDotType
+                    : getOpenDateDotType
+              }
+            />
+          )}
+        </View>
 
-            <BottomSheet
-              visible={batchActionSheetVisible}
-              title="批量处理"
-              onClose={() => setBatchActionSheetVisible(false)}
-              scrollable={false}
-              className="pb-safe-bar"
-            >
-              <View className="px-[24rpx] py-[18rpx]">
-                <View className="rounded-[18rpx] bg-[#f6f8fc] px-[18rpx] py-[16rpx]">
-                  <Text className="text-[24rpx] text-muted-foreground">请选择要执行的批量操作</Text>
-                </View>
-              </View>
-              <View className="px-[24rpx] pb-[32rpx] flex flex-col gap-[18rpx]">
-                <View
-                  className="rounded-[22rpx] border border-[#dceafe] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-[24rpx] py-[24rpx]"
-                  onClick={() => handleChooseBatchType('reschedule')}
-                >
-                  <View className="flex items-center justify-between gap-[16rpx]">
-                    <View className="flex items-center gap-[16rpx]">
-                      <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-white shadow-[0_6rpx_16rpx_rgba(59,110,245,0.10)]">
-                        <Icon name="mdi-calendar-check-outline" size="md" color="primary" />
-                      </View>
-                      <View className="min-w-0 flex-1">
-                        <View className="flex items-center gap-[10rpx]">
-                          <Text className="text-[30rpx] font-semibold text-foreground">
-                            批量调课
-                          </Text>
-                          <View className="rounded-full bg-white/80 px-[12rpx] py-[6rpx]">
-                            <Text className="text-[20rpx] font-medium text-primary">只调当天</Text>
-                          </View>
-                        </View>
-                        <Text className="mt-[8rpx] block text-[24rpx] leading-[34rpx] text-muted-foreground">
-                          选择多个班级，将当天课程统一调整到新的日期
-                        </Text>
-                      </View>
-                    </View>
-                    <Icon name="mdi-chevron-right" size="sm" color="primary" />
-                  </View>
-                </View>
-                <View
-                  className="rounded-[22rpx] border border-[#fde2e2] bg-[linear-gradient(180deg,#fff8f8_0%,#fff1f1_100%)] px-[24rpx] py-[24rpx]"
-                  onClick={() => handleChooseBatchType('delete')}
-                >
-                  <View className="flex items-center justify-between gap-[16rpx]">
-                    <View className="flex items-center gap-[16rpx]">
-                      <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-white shadow-[0_6rpx_16rpx_rgba(239,68,68,0.08)]">
-                        <Icon name="mdi-delete-outline" size="md" color="destructive" />
-                      </View>
-                      <View className="min-w-0 flex-1">
-                        <View className="flex items-center gap-[10rpx]">
-                          <Text className="text-[30rpx] font-semibold text-destructive">
-                            批量删除
-                          </Text>
-                          <View className="rounded-full bg-white/85 px-[12rpx] py-[6rpx]">
-                            <Text className="text-[20rpx] font-medium text-destructive">
-                              谨慎操作
-                            </Text>
-                          </View>
-                        </View>
-                        <Text className="mt-[8rpx] block text-[24rpx] leading-[34rpx] text-muted-foreground">
-                          选择多个班级删除，并向学员发送班级解散通知
-                        </Text>
-                      </View>
-                    </View>
-                    <Icon name="mdi-chevron-right" size="sm" color="destructive" />
-                  </View>
-                </View>
-              </View>
-            </BottomSheet>
-
-            <BottomSheet
-              visible={batchClassSheetVisible}
-              title={batchActionType === 'reschedule' ? '选择调课班级' : '选择删除班级'}
-              onClose={() => setBatchClassSheetVisible(false)}
-              className="pb-safe-bar"
-            >
-              <View className="px-[24rpx] py-[16rpx]">
-                <View className="flex items-center justify-between">
-                  <Text className="text-[24rpx] text-muted-foreground">
-                    已选 {batchSelectedClassIds.length} 个班级
-                  </Text>
-                  <Text className="text-[24rpx] text-primary" onClick={handleSelectAllBatchClasses}>
-                    {batchSelectedClassIds.length === batchClassOptions.length
-                      ? '取消全选'
-                      : '全选'}
-                  </Text>
-                </View>
-              </View>
-
-              <View className="px-[24rpx] pb-[24rpx] flex flex-col gap-[16rpx]">
-                {batchClassOptions.map((item) => {
-                  const checked = batchSelectedClassIds.includes(item.id);
-                  return (
-                    <View
-                      key={item.id}
-                      className={cn(
-                        'rounded-[16rpx] border px-[24rpx] py-[22rpx] flex items-start gap-[18rpx]',
-                        checked ? 'border-primary bg-primary-10' : 'border-schedule-soft bg-white',
-                      )}
-                      onClick={() => toggleBatchClassSelection(item.id)}
-                    >
-                      <CircleCheckbox checked={checked} size={42} />
-                      <View className="min-w-0 flex-1">
-                        <View className="flex items-center gap-[12rpx]">
-                          <Text className="truncate text-[30rpx] font-semibold text-foreground">
-                            {item.name}
-                          </Text>
-                          <Text className="text-[22rpx] text-muted-foreground">
-                            {item.studentCount}人
-                          </Text>
-                        </View>
-                        <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
-                          {item.scheduleSummary}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-
-              <View className="border-t border-schedule-soft px-[24rpx] pt-[20rpx] pb-[24rpx] flex gap-[16rpx] bg-white">
-                <View
-                  className="flex-1 h-[84rpx] rounded-[14rpx] bg-muted flex items-center justify-center"
-                  onClick={() => setBatchClassSheetVisible(false)}
-                >
-                  <Text className="text-[28rpx] font-medium text-foreground-secondary">取消</Text>
-                </View>
-                <View
-                  className={cn(
-                    'flex-1 h-[84rpx] rounded-[14rpx] flex items-center justify-center',
-                    batchActionType === 'delete' ? 'bg-schedule-delete' : 'bg-schedule-adjust',
-                    batchSubmitting ? 'opacity-60' : '',
-                  )}
-                  onClick={() => void handleConfirmBatchClassSelection()}
-                >
-                  <Text className="text-[28rpx] font-semibold text-white">
-                    {batchActionType === 'delete' ? '确定删除' : '下一步'}
-                  </Text>
-                </View>
-              </View>
-            </BottomSheet>
-
-            {dangerActionMeta ? (
-              <ConfirmDialog
-                visible={dangerActionState.visible}
-                title={dangerActionMeta.title}
-                description={dangerActionMeta.description}
-                confirmText={dangerActionMeta.confirmText}
-                tone={dangerActionMeta.tone}
-                confirmLoading={dangerActionSubmitting}
-                onClose={closeDangerActionDialog}
-                onConfirm={() => void handleConfirmDangerAction()}
-              />
-            ) : null}
-          </>
+        {activeTab?.mode === 'class' && activeTab?.type === 'category' && (
+          <Swiper
+            className="bg-schedule-page"
+            style={{ flex: 1, minHeight: 0 }}
+            current={swiperCurrent}
+            duration={SCHEDULE_CARD_SWIPER_DURATION}
+            easingFunction="easeOutCubic"
+            skipHiddenItemLayout
+            onChange={handleSwiperChange}
+            onAnimationFinish={handleSwiperFinish}
+          >
+            {scheduleDateWindow.map((date) => (
+              <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
+                {renderSwiperItem(date)}
+              </SwiperItem>
+            ))}
+          </Swiper>
         )}
 
-        {viewMode === 'booking' && (
+        {activeTab?.mode === 'group' && activeTab?.type === 'category' && (
+          <Swiper
+            className="bg-schedule-page"
+            style={{ flex: 1, minHeight: 0 }}
+            current={swiperCurrent}
+            duration={SCHEDULE_CARD_SWIPER_DURATION}
+            easingFunction="easeOutCubic"
+            skipHiddenItemLayout
+            onChange={handleSwiperChange}
+            onAnimationFinish={handleSwiperFinish}
+          >
+            {scheduleDateWindow.map((date) => (
+              <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
+                {renderOpenClassList(date)}
+              </SwiperItem>
+            ))}
+          </Swiper>
+        )}
+
+        {(activeTab?.mode === 'class' || activeTab?.mode === 'group') &&
+          activeTab?.type === 'category' && (
+            <>
+              <BottomSheet
+                visible={batchActionSheetVisible}
+                title="批量处理"
+                onClose={() => setBatchActionSheetVisible(false)}
+                scrollable={false}
+                className="pb-safe-bar"
+              >
+                <View className="px-[24rpx] py-[18rpx]">
+                  <View className="rounded-[18rpx] bg-[#f6f8fc] px-[18rpx] py-[16rpx]">
+                    <Text className="text-[24rpx] text-muted-foreground">
+                      请选择要执行的批量操作
+                    </Text>
+                  </View>
+                </View>
+                <View className="px-[24rpx] pb-[32rpx] flex flex-col gap-[18rpx]">
+                  <View
+                    className="rounded-[22rpx] border border-[#dceafe] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-[24rpx] py-[24rpx]"
+                    onClick={() => handleChooseBatchType('reschedule')}
+                  >
+                    <View className="flex items-center justify-between gap-[16rpx]">
+                      <View className="flex items-center gap-[16rpx]">
+                        <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-white shadow-[0_6rpx_16rpx_rgba(59,110,245,0.10)]">
+                          <Icon name="mdi-calendar-check-outline" size="md" color="primary" />
+                        </View>
+                        <View className="min-w-0 flex-1">
+                          <View className="flex items-center gap-[10rpx]">
+                            <Text className="text-[30rpx] font-semibold text-foreground">
+                              批量调课
+                            </Text>
+                            <View className="rounded-full bg-white/80 px-[12rpx] py-[6rpx]">
+                              <Text className="text-[20rpx] font-medium text-primary">
+                                只调当天
+                              </Text>
+                            </View>
+                          </View>
+                          <Text className="mt-[8rpx] block text-[24rpx] leading-[34rpx] text-muted-foreground">
+                            选择多个班级，将当天课程统一调整到新的日期
+                          </Text>
+                        </View>
+                      </View>
+                      <Icon name="mdi-chevron-right" size="sm" color="primary" />
+                    </View>
+                  </View>
+                  <View
+                    className="rounded-[22rpx] border border-[#fde2e2] bg-[linear-gradient(180deg,#fff8f8_0%,#fff1f1_100%)] px-[24rpx] py-[24rpx]"
+                    onClick={() => handleChooseBatchType('delete')}
+                  >
+                    <View className="flex items-center justify-between gap-[16rpx]">
+                      <View className="flex items-center gap-[16rpx]">
+                        <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-white shadow-[0_6rpx_16rpx_rgba(239,68,68,0.08)]">
+                          <Icon name="mdi-delete-outline" size="md" color="destructive" />
+                        </View>
+                        <View className="min-w-0 flex-1">
+                          <View className="flex items-center gap-[10rpx]">
+                            <Text className="text-[30rpx] font-semibold text-destructive">
+                              批量删除
+                            </Text>
+                            <View className="rounded-full bg-white/85 px-[12rpx] py-[6rpx]">
+                              <Text className="text-[20rpx] font-medium text-destructive">
+                                谨慎操作
+                              </Text>
+                            </View>
+                          </View>
+                          <Text className="mt-[8rpx] block text-[24rpx] leading-[34rpx] text-muted-foreground">
+                            选择多个班级删除，并向学员发送班级解散通知
+                          </Text>
+                        </View>
+                      </View>
+                      <Icon name="mdi-chevron-right" size="sm" color="destructive" />
+                    </View>
+                  </View>
+                </View>
+              </BottomSheet>
+
+              <BottomSheet
+                visible={batchClassSheetVisible}
+                title={batchActionType === 'reschedule' ? '选择调课班级' : '选择删除班级'}
+                onClose={() => setBatchClassSheetVisible(false)}
+                className="pb-safe-bar"
+              >
+                <View className="px-[24rpx] py-[16rpx]">
+                  <View className="flex items-center justify-between">
+                    <Text className="text-[24rpx] text-muted-foreground">
+                      已选 {batchSelectedClassIds.length} 个班级
+                    </Text>
+                    <Text
+                      className="text-[24rpx] text-primary"
+                      onClick={handleSelectAllBatchClasses}
+                    >
+                      {batchSelectedClassIds.length === batchClassOptions.length
+                        ? '取消全选'
+                        : '全选'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="px-[24rpx] pb-[24rpx] flex flex-col gap-[16rpx]">
+                  {batchClassOptions.map((item) => {
+                    const checked = batchSelectedClassIds.includes(item.id);
+                    return (
+                      <View
+                        key={item.id}
+                        className={cn(
+                          'rounded-[16rpx] border px-[24rpx] py-[22rpx] flex items-start gap-[18rpx]',
+                          checked
+                            ? 'border-primary bg-primary-10'
+                            : 'border-schedule-soft bg-white',
+                        )}
+                        onClick={() => toggleBatchClassSelection(item.id)}
+                      >
+                        <CircleCheckbox checked={checked} size={42} />
+                        <View className="min-w-0 flex-1">
+                          <View className="flex items-center gap-[12rpx]">
+                            <Text className="truncate text-[30rpx] font-semibold text-foreground">
+                              {item.name}
+                            </Text>
+                            <Text className="text-[22rpx] text-muted-foreground">
+                              {item.studentCount}人
+                            </Text>
+                          </View>
+                          <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
+                            {item.scheduleSummary}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View className="border-t border-schedule-soft px-[24rpx] pt-[20rpx] pb-[24rpx] flex gap-[16rpx] bg-white">
+                  <View
+                    className="flex-1 h-[84rpx] rounded-[14rpx] bg-muted flex items-center justify-center"
+                    onClick={() => setBatchClassSheetVisible(false)}
+                  >
+                    <Text className="text-[28rpx] font-medium text-foreground-secondary">取消</Text>
+                  </View>
+                  <View
+                    className={cn(
+                      'flex-1 h-[84rpx] rounded-[14rpx] flex items-center justify-center',
+                      batchActionType === 'delete' ? 'bg-schedule-delete' : 'bg-schedule-adjust',
+                      batchSubmitting ? 'opacity-60' : '',
+                    )}
+                    onClick={() => void handleConfirmBatchClassSelection()}
+                  >
+                    <Text className="text-[28rpx] font-semibold text-white">
+                      {batchActionType === 'delete' ? '确定删除' : '下一步'}
+                    </Text>
+                  </View>
+                </View>
+              </BottomSheet>
+
+              {dangerActionMeta ? (
+                <ConfirmDialog
+                  visible={dangerActionState.visible}
+                  title={dangerActionMeta.title}
+                  description={dangerActionMeta.description}
+                  confirmText={dangerActionMeta.confirmText}
+                  tone={dangerActionMeta.tone}
+                  confirmLoading={dangerActionSubmitting}
+                  onClose={closeDangerActionDialog}
+                  onConfirm={() => void handleConfirmDangerAction()}
+                />
+              ) : null}
+            </>
+          )}
+
+        {activeTab?.mode === 'private' && activeTab?.type === 'category' && (
           <TrialBookingView
             className="min-h-0 flex-1"
-            onSuccess={() => setViewMode('schedule')}
+            onSuccess={() => {
+              const firstClassTab = tabs.find((item) => item.mode === 'class');
+              const targetKey = firstClassTab?.key || tabs[0]?.key || '';
+              const targetIndex = tabs.findIndex((item) => item.key === targetKey);
+              handleMainTabChange(targetKey, Math.max(0, targetIndex));
+            }}
             switchSheetVisible={teacherSwitchSheetVisible}
             onSwitchSheetClose={() => setTeacherSwitchSheetVisible(false)}
           />
         )}
 
-        {/* 悬浮加号按钮：固定排课进入排课表单，预约视图打开老师预约开关弹窗；开放预约使用卡片内加号 */}
-        {!(viewMode === 'schedule' && scheduleSubMode === 'open') && (
-          <View
-            className="fixed bottom-[160rpx] right-[32rpx] z-100"
-            onClick={viewMode === 'schedule' ? handleCreateSchedule : handleManageBookingConfig}
+        {activeTab?.type === 'venue' && (
+          <Swiper
+            className="bg-schedule-page"
+            style={{ flex: 1, minHeight: 0 }}
+            current={swiperCurrent}
+            duration={SCHEDULE_CARD_SWIPER_DURATION}
+            easingFunction="easeOutCubic"
+            skipHiddenItemLayout
+            onChange={handleSwiperChange}
+            onAnimationFinish={handleSwiperFinish}
           >
-            <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-full bg-schedule-attend shadow-schedule-fab">
-              <Icon name="mdi-plus" size="md" color="white" />
-            </View>
-          </View>
+            {scheduleDateWindow.map((date) => (
+              <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
+                <ScrollView
+                  className="h-full bg-schedule-page"
+                  scrollY
+                  enhanced
+                  showScrollbar={false}
+                >
+                  {renderVenueTab(date)}
+                </ScrollView>
+              </SwiperItem>
+            ))}
+          </Swiper>
         )}
+
+        {/* 悬浮加号按钮：班课进入排课表单，私教打开老师预约开关弹窗；团课使用卡片内加号 */}
+        {(activeTab?.mode === 'class' || activeTab?.mode === 'private') &&
+          activeTab?.type === 'category' && (
+            <View
+              className="fixed bottom-[160rpx] right-[32rpx] z-100"
+              onClick={
+                activeTab?.mode === 'class' ? handleCreateSchedule : handleManageBookingConfig
+              }
+            >
+              <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-full bg-schedule-attend shadow-schedule-fab">
+                <Icon name="mdi-plus" size="md" color="white" />
+              </View>
+            </View>
+          )}
 
         <BookTrialByClassSheet
           visible={bookSheetVisible}

@@ -62,6 +62,8 @@ const TOOLTIPS: Record<string, string> = {
     '开启后，该分类会作为约课首页顶部的一个独立标签单独展示(排在「场地」之后);关闭时其名下课程仍会并入「团课」等同模式标签中显示。多个独立标签之间按「分类排列顺序」排序。',
 };
 
+const NEW_CATEGORY_ACTIVE_KEY = 'yunce:schedule:new_category_active_id';
+
 const CategoryFormPage: React.FC = () => {
   const { create, update, remove, categories, fetchList } = useCourseCategoryStore();
   const instance = Taro.getCurrentInstance();
@@ -85,7 +87,7 @@ const CategoryFormPage: React.FC = () => {
 
   // 模式与展示
   const [mode, setMode] = useState<CourseCategoryMode>('class');
-  const [independentDisplay, setIndependentDisplay] = useState(false);
+  const [independentDisplay, setIndependentDisplay] = useState(true);
 
   // 加载与提交状态
   const [loading, setLoading] = useState(isEdit);
@@ -316,7 +318,8 @@ const CategoryFormPage: React.FC = () => {
         await update(categoryId, formData);
         Taro.showToast({ title: '保存成功', icon: 'success' });
       } else {
-        await create(formData);
+        const created = await create(formData);
+        Taro.setStorageSync(NEW_CATEGORY_ACTIVE_KEY, created.id);
         Taro.showToast({ title: '新增成功', icon: 'success' });
       }
       setTimeout(() => Taro.navigateBack(), 800);

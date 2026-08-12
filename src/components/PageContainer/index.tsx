@@ -1,5 +1,7 @@
 import { View } from '@tarojs/components';
+import cn from 'classnames';
 import React from 'react';
+import { useThemeStore } from '@/stores/theme';
 
 interface PageContainerProps {
   safeBottom?: boolean;
@@ -14,9 +16,17 @@ const PageContainer: React.FC<PageContainerProps> = ({
   className = '',
   children,
 }) => {
+  const { activeTheme } = useThemeStore();
+
   return (
     <View
-      className={`min-h-screen bg-background ${safeTop ? 'pt-safe' : ''} ${safeBottom ? 'pb-safe-bottom' : ''} ${className}`}
+      className={cn(
+        `theme-${activeTheme}`,
+        'min-h-screen bg-background',
+        safeTop && 'pt-safe',
+        safeBottom && 'pb-safe-bottom',
+        className,
+      )}
     >
       {children}
     </View>

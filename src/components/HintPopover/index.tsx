@@ -24,12 +24,21 @@ export interface HintPopoverProps {
   content: string;
   /** 额外类名 */
   className?: string;
+  /** 图标外层自定义类名 */
+  iconClassName?: string;
+  /** 图标文字自定义类名 */
+  textClassName?: string;
 }
 
 /** 气泡水平对齐方式 */
 type Align = 'left' | 'center' | 'right';
 
-const HintPopover: React.FC<HintPopoverProps> = ({ content, className }) => {
+const HintPopover: React.FC<HintPopoverProps> = ({
+  content,
+  className,
+  iconClassName,
+  textClassName,
+}) => {
   const [visible, setVisible] = useState(false);
   const [align, setAlign] = useState<Align>('left');
   const uidRef = useRef<number>(++instanceCounter);
@@ -56,7 +65,7 @@ const HintPopover: React.FC<HintPopoverProps> = ({ content, className }) => {
               return;
             }
 
-            const screenWidth = Taro.getSystemInfoSync().windowWidth;
+            const screenWidth = Taro.getWindowInfo().windowWidth;
             const iconCenterX = rect.left + rect.width / 2;
             // 气泡宽度 480rpx ≈ 240px
             const BUBBLE_HALF_WIDTH = 120;
@@ -89,10 +98,20 @@ const HintPopover: React.FC<HintPopoverProps> = ({ content, className }) => {
       {/* 问号图标 - 灰色圆形外边框 + 透明背景 + 灰色问号（边框与问号粗细协调） */}
       <View
         id={iconId}
-        className="w-[30rpx] h-[30rpx] rounded-full border-[2rpx] border-solid border-muted-foreground bg-transparent flex items-center justify-center ml-[8rpx] press-scale"
+        className={cn(
+          'w-[30rpx] h-[30rpx] rounded-full border-[2rpx] border-solid border-muted-foreground bg-transparent flex items-center justify-center ml-[8rpx] press-scale',
+          iconClassName,
+        )}
         onClick={handleToggle}
       >
-        <Text className="text-[20rpx] leading-none text-muted-foreground font-semibold">?</Text>
+        <Text
+          className={cn(
+            'text-[20rpx] leading-none text-muted-foreground font-semibold',
+            textClassName,
+          )}
+        >
+          ?
+        </Text>
       </View>
 
       {/* 遮罩层 - 点击关闭气泡 */}

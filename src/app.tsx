@@ -1,5 +1,6 @@
 import { useDidShow, useDidHide } from '@tarojs/taro';
 import React from 'react';
+import { useThemeStore } from '@/stores/theme';
 import { AuthProvider } from '@/utils/auth';
 import 'uno.css';
 
@@ -40,6 +41,9 @@ import '@/components/student/StudentAvatar';
 import '@/components/teacher/SalaryEditSheet';
 import '@/components/PageContainer';
 import './app.scss';
+
+// 应用启动时立即从本地存储初始化主题，避免首屏闪烁
+useThemeStore.getState().initTheme();
 
 const App: React.FC<{ children?: React.ReactNode }> = (props) => {
   useDidShow(() => {

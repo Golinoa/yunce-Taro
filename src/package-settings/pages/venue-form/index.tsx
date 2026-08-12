@@ -10,7 +10,7 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import FormCell from '@/components/FormCell';
-import ImageUploader from '@/components/ImageUploader';
+import ImageUploaderList from '@/components/ImageUploaderList';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
@@ -25,7 +25,7 @@ interface FormState {
   capacity: string;
   status: RoomStatus;
   bookingEnabled: boolean;
-  photo?: string;
+  photos: string[];
   openTimeStart: string;
   openTimeEnd: string;
   pricePerSession: string;
@@ -37,7 +37,7 @@ const EMPTY_FORM: FormState = {
   capacity: '',
   status: 'active',
   bookingEnabled: false,
-  photo: undefined,
+  photos: [],
   openTimeStart: '09:00',
   openTimeEnd: '22:00',
   pricePerSession: '0',
@@ -141,7 +141,7 @@ const VenueFormPage: React.FC = () => {
         capacity: form.capacity ? Number(form.capacity) : undefined,
         status: form.status,
         bookingEnabled: form.bookingEnabled,
-        photo: form.photo,
+        photos: form.photos,
         openTimeStart: form.openTimeStart,
         openTimeEnd: form.openTimeEnd,
         pricePerSession: Number(form.pricePerSession || 0),
@@ -284,19 +284,19 @@ const VenueFormPage: React.FC = () => {
           <>
             {/* 场地照片 */}
             <View className="bg-white rounded-[32rpx] p-[32rpx] mb-[24rpx]">
-              <View className="flex flex-row items-start justify-between gap-[24rpx]">
-                <View className="flex-1">
+              <View className="flex flex-col gap-[16rpx]">
+                <View>
                   <Text className="text-[30rpx] font-medium text-foreground">场地照片</Text>
                   <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] leading-relaxed">
-                    会员端场地列表会展示这张图片
+                    会员端场地详情顶部轮播展示，最多 3 张
                   </Text>
                 </View>
-                <ImageUploader
-                  value={form.photo}
+                <ImageUploaderList
+                  value={form.photos}
                   placeholder="上传"
+                  maxCount={3}
                   maxSizeMB={2}
-                  className="w-[140rpx] h-[140rpx] shrink-0"
-                  onChange={(value) => updateField('photo', value)}
+                  onChange={(value) => updateField('photos', value)}
                 />
               </View>
             </View>
@@ -400,7 +400,7 @@ function mapRoomToForm(room: Room): FormState {
     capacity: room.capacity ? String(room.capacity) : '',
     status: room.status,
     bookingEnabled: room.bookingEnabled ?? false,
-    photo: room.photo,
+    photos: room.photos || [],
     openTimeStart: room.openTimeStart ?? '09:00',
     openTimeEnd: room.openTimeEnd ?? '22:00',
     pricePerSession: room.pricePerSession !== undefined ? String(room.pricePerSession) : '0',

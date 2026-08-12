@@ -124,6 +124,33 @@ page {
   --chart-4: 38 92% 50%;
   --chart-5: 0 84% 60%;
 
+  // --- 课表页语义色（接入主题系统，随主题切换） ---
+  --schedule-header: hsl(var(--primary));
+  --schedule-header-soft: hsl(var(--primary) / 0.6);
+  --schedule-attend: hsl(var(--primary));
+  --schedule-adjust: hsl(var(--accent));
+  --schedule-edit: hsl(var(--warning));
+  --schedule-delete: hsl(var(--muted-foreground));
+  --schedule-cancel: hsl(var(--info));
+  --schedule-selected-date: hsl(var(--accent));
+  --schedule-link: hsl(var(--primary-dark));
+  --schedule-dot: hsl(var(--primary) / 0.7);
+  --schedule-page: hsl(var(--background));
+
+  // --- 课表日历语义色（接入主题系统，随主题切换） ---
+  // 选中态使用强调色，今日态使用主题色，形成主次对比
+  --schedule-calendar-selected-bg: hsl(var(--accent));
+  --schedule-calendar-selected-text: hsl(var(--accent-foreground));
+  --schedule-calendar-today-bg: hsl(var(--primary) / 0.12);
+  --schedule-calendar-today-text: hsl(var(--primary));
+  --schedule-calendar-dot: hsl(var(--accent));
+  --schedule-calendar-outside-text: hsl(var(--muted-foreground));
+
+  // --- 我的页语义色（接入主题系统，随主题切换） ---
+  --profile-primary: hsl(var(--primary));
+  --profile-primary-soft: hsl(var(--primary) / 0.75);
+  --profile-primary-10: hsl(var(--primary) / 0.1);
+
   // --- 渐变（对齐设计稿蓝色主题，使用 CSS 变量） ---
   --gradient-primary: linear-gradient(
     135deg,
@@ -191,6 +218,118 @@ page {
   line-height: 1.5;
   color: hsl(var(--foreground));
   background-color: hsl(var(--background));
+}
+
+// ============================================
+// 主题切换类（与 theme.ts 中的 ThemeKey 对应）
+// 在 app.tsx 中根据 useThemeStore 的 activeTheme 动态应用到 page 容器
+// ============================================
+.theme-coral {
+  // 主题色（珊瑚粉 #f97768）
+  --primary: 6 92% 69%;
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 6 90% 77%;
+  --primary-dark: 5 80% 60%;
+
+  // 次要色
+  --secondary: 6 100% 95%;
+  --secondary-foreground: 5 50% 37%;
+
+  // 强调色（课表页青绿 #47c1b6）
+  --accent: 174 50% 52%;
+  --accent-foreground: 0 0% 100%;
+  --accent-glow: 174 50% 67%;
+
+  // 背景与表面
+  --background: 0 0% 96%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 54%;
+
+  // 边框
+  --border: 0 0% 93%;
+  --border-light: 0 0% 93%;
+  --input: 0 0% 93%;
+  --input-border: 0 0% 90%;
+  --ring: 6 92% 69%;
+
+  // 身份角色色
+  --role-teacher: 6 92% 69%;
+  --role-teacher-glow: 6 90% 77%;
+  --role-teacher-dark: 5 80% 60%;
+  --role-parent: 174 50% 52%;
+  --role-parent-glow: 174 50% 67%;
+  --role-parent-dark: 174 45% 45%;
+
+  // 花瓣五色与图表
+  --petal-blue: 6 92% 69%;
+  --petal-purple: 174 50% 52%;
+  --chart-1: 6 92% 69%;
+  --chart-2: 174 50% 52%;
+
+  // 阴影（随主题色变化）
+  --shadow-elegant: 0 20rpx 60rpx -20rpx rgba(249, 119, 104, 0.3);
+  --shadow-soft: 0 8rpx 40rpx -8rpx rgba(249, 119, 104, 0.08);
+  --shadow-card: 0 2rpx 12rpx rgba(249, 119, 104, 0.06);
+  --shadow-card-hover: 0 4rpx 20rpx rgba(249, 119, 104, 0.1);
+  --shadow-float: 0 4rpx 16rpx rgba(249, 119, 104, 0.08);
+  --shadow-rollcall: 0 4rpx 16rpx rgba(232, 90, 74, 0.3);
+}
+
+.theme-orange {
+  // 主题色（活力橙 #FF8A2A）
+  --primary: 27 100% 58%;
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 27 96% 67%;
+  --primary-dark: 25 80% 50%;
+
+  // 次要色
+  --secondary: 27 100% 95%;
+  --secondary-foreground: 25 77% 28%;
+
+  // 强调色（活力青 #06B6D4，与橙色形成互补对比）
+  --accent: 189 94% 43%;
+  --accent-foreground: 0 0% 100%;
+  --accent-glow: 187 92% 59%;
+
+  // 背景与表面
+  --background: 30 30% 97%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+  --muted: 30 20% 96%;
+  --muted-foreground: 0 0% 54%;
+
+  // 边框
+  --border: 30 20% 93%;
+  --border-light: 30 20% 93%;
+  --input: 30 20% 93%;
+  --input-border: 30 20% 90%;
+  --ring: 27 100% 58%;
+
+  // 身份角色色
+  --role-teacher: 27 100% 58%;
+  --role-teacher-glow: 27 96% 67%;
+  --role-teacher-dark: 25 80% 50%;
+  --role-parent: 189 94% 43%;
+  --role-parent-glow: 187 92% 59%;
+  --role-parent-dark: 191 91% 36%;
+
+  // 花瓣五色与图表
+  --petal-blue: 27 100% 58%;
+  --petal-purple: 189 94% 43%;
+  --chart-1: 27 100% 58%;
+  --chart-2: 189 94% 43%;
+
+  // 阴影（随主题色变化）
+  --shadow-elegant: 0 20rpx 60rpx -20rpx rgba(255, 138, 42, 0.3);
+  --shadow-soft: 0 8rpx 40rpx -8rpx rgba(255, 138, 42, 0.08);
+  --shadow-card: 0 2rpx 12rpx rgba(255, 138, 42, 0.06);
+  --shadow-card-hover: 0 4rpx 20rpx rgba(255, 138, 42, 0.1);
+  --shadow-float: 0 4rpx 16rpx rgba(255, 138, 42, 0.08);
+  --shadow-rollcall: 0 4rpx 16rpx rgba(230, 109, 26, 0.3);
 }
 
 /* ===== 渐变背景工具类（使用 CSS 变量） ===== */

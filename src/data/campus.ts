@@ -671,6 +671,7 @@ export async function mockAddRoom(data: RoomFormData): Promise<Room> {
     id: `room-${Date.now()}`,
     ...data,
     bookingEnabled: data.bookingEnabled ?? false,
+    photos: data.photos ?? [],
     openTimeStart: data.openTimeStart ?? '09:00',
     openTimeEnd: data.openTimeEnd ?? '22:00',
     pricePerSession: data.pricePerSession ?? 0,
@@ -690,17 +691,15 @@ export async function mockUpdateRoom(
   const current = mockRooms.find((item) => item.id === id);
   if (!current) return undefined;
 
-  const photo =
-    data.photo !== undefined
-      ? isTempImagePath(data.photo)
-        ? await uploadImage(data.photo)
-        : data.photo || undefined
-      : current.photo;
+  const photos =
+    data.photos !== undefined
+      ? await Promise.all(data.photos.map((url) => (isTempImagePath(url) ? uploadImage(url) : url)))
+      : current.photos;
 
   const updated: Room = {
     ...current,
     ...data,
-    photo,
+    photos,
     updatedAt: new Date().toISOString(),
   };
   mockRooms = mockRooms.map((item) => (item.id === id ? updated : item));

@@ -37,7 +37,7 @@ const ProfileAbout: React.FC<ProfileAboutProps> = ({
         <Text className="text-[28rpx] font-medium text-profile-orange-soft">
           关于{BRAND_NAME_ZH}
         </Text>
-        <Icon name="mdi-chevron-right" size="xs" color="#ffa06c" />
+        <Icon name="mdi-chevron-right" size="xs" color="primaryLight" />
       </View>
       <Text className="text-[22rpx] text-muted-foreground">正式版 版本号 {version}</Text>
     </View>

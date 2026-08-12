@@ -6,13 +6,15 @@
  * - 管理员专属项（主题颜色、课表管理、定时备份、重置新手引导）：仅管理员可见
  */
 import { View, Text } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import Switch from '@/components/Switch';
 import { clearVisitedMap } from '@/services/onboarding';
 import { isAdmin, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
+import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 
 /** 设置项配置 */
 interface SettingItem {
@@ -42,7 +44,7 @@ const ALL_SETTING_ITEMS: SettingItem[] = [
     iconColor: 'accent',
     title: '主题颜色',
     desc: '设置个人主题色',
-    route: '',
+    route: '/package-settings/pages/theme-settings/index',
   },
   {
     icon: 'mdi-calendar-clock',
@@ -86,6 +88,17 @@ const PLACEHOLDER_TIP = '功能开发中，敬请期待';
 
 const SystemSettings: React.FC = () => {
   const { signOut, currentRole } = useAuth();
+  const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
+
+  // 页面显示时读取最新开关状态
+  useDidShow(() => {
+    setVenueBookingEnabledState(getVenueBookingEnabled());
+  });
+
+  const handleVenueBookingChange = useCallback((enabled: boolean) => {
+    setVenueBookingEnabledState(enabled);
+    setVenueBookingEnabled(enabled);
+  }, []);
 
   // 按角色过滤设置项：adminOnly 的仅管理员可见，其余通用
   const visibleItems = useMemo(
@@ -160,6 +173,25 @@ const SystemSettings: React.FC = () => {
             </View>
           </View>
         ))}
+
+        {/* 场地预约开关 */}
+        <View className="flex flex-row items-center bg-white rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx]">
+          <View
+            className={cn(
+              'w-[76rpx] h-[76rpx] rounded-[22rpx] flex items-center justify-center mr-[20rpx] flex-shrink-0',
+              'bg-success-bg',
+            )}
+          >
+            <Icon name="mdi-map-marker" size={38} color="success" />
+          </View>
+          <View className="flex-1 min-w-0 flex flex-col">
+            <Text className="text-[28rpx] font-semibold text-foreground">场地预约</Text>
+            <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] truncate">
+              关闭后课表页将不再显示「场地」标签
+            </Text>
+          </View>
+          <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
+        </View>
       </View>
 
       {/* 退出登录：所有角色可见 */}
