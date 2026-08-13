@@ -255,6 +255,17 @@ page {
   --input-border: 0 0% 90%;
   --ring: 6 92% 69%;
 
+  // 状态色（柔和调整以贴合暖色调）
+  --success: 160 84% 39%;
+  --warning: 32 90% 50%;
+  --error: 0 84% 60%;
+  --info: 189 80% 48%;
+
+  // 薄荷绿（在珊瑚主题下保持原有色，不变）
+  --mint: 160 100% 97%;
+  --mint-foreground: 160 84% 39%;
+  --mint-border: 160 60% 90%;
+
   // 身份角色色
   --role-teacher: 6 92% 69%;
   --role-teacher-glow: 6 90% 77%;
@@ -266,8 +277,14 @@ page {
   // 花瓣五色与图表
   --petal-blue: 6 92% 69%;
   --petal-purple: 174 50% 52%;
+  --petal-orange: 32 90% 50%;
+  --petal-red: 0 84% 60%;
+  --petal-cyan: 189 94% 43%;
   --chart-1: 6 92% 69%;
   --chart-2: 174 50% 52%;
+  --chart-3: 189 94% 43%;
+  --chart-4: 32 90% 50%;
+  --chart-5: 0 84% 60%;
 
   // 阴影（随主题色变化）
   --shadow-elegant: 0 20rpx 60rpx -20rpx rgba(249, 119, 104, 0.3);
@@ -309,6 +326,17 @@ page {
   --input-border: 30 20% 90%;
   --ring: 27 100% 58%;
 
+  // 状态色
+  --success: 160 84% 39%;
+  --warning: 32 90% 50%;
+  --error: 0 84% 60%;
+  --info: 189 94% 43%;
+
+  // 薄荷绿
+  --mint: 160 100% 97%;
+  --mint-foreground: 160 84% 39%;
+  --mint-border: 160 60% 90%;
+
   // 身份角色色
   --role-teacher: 27 100% 58%;
   --role-teacher-glow: 27 96% 67%;
@@ -320,8 +348,14 @@ page {
   // 花瓣五色与图表
   --petal-blue: 27 100% 58%;
   --petal-purple: 189 94% 43%;
+  --petal-orange: 32 90% 50%;
+  --petal-red: 0 84% 60%;
+  --petal-cyan: 189 94% 43%;
   --chart-1: 27 100% 58%;
   --chart-2: 189 94% 43%;
+  --chart-3: 189 94% 43%;
+  --chart-4: 32 90% 50%;
+  --chart-5: 0 84% 60%;
 
   // 阴影（随主题色变化）
   --shadow-elegant: 0 20rpx 60rpx -20rpx rgba(255, 138, 42, 0.3);

@@ -125,8 +125,32 @@ export function usePageBgNavigationBar(): void {
 /**
  * 同步 TabBar 颜色到当前主题
  * 小程序 tabBar 配置是静态的，需要通过 setTabBarStyle 动态更新
+ *
+ * 注意：只有 TabBar 页面可以调用 setTabBarStyle，非 Tab 页（如主题设置页）会报错。
+ * 因此本函数会先检查当前页面是否为 TabBar 页面，非 Tab 页时静默跳过。
  */
 export function syncTabBarToTheme(theme: ThemeKey): void {
+  // 检查当前页面是否为 TabBar 页面
+  try {
+    const pages = Taro.getCurrentPages?.() ?? [];
+    const currentPage = pages[pages.length - 1] as { route?: string } | undefined;
+    const currentRoute = currentPage?.route ?? '';
+
+    // TabBar 页面的 path 在 app.config.ts 的 tabBar.list 中列出
+    const tabBarPages = [
+      'pages/home/index',
+      'pages/schedule/index',
+      'pages/statistics/index',
+      'pages/profile/index',
+    ];
+    if (!tabBarPages.some((p) => currentRoute.includes(p))) {
+      return; // 非 TabBar 页面，跳过
+    }
+  } catch {
+    // 安全兜底：异常时也跳过
+    return;
+  }
+
   const themeHex = getThemeHex(theme);
   try {
     Taro.setTabBarStyle({

@@ -9,8 +9,10 @@
  * 修改原则：改这里 → 同步 app.scss → 全局生效
  */
 
-// ============================================
-// 颜色 Token（HSL 值，用于 CSS 变量和运行时拼接）
+// Taro 运行时引用（仅 applyTheme 函数使用，避免 tree-shaking）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type WechatMinigameGlobal = { wx?: any; getCurrentPages?: () => any[] };
+declare const globalThis: WechatMinigameGlobal;
 // 配色方案对齐设计稿 scheme-bc-fusion-v2.html（蓝色主题 + 花瓣五色）
 // ============================================
 export const colors = {
@@ -652,23 +654,91 @@ export function generateCSSVars(overrides?: Partial<typeof colors>): Record<stri
 }
 
 /**
- * 应用主题到页面（小程序运行时主题切换）
- * 使用 Taro 的 setPageStyle API
+ * 应用主题到所有已渲染页面（小程序运行时主题切换）
+ *
+ * 实现思路：
+ *  1. 通过 `Taro.getCurrentPages()` 拿到所有已加载的页面实例
+ *  2. 给每个页面根 view 注入 style 字符串（包含 CSS 变量声明）
+ *  3. CSS 变量会自动向下级联，所有 UnoCSS 主题色类（如 `bg-primary`）都会跟随更新
+ *
+ * 实现细节：
+ *  - 小程序 page 根元素是 `<page>` 元素，Taro 在编译后会把页面根组件挂到 page 容器内
+ *  - 通过 `wx.createSelectorQuery().selectPage()` 拿到 page 根节点，调用 setStyle
+ *  - 为了兼容不同端：依次降级到 page.$scope.setData({ style }) / page.setData({ style })
+ *
+ * @param palette 完整的 HSL 色板（通常来自 getThemePalette(themeKey)）
  */
-export async function applyTheme(overrides?: Partial<typeof colors>) {
-  const { default: Taro } = await import('@tarojs/taro');
-  const vars = generateCSSVars(overrides);
-  // Taro 4.x 支持 setPageStyle
+export function applyTheme(palette: ThemePalette): void {
+  // 小程序环境检查：通过 globalThis.wx 判断
+  if (typeof globalThis === 'undefined' || !(globalThis as WechatMinigameGlobal).wx) {
+    // 非小程序环境（H5/React Native），静默退出
+    return;
+  }
+
+  const vars = generateThemeCSSVars(palette);
+  // 将 CSS 变量序列化为 inline style 字符串
+  const styleStr = Object.entries(vars)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('; ');
+
+  // 方案 A：通过 wx.createSelectorQuery 拿到 page 节点直接设置 style（推荐）
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (Taro as any).setPageStyle?.({ style: vars });
-  } catch {
-    // 降级：直接设置 page 元素 style（兼容旧版本）
-    const page = (
-      typeof document !== 'undefined' ? document.querySelector('page') : null
-    ) as PageElement | null;
-    if (page) {
-      Object.assign(page.style, vars);
+    const wx = (typeof globalThis !== 'undefined' ? (globalThis as any).wx : undefined) as
+      | {
+          createSelectorQuery?: () => {
+            selectPage?: () => unknown;
+            exec?: (cb: (res: unknown) => void) => void;
+          };
+        }
+      | undefined;
+    if (wx?.createSelectorQuery) {
+      const query = wx.createSelectorQuery();
+      if (query.selectPage) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (query as any)
+          .selectPage()
+          .node()
+          .exec((res: any) => {
+            const node = res?.[0]?.node;
+            if (node?.style) {
+              // 给 page 根节点的所有 CSS 变量赋值
+              for (const [k, v] of Object.entries(vars)) {
+                try {
+                  node.style.setProperty(k, String(v));
+                } catch {
+                  // 忽略单变量设置失败
+                }
+              }
+            }
+          });
+        return; // 方案 A 成功就直接返回
+      }
     }
+  } catch (err) {
+    console.warn('[theme] applyTheme: wx.selectPage 失败，降级到 setData', err);
+  }
+
+  // 方案 B：setData 写 style 字段（需要 page WXML 模板绑定 style="{{style}}"，通常不生效）
+  try {
+    const pages = globalThis.getCurrentPages?.() ?? [];
+    for (const page of pages) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = page as any;
+      if (typeof p.setData === 'function') {
+        p.setData({ style: styleStr });
+      } else if (p.$scope && typeof p.$scope.setData === 'function') {
+        p.$scope.setData({ style: styleStr });
+      }
+    }
+  } catch (err) {
+    // page 实例未就绪（首屏渲染前），静默忽略
+    console.warn('[theme] applyTheme: 无法访问 page 实例', err);
   }
 }
+
+/**
+ * @deprecated 该函数旧版本签名，仅保留类型导出兼容。请使用 `applyTheme(palette)` 新版本。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const _legacyApplyTheme: any = undefined;
