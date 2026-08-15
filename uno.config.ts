@@ -253,6 +253,15 @@ export default defineConfig({
       { background: 'linear-gradient(160deg, #C0E8E8 0%, #D5F0F0 50%, #E8F8F8 100%)' },
     ],
 
+    // ===== 会员权益卡片（接入主题色：浅主题背景 + 主题色右侧按钮区） =====
+    [
+      'bg-card-gradient',
+      {
+        background:
+          'linear-gradient(135deg, hsl(var(--primary)/0.10) 0%, hsl(var(--primary)/0.04) 100%)',
+      },
+    ],
+
     // ===== KPI 深色渐变（接入主题系统，随主题切换） =====
     [
       'bg-kpi-green',

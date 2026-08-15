@@ -72,6 +72,9 @@ const Profile: React.FC = () => {
   const [loadingStoreProgress, setLoadingStoreProgress] = useState(false);
   const [storeOnboardingHidden, setStoreOnboardingHidden] = useState<boolean | null>(null);
 
+  // 会员开通状态（TODO: 后续接入接口）
+  const [isMembershipActive] = useState(false);
+
   // 加载家长绑定的学生
   const loadStudents = useCallback(async () => {
     if (!profile?.id || isTeacher) return;
@@ -256,11 +259,6 @@ const Profile: React.FC = () => {
     Taro.showToast({ title: '关于页面开发中', icon: 'none' });
   }, []);
 
-  // 续费（暂无接入）
-  const handleRenew = useCallback(() => {
-    Taro.showToast({ title: '续费功能开发中', icon: 'none' });
-  }, []);
-
   // ============================================
   // 教师视图：店铺管理
   // ============================================
@@ -350,19 +348,15 @@ const Profile: React.FC = () => {
     return items;
   }, [handleNavigate]);
 
-  // 教师视图：4 列数据（已接入的取真实数据，其余占位 0）
+  // 教师视图：4 列核心数据
   const teacherStats = useMemo(
     () => [
-      {
-        label: '学员数量',
-        value: profile?.teacher_profile?.student_count ?? 0,
-        unit: '名',
-      },
-      { label: '班级数量', value: profile?.teacher_profile?.class_count ?? 0, unit: '个' },
       { label: '累计出勤', value: 0, unit: '次' },
-      { label: '剩余课时', value: 0, unit: '节' },
+      { label: '剩余次数', value: 0, unit: '次' },
+      { label: '剩余时长', value: 0, unit: '天' },
+      { label: '剩余储值', value: 0, unit: '元' },
     ],
-    [profile?.teacher_profile?.student_count, profile?.teacher_profile?.class_count],
+    [],
   );
 
   // ============================================
@@ -485,33 +479,56 @@ const Profile: React.FC = () => {
           layout="label-top"
         />
 
-        {/* ====== 试用版/续费卡片 ====== */}
-        <View className="mx-[32rpx] mt-[24rpx] px-[28rpx] py-[26rpx] rounded-[24rpx] bg-card shadow-soft flex items-center justify-between">
-          {isTeacher ? (
-            <View className="flex items-baseline gap-[8rpx]">
-              <Text className="text-[32rpx] font-bold text-foreground">试用版</Text>
-              <Text className="text-[24rpx] text-muted-foreground">剩余可用天数0天</Text>
+        {/* ====== 会员权益卡片 ====== */}
+        <View className="mx-[32rpx] mt-[24rpx] h-[160rpx] rounded-[28rpx] bg-card-gradient overflow-hidden shadow-soft flex relative">
+          {/* 左侧信息区 */}
+          <View className="flex-1 px-[32rpx] py-[28rpx] flex flex-col justify-center relative z-10">
+            <View className="flex items-baseline">
+              <Text className="text-[48rpx] font-black text-primary leading-none italic">V</Text>
+              <Text className="text-[32rpx] font-bold text-primary ml-[6rpx]">会员卡</Text>
             </View>
-          ) : (
-            <View>
-              <Text className="text-[32rpx] font-bold text-foreground">试用版</Text>
-              <Text className="mt-[6rpx] text-[24rpx] text-muted-foreground">剩余可用天数0天</Text>
-            </View>
-          )}
+            <Text className="text-[24rpx] text-muted-foreground mt-[14rpx]">
+              {isMembershipActive
+                ? '已开通会员，尊享全部教务特权'
+                : '开通会员，尊享全部教务特权'}
+            </Text>
+          </View>
+
+          {/* 右侧斜切按钮区 */}
           <View
-            className="px-[32rpx] py-[12rpx] rounded-full bg-profile-orange-solid active:opacity-85"
-            onClick={handleRenew}
+            className={cn(
+              'w-[220rpx] h-full relative flex flex-col items-center justify-center press-opacity',
+              isMembershipActive ? 'bg-foreground/10' : 'bg-primary',
+            )}
+            style={{
+              clipPath: 'polygon(24rpx 0, 100% 0, 100% 100%, 0 100%)',
+            }}
           >
-            <Text className="text-[26rpx] font-medium text-primary-foreground">续费</Text>
+            <Text
+              className={cn(
+                'text-[30rpx] font-bold',
+                isMembershipActive ? 'text-foreground' : 'text-primary-foreground',
+              )}
+            >
+              {isMembershipActive ? '立即查看' : '立即开通'}
+            </Text>
+            <Text
+              className={cn(
+                'text-[20rpx] mt-[10rpx]',
+                isMembershipActive ? 'text-foreground/60' : 'text-primary-foreground/75',
+              )}
+            >
+              {isMembershipActive ? '有效期至 2026-12-31' : '已有 2,333 人开通'}
+            </Text>
           </View>
         </View>
 
-        {/* ====== 公众号关注卡片 ====== */}
-        <ProfileFollowCard className="mt-[24rpx]" onClick={handleFollow} />
+        {/* ====== 公众号关注卡片（暂时隐藏） ====== */}
+        {false && <ProfileFollowCard className="mt-[24rpx]" onClick={handleFollow} />}
 
-        {/* ====== 我的约课：压住公众号关注卡片 ====== */}
+        {/* ====== 我的约课 ====== */}
         <ProfileGrid
-          className="relative z-10 mt-[-32rpx]"
+          className="mt-[24rpx]"
           title="我的约课"
           items={parentBookingItems}
         />
