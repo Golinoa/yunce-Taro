@@ -35,6 +35,9 @@ interface IconProps {
   size?: IconSize;
   color?: IconColor;
   className?: string;
+  style?: React.CSSProperties;
+  /** 是否使用描边线条风格（1px 细线，适合 outline 图标） */
+  stroke?: boolean;
   onClick?: () => void;
 }
 
@@ -92,6 +95,8 @@ const Icon: React.FC<IconProps> = ({
   size = 'md',
   color = 'inherit',
   className,
+  style,
+  stroke = false,
   onClick,
 }) => {
   const sizeRpx = typeof size === 'number' ? size : SIZE_MAP[size];
@@ -116,7 +121,10 @@ const Icon: React.FC<IconProps> = ({
     console.warn(`[Icon] unknown icon name: ${name}`);
     return null;
   }
-  const svgUrl = `data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='${svgPath}'/%3E%3C/svg%3E`;
+  // 描边模式：1px 细线，fill 为 none，通过 stroke 渲染
+  const svgUrl = stroke
+    ? `data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='currentColor' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='${svgPath}'/%3E%3C/svg%3E`
+    : `data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='${svgPath}'/%3E%3C/svg%3E`;
 
   return (
     <View
@@ -131,6 +139,7 @@ const Icon: React.FC<IconProps> = ({
         maskRepeat: 'no-repeat',
         WebkitMaskSize: '100% 100%',
         maskSize: '100% 100%',
+        ...style,
       }}
       onClick={onClick}
     />

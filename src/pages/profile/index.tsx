@@ -268,50 +268,42 @@ const Profile: React.FC = () => {
     () => [
       {
         label: '门店管理',
-        icon: 'mdi-office-building' as const,
-        color: 'warning' as const,
+        icon: 'mdi-office-building-outline' as const,
         onClick: handlePlaceholder,
       },
       {
         label: '场地管理',
-        icon: 'mdi-map-marker' as const,
-        color: 'accent' as const,
+        icon: 'mdi-map-marker-outline' as const,
         onClick: handleVenueManage,
       },
       {
         label: '员工管理',
-        icon: 'mdi-account-group' as const,
-        color: 'primary' as const,
+        icon: 'mdi-account-group-outline' as const,
         onClick: handleTeacherManage,
       },
       {
         label: '课程管理',
-        icon: 'mdi-book-open-variant' as const,
-        color: 'info' as const,
+        icon: 'mdi-book-open-variant-outline' as const,
         onClick: handleCourseManage,
       },
       {
         label: '卡种管理',
-        icon: 'mdi-cash' as const,
-        color: 'success' as const,
+        icon: 'mdi-credit-card-outline' as const,
         onClick: handleCardManage,
       },
       {
         label: '薪资管理',
-        icon: 'mdi-cash-multiple' as const,
-        color: 'warning' as const,
+        icon: 'mdi-wallet-outline' as const,
         onClick: () => handleNavigate('/package-teacher/pages/salary-home/index'),
       },
       {
         label: '学员信箱',
-        icon: 'mdi-email' as const,
-        color: 'accent' as const,
+        icon: 'mdi-email-outline' as const,
         onClick: handlePlaceholder,
       },
       {
         label: '促销工具',
         icon: 'mdi-bullhorn-outline' as const,
-        color: 'primary' as const,
         onClick: handlePlaceholder,
       },
     ],
@@ -330,34 +322,29 @@ const Profile: React.FC = () => {
     type SystemItem = {
       label: string;
       icon: string;
-      color?: 'primary' | 'accent' | 'warning' | 'info' | 'success' | 'destructive';
       onClick: () => void;
     };
     const items: SystemItem[] = [
       {
         label: '使用帮助',
-        icon: 'mdi-help-circle',
-        color: 'accent',
+        icon: 'mdi-help-circle-outline',
         onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
       },
       {
         label: '平台客服',
         icon: 'mdi-headset',
-        color: 'info',
         onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
       },
       {
         label: '消息通知',
         icon: 'mdi-message-text-outline',
-        color: 'primary',
         onClick: () => handleNavigate('/pages/notifications/index'),
       },
     ];
     // 系统设置：所有角色可见，内部设置项按权限过滤
     items.push({
       label: '系统设置',
-      icon: 'mdi-cog',
-      color: 'destructive',
+      icon: 'mdi-cog-outline',
       onClick: () => handleNavigate('/package-settings/pages/system-settings/index'),
     });
     return items;
@@ -385,26 +372,22 @@ const Profile: React.FC = () => {
     () => [
       {
         label: '已预约',
-        icon: 'mdi-calendar-check' as const,
-        color: 'primary' as const,
+        icon: 'mdi-calendar-check-outline' as const,
         onClick: () => handleNavigate('/pages/booking/index'),
       },
       {
         label: '排队中',
         icon: 'mdi-account-group-outline' as const,
-        color: 'warning' as const,
         onClick: handlePlaceholder,
       },
       {
         label: '待评价',
         icon: 'mdi-star-outline' as const,
-        color: 'accent' as const,
         onClick: handlePlaceholder,
       },
       {
         label: '已取消',
-        icon: 'mdi-calendar-blank' as const,
-        color: 'info' as const,
+        icon: 'mdi-calendar-blank-outline' as const,
         onClick: handlePlaceholder,
       },
     ],
@@ -416,32 +399,27 @@ const Profile: React.FC = () => {
     () => [
       {
         label: '我的卡包',
-        icon: 'mdi-package-variant' as const,
-        color: 'primary' as const,
+        icon: 'mdi-package' as const,
         onClick: () => handleNavigate('/package-course/pages/course-packages/index'),
       },
       {
         label: '我的合同',
         icon: 'mdi-file-document-outline' as const,
-        color: 'warning' as const,
         onClick: handlePlaceholder,
       },
       {
         label: '排行榜',
-        icon: 'mdi-trophy' as const,
-        color: 'accent' as const,
+        icon: 'mdi-trophy-outline' as const,
         onClick: handlePlaceholder,
       },
       {
         label: '课程足迹',
-        icon: 'mdi-calendar' as const,
-        color: 'info' as const,
+        icon: 'mdi-calendar-outline' as const,
         onClick: () => handleNavigate('/package-course/pages/records/index'),
       },
       {
         label: '积分中心',
-        icon: 'mdi-star' as const,
-        color: 'success' as const,
+        icon: 'mdi-star-outline' as const,
         onClick: handlePlaceholder,
       },
     ],
@@ -453,26 +431,22 @@ const Profile: React.FC = () => {
     () => [
       {
         label: '使用帮助',
-        icon: 'mdi-help-circle' as const,
-        color: 'accent' as const,
+        icon: 'mdi-help-circle-outline' as const,
         onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
       },
       {
         label: '平台客服',
         icon: 'mdi-headset' as const,
-        color: 'info' as const,
         onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
       },
       {
         label: '消息通知',
         icon: 'mdi-message-text-outline' as const,
-        color: 'primary' as const,
         onClick: () => handleNavigate('/pages/notifications/index'),
       },
       {
         label: '系统设置',
-        icon: 'mdi-cog' as const,
-        color: 'destructive' as const,
+        icon: 'mdi-cog-outline' as const,
         onClick: () => handleNavigate('/package-settings/pages/system-settings/index'),
       },
     ],
@@ -539,7 +513,6 @@ const Profile: React.FC = () => {
         <ProfileGrid
           className="relative z-10 mt-[-32rpx]"
           title="我的约课"
-          variant="simple"
           items={parentBookingItems}
         />
 
@@ -569,15 +542,13 @@ const Profile: React.FC = () => {
               <ProfileGrid
                 className="mt-[24rpx]"
                 title="店铺管理"
-                variant="simple"
-                items={teacherStoreItems}
+                      items={teacherStoreItems}
               />
             )}
             <ProfileGrid
               className="mt-[24rpx]"
               title="系统管理"
-              variant="simple"
-              items={teacherSystemItems}
+                  items={teacherSystemItems}
             />
           </>
         )}
@@ -621,20 +592,17 @@ const Profile: React.FC = () => {
             <ProfileGrid
               className="mt-[24rpx]"
               title="我的约课"
-              variant="simple"
-              items={parentBookingItems}
+                  items={parentBookingItems}
             />
             <ProfileGrid
               className="mt-[24rpx]"
               title="我的服务"
-              variant="simple"
-              items={parentServiceItems}
+                  items={parentServiceItems}
             />
             <ProfileGrid
               className="mt-[24rpx]"
               title="系统管理"
-              variant="simple"
-              items={parentSystemItems}
+                  items={parentSystemItems}
             />
           </>
         )}

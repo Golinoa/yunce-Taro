@@ -1,5 +1,4 @@
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useState } from 'react';
 import cn from 'classnames';
 import Icon from '@/components/Icon';
@@ -46,11 +45,6 @@ const MemberData: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  /** 返回上一页 */
-  const handleBack = useCallback(() => {
-    Taro.navigateBack();
-  }, []);
-
   /** 切换周期 */
   const handlePeriodChange = useCallback((value: string) => {
     setPeriod(value as 'day' | 'month' | 'year');
@@ -78,17 +72,53 @@ const MemberData: React.FC = () => {
         .join(', ');
     };
 
-    /** 计算标签位置 */
-    const getLabelPosition = (index: number) => {
+    /** 计算标签位置和对齐方式 */
+    const getLabelStyle = (index: number) => {
       const angle = (Math.PI * 2 * index) / categories.length - Math.PI / 2;
-      const radius = maxRadius + 24;
+      const radius = maxRadius + 16;
       const x = center + radius * Math.cos(angle);
       const y = center + radius * Math.sin(angle);
-      return { x: `${x}rpx`, y: `${y}rpx` };
+
+      // 根据角度判断标签方位，调整对齐方式
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      let translateX = '-50%';
+      let translateY = '-50%';
+      let whiteSpace = 'nowrap' as const;
+
+      if (cos > 0.3) {
+        // 右侧：左对齐
+        translateX = '0';
+      } else if (cos < -0.3) {
+        // 左侧：右对齐
+        translateX = '-100%';
+      }
+      // 顶部/底部保持水平居中
+
+      if (sin > 0.3) {
+        // 底部：顶部对齐
+        translateY = '0';
+      } else if (sin < -0.3) {
+        // 顶部：底部对齐
+        translateY = '-100%';
+      }
+
+      return {
+        left: `${x}rpx`,
+        top: `${y}rpx`,
+        transform: `translate(${translateX}, ${translateY})`,
+        whiteSpace,
+      };
     };
 
     return (
-      <View className="relative mx-auto" style={{ width: `${size}rpx`, height: `${size}rpx` }}>
+      <View className="relative mx-auto" style={{ width: `${size + 80}rpx`, height: `${size + 80}rpx` }}>
+        {/* 雷达图主体（居中） */}
+        <View
+          className="absolute"
+          style={{ left: '40rpx', top: '40rpx', width: `${size}rpx`, height: `${size}rpx` }}
+        >
         {/* 背景网格 */}
         {Array.from({ length: 5 }).map((_, levelIndex) => {
           const levelValues = categories.map(() => ((levelIndex + 1) / 5) * 100);
@@ -121,18 +151,20 @@ const MemberData: React.FC = () => {
             clipPath: `polygon(${getPolygonPoints(attendanceData)})`,
           }}
         />
+        </View>
 
-        {/* 标签 */}
+        {/* 标签（在外层，坐标偏移 40rpx 与雷达图对齐） */}
         {categories.map((category, index) => {
-          const pos = getLabelPosition(index);
+          const style = getLabelStyle(index);
           return (
             <Text
               key={index}
               className="absolute text-[22rpx] text-foreground-secondary font-medium"
               style={{
-                left: pos.x,
-                top: pos.y,
-                transform: 'translate(-50%, -50%)',
+                left: `calc(${style.left} + 40rpx)`,
+                top: `calc(${style.top} + 40rpx)`,
+                transform: style.transform,
+                whiteSpace: style.whiteSpace,
               }}
             >
               {category}
@@ -147,18 +179,6 @@ const MemberData: React.FC = () => {
     <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       {/* 顶部渐变头部 */}
       <View className="bg-gradient-diffuse-top pb-[60rpx] px-[32rpx] pt-[24rpx] relative overflow-hidden">
-        {/* 自定义导航栏 */}
-        <View className="flex items-center justify-between mb-[32rpx] relative z-10">
-          <View className="flex items-center gap-[16rpx]" onClick={handleBack}>
-            <Icon name="mdi-arrow-left" size={28} color="foreground" />
-            <Text className="text-[32rpx] font-bold text-foreground">会员数据</Text>
-          </View>
-          <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[10rpx] rounded-full shadow-card">
-            <Text className="text-[26rpx] text-foreground font-medium">云策健身</Text>
-            <Icon name="mdi-chevron-down" size={20} color="muted" />
-          </View>
-        </View>
-
         {/* 日期选择 + 周期切换 */}
         <View className="flex items-center justify-between relative z-10">
           <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">

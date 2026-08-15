@@ -2,8 +2,10 @@
  * 系统设置页 package-settings/pages/system-settings/index
  *
  * 所有角色均可进入，内部设置项按角色权限过滤显示：
- * - 通用项（操作记录、用户协议、退出登录）：所有角色可见
+ * - 通用项（操作记录、用户协议）：所有角色可见
  * - 管理员专属项（主题颜色、课表管理、定时备份、重置新手引导）：仅管理员可见
+ *
+ * 视觉风格：简洁文字列表，无图标无描述，右侧箭头/开关。
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
@@ -21,11 +23,7 @@ import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-bo
 
 /** 设置项配置 */
 interface SettingItem {
-  icon: string;
-  iconBg: string;
-  iconColor: string;
   title: string;
-  desc: string;
   route: string;
   /** 仅管理员可见 */
   adminOnly?: boolean;
@@ -34,53 +32,24 @@ interface SettingItem {
 /** 系统设置全量分组 */
 const ALL_SETTING_ITEMS: SettingItem[] = [
   {
-    icon: 'mdi-clipboard-text',
-    iconBg: 'bg-primary-bg',
-    iconColor: 'primary',
     title: '操作记录',
-    desc: '查看账号与业务操作日志',
     route: '',
   },
   {
-    icon: 'mdi-palette',
-    iconBg: 'bg-accent-bg',
-    iconColor: 'accent',
     title: '主题颜色',
-    desc: '设置个人主题色',
     route: '/package-settings/pages/theme-settings/index',
   },
   {
-    icon: 'mdi-calendar-clock',
-    iconBg: 'bg-info-bg',
-    iconColor: 'info',
-    title: '课表管理',
-    desc: '管理排课与课表展示',
-    route: '',
-    adminOnly: true,
-  },
-  {
-    icon: 'mdi-timer',
-    iconBg: 'bg-success-bg',
-    iconColor: 'success',
     title: '定时备份',
-    desc: '设置数据自动备份周期',
     route: '',
     adminOnly: true,
   },
   {
-    icon: 'mdi-file-document-outline',
-    iconBg: 'bg-warning-bg',
-    iconColor: 'warning',
     title: '用户协议',
-    desc: '查看用户协议与隐私政策',
     route: '/pages/agreement/index',
   },
   {
-    icon: 'mdi-history',
-    iconBg: 'bg-purple-bg',
-    iconColor: 'accent',
     title: '重置新手引导',
-    desc: '重新显示店铺管理配置引导',
     route: '__reset_onboarding__',
     adminOnly: true,
   },
@@ -153,52 +122,30 @@ const SystemSettings: React.FC = () => {
   return (
     <PageContainer safeBottom>
       <View className="px-[32rpx] pt-[32rpx]">
-        {visibleItems.map((item) => (
-          <View
-            key={item.title}
-            className="flex flex-row items-center bg-card rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx] press-bg"
-            onClick={() => handleNavigate(item.route)}
-          >
-            {/* 图标 */}
+        {/* 设置列表卡片 */}
+        <View className="bg-card rounded-[28rpx] shadow-soft overflow-hidden">
+          {visibleItems.map((item, index) => (
             <View
+              key={item.title}
               className={cn(
-                'w-[76rpx] h-[76rpx] rounded-[22rpx] flex items-center justify-center mr-[20rpx] flex-shrink-0',
-                item.iconBg,
+                'flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg',
+                index !== visibleItems.length - 1 && 'border-b border-border',
               )}
+              onClick={() => handleNavigate(item.route)}
             >
-              <Icon name={item.icon} size={38} color={item.iconColor} />
+              <Text className="text-[30rpx] text-foreground">{item.title}</Text>
+              <Icon name="mdi-chevron-right" size={28} color="mutedForeground" />
             </View>
-            {/* 文字 */}
-            <View className="flex-1 min-w-0 flex flex-col">
-              <Text className="text-[28rpx] font-semibold text-foreground">{item.title}</Text>
-              <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] truncate">
-                {item.desc}
-              </Text>
-            </View>
-            {/* 箭头 */}
-            <View className="w-[56rpx] h-[56rpx] rounded-[16rpx] bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Icon name="mdi-chevron-right" size={28} color="primary" />
-            </View>
-          </View>
-        ))}
+          ))}
 
-        {/* 场地预约开关 */}
-        <View className="flex flex-row items-center bg-card rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx]">
-          <View
-            className={cn(
-              'w-[76rpx] h-[76rpx] rounded-[22rpx] flex items-center justify-center mr-[20rpx] flex-shrink-0',
-              'bg-success-bg',
-            )}
-          >
-            <Icon name="mdi-map-marker" size={38} color="success" />
+          {/* 场地预约开关 */}
+          {visibleItems.length > 0 && (
+            <View className="border-t border-border" />
+          )}
+          <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
+            <Text className="text-[30rpx] text-foreground">场地预约</Text>
+            <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
           </View>
-          <View className="flex-1 min-w-0 flex flex-col">
-            <Text className="text-[28rpx] font-semibold text-foreground">场地预约</Text>
-            <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] truncate">
-              关闭后课表页将不再显示「场地」标签
-            </Text>
-          </View>
-          <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
         </View>
       </View>
 

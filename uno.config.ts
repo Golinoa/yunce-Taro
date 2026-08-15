@@ -193,6 +193,15 @@ export default defineConfig({
           'linear-gradient(180deg, hsl(var(--primary-soft)) 0%, hsl(var(--primary-soft)) 8%, hsl(var(--primary)/0.15) 25%, hsl(var(--primary)/0.08) 50%, hsl(var(--primary)/0.03) 75%, hsl(var(--background)) 100%)',
       },
     ],
+    // 自定义导航栏页面用的渐变（顶部纯色区域更高，模拟原生导航栏高度，使内容区渐变浓度与数据页一致）
+    // 前 12% 为纯色 primary-soft（对应状态栏+导航栏区域），渐变从 12% 位置开始
+    [
+      'bg-gradient-diffuse-custom-nav',
+      {
+        background:
+          'linear-gradient(180deg, hsl(var(--primary-soft)) 0%, hsl(var(--primary-soft)) 12%, hsl(var(--primary)/0.15) 30%, hsl(var(--primary)/0.08) 55%, hsl(var(--primary)/0.03) 80%, hsl(var(--background)) 100%)',
+      },
+    ],
     [
       'bg-gradient-primary-soft',
       {

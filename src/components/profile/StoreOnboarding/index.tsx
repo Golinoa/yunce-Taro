@@ -6,6 +6,7 @@
  * - 显示进度条、「配置进度 X/6」、步骤角标
  * - 未完成步骤逐个雷达扩散光圈闪烁，引导用户按顺序配置
  * - 全部完成后由页面切换回普通 8 宫格（ProfileGrid）
+ * - 图标统一使用主题色 + 浅色圆形背景，随主题切换变化
  */
 import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
@@ -15,8 +16,8 @@ import type { StoreOnboardingStep } from '@/types/onboarding';
 import type { StoreOnboardingProps } from './types';
 
 // 引导态中不参与步骤统计的固定入口
-const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-email' | 'mdi-bullhorn-outline' }> = [
-  { label: '学员信箱', icon: 'mdi-email' },
+const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-email-outline' | 'mdi-bullhorn-outline' }> = [
+  { label: '学员信箱', icon: 'mdi-email-outline' },
   { label: '促销工具', icon: 'mdi-bullhorn-outline' },
 ];
 
@@ -85,16 +86,16 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
               onClick={handleStepClick(step)}
             >
               <View className="relative">
-                {/* 图标加大：72rpx */}
-                <Icon name={step.icon} size={72} color="primaryLight" />
+                {/* 图标统一使用主题色 */}
+                <Icon name={step.icon} size={56} color="primary" />
                 {step.completed ? (
-                  /* 完成标记：悬浮在右上角，稍微接触一部分 */
-                  <View className="absolute -top-[12rpx] -right-[12rpx] w-[36rpx] h-[36rpx] rounded-full bg-success center">
-                    <Icon name="mdi-check" size={20} color="hsl(var(--primary-foreground))" />
+                  /* 完成标记 */
+                  <View className="absolute -top-[8rpx] -right-[8rpx] w-[28rpx] h-[28rpx] rounded-full bg-success center shadow">
+                    <Icon name="mdi-check" size={16} color="hsl(var(--primary-foreground))" />
                   </View>
                 ) : (
-                  /* 待配置序号：悬浮在右上角，带精致呼吸光圈 */
-                  <View className="absolute -top-[12rpx] -right-[12rpx] w-[38rpx] h-[38rpx]">
+                  /* 待配置序号：悬浮在右上角，带轻微阴影 */
+                  <View className="absolute -top-[8rpx] -right-[8rpx] w-[32rpx] h-[32rpx]">
                     {/* 扩散环：垫在角标下面，初始被角标完全遮住 */}
                     {isPulsing && (
                       <View className="absolute inset-0 rounded-full bg-profile-orange-solid animate-radar-ring" />
@@ -102,18 +103,17 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
                     {/* 角标本体 */}
                     <View
                       className={cn(
-                        'absolute inset-0 rounded-full bg-profile-orange-solid border-[3rpx] border-card flex items-center justify-center',
+                        'absolute inset-0 rounded-full bg-profile-orange-solid border-[3rpx] border-card flex items-center justify-center shadow',
                         isPulsing && 'animate-badge-scale',
                       )}
                     >
-                      <Text className="text-[24rpx] font-bold text-primary-foreground leading-none">
+                      <Text className="text-[20rpx] font-bold text-primary-foreground leading-none">
                         {index + 1}
                       </Text>
                     </View>
                   </View>
                 )}
               </View>
-              {/* 文字加大 */}
               <Text className="text-[24rpx] text-foreground-secondary font-medium whitespace-nowrap">
                 {step.label}
               </Text>
@@ -128,7 +128,7 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
             className="flex flex-col items-center gap-[14rpx] active:opacity-70"
             onClick={() => onExtraClick?.()}
           >
-            <Icon name={item.icon} size={72} color="primaryLight" />
+            <Icon name={item.icon} size={56} color="primary" />
             <Text className="text-[24rpx] text-foreground-secondary font-medium whitespace-nowrap">
               {item.label}
             </Text>

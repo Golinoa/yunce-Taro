@@ -41,37 +41,37 @@ const STEP_META_LIST: Array<{
   {
     key: 'campus',
     label: '门店管理',
-    icon: 'mdi-office-building',
+    icon: 'mdi-office-building-outline',
     route: '/package-settings/pages/campus-settings/index',
   },
   {
     key: 'venue',
     label: '场地管理',
-    icon: 'mdi-map-marker',
+    icon: 'mdi-map-marker-outline',
     route: '/package-settings/pages/venue-list/index',
   },
   {
     key: 'staff',
     label: '员工管理',
-    icon: 'mdi-account-group',
+    icon: 'mdi-account-group-outline',
     route: '/package-teacher/pages/teacher-list/index',
   },
   {
     key: 'course',
     label: '课程管理',
-    icon: 'mdi-book-open-variant',
+    icon: 'mdi-book-open-variant-outline',
     route: '/package-course/pages/course-management/index',
   },
   {
     key: 'package',
     label: '卡种管理',
-    icon: 'mdi-cash',
+    icon: 'mdi-credit-card-outline',
     route: '/package-course/pages/card-management/index',
   },
   {
     key: 'salary',
     label: '薪资管理',
-    icon: 'mdi-cash-multiple',
+    icon: 'mdi-wallet-outline',
     route: '/package-teacher/pages/salary-home/index',
   },
 ];

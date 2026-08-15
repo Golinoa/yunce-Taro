@@ -1,4 +1,3 @@
 export default definePageConfig({
-  navigationStyle: 'custom',
-  navigationBarTextStyle: 'white',
+  navigationBarTitleText: '卡项数据',
 });

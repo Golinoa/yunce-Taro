@@ -3,10 +3,12 @@
  * 纯静态页面，根据 URL 参数 type 显示不同协议内容
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import { useRouter } from '@tarojs/taro';
-import React from 'react';
+import Taro, { useRouter } from '@tarojs/taro';
+import cn from 'classnames';
+import React, { useEffect } from 'react';
 import PageContainer from '@/components/PageContainer';
-import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
+import { useThemeStore } from '@/stores/theme';
+import { useThemedNavigationBar } from '@/utils/navigation-bar';
 
 // ============================================
 // 用户协议内容
@@ -300,22 +302,31 @@ const PrivacyPolicy: React.FC = () => (
 // 协议页面主组件
 // ============================================
 const Agreement: React.FC = () => {
-  usePrimaryNavigationBar();
+  const { activeTheme } = useThemeStore();
   const router = useRouter();
   const type = router.params.type || 'user';
 
   const title = type === 'privacy' ? '隐私政策' : '用户协议';
 
+  // 导航栏背景色与弥散渐变顶部一致，实现无缝衔接
+  useThemedNavigationBar((themeHex) => ({
+    backgroundColor: themeHex.primarySoftBg,
+    frontColor: '#000000',
+  }));
+
+  useEffect(() => {
+    Taro.setNavigationBarTitle({ title });
+  }, [title]);
+
   return (
     <PageContainer>
-      <View className="min-h-screen bg-gradient-subtle flex flex-col">
-        {/* 标题区 */}
-        <View className="bg-gradient-primary px-6 pt-6 pb-8 rounded-b-60rpx shadow-elegant relative overflow-hidden">
-          <View className="absolute top-4 right-4 w-24 h-24 rounded-full bg-primary-foreground/10 blur-xl" />
-          <Text className="text-primary-foreground text-[40rpx] font-bold block relative z-1">
+      <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background flex flex-col')}>
+        {/* 顶部弥散渐变头部，与数据页面对齐 */}
+        <View className="bg-gradient-diffuse-top px-[32rpx] pt-[24rpx] pb-[32rpx] relative overflow-hidden">
+          <Text className="text-[40rpx] font-bold text-foreground block relative z-10">
             {title}
           </Text>
-          <Text className="text-primary-foreground/70 text-md block mt-1 relative z-1">
+          <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] block relative z-10">
             最近更新日期：2025年1月1日
           </Text>
         </View>

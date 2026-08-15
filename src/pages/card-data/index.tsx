@@ -1,5 +1,4 @@
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useState } from 'react';
 import cn from 'classnames';
 import Icon from '@/components/Icon';
@@ -45,11 +44,6 @@ const CardData: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  /** 返回上一页 */
-  const handleBack = useCallback(() => {
-    Taro.navigateBack();
-  }, []);
 
   /** 切换周期 */
   const handlePeriodChange = useCallback((value: string) => {
@@ -107,18 +101,6 @@ const CardData: React.FC = () => {
     <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       {/* 顶部渐变头部 */}
       <View className="bg-gradient-diffuse-top pb-[60rpx] px-[32rpx] pt-[24rpx] relative overflow-hidden">
-        {/* 自定义导航栏 */}
-        <View className="flex items-center justify-between mb-[32rpx] relative z-10">
-          <View className="flex items-center gap-[16rpx]" onClick={handleBack}>
-            <Icon name="mdi-arrow-left" size={28} color="foreground" />
-            <Text className="text-[32rpx] font-bold text-foreground">卡项数据</Text>
-          </View>
-          <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[10rpx] rounded-full shadow-card">
-            <Text className="text-[26rpx] text-foreground font-medium">云策健身</Text>
-            <Icon name="mdi-chevron-down" size={20} color="muted" />
-          </View>
-        </View>
-
         {/* 日期选择 + 周期切换 */}
         <View className="flex items-center justify-between relative z-10">
           <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
