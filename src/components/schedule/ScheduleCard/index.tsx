@@ -52,15 +52,17 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   return (
     <View
       className={cn(
-        'relative rounded-[14rpx] bg-white px-[24rpx] py-[22rpx] shadow-card',
+        'relative rounded-[14rpx] bg-card px-[24rpx] py-[22rpx] shadow-card',
         className,
       )}
       onClick={() => onClick?.(item)}
     >
       {item.status === 'cancelled' ? (
         <View className="absolute right-0 top-0 overflow-hidden rounded-tr-[14rpx]">
-          <View className="bg-destructive px-[20rpx] py-[10rpx] rounded-bl-[16rpx] shadow-[0_6rpx_14rpx_rgba(239,68,68,0.18)]">
-            <Text className="text-[20rpx] font-semibold tracking-[2rpx] text-white">取消</Text>
+          <View className="bg-destructive px-[20rpx] py-[10rpx] rounded-bl-[16rpx] shadow-card">
+            <Text className="text-[20rpx] font-semibold tracking-[2rpx] text-destructive-foreground">
+              取消
+            </Text>
           </View>
         </View>
       ) : null}
@@ -73,7 +75,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
               <Text className="text-[34rpx] font-bold text-foreground">{item.className}</Text>
               {item.bookingTag ? (
                 <View className="rounded-[8rpx] bg-schedule-attend px-[12rpx] py-[4rpx]">
-                  <Text className="text-center text-[20rpx] font-semibold text-white">
+                  <Text className="text-center text-[20rpx] font-semibold text-primary-foreground">
                     {item.bookingTag}
                   </Text>
                 </View>

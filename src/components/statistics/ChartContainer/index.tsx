@@ -8,8 +8,9 @@
  */
 import { View, Text, Canvas } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useEffect, useRef } from 'react';
-import { hexColors } from '@/theme';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 
 export interface ChartDataItem {
   label: string;
@@ -40,27 +41,17 @@ const PAD_BOTTOM = 36;
 const CHART_W = CANVAS_W - PAD_LEFT - PAD_RIGHT;
 const CHART_H = CANVAS_H - PAD_TOP - PAD_BOTTOM;
 
-// 主题色映射
-const THEME_MAP: Record<ChartTheme, { bar: string; barLight: string; barFill: string }> = {
-  primary: {
-    bar: hexColors.primary,
-    barLight: hexColors.primaryLight,
-    barFill: 'rgba(59, 110, 245, 0.85)',
-  },
-  accent: {
-    bar: hexColors.accent,
-    barLight: hexColors.accentLight,
-    barFill: 'rgba(139, 92, 246, 0.85)',
-  },
-  success: {
-    bar: hexColors.success,
-    barLight: '#34d399',
-    barFill: 'rgba(16, 185, 129, 0.85)',
-  },
-};
-
-const GRID_COLOR = hexColors.border;
-const LABEL_COLOR = hexColors.mutedForeground;
+function getThemeChartColors(theme: ChartTheme, hex: ReturnType<typeof getThemeHexColors>) {
+  switch (theme) {
+    case 'accent':
+      return { bar: hex.accent, barLight: hex.accentLight, barFillOpacity: 0.85 };
+    case 'success':
+      return { bar: hex.success, barLight: hex.successLight, barFillOpacity: 0.85 };
+    case 'primary':
+    default:
+      return { bar: hex.primary, barLight: hex.primaryLight, barFillOpacity: 0.85 };
+  }
+}
 
 interface Canvas2DNode {
   width: number;
@@ -102,9 +93,20 @@ function drawRoundedTopBar(
   ctx.closePath();
 }
 
-function drawBarChart(ctx: CanvasRenderingContext2D, data: ChartDataItem[], theme: ChartTheme) {
+interface ChartDrawColors {
+  bar: string;
+  barLight: string;
+  barFillOpacity: number;
+  grid: string;
+  label: string;
+}
+
+function drawBarChart(
+  ctx: CanvasRenderingContext2D,
+  data: ChartDataItem[],
+  colors: ChartDrawColors,
+) {
   const maxVal = Math.max(...data.map((d) => d.value), 1);
-  const colors = THEME_MAP[theme];
   const bottomY = PAD_TOP + CHART_H;
 
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
@@ -117,14 +119,14 @@ function drawBarChart(ctx: CanvasRenderingContext2D, data: ChartDataItem[], them
     ctx.beginPath();
     ctx.moveTo(PAD_LEFT, y);
     ctx.lineTo(PAD_LEFT + CHART_W, y);
-    ctx.strokeStyle = GRID_COLOR;
+    ctx.strokeStyle = colors.grid;
     ctx.setLineDash(step === 0 || step === 1 ? [] : [3, 3]);
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.setLineDash([]);
 
     const val = Math.round(maxVal * step);
-    ctx.fillStyle = LABEL_COLOR;
+    ctx.fillStyle = colors.label;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -147,13 +149,15 @@ function drawBarChart(ctx: CanvasRenderingContext2D, data: ChartDataItem[], them
 
     // 渐变填充
     const gradient = ctx.createLinearGradient(x, y, x, bottomY);
-    gradient.addColorStop(0, colors.barFill);
+    gradient.addColorStop(0, colors.barLight);
     gradient.addColorStop(1, colors.bar);
+    ctx.globalAlpha = colors.barFillOpacity;
     ctx.fillStyle = gradient;
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     // X轴标签
-    ctx.fillStyle = LABEL_COLOR;
+    ctx.fillStyle = colors.label;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -169,6 +173,16 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   theme = 'primary',
 }) => {
   const canvasIdRef = useRef(`bc-${Math.random().toString(36).slice(2, 9)}`);
+  const { activeTheme } = useThemeStore();
+  const colors = useMemo(() => {
+    const hex = getThemeHexColors(activeTheme);
+    const themeColors = getThemeChartColors(theme, hex);
+    return {
+      ...themeColors,
+      grid: hex.border,
+      label: hex.mutedForeground,
+    };
+  }, [activeTheme, theme]);
 
   useEffect(() => {
     if (!data || data.length === 0) {
@@ -208,7 +222,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.scale(dpr, dpr);
 
-          drawBarChart(ctx, data, theme);
+          drawBarChart(ctx, data, colors);
         });
     }, 80);
 
@@ -216,11 +230,11 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [data, unit, theme]);
+  }, [data, unit, theme, colors]);
 
   if (!data || data.length === 0) {
     return (
-      <View className="bg-white rounded-2xl p-4 shadow-soft mb-5">
+      <View className="bg-card rounded-2xl p-4 shadow-soft mb-5">
         <Text className="text-lg font-semibold text-foreground block mb-4">{title}</Text>
         <View className="flex items-center justify-center h-50">
           <Text className="text-base text-muted-foreground">暂无数据</Text>
@@ -230,7 +244,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   }
 
   return (
-    <View className="bg-white rounded-2xl p-4 shadow-soft mb-5">
+    <View className="bg-card rounded-2xl p-4 shadow-soft mb-5">
       {title && <Text className="text-lg font-semibold text-foreground block mb-4">{title}</Text>}
       <View className="flex justify-center">
         <Canvas

@@ -26,12 +26,14 @@ const ProfileFollowCard: React.FC<ProfileFollowCardProps> = ({ onClick, classNam
       )}
       onClick={onClick}
     >
-      <Text className="text-[28rpx] font-medium leading-none text-white">
+      <Text className="text-[28rpx] font-medium leading-none text-primary-foreground">
         关注「{BRAND_NAME_ZH}」公众号
       </Text>
       <View className="flex items-center gap-[4rpx] flex-shrink-0 ml-[16rpx]">
-        <Text className="text-[24rpx] leading-none text-white/50">开启会员约课消息推送</Text>
-        <Icon name="mdi-chevron-right" size="xs" color="rgba(255,255,255,0.5)" />
+        <Text className="text-[24rpx] leading-none text-primary-foreground/50">
+          开启会员约课消息推送
+        </Text>
+        <Icon name="mdi-chevron-right" size="xs" color="hsl(var(--primary-foreground) / 0.5)" />
       </View>
     </View>
   );

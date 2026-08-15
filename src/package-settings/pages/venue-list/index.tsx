@@ -18,10 +18,12 @@ import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCampusStore } from '@/stores/campus';
 import type { Room } from '@/types/campus';
 import { logError } from '@/utils/logger';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.venue;
 
 const VenueListPage: React.FC = () => {
+  useCardNavigationBar();
   const { currentCampusId } = useCampusStore();
 
   const [rooms, setRooms] = useState<Room[]>([]);

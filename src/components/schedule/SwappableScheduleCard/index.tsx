@@ -212,6 +212,24 @@ const SwappableScheduleCard: React.FC<SwappableScheduleCardProps> = ({
     }
   };
 
+  const getActionTextClassName = (
+    variant?: SwappableScheduleCardAction['variant'],
+    disabled?: boolean,
+  ) => {
+    if (disabled) {
+      return 'text-muted-foreground';
+    }
+    switch (variant) {
+      case 'danger':
+        return 'text-destructive-foreground';
+      case 'warning':
+        return 'text-warning-foreground';
+      case 'default':
+      default:
+        return 'text-primary-foreground';
+    }
+  };
+
   return (
     <View className={cn('relative overflow-hidden', radiusClassName, className)}>
       {/* 操作按钮层：绝对定位在卡片右侧，不参与正常文档流；
@@ -228,7 +246,14 @@ const SwappableScheduleCard: React.FC<SwappableScheduleCardProps> = ({
             style={{ width: `${ACTION_ITEM_WIDTH_PX}px` }}
             onClick={(e) => handleActionClick(action, e)}
           >
-            <Text className="text-[26rpx] font-medium text-white">{action.label}</Text>
+            <Text
+              className={cn(
+                'text-[26rpx] font-medium',
+                getActionTextClassName(action.variant, action.disabled),
+              )}
+            >
+              {action.label}
+            </Text>
           </View>
         ))}
       </View>

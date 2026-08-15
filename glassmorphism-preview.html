@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>玻璃拟态风渐变预览 - 采集蓝主题</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #2563EB;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .preview {
+      height: 220px;
+      position: relative;
+    }
+    .info {
+      padding: 14px 16px;
+      background: white;
+    }
+    .info h3 {
+      font-size: 15px;
+      margin-bottom: 6px;
+      color: #1a1a1a;
+    }
+    .info p {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e0e7ff;
+      color: #4338ca;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-right: 4px;
+      margin-bottom: 6px;
+    }
+
+    /* 预览内容模拟 */
+    .preview-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .venue {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .date-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .date {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .seg {
+      display: flex;
+      border-radius: 20px;
+      padding: 2px;
+    }
+    .seg span {
+      padding: 4px 12px;
+      font-size: 11px;
+      border-radius: 18px;
+    }
+    .seg span.active {
+      font-weight: 600;
+    }
+
+    /* 玻璃卡片模拟 */
+    .glass-card {
+      flex: 1;
+      border-radius: 14px;
+      padding: 14px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .glass-card .label {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-bottom: 4px;
+    }
+    .glass-card .value {
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .glass-row {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+    .glass-row .glass-card {
+      flex: 1;
+    }
+
+    /* ========== 玻璃拟态 1 - 经典蓝玻璃 ========== */
+    .g1 {
+      background: #f5f5f5;
+      background-image:
+        radial-gradient(circle at 30% 20%, rgba(96,165,250,0.4) 0%, transparent 45%),
+        radial-gradient(circle at 70% 10%, rgba(147,197,253,0.3) 0%, transparent 40%),
+        linear-gradient(180deg, rgba(59,130,246,0.08) 0%, transparent 60%);
+    }
+    .g1 .venue { color: #1E3A8A; }
+    .g1 .date { color: #1E3A8A; }
+    .g1 .seg { background: rgba(30,58,138,0.08); }
+    .g1 .seg span { color: rgba(30,58,138,0.5); }
+    .g1 .seg span.active { background: white; color: #2563EB; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g1 .glass-card {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.8);
+      color: #1E3A8A;
+      box-shadow: 0 4px 20px rgba(37,99,235,0.1);
+    }
+
+    /* ========== 玻璃拟态 2 - 深色玻璃 ========== */
+    .g2 {
+      background: #1E3A8A;
+      background-image:
+        radial-gradient(circle at 30% 20%, rgba(96,165,250,0.5) 0%, transparent 45%),
+        radial-gradient(circle at 70% 10%, rgba(147,197,253,0.4) 0%, transparent 40%);
+    }
+    .g2 .venue { color: white; }
+    .g2 .date { color: white; }
+    .g2 .seg { background: rgba(255,255,255,0.15); }
+    .g2 .seg span { color: rgba(255,255,255,0.7); }
+    .g2 .seg span.active { background: white; color: #2563EB; }
+    .g2 .glass-card {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    /* ========== 玻璃拟态 3 - 多彩光晕 ========== */
+    .g3 {
+      background: #f5f5f5;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(59,130,246,0.35) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(139,92,246,0.3) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(236,72,153,0.15) 0%, transparent 50%);
+    }
+    .g3 .venue { color: #4338CA; }
+    .g3 .date { color: #4338CA; }
+    .g3 .seg { background: rgba(67,56,202,0.08); }
+    .g3 .seg span { color: rgba(67,56,202,0.5); }
+    .g3 .seg span.active { background: white; color: #7C3AED; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g3 .glass-card {
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(255,255,255,0.7);
+      color: #4338CA;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.1);
+    }
+
+    /* ========== 玻璃拟态 4 - 极光渐变 ========== */
+    .g4 {
+      background: #f5f5f5;
+      background-image:
+        linear-gradient(135deg, rgba(96,165,250,0.2) 0%, rgba(139,92,246,0.15) 50%, rgba(236,72,153,0.1) 100%),
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(59,130,246,0.3) 0%, transparent 60%);
+    }
+    .g4 .venue { color: #4338CA; }
+    .g4 .date { color: #4338CA; }
+    .g4 .seg { background: rgba(255,255,255,0.4); }
+    .g4 .seg span { color: rgba(67,56,202,0.5); }
+    .g4 .seg span.active { background: white; color: #7C3AED; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g4 .glass-card {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #4338CA;
+    }
+
+    /* ========== 玻璃拟态 5 - 极简毛玻璃 ========== */
+    .g5 {
+      background: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 40%, transparent 70%);
+    }
+    .g5 .venue { color: #1E3A8A; }
+    .g5 .date { color: #1E3A8A; }
+    .g5 .seg { background: rgba(255,255,255,0.6); border: 1px solid rgba(0,0,0,0.05); }
+    .g5 .seg span { color: rgba(30,58,138,0.5); }
+    .g5 .seg span.active { background: #2563EB; color: white; }
+    .g5 .glass-card {
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(0,0,0,0.06);
+      color: #1E3A8A;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+
+    /* ========== 玻璃拟态 6 - 霓虹光晕 ========== */
+    .g6 {
+      background: #0f172a;
+      background-image:
+        radial-gradient(circle at 30% 30%, rgba(59,130,246,0.6) 0%, transparent 40%),
+        radial-gradient(circle at 70% 20%, rgba(236,72,153,0.4) 0%, transparent 40%),
+        radial-gradient(circle at 50% 60%, rgba(139,92,246,0.3) 0%, transparent 50%);
+    }
+    .g6 .venue { color: white; }
+    .g6 .date { color: white; }
+    .g6 .seg { background: rgba(255,255,255,0.1); }
+    .g6 .seg span { color: rgba(255,255,255,0.6); }
+    .g6 .seg span.active { background: rgba(255,255,255,0.25); color: white; }
+    .g6 .glass-card {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: white;
+    }
+
+    /* ========== 玻璃拟态 7 - 磨砂玻璃 ========== */
+    .g7 {
+      background: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 100% 60% at 50% -10%, rgba(191,219,254,0.6) 0%, rgba(147,197,253,0.3) 30%, transparent 60%);
+    }
+    .g7 .venue { color: #1E40AF; }
+    .g7 .date { color: #1E40AF; }
+    .g7 .seg { background: rgba(255,255,255,0.5); backdrop-filter: blur(10px); }
+    .g7 .seg span { color: rgba(30,64,175,0.5); }
+    .g7 .seg span.active { background: white; color: #2563EB; box-shadow: 0 2px 8px rgba(37,99,235,0.15); }
+    .g7 .glass-card {
+      background: rgba(255,255,255,0.65);
+      border: 1px solid rgba(255,255,255,0.9);
+      color: #1E40AF;
+      box-shadow: 0 8px 32px rgba(37,99,235,0.12);
+    }
+
+    /* ========== 玻璃拟态 8 - 冰感玻璃 ========== */
+    .g8 {
+      background: linear-gradient(180deg, #EFF6FF 0%, #f5f5f5 100%);
+      background-image:
+        linear-gradient(180deg, #DBEAFE 0%, #EFF6FF 30%, #f5f5f5 70%),
+        radial-gradient(circle at 20% 10%, rgba(147,197,253,0.4) 0%, transparent 35%),
+        radial-gradient(circle at 80% 20%, rgba(191,219,254,0.5) 0%, transparent 35%);
+    }
+    .g8 .venue { color: #1E3A8A; }
+    .g8 .date { color: #1E3A8A; }
+    .g8 .seg { background: white; box-shadow: 0 2px 8px rgba(37,99,235,0.08); }
+    .g8 .seg span { color: rgba(30,58,138,0.4); }
+    .g8 .seg span.active { background: #2563EB; color: white; }
+    .g8 .glass-card {
+      background: rgba(255,255,255,0.8);
+      border: 1px solid rgba(219,234,254,0.8);
+      color: #1E3A8A;
+      box-shadow: 0 4px 15px rgba(37,99,235,0.08);
+    }
+
+    /* ========== 玻璃拟态 9 - 梦幻紫蓝 ========== */
+    .g9 {
+      background: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 60% 50% at 0% 0%, rgba(59,130,246,0.3) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 50% at 100% 0%, rgba(139,92,246,0.25) 0%, transparent 50%),
+        linear-gradient(180deg, rgba(139,92,246,0.05) 0%, transparent 50%);
+    }
+    .g9 .venue { color: #5B21B6; }
+    .g9 .date { color: #5B21B6; }
+    .g9 .seg { background: rgba(139,92,246,0.1); }
+    .g9 .seg span { color: rgba(91,33,182,0.5); }
+    .g9 .seg span.active { background: white; color: #7C3AED; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g9 .glass-card {
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(255,255,255,0.7);
+      color: #5B21B6;
+      box-shadow: 0 4px 20px rgba(139,92,246,0.1);
+    }
+
+    /* ========== 玻璃拟态 10 - 晨曦微光 ========== */
+    .g10 {
+      background: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 120% 70% at 50% 0%, rgba(251,191,36,0.2) 0%, rgba(251,146,60,0.15) 25%, rgba(59,130,246,0.1) 50%, transparent 75%);
+    }
+    .g10 .venue { color: #92400E; }
+    .g10 .date { color: #92400E; }
+    .g10 .seg { background: rgba(251,191,36,0.15); }
+    .g10 .seg span { color: rgba(146,64,14,0.5); }
+    .g10 .seg span.active { background: white; color: #D97706; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g10 .glass-card {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.8);
+      color: #92400E;
+      box-shadow: 0 4px 20px rgba(251,146,60,0.1);
+    }
+
+    /* ========== 玻璃拟态 11 - 深海蓝 ========== */
+    .g11 {
+      background: #0c4a6e;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% 20%, rgba(56,189,248,0.4) 0%, rgba(14,165,233,0.3) 30%, transparent 60%),
+        radial-gradient(circle at 20% 50%, rgba(6,182,212,0.2) 0%, transparent 40%);
+    }
+    .g11 .venue { color: white; }
+    .g11 .date { color: white; }
+    .g11 .seg { background: rgba(255,255,255,0.12); }
+    .g11 .seg span { color: rgba(255,255,255,0.6); }
+    .g11 .seg span.active { background: rgba(255,255,255,0.25); color: white; }
+    .g11 .glass-card {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: white;
+    }
+
+    /* ========== 玻璃拟态 12 - 薄雾蓝 ========== */
+    .g12 {
+      background: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, rgba(191,219,254,0.4) 0%, rgba(147,197,253,0.2) 25%, rgba(96,165,250,0.1) 50%, transparent 75%),
+        radial-gradient(circle at 50% 0%, rgba(59,130,246,0.2) 0%, transparent 50%);
+    }
+    .g12 .venue { color: #1E3A8A; }
+    .g12 .date { color: #1E3A8A; }
+    .g12 .seg { background: rgba(255,255,255,0.5); backdrop-filter: blur(10px); }
+    .g12 .seg span { color: rgba(30,58,138,0.5); }
+    .g12 .seg span.active { background: white; color: #2563EB; box-shadow: 0 2px 8px rgba(37,99,235,0.15); }
+    .g12 .glass-card {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.8);
+      color: #1E3A8A;
+      box-shadow: 0 6px 24px rgba(37,99,235,0.1);
+    }
+
+    /* ========== 玻璃拟态 13 - 粉蓝渐变 ========== */
+    .g13 {
+      background: #f5f5f5;
+      background-image:
+        linear-gradient(135deg, rgba(244,114,182,0.15) 0%, rgba(59,130,246,0.2) 100%),
+        radial-gradient(circle at 10% 20%, rgba(244,114,182,0.3) 0%, transparent 35%),
+        radial-gradient(circle at 90% 10%, rgba(59,130,246,0.3) 0%, transparent 35%);
+    }
+    .g13 .venue { color: #BE185D; }
+    .g13 .date { color: #BE185D; }
+    .g13 .seg { background: rgba(255,255,255,0.4); }
+    .g13 .seg span { color: rgba(190,24,93,0.5); }
+    .g13 .seg span.active { background: white; color: #DB2777; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g13 .glass-card {
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(255,255,255,0.7);
+      color: #BE185D;
+      box-shadow: 0 4px 20px rgba(244,114,182,0.1);
+    }
+
+    /* ========== 玻璃拟态 14 - 纯净白玻璃 ========== */
+    .g14 {
+      background: #fafafa;
+      background-image:
+        linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(239,246,255,0.5) 30%, #f5f5f5 70%);
+    }
+    .g14 .venue { color: #374151; }
+    .g14 .date { color: #111827; }
+    .g14 .seg { background: #F3F4F6; }
+    .g14 .seg span { color: #9CA3AF; }
+    .g14 .seg span.active { background: white; color: #2563EB; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g14 .glass-card {
+      background: white;
+      border: 1px solid #E5E7EB;
+      color: #111827;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    /* ========== 玻璃拟态 15 - 青蓝渐变 ========== */
+    .g15 {
+      background: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(34,211,238,0.3) 0%, rgba(59,130,246,0.2) 40%, transparent 70%),
+        linear-gradient(180deg, rgba(34,211,238,0.1) 0%, transparent 50%);
+    }
+    .g15 .venue { color: #0E7490; }
+    .g15 .date { color: #0E7490; }
+    .g15 .seg { background: rgba(34,211,238,0.15); }
+    .g15 .seg span { color: rgba(14,116,144,0.5); }
+    .g15 .seg span.active { background: white; color: #0891B2; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .g15 .glass-card {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.8);
+      color: #0E7490;
+      box-shadow: 0 4px 20px rgba(34,211,238,0.1);
+    }
+
+    /* ========== 玻璃拟态 16 - 深邃蓝玻璃 ========== */
+    .g16 {
+      background: #1e3a5f;
+      background-image:
+        radial-gradient(ellipse 100% 70% at 50% 0%, rgba(59,130,246,0.5) 0%, rgba(37,99,235,0.3) 30%, transparent 65%),
+        radial-gradient(circle at 20% 40%, rgba(14,165,233,0.25) 0%, transparent 40%);
+    }
+    .g16 .venue { color: rgba(255,255,255,0.9); }
+    .g16 .date { color: white; }
+    .g16 .seg { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
+    .g16 .seg span { color: rgba(255,255,255,0.6); }
+    .g16 .seg span.active { background: rgba(255,255,255,0.25); color: white; }
+    .g16 .glass-card {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: white;
+      backdrop-filter: blur(20px);
+    }
+  </style>
+</head>
+<body>
+  <h1>🪟 玻璃拟态风渐变预览</h1>
+  <p class="subtitle">Glassmorphism 风格 · 采集蓝主题 · 16 种效果</p>
+  <div class="grid">
+
+    <!-- 1 -->
+    <div class="card">
+      <div class="preview g1">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">经典</span>
+        <h3>① 经典蓝玻璃</h3>
+        <p>双团蓝光晕 + 淡蓝底色。毛玻璃卡片，白色半透明边框。</p>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="card">
+      <div class="preview g2">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">深色</span><span class="tag">高级</span>
+        <h3>② 深色玻璃</h3>
+        <p>深蓝底 + 蓝光晕。深色毛玻璃，半透明白边。高级感强。</p>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="card">
+      <div class="preview g3">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">多彩</span>
+        <h3>③ 多彩光晕</h3>
+        <p>蓝+紫+粉 三团光晕。梦幻多彩，年轻活泼。</p>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="card">
+      <div class="preview g4">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">极光</span>
+        <h3>④ 极光渐变</h3>
+        <p>斜向蓝紫粉渐变 + 顶部光晕。极光般的梦幻效果。</p>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="card">
+      <div class="preview g5">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">极简</span>
+        <h3>⑤ 极简毛玻璃</h3>
+        <p>单层淡蓝线性渐变。极简干净，商务稳重。</p>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="card">
+      <div class="preview g6">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">深色</span><span class="tag">霓虹</span>
+        <h3>⑥ 霓虹光晕</h3>
+        <p>深蓝底 + 蓝/粉/紫 三色霓虹光晕。赛博朋克风。</p>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="card">
+      <div class="preview g7">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">磨砂</span>
+        <h3>⑦ 磨砂玻璃</h3>
+        <p>大椭圆蓝光晕 + 磨砂质感卡片。柔和朦胧。</p>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <div class="card">
+      <div class="preview g8">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">冰感</span>
+        <h3>⑧ 冰感玻璃</h3>
+        <p>全幅淡蓝渐变 + 双团光晕。冰清玉洁，清爽通透。</p>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <div class="card">
+      <div class="preview g9">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">紫蓝</span>
+        <h3>⑨ 梦幻紫蓝</h3>
+        <p>左右对称光晕（蓝+紫）。梦幻优雅，女性化风格。</p>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="card">
+      <div class="preview g10">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">暖调</span>
+        <h3>⑩ 晨曦微光</h3>
+        <p>橙黄+蓝 渐变光晕。温暖晨曦感，活力满满。</p>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <div class="card">
+      <div class="preview g11">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">深色</span><span class="tag">深海</span>
+        <h3>⑪ 深海蓝</h3>
+        <p>深青蓝底 + 浅蓝光晕。深海般的宁静深邃。</p>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="card">
+      <div class="preview g12">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">薄雾</span>
+        <h3>⑫ 薄雾蓝</h3>
+        <p>多层蓝渐变 + 顶部光晕。薄雾朦胧，柔和自然。</p>
+      </div>
+    </div>
+
+    <!-- 13 -->
+    <div class="card">
+      <div class="preview g13">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">粉蓝</span>
+        <h3>⑬ 粉蓝渐变</h3>
+        <p>粉+蓝 斜向渐变 + 双团光晕。甜美浪漫，少女感。</p>
+      </div>
+    </div>
+
+    <!-- 14 -->
+    <div class="card">
+      <div class="preview g14">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">纯净</span>
+        <h3>⑭ 纯净白玻璃</h3>
+        <p>纯白底 + 微淡蓝。极简纯净，商务首选。</p>
+      </div>
+    </div>
+
+    <!-- 15 -->
+    <div class="card">
+      <div class="preview g15">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">浅色</span><span class="tag">青蓝</span>
+        <h3>⑮ 青蓝渐变</h3>
+        <p>青+蓝 顶部大光晕。清新活力，科技感。</p>
+      </div>
+    </div>
+
+    <!-- 16 -->
+    <div class="card">
+      <div class="preview g16">
+        <div class="preview-inner">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+          <div class="glass-row">
+            <div class="glass-card">
+              <div class="label">收入</div>
+              <div class="value">¥41.3万</div>
+            </div>
+            <div class="glass-card">
+              <div class="label">支出</div>
+              <div class="value">¥26.8万</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <span class="tag">深色</span><span class="tag">深邃</span>
+        <h3>⑯ 深邃蓝玻璃</h3>
+        <p>深蓝底 + 大椭圆光晕。深邃大气，高端质感。</p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

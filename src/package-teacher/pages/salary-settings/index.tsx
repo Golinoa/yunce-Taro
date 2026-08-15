@@ -6,13 +6,16 @@
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
 import type { BaseSalaryMode, LessonFeeMode, TeacherUIModel } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = 'salary_settings_intro_hidden';
 
@@ -69,6 +72,8 @@ function summarizeTeacher(t: TeacherUIModel): string {
 }
 
 const SalarySettingsPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const { teachers, fetchAll } = useTeacherStore();
   const [introVisible, setIntroVisible] = useState(false);
   const [keyword] = useState('');
@@ -99,7 +104,7 @@ const SalarySettingsPage: React.FC = () => {
   }, []);
 
   return (
-    <View className="min-h-screen bg-background pb-safe-bar">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-safe-bar')}>
       {/* 搜索框 */}
       <View className="px-[32rpx] py-[20rpx] bg-white">
         <View className="flex items-center gap-[12rpx] px-[24rpx] py-[16rpx] rounded-[24rpx] bg-muted">

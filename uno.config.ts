@@ -43,6 +43,7 @@ export default defineConfig({
       // 状态色
       success: 'hsl(var(--success))',
       warning: 'hsl(var(--warning))',
+      'warning-foreground': 'hsl(var(--warning-foreground))',
       error: 'hsl(var(--error))',
       info: 'hsl(var(--info))',
       // 薄荷绿（课程/消课详情头部卡片）
@@ -175,6 +176,23 @@ export default defineConfig({
           'linear-gradient(135deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 50%, hsl(var(--primary-dark)) 100%)',
       },
     ],
+    // 左上到右下的主题渐变（用于数据页面导航栏/头部）
+    [
+      'bg-gradient-primary-tlbr',
+      {
+        background:
+          'linear-gradient(135deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 50%, hsl(var(--primary-dark)) 100%)',
+      },
+    ],
+    // 垂直淡蓝全幅渐变（顶部与导航栏同色，向下逐渐变淡，自然融入背景）
+    // 顶部用 primary-soft 纯色打底，确保与导航栏完全一致，无缝衔接
+    [
+      'bg-gradient-diffuse-top',
+      {
+        background:
+          'linear-gradient(180deg, hsl(var(--primary-soft)) 0%, hsl(var(--primary-soft)) 8%, hsl(var(--primary)/0.15) 25%, hsl(var(--primary)/0.08) 50%, hsl(var(--primary)/0.03) 75%, hsl(var(--background)) 100%)',
+      },
+    ],
     [
       'bg-gradient-primary-soft',
       {
@@ -226,26 +244,48 @@ export default defineConfig({
       { background: 'linear-gradient(160deg, #C0E8E8 0%, #D5F0F0 50%, #E8F8F8 100%)' },
     ],
 
-    // ===== KPI 深色渐变（对齐设计稿 scheme-bc-fusion-v3.html） =====
+    // ===== KPI 深色渐变（接入主题系统，随主题切换） =====
     [
       'bg-kpi-green',
-      { background: 'linear-gradient(160deg, #34d399 0%, #10b981 50%, #059669 100%)' },
+      {
+        background:
+          'linear-gradient(160deg, hsl(var(--success)/0.8) 0%, hsl(var(--success)) 50%, hsl(var(--success)/0.85) 100%)',
+      },
     ],
     [
       'bg-kpi-orange',
-      { background: 'linear-gradient(160deg, #fb923c 0%, #f97316 50%, #ea580c 100%)' },
+      {
+        background:
+          'linear-gradient(160deg, hsl(var(--warning)/0.8) 0%, hsl(var(--warning)) 50%, hsl(var(--warning)/0.85) 100%)',
+      },
     ],
     [
       'bg-kpi-blue',
-      { background: 'linear-gradient(160deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%)' },
+      {
+        background:
+          'linear-gradient(160deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 50%, hsl(var(--primary-dark)) 100%)',
+      },
     ],
     [
       'bg-kpi-purple',
-      { background: 'linear-gradient(160deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%)' },
+      {
+        background:
+          'linear-gradient(160deg, hsl(var(--accent-glow)) 0%, hsl(var(--accent)) 50%, hsl(var(--accent)/0.85) 100%)',
+      },
     ],
     [
       'bg-kpi-amber',
-      { background: 'linear-gradient(160deg, #fcd34d 0%, #fbbf24 50%, #f59e0b 100%)' },
+      {
+        background:
+          'linear-gradient(160deg, hsl(var(--warning)/0.8) 0%, hsl(var(--warning)) 50%, hsl(var(--warning)/0.85) 100%)',
+      },
+    ],
+    [
+      'bg-kpi-red',
+      {
+        background:
+          'linear-gradient(160deg, hsl(var(--destructive)/0.8) 0%, hsl(var(--destructive)) 50%, hsl(var(--destructive)/0.85) 100%)',
+      },
     ],
 
     // ===== 财务大卡片深色背景 =====
@@ -368,11 +408,6 @@ export default defineConfig({
     // ===== 组件级圆角 =====
     ['rounded-b-60rpx', { 'border-radius': '0 0 60rpx 60rpx' }], // 渐变头部底部
     ['rounded-t-32rpx', { 'border-radius': '32rpx 32rpx 0 0' }], // 底部弹窗顶部
-
-    [
-      'bg-kpi-red',
-      { background: 'linear-gradient(160deg, #f87171 0%, #ef4444 50%, #dc2626 100%)' },
-    ],
 
     // ===== 半透明背景（CSS 变量颜色无法直接用 /opacity 语法） =====
     ['bg-primary-5', { background: 'hsl(var(--primary) / 0.05)' }],
@@ -593,6 +628,14 @@ export default defineConfig({
     // ===== 毛玻璃效果（渐变头部内使用） =====
     ['bg-glass-25', { background: 'rgba(255,255,255,0.25)', 'backdrop-filter': 'blur(4px)' }],
     ['bg-glass-15', { background: 'rgba(255,255,255,0.15)', 'backdrop-filter': 'blur(4px)' }],
+
+    // ===== 雷达图（会员数据页） =====
+    ['radar-grid-bg', { background: 'hsl(var(--muted))' }],
+    ['radar-grid-border', { border: '2rpx solid hsl(var(--border))' }],
+    ['radar-purchase-fill', { background: 'hsl(var(--primary) / 0.3)' }],
+    ['radar-purchase-border', { border: '3rpx solid hsl(var(--primary))' }],
+    ['radar-attendance-fill', { background: 'hsl(var(--accent) / 0.3)' }],
+    ['radar-attendance-border', { border: '3rpx solid hsl(var(--accent))' }],
 
     // ===== 快捷入口图标毛玻璃风格（设计稿 homepages） =====
     [

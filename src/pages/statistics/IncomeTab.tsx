@@ -50,7 +50,7 @@ const IncomeTab: React.FC<IncomeTabProps> = ({
       <ChartContainer title="近6个月收入趋势" data={displayIncomeTrend} unit="元" theme="accent" />
 
       <View className="grid grid-cols-2 gap-3 mb-5">
-        <View className="bg-white rounded-2xl p-4 shadow-soft text-center">
+        <View className="bg-card rounded-2xl p-4 shadow-soft text-center">
           <Text className="text-sm text-muted-foreground mb-1">环比上月</Text>
           <Text
             className={`text-2xl font-bold ${compareData.mom.startsWith('-') ? 'text-destructive' : 'text-success'}`}
@@ -59,7 +59,7 @@ const IncomeTab: React.FC<IncomeTabProps> = ({
           </Text>
           <Text className="text-xs text-muted-foreground mt-1">{compareData.momValue}</Text>
         </View>
-        <View className="bg-white rounded-2xl p-4 shadow-soft text-center">
+        <View className="bg-card rounded-2xl p-4 shadow-soft text-center">
           <Text className="text-sm text-muted-foreground mb-1">同比去年同月</Text>
           <Text
             className={`text-2xl font-bold ${compareData.yoy.startsWith('-') ? 'text-destructive' : 'text-success'}`}
@@ -82,11 +82,11 @@ const IncomeTab: React.FC<IncomeTabProps> = ({
           <Text className="text-xl font-semibold text-foreground mb-3 mt-6">收入明细</Text>
           <View className="flex flex-col gap-3">
             {incomeDetail.map((item) => (
-              <View key={item.id} className="bg-white rounded-2xl p-4 shadow-soft">
+              <View key={item.id} className="bg-card rounded-2xl p-4 shadow-soft">
                 <View className="flex items-center justify-between">
                   <View className="flex items-center gap-3">
                     <View className="w-10 h-10 rounded-full bg-gradient-accent flex items-center justify-center">
-                      <Icon name="mdi-cash" size="sm" color="white" />
+                      <Icon name="mdi-cash" size="sm" color="hsl(var(--primary-foreground))" />
                     </View>
                     <View className="flex flex-col gap-1">
                       <Text className="text-lg font-medium text-foreground">{item.name}</Text>

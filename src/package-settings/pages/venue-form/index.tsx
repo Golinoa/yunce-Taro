@@ -16,9 +16,11 @@ import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
 import { roomService, venueService } from '@/services/campus';
 import { useCampusStore } from '@/stores/campus';
-import { hexColors } from '@/theme';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { Room, RoomStatus } from '@/types/campus';
 import { logError } from '@/utils/logger';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 interface FormState {
   name: string;
@@ -50,6 +52,8 @@ const STATUS_OPTIONS: { label: string; value: RoomStatus }[] = [
 ];
 
 const VenueFormPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const instance = Taro.getCurrentInstance();
   const roomId = decodeURIComponent(instance?.router?.params?.id || '');
   const isEdit = !!roomId;
@@ -168,7 +172,7 @@ const VenueFormPage: React.FC = () => {
     const { confirm } = await Taro.showModal({
       title: '删除场地',
       content: '确定删除该场地吗？',
-      confirmColor: hexColors.destructive,
+      confirmColor: getThemeHexColors(activeTheme).destructive,
     });
     if (!confirm) return;
     try {
@@ -179,7 +183,7 @@ const VenueFormPage: React.FC = () => {
       logError('delete room', err);
       Taro.showToast({ title: '删除失败', icon: 'none' });
     }
-  }, [isEdit, roomId]);
+  }, [isEdit, roomId, activeTheme]);
 
   const statusText = useMemo(
     () => STATUS_OPTIONS.find((opt) => opt.value === form.status)?.label || '',
@@ -274,7 +278,7 @@ const VenueFormPage: React.FC = () => {
             <Switch
               checked={form.bookingEnabled}
               onChange={(e) => updateField('bookingEnabled', e.detail.value)}
-              color={hexColors.primary}
+              color={getThemeHexColors(activeTheme).primary}
             />
           </View>
         </View>
@@ -355,7 +359,7 @@ const VenueFormPage: React.FC = () => {
                 <Switch
                   checked={form.timeBasedPricing}
                   onChange={(e) => updateField('timeBasedPricing', e.detail.value)}
-                  color={hexColors.primary}
+                  color={getThemeHexColors(activeTheme).primary}
                 />
               </View>
             </View>

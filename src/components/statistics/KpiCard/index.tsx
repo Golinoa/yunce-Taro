@@ -37,16 +37,18 @@ const KpiCard: React.FC<KpiCardProps> = ({ data, isTop = false }) => {
           return (
             <View
               key={item.id}
-              className={`flex-1 bg-white/20 backdrop-blur-sm rounded-2xl p-3 text-center ${item.navigateTo ? 'active:opacity-90' : ''}`}
+              className={`flex-1 bg-primary-foreground/20 backdrop-blur-sm rounded-2xl p-3 text-center ${item.navigateTo ? 'active:opacity-90' : ''}`}
               onClick={handleClick}
             >
-              <Text className="text-2xl font-bold text-white leading-none block mb-1">
+              <Text className="text-2xl font-bold text-primary-foreground leading-none block mb-1">
                 {item.value}
                 {item.unit && (
-                  <Text className="text-xs font-normal text-white/80 ml-0_d5">{item.unit}</Text>
+                  <Text className="text-xs font-normal text-primary-foreground/80 ml-0_d5">
+                    {item.unit}
+                  </Text>
                 )}
               </Text>
-              <Text className="text-xs text-white/80 block mt-1">{item.label}</Text>
+              <Text className="text-xs text-primary-foreground/80 block mt-1">{item.label}</Text>
             </View>
           );
         })}
@@ -63,7 +65,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ data, isTop = false }) => {
         return (
           <View
             key={item.id}
-            className={`bg-white rounded-2xl p-4 shadow-soft text-center ${item.navigateTo ? 'active:opacity-90' : ''}`}
+            className={`bg-card rounded-2xl p-4 shadow-soft text-center ${item.navigateTo ? 'active:opacity-90' : ''}`}
             onClick={handleClick}
           >
             <Text className="text-3xl font-bold text-primary block leading-tight mb-1">

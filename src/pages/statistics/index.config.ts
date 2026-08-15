@@ -1,3 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '统计报表',
+  navigationBarTitleText: '经营数据',
+  navigationBarBackgroundColor: '#ffffff',
+  navigationBarTextStyle: 'black',
 });

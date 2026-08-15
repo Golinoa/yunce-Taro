@@ -1,4 +1,5 @@
 export default definePageConfig({
   navigationBarTitleText: '协议',
-  enablePullDownRefresh: false,
+  navigationBarBackgroundColor: '#3B6EF5',
+  navigationBarTextStyle: 'white',
 });

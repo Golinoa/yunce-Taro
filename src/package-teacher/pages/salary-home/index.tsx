@@ -10,11 +10,14 @@
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useCallback, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.salary;
 
@@ -51,6 +54,8 @@ const ENTRY_LIST: EntryItem[] = [
 ];
 
 const SalaryHomePage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const { fetchSalaryTemplates, fetchTeachers } = useTeacherStore();
   const [introVisible, setIntroVisible] = useState(false);
 
@@ -72,7 +77,7 @@ const SalaryHomePage: React.FC = () => {
   }, []);
 
   return (
-    <View className="min-h-screen bg-background">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       {/* 三大入口卡片 */}
       <View className="px-[32rpx] pt-[24rpx] flex flex-col gap-[24rpx]">
         {ENTRY_LIST.map((item) => (

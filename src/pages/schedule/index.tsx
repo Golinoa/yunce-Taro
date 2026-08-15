@@ -31,6 +31,8 @@ import {
 } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import { useCourseCategoryStore } from '@/stores/course-category';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import { CLASS_LEVEL_LABELS } from '@/types/class';
 import type { CourseCategoryMode } from '@/types/course-category';
@@ -382,6 +384,7 @@ function isBookingSchedule(schedule: Schedule): boolean {
 const SchedulePage: React.FC = () => {
   const { profile, currentRole } = useAuth();
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
+  const themeStore = useThemeStore();
 
   // 家长角色进入课表页时重定向到约课页
   React.useEffect(() => {
@@ -1332,7 +1335,7 @@ const SchedulePage: React.FC = () => {
         title: '恢复开课',
         content: `确定恢复【${item.className}】${lessonDate} ${item.startTime}-${item.endTime} 的课程吗？`,
         confirmText: '恢复',
-        confirmColor: '#2563eb',
+        confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
       });
 
       if (!confirmResult.confirm) {
@@ -1357,7 +1360,7 @@ const SchedulePage: React.FC = () => {
         Taro.showToast({ title: '恢复失败，请重试', icon: 'none' });
       }
     },
-    [lessonRecords, selectedDate],
+    [lessonRecords, selectedDate, themeStore.activeTheme],
   );
 
   const handleConfirmDangerAction = useCallback(async () => {
@@ -1588,7 +1591,7 @@ const SchedulePage: React.FC = () => {
                 ) : null}
 
                 {!loading && cards.length === 0 ? (
-                  <View className="rounded-[16rpx] bg-white py-[80rpx] shadow-card">
+                  <View className="rounded-[16rpx] bg-card py-[80rpx] shadow-card">
                     <Empty icon="mdi-calendar-blank" description="当前日期暂无课程安排" />
                   </View>
                 ) : null}
@@ -1861,7 +1864,7 @@ const SchedulePage: React.FC = () => {
                   <View className="py-[120rpx] flex flex-col items-center justify-center gap-[16rpx]">
                     <Text className="text-[28rpx] text-muted-foreground">开放班级加载失败</Text>
                     <Button
-                      className="m-0 h-[64rpx] px-[32rpx] text-[28rpx] leading-[64rpx] rounded-[32rpx] bg-primary text-white"
+                      className="m-0 h-[64rpx] px-[32rpx] text-[28rpx] leading-[64rpx] rounded-[32rpx] bg-primary text-primary-foreground"
                       onClick={() => loadOpenClassSlots(date, true)}
                     >
                       点击重试
@@ -1870,7 +1873,7 @@ const SchedulePage: React.FC = () => {
                 ) : null}
 
                 {!isDateLoading && !isDateError && allSlots.length === 0 ? (
-                  <View className="rounded-[16rpx] bg-white py-[80rpx] shadow-card">
+                  <View className="rounded-[16rpx] bg-card py-[80rpx] shadow-card">
                     <Empty icon="mdi-calendar-blank" description="当前日期暂无开放预约时段" />
                   </View>
                 ) : null}
@@ -1919,20 +1922,20 @@ const SchedulePage: React.FC = () => {
                         <View
                           className={cn(
                             'rounded-[24rpx] px-[24rpx] py-[20rpx] shadow-card',
-                            isRest ? 'bg-muted border border-border' : 'bg-white',
+                            isRest ? 'bg-muted border border-border' : 'bg-card',
                           )}
                         >
                           <View className="flex">
                             {/* 左侧时间轴 */}
                             <View className="flex w-[116rpx] flex-shrink-0 flex-col items-center py-[2rpx]">
                               <View className="flex items-center gap-[8rpx]">
-                                <View className="h-[12rpx] w-[12rpx] rounded-full bg-black" />
+                                <View className="h-[12rpx] w-[12rpx] rounded-full bg-foreground" />
                                 <Text className="text-[34rpx] font-bold leading-none text-foreground">
                                   {slot.start_time}
                                 </Text>
                               </View>
                               <View className="flex w-[2rpx] flex-1 flex-col items-center py-[4rpx]">
-                                <View className="w-[2rpx] flex-1 bg-[#e8e8e8]" />
+                                <View className="w-[2rpx] flex-1 bg-border" />
                                 {duration ? (
                                   <View className="py-[2rpx]">
                                     <Text className="text-[22rpx] text-muted-foreground">
@@ -1940,10 +1943,10 @@ const SchedulePage: React.FC = () => {
                                     </Text>
                                   </View>
                                 ) : null}
-                                <View className="w-[2rpx] flex-1 bg-[#e8e8e8]" />
+                                <View className="w-[2rpx] flex-1 bg-border" />
                               </View>
                               <View className="flex items-center gap-[8rpx]">
-                                <View className="h-[12rpx] w-[12rpx] rounded-full border-[3rpx] border-black bg-transparent" />
+                                <View className="h-[12rpx] w-[12rpx] rounded-full border-[3rpx] border-foreground bg-transparent" />
                                 <Text className="text-[34rpx] font-bold leading-none text-foreground">
                                   {slot.end_time}
                                 </Text>
@@ -1957,7 +1960,11 @@ const SchedulePage: React.FC = () => {
                                 openType="share"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <Icon name="mdi-share-variant" size={28} color="#999999" />
+                                <Icon
+                                  name="mdi-share-variant"
+                                  size={28}
+                                  color="hsl(var(--muted-foreground))"
+                                />
                               </Button>
 
                               <View>
@@ -1966,16 +1973,20 @@ const SchedulePage: React.FC = () => {
                                 </Text>
                                 <View className="mt-[12rpx] flex flex-wrap items-center gap-[12rpx]">
                                   {cls?.level ? (
-                                    <View className="rounded-[10rpx] bg-[#f5f5f5] px-[14rpx] py-[6rpx]">
-                                      <Text className="text-[24rpx] font-medium leading-none text-[#666666]">
+                                    <View className="rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
+                                      <Text className="text-[24rpx] font-medium leading-none text-muted-foreground">
                                         {CLASS_LEVEL_LABELS[cls.level]}
                                       </Text>
                                     </View>
                                   ) : null}
                                   {slot.room ? (
-                                    <View className="flex items-center gap-[6rpx] rounded-[10rpx] bg-[#f5f5f5] px-[14rpx] py-[6rpx]">
-                                      <Icon name="mdi-map-marker" size={18} color="#999999" />
-                                      <Text className="text-[24rpx] font-medium leading-none text-[#666666]">
+                                    <View className="flex items-center gap-[6rpx] rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
+                                      <Icon
+                                        name="mdi-map-marker"
+                                        size={18}
+                                        color="hsl(var(--muted-foreground))"
+                                      />
+                                      <Text className="text-[24rpx] font-medium leading-none text-muted-foreground">
                                         {slot.room}
                                       </Text>
                                     </View>
@@ -1986,16 +1997,16 @@ const SchedulePage: React.FC = () => {
                               <View className="mt-[12rpx] flex items-center gap-[12rpx]">
                                 <Image
                                   src={BRAND_LOGO}
-                                  className="h-[40rpx] w-[40rpx] rounded-full border border-[#e8e8e8] bg-white"
+                                  className="h-[40rpx] w-[40rpx] rounded-full border border-border bg-card"
                                   mode="aspectFit"
                                 />
-                                <Text className="text-[26rpx] text-[#333333]">{teacherName}</Text>
+                                <Text className="text-[26rpx] text-foreground">{teacherName}</Text>
                               </View>
                             </View>
                           </View>
 
                           {/* 底部操作栏：已约学员头像 + 代约加号按钮 + 人数 */}
-                          <View className="mt-[18rpx] flex items-center justify-between border-t border-[#f0f0f0] pt-[14rpx]">
+                          <View className="mt-[18rpx] flex items-center justify-between border-t border-border pt-[14rpx]">
                             <View className="flex flex-1 items-center min-w-0 overflow-hidden">
                               {/* 已约学员头像从左往右排列，互相轻微压住，最多展示前 x 个 */}
                               {(slot.booking_students || [])
@@ -2005,7 +2016,7 @@ const SchedulePage: React.FC = () => {
                                     key={student.id}
                                     src={student.avatar || BRAND_LOGO}
                                     className={cn(
-                                      'relative h-[60rpx] w-[60rpx] flex-shrink-0 rounded-full border-2 border-white bg-muted',
+                                      'relative h-[60rpx] w-[60rpx] flex-shrink-0 rounded-full border-2 border-card bg-muted',
                                       index > 0 && '-ml-[16rpx]',
                                     )}
                                     mode="aspectFill"
@@ -2014,21 +2025,25 @@ const SchedulePage: React.FC = () => {
 
                               {/* 代约加号按钮：无预约时在最左侧，随头像增多被挤到最右侧 */}
                               <View
-                                className="relative flex h-[60rpx] w-[60rpx] flex-shrink-0 items-center justify-center rounded-full border border-[#e8e8e8] bg-[#f8f8f8] active:opacity-80"
+                                className="relative flex h-[60rpx] w-[60rpx] flex-shrink-0 items-center justify-center rounded-full border border-border bg-muted active:opacity-80"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   handleProxyBooking(slot);
                                 }}
                               >
-                                <Icon name="mdi-plus" size={30} color="#999999" />
+                                <Icon
+                                  name="mdi-plus"
+                                  size={30}
+                                  color="hsl(var(--muted-foreground))"
+                                />
                               </View>
                             </View>
 
                             <Text className="ml-[24rpx] flex-shrink-0 text-[30rpx] font-semibold text-foreground">
-                              <Text className="text-[34rpx] font-bold text-[#333333]">
+                              <Text className="text-[34rpx] font-bold text-foreground">
                                 {slot.current_count}
                               </Text>
-                              <Text className="text-[24rpx] font-medium text-[#999999]">
+                              <Text className="text-[24rpx] font-medium text-muted-foreground">
                                 /{slot.max_count}人
                               </Text>
                             </Text>
@@ -2074,7 +2089,7 @@ const SchedulePage: React.FC = () => {
       if (venues.length === 0) {
         return (
           <View className="px-[24rpx]">
-            <View className="rounded-[16rpx] bg-white py-[80rpx] shadow-card">
+            <View className="rounded-[16rpx] bg-card py-[80rpx] shadow-card">
               <Empty icon="mdi-map-marker-outline" description="暂无可用场地" />
             </View>
           </View>
@@ -2147,7 +2162,7 @@ const SchedulePage: React.FC = () => {
                         !isLast && 'mr-[16rpx]',
                         isActive
                           ? 'border-schedule-header bg-schedule-header shadow-md'
-                          : 'border-border bg-white',
+                          : 'border-border bg-card',
                       )}
                       style={{ width: `${TAB_WIDTH_RPX}rpx` }}
                       onClick={() => handleMainTabChange(tab.key, index)}
@@ -2155,7 +2170,7 @@ const SchedulePage: React.FC = () => {
                       <Text
                         className={cn(
                           'text-[28rpx] font-medium',
-                          isActive ? 'text-white' : 'text-foreground-secondary',
+                          isActive ? 'text-primary-foreground' : 'text-foreground-secondary',
                         )}
                       >
                         {tab.label}
@@ -2252,7 +2267,7 @@ const SchedulePage: React.FC = () => {
                 className="pb-safe-bar"
               >
                 <View className="px-[24rpx] py-[18rpx]">
-                  <View className="rounded-[18rpx] bg-[#f6f8fc] px-[18rpx] py-[16rpx]">
+                  <View className="rounded-[18rpx] bg-muted px-[18rpx] py-[16rpx]">
                     <Text className="text-[24rpx] text-muted-foreground">
                       请选择要执行的批量操作
                     </Text>
@@ -2260,12 +2275,12 @@ const SchedulePage: React.FC = () => {
                 </View>
                 <View className="px-[24rpx] pb-[32rpx] flex flex-col gap-[18rpx]">
                   <View
-                    className="rounded-[22rpx] border border-[#dceafe] bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] px-[24rpx] py-[24rpx]"
+                    className="rounded-[22rpx] border border-border bg-muted px-[24rpx] py-[24rpx]"
                     onClick={() => handleChooseBatchType('reschedule')}
                   >
                     <View className="flex items-center justify-between gap-[16rpx]">
                       <View className="flex items-center gap-[16rpx]">
-                        <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-white shadow-[0_6rpx_16rpx_rgba(59,110,245,0.10)]">
+                        <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-card shadow-card">
                           <Icon name="mdi-calendar-check-outline" size="md" color="primary" />
                         </View>
                         <View className="min-w-0 flex-1">
@@ -2273,7 +2288,7 @@ const SchedulePage: React.FC = () => {
                             <Text className="text-[30rpx] font-semibold text-foreground">
                               批量调课
                             </Text>
-                            <View className="rounded-full bg-white/80 px-[12rpx] py-[6rpx]">
+                            <View className="rounded-full bg-card/80 px-[12rpx] py-[6rpx]">
                               <Text className="text-[20rpx] font-medium text-primary">
                                 只调当天
                               </Text>
@@ -2288,12 +2303,12 @@ const SchedulePage: React.FC = () => {
                     </View>
                   </View>
                   <View
-                    className="rounded-[22rpx] border border-[#fde2e2] bg-[linear-gradient(180deg,#fff8f8_0%,#fff1f1_100%)] px-[24rpx] py-[24rpx]"
+                    className="rounded-[22rpx] border border-border bg-muted px-[24rpx] py-[24rpx]"
                     onClick={() => handleChooseBatchType('delete')}
                   >
                     <View className="flex items-center justify-between gap-[16rpx]">
                       <View className="flex items-center gap-[16rpx]">
-                        <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-white shadow-[0_6rpx_16rpx_rgba(239,68,68,0.08)]">
+                        <View className="flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[22rpx] bg-card shadow-card">
                           <Icon name="mdi-delete-outline" size="md" color="destructive" />
                         </View>
                         <View className="min-w-0 flex-1">
@@ -2301,7 +2316,7 @@ const SchedulePage: React.FC = () => {
                             <Text className="text-[30rpx] font-semibold text-destructive">
                               批量删除
                             </Text>
-                            <View className="rounded-full bg-white/85 px-[12rpx] py-[6rpx]">
+                            <View className="rounded-full bg-card/85 px-[12rpx] py-[6rpx]">
                               <Text className="text-[20rpx] font-medium text-destructive">
                                 谨慎操作
                               </Text>
@@ -2348,9 +2363,7 @@ const SchedulePage: React.FC = () => {
                         key={item.id}
                         className={cn(
                           'rounded-[16rpx] border px-[24rpx] py-[22rpx] flex items-start gap-[18rpx]',
-                          checked
-                            ? 'border-primary bg-primary-10'
-                            : 'border-schedule-soft bg-white',
+                          checked ? 'border-primary bg-primary-10' : 'border-schedule-soft bg-card',
                         )}
                         onClick={() => toggleBatchClassSelection(item.id)}
                       >
@@ -2373,7 +2386,7 @@ const SchedulePage: React.FC = () => {
                   })}
                 </View>
 
-                <View className="border-t border-schedule-soft px-[24rpx] pt-[20rpx] pb-[24rpx] flex gap-[16rpx] bg-white">
+                <View className="border-t border-schedule-soft px-[24rpx] pt-[20rpx] pb-[24rpx] flex gap-[16rpx] bg-card">
                   <View
                     className="flex-1 h-[84rpx] rounded-[14rpx] bg-muted flex items-center justify-center"
                     onClick={() => setBatchClassSheetVisible(false)}
@@ -2388,7 +2401,7 @@ const SchedulePage: React.FC = () => {
                     )}
                     onClick={() => void handleConfirmBatchClassSelection()}
                   >
-                    <Text className="text-[28rpx] font-semibold text-white">
+                    <Text className="text-[28rpx] font-semibold text-primary-foreground">
                       {batchActionType === 'delete' ? '确定删除' : '下一步'}
                     </Text>
                   </View>
@@ -2460,7 +2473,7 @@ const SchedulePage: React.FC = () => {
               }
             >
               <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-full bg-schedule-attend shadow-schedule-fab">
-                <Icon name="mdi-plus" size="md" color="white" />
+                <Icon name="mdi-plus" size="md" color="hsl(var(--primary-foreground))" />
               </View>
             </View>
           )}

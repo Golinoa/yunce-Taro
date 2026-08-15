@@ -13,7 +13,10 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import { clearVisitedMap } from '@/services/onboarding';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import { isAdmin, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 
 /** 设置项配置 */
@@ -87,7 +90,9 @@ const ALL_SETTING_ITEMS: SettingItem[] = [
 const PLACEHOLDER_TIP = '功能开发中，敬请期待';
 
 const SystemSettings: React.FC = () => {
+  useCardNavigationBar();
   const { signOut, currentRole } = useAuth();
+  const { activeTheme } = useThemeStore();
   const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
 
   // 页面显示时读取最新开关状态
@@ -106,41 +111,44 @@ const SystemSettings: React.FC = () => {
     [currentRole],
   );
 
-  const handleNavigate = useCallback((route: string) => {
-    if (route === '__reset_onboarding__') {
-      Taro.showModal({
-        title: '重置新手引导',
-        content: '重置后将重新显示店铺管理配置引导，所有步骤进度也将清除，是否继续？',
-        confirmColor: '#5EC8A8',
-        success: (res) => {
-          if (res.confirm) {
-            // 清除访问记录，所有步骤回到未完成
-            clearVisitedMap();
-            // 重新显示引导态
-            Taro.setStorageSync(STORE_ONBOARDING_HIDDEN_KEY, false);
-            Taro.showToast({ title: '已重置', icon: 'success' });
-          }
-        },
-      });
-      return;
-    }
-    if (!route) {
-      Taro.showToast({ title: PLACEHOLDER_TIP, icon: 'none' });
-      return;
-    }
-    Taro.navigateTo({ url: route });
-  }, []);
+  const handleNavigate = useCallback(
+    (route: string) => {
+      if (route === '__reset_onboarding__') {
+        Taro.showModal({
+          title: '重置新手引导',
+          content: '重置后将重新显示店铺管理配置引导，所有步骤进度也将清除，是否继续？',
+          confirmColor: getThemeHexColors(activeTheme).primary,
+          success: (res) => {
+            if (res.confirm) {
+              // 清除访问记录，所有步骤回到未完成
+              clearVisitedMap();
+              // 重新显示引导态
+              Taro.setStorageSync(STORE_ONBOARDING_HIDDEN_KEY, false);
+              Taro.showToast({ title: '已重置', icon: 'success' });
+            }
+          },
+        });
+        return;
+      }
+      if (!route) {
+        Taro.showToast({ title: PLACEHOLDER_TIP, icon: 'none' });
+        return;
+      }
+      Taro.navigateTo({ url: route });
+    },
+    [activeTheme],
+  );
 
   const handleSignOut = useCallback(async () => {
     const res = await Taro.showModal({
       title: '确认退出',
       content: '退出后将清除本地登录状态，是否继续？',
-      confirmColor: '#5EC8A8',
+      confirmColor: getThemeHexColors(activeTheme).primary,
     });
     if (!res.confirm) return;
     await signOut();
     Taro.reLaunch({ url: '/pages/login/index' });
-  }, [signOut]);
+  }, [activeTheme, signOut]);
 
   return (
     <PageContainer safeBottom>
@@ -148,7 +156,7 @@ const SystemSettings: React.FC = () => {
         {visibleItems.map((item) => (
           <View
             key={item.title}
-            className="flex flex-row items-center bg-white rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx] press-bg"
+            className="flex flex-row items-center bg-card rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx] press-bg"
             onClick={() => handleNavigate(item.route)}
           >
             {/* 图标 */}
@@ -175,7 +183,7 @@ const SystemSettings: React.FC = () => {
         ))}
 
         {/* 场地预约开关 */}
-        <View className="flex flex-row items-center bg-white rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx]">
+        <View className="flex flex-row items-center bg-card rounded-[28rpx] shadow-soft px-[28rpx] py-[24rpx] mb-[20rpx]">
           <View
             className={cn(
               'w-[76rpx] h-[76rpx] rounded-[22rpx] flex items-center justify-center mr-[20rpx] flex-shrink-0',
@@ -197,7 +205,7 @@ const SystemSettings: React.FC = () => {
       {/* 退出登录：所有角色可见 */}
       <View className="px-[32rpx] mt-[48rpx] mb-[48rpx]">
         <View
-          className="bg-white rounded-[28rpx] py-[28rpx] flex items-center justify-center shadow-soft press-bg"
+          className="bg-card rounded-[28rpx] py-[28rpx] flex items-center justify-center shadow-soft press-bg"
           onClick={handleSignOut}
         >
           <Text className="text-[30rpx] font-semibold text-error">退出登录</Text>

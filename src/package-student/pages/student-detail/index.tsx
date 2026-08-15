@@ -12,6 +12,8 @@ import StudentAvatar from '@/components/student/StudentAvatar';
 import { studentService, packageService, lessonRecordService, leaveService } from '@/services';
 import { followRecordService } from '@/services/follow-record';
 import { memberCardService } from '@/services/member-card';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest, LeaveStatus } from '@/types/leave-request';
@@ -43,7 +45,7 @@ const STUDENT_DETAIL_SWIPER_DURATION = 280;
 
 /** 请假状态映射 */
 const LEAVE_STATUS_MAP: Record<LeaveStatus, { label: string; className: string }> = {
-  pending: { label: '待审批', className: 'bg-amber-500/15 text-amber-500' },
+  pending: { label: '待审批', className: 'bg-warning/15 text-warning' },
   approved: { label: '已通过', className: 'bg-primary-15 text-primary' },
   rejected: { label: '已拒绝', className: 'bg-destructive-10 text-destructive' },
 };
@@ -142,6 +144,7 @@ function getPackageRefundableAmount(pkg: CoursePackage, refundedAmount = 0): num
 
 const StudentDetail: React.FC = () => {
   const { profile } = useAuth();
+  const { activeTheme } = useThemeStore();
   const isTeacher = isStaffRole(profile?.currentContext?.role);
   const currentUserId = profile?.id || '';
 
@@ -555,23 +558,26 @@ const StudentDetail: React.FC = () => {
     }
   }, []);
 
-  const handleRejectLeave = useCallback(async (id: string) => {
-    const { confirm } = await Taro.showModal({
-      title: '确认拒绝',
-      content: '确认拒绝该请假申请？',
-      confirmColor: '#ef4444',
-    });
-    if (!confirm) return;
-    try {
-      await leaveService.updateStatus(id, 'rejected');
-      setLeaves((prev) =>
-        prev.map((l) => (l.id === id ? { ...l, status: 'rejected' as const } : l)),
-      );
-      Taro.showToast({ title: '已拒绝', icon: 'success' });
-    } catch {
-      Taro.showToast({ title: '操作失败', icon: 'none' });
-    }
-  }, []);
+  const handleRejectLeave = useCallback(
+    async (id: string) => {
+      const { confirm } = await Taro.showModal({
+        title: '确认拒绝',
+        content: '确认拒绝该请假申请？',
+        confirmColor: getThemeHexColors(activeTheme).destructive,
+      });
+      if (!confirm) return;
+      try {
+        await leaveService.updateStatus(id, 'rejected');
+        setLeaves((prev) =>
+          prev.map((l) => (l.id === id ? { ...l, status: 'rejected' as const } : l)),
+        );
+        Taro.showToast({ title: '已拒绝', icon: 'success' });
+      } catch {
+        Taro.showToast({ title: '操作失败', icon: 'none' });
+      }
+    },
+    [activeTheme],
+  );
 
   // 退费操作
   const handleSelectRefundPackage = useCallback(
@@ -664,7 +670,12 @@ const StudentDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <View className="min-h-screen bg-background flex items-center justify-center">
+      <View
+        className={cn(
+          `theme-${activeTheme}`,
+          'min-h-screen bg-background flex items-center justify-center',
+        )}
+      >
         <Loading text="加载学员详情中..." />
       </View>
     );
@@ -672,7 +683,12 @@ const StudentDetail: React.FC = () => {
 
   if (loadError) {
     return (
-      <View className="min-h-screen bg-background px-[32rpx] flex items-center justify-center">
+      <View
+        className={cn(
+          `theme-${activeTheme}`,
+          'min-h-screen bg-background px-[32rpx] flex items-center justify-center',
+        )}
+      >
         <Empty
           icon="mdi-alert-circle"
           description={loadError}
@@ -685,7 +701,12 @@ const StudentDetail: React.FC = () => {
 
   if (notFound || !student) {
     return (
-      <View className="min-h-screen bg-background px-[32rpx] flex items-center justify-center">
+      <View
+        className={cn(
+          `theme-${activeTheme}`,
+          'min-h-screen bg-background px-[32rpx] flex items-center justify-center',
+        )}
+      >
         <Empty
           icon="mdi-account-search"
           description="未找到该学员信息"
@@ -697,20 +718,23 @@ const StudentDetail: React.FC = () => {
   }
 
   return (
-    <View className="min-h-screen bg-background">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       {/* ====== 渐变头部 ====== */}
       <View
         className="bg-gradient-primary px-[40rpx] rounded-b-[48rpx] relative overflow-hidden pb-[72rpx]"
         style={{ paddingTop: `${statusBarHeight + 8}px` }}
       >
         {/* 装饰圆 */}
-        <View className="absolute -top-[60rpx] -right-[60rpx] w-[240rpx] h-[240rpx] rounded-full bg-white/8" />
-        <View className="absolute bottom-[-40rpx] right-[100rpx] w-[160rpx] h-[160rpx] rounded-full bg-white/6" />
+        <View className="absolute -top-[60rpx] -right-[60rpx] w-[240rpx] h-[240rpx] rounded-full bg-primary-foreground/8" />
+        <View className="absolute bottom-[-40rpx] right-[100rpx] w-[160rpx] h-[160rpx] rounded-full bg-primary-foreground/6" />
 
         {/* 返回 */}
         <View className="relative z-1">
-          <View className="w-[64rpx] h-[64rpx] rounded-full bg-white/20 center" onClick={goBack}>
-            <Icon name="mdi-arrow-left" size="sm" color="white" />
+          <View
+            className="w-[64rpx] h-[64rpx] rounded-full bg-primary-foreground/20 center"
+            onClick={goBack}
+          >
+            <Icon name="mdi-arrow-left" size="sm" color="hsl(var(--primary-foreground))" />
           </View>
         </View>
 
@@ -724,38 +748,50 @@ const StudentDetail: React.FC = () => {
           />
           <View className="flex-1 min-w-0">
             <View className="flex items-center gap-[12rpx]">
-              <Text className="text-[40rpx] font-bold text-white leading-none">{student.name}</Text>
+              <Text className="text-[40rpx] font-bold text-primary-foreground leading-none">
+                {student.name}
+              </Text>
               {student.gender && (
                 <Icon
                   name={student.gender === 'male' ? 'mdi-gender-male' : 'mdi-gender-female'}
                   size={24}
-                  color="white"
+                  color="hsl(var(--primary-foreground))"
                 />
               )}
             </View>
             <View className="flex items-center gap-[16rpx] mt-[16rpx]">
               {student.phone && (
-                <Text className="text-[28rpx] text-white font-medium">{student.phone}</Text>
+                <Text className="text-[28rpx] text-primary-foreground font-medium">
+                  {student.phone}
+                </Text>
               )}
               {student.phone && (
                 <View className="flex items-center gap-[12rpx]">
                   <View
-                    className="w-[52rpx] h-[52rpx] rounded-full bg-white/20 center press-scale"
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-primary-foreground/20 center press-scale"
                     onClick={handleCopyPhone}
                   >
-                    <Icon name="mdi-content-copy" size={20} color="white" />
+                    <Icon
+                      name="mdi-content-copy"
+                      size={20}
+                      color="hsl(var(--primary-foreground))"
+                    />
                   </View>
                   <View
-                    className="w-[52rpx] h-[52rpx] rounded-full bg-white/20 center press-scale"
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-primary-foreground/20 center press-scale"
                     onClick={handleCallPhone}
                   >
-                    <Icon name="mdi-phone" size={20} color="white" />
+                    <Icon name="mdi-phone" size={20} color="hsl(var(--primary-foreground))" />
                   </View>
                   <View
-                    className="w-[52rpx] h-[52rpx] rounded-full bg-white/20 center press-scale"
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-primary-foreground/20 center press-scale"
                     onClick={handleSendMessage}
                   >
-                    <Icon name="mdi-message-text" size={20} color="white" />
+                    <Icon
+                      name="mdi-message-text"
+                      size={20}
+                      color="hsl(var(--primary-foreground))"
+                    />
                   </View>
                 </View>
               )}
@@ -766,7 +802,7 @@ const StudentDetail: React.FC = () => {
 
       {/* ====== Tab 栏（胶囊圆角） ====== */}
       <View className="px-[32rpx] -mt-[40rpx] relative z-2">
-        <View className="flex bg-white rounded-[32rpx] p-[8rpx] shadow-soft">
+        <View className="flex bg-card rounded-[32rpx] p-[8rpx] shadow-soft">
           {STUDENT_DETAIL_TABS.map((tab) => (
             <View
               key={tab.key}
@@ -806,9 +842,9 @@ const StudentDetail: React.FC = () => {
           <ScrollView scrollY className="h-full">
             <View className="px-[32rpx] pt-[32rpx] pb-[200rpx] flex flex-col gap-[24rpx]">
               {/* 基础信息 */}
-              <View className="bg-white rounded-[28rpx] p-[32rpx] shadow-soft">
+              <View className="bg-card rounded-[28rpx] p-[32rpx] shadow-soft">
                 <View className="flex items-center gap-[12rpx] mb-[28rpx]">
-                  <Icon name="mdi-account-outline" size={28} color="#3B6EF5" />
+                  <Icon name="mdi-account-outline" size={28} color="primary" />
                   <Text className="text-[30rpx] font-bold text-foreground">基础信息</Text>
                 </View>
                 <View className="flex flex-col gap-[24rpx]">
@@ -861,7 +897,7 @@ const StudentDetail: React.FC = () => {
               </View>
 
               {/* 家长绑定 */}
-              <View className="bg-white rounded-[28rpx] p-[32rpx] shadow-soft">
+              <View className="bg-card rounded-[28rpx] p-[32rpx] shadow-soft">
                 <View className="flex items-center justify-between mb-[28rpx]">
                   <View className="flex items-center gap-[12rpx]">
                     <Icon name="mdi-account-group" size={28} color="primary" />
@@ -871,8 +907,10 @@ const StudentDetail: React.FC = () => {
                     className="flex items-center gap-[8rpx] rounded-[40rpx] bg-gradient-primary px-[28rpx] py-[12rpx] press-scale"
                     onClick={handleInviteParent}
                   >
-                    <Icon name="mdi-link-plus" size={24} color="white" />
-                    <Text className="text-[24rpx] text-white font-medium">邀请绑定</Text>
+                    <Icon name="mdi-link-plus" size={24} color="hsl(var(--primary-foreground))" />
+                    <Text className="text-[24rpx] text-primary-foreground font-medium">
+                      邀请绑定
+                    </Text>
                   </View>
                 </View>
 
@@ -884,7 +922,11 @@ const StudentDetail: React.FC = () => {
                         className="flex items-center gap-[20rpx] py-[20rpx] px-[24rpx] bg-muted rounded-[20rpx]"
                       >
                         <View className="w-[72rpx] h-[72rpx] rounded-full bg-gradient-primary center flex-shrink-0">
-                          <Icon name="mdi-account" size={32} color="white" />
+                          <Icon
+                            name="mdi-account"
+                            size={32}
+                            color="hsl(var(--primary-foreground))"
+                          />
                         </View>
                         <View className="flex-1 min-w-0">
                           <Text className="text-[28rpx] font-medium text-foreground block">
@@ -899,7 +941,7 @@ const StudentDetail: React.FC = () => {
                   </View>
                 ) : (
                   <View className="py-[40rpx] center-col gap-[16rpx]">
-                    <Icon name="mdi-account-plus" size={56} color="#c7ced9" />
+                    <Icon name="mdi-account-plus" size={56} color="hsl(var(--muted-foreground))" />
                     <Text className="text-[26rpx] text-muted-foreground">
                       暂无家长绑定，点击「邀请绑定」分享给家长
                     </Text>
@@ -915,7 +957,7 @@ const StudentDetail: React.FC = () => {
           <ScrollView scrollY className="h-full">
             <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
               {/* 卡包汇总 */}
-              <View className="bg-white rounded-[24rpx] p-[24rpx] shadow-soft mb-[24rpx]">
+              <View className="bg-card rounded-[24rpx] p-[24rpx] shadow-soft mb-[24rpx]">
                 <View className="flex flex-row gap-[24rpx]">
                   <View className="flex-1 center-col">
                     <Text className="text-[32rpx] font-bold text-foreground leading-none">
@@ -1041,36 +1083,38 @@ const StudentDetail: React.FC = () => {
                             className={cn('absolute inset-0 pointer-events-none', cardOverlayClass)}
                           />
                         )}
-                        <View className="absolute -right-[40rpx] -bottom-[40rpx] w-[180rpx] h-[180rpx] rounded-full bg-white/10" />
-                        <View className="absolute top-[16rpx] right-[20rpx] text-[72rpx] font-bold text-white/15 leading-none">
+                        <View className="absolute -right-[40rpx] -bottom-[40rpx] w-[180rpx] h-[180rpx] rounded-full bg-primary-foreground/10" />
+                        <View className="absolute top-[16rpx] right-[20rpx] text-[72rpx] font-bold text-primary-foreground/15 leading-none">
                           {kindText}
                         </View>
                         <View className="relative z-1">
                           <View className="flex items-start justify-between gap-[16rpx]">
                             <View className="flex-1 min-w-0">
-                              <Text className="text-[32rpx] font-bold text-white">
+                              <Text className="text-[32rpx] font-bold text-primary-foreground">
                                 {card.cardTypeName}
                               </Text>
-                              <Text className="text-[22rpx] text-white/80 mt-[8rpx]">
+                              <Text className="text-[22rpx] text-primary-foreground/80 mt-[8rpx]">
                                 有效{card.cardTypeKind === 'time' ? '天数' : '次数'} {remainingText}
                               </Text>
                             </View>
-                            <View className="py-[6rpx] px-[16rpx] rounded-full bg-white/20">
-                              <Text className="text-[20rpx] text-white font-medium">
+                            <View className="py-[6rpx] px-[16rpx] rounded-full bg-primary-foreground/20">
+                              <Text className="text-[20rpx] text-primary-foreground font-medium">
                                 {statusInfo.label}
                               </Text>
                             </View>
                           </View>
                           <View className="mt-[32rpx] flex items-end justify-between">
                             <View>
-                              <Text className="text-[48rpx] font-bold text-white leading-none">
+                              <Text className="text-[48rpx] font-bold text-primary-foreground leading-none">
                                 {remainingText}
                               </Text>
-                              <Text className="text-[22rpx] text-white/80 mt-[8rpx]">
+                              <Text className="text-[22rpx] text-primary-foreground/80 mt-[8rpx]">
                                 剩余{card.cardTypeKind === 'time' ? '天数' : '次数'}
                               </Text>
                             </View>
-                            <Text className="text-[22rpx] text-white/80">{totalText}</Text>
+                            <Text className="text-[22rpx] text-primary-foreground/80">
+                              {totalText}
+                            </Text>
                           </View>
                         </View>
                       </View>
@@ -1104,7 +1148,7 @@ const StudentDetail: React.FC = () => {
               ) : (
                 <View className="flex flex-col gap-[24rpx]">
                   {/* 顶部总结 */}
-                  <View className="bg-white rounded-[24rpx] p-[20rpx] shadow-soft">
+                  <View className="bg-card rounded-[24rpx] p-[20rpx] shadow-soft">
                     <View className="flex items-center gap-[8rpx] mb-[16rpx]">
                       <Icon name="mdi-chart-bar" size={24} color="primary" />
                       <Text className="text-[26rpx] font-bold text-foreground">出勤总结</Text>
@@ -1134,7 +1178,7 @@ const StudentDetail: React.FC = () => {
                     const isExpanded = expandedMonths.has(month);
                     const stat = monthStats[month] || { checkIn: 0, leave: 0 };
                     return (
-                      <View key={month} className="bg-white rounded-[28rpx] p-[28rpx] shadow-soft">
+                      <View key={month} className="bg-card rounded-[28rpx] p-[28rpx] shadow-soft">
                         {/* 月份标题行（点击展开/收起） */}
                         <View
                           className="flex items-center justify-between"
@@ -1149,7 +1193,7 @@ const StudentDetail: React.FC = () => {
                           <Icon
                             name={isExpanded ? 'mdi-chevron-down' : 'mdi-chevron-right'}
                             size={32}
-                            color="#999999"
+                            color="hsl(var(--muted-foreground))"
                           />
                         </View>
 
@@ -1189,7 +1233,7 @@ const StudentDetail: React.FC = () => {
                                         </Text>
                                       </View>
                                       {record.content && (
-                                        <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-white rounded-[16rpx]">
+                                        <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-card rounded-[16rpx]">
                                           <Text className="text-[24rpx] text-muted-foreground">
                                             课程内容：{record.content}
                                           </Text>
@@ -1235,7 +1279,7 @@ const StudentDetail: React.FC = () => {
                                       </View>
                                     </View>
                                     {leave.reason && (
-                                      <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-white rounded-[16rpx]">
+                                      <View className="mt-[16rpx] py-[16rpx] px-[24rpx] bg-card rounded-[16rpx]">
                                         <Text className="text-[24rpx] text-muted-foreground">
                                           原因：{leave.reason}
                                         </Text>
@@ -1247,7 +1291,7 @@ const StudentDetail: React.FC = () => {
                                           className="flex-1 py-[16rpx] rounded-[24rpx] bg-gradient-primary center press-scale"
                                           onClick={() => handleApproveLeave(leave.id)}
                                         >
-                                          <Text className="text-white text-[26rpx] font-medium">
+                                          <Text className="text-primary-foreground text-[26rpx] font-medium">
                                             同意
                                           </Text>
                                         </View>
@@ -1287,7 +1331,7 @@ const StudentDetail: React.FC = () => {
                   {followRecords.map((record) => (
                     <View
                       key={record.id}
-                      className="bg-white rounded-[24rpx] p-[24rpx] shadow-soft press-scale"
+                      className="bg-card rounded-[24rpx] p-[24rpx] shadow-soft press-scale"
                       onClick={() => handleFollowClick(record)}
                     >
                       <View className="flex items-start justify-between gap-[12rpx]">
@@ -1325,8 +1369,8 @@ const StudentDetail: React.FC = () => {
             className="w-[120rpx] h-[120rpx] rounded-full bg-gradient-primary shadow-elegant center flex flex-col gap-[4rpx] press-scale"
             onClick={handleIssueCard}
           >
-            <Icon name="mdi-plus" size={36} color="white" />
-            <Text className="text-[20rpx] text-white font-medium">发会员卡</Text>
+            <Icon name="mdi-plus" size={36} color="hsl(var(--primary-foreground))" />
+            <Text className="text-[20rpx] text-primary-foreground font-medium">发会员卡</Text>
           </View>
         </View>
       )}
@@ -1337,8 +1381,8 @@ const StudentDetail: React.FC = () => {
             className="w-[120rpx] h-[120rpx] rounded-full bg-gradient-primary shadow-elegant center flex flex-col gap-[4rpx] press-scale"
             onClick={handleWriteFollow}
           >
-            <Icon name="mdi-pencil" size={32} color="white" />
-            <Text className="text-[20rpx] text-white font-medium">写跟进</Text>
+            <Icon name="mdi-pencil" size={32} color="hsl(var(--primary-foreground))" />
+            <Text className="text-[20rpx] text-primary-foreground font-medium">写跟进</Text>
           </View>
         </View>
       )}
@@ -1375,7 +1419,7 @@ const StudentDetail: React.FC = () => {
                   <View
                     key={pkg.id}
                     className={`rounded-[24rpx] border px-[24rpx] py-[22rpx] ${
-                      isSelected ? 'border-primary bg-primary/5' : 'border-border bg-white'
+                      isSelected ? 'border-primary bg-primary/5' : 'border-border bg-card'
                     }`}
                     onClick={() => handleSelectRefundPackage(pkg)}
                   >
@@ -1400,7 +1444,7 @@ const StudentDetail: React.FC = () => {
                       <Icon
                         name={isSelected ? 'mdi-check-circle' : 'mdi-checkbox-blank-circle-outline'}
                         size="sm"
-                        color={isSelected ? '#5EC8A8' : '#c7ced9'}
+                        color={isSelected ? 'success' : 'hsl(var(--muted-foreground))'}
                       />
                     </View>
                   </View>
@@ -1460,7 +1504,7 @@ const StudentDetail: React.FC = () => {
               refundablePackages.length > 0 && !refundSubmitting ? handleConfirmRefund : undefined
             }
           >
-            <Text className="text-[30rpx] text-white font-semibold">
+            <Text className="text-[30rpx] text-primary-foreground font-semibold">
               {refundSubmitting ? '提交中...' : '确认退费'}
             </Text>
           </View>

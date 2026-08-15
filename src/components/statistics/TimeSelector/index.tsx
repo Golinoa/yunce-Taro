@@ -47,7 +47,7 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
         if (opt) onMonthChange(opt.year, opt.month);
       }}
     >
-      <View className="bg-white rounded-2xl px-5 py-3 flex items-center justify-between mb-4 border border-solid border-border-light">
+      <View className="bg-card rounded-2xl px-5 py-3 flex items-center justify-between mb-4 border border-solid border-border-light">
         <Text className="text-foreground text-lg font-semibold">{displayText}</Text>
         <Icon name="mdi-chevron-down" size="sm" color="muted" />
       </View>

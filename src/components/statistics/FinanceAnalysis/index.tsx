@@ -96,7 +96,7 @@ const FinanceAnalysis: React.FC<{ data: FinanceAnalysisData }> = ({ data }) => {
       </Text>
 
       {/* 收入/支出构成 Tab */}
-      <View className="bg-white rounded-[24rpx] border-[2rpx] border-solid border-border-light mb-[24rpx] overflow-hidden shadow-card">
+      <View className="bg-card rounded-[24rpx] border-[2rpx] border-solid border-border-light mb-[24rpx] overflow-hidden shadow-card">
         {/* Tab 切换 */}
         <View className="flex border-b-[2rpx] border-solid border-border-light">
           <View
@@ -155,7 +155,7 @@ const FinanceAnalysis: React.FC<{ data: FinanceAnalysisData }> = ({ data }) => {
 
       {/* 环比/同比 */}
       <View className="grid grid-cols-2 gap-[24rpx]">
-        <View className="bg-white rounded-[24rpx] p-[24rpx] border-[2rpx] border-solid border-border-light shadow-card">
+        <View className="bg-card rounded-[24rpx] p-[24rpx] border-[2rpx] border-solid border-border-light shadow-card">
           <Text className="text-[20rpx] text-muted-foreground block mb-[8rpx]">环比</Text>
           <View className="flex items-baseline gap-[8rpx]">
             <Text className="text-[36rpx] font-bold text-primary number-display">
@@ -167,7 +167,7 @@ const FinanceAnalysis: React.FC<{ data: FinanceAnalysisData }> = ({ data }) => {
             {data.momDesc}
           </Text>
         </View>
-        <View className="bg-white rounded-[24rpx] p-[24rpx] border-[2rpx] border-solid border-border-light shadow-card">
+        <View className="bg-card rounded-[24rpx] p-[24rpx] border-[2rpx] border-solid border-border-light shadow-card">
           <Text className="text-[20rpx] text-muted-foreground block mb-[8rpx]">同比去年</Text>
           <View className="flex items-baseline gap-[8rpx]">
             <Text className="text-[36rpx] font-bold text-primary number-display">

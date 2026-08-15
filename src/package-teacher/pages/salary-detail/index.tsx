@@ -13,15 +13,14 @@ import Icon from '@/components/Icon';
 import PayConfirmSheet from '@/components/teacher/PayConfirmSheet';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
 import { useTeacherStore, calcTotal } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
 import {
   normalizeSalaryStatus,
   SALARY_STATUS_META,
   PAY_METHOD_TEXT,
   type PayMethod,
 } from '@/types/teacher';
-
-/** 页面背景色：按产品要求使用 #EFEFEF */
-const PAGE_BACKGROUND = '#EFEFEF';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 /** 生成本地模拟课时费流水 */
 function genMockLessonRecords(teacher: { subject: string; rate: number }) {
@@ -121,6 +120,8 @@ const RecordRow: React.FC<{ name: string; amount: string; amountClassName?: stri
 );
 
 const SalaryDetailPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const { id } = useRouter().params;
   const { teachers, setPendingPayAction } = useTeacherStore();
 
@@ -199,7 +200,7 @@ const SalaryDetailPage: React.FC = () => {
 
   if (!teacher) {
     return (
-      <View className="min-h-screen bg-background pb-safe-bar">
+      <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-safe-bar')}>
         <View className="flex items-center justify-center py-[160rpx]">
           <Text className="text-[28rpx] text-muted-foreground">教师不存在</Text>
         </View>
@@ -208,9 +209,9 @@ const SalaryDetailPage: React.FC = () => {
   }
 
   return (
-    <View className="min-h-screen pb-[140rpx]" style={{ backgroundColor: PAGE_BACKGROUND }}>
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-[140rpx]')}>
       {/* 顶部：白色背景，居中头像/名称/金额，底部带分割线 */}
-      <View className="bg-white pt-[48rpx] pb-[40rpx] px-[64rpx] border-b border-border/30">
+      <View className="bg-card pt-[48rpx] pb-[40rpx] px-[64rpx] border-b border-border/30">
         <View className="flex flex-col items-center">
           <Image
             src={teacher.avatar || BRAND_LOGO}
@@ -231,7 +232,7 @@ const SalaryDetailPage: React.FC = () => {
       </View>
 
       {/* 基本信息：当前状态 / 确认时间 / 发放方式 / 流水单号 */}
-      <View className="bg-white px-[64rpx] mb-[36rpx]">
+      <View className="bg-card px-[64rpx] mb-[36rpx]">
         <InfoRow label="当前状态" value={statusMeta.label} valueClassName={statusMeta.textClass} />
         <InfoRow
           label="确认时间"
@@ -245,7 +246,7 @@ const SalaryDetailPage: React.FC = () => {
       </View>
 
       {/* 工资明细卡片：双排紧凑布局 */}
-      <View className="bg-white px-[64rpx] py-[32rpx] mb-[36rpx]">
+      <View className="bg-card px-[64rpx] py-[32rpx] mb-[36rpx]">
         <Text className="text-[28rpx] text-foreground font-bold mb-[32rpx]">工资明细</Text>
 
         <View className="grid grid-cols-2 gap-x-[24rpx] gap-y-[32rpx]">
@@ -374,10 +375,10 @@ const SalaryDetailPage: React.FC = () => {
       </View>
 
       {/* 底部操作 */}
-      <View className="fixed bottom-0 left-0 right-0 px-[64rpx] py-[24rpx] pb-safe-bar bg-white border-t border-border z-20">
+      <View className="fixed bottom-0 left-0 right-0 px-[64rpx] py-[24rpx] pb-safe-bar bg-card border-t border-border z-20">
         {(currentStatus === 'sending' || currentStatus === 'teacher_confirmed') && (
           <View
-            className="w-full py-[26rpx] rounded-full bg-primary text-white text-center text-[30rpx] font-semibold press-scale"
+            className="w-full py-[26rpx] rounded-full bg-primary text-primary-foreground text-center text-[30rpx] font-semibold press-scale"
             onClick={() => {
               setPendingPayAction({ type: 'single', ids: [teacher.id] });
               setPaySheetVisible(true);
@@ -388,7 +389,7 @@ const SalaryDetailPage: React.FC = () => {
         )}
         {currentStatus === 'archived' && (
           <View
-            className="w-full py-[26rpx] rounded-full bg-primary text-white text-center text-[30rpx] font-semibold press-scale"
+            className="w-full py-[26rpx] rounded-full bg-primary text-primary-foreground text-center text-[30rpx] font-semibold press-scale"
             onClick={() => void Taro.navigateBack()}
           >
             返回

@@ -19,7 +19,9 @@ import Switch from '@/components/Switch';
 import SalaryRuleEditor from '@/components/teacher/SalaryRuleEditor';
 import { createDefaultSalaryRule } from '@/data/teacher';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 /** 表单字段错误 */
 interface SalaryTemplateFormErrors {
@@ -27,6 +29,8 @@ interface SalaryTemplateFormErrors {
 }
 
 const SalaryTemplateFormPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const router = useRouter();
   const editId = (router.params?.id as string) || '';
   const isEdit = !!editId;
@@ -119,7 +123,7 @@ const SalaryTemplateFormPage: React.FC = () => {
   }, []);
 
   return (
-    <View className="min-h-screen bg-background">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       <ScrollView scrollY className="h-screen" style={{ paddingBottom: '180rpx' }}>
         <View className="px-[32rpx] py-[24rpx] flex flex-col gap-[24rpx]">
           {/* 基本信息 */}

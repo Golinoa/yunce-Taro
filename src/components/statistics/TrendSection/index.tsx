@@ -83,7 +83,7 @@ const TrendSection: React.FC<{ data: TrendSectionData; title?: string }> = ({
 
           {/* 环比/同比卡片 */}
           <View className="grid grid-cols-2 gap-[24rpx]">
-            <View className="bg-white rounded-[24rpx] p-[32rpx] border-[2rpx] border-solid border-border-light shadow-card">
+            <View className="bg-card rounded-[24rpx] p-[32rpx] border-[2rpx] border-solid border-border-light shadow-card">
               <Text className="text-[24rpx] text-muted-foreground block mb-[8rpx]">环比</Text>
               <View className="flex items-baseline gap-[16rpx]">
                 <Text className="text-[40rpx] font-bold text-primary number-display">
@@ -95,7 +95,7 @@ const TrendSection: React.FC<{ data: TrendSectionData; title?: string }> = ({
                 {data.momDesc}
               </Text>
             </View>
-            <View className="bg-white rounded-[24rpx] p-[32rpx] border-[2rpx] border-solid border-border-light shadow-card">
+            <View className="bg-card rounded-[24rpx] p-[32rpx] border-[2rpx] border-solid border-border-light shadow-card">
               <Text className="text-[24rpx] text-muted-foreground block mb-[8rpx]">同比去年</Text>
               <View className="flex items-baseline gap-[16rpx]">
                 <Text className="text-[40rpx] font-bold text-primary number-display">

@@ -60,7 +60,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         {/* 用户信息：头像 + 名称 + 手机号/机构 + 我的资料 */}
         <View className="absolute bottom-[120rpx] left-0 right-0 px-page-padding flex items-center gap-[24rpx]">
           {/* 头像：白色圆形底 + 灰色外边框，头像缩小后自然留出白色内边 */}
-          <View className="relative flex-shrink-0 w-[96rpx] h-[96rpx] rounded-full border-[4rpx] border-solid border-profile-avatar-outer bg-white flex items-center justify-center overflow-hidden">
+          <View className="relative flex-shrink-0 w-[96rpx] h-[96rpx] rounded-full border-[4rpx] border-solid border-profile-avatar-outer bg-card flex items-center justify-center overflow-hidden">
             <Image
               src={avatarUrl || DEFAULT_AVATAR_URL}
               mode="aspectFill"
@@ -69,14 +69,16 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </View>
 
           <View className="flex-1 min-w-0">
-            <Text className="text-[34rpx] font-bold text-white/95 truncate block">{name}</Text>
+            <Text className="text-[34rpx] font-bold text-primary-foreground/95 truncate block">
+              {name}
+            </Text>
             {phone && (
-              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-white/75 truncate block">
+              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-primary-foreground/75 truncate block">
                 {phone}
               </Text>
             )}
             {!phone && orgName && (
-              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-white/75 truncate block">
+              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-primary-foreground/75 truncate block">
                 {orgName}
               </Text>
             )}
@@ -86,8 +88,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             className="flex items-center gap-[4rpx] active:opacity-70 flex-shrink-0"
             onClick={onSettings}
           >
-            <Text className="text-[26rpx] text-white/95">我的资料</Text>
-            <Icon name="mdi-chevron-right" size="xs" color="white" />
+            <Text className="text-[26rpx] text-primary-foreground/95">我的资料</Text>
+            <Icon name="mdi-chevron-right" size="xs" color="hsl(var(--primary-foreground))" />
           </View>
         </View>
       </View>
@@ -97,7 +99,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   return (
     <View
       className={cn(
-        'mx-[32rpx] mt-[24rpx] mb-[24rpx] px-[32rpx] py-[36rpx] rounded-[32rpx] bg-white shadow-soft',
+        'mx-[32rpx] mt-[24rpx] mb-[24rpx] px-[32rpx] py-[36rpx] rounded-[32rpx] bg-card shadow-soft',
         className,
       )}
     >

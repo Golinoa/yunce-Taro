@@ -65,7 +65,7 @@ const VenueBookingCard: React.FC<VenueBookingCardProps> = ({
   return (
     <View
       className={cn(
-        'relative overflow-hidden rounded-[24rpx] bg-white px-[24rpx] py-[24rpx] shadow-card active:opacity-90',
+        'relative overflow-hidden rounded-[24rpx] bg-card px-[24rpx] py-[24rpx] shadow-card active:opacity-90',
         className,
       )}
       onClick={() => onClick?.(venue)}
@@ -92,7 +92,7 @@ const VenueBookingCard: React.FC<VenueBookingCardProps> = ({
                 onBook?.(venue);
               }}
             >
-              <Text className="text-[26rpx] font-semibold text-white">预约</Text>
+              <Text className="text-[26rpx] font-semibold text-primary-foreground">预约</Text>
             </View>
           </View>
 
@@ -144,14 +144,14 @@ const VenueBookingCard: React.FC<VenueBookingCardProps> = ({
                   key={`${avatar}-${index}`}
                   src={avatar || BRAND_LOGO}
                   className={cn(
-                    'relative h-[52rpx] w-[52rpx] flex-shrink-0 rounded-full border-2 border-white bg-muted',
+                    'relative h-[52rpx] w-[52rpx] flex-shrink-0 rounded-full border-2 border-card bg-muted',
                     index > 0 && '-ml-[16rpx]',
                   )}
                   mode="aspectFill"
                 />
               ))}
               {remainingAvatarCount > 0 ? (
-                <View className="relative -ml-[16rpx] flex h-[52rpx] w-[52rpx] flex-shrink-0 items-center justify-center rounded-full border-2 border-white bg-muted">
+                <View className="relative -ml-[16rpx] flex h-[52rpx] w-[52rpx] flex-shrink-0 items-center justify-center rounded-full border-2 border-card bg-muted">
                   <Text className="text-[20rpx] font-medium text-muted-foreground">
                     +{remainingAvatarCount}
                   </Text>

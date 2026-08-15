@@ -23,8 +23,10 @@ import PickerSheet from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
 import { useTeacherStore } from '@/stores/teacher';
-import { hexColors } from '@/theme';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { Gender, TeacherIdentity, TeacherUIModel } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = 'teacher_form_intro_v1';
 
@@ -57,8 +59,10 @@ const DEFAULT_IDENTITY_TO_ROLE: Record<TeacherIdentity, TeacherUIModel['role']> 
 };
 
 const TeacherFormPage: React.FC = () => {
+  useCardNavigationBar();
   const { id } = useRouter().params;
   const isEdit = !!id;
+  const { activeTheme } = useThemeStore();
   const { teachers, addTeacher, updateTeacher, fetchAll, loading } = useTeacherStore();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -191,7 +195,7 @@ const TeacherFormPage: React.FC = () => {
           perf: 0,
           salaryStatus: 'pending',
           modelIdx: 1,
-          color: '#5EC8A8',
+          color: 'success',
           initial: form.name[0] || '?',
           deductions: [],
           status: 'active',
@@ -208,14 +212,19 @@ const TeacherFormPage: React.FC = () => {
 
   if (isEdit && loading && !formInitializedRef.current) {
     return (
-      <View className="flex flex-col h-screen bg-background items-center justify-center">
+      <View
+        className={cn(
+          `theme-${activeTheme}`,
+          'flex flex-col h-screen bg-background items-center justify-center',
+        )}
+      >
         <Loading text="加载老师信息中..." />
       </View>
     );
   }
 
   return (
-    <View className="flex flex-col h-screen bg-background">
+    <View className={cn(`theme-${activeTheme}`, 'flex flex-col h-screen bg-background')}>
       <ScrollView scrollY enhanced scrollWithAnimation className="flex-1 px-[32rpx] pb-[200rpx]">
         {/* 头像展示 */}
         <View className="flex flex-col items-center py-[48rpx]">
@@ -363,7 +372,7 @@ const TeacherFormPage: React.FC = () => {
             <Switch
               checked={form.showInPrivateList}
               onChange={(e) => updateField('showInPrivateList', e.detail.value)}
-              color={hexColors.primary}
+              color={getThemeHexColors(activeTheme).primary}
             />
           </View>
         </View>
@@ -381,7 +390,7 @@ const TeacherFormPage: React.FC = () => {
           <Text
             className={cn(
               'text-[32rpx] font-semibold',
-              hasChanged && !saving ? 'text-white' : 'text-muted-foreground',
+              hasChanged && !saving ? 'text-primary-foreground' : 'text-muted-foreground',
             )}
           >
             {saving ? '保存中...' : '保存'}

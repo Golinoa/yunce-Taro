@@ -21,6 +21,7 @@ export const colors = {
   primaryForeground: '0 0% 100%', // #FFFFFF
   primaryGlow: '222 87% 69%', // #6B95F5
   primaryDark: '221 83% 53%', // #2563EB
+  primarySoft: '220 100% 93%', // #DCE8FF 淡主题色（primary 20%），用于导航栏/头部渐变背景
 
   // 次要色
   secondary: '224 90% 95%', // #D8E5F8
@@ -100,6 +101,7 @@ export const hexColors = {
   primary: '#3B6EF5',
   primaryLight: '#6B95F5',
   primaryDark: '#2563EB',
+  primarySoftBg: '#DCE8FF', // 淡主题色背景，用于导航栏/头部弥散
   accent: '#8B5CF6',
   accentLight: '#A78BFA',
   background: '#f8f9fa',
@@ -112,6 +114,7 @@ export const hexColors = {
   border: '#eef0f2',
   borderLight: '#eef0f2',
   success: '#10b981',
+  successLight: '#34d399',
   warning: '#f59e0b',
   error: '#ef4444',
   info: '#0EA5E9',
@@ -449,6 +452,7 @@ export const hexThemeColors: Record<ThemeKey, HexColorPalette> = {
     primary: '#f97768',
     primaryLight: '#fb9b8f',
     primaryDark: '#e85a4a',
+    primarySoftBg: '#FEE4E0', // 淡珊瑚色背景（primary 20%）
     accent: '#47c1b6',
     accentLight: '#7dd9d0',
     background: '#f5f5f5',
@@ -471,6 +475,7 @@ export const hexThemeColors: Record<ThemeKey, HexColorPalette> = {
     primary: '#FF8A2A',
     primaryLight: '#FCA45C',
     primaryDark: '#e66d1a',
+    primarySoftBg: '#FFE4CC', // 淡橙色背景（primary 20%）
     accent: '#06B6D4',
     accentLight: '#38D5F0',
     background: '#faf8f5',

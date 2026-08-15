@@ -11,9 +11,9 @@ export interface ScheduleActionButtonProps {
 }
 
 const VARIANT_CLASS_MAP: Record<ScheduleActionButtonProps['variant'], string> = {
-  attend: 'bg-schedule-attend text-white',
-  adjust: 'bg-schedule-adjust text-white',
-  edit: 'bg-schedule-edit text-white',
+  attend: 'bg-schedule-attend text-primary-foreground',
+  adjust: 'bg-schedule-adjust text-primary-foreground',
+  edit: 'bg-schedule-edit text-primary-foreground',
   warning: 'border border-warning/25 bg-warning/10 text-warning',
   danger: 'border border-destructive/20 bg-destructive/10 text-destructive',
 };

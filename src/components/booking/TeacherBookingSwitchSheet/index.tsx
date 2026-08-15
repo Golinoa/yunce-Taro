@@ -15,7 +15,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import ClassAvatar from '@/components/class/ClassAvatar';
 import Icon from '@/components/Icon';
-import { hexColors } from '@/theme';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { TeacherUIModel } from '@/types/teacher';
 import {
   createTeacherBookingConfig,
@@ -48,6 +49,7 @@ const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
   teachers,
   onChange,
 }) => {
+  const { activeTheme } = useThemeStore();
   const [configs, setConfigs] = useState<Record<string, TeacherBookingConfig>>(() =>
     readTeacherBookingConfigs(),
   );
@@ -153,7 +155,7 @@ const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
                   </View>
                   <Switch
                     checked={open}
-                    color={hexColors.primary}
+                    color={getThemeHexColors(activeTheme).primary}
                     onChange={(e) => handleToggle(teacher, e.detail.value)}
                   />
                 </View>

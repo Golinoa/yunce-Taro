@@ -45,25 +45,27 @@ const FinanceKpi: React.FC<{ data: FinanceKpiItem }> = ({ data }) => {
       {/* 大营收卡片（深色渐变，对齐设计稿 v3） */}
       <View className="bg-finance-dark rounded-[48rpx] p-[48rpx] relative overflow-hidden mb-[32rpx]">
         {/* 装饰圆 */}
-        <View className="absolute -top-[80rpx] -right-[80rpx] w-[256rpx] h-[256rpx] rounded-full bg-white/10" />
-        <View className="absolute top-[160rpx] -right-[32rpx] w-[128rpx] h-[128rpx] rounded-full bg-white/10" />
+        <View className="absolute -top-[80rpx] -right-[80rpx] w-[256rpx] h-[256rpx] rounded-full bg-primary-foreground/10" />
+        <View className="absolute top-[160rpx] -right-[32rpx] w-[128rpx] h-[128rpx] rounded-full bg-primary-foreground/10" />
 
         <View className="relative z-10">
           <View className="flex items-center gap-[16rpx] mb-[24rpx]">
-            <Text className="text-[24rpx] font-medium text-white/60 uppercase tracking-wider">
+            <Text className="text-[24rpx] font-medium text-primary-foreground/60 uppercase tracking-wider">
               本月营收
             </Text>
-            <View className="px-[16rpx] py-[4rpx] rounded-full bg-white/20">
-              <Text className="text-[24rpx] text-white font-medium">{data.revenueBadge}</Text>
+            <View className="px-[16rpx] py-[4rpx] rounded-full bg-primary-foreground/20">
+              <Text className="text-[24rpx] text-primary-foreground font-medium">
+                {data.revenueBadge}
+              </Text>
             </View>
           </View>
-          <Text className="text-[80rpx] font-bold number-display text-white block leading-tight">
+          <Text className="text-[80rpx] font-bold number-display text-primary-foreground block leading-tight">
             {data.revenue}
           </Text>
           <View className="flex items-center gap-[32rpx] mt-[16rpx]">
-            <Text className="text-[28rpx] text-white/70">{data.bills}</Text>
-            <Text className="text-[28rpx] text-white/70">·</Text>
-            <Text className="text-[28rpx] text-white/70">{data.avg}</Text>
+            <Text className="text-[28rpx] text-primary-foreground/70">{data.bills}</Text>
+            <Text className="text-[28rpx] text-primary-foreground/70">·</Text>
+            <Text className="text-[28rpx] text-primary-foreground/70">{data.avg}</Text>
           </View>
         </View>
       </View>
@@ -71,7 +73,7 @@ const FinanceKpi: React.FC<{ data: FinanceKpiItem }> = ({ data }) => {
       {/* 4 小卡 */}
       <View className="grid grid-cols-4 gap-[16rpx] mb-[24rpx]">
         {/* 课消金额 */}
-        <View className="bg-white rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
+        <View className="bg-card rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
           <Text className="text-[22rpx] text-muted-foreground block mb-[8rpx]">课消金额</Text>
           <Text className="text-[32rpx] font-bold text-primary number-display block">
             {data.lessonAmount}
@@ -79,7 +81,7 @@ const FinanceKpi: React.FC<{ data: FinanceKpiItem }> = ({ data }) => {
           <Text className="text-[22rpx] text-success block mt-[8rpx]">{data.lessonTrend}</Text>
         </View>
         {/* 新签金额 */}
-        <View className="bg-white rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
+        <View className="bg-card rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
           <Text className="text-[22rpx] text-muted-foreground block mb-[8rpx]">新签金额</Text>
           <Text className="text-[32rpx] font-bold text-primary number-display block">
             {data.newAmount}
@@ -87,7 +89,7 @@ const FinanceKpi: React.FC<{ data: FinanceKpiItem }> = ({ data }) => {
           <Text className="text-[22rpx] text-muted-foreground block mt-[8rpx]">{data.newNote}</Text>
         </View>
         {/* 待收金额 */}
-        <View className="bg-white rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
+        <View className="bg-card rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
           <Text className="text-[22rpx] text-muted-foreground block mb-[8rpx]">待收金额</Text>
           <Text className="text-[32rpx] font-bold text-primary number-display block">
             {data.pending}
@@ -95,7 +97,7 @@ const FinanceKpi: React.FC<{ data: FinanceKpiItem }> = ({ data }) => {
           <Text className="text-[22rpx] text-warning block mt-[8rpx]">{data.pendingNote}</Text>
         </View>
         {/* 总支出 */}
-        <View className="bg-white rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
+        <View className="bg-card rounded-[24rpx] p-[20rpx] border-[2rpx] border-solid border-border-light text-center shadow-card">
           <Text className="text-[22rpx] text-muted-foreground block mb-[8rpx]">总支出</Text>
           <Text className="text-[32rpx] font-bold text-destructive number-display block">
             {data.totalExpense}
@@ -105,7 +107,7 @@ const FinanceKpi: React.FC<{ data: FinanceKpiItem }> = ({ data }) => {
       </View>
 
       {/* 收支利润概览卡片（总收入 - 总支出 = 净利润） */}
-      <View className="bg-white rounded-[24rpx] p-[24rpx] border-[2rpx] border-solid border-border-light flex items-center justify-between shadow-card">
+      <View className="bg-card rounded-[24rpx] p-[24rpx] border-[2rpx] border-solid border-border-light flex items-center justify-between shadow-card">
         {/* 总收入 */}
         <View className="flex items-center gap-[16rpx]">
           <View className="w-[56rpx] h-[56rpx] rounded-[16rpx] bg-primary/10 flex items-center justify-center flex-shrink-0">

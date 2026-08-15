@@ -67,6 +67,7 @@ export {
   roomService,
 } from './campus';
 export { statisticsService } from './statistics';
+export { dataCenterService } from './data-center';
 export { leadService } from './lead';
 export type { TrialCourseSlot } from './lead';
 export { classBookingService } from './class-booking';

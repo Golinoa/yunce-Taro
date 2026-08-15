@@ -1,5 +1,6 @@
 import { View, Text, ScrollView, Image, Swiper, SwiperItem } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import KingKongSection from '@/components/home/KingKongSection';
 import StatsOverview from '@/components/home/StatsOverview';
@@ -26,6 +27,7 @@ import type {
   OperationBannerItem,
 } from '@/services/home';
 import { useCampusStore } from '@/stores/campus';
+import { useThemeStore } from '@/stores/theme';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import { isStaffRole, useAuth } from '@/utils/auth';
@@ -104,6 +106,7 @@ const Home: React.FC = () => {
   const { profile, currentRole, currentIdentity } = useAuth();
   const { orgName, campuses, currentCampusId, setMainCampus, setCurrentCampusId, fetchCampuses } =
     useCampusStore();
+  const { activeTheme } = useThemeStore();
   const [roleSheetVisible, setRoleSheetVisible] = useState(false);
   const mainCampus = campuses.find((c) => c.isMain) || campuses[0];
   const navSafeHeight = useNavSafeHeight();
@@ -478,7 +481,7 @@ const Home: React.FC = () => {
 
   return (
     <>
-      <View className="h-screen overflow-x-hidden bg-[var(--muted)]">
+      <View className={cn(`theme-${activeTheme}`, 'h-screen overflow-x-hidden bg-[var(--muted)]')}>
         <ScrollView scrollY showScrollbar={false} className="h-full overflow-x-hidden no-scrollbar">
           <View className="min-h-full">
             {/* ========== 渐变背景层 ========== */}

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>渐变效果预览 - 采集蓝主题</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #2563EB;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .preview {
+      height: 200px;
+      position: relative;
+    }
+    .preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60%;
+      background: linear-gradient(180deg, transparent, #f5f5f5);
+    }
+    .info {
+      padding: 16px;
+      background: white;
+    }
+    .info h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #1a1a1a;
+    }
+    .info p {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.6;
+      word-break: break-all;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e0e7ff;
+      color: #4338ca;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    /* ========== 渐变效果 1 - 线性渐变 左上到右下 ========== */
+    .g1 {
+      background: linear-gradient(135deg, #6B95F5 0%, #2563EB 50%, #1D4ED8 100%);
+    }
+
+    /* ========== 渐变效果 2 - 线性渐变 顶部到底部 ========== */
+    .g2 {
+      background: linear-gradient(180deg, #6B95F5 0%, #2563EB 60%, #1D4ED8 100%);
+    }
+
+    /* ========== 渐变效果 3 - 径向渐变 中心弥散 ========== */
+    .g3 {
+      background: radial-gradient(ellipse 80% 60% at 50% 30%, #6B95F5 0%, #2563EB 50%, #1D4ED8 100%);
+    }
+
+    /* ========== 渐变效果 4 - 淡色弥散（当前方案 - 加深版） ========== */
+    .g4 {
+      background-color: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, #DCE8FF 0%, #DCE8FF 20%, rgba(37,99,235,0.15) 50%, transparent 75%),
+        radial-gradient(ellipse 160% 80% at 50% -30%, rgba(37,99,235,0.45) 0%, rgba(37,99,235,0.25) 30%, rgba(37,99,235,0.1) 55%, transparent 80%);
+    }
+
+    /* ========== 渐变效果 5 - 淡色弥散（更柔和版） ========== */
+    .g5 {
+      background-color: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, #E8F0FF 0%, #E8F0FF 15%, rgba(37,99,235,0.1) 45%, transparent 70%),
+        radial-gradient(ellipse 140% 70% at 50% -20%, rgba(37,99,235,0.35) 0%, rgba(37,99,235,0.18) 35%, transparent 70%);
+    }
+
+    /* ========== 渐变效果 6 - 顶部纯色 + 快速淡出 ========== */
+    .g6 {
+      background-color: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, #BFDBFE 0%, #BFDBFE 10%, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.1) 45%, transparent 65%);
+    }
+
+    /* ========== 渐变效果 7 - 双光晕弥散 ========== */
+    .g7 {
+      background-color: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 60% 50% at 20% -10%, rgba(59,130,246,0.4) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 0%, rgba(139,92,246,0.3) 0%, transparent 60%),
+        linear-gradient(180deg, rgba(59,130,246,0.15) 0%, transparent 50%);
+    }
+
+    /* ========== 渐变效果 8 - 斜向渐变 + 光晕 ========== */
+    .g8 {
+      background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 30%, #BFDBFE 60%, #93C5FD 100%);
+    }
+
+    /* ========== 渐变效果 9 - 顶部深色渐变条 ========== */
+    .g9 {
+      background: linear-gradient(180deg, #2563EB 0%, #3B82F6 25%, #60A5FA 50%, #93C5FD 70%, #DBEAFE 85%, #f5f5f5 100%);
+    }
+
+    /* ========== 渐变效果 10 - 玻璃拟态风 ========== */
+    .g10 {
+      background-color: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 60%, transparent 100%),
+        radial-gradient(circle at 30% 20%, rgba(96,165,250,0.25) 0%, transparent 40%),
+        radial-gradient(circle at 70% 10%, rgba(147,197,253,0.2) 0%, transparent 35%);
+    }
+
+    /* ========== 渐变效果 11 - 苹果风 大圆角顶部 ========== */
+    .g11 {
+      background: linear-gradient(180deg, #F0F7FF 0%, #E0EEFF 20%, #C9DEFF 45%, #A5C8FF 70%, #7AA8FF 100%);
+    }
+
+    /* ========== 渐变效果 12 - 极简淡蓝 ========== */
+    .g12 {
+      background-color: #f5f5f5;
+      background-image: linear-gradient(180deg, #E0E7FF 0%, #EEF2FF 30%, #f5f5f5 60%);
+    }
+
+    /* ========== 渐变效果 13 - 强对比 深色顶部 ========== */
+    .g13 {
+      background: linear-gradient(180deg, #1E40AF 0%, #2563EB 15%, #3B82F6 30%, #60A5FA 50%, #93C5FD 70%, #DBEAFE 85%, #f5f5f5 100%);
+    }
+
+    /* ========== 渐变效果 14 - 柔和径向 + 线性 ========== */
+    .g14 {
+      background-color: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 100% 60% at 50% 0%, rgba(59,130,246,0.5) 0%, rgba(59,130,246,0.2) 40%, transparent 70%),
+        linear-gradient(180deg, rgba(191,219,254,0.5) 0%, transparent 50%);
+    }
+
+    /* ========== 渐变效果 15 - 多层次渐变 ========== */
+    .g15 {
+      background-color: #f5f5f5;
+      background-image:
+        linear-gradient(180deg, #DBEAFE 0%, #DBEAFE 10%, rgba(219,234,254,0.8) 20%, rgba(191,219,254,0.5) 35%, rgba(147,197,253,0.3) 50%, rgba(96,165,250,0.15) 65%, transparent 80%);
+    }
+
+    /* ========== 渐变效果 16 - 侧边光晕 ========== */
+    .g16 {
+      background-color: #f5f5f5;
+      background-image:
+        radial-gradient(ellipse 40% 60% at 0% 0%, rgba(59,130,246,0.4) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 50% at 100% 0%, rgba(139,92,246,0.3) 0%, transparent 60%),
+        linear-gradient(180deg, rgba(59,130,246,0.1) 0%, transparent 50%);
+    }
+
+    /* 预览内容模拟 */
+    .preview-content {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      z-index: 2;
+    }
+    .venue {
+      font-size: 14px;
+      color: white;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .venue-dark {
+      color: #1E3A8A;
+      text-shadow: none;
+    }
+    .date-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .date {
+      font-size: 18px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .date-dark {
+      color: #1E3A8A;
+      text-shadow: none;
+    }
+    .seg {
+      display: flex;
+      background: rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 2px;
+      backdrop-filter: blur(10px);
+    }
+    .seg-dark {
+      background: rgba(30,58,138,0.1);
+    }
+    .seg span {
+      padding: 4px 12px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.8);
+      border-radius: 18px;
+    }
+    .seg-dark span {
+      color: rgba(30,58,138,0.6);
+    }
+    .seg span.active {
+      background: white;
+      color: #2563EB;
+      font-weight: 600;
+    }
+    .seg-dark span.active {
+      background: #1E3A8A;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 渐变效果预览 - 采集蓝主题</h1>
+  <div class="grid">
+
+    <!-- 1 -->
+    <div class="card">
+      <div class="preview g1">
+        <div class="preview-content">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>① 线性渐变 135°</h3>
+        <span class="tag">深色</span><span class="tag">经典</span>
+        <p>左上到右下，浅蓝→中蓝→深蓝。标准渐变，层次分明。</p>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="card">
+      <div class="preview g2">
+        <div class="preview-content">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>② 线性渐变 180°</h3>
+        <span class="tag">深色</span><span class="tag">垂直</span>
+        <p>从上到下，浅蓝→中蓝→深蓝。垂直过渡，更有纵深感。</p>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="card">
+      <div class="preview g3">
+        <div class="preview-content">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>③ 径向渐变 中心弥散</h3>
+        <span class="tag">深色</span><span class="tag">弥散</span>
+        <p>从中心向外椭圆扩散，中间亮边缘深。聚光效果。</p>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="card">
+      <div class="preview g4">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>④ 淡色弥散（当前方案）</h3>
+        <span class="tag">淡色</span><span class="tag">弥散</span><span class="tag">当前</span>
+        <p>顶部纯色 + 径向光晕，向下融入背景。浓度 45%→25%→10%。</p>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="card">
+      <div class="preview g5">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑤ 淡色弥散（柔和版）</h3>
+        <span class="tag">淡色</span><span class="tag">柔和</span>
+        <p>比④更淡，浓度 35%→18%。更含蓄，适合极简风格。</p>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="card">
+      <div class="preview g6">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑥ 顶部纯色 + 快速淡出</h3>
+        <span class="tag">淡色</span><span class="tag">简洁</span>
+        <p>顶部一条纯色带，快速淡出到背景。干净利落。</p>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="card">
+      <div class="preview g7">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑦ 双光晕弥散（蓝+紫）</h3>
+        <span class="tag">淡色</span><span class="tag">双色</span>
+        <p>左右两个光晕（蓝+紫），更有层次感和设计感。</p>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <div class="card">
+      <div class="preview g8">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑧ 斜向淡蓝渐变</h3>
+        <span class="tag">淡色</span><span class="tag">斜向</span>
+        <p>左上到右下全幅淡蓝渐变，从极淡到中淡。清新柔和。</p>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <div class="card">
+      <div class="preview g9">
+        <div class="preview-content">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑨ 深色顶部 + 长过渡</h3>
+        <span class="tag">深色</span><span class="tag">长过渡</span>
+        <p>顶部深蓝，经过 5 层渐变过渡到背景色。过渡自然。</p>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="card">
+      <div class="preview g10">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑩ 玻璃拟态风</h3>
+        <span class="tag">淡色</span><span class="tag">玻璃感</span>
+        <p>极淡底色 + 两团柔光，若隐若现。高级感强。</p>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <div class="card">
+      <div class="preview g11">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑪ 苹果风 全幅淡蓝</h3>
+        <span class="tag">淡色</span><span class="tag">苹果风</span>
+        <p>从上到下全幅淡蓝渐变，5 层过渡。柔和高级。</p>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="card">
+      <div class="preview g12">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑫ 极简淡蓝</h3>
+        <span class="tag">淡色</span><span class="tag">极简</span>
+        <p>最简单的线性淡出，3 层色阶。干净到极致。</p>
+      </div>
+    </div>
+
+    <!-- 13 -->
+    <div class="card">
+      <div class="preview g13">
+        <div class="preview-content">
+          <div class="venue">云策健身</div>
+          <div class="date-row">
+            <div class="date">2025年8月</div>
+            <div class="seg">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑬ 强对比 深色顶部</h3>
+        <span class="tag">深色</span><span class="tag">强对比</span>
+        <p>顶部最深蓝，7 层渐变到背景。冲击力强。</p>
+      </div>
+    </div>
+
+    <!-- 14 -->
+    <div class="card">
+      <div class="preview g14">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑭ 柔和径向 + 线性</h3>
+        <span class="tag">淡色</span><span class="tag">双层</span>
+        <p>径向光晕 + 线性淡底叠加。柔和但有存在感。</p>
+      </div>
+    </div>
+
+    <!-- 15 -->
+    <div class="card">
+      <div class="preview g15">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑮ 多层次线性渐变</h3>
+        <span class="tag">淡色</span><span class="tag">多层次</span>
+        <p>6 层色阶线性渐变，层次丰富，过渡细腻。</p>
+      </div>
+    </div>
+
+    <!-- 16 -->
+    <div class="card">
+      <div class="preview g16">
+        <div class="preview-content">
+          <div class="venue venue-dark">云策健身</div>
+          <div class="date-row">
+            <div class="date date-dark">2025年8月</div>
+            <div class="seg seg-dark">
+              <span>日</span><span class="active">月</span><span>年</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info">
+        <h3>⑯ 侧边双光晕</h3>
+        <span class="tag">淡色</span><span class="tag">对称</span>
+        <p>左右两侧各一团光晕（蓝+紫），中间淡。对称美感。</p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

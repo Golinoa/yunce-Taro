@@ -60,20 +60,22 @@ const FilterBar: React.FC<FilterBarProps> = ({
           return (
             <View
               key={opt.key}
-              className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isActive ? 'bg-primary text-white shadow-soft' : 'bg-white border border-solid border-border-light text-foreground-secondary'}`}
+              className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isActive ? 'bg-primary text-primary-foreground shadow-soft' : 'bg-card border border-solid border-border-light text-foreground-secondary'}`}
               onClick={() => onQuickFilter(opt.key)}
             >
-              <Text className={isActive ? 'text-white' : 'text-foreground-secondary'}>
+              <Text className={isActive ? 'text-primary-foreground' : 'text-foreground-secondary'}>
                 {opt.label}
               </Text>
             </View>
           );
         })}
         <View
-          className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isCustomActive ? 'bg-primary text-white shadow-soft' : 'bg-white border border-solid border-border-light text-foreground-secondary'}`}
+          className={`px-3 py-1_d5 rounded-full text-base font-medium transition ${isCustomActive ? 'bg-primary text-primary-foreground shadow-soft' : 'bg-card border border-solid border-border-light text-foreground-secondary'}`}
           onClick={onToggleCustomPicker}
         >
-          <Text className={isCustomActive ? 'text-white' : 'text-foreground-secondary'}>
+          <Text
+            className={isCustomActive ? 'text-primary-foreground' : 'text-foreground-secondary'}
+          >
             自定义
           </Text>
         </View>
@@ -81,7 +83,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
       {showCustomPicker && (
         <View className="mt-1_d5 flex flex-col gap-1_d5">
-          <View className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
+          <View className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
             <Text className="text-base text-muted-foreground whitespace-nowrap">开始</Text>
             <Picker
               mode="date"
@@ -96,7 +98,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </Text>
             </Picker>
           </View>
-          <View className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
+          <View className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
             <Text className="text-base text-muted-foreground whitespace-nowrap">结束</Text>
             <Picker
               mode="date"
@@ -113,10 +115,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </View>
           {startDate && endDate && onCustomQuery && (
             <View
-              className="w-full rounded-2xl py-2 bg-primary text-white text-base font-semibold shadow-soft flex items-center justify-center"
+              className="w-full rounded-2xl py-2 bg-primary text-primary-foreground text-base font-semibold shadow-soft flex items-center justify-center"
               onClick={onCustomQuery}
             >
-              <Text className="text-base text-white font-semibold">查询</Text>
+              <Text className="text-base text-primary-foreground font-semibold">查询</Text>
             </View>
           )}
         </View>

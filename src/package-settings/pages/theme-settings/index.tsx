@@ -11,8 +11,10 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { useThemeStore } from '@/stores/theme';
 import { THEME_KEYS, THEME_META, hexThemeColors, type ThemeKey } from '@/theme';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const ThemeSettings: React.FC = () => {
+  useCardNavigationBar();
   const { activeTheme, setTheme } = useThemeStore();
 
   const handleSelect = useCallback(

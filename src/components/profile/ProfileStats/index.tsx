@@ -41,7 +41,7 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({
   return (
     <View
       className={cn(
-        'mx-[32rpx] px-[24rpx] py-[28rpx] rounded-[24rpx] bg-white shadow-profile-stats',
+        'mx-[32rpx] px-[24rpx] py-[28rpx] rounded-[24rpx] bg-card shadow-profile-stats',
         onClick && 'active:bg-muted',
         className,
       )}

@@ -56,7 +56,7 @@ const ProfileGrid: React.FC<ProfileGridProps> = ({
   return (
     <View
       className={cn(
-        'mx-[32rpx] px-[24rpx] pt-[28rpx] pb-[20rpx] rounded-[24rpx] bg-white shadow-soft',
+        'mx-[32rpx] px-[24rpx] pt-[28rpx] pb-[20rpx] rounded-[24rpx] bg-card shadow-soft',
         className,
       )}
     >

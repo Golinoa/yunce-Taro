@@ -121,7 +121,9 @@ const DateRangeSheet: React.FC<DateRangeSheetProps> = ({
             }`}
             onClick={handleConfirm}
           >
-            <Text className={`text-[28rpx] ${canConfirm ? 'text-white' : 'text-muted-foreground'}`}>
+            <Text
+              className={`text-[28rpx] ${canConfirm ? 'text-primary-foreground' : 'text-muted-foreground'}`}
+            >
               确认
             </Text>
           </View>

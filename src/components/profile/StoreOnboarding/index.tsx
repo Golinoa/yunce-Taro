@@ -51,7 +51,7 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
   return (
     <View
       className={cn(
-        'mx-[32rpx] px-[24rpx] pt-[28rpx] pb-[24rpx] rounded-[24rpx] bg-white shadow-soft',
+        'mx-[32rpx] px-[24rpx] pt-[28rpx] pb-[24rpx] rounded-[24rpx] bg-card shadow-soft',
         className,
       )}
     >
@@ -90,7 +90,7 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
                 {step.completed ? (
                   /* 完成标记：悬浮在右上角，稍微接触一部分 */
                   <View className="absolute -top-[12rpx] -right-[12rpx] w-[36rpx] h-[36rpx] rounded-full bg-success center">
-                    <Icon name="mdi-check" size={20} color="white" />
+                    <Icon name="mdi-check" size={20} color="hsl(var(--primary-foreground))" />
                   </View>
                 ) : (
                   /* 待配置序号：悬浮在右上角，带精致呼吸光圈 */
@@ -102,11 +102,11 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
                     {/* 角标本体 */}
                     <View
                       className={cn(
-                        'absolute inset-0 rounded-full bg-profile-orange-solid border-[3rpx] border-white flex items-center justify-center',
+                        'absolute inset-0 rounded-full bg-profile-orange-solid border-[3rpx] border-card flex items-center justify-center',
                         isPulsing && 'animate-badge-scale',
                       )}
                     >
-                      <Text className="text-[24rpx] font-bold text-white leading-none">
+                      <Text className="text-[24rpx] font-bold text-primary-foreground leading-none">
                         {index + 1}
                       </Text>
                     </View>

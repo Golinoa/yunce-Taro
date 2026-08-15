@@ -6,6 +6,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import { useRouter } from '@tarojs/taro';
 import React from 'react';
 import PageContainer from '@/components/PageContainer';
+import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 
 // ============================================
 // 用户协议内容
@@ -299,6 +300,7 @@ const PrivacyPolicy: React.FC = () => (
 // 协议页面主组件
 // ============================================
 const Agreement: React.FC = () => {
+  usePrimaryNavigationBar();
   const router = useRouter();
   const type = router.params.type || 'user';
 
@@ -309,9 +311,11 @@ const Agreement: React.FC = () => {
       <View className="min-h-screen bg-gradient-subtle flex flex-col">
         {/* 标题区 */}
         <View className="bg-gradient-primary px-6 pt-6 pb-8 rounded-b-60rpx shadow-elegant relative overflow-hidden">
-          <View className="absolute top-4 right-4 w-24 h-24 rounded-full bg-white/10 blur-xl" />
-          <Text className="text-white text-[40rpx] font-bold block relative z-1">{title}</Text>
-          <Text className="text-white/70 text-md block mt-1 relative z-1">
+          <View className="absolute top-4 right-4 w-24 h-24 rounded-full bg-primary-foreground/10 blur-xl" />
+          <Text className="text-primary-foreground text-[40rpx] font-bold block relative z-1">
+            {title}
+          </Text>
+          <Text className="text-primary-foreground/70 text-md block mt-1 relative z-1">
             最近更新日期：2025年1月1日
           </Text>
         </View>

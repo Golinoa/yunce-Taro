@@ -26,7 +26,7 @@ const ProfileSupport: React.FC<ProfileSupportProps> = ({
     <View className={cn('mx-[32rpx] mb-[24rpx] flex gap-[20rpx]', className)}>
       {onCustomerService && (
         <View
-          className="flex-1 flex items-center justify-center gap-[12rpx] py-[26rpx] rounded-[32rpx] bg-white shadow-soft active:bg-muted"
+          className="flex-1 flex items-center justify-center gap-[12rpx] py-[26rpx] rounded-[32rpx] bg-card shadow-soft active:bg-muted"
           onClick={onCustomerService}
         >
           <Icon name="mdi-headset" size="sm" color="primary" />
@@ -35,7 +35,7 @@ const ProfileSupport: React.FC<ProfileSupportProps> = ({
       )}
       {onServiceCenter && (
         <View
-          className="flex-1 flex items-center justify-center gap-[12rpx] py-[26rpx] rounded-[32rpx] bg-white shadow-soft active:bg-muted"
+          className="flex-1 flex items-center justify-center gap-[12rpx] py-[26rpx] rounded-[32rpx] bg-card shadow-soft active:bg-muted"
           onClick={onServiceCenter}
         >
           <Icon name="mdi-help-circle" size="sm" color="accent" />

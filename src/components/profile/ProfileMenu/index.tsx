@@ -56,7 +56,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({ title, items, className }) =>
   return (
     <View
       className={cn(
-        'mx-[32rpx] mb-[24rpx] px-[24rpx] pt-[28rpx] pb-[12rpx] rounded-[32rpx] bg-white shadow-soft',
+        'mx-[32rpx] mb-[24rpx] px-[24rpx] pt-[28rpx] pb-[12rpx] rounded-[32rpx] bg-card shadow-soft',
         className,
       )}
     >

@@ -53,12 +53,12 @@ const RankTabs: React.FC<{
               key={tab.type}
               className={`flex-1 py-[16rpx] rounded-[24rpx] text-center text-[24rpx] font-medium transition-all ${
                 isActive
-                  ? 'bg-primary text-white shadow-elegant'
-                  : 'bg-white border-[2rpx] border-solid border-border-light text-foreground-secondary'
+                  ? 'bg-primary text-primary-foreground shadow-elegant'
+                  : 'bg-card border-[2rpx] border-solid border-border-light text-foreground-secondary'
               }`}
               onClick={() => handleTabChange(tab.type)}
             >
-              <Text className={isActive ? 'text-white' : 'text-foreground-secondary'}>
+              <Text className={isActive ? 'text-primary-foreground' : 'text-foreground-secondary'}>
                 {tab.label}
               </Text>
             </View>
@@ -67,7 +67,7 @@ const RankTabs: React.FC<{
       </View>
 
       {/* 排行内容 */}
-      <View className="bg-white rounded-[24rpx] border-[2rpx] border-solid border-border-light overflow-hidden shadow-card">
+      <View className="bg-card rounded-[24rpx] border-[2rpx] border-solid border-border-light overflow-hidden shadow-card">
         {activeTab && activeTab.data.length > 0 ? (
           <View className="p-[24rpx]">
             {activeTab.data.map((item, index) => {
@@ -85,7 +85,9 @@ const RankTabs: React.FC<{
                     <View
                       className={`w-[48rpx] h-[48rpx] rounded-full flex items-center justify-center flex-shrink-0 ${RANK_BG_CLASSES[index]}`}
                     >
-                      <Text className="text-[24rpx] text-white font-bold">{index + 1}</Text>
+                      <Text className="text-[24rpx] text-primary-foreground font-bold">
+                        {index + 1}
+                      </Text>
                     </View>
                   ) : (
                     <Text className="w-[48rpx] text-[24rpx] text-muted-foreground text-center flex-shrink-0">

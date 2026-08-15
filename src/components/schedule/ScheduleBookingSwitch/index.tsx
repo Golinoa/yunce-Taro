@@ -54,7 +54,9 @@ const ScheduleBookingSwitch: React.FC<ScheduleBookingSwitchProps> = ({
     <View
       className={cn(
         'flex items-center rounded-full p-[4rpx]',
-        isDark ? 'border border-white/40 bg-white/15' : 'border border-border bg-white',
+        isDark
+          ? 'border border-primary-foreground/40 bg-primary-foreground/15'
+          : 'border border-border bg-card',
       )}
     >
       {TAB_OPTIONS.map((tab) => {
@@ -64,7 +66,7 @@ const ScheduleBookingSwitch: React.FC<ScheduleBookingSwitchProps> = ({
             key={tab.key}
             className={cn(
               'px-[20rpx] py-[8rpx] rounded-full active:opacity-80',
-              isActive ? (isDark ? 'bg-white' : 'bg-primary') : 'bg-transparent',
+              isActive ? (isDark ? 'bg-primary-foreground' : 'bg-primary') : 'bg-transparent',
             )}
             onClick={() => handleTabChange(tab.key)}
           >
@@ -74,9 +76,9 @@ const ScheduleBookingSwitch: React.FC<ScheduleBookingSwitchProps> = ({
                 isActive
                   ? isDark
                     ? 'text-schedule-header'
-                    : 'text-white'
+                    : 'text-primary-foreground'
                   : isDark
-                    ? 'text-white'
+                    ? 'text-primary-foreground'
                     : 'text-foreground-secondary',
               )}
             >

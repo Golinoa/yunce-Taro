@@ -512,7 +512,7 @@ const Profile: React.FC = () => {
         />
 
         {/* ====== 试用版/续费卡片 ====== */}
-        <View className="mx-[32rpx] mt-[24rpx] px-[28rpx] py-[26rpx] rounded-[24rpx] bg-white shadow-soft flex items-center justify-between">
+        <View className="mx-[32rpx] mt-[24rpx] px-[28rpx] py-[26rpx] rounded-[24rpx] bg-card shadow-soft flex items-center justify-between">
           {isTeacher ? (
             <View className="flex items-baseline gap-[8rpx]">
               <Text className="text-[32rpx] font-bold text-foreground">试用版</Text>
@@ -528,7 +528,7 @@ const Profile: React.FC = () => {
             className="px-[32rpx] py-[12rpx] rounded-full bg-profile-orange-solid active:opacity-85"
             onClick={handleRenew}
           >
-            <Text className="text-[26rpx] font-medium text-white">续费</Text>
+            <Text className="text-[26rpx] font-medium text-primary-foreground">续费</Text>
           </View>
         </View>
 
@@ -548,7 +548,7 @@ const Profile: React.FC = () => {
           <View className="mx-[32rpx] mt-[24rpx] bg-destructive-10 border-2 border-destructive-20 rounded-[24rpx] p-5 flex items-center gap-3">
             <Text className="flex-1 text-destructive text-lg">{errorMsg}</Text>
             <View className="px-4 py-2 rounded-full bg-destructive" onClick={loadStudents}>
-              <Text className="text-white text-md font-medium">重试</Text>
+              <Text className="text-destructive-foreground text-md font-medium">重试</Text>
             </View>
           </View>
         )}
@@ -679,7 +679,7 @@ const Profile: React.FC = () => {
                 )}
                 onClick={binding ? undefined : handleBind}
               >
-                <Text className="text-xl font-medium text-white">
+                <Text className="text-xl font-medium text-primary-foreground">
                   {binding ? '绑定中…' : '确认绑定'}
                 </Text>
               </View>

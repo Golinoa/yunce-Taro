@@ -18,10 +18,9 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import LessonFeeDetailSheet from '@/components/teacher/LessonFeeDetailSheet';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
 import type { CategoryLessonFeeItem, DeductionType } from '@/types/teacher';
-
-/** 页面背景色 */
-const PAGE_BACKGROUND = '#EFEFEF';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 /** 解析金额字符串为数字 */
 const parseAmount = (value: string) => {
@@ -137,7 +136,7 @@ const DeductionItemCard: React.FC<{
 }> = ({ item, onChange, onDelete }) => {
   const isDeduct = item.type === 'deduct';
   return (
-    <View className="border border-border rounded-[20rpx] p-[24rpx] mb-[16rpx] bg-white">
+    <View className="border border-border rounded-[20rpx] p-[24rpx] mb-[16rpx] bg-card">
       {/* 第一行：名称输入 + 类型切换 */}
       <View className="flex items-center justify-between gap-[16rpx] mb-[20rpx]">
         <FormInput
@@ -196,6 +195,8 @@ const DeductionItemCard: React.FC<{
 };
 
 const SalaryAdjustPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const { id } = useRouter().params;
   const { teachers, updateTeacher } = useTeacherStore();
 
@@ -359,7 +360,7 @@ const SalaryAdjustPage: React.FC = () => {
 
   if (!teacher) {
     return (
-      <View className="min-h-screen bg-background pb-safe-bar">
+      <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-safe-bar')}>
         <View className="flex items-center justify-center py-[160rpx]">
           <Text className="text-[28rpx] text-muted-foreground">教师不存在</Text>
         </View>
@@ -370,9 +371,9 @@ const SalaryAdjustPage: React.FC = () => {
   const categoryLessonFees = teacher.categoryLessonFees ?? [];
 
   return (
-    <View className="min-h-screen pb-[140rpx]" style={{ backgroundColor: PAGE_BACKGROUND }}>
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-[140rpx]')}>
       {/* 系统计算工资 */}
-      <View className="mx-[32rpx] mt-[24rpx] bg-white rounded-[28rpx] p-[32rpx] shadow-card">
+      <View className="mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] p-[32rpx] shadow-card">
         <CardTitle>系统计算工资</CardTitle>
         <EditableRow
           label="底薪"
@@ -408,7 +409,7 @@ const SalaryAdjustPage: React.FC = () => {
       </View>
 
       {/* 罚款扣除 */}
-      <View className="mx-[32rpx] mt-[24rpx] bg-white rounded-[28rpx] p-[32rpx] shadow-card">
+      <View className="mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] p-[32rpx] shadow-card">
         <CardTitle>罚款扣除</CardTitle>
         <EditableRow
           label="迟到罚款"
@@ -425,7 +426,7 @@ const SalaryAdjustPage: React.FC = () => {
       </View>
 
       {/* 奖金 */}
-      <View className="mx-[32rpx] mt-[24rpx] bg-white rounded-[28rpx] p-[32rpx] shadow-card">
+      <View className="mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] p-[32rpx] shadow-card">
         <CardTitle>奖金</CardTitle>
         <EditableRow
           label="奖金金额"
@@ -436,7 +437,7 @@ const SalaryAdjustPage: React.FC = () => {
       </View>
 
       {/* 自定义调整项 */}
-      <View className="mx-[32rpx] mt-[24rpx] bg-white rounded-[28rpx] p-[32rpx] shadow-card">
+      <View className="mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] p-[32rpx] shadow-card">
         <CardTitle
           action={
             <Text
@@ -466,7 +467,7 @@ const SalaryAdjustPage: React.FC = () => {
       </View>
 
       {/* 汇总：带次级明细 */}
-      <View className="mx-[32rpx] mt-[24rpx] mb-[24rpx] bg-white rounded-[28rpx] p-[32rpx] shadow-card">
+      <View className="mx-[32rpx] mt-[24rpx] mb-[24rpx] bg-card rounded-[28rpx] p-[32rpx] shadow-card">
         <SummaryRow label="系统薪资合计" value={systemTotal.toFixed(2)} />
         {customBonus > 0 && (
           <SummaryRow label="+ 自定义奖励" value={`+${customBonus.toFixed(2)}`} positive />
@@ -479,9 +480,9 @@ const SalaryAdjustPage: React.FC = () => {
       </View>
 
       {/* 底部保存按钮 */}
-      <View className="fixed bottom-0 left-0 right-0 px-[32rpx] py-[24rpx] pb-safe-bar bg-white border-t border-border z-20">
+      <View className="fixed bottom-0 left-0 right-0 px-[32rpx] py-[24rpx] pb-safe-bar bg-card border-t border-border z-20">
         <View
-          className="w-full py-[28rpx] rounded-full bg-primary text-white text-[32rpx] font-bold text-center shadow-card press-scale"
+          className="w-full py-[28rpx] rounded-full bg-primary text-primary-foreground text-[32rpx] font-bold text-center shadow-card press-scale"
           onClick={handleSave}
         >
           保存调整

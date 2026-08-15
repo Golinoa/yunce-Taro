@@ -93,7 +93,7 @@ const LessonTab: React.FC<LessonTabProps> = ({
 
       {/* 家长端：还未绑定学生空状态引导 */}
       {!isTeacher && parentStudents.length === 0 && (
-        <View className="bg-white rounded-2xl p-6 shadow-soft flex flex-col items-center gap-4 mt-6">
+        <View className="bg-card rounded-2xl p-6 shadow-soft flex flex-col items-center gap-4 mt-6">
           <View className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <Icon name="mdi-link-plus" size="lg" color="primary" />
           </View>
@@ -105,7 +105,7 @@ const LessonTab: React.FC<LessonTabProps> = ({
             className="w-full btn-primary bg-gradient-primary shadow-elegant"
             onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
           >
-            <Text className="text-white text-xl font-medium">前往绑定</Text>
+            <Text className="text-primary-foreground text-xl font-medium">前往绑定</Text>
           </View>
         </View>
       )}
@@ -119,7 +119,7 @@ const LessonTab: React.FC<LessonTabProps> = ({
               records.map((r) => (
                 <View
                   key={r.id}
-                  className="bg-white rounded-2xl p-4 shadow-soft press-scale"
+                  className="bg-card rounded-2xl p-4 shadow-soft press-scale"
                   onClick={() =>
                     Taro.navigateTo({
                       url: `/package-course/pages/lesson-detail/index?id=${encodeURIComponent(r.id)}`,
@@ -129,7 +129,11 @@ const LessonTab: React.FC<LessonTabProps> = ({
                   <View className="flex items-center justify-between">
                     <View className="flex items-center gap-3">
                       <View className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                        <Icon name="mdi-book-open-variant" size="sm" color="white" />
+                        <Icon
+                          name="mdi-book-open-variant"
+                          size="sm"
+                          color="hsl(var(--primary-foreground))"
+                        />
                       </View>
                       <View className="flex flex-col gap-1">
                         <Text className="text-lg font-medium text-foreground">
@@ -163,11 +167,15 @@ const LessonTab: React.FC<LessonTabProps> = ({
           <View className="space-y-3">
             {packages.length > 0 ? (
               packages.map((pkg) => (
-                <View key={pkg.id} className="bg-white rounded-2xl p-4 shadow-soft">
+                <View key={pkg.id} className="bg-card rounded-2xl p-4 shadow-soft">
                   <View className="flex items-center justify-between mb-2">
                     <View className="flex items-center gap-3">
                       <View className="w-10 h-10 rounded-full bg-gradient-accent flex items-center justify-center">
-                        <Icon name="mdi-cash-multiple" size="sm" color="white" />
+                        <Icon
+                          name="mdi-cash-multiple"
+                          size="sm"
+                          color="hsl(var(--accent-foreground))"
+                        />
                       </View>
                       <View className="flex flex-col gap-1">
                         <Text className="text-lg font-medium text-foreground">{pkg.name}</Text>

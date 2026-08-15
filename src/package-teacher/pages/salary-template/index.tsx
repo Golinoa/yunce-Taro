@@ -10,12 +10,16 @@
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import ApplyTeacherSheet from '@/components/teacher/ApplyTeacherSheet';
 import ApplyTemplateConfirmDialog from '@/components/teacher/ApplyTemplateConfirmDialog';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { SalaryTemplate } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type ApplyState =
   | { phase: 'none' }
@@ -23,6 +27,8 @@ type ApplyState =
   | { phase: 'confirm'; template: SalaryTemplate; ids: string[] };
 
 const SalaryTemplateListPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const {
     salaryTemplates,
     fetchSalaryTemplates,
@@ -94,7 +100,7 @@ const SalaryTemplateListPage: React.FC = () => {
         title: '删除模板',
         content: `确定删除模板「${tpl.name}」？${isDefaultHint}已套用该模板的教练配置会保留、但不再关联此模板。`,
         confirmText: '删除',
-        confirmColor: '#FF4D4F',
+        confirmColor: getThemeHexColors(activeTheme).destructive,
         success: async (res) => {
           if (res.confirm) {
             const ok = await deleteSalaryTemplate(tpl.id);
@@ -107,7 +113,7 @@ const SalaryTemplateListPage: React.FC = () => {
         },
       });
     },
-    [deleteSalaryTemplate],
+    [activeTheme, deleteSalaryTemplate],
   );
 
   const sortedTemplates = useMemo(() => {
@@ -119,11 +125,11 @@ const SalaryTemplateListPage: React.FC = () => {
   const applyConfirmVisible = applyState.phase === 'confirm';
 
   return (
-    <View className="min-h-screen bg-background pb-safe-bar">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-safe-bar')}>
       {/* 模板列表 */}
       <View className="px-[32rpx] pt-[24rpx] flex flex-col gap-[24rpx]">
         {sortedTemplates.map((tpl) => (
-          <View key={tpl.id} className="bg-white rounded-[28rpx] p-[28rpx] shadow-card">
+          <View key={tpl.id} className="bg-card rounded-[28rpx] p-[28rpx] shadow-card">
             {/* 顶部：名称 + 默认标签 + 在用人数 */}
             <View className="flex items-start justify-between mb-[16rpx]">
               <View className="flex-1 min-w-0 flex items-center gap-[12rpx] flex-wrap">
@@ -182,8 +188,8 @@ const SalaryTemplateListPage: React.FC = () => {
         className="fixed right-[32rpx] bottom-[48rpx] pb-safe-bar z-30 px-[32rpx] py-[22rpx] rounded-full shadow-primary flex items-center gap-[8rpx] bg-primary press-scale"
         onClick={handleCreate}
       >
-        <Icon name="mdi-plus" size={22} color="#fff" />
-        <Text className="text-[30rpx] font-semibold text-white">新建模板</Text>
+        <Icon name="mdi-plus" size={22} color="hsl(var(--primary-foreground))" />
+        <Text className="text-[30rpx] font-semibold text-primary-foreground">新建模板</Text>
       </View>
 
       {/* 套用到教练弹窗 */}

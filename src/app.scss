@@ -52,6 +52,7 @@ page {
   --primary-foreground: 0 0% 100%;
   --primary-glow: 222 87% 69%;
   --primary-dark: 221 83% 53%;
+  --primary-soft: 220 100% 93%;
 
   // --- 次要色 ---
   --secondary: 224 90% 95%;
@@ -91,6 +92,7 @@ page {
   // --- 状态色（对齐设计稿） ---
   --success: 160 84% 39%;
   --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
   --error: 0 84% 60%;
   --info: 199 89% 48%;
 
@@ -123,6 +125,11 @@ page {
   --chart-3: 189 94% 43%;
   --chart-4: 38 92% 50%;
   --chart-5: 0 84% 60%;
+
+  // --- KPI 主色卡片渐变（接入主题系统，随主题切换） ---
+  --kpi-blue-light: hsl(var(--primary-glow));
+  --kpi-blue: hsl(var(--primary));
+  --kpi-blue-dark: hsl(var(--primary-dark));
 
   // --- 课表页语义色（接入主题系统，随主题切换） ---
   --schedule-header: hsl(var(--primary));
@@ -230,6 +237,7 @@ page {
   --primary-foreground: 0 0% 100%;
   --primary-glow: 6 90% 77%;
   --primary-dark: 5 80% 60%;
+  --primary-soft: 6 100% 94%;
 
   // 次要色
   --secondary: 6 100% 95%;
@@ -258,6 +266,7 @@ page {
   // 状态色（柔和调整以贴合暖色调）
   --success: 160 84% 39%;
   --warning: 32 90% 50%;
+  --warning-foreground: 0 0% 100%;
   --error: 0 84% 60%;
   --info: 189 80% 48%;
 
@@ -293,6 +302,37 @@ page {
   --shadow-card-hover: 0 4rpx 20rpx rgba(249, 119, 104, 0.1);
   --shadow-float: 0 4rpx 16rpx rgba(249, 119, 104, 0.08);
   --shadow-rollcall: 0 4rpx 16rpx rgba(232, 90, 74, 0.3);
+
+  // --- 课表页语义色（随主题切换，作用域内引用主题色，保证 mini 引擎正确级联） ---
+  --schedule-header: hsl(var(--primary));
+  --schedule-header-soft: hsl(var(--primary) / 0.6);
+  --schedule-attend: hsl(var(--primary));
+  --schedule-adjust: hsl(var(--accent));
+  --schedule-edit: hsl(var(--warning));
+  --schedule-delete: hsl(var(--muted-foreground));
+  --schedule-cancel: hsl(var(--info));
+  --schedule-selected-date: hsl(var(--accent));
+  --schedule-link: hsl(var(--primary-dark));
+  --schedule-dot: hsl(var(--primary) / 0.7);
+  --schedule-page: hsl(var(--background));
+
+  // --- 课表日历语义色（随主题切换） ---
+  --schedule-calendar-selected-bg: hsl(var(--accent));
+  --schedule-calendar-selected-text: hsl(var(--accent-foreground));
+  --schedule-calendar-today-bg: hsl(var(--primary) / 0.12);
+  --schedule-calendar-today-text: hsl(var(--primary));
+  --schedule-calendar-dot: hsl(var(--accent));
+  --schedule-calendar-outside-text: hsl(var(--muted-foreground));
+
+  // --- 我的页语义色（随主题切换，作用域内引用主题色） ---
+  --profile-primary: hsl(var(--primary));
+  --profile-primary-soft: hsl(var(--primary) / 0.75);
+  --profile-primary-10: hsl(var(--primary) / 0.1);
+
+  // --- KPI 主色卡片渐变（随主题切换） ---
+  --kpi-blue-light: hsl(var(--primary-glow));
+  --kpi-blue: hsl(var(--primary));
+  --kpi-blue-dark: hsl(var(--primary-dark));
 }
 
 .theme-orange {
@@ -301,6 +341,7 @@ page {
   --primary-foreground: 0 0% 100%;
   --primary-glow: 27 96% 67%;
   --primary-dark: 25 80% 50%;
+  --primary-soft: 27 100% 90%;
 
   // 次要色
   --secondary: 27 100% 95%;
@@ -329,6 +370,7 @@ page {
   // 状态色
   --success: 160 84% 39%;
   --warning: 32 90% 50%;
+  --warning-foreground: 0 0% 100%;
   --error: 0 84% 60%;
   --info: 189 94% 43%;
 
@@ -364,6 +406,37 @@ page {
   --shadow-card-hover: 0 4rpx 20rpx rgba(255, 138, 42, 0.1);
   --shadow-float: 0 4rpx 16rpx rgba(255, 138, 42, 0.08);
   --shadow-rollcall: 0 4rpx 16rpx rgba(230, 109, 26, 0.3);
+
+  // --- 课表页语义色（随主题切换，作用域内引用主题色，保证 mini 引擎正确级联） ---
+  --schedule-header: hsl(var(--primary));
+  --schedule-header-soft: hsl(var(--primary) / 0.6);
+  --schedule-attend: hsl(var(--primary));
+  --schedule-adjust: hsl(var(--accent));
+  --schedule-edit: hsl(var(--warning));
+  --schedule-delete: hsl(var(--muted-foreground));
+  --schedule-cancel: hsl(var(--info));
+  --schedule-selected-date: hsl(var(--accent));
+  --schedule-link: hsl(var(--primary-dark));
+  --schedule-dot: hsl(var(--primary) / 0.7);
+  --schedule-page: hsl(var(--background));
+
+  // --- 课表日历语义色（随主题切换） ---
+  --schedule-calendar-selected-bg: hsl(var(--accent));
+  --schedule-calendar-selected-text: hsl(var(--accent-foreground));
+  --schedule-calendar-today-bg: hsl(var(--primary) / 0.12);
+  --schedule-calendar-today-text: hsl(var(--primary));
+  --schedule-calendar-dot: hsl(var(--accent));
+  --schedule-calendar-outside-text: hsl(var(--muted-foreground));
+
+  // --- 我的页语义色（随主题切换，作用域内引用主题色） ---
+  --profile-primary: hsl(var(--primary));
+  --profile-primary-soft: hsl(var(--primary) / 0.75);
+  --profile-primary-10: hsl(var(--primary) / 0.1);
+
+  // --- KPI 主色卡片渐变（随主题切换） ---
+  --kpi-blue-light: hsl(var(--primary-glow));
+  --kpi-blue: hsl(var(--primary));
+  --kpi-blue-dark: hsl(var(--primary-dark));
 }
 
 /* ===== 渐变背景工具类（使用 CSS 变量） ===== */

@@ -23,7 +23,9 @@ import { BRAND_LOGO } from '@/constants/brand';
 import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
 import type { ResignType, TeacherStatus, TeacherUIModel } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type StatusTab = Extract<TeacherStatus, 'active' | 'resigned'>;
 
@@ -35,6 +37,8 @@ const TAB_LIST: { key: StatusTab; label: string }[] = [
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.staff;
 
 const TeacherListPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const { teachers, loading, error, fetchAll, resignTeacher, updateTeacher } = useTeacherStore();
   const [activeTab, setActiveTab] = useState<StatusTab>('active');
 
@@ -155,7 +159,12 @@ const TeacherListPage: React.FC = () => {
 
   if (loading && !teachers.length) {
     return (
-      <View className="flex flex-col h-screen bg-background items-center justify-center">
+      <View
+        className={cn(
+          `theme-${activeTheme}`,
+          'flex flex-col h-screen bg-background items-center justify-center',
+        )}
+      >
         <Loading text="加载老师数据中..." />
       </View>
     );
@@ -163,14 +172,19 @@ const TeacherListPage: React.FC = () => {
 
   if (error && !teachers.length) {
     return (
-      <View className="flex flex-col h-screen bg-background px-[32rpx] items-center justify-center">
+      <View
+        className={cn(
+          `theme-${activeTheme}`,
+          'flex flex-col h-screen bg-background px-[32rpx] items-center justify-center',
+        )}
+      >
         <Empty description={error} actionText="重新加载" onAction={() => void fetchAll()} />
       </View>
     );
   }
 
   return (
-    <View className="flex flex-col h-screen bg-background">
+    <View className={cn(`theme-${activeTheme}`, 'flex flex-col h-screen bg-background')}>
       {/* 状态切换 Tab */}
       <View className="flex flex-row items-center justify-center py-[24rpx]">
         <View className="flex flex-row items-center bg-muted rounded-full p-[6rpx]">
@@ -186,7 +200,7 @@ const TeacherListPage: React.FC = () => {
               <Text
                 className={cn(
                   'text-[28rpx] font-medium',
-                  activeTab === tab.key ? 'text-white' : 'text-muted-foreground',
+                  activeTab === tab.key ? 'text-primary-foreground' : 'text-muted-foreground',
                 )}
               >
                 {tab.label}
@@ -238,8 +252,8 @@ const TeacherListPage: React.FC = () => {
         className="fixed right-[32rpx] bottom-[calc(64rpx+env(safe-area-inset-bottom))] flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-primary shadow-float press-scale"
         onClick={handleAdd}
       >
-        <Icon name="mdi-plus" size={28} color="white" />
-        <Text className="text-[28rpx] font-medium text-white">新增员工</Text>
+        <Icon name="mdi-plus" size={28} color="hsl(var(--primary-foreground))" />
+        <Text className="text-[28rpx] font-medium text-primary-foreground">新增员工</Text>
       </View>
 
       {/* 离职确认弹窗 */}
@@ -338,7 +352,7 @@ const SwappableTeacherCard: React.FC<{
       radiusClassName="rounded-[24rpx]"
     >
       <View className="bg-card px-[28rpx] py-[24rpx] flex flex-row items-center gap-[24rpx]">
-        <View className="w-[100rpx] h-[100rpx] rounded-full p-[4rpx] border-[2rpx] border-primary bg-white shrink-0">
+        <View className="w-[100rpx] h-[100rpx] rounded-full p-[4rpx] border-[2rpx] border-primary bg-card shrink-0">
           <Image
             className="w-full h-full rounded-full"
             src={BRAND_LOGO}

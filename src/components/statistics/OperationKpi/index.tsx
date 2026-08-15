@@ -67,24 +67,28 @@ const PetalCard: React.FC<PetalCardProps> = ({
   value,
   trend,
   trendUp,
-  trendColorClass = 'text-white/80',
+  trendColorClass = 'text-primary-foreground/80',
 }) => (
   <View className={`relative overflow-hidden rounded-2xl p-[20rpx] ${bgClass}`}>
     {/* 装饰光斑 */}
-    <View className="absolute -top-[40rpx] -right-[40rpx] w-[112rpx] h-[112rpx] rounded-full bg-white/20" />
-    <View className="absolute -bottom-[24rpx] -left-[24rpx] w-[80rpx] h-[80rpx] rounded-full bg-white/10" />
+    <View className="absolute -top-[40rpx] -right-[40rpx] w-[112rpx] h-[112rpx] rounded-full bg-primary-foreground/20" />
+    <View className="absolute -bottom-[24rpx] -left-[24rpx] w-[80rpx] h-[80rpx] rounded-full bg-primary-foreground/10" />
     {/* 标签 */}
     <View className="relative z-10 mb-[8rpx]">
-      <Text className="text-[20rpx] font-medium text-white">{label}</Text>
+      <Text className="text-[20rpx] font-medium text-primary-foreground">{label}</Text>
     </View>
     {/* 主数值（不带单位，长数字已截断） */}
-    <Text className="relative z-10 text-[44rpx] font-bold number-display leading-none text-white block truncate">
+    <Text className="relative z-10 text-[44rpx] font-bold number-display leading-none text-primary-foreground block truncate">
       {value}
     </Text>
     {/* 趋势 */}
     <View className="relative z-10 flex items-center gap-[4rpx] mt-[8rpx]">
       {trendUp !== undefined && (
-        <Icon name={trendUp ? 'mdi-trending-up' : 'mdi-trending-down'} size="xs" color="white" />
+        <Icon
+          name={trendUp ? 'mdi-trending-up' : 'mdi-trending-down'}
+          size="xs"
+          color="hsl(var(--primary-foreground))"
+        />
       )}
       <Text className={`text-[18rpx] font-medium ${trendColorClass}`}>{trend}</Text>
     </View>
@@ -101,31 +105,35 @@ const OperationKpi: React.FC<{ data: OperationKpiItem }> = ({ data }) => {
       {/* 左侧大卡片：在册学员（绿色渐变，带单位"人"） */}
       <View className="rounded-2xl p-[24rpx] relative overflow-hidden flex flex-col justify-between bg-kpi-green flex-[0.9]">
         {/* 装饰光斑 */}
-        <View className="absolute -top-[64rpx] -right-[48rpx] w-[192rpx] h-[192rpx] rounded-full bg-white/20" />
-        <View className="absolute top-[96rpx] -right-[24rpx] w-[96rpx] h-[96rpx] rounded-full bg-white/15" />
-        <View className="absolute -bottom-[48rpx] -left-[48rpx] w-[160rpx] h-[160rpx] rounded-full bg-white/10" />
+        <View className="absolute -top-[64rpx] -right-[48rpx] w-[192rpx] h-[192rpx] rounded-full bg-primary-foreground/20" />
+        <View className="absolute top-[96rpx] -right-[24rpx] w-[96rpx] h-[96rpx] rounded-full bg-primary-foreground/15" />
+        <View className="absolute -bottom-[48rpx] -left-[48rpx] w-[160rpx] h-[160rpx] rounded-full bg-primary-foreground/10" />
 
         {/* 顶部：标签 + 趋势 */}
         <View className="relative z-10 flex items-center justify-between">
-          <Text className="text-[22rpx] font-medium text-white">在册学员</Text>
-          <View className="flex items-center gap-[4rpx] px-[12rpx] py-[4rpx] rounded-full bg-white/20">
-            <Icon name="mdi-trending-up" size="xs" color="white" />
-            <Text className="text-[20rpx] font-bold text-white">{data.studentsTrend}</Text>
+          <Text className="text-[22rpx] font-medium text-primary-foreground">在册学员</Text>
+          <View className="flex items-center gap-[4rpx] px-[12rpx] py-[4rpx] rounded-full bg-primary-foreground/20">
+            <Icon name="mdi-trending-up" size="xs" color="hsl(var(--primary-foreground))" />
+            <Text className="text-[20rpx] font-bold text-primary-foreground">
+              {data.studentsTrend}
+            </Text>
           </View>
         </View>
 
         {/* 中部：主数据（带单位"人"） */}
         <View className="relative z-10">
-          <Text className="text-[72rpx] font-bold number-display leading-none text-white block">
+          <Text className="text-[72rpx] font-bold number-display leading-none text-primary-foreground block">
             {data.students}
-            <Text className="text-[28rpx] font-normal ml-[8rpx] text-white/70">人</Text>
+            <Text className="text-[28rpx] font-normal ml-[8rpx] text-primary-foreground/70">
+              人
+            </Text>
           </Text>
         </View>
 
         {/* 底部：备注 */}
         <View className="relative z-10 flex items-center gap-[8rpx]">
-          <Icon name="mdi-trending-up" size="xs" color="white" />
-          <Text className="text-[20rpx] text-white/70">{data.studentsNote}</Text>
+          <Icon name="mdi-trending-up" size="xs" color="hsl(var(--primary-foreground))" />
+          <Text className="text-[20rpx] text-primary-foreground/70">{data.studentsNote}</Text>
         </View>
       </View>
 
@@ -138,7 +146,7 @@ const OperationKpi: React.FC<{ data: OperationKpiItem }> = ({ data }) => {
           value={formatNum(data.hours)}
           trend={data.hoursTrend}
           trendUp
-          trendColorClass="text-white/80"
+          trendColorClass="text-primary-foreground/80"
         />
         {/* 上课人次 */}
         <PetalCard
@@ -147,7 +155,7 @@ const OperationKpi: React.FC<{ data: OperationKpiItem }> = ({ data }) => {
           value={formatNum(data.count)}
           trend={data.countTrend}
           trendUp
-          trendColorClass="text-white/80"
+          trendColorClass="text-primary-foreground/80"
         />
         {/* 新签学员 */}
         <PetalCard
@@ -155,7 +163,7 @@ const OperationKpi: React.FC<{ data: OperationKpiItem }> = ({ data }) => {
           label="新签学员"
           value={formatNum(data.newSign)}
           trend={data.newSignNote}
-          trendColorClass="text-white/80"
+          trendColorClass="text-primary-foreground/80"
         />
         {/* 剩余课时 */}
         <PetalCard
@@ -163,7 +171,7 @@ const OperationKpi: React.FC<{ data: OperationKpiItem }> = ({ data }) => {
           label="剩余课时"
           value={formatNum(data.remain)}
           trend={data.remainNote}
-          trendColorClass="text-white/80"
+          trendColorClass="text-primary-foreground/80"
         />
       </View>
     </View>

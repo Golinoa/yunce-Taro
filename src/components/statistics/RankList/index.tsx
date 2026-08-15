@@ -40,7 +40,7 @@ const RankList: React.FC<RankListProps> = ({
   const maxValue = Math.max(...displayData.map((d) => d.value), 1);
 
   return (
-    <View className="bg-white rounded-2xl p-4 shadow-soft mb-5">
+    <View className="bg-card rounded-2xl p-4 shadow-soft mb-5">
       <Text className="text-lg font-semibold text-foreground block mb-4">{title}</Text>
 
       {displayData.length === 0 ? (
@@ -62,7 +62,7 @@ const RankList: React.FC<RankListProps> = ({
                     <View
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${rankBgClass}`}
                     >
-                      <Text className="text-sm text-white font-bold">{index + 1}</Text>
+                      <Text className="text-sm text-primary-foreground font-bold">{index + 1}</Text>
                     </View>
                   ) : (
                     <Text className="w-8 text-sm text-muted-foreground text-center flex-shrink-0">
@@ -93,13 +93,13 @@ const RankList: React.FC<RankListProps> = ({
               const percentStr = item.extra || '0%';
               const barPercent = parseFloat(percentStr) || (item.value / maxValue) * 100;
               return (
-                <View key={item.id} className="bg-white rounded-2xl p-4 shadow-soft mb-4">
+                <View key={item.id} className="bg-card rounded-2xl p-4 shadow-soft mb-4">
                   <View className="flex items-center gap-3">
                     <View
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isTopThree ? 'bg-gradient-primary' : 'bg-muted'}`}
                     >
                       <Text
-                        className={`text-sm font-bold ${isTopThree ? 'text-white' : 'text-muted-foreground'}`}
+                        className={`text-sm font-bold ${isTopThree ? 'text-primary-foreground' : 'text-muted-foreground'}`}
                       >
                         {index + 1}
                       </Text>
@@ -129,13 +129,13 @@ const RankList: React.FC<RankListProps> = ({
               const totalHours = item.value + (item.remain || 0);
               const consumedPercent = totalHours > 0 ? (item.value / totalHours) * 100 : 0;
               return (
-                <View key={item.id} className="bg-white rounded-2xl p-4 shadow-soft mb-4">
+                <View key={item.id} className="bg-card rounded-2xl p-4 shadow-soft mb-4">
                   <View className="flex items-center gap-3">
                     <View
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isTopThree ? 'bg-gradient-primary' : 'bg-muted'}`}
                     >
                       <Text
-                        className={`text-sm font-bold ${isTopThree ? 'text-white' : 'text-muted-foreground'}`}
+                        className={`text-sm font-bold ${isTopThree ? 'text-primary-foreground' : 'text-muted-foreground'}`}
                       >
                         {index + 1}
                       </Text>

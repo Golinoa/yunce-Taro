@@ -24,9 +24,13 @@ import SaveTemplateDialog from '@/components/teacher/SaveTemplateDialog';
 import TemplatePickerSheet from '@/components/teacher/TemplatePickerSheet';
 import { createDefaultSalaryRule } from '@/data/teacher';
 import { useTeacherStore } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig, SalaryTemplate } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const SalaryFormPage: React.FC = () => {
+  useCardNavigationBar();
+  const { activeTheme } = useThemeStore();
   const router = useRouter();
   const teacherId = (router.params?.teacherId as string) || '';
   const nameFromParam = decodeURIComponent((router.params?.name as string) || '');
@@ -198,7 +202,7 @@ const SalaryFormPage: React.FC = () => {
   );
 
   return (
-    <View className="min-h-screen bg-background">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       <ScrollView scrollY className="h-screen" style={{ paddingBottom: '300rpx' }}>
         <View className="px-[32rpx] py-[24rpx]">
           {/* 套用模板 + 薪资规则共用一个 Card */}

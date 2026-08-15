@@ -22,7 +22,7 @@ const BarChart: React.FC<BarChartProps> = ({
 }) => {
   if (!data || data.length === 0) {
     return (
-      <View className="bg-white rounded-2xl p-4 shadow-soft mb-5">
+      <View className="bg-card rounded-2xl p-4 shadow-soft mb-5">
         <Text className="text-lg font-semibold text-foreground block mb-4">{title}</Text>
         <View className="flex items-center justify-center h-50">
           <Text className="text-base text-muted-foreground">暂无数据</Text>
@@ -34,7 +34,7 @@ const BarChart: React.FC<BarChartProps> = ({
   const maxVal = Math.max(...data.map((d) => d.value), 1);
 
   return (
-    <View className="bg-white rounded-2xl p-4 shadow-soft mb-5">
+    <View className="bg-card rounded-2xl p-4 shadow-soft mb-5">
       <Text className="text-lg font-semibold text-foreground block mb-4">{title}</Text>
       <View className="flex flex-col gap-3">
         {data.map((item, idx) => (

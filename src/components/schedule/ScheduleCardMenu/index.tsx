@@ -39,7 +39,7 @@ const ScheduleCardMenu: React.FC<ScheduleCardMenuProps> = ({ items }) => {
     <>
       {/* 三圆点触发按钮 */}
       <View
-        className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full border-[2rpx] border-border bg-card active:scale-90 active:bg-primary/10 active:border-primary/30 active:shadow-[0_0_16rpx_rgba(59,110,245,0.15)]"
+        className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full border-[2rpx] border-border bg-card active:scale-90 active:bg-primary/10 active:border-primary/30 active:shadow-card"
         style={{ boxShadow: '0 2rpx 8rpx rgba(0,0,0,0.06)' }}
         onClick={(e) => {
           e.stopPropagation();
@@ -68,10 +68,10 @@ const ScheduleCardMenu: React.FC<ScheduleCardMenuProps> = ({ items }) => {
                 className={cn(
                   'flex items-center justify-center gap-[12rpx] rounded-[16rpx] border-[3rpx] px-[32rpx] py-[24rpx] active:scale-[0.97] transition-transform',
                   isDanger
-                    ? 'border-destructive bg-destructive/5 active:bg-destructive/10 active:border-destructive active:shadow-[0_0_16rpx_rgba(239,68,68,0.15)]'
+                    ? 'border-destructive bg-destructive/5 active:bg-destructive/10 active:border-destructive active:shadow-card'
                     : isWarning
-                      ? 'border-warning bg-warning/5 active:bg-warning/10 active:border-warning active:shadow-[0_0_16rpx_rgba(245,158,11,0.15)]'
-                      : 'border-primary/40 bg-primary/5 active:bg-primary/10 active:border-primary active:shadow-[0_0_16rpx_rgba(59,110,245,0.15)]',
+                      ? 'border-warning bg-warning/5 active:bg-warning/10 active:border-warning active:shadow-card'
+                      : 'border-primary/40 bg-primary/5 active:bg-primary/10 active:border-primary active:shadow-card',
                 )}
                 style={{ boxShadow: '0 2rpx 8rpx rgba(0,0,0,0.04)' }}
                 onClick={() => handleItemClick(item)}

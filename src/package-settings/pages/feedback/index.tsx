@@ -12,6 +12,7 @@ import PageContainer from '@/components/PageContainer';
 import { feedbackService, uploadService } from '@/services';
 import type { FeedbackType } from '@/services/feedback';
 import { useAuth } from '@/utils/auth';
+import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
 const MAX_IMAGES = 3;
@@ -23,6 +24,7 @@ const FEEDBACK_TYPE_OPTIONS: Array<{ label: string; value: FeedbackType }> = [
 ];
 
 const Feedback: React.FC = () => {
+  usePrimaryNavigationBar();
   const { profile } = useAuth();
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('OTHER');
   const [content, setContent] = useState('');
@@ -111,16 +113,18 @@ const Feedback: React.FC = () => {
       <View className="min-h-screen bg-gradient-subtle pb-40">
         {/* ====== 顶部标题区 ====== */}
         <View className="bg-gradient-primary px-6 pt-8 pb-10 rounded-b-60rpx shadow-elegant relative overflow-hidden">
-          <View className="absolute top-4 right-4 w-24 h-24 rounded-full bg-white/10 blur-xl" />
+          <View className="absolute top-4 right-4 w-24 h-24 rounded-full bg-primary-foreground/10 blur-xl" />
           <View className="relative z-1">
-            <Text className="text-white text-[40rpx] font-bold block">使用反馈</Text>
-            <Text className="text-white/70 text-md block mt-1">遇到问题或建议？欢迎随时反馈</Text>
+            <Text className="text-primary-foreground text-[40rpx] font-bold block">使用反馈</Text>
+            <Text className="text-primary-foreground/70 text-md block mt-1">
+              遇到问题或建议？欢迎随时反馈
+            </Text>
           </View>
         </View>
 
         {/* ====== 表单区域 ====== */}
         <View className="px-6 -mt-4 relative z-2">
-          <View className="bg-white rounded-lg shadow-soft p-5">
+          <View className="bg-card rounded-lg shadow-soft p-5">
             <View className="flex items-center gap-[12rpx] mb-3">
               <Text className="text-xl">✍</Text>
               <Text className="text-lg font-semibold text-foreground">填写反馈</Text>
@@ -141,7 +145,9 @@ const Feedback: React.FC = () => {
                   >
                     <Text
                       className={`text-sm font-medium ${
-                        feedbackType === option.value ? 'text-white' : 'text-foreground'
+                        feedbackType === option.value
+                          ? 'text-primary-foreground'
+                          : 'text-foreground'
                       }`}
                     >
                       {option.label}
@@ -184,7 +190,7 @@ const Feedback: React.FC = () => {
                       className="absolute top-0 right-0 w-[40rpx] h-[40rpx] bg-destructive/80 rounded-bl-sm flex items-center justify-center"
                       onClick={() => handleRemoveImage(idx)}
                     >
-                      <Text className="text-white text-[22rpx]">✕</Text>
+                      <Text className="text-primary-foreground text-[22rpx]">✕</Text>
                     </View>
                   </View>
                 ))}

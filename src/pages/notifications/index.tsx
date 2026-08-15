@@ -2,6 +2,7 @@ import { View, Text } from '@tarojs/components';
 import React, { useCallback, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /**
@@ -29,6 +30,7 @@ interface NotifyGroup {
  * 未接入业务的功能不展示，避免界面冗余。
  */
 const NotificationsPage: React.FC = () => {
+  useCardNavigationBar();
   const [groups, setGroups] = useState<NotifyGroup[]>([
     {
       title: '通知学员',
@@ -100,7 +102,7 @@ const NotificationsPage: React.FC = () => {
         {/* 分组列表 */}
         <View className="px-[32rpx] pt-[24rpx] pb-[60rpx] flex flex-col gap-[24rpx]">
           {groups.map((group, groupIndex) => (
-            <View key={group.title} className="bg-white rounded-[28rpx] overflow-hidden">
+            <View key={group.title} className="bg-card rounded-[28rpx] overflow-hidden">
               {/* 分组标题 */}
               <View className="flex flex-row items-center px-[32rpx] pt-[28rpx] pb-[12rpx]">
                 <View className="w-[8rpx] h-[24rpx] rounded-[4rpx] bg-primary mr-[12rpx]" />

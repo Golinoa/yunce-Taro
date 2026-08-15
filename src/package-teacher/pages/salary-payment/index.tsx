@@ -19,6 +19,8 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import MonthPickerSheet from '@/components/teacher/MonthPickerSheet';
 import SendSalarySheet from '@/components/teacher/SendSalarySheet';
 import { useTeacherStore, calcTotal } from '@/stores/teacher';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import {
   SALARY_STATUS_META,
   normalizeSalaryStatus,
@@ -26,6 +28,7 @@ import {
   type SendResult,
   type TeacherUIModel,
 } from '@/types/teacher';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const PAGE_INTRO_KEY = 'salary_payment_intro_hidden';
 
@@ -107,7 +110,7 @@ const SalaryStatusExplainSheet: React.FC<{ visible: boolean; onClose: () => void
           );
         })}
         <View
-          className="w-full py-[26rpx] rounded-full bg-primary text-white text-center text-[30rpx] font-semibold press-scale mt-[16rpx]"
+          className="w-full py-[26rpx] rounded-full bg-primary text-primary-foreground text-center text-[30rpx] font-semibold press-scale mt-[16rpx]"
           onClick={onClose}
         >
           知道了
@@ -118,8 +121,10 @@ const SalaryStatusExplainSheet: React.FC<{ visible: boolean; onClose: () => void
 };
 
 const SalaryPaymentPage: React.FC = () => {
+  useCardNavigationBar();
   const { teachers, fetchAll, setSalaryMonth, batchConfirm, setPendingSendAction, executeSend } =
     useTeacherStore();
+  const { activeTheme } = useThemeStore();
 
   /** 当前展示的月份 YYYY-MM */
   const [currentMonth, setCurrentMonth] = useState(dayjs().format('YYYY-MM'));
@@ -237,7 +242,7 @@ const SalaryPaymentPage: React.FC = () => {
       content: `确认核对 ${pendingIds.length} 位员工的薪资？核对后可在列表页发送工资单。`,
       confirmText: '确认核对',
       cancelText: '再检查',
-      confirmColor: '#FF8A4C',
+      confirmColor: getThemeHexColors(activeTheme).primary,
     });
     if (!confirm) return;
 
@@ -250,7 +255,7 @@ const SalaryPaymentPage: React.FC = () => {
     } finally {
       setSending(false);
     }
-  }, [visibleTeachers, batchConfirm]);
+  }, [activeTheme, visibleTeachers, batchConfirm]);
 
   /** 发送工资单：直接发放并弹窗展示结果 */
   const handleOpenSendSheet = useCallback(async () => {
@@ -291,9 +296,9 @@ const SalaryPaymentPage: React.FC = () => {
   }, []);
 
   return (
-    <View className="min-h-screen bg-background pb-[160rpx]">
+    <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-[160rpx]')}>
       {/* 月份切换 */}
-      <View className="flex items-center justify-between px-[40rpx] py-[24rpx] bg-white">
+      <View className="flex items-center justify-between px-[40rpx] py-[24rpx] bg-card">
         <Text className="text-[28rpx] font-medium text-primary" onClick={handlePrevMonth}>
           上月
         </Text>
@@ -317,7 +322,7 @@ const SalaryPaymentPage: React.FC = () => {
 
       {/* 统计卡片 */}
       {visibleTeachers.length > 0 && (
-        <View className="mx-[32rpx] mt-[16rpx] bg-white rounded-[28rpx] p-[32rpx] shadow-card">
+        <View className="mx-[32rpx] mt-[16rpx] bg-card rounded-[28rpx] p-[32rpx] shadow-card">
           {/* 第一行 */}
           <View className="flex items-start justify-between mb-[24rpx]">
             <View>
@@ -405,7 +410,7 @@ const SalaryPaymentPage: React.FC = () => {
             return (
               <View
                 key={t.id}
-                className="bg-white rounded-[28rpx] p-[28rpx] shadow-card press-bg"
+                className="bg-card rounded-[28rpx] p-[28rpx] shadow-card press-bg"
                 onClick={() => handleOpenDetail(t)}
               >
                 {/* 姓名行 */}
@@ -531,12 +536,12 @@ const SalaryPaymentPage: React.FC = () => {
 
       {/* 底部按钮区 — 仅有数据时显示 */}
       {visibleTeachers.length > 0 && (stats.pending > 0 || stats.confirmed > 0) && (
-        <View className="fixed bottom-0 left-0 right-0 px-[32rpx] py-[24rpx] pb-safe-bar bg-white/95 backdrop-blur border-t border-border z-20">
+        <View className="fixed bottom-0 left-0 right-0 px-[32rpx] py-[24rpx] pb-safe-bar bg-card/95 backdrop-blur border-t border-border z-20">
           {stats.pending > 0 ? (
             <View
               className={cn(
                 'w-full py-[28rpx] rounded-full text-[32rpx] font-bold text-center shadow-card press-scale',
-                'bg-primary text-white',
+                'bg-primary text-primary-foreground',
               )}
               onClick={handleBatchConfirm}
             >
@@ -544,7 +549,7 @@ const SalaryPaymentPage: React.FC = () => {
             </View>
           ) : (
             <View
-              className="w-full py-[28rpx] rounded-full bg-primary text-white text-[32rpx] font-bold text-center shadow-primary press-scale"
+              className="w-full py-[28rpx] rounded-full bg-primary text-primary-foreground text-[32rpx] font-bold text-center shadow-primary press-scale"
               onClick={handleOpenSendSheet}
             >
               发送工资单（{stats.confirmed}人）
