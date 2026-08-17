@@ -995,6 +995,7 @@ function mapMockStudent(student: NonNullable<MockStudent>): Student {
     teacher_id: student.teacherId,
     invite_code: `INV-${student.id.slice(-4).toUpperCase()}`,
     nickname: student.nickname,
+    relation: student.relation,
     gender: student.gender,
     birthday: student.birthday,
     phone: student.phone,
@@ -1005,6 +1006,7 @@ function mapMockStudent(student: NonNullable<MockStudent>): Student {
     campus_name:
       (student as { campusName?: string }).campusName ||
       (student as { campus_name?: string }).campus_name,
+    avatar_url: (student as { avatar_url?: string }).avatar_url,
     status: student.status === 'active' ? 'active' : 'deleted',
     created_at: student.createdAt,
     updated_at: student.createdAt,
@@ -1510,7 +1512,8 @@ export const studentService = {
       return mapBackendStudentListItem(created);
     }
 
-    return mockCreateStudent(data);
+    const created = await mockCreateStudent(data);
+    return mapMockStudent(created);
   },
 
   /** 更新学员 */

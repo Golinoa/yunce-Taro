@@ -433,6 +433,39 @@ export const USERS: User[] = [
   },
 ];
 
+/** 学员-家长绑定关系 */
+export interface StudentParentBinding {
+  id: string;
+  studentId: string;
+  parentId: string;
+  relation?: string;
+  createdAt: string;
+}
+
+export const STUDENT_PARENTS: StudentParentBinding[] = [
+  {
+    id: 'sp-001',
+    studentId: 'stu-001',
+    parentId: 'user-parent-001',
+    relation: '父亲',
+    createdAt: '2025-08-20T00:00:00Z',
+  },
+  {
+    id: 'sp-002',
+    studentId: 'stu-002',
+    parentId: 'user-parent-002',
+    relation: '母亲',
+    createdAt: '2025-08-20T00:00:00Z',
+  },
+  {
+    id: 'sp-003',
+    studentId: 'stu-003',
+    parentId: 'user-parent-003',
+    relation: '父亲',
+    createdAt: '2025-08-25T00:00:00Z',
+  },
+];
+
 export const IDENTITIES: Identity[] = [
   // 管理员 - 可访问全部校区，拥有系统设置等管理权限
   {
@@ -939,7 +972,9 @@ export interface Student {
   id: string;
   name: string;
   nickname?: string;
-  gender: 'male' | 'female';
+  /** 与家长的亲属关系（儿子/女儿），家长端子女卡片展示用 */
+  relation?: string;
+  gender: 'male' | 'female' | 'other';
   birthday: string;
   phone: string;
   address: string;
@@ -952,6 +987,7 @@ export interface Student {
   status: 'active' | 'inactive' | 'graduated';
   createdAt: string;
   note?: string;
+  avatar_url?: string;
 }
 
 export const STUDENTS: Student[] = [
@@ -963,6 +999,7 @@ export const STUDENTS: Student[] = [
     id: 'stu-001',
     name: '张小明',
     nickname: '小明',
+    relation: '儿子',
     gender: 'male',
     birthday: '2015-03-12',
     phone: '13800001101',
@@ -981,6 +1018,7 @@ export const STUDENTS: Student[] = [
     id: 'stu-002',
     name: '赵小红',
     nickname: '小红',
+    relation: '女儿',
     gender: 'female',
     birthday: '2016-07-22',
     phone: '13800001102',
@@ -998,6 +1036,7 @@ export const STUDENTS: Student[] = [
     id: 'stu-003',
     name: '李子轩',
     nickname: '轩轩',
+    relation: '儿子',
     gender: 'male',
     birthday: '2014-11-05',
     phone: '13800001103',

@@ -11,9 +11,8 @@ import React from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 
-// 默认 Mock 头像，当用户未上传头像时使用
-// 上线前请替换为业务自己的默认头像图片或本地资源
-const DEFAULT_AVATAR_URL = 'https://api.dicebear.com/7.x/avataaars/png?seed=teacher&radius=50';
+// 默认头像：项目内置 sgpk.png（家长 / 教师未上传头像时统一使用）
+const DEFAULT_AVATAR_URL = '/assets/images/sgpk.png';
 
 export type ProfileHeaderVariant = 'default' | 'gradient';
 
@@ -69,9 +68,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </View>
 
           <View className="flex-1 min-w-0">
-            <Text className="text-[34rpx] font-bold text-foreground truncate block">
-              {name}
-            </Text>
+            <Text className="text-[34rpx] font-bold text-foreground truncate block">{name}</Text>
             {phone && (
               <Text className="mt-[8rpx] text-[26rpx] font-semibold text-muted-foreground truncate block">
                 {phone}

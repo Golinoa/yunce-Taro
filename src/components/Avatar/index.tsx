@@ -1,6 +1,7 @@
 import { View, Text, Image } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
+import { BRAND_LOGO } from '@/constants/brand';
 
 /**
  * Avatar - 全局统一头像组件
@@ -53,12 +54,13 @@ const SIZE_MAP = {
 
 const Avatar: React.FC<AvatarProps> = ({ name, avatarUrl, size = 'md', className, onClick }) => {
   const { container, text } = SIZE_MAP[size];
+  const src = avatarUrl || BRAND_LOGO;
 
-  // 图片头像
-  if (avatarUrl) {
+  // 图片头像（无自定义头像时使用品牌默认头像）
+  if (src) {
     return (
       <Image
-        src={avatarUrl}
+        src={src}
         mode="aspectFill"
         className={cn('rounded-full flex-shrink-0', container, className)}
         onClick={onClick}
@@ -66,7 +68,7 @@ const Avatar: React.FC<AvatarProps> = ({ name, avatarUrl, size = 'md', className
     );
   }
 
-  // 文字头像
+  // 文字头像兜底
   return (
     <View
       className={cn(

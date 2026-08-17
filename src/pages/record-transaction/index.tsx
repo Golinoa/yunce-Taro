@@ -1,11 +1,11 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
+import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import { dataCenterService } from '@/services/data-center';
 import type { ExpenseCategoryType, IncomeCategoryType } from '@/data/data-center';
-import dayjs from 'dayjs';
+import { dataCenterService } from '@/services/data-center';
 
 /**
  * 记一笔页面
@@ -133,7 +133,16 @@ const RecordTransaction: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [type, amount, selectedCategory, categories, date, note, showAmortization, amortizationPeriod]);
+  }, [
+    type,
+    amount,
+    selectedCategory,
+    categories,
+    date,
+    note,
+    showAmortization,
+    amortizationPeriod,
+  ]);
 
   /** 格式化显示金额 */
   const formatDisplayAmount = (value: string): string => {
@@ -276,7 +285,9 @@ const RecordTransaction: React.FC = () => {
                       <Icon
                         name={category.icon}
                         size={32}
-                        color={isSelected ? 'white' : type === 'expense' ? 'destructive' : 'success'}
+                        color={
+                          isSelected ? 'white' : type === 'expense' ? 'destructive' : 'success'
+                        }
                       />
                     </View>
                     <Text

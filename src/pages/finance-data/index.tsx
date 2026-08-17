@@ -1,15 +1,15 @@
 import { View, Text, ScrollView, Canvas } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cn from 'classnames';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import Card from '@/components/Card';
-import { useThemeStore } from '@/stores/theme';
-import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { getThemeHexColors } from '@/theme';
-import { dataCenterService } from '@/services/data-center';
 import type { FinanceDetailType, RevenueTrendItem } from '@/data/data-center';
+import { dataCenterService } from '@/services/data-center';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
+import { useThemedNavigationBar } from '@/utils/navigation-bar';
 
 const CHART_CANVAS_W = 340;
 const CHART_CANVAS_H = 260;
@@ -113,7 +113,9 @@ const FinanceData: React.FC = () => {
       .select(`#${canvasIdRef.current}`)
       .fields({ node: true, size: true })
       .exec((res) => {
-        const target = res?.[0] as { node?: HTMLCanvasElement; size?: { width: number; height: number } } | undefined;
+        const target = res?.[0] as
+          | { node?: HTMLCanvasElement; size?: { width: number; height: number } }
+          | undefined;
         const canvas = target?.node;
         if (!canvas) return;
 
@@ -333,11 +335,13 @@ const FinanceData: React.FC = () => {
 
           {/* 收支趋势卡片 */}
           <Card>
-            <Text className="text-[30rpx] font-bold text-foreground block mb-[8rpx]">
-              收支趋势
-            </Text>
+            <Text className="text-[30rpx] font-bold text-foreground block mb-[8rpx]">收支趋势</Text>
             <Text className="text-[24rpx] text-muted-foreground block mb-[16rpx]">
-              {period === 'day' ? '近7日收支趋势' : period === 'month' ? '近30日收支趋势' : '全年收支趋势'}
+              {period === 'day'
+                ? '近7日收支趋势'
+                : period === 'month'
+                  ? '近30日收支趋势'
+                  : '全年收支趋势'}
             </Text>
             <View className="flex justify-center">
               <Canvas

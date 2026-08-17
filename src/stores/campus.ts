@@ -34,6 +34,9 @@ const DEFAULT_ORG_NAME = '松果排课';
 /** 当前选中校区本地存储键 */
 const CURRENT_CAMPUS_ID_KEY = 'yunce_current_campus_id';
 
+/** 上次访问校区本地存储键 */
+const LAST_VISITED_CAMPUS_ID_KEY = 'yunce_last_visited_campus_id';
+
 interface CampusState {
   // 数据
   orgName: string;
@@ -42,6 +45,8 @@ interface CampusState {
   allowedCampusIds: string[];
   /** 当前选中的校区ID */
   currentCampusId: string;
+  /** 上次访问的校区ID */
+  lastVisitedCampusId: string;
   salaryModels: SalaryModel[];
   payDaySettings: PayDaySettings;
   holidays: Holiday[];
@@ -94,6 +99,7 @@ interface CampusState {
 
   // 当前校区
   setCurrentCampusId: (id: string) => void;
+  setLastVisitedCampusId: (id: string) => void;
   initCurrentCampus: (identityCampusIds?: string[]) => void;
   setAllowedCampusIds: (ids: string[]) => void;
 
@@ -106,6 +112,7 @@ export const useCampusStore = create<CampusState>((set) => ({
   campuses: [],
   allowedCampusIds: [],
   currentCampusId: Taro.getStorageSync(CURRENT_CAMPUS_ID_KEY) || '',
+  lastVisitedCampusId: Taro.getStorageSync(LAST_VISITED_CAMPUS_ID_KEY) || '',
   salaryModels: [],
   payDaySettings: { mode: 'fixed', fixedDay: 15 },
   holidays: [],
@@ -436,8 +443,23 @@ export const useCampusStore = create<CampusState>((set) => ({
   // ============================================
   setCurrentCampusId: (id: string) => {
     if (!id) return;
-    Taro.setStorageSync(CURRENT_CAMPUS_ID_KEY, id);
-    set({ currentCampusId: id });
+    set((state) => {
+      const prevId = state.currentCampusId;
+      if (prevId && prevId !== id) {
+        Taro.setStorageSync(LAST_VISITED_CAMPUS_ID_KEY, prevId);
+      }
+      Taro.setStorageSync(CURRENT_CAMPUS_ID_KEY, id);
+      return {
+        currentCampusId: id,
+        lastVisitedCampusId: prevId && prevId !== id ? prevId : state.lastVisitedCampusId,
+      };
+    });
+  },
+
+  setLastVisitedCampusId: (id: string) => {
+    if (!id) return;
+    Taro.setStorageSync(LAST_VISITED_CAMPUS_ID_KEY, id);
+    set({ lastVisitedCampusId: id });
   },
 
   initCurrentCampus: (identityCampusIds) => {

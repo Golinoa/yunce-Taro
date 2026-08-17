@@ -10,6 +10,8 @@ export interface Student {
   invite_code: string;
   avatar_url?: string;
   nickname?: string;
+  /** 与当前家长的亲属关系（儿子/女儿等），家长端子女卡片展示用 */
+  relation?: string;
   gender?: 'male' | 'female' | 'other';
   birthday?: string;
   phone?: string;
@@ -54,6 +56,7 @@ export interface StudentParent {
     id: string;
     name: string;
     phone?: string;
+    avatar_url?: string;
   };
   created_at: string;
 }

@@ -222,16 +222,12 @@ export const dataCenterService = {
   getRevenueTrend: (params: RevenueTrendQueryParams): Promise<RevenueTrendType> =>
     USE_MOCK
       ? mockGetRevenueTrend(params.period)
-      : get<BackendRevenueTrendResponse>(
-          `/data-center/revenue-trend?period=${params.period}`,
-        ),
+      : get<BackendRevenueTrendResponse>(`/data-center/revenue-trend?period=${params.period}`),
 
   // ---------- 财务数据 ----------
   /** 获取财务数据卡片 */
   getFinanceData: (): Promise<FinanceDataType> =>
-    USE_MOCK
-      ? mockGetFinanceData()
-      : get<BackendFinanceDataResponse>('/data-center/finance'),
+    USE_MOCK ? mockGetFinanceData() : get<BackendFinanceDataResponse>('/data-center/finance'),
 
   /** 获取财务详情 */
   getFinanceDetail: (params: FinanceDetailQueryParams): Promise<FinanceDetailType> =>
@@ -244,9 +240,7 @@ export const dataCenterService = {
   // ---------- 会员数据 ----------
   /** 获取会员数据卡片 */
   getMemberData: (): Promise<MemberDataType> =>
-    USE_MOCK
-      ? mockGetMemberData()
-      : get<BackendMemberDataResponse>('/data-center/member'),
+    USE_MOCK ? mockGetMemberData() : get<BackendMemberDataResponse>('/data-center/member'),
 
   /** 获取会员详情 */
   getMemberDetail: (params: MemberDetailQueryParams): Promise<MemberDetailType> =>
@@ -259,9 +253,7 @@ export const dataCenterService = {
   // ---------- 卡项数据 ----------
   /** 获取卡项数据卡片 */
   getCardData: (): Promise<CardDataType> =>
-    USE_MOCK
-      ? mockGetCardData()
-      : get<BackendCardDataResponse>('/data-center/card'),
+    USE_MOCK ? mockGetCardData() : get<BackendCardDataResponse>('/data-center/card'),
 
   /** 获取卡项详情 */
   getCardDetail: (params: CardDetailQueryParams): Promise<CardDetailType> =>
@@ -274,9 +266,7 @@ export const dataCenterService = {
   // ---------- 薪资数据 ----------
   /** 获取薪资数据卡片 */
   getSalaryData: (): Promise<SalaryDataType> =>
-    USE_MOCK
-      ? mockGetSalaryData()
-      : get<BackendSalaryDataResponse>('/data-center/salary'),
+    USE_MOCK ? mockGetSalaryData() : get<BackendSalaryDataResponse>('/data-center/salary'),
 
   /** 获取薪资详情 */
   getSalaryDetail: (params: SalaryDetailQueryParams): Promise<SalaryDetailType> =>
@@ -303,7 +293,10 @@ export const dataCenterService = {
   createTransaction: (data: CreateTransactionParams): Promise<{ success: boolean }> =>
     USE_MOCK
       ? mockCreateTransaction(data)
-      : post<{ success: boolean }>('/data-center/transaction', data as unknown as Record<string, unknown>),
+      : post<{ success: boolean }>(
+          '/data-center/transaction',
+          data as unknown as Record<string, unknown>,
+        ),
 
   // ---------- 同步 Fallback ----------
   getVenueOverviewFallback,

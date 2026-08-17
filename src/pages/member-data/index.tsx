@@ -1,13 +1,13 @@
 import { View, Text, ScrollView } from '@tarojs/components';
-import React, { useCallback, useEffect, useState } from 'react';
 import cn from 'classnames';
+import React, { useCallback, useEffect, useState } from 'react';
+import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import Card from '@/components/Card';
+import type { MemberDetailType } from '@/data/data-center';
+import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { dataCenterService } from '@/services/data-center';
-import type { MemberDetailType } from '@/data/data-center';
 
 /**
  * 会员数据详情页
@@ -85,7 +85,7 @@ const MemberData: React.FC = () => {
 
       let translateX = '-50%';
       let translateY = '-50%';
-      let whiteSpace = 'nowrap' as const;
+      const whiteSpace = 'nowrap' as const;
 
       if (cos > 0.3) {
         // 右侧：左对齐
@@ -113,44 +113,47 @@ const MemberData: React.FC = () => {
     };
 
     return (
-      <View className="relative mx-auto" style={{ width: `${size + 80}rpx`, height: `${size + 80}rpx` }}>
+      <View
+        className="relative mx-auto"
+        style={{ width: `${size + 80}rpx`, height: `${size + 80}rpx` }}
+      >
         {/* 雷达图主体（居中） */}
         <View
           className="absolute"
           style={{ left: '40rpx', top: '40rpx', width: `${size}rpx`, height: `${size}rpx` }}
         >
-        {/* 背景网格 */}
-        {Array.from({ length: 5 }).map((_, levelIndex) => {
-          const levelValues = categories.map(() => ((levelIndex + 1) / 5) * 100);
-          return (
-            <View
-              key={levelIndex}
-              className={`absolute left-0 top-0 w-full h-full ${
-                levelIndex === 4 ? 'radar-grid-border' : 'radar-grid-bg'
-              }`}
-              style={{
-                clipPath: `polygon(${getPolygonPoints(levelValues)})`,
-                opacity: levelIndex === 4 ? 1 : 0.3 + levelIndex * 0.15,
-              }}
-            />
-          );
-        })}
+          {/* 背景网格 */}
+          {Array.from({ length: 5 }).map((_, levelIndex) => {
+            const levelValues = categories.map(() => ((levelIndex + 1) / 5) * 100);
+            return (
+              <View
+                key={levelIndex}
+                className={`absolute left-0 top-0 w-full h-full ${
+                  levelIndex === 4 ? 'radar-grid-border' : 'radar-grid-bg'
+                }`}
+                style={{
+                  clipPath: `polygon(${getPolygonPoints(levelValues)})`,
+                  opacity: levelIndex === 4 ? 1 : 0.3 + levelIndex * 0.15,
+                }}
+              />
+            );
+          })}
 
-        {/* 购卡数据多边形 */}
-        <View
-          className="absolute left-0 top-0 w-full h-full radar-purchase-fill radar-purchase-border"
-          style={{
-            clipPath: `polygon(${getPolygonPoints(purchaseData)})`,
-          }}
-        />
+          {/* 购卡数据多边形 */}
+          <View
+            className="absolute left-0 top-0 w-full h-full radar-purchase-fill radar-purchase-border"
+            style={{
+              clipPath: `polygon(${getPolygonPoints(purchaseData)})`,
+            }}
+          />
 
-        {/* 出勤数据多边形 */}
-        <View
-          className="absolute left-0 top-0 w-full h-full radar-attendance-fill radar-attendance-border"
-          style={{
-            clipPath: `polygon(${getPolygonPoints(attendanceData)})`,
-          }}
-        />
+          {/* 出勤数据多边形 */}
+          <View
+            className="absolute left-0 top-0 w-full h-full radar-attendance-fill radar-attendance-border"
+            style={{
+              clipPath: `polygon(${getPolygonPoints(attendanceData)})`,
+            }}
+          />
         </View>
 
         {/* 标签（在外层，坐标偏移 40rpx 与雷达图对齐） */}

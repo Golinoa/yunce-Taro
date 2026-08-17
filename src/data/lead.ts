@@ -1386,37 +1386,38 @@ export async function mockBatchCreateProxyBookings(params: {
     const student = STUDENTS.find((s) => s.id === studentId);
     if (!student) continue;
 
-    let lead = LEADS.find(
+    const existingLead = LEADS.find(
       (l) =>
         l.child_name === student.name &&
         (l.owner_teacher_id === params.teacherId || l.creator_teacher_id === params.teacherId),
     );
 
-    if (!lead) {
-      lead = {
-        id: nextLeadId(),
-        trial_student_id: nextTrialStudentId(),
-        child_name: student.name,
-        child_gender: student.gender,
-        child_age: student.birthday
-          ? String(dayjs().diff(dayjs(student.birthday), 'year'))
-          : undefined,
-        parent_phone: student.phone,
-        first_invite_teacher_id: params.teacherId,
-        latest_invite_teacher_id: params.teacherId,
-        owner_teacher_id: params.teacherId,
-        creator_teacher_id: params.teacherId,
-        campus_id: params.campusId || student.campusId,
-        source_type: 'manual',
-        source_channel: 'member_proxy_booking',
-        owner_lock_status: 'locked',
-        status: 'booked',
-        duplicate_hint: false,
-        weak_bind_parent: true,
-        booked_at: dayjs().toISOString(),
-        created_at: dayjs().toISOString(),
-        updated_at: dayjs().toISOString(),
-      };
+    const lead: Lead = existingLead || {
+      id: nextLeadId(),
+      trial_student_id: nextTrialStudentId(),
+      child_name: student.name,
+      child_gender: student.gender === 'other' ? undefined : student.gender,
+      child_age: student.birthday
+        ? String(dayjs().diff(dayjs(student.birthday), 'year'))
+        : undefined,
+      parent_phone: student.phone,
+      first_invite_teacher_id: params.teacherId,
+      latest_invite_teacher_id: params.teacherId,
+      owner_teacher_id: params.teacherId,
+      creator_teacher_id: params.teacherId,
+      campus_id: params.campusId || student.campusId,
+      source_type: 'manual',
+      source_channel: 'member_proxy_booking',
+      owner_lock_status: 'locked',
+      status: 'booked',
+      duplicate_hint: false,
+      weak_bind_parent: true,
+      booked_at: dayjs().toISOString(),
+      created_at: dayjs().toISOString(),
+      updated_at: dayjs().toISOString(),
+    };
+
+    if (!existingLead) {
       LEADS.push(lead);
     } else {
       lead.status = 'booked';

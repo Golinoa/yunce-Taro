@@ -31,6 +31,7 @@ import {
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 const USER_PROFILE_KEY = 'yunce-edu-user-profile';
 const REGISTER_DRAFT_KEY = 'yunce-edu-register-draft';
+const PROFILE_EXTRA_KEY = 'yunce-edu-profile-extra';
 const EMAIL_LOGIN_CODE = '123456';
 const emailLoginCodeMap: Record<string, string> = {};
 const accountRecoveryCodeMap: Record<string, string> = {};
@@ -738,6 +739,78 @@ export async function mockLogout(): Promise<void> {
     Taro.removeStorageSync('loginRedirectPath');
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * 更新当前用户的基础资料（mock 模式下仅持久化到本地）
+ * - 支持的字段：name / nickname / avatar_url / phone / email / gender / birthday / id_card / region / address
+ * - 同步更新 USERS 与 Profile，便于刷新后保持一致
+ */
+export async function mockUpdateProfile(
+  patch: Partial<Pick<Profile, 'name' | 'nickname' | 'avatar_url' | 'phone' | 'email'>> & {
+    gender?: 'male' | 'female' | 'other';
+    birthday?: string;
+    id_card?: string;
+    region?: string;
+    address?: string;
+  },
+): Promise<{ profile: Profile | null; error: { message: string } | null }> {
+  await delay(250);
+  const { session, profile } = getStoredSession();
+  if (!session || !profile) {
+    return { profile: null, error: { message: '未登录' } };
+  }
+
+  const nextProfile: Profile = {
+    ...profile,
+    ...(patch.name !== undefined && { name: patch.name }),
+    ...(patch.nickname !== undefined && { nickname: patch.nickname }),
+    ...(patch.avatar_url !== undefined && { avatar_url: patch.avatar_url }),
+    ...(patch.phone !== undefined && { phone: patch.phone }),
+    ...(patch.email !== undefined && { email: patch.email }),
+  };
+
+  // 同步底层 User 模型（仅 mock 内存）
+  const userIdx = USERS.findIndex((u) => u.id === profile.id);
+  if (userIdx >= 0) {
+    const u = USERS[userIdx];
+    USERS[userIdx] = {
+      ...u,
+      ...(patch.name !== undefined && { nickname: patch.name }),
+      ...(patch.phone !== undefined && { phone: patch.phone }),
+      ...(patch.email !== undefined && { email: patch.email }),
+      ...(patch.avatar_url !== undefined && { avatar: patch.avatar_url }),
+    };
+  }
+
+  // 性别 / 生日扩展字段：暂存到 storage（mock 不会反映到 Profile 类型，但保持可读性）
+  try {
+    const prev = Taro.getStorageSync(PROFILE_EXTRA_KEY) || {};
+    Taro.setStorageSync(PROFILE_EXTRA_KEY, { ...prev, [profile.id]: patch });
+  } catch {
+    /* ignore */
+  }
+
+  saveSession(session, nextProfile);
+  return { profile: nextProfile, error: null };
+}
+
+/** 读取某用户的扩展资料（性别/生日等），从 localStorage 反序列化 */
+export async function mockGetProfileExtra(userId: string): Promise<{
+  gender?: 'male' | 'female' | 'other';
+  birthday?: string;
+  id_card?: string;
+  region?: string;
+  address?: string;
+}> {
+  await delay(80);
+  try {
+    const all = Taro.getStorageSync(PROFILE_EXTRA_KEY) || {};
+    const value = all[userId];
+    return value || {};
+  } catch {
+    return {};
   }
 }
 

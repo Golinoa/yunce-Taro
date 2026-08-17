@@ -1,3 +1,9 @@
+/**
+ * 预约详情页 package-course/pages/booking-record-detail/index
+ *
+ * 家长端查看单次课程预约的详情，展示状态、上课时间、老师、校区、教室、履约进度和快捷操作。
+ * 全部使用 UnoCSS Token，随主题色联动。
+ */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -17,22 +23,29 @@ import { withRouteGuard } from '@/utils/route-guard';
 
 type BookingRecordStatus = 'upcoming' | 'completed' | 'leave' | 'expired';
 
-const STATUS_META: Record<BookingRecordStatus, { label: string; badgeClassName: string }> = {
+const STATUS_META: Record<
+  BookingRecordStatus,
+  { label: string; badgeClassName: string; dotClassName: string }
+> = {
   upcoming: {
     label: '待上课',
-    badgeClassName: 'bg-[#eaf6ff] text-[#3a8ee6]',
+    badgeClassName: 'tag-primary',
+    dotClassName: 'bg-primary',
   },
   completed: {
     label: '已完成',
-    badgeClassName: 'bg-[#ebf9f1] text-[#33b07a]',
+    badgeClassName: 'tag-success',
+    dotClassName: 'bg-success',
   },
   leave: {
     label: '已请假',
-    badgeClassName: 'bg-[#fff3e8] text-[#df8b3b]',
+    badgeClassName: 'tag-warning',
+    dotClassName: 'bg-warning',
   },
   expired: {
     label: '已失效',
-    badgeClassName: 'bg-[#f1f1f1] text-[#8f8f8f]',
+    badgeClassName: 'bg-muted text-muted-foreground',
+    dotClassName: 'bg-muted-foreground',
   },
 };
 
@@ -245,59 +258,70 @@ const BookingRecordDetailPage: React.FC = () => {
   );
 
   return (
-    <PageContainer safeBottom className="bg-[#f6f7fb]">
-      <View className="h-screen bg-[#f6f7fb]">
+    <PageContainer safeBottom className="bg-background">
+      <View className="h-screen bg-background">
         <ScrollView scrollY className="h-full" showScrollbar={false}>
-          <View className="px-[24rpx] pb-[56rpx] pt-[24rpx]">
-            <View className="mb-[18rpx] rounded-[28rpx] bg-white px-[24rpx] py-[24rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
+          <View className="px-[24rpx] pb-[56rpx] pt-[24rpx] flex flex-col gap-[18rpx]">
+            {/* 基本信息卡片 */}
+            <View className="rounded-[28rpx] bg-card px-[24rpx] py-[24rpx] shadow-card">
               <View className="mb-[18rpx] flex items-center justify-between gap-[16rpx]">
                 <View className="min-w-0 flex-1">
-                  <Text className="block text-[34rpx] font-semibold text-[#202939]">
+                  <Text className="block text-[34rpx] font-semibold text-foreground">
                     {studentName}
                   </Text>
-                  <Text className="mt-[10rpx] block text-[24rpx] text-[#8b95a7]">{className}</Text>
+                  <Text className="mt-[10rpx] block text-[24rpx] text-muted-foreground">
+                    {className}
+                  </Text>
                 </View>
-                <View className={`rounded-full px-[18rpx] py-[8rpx] ${meta.badgeClassName}`}>
+                <View
+                  className={['rounded-full px-[18rpx] py-[8rpx]', meta.badgeClassName].join(' ')}
+                >
                   <Text className="text-[22rpx] font-medium">{meta.label}</Text>
                 </View>
               </View>
 
               <View className="flex flex-col gap-[12rpx]">
                 <View className="flex items-center">
-                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-[#65c08b]" />
-                  <Text className="text-[26rpx] text-[#4a4a4a]">
+                  <View
+                    className={[
+                      'mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full',
+                      meta.dotClassName,
+                    ].join(' ')}
+                  />
+                  <Text className="text-[26rpx] text-foreground">
                     上课时间：{lessonDate} {timeRange}
                   </Text>
                 </View>
                 <View className="flex items-center">
-                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-[#e0a54e]" />
-                  <Text className="text-[26rpx] text-[#4a4a4a]">授课老师：{teacherName}</Text>
+                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-warning" />
+                  <Text className="text-[26rpx] text-foreground">授课老师：{teacherName}</Text>
                 </View>
                 <View className="flex items-center">
-                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-[#6aa8ff]" />
-                  <Text className="text-[26rpx] text-[#4a4a4a]">上课校区：{campusName}</Text>
+                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-primary" />
+                  <Text className="text-[26rpx] text-foreground">上课校区：{campusName}</Text>
                 </View>
                 <View className="flex items-center">
-                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-[#c28cff]" />
-                  <Text className="text-[26rpx] text-[#4a4a4a]">教室信息：{room}</Text>
+                  <View className="mr-[14rpx] h-[10rpx] w-[10rpx] rounded-full bg-purple" />
+                  <Text className="text-[26rpx] text-foreground">教室信息：{room}</Text>
                 </View>
               </View>
             </View>
 
-            <View className="mb-[18rpx] rounded-[28rpx] bg-white px-[24rpx] py-[22rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
-              <Text className="mb-[16rpx] block text-[28rpx] font-semibold text-[#202939]">
+            {/* 规则快照 */}
+            <View className="rounded-[28rpx] bg-card px-[24rpx] py-[22rpx] shadow-card">
+              <Text className="mb-[16rpx] block text-[28rpx] font-semibold text-foreground">
                 规则快照
               </Text>
               {ruleSummaryList.length ? (
                 <View className="mb-[14rpx] flex flex-wrap gap-[12rpx]">
                   {ruleSummaryList.map((summary) => (
-                    <View key={summary} className="rounded-full bg-[#fff4f2] px-[16rpx] py-[8rpx]">
-                      <Text className="text-[22rpx] text-[#de7567]">{summary}</Text>
+                    <View key={summary} className="rounded-full bg-primary-10 px-[16rpx] py-[8rpx]">
+                      <Text className="text-[22rpx] text-primary">{summary}</Text>
                     </View>
                   ))}
                 </View>
               ) : null}
-              <Text className="block text-[24rpx] leading-[38rpx] text-[#8b95a7]">
+              <Text className="block text-[24rpx] leading-[38rpx] text-muted-foreground">
                 {rules.cancelEnabled
                   ? `当前支持取消预约，需在开课前 ${rules.cancelDeadlineHours} 小时前完成。`
                   : '当前规则不支持取消预约。'}
@@ -305,8 +329,9 @@ const BookingRecordDetailPage: React.FC = () => {
               </Text>
             </View>
 
-            <View className="mb-[18rpx] rounded-[28rpx] bg-white px-[24rpx] py-[22rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
-              <Text className="mb-[16rpx] block text-[28rpx] font-semibold text-[#202939]">
+            {/* 履约进度 */}
+            <View className="rounded-[28rpx] bg-card px-[24rpx] py-[22rpx] shadow-card">
+              <Text className="mb-[16rpx] block text-[28rpx] font-semibold text-foreground">
                 履约进度
               </Text>
               <View className="flex flex-col gap-[16rpx]">
@@ -331,14 +356,14 @@ const BookingRecordDetailPage: React.FC = () => {
                   },
                 ].map((item, index) => (
                   <View key={item.title} className="flex items-start">
-                    <View className="mr-[16rpx] mt-[6rpx] flex h-[36rpx] w-[36rpx] items-center justify-center rounded-full bg-[#fff4f2]">
-                      <Text className="text-[20rpx] font-semibold text-[#de7567]">{index + 1}</Text>
+                    <View className="mr-[16rpx] mt-[6rpx] flex h-[36rpx] w-[36rpx] items-center justify-center rounded-full bg-primary-10">
+                      <Text className="text-[20rpx] font-semibold text-primary">{index + 1}</Text>
                     </View>
                     <View className="min-w-0 flex-1">
-                      <Text className="block text-[26rpx] font-medium text-[#202939]">
+                      <Text className="block text-[26rpx] font-medium text-foreground">
                         {item.title}
                       </Text>
-                      <Text className="mt-[6rpx] block text-[24rpx] leading-[36rpx] text-[#8b95a7]">
+                      <Text className="mt-[6rpx] block text-[24rpx] leading-[36rpx] text-muted-foreground">
                         {item.desc}
                       </Text>
                     </View>
@@ -347,20 +372,21 @@ const BookingRecordDetailPage: React.FC = () => {
               </View>
             </View>
 
-            <View className="rounded-[28rpx] bg-white px-[24rpx] py-[22rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
-              <Text className="mb-[16rpx] block text-[28rpx] font-semibold text-[#202939]">
+            {/* 快捷操作 */}
+            <View className="rounded-[28rpx] bg-card px-[24rpx] py-[22rpx] shadow-card">
+              <Text className="mb-[16rpx] block text-[28rpx] font-semibold text-foreground">
                 快捷操作
               </Text>
               <View className="flex flex-col gap-[14rpx]">
                 {actionList.map((label) => (
                   <View
                     key={label}
-                    className="flex items-center justify-between rounded-[20rpx] bg-[#f8fafc] px-[20rpx] py-[18rpx]"
+                    className="flex items-center justify-between rounded-[20rpx] bg-muted px-[20rpx] py-[18rpx] active:bg-muted/80"
                     onClick={() => handleAction(label)}
                   >
                     <View className="flex items-center gap-[12rpx]">
                       <Icon name="mdi-lightning-bolt-outline" size="xs" color="mutedForeground" />
-                      <Text className="text-[26rpx] text-[#202939]">{label}</Text>
+                      <Text className="text-[26rpx] text-foreground">{label}</Text>
                     </View>
                     <Icon name="mdi-chevron-right" size="xs" color="mutedForeground" />
                   </View>

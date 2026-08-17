@@ -73,5 +73,7 @@ export type { TrialCourseSlot } from './lead';
 export { classBookingService } from './class-booking';
 export { venueBookingService } from './venue-booking';
 export type { BookableVenue, VenueBookingRecord, VenueBookingSlot } from '@/types/venue-booking';
+export { myCourseService } from './my-course';
+export type { MyCourseItem, MyCourseStatus } from './my-course';
 export { onboardingService } from './onboarding';
 export type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';

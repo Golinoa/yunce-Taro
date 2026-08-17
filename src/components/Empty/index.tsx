@@ -10,9 +10,13 @@ import type { IconName } from '@/components/Icon';
 const MDI_ICON_NAMES: string[] = [
   'mdi-inbox',
   'mdi-account-search',
+  'mdi-account-question-outline',
   'mdi-school-outline',
   'mdi-calendar-blank',
   'mdi-book-open-blank-variant',
+  'mdi-book-open-variant',
+  'mdi-wallet-outline',
+  'mdi-calendar-check-outline',
   'mdi-account-group-outline',
   'mdi-account-multiple-plus',
   'mdi-bell-off',

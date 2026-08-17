@@ -25,6 +25,8 @@ import {
   mockAddIdentity,
   mockRestoreRegisterDrafts,
   mockLogout,
+  mockUpdateProfile,
+  mockGetProfileExtra,
 } from '@/data/auth';
 import { TEST_ACCOUNTS, TEST_PASSWORD } from '@/data/mock-database';
 import type { TestAccount } from '@/data/mock-database';
@@ -37,7 +39,7 @@ import type {
   RegisterDraft,
   TeacherRoleInfo,
 } from '@/types/profile';
-import { get, post } from '@/utils/request';
+import { get, post, put } from '@/utils/request';
 
 type BackendRole = 'ADMIN' | 'ASSISTANT' | 'PARENT' | 'PRINCIPAL' | 'TEACHER';
 
@@ -579,6 +581,68 @@ export async function switchIdentity(identityId: string): Promise<{
 }> {
   if (USE_MOCK) return mockSwitchIdentity(identityId);
   return { profile: null, error: { message: '真实后端联调阶段暂未开放多身份切换' } };
+}
+
+/**
+ * 更新当前用户的基础资料
+ * - Mock：本地持久化到 profile storage
+ * - 真实接口：调用 `PUT /profile`
+ */
+export async function updateProfile(
+  patch: Partial<Pick<Profile, 'name' | 'nickname' | 'avatar_url' | 'phone' | 'email'>> & {
+    gender?: 'male' | 'female' | 'other';
+    birthday?: string;
+    id_card?: string;
+    region?: string;
+    address?: string;
+  },
+): Promise<{ profile: Profile | null; error: { message: string } | null }> {
+  if (USE_MOCK) return mockUpdateProfile(patch);
+  try {
+    const updated = await put<BackendUserInfo>(
+      AUTH_ENDPOINTS.profile,
+      patch as Record<string, unknown>,
+    );
+    const mapped = mapBackendProfile(updated);
+    return { profile: mapped, error: null };
+  } catch (err) {
+    return {
+      profile: null,
+      error: { message: err instanceof Error ? err.message : '更新资料失败' },
+    };
+  }
+}
+
+/** 获取用户扩展资料（性别/生日等） */
+export async function getProfileExtra(userId: string): Promise<{
+  gender?: 'male' | 'female' | 'other';
+  birthday?: string;
+  id_card?: string;
+  region?: string;
+  address?: string;
+}> {
+  if (USE_MOCK) return mockGetProfileExtra(userId);
+  // 真实接口暂未独立暴露，从 profile 中按需取
+  try {
+    const data = await get<{
+      gender?: string;
+      birthday?: string;
+      id_card?: string;
+      region?: string;
+      address?: string;
+    }>(`${AUTH_ENDPOINTS.profile}/extra`);
+    const mapGender = (v?: string) =>
+      v === 'male' || v === 'female' || v === 'other' ? v : undefined;
+    return {
+      gender: mapGender(data?.gender),
+      birthday: data?.birthday,
+      id_card: data?.id_card,
+      region: data?.region,
+      address: data?.address,
+    };
+  } catch {
+    return {};
+  }
 }
 
 export async function addIdentity(

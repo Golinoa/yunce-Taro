@@ -235,19 +235,20 @@ const Profile: React.FC = () => {
     handlePlaceholder();
   }, [handlePlaceholder]);
 
-  // 打开我的孩子弹窗（未绑定则打开绑定弹窗）
+  // 跳转到个人资料编辑页
+  const handleProfile = useCallback(() => {
+    Taro.navigateTo({ url: '/pages/profile-edit/index' });
+  }, []);
+
+  // 跳转到子女档案页
   const handleMyChildren = useCallback(() => {
     if (students.length === 0) {
+      // 0 个孩子时引导去绑定
       setShowBindSheet(true);
     } else {
-      setShowSwitchSheet(true);
+      Taro.navigateTo({ url: '/pages/children/index' });
     }
   }, [students.length]);
-
-  // 我的资料（暂无独立页）
-  const handleProfile = useCallback(() => {
-    Taro.showToast({ title: '资料编辑页开发中', icon: 'none' });
-  }, []);
 
   // 公众号关注（暂无接入）
   const handleFollow = useCallback(() => {
@@ -256,7 +257,7 @@ const Profile: React.FC = () => {
 
   // 关于品牌
   const handleAbout = useCallback(() => {
-    Taro.showToast({ title: '关于页面开发中', icon: 'none' });
+    Taro.navigateTo({ url: '/pages/about/index' });
   }, []);
 
   // ============================================
@@ -326,7 +327,7 @@ const Profile: React.FC = () => {
       {
         label: '使用帮助',
         icon: 'mdi-help-circle-outline',
-        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+        onClick: () => handleNavigate('/package-settings/pages/help/index'),
       },
       {
         label: '平台客服',
@@ -367,25 +368,25 @@ const Profile: React.FC = () => {
       {
         label: '已预约',
         icon: 'mdi-calendar-check-outline' as const,
-        onClick: () => handleNavigate('/pages/booking/index'),
+        onClick: () => handleNavigate('/pages/my-course/index?tab=booked'),
       },
       {
         label: '排队中',
         icon: 'mdi-account-group-outline' as const,
-        onClick: handlePlaceholder,
+        onClick: () => handleNavigate('/pages/my-course/index?tab=waiting'),
       },
       {
         label: '待评价',
         icon: 'mdi-star-outline' as const,
-        onClick: handlePlaceholder,
+        onClick: () => handleNavigate('/pages/my-course/index?tab=pending_evaluate'),
       },
       {
         label: '已取消',
         icon: 'mdi-calendar-blank-outline' as const,
-        onClick: handlePlaceholder,
+        onClick: () => handleNavigate('/pages/my-course/index?tab=cancelled'),
       },
     ],
-    [handleNavigate, handlePlaceholder],
+    [handleNavigate],
   );
 
   // 家长视图：我的服务
@@ -426,7 +427,7 @@ const Profile: React.FC = () => {
       {
         label: '使用帮助',
         icon: 'mdi-help-circle-outline' as const,
-        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+        onClick: () => handleNavigate('/package-settings/pages/help/index'),
       },
       {
         label: '平台客服',
@@ -488,9 +489,7 @@ const Profile: React.FC = () => {
               <Text className="text-[32rpx] font-bold text-primary ml-[6rpx]">会员卡</Text>
             </View>
             <Text className="text-[24rpx] text-muted-foreground mt-[14rpx]">
-              {isMembershipActive
-                ? '已开通会员，尊享全部教务特权'
-                : '开通会员，尊享全部教务特权'}
+              {isMembershipActive ? '已开通会员，尊享全部教务特权' : '开通会员，尊享全部教务特权'}
             </Text>
           </View>
 
@@ -527,11 +526,7 @@ const Profile: React.FC = () => {
         {false && <ProfileFollowCard className="mt-[24rpx]" onClick={handleFollow} />}
 
         {/* ====== 我的约课 ====== */}
-        <ProfileGrid
-          className="mt-[24rpx]"
-          title="我的约课"
-          items={parentBookingItems}
-        />
+        <ProfileGrid className="mt-[24rpx]" title="我的约课" items={parentBookingItems} />
 
         {/* ====== 错误提示 ====== */}
         {errorMsg && (
@@ -556,17 +551,9 @@ const Profile: React.FC = () => {
                 onExtraClick={handleStoreExtraClick}
               />
             ) : (
-              <ProfileGrid
-                className="mt-[24rpx]"
-                title="店铺管理"
-                      items={teacherStoreItems}
-              />
+              <ProfileGrid className="mt-[24rpx]" title="店铺管理" items={teacherStoreItems} />
             )}
-            <ProfileGrid
-              className="mt-[24rpx]"
-              title="系统管理"
-                  items={teacherSystemItems}
-            />
+            <ProfileGrid className="mt-[24rpx]" title="系统管理" items={teacherSystemItems} />
           </>
         )}
 
@@ -606,26 +593,14 @@ const Profile: React.FC = () => {
               <Icon name="mdi-chevron-right" size="xs" color="mutedForeground" />
             </View>
 
-            <ProfileGrid
-              className="mt-[24rpx]"
-              title="我的约课"
-                  items={parentBookingItems}
-            />
-            <ProfileGrid
-              className="mt-[24rpx]"
-              title="我的服务"
-                  items={parentServiceItems}
-            />
-            <ProfileGrid
-              className="mt-[24rpx]"
-              title="系统管理"
-                  items={parentSystemItems}
-            />
+            <ProfileGrid className="mt-[24rpx]" title="我的约课" items={parentBookingItems} />
+            <ProfileGrid className="mt-[24rpx]" title="我的服务" items={parentServiceItems} />
+            <ProfileGrid className="mt-[24rpx]" title="系统管理" items={parentSystemItems} />
           </>
         )}
 
         {/* ====== 底部品牌关于 ====== */}
-        <ProfileAbout onClick={handleAbout} />
+        <ProfileAbout onClick={handleAbout} className="mb-[32rpx]" />
 
         {/* ====== 绑定学生弹窗 ====== */}
         <BottomSheet
@@ -672,7 +647,7 @@ const Profile: React.FC = () => {
           </View>
         </BottomSheet>
 
-        {/* ====== 切换学生弹窗 ====== */}
+        {/* ====== 切换学生弹窗（保留兼容，已不再主动触发） ====== */}
         <BottomSheet
           visible={showSwitchSheet}
           title="切换学生"

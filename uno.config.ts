@@ -131,6 +131,7 @@ export default defineConfig({
       soft: '0 8rpx 40rpx -8rpx hsl(var(--primary) / 0.08)',
       card: '0 2rpx 12rpx hsl(var(--primary) / 0.06)',
       float: '0 4rpx 16rpx hsl(var(--primary) / 0.08)',
+      campus: '0 6rpx 18rpx rgba(0, 0, 0, 0.05), 0 2rpx 4rpx rgba(0, 0, 0, 0.03)',
     },
     animation: {
       keyframes: {

@@ -18,6 +18,8 @@ import {
   CAMPUSES,
   SCHEDULES,
   NOTIFICATIONS,
+  USERS,
+  STUDENT_PARENTS,
   type Student,
   type CoursePackage,
   type Class,
@@ -590,7 +592,29 @@ export async function mockGetStudentsByParent(parentId: string) {
 
 export async function mockCreateStudent(data: any) {
   await delay();
-  return { id: `stu-${Date.now()}`, ...data };
+  const now = new Date().toISOString();
+  const newStudent: Student = {
+    id: `stu-${Date.now()}`,
+    name: data.name || '',
+    nickname: data.nickname,
+    relation: data.relation,
+    gender: data.gender || 'male',
+    birthday: data.birthday || now.split('T')[0],
+    phone: data.phone || '',
+    address: data.address || '',
+    parentId: data.parentId || data.parent_id,
+    campusId: data.campusId || data.campus_id || '',
+    teacherId: data.teacherId || data.teacher_id || '',
+    classIds: data.classIds || data.class_ids || [],
+    totalHours: data.totalHours ?? data.total_hours ?? 0,
+    remainingHours: data.remainingHours ?? data.remaining_hours ?? 0,
+    status: 'active',
+    createdAt: now,
+    note: data.note,
+    avatar_url: data.avatar_url,
+  };
+  DB_STUDENTS.push(newStudent);
+  return newStudent;
 }
 
 export async function mockUpdateStudent(studentId: string, data: any) {
@@ -623,13 +647,34 @@ export async function mockCheckDuplicateName(teacherId: string, name: string, ex
   );
 }
 
-export async function mockGetParentsByStudent(_studentId: string): Promise<StudentParent[]> {
+export async function mockGetParentsByStudent(studentId: string): Promise<StudentParent[]> {
   await delay();
-  return [];
+  const bindings = STUDENT_PARENTS.filter((item) => item.studentId === studentId);
+  return bindings.map((item) => {
+    const user = USERS.find((u) => u.id === item.parentId);
+    return {
+      id: item.id,
+      student_id: studentId,
+      parent_id: item.parentId,
+      parent: user
+        ? {
+            id: user.id,
+            name: user.name,
+            phone: user.phone,
+            avatar_url: user.avatar,
+          }
+        : undefined,
+      created_at: item.createdAt,
+    };
+  });
 }
 
-export async function mockRemoveParentFromStudent(_bindingId: string) {
+export async function mockRemoveParentFromStudent(bindingId: string) {
   await delay();
+  const index = STUDENT_PARENTS.findIndex((item) => item.id === bindingId);
+  if (index >= 0) {
+    STUDENT_PARENTS.splice(index, 1);
+  }
   return true;
 }
 
@@ -638,8 +683,19 @@ export async function mockFindStudentByInviteCode(code: string) {
   return DB_STUDENTS.find((student) => buildStudentInviteCode(student.id) === code);
 }
 
-export async function mockBindParentToStudent(_studentId: string, _parentId: string) {
+export async function mockBindParentToStudent(studentId: string, parentId: string) {
   await delay();
+  const exists = STUDENT_PARENTS.some(
+    (item) => item.studentId === studentId && item.parentId === parentId,
+  );
+  if (!exists) {
+    STUDENT_PARENTS.push({
+      id: `sp-${Date.now()}`,
+      studentId,
+      parentId,
+      createdAt: new Date().toISOString(),
+    });
+  }
   return true;
 }
 

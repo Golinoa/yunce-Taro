@@ -1,9 +1,10 @@
 import { View, Text, ScrollView, Image, Swiper, SwiperItem } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import KingKongSection from '@/components/home/KingKongSection';
-import StatsOverview from '@/components/home/StatsOverview';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import TodoList from '@/components/home/TodoList';
 import type { TodoItem } from '@/components/home/TodoList';
@@ -13,24 +14,15 @@ import LessonConsumptionList, {
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
-import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { lessonRecordService } from '@/services';
 import { homeService } from '@/services/home';
-import type {
-  StatsPeriod,
-  StatsData,
-  QuickEntry,
-  HomeTeacherSummary,
-  HomeOperationContent,
-  OperationActionConfig,
-  OperationActivityItem,
-  OperationBannerItem,
-} from '@/services/home';
+import type { QuickEntry } from '@/services/home';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
+import type { CampusUIModel } from '@/types/campus';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
-import { isStaffRole, useAuth } from '@/utils/auth';
+import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -40,118 +32,65 @@ type HomeTab = 'schedule' | 'todo' | 'recent';
 
 const HOME_TAB_SWIPER_DURATION = 260;
 const HOME_TAB_ORDER: HomeTab[] = ['schedule', 'todo', 'recent'];
+const ORG_COVER_IMAGE = '/assets/images/2.jpg';
 
 const getHomeTabIndex = (tab: HomeTab): number => HOME_TAB_ORDER.indexOf(tab);
 
 const getHomeTabByIndex = (index: number): HomeTab => HOME_TAB_ORDER[index] || 'schedule';
 
-/** 校区选项 */
-interface CampusOption {
-  id: string;
-  name: string;
-  isMain: boolean;
+/** 解析营业时间，返回 HH:mm 格式起止时间 */
+function parseBusinessHours(hours?: string): { start: string; end: string } | null {
+  if (!hours) return null;
+  const match = hours.match(/(\d{2}:\d{2}):\d{2}至(\d{2}:\d{2}):\d{2}/);
+  if (!match) return null;
+  return { start: match[1], end: match[2] };
+}
+
+/** 根据当前时间判断校区是否营业中 */
+function isCampusOpen(hours?: string): boolean {
+  const parsed = parseBusinessHours(hours);
+  if (!parsed) return true;
+  const now = dayjs();
+  const start = dayjs(`${now.format('YYYY-MM-DD')} ${parsed.start}`);
+  const end = dayjs(`${now.format('YYYY-MM-DD')} ${parsed.end}`);
+  return now.isAfter(start) && now.isBefore(end);
 }
 
 /**
- * Home - 教师端首页 v14
+ * Home - 机构端首页
  *
- * 对齐设计稿 index_v14.html：
- * - 黄绿渐变头部 + 导航栏 + 问候语
- * - 白色统计卡片 + 时段Tab + "更多"按钮
- * - 金刚区：三卡片 + 图标网格 + 分页
- * - Tab切换：今日课表 / 待办事项 / 最近消课
+ * 对齐设计稿：
+ * - 机构图片背景头部 + 校区切换卡片
+ * - 金刚区快捷入口
+ * - Tab 切换：今日课表 / 待办事项 / 最近消课
  */
-const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员',
-  principal: '校长',
-  teacher: '教师',
-  assistant: '助教',
-  parent: '家长',
-};
-
-const EMPTY_OPERATION_CONTENT: HomeOperationContent = {
-  placements: {
-    banners: [],
-    cards: [],
-    floatings: [],
-    notices: [],
-    popups: [],
-  },
-  updatedAt: '',
-};
-
-const normalizeMiniProgramPath = (path?: string): string | null => {
-  if (!path) {
-    return null;
-  }
-
-  return path.startsWith('/') ? path : `/${path}`;
-};
-
-const getOperationTarget = (actionConfig?: OperationActionConfig) => {
-  if (!actionConfig) {
-    return { target: null, type: 'NONE' as const };
-  }
-
-  const type = actionConfig.type || 'NONE';
-  const target = actionConfig.path || actionConfig.url || actionConfig.appId || null;
-  return { target, type };
-};
-
-const getOperationSummary = (item: OperationActivityItem): string => {
-  return item.summary?.trim() || item.content?.trim() || '暂无活动说明';
-};
-
 const Home: React.FC = () => {
   const { profile, currentRole, currentIdentity } = useAuth();
-  const { orgName, campuses, currentCampusId, setMainCampus, setCurrentCampusId, fetchCampuses } =
+  const { campuses, currentCampusId, lastVisitedCampusId, setCurrentCampusId, fetchCampuses } =
     useCampusStore();
   const { activeTheme } = useThemeStore();
   const [roleSheetVisible, setRoleSheetVisible] = useState(false);
-  const mainCampus = campuses.find((c) => c.isMain) || campuses[0];
+  const [showCampusSheet, setShowCampusSheet] = useState(false);
   const navSafeHeight = useNavSafeHeight();
 
-  // ---- 招呼语：昵称最多 5 字，按字数动态缩放字号 ----
-  const nickname = (profile?.name || '').slice(0, 5);
-  const greetingSize = nickname ? [72, 64, 56, 48, 40][nickname.length - 1] || 40 : 64;
+  const currentCampus = useMemo<CampusUIModel | null>(() => {
+    const byId = campuses.find((c) => c.id === currentCampusId);
+    return byId || campuses.find((c) => c.isMain) || campuses[0] || null;
+  }, [campuses, currentCampusId]);
 
-  // ---- 校区下拉选择 ----
-  const [showCampusPicker, setShowCampusPicker] = useState(false);
-  const campusOptions: CampusOption[] = campuses.map((c) => ({
-    id: c.id,
-    name: c.name,
-    isMain: c.isMain,
-  }));
-  const handleToggleCampusPicker = useCallback(() => {
-    if (campusOptions.length === 0) {
-      Taro.showToast({ title: '暂无校区', icon: 'none' });
-      return;
-    }
-    setShowCampusPicker((prev) => !prev);
-  }, [campusOptions]);
-  const handleCampusSelect = useCallback(
-    async (campus: CampusOption) => {
-      setShowCampusPicker(false);
-      setCurrentCampusId(campus.id);
-      if (!campus.isMain) {
-        await setMainCampus(campus.id);
-      }
-    },
-    [setCurrentCampusId, setMainCampus],
+  const businessTime = useMemo(() => {
+    const parsed = parseBusinessHours(currentCampus?.businessHours);
+    if (!parsed) return '';
+    return `${parsed.start}-${parsed.end}`;
+  }, [currentCampus?.businessHours]);
+
+  const isOpen = useMemo(
+    () => isCampusOpen(currentCampus?.businessHours),
+    [currentCampus?.businessHours],
   );
 
   // ---- 教师端状态 ----
-  const [teacher, setTeacher] = useState<HomeTeacherSummary | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-
-  // ---- 统计概览状态 ----
-  const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('today');
-  const [statsData, setStatsData] = useState<StatsData>({
-    checkinCount: 0,
-    leaveCount: 0,
-    lessonHours: 0,
-    lessonAmount: 0,
-  });
 
   // ---- 快捷入口 ----
   const [quickEntries, setQuickEntries] = useState<QuickEntry[]>([]);
@@ -169,29 +108,38 @@ const Home: React.FC = () => {
 
   // ---- 未读消息数 ----
   const [unreadCount, setUnreadCount] = useState(0);
-  const [operationContent, setOperationContent] =
-    useState<HomeOperationContent>(EMPTY_OPERATION_CONTENT);
-  const [operationLoading, setOperationLoading] = useState(true);
-  const [operationError, setOperationError] = useState('');
-
   // ---- 公共状态 ----
   const isFirstMount = useRef(true);
-  const shownPopupIdsRef = useRef<string[]>([]);
   const homeTabMeasureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ============================================
-  // 统计数据加载
+  // 校区切换
   // ============================================
-  const loadStatsData = useCallback(
-    async (teacherId: string, period: StatsPeriod, campusId?: string) => {
-      try {
-        const data = await homeService.getStatsByPeriod(teacherId, period, campusId);
-        setStatsData(data);
-      } catch (err) {
-        logError('Home loadStatsData', err);
-      }
+  const managedCampusIds = useMemo(() => {
+    if (isPrincipalOrAbove(currentRole)) {
+      return currentIdentity?.campusIds || [];
+    }
+    return [];
+  }, [currentRole, currentIdentity]);
+
+  const handleOpenCampusSheet = useCallback(() => {
+    if (campuses.length === 0) {
+      Taro.showToast({ title: '暂无校区', icon: 'none' });
+      return;
+    }
+    setShowCampusSheet(true);
+  }, [campuses.length]);
+
+  const handleCloseCampusSheet = useCallback(() => {
+    setShowCampusSheet(false);
+  }, []);
+
+  const handleConfirmCampus = useCallback(
+    (campus: CampusUIModel) => {
+      setCurrentCampusId(campus.id);
+      setShowCampusSheet(false);
     },
-    [],
+    [setCurrentCampusId],
   );
 
   // ============================================
@@ -216,7 +164,6 @@ const Home: React.FC = () => {
         if (!teacherData) {
           return;
         }
-        setTeacher(teacherData);
 
         const recentLessonRequest =
           currentRole === 'teacher'
@@ -233,127 +180,24 @@ const Home: React.FC = () => {
         setUnreadCount(unread);
         setTodoItems(todoList);
         setRecentRecords(lessonRecords);
-        await loadStatsData(teacherData.id, 'today', campusId);
       } catch (err) {
         logError('Home loadData', err);
       }
     },
-    [profile, currentRole, loadStatsData],
-  );
-
-  const executeOperationAction = useCallback(async (actionConfig?: OperationActionConfig) => {
-    const { target, type } = getOperationTarget(actionConfig);
-
-    if (type === 'NONE') {
-      return;
-    }
-
-    if ((type === 'PAGE' || type === 'TAB') && target) {
-      const path = normalizeMiniProgramPath(target);
-      if (!path) {
-        Taro.showToast({ title: '运营配置缺少跳转页面', icon: 'none' });
-        return;
-      }
-
-      if (type === 'TAB') {
-        Taro.switchTab({ url: path });
-      } else {
-        Taro.navigateTo({ url: path });
-      }
-      return;
-    }
-
-    if (type === 'MINI_PROGRAM' && actionConfig?.appId) {
-      try {
-        await Taro.navigateToMiniProgram({
-          appId: actionConfig.appId,
-          path: actionConfig.path,
-        });
-      } catch {
-        Taro.showToast({ title: '打开关联小程序失败', icon: 'none' });
-      }
-      return;
-    }
-
-    if (type === 'WEBVIEW') {
-      if (target) {
-        try {
-          await Taro.setClipboardData({
-            data: target,
-          });
-          Taro.showToast({ title: '活动链接已复制', icon: 'success' });
-        } catch {
-          Taro.showToast({ title: '活动链接暂不可用', icon: 'none' });
-        }
-        return;
-      }
-      Taro.showToast({ title: 'H5 活动页暂未配置链接', icon: 'none' });
-      return;
-    }
-
-    if (type === 'ACTIVITY') {
-      const path = normalizeMiniProgramPath(target || actionConfig?.path);
-      if (path) {
-        Taro.navigateTo({ url: path });
-        return;
-      }
-      Taro.showToast({ title: '活动详情暂未配置页面', icon: 'none' });
-      return;
-    }
-
-    Taro.showToast({ title: '运营跳转配置暂不可用', icon: 'none' });
-  }, []);
-
-  const handleOperationTap = useCallback(
-    async (item: OperationActivityItem | OperationBannerItem) => {
-      await executeOperationAction(item.actionConfig);
-    },
-    [executeOperationAction],
-  );
-
-  const loadOperationContent = useCallback(async () => {
-    setOperationLoading(true);
-    setOperationError('');
-    try {
-      const content = await homeService.getOperationContent(currentRole);
-      setOperationContent(content);
-    } catch (error) {
-      logError('Home loadOperationContent', error);
-      setOperationContent(EMPTY_OPERATION_CONTENT);
-      setOperationError('运营内容加载失败');
-    } finally {
-      setOperationLoading(false);
-    }
-  }, [currentRole]);
-
-  /** 统计时段切换 */
-  const handleStatsPeriodChange = useCallback(
-    (period: StatsPeriod) => {
-      setStatsPeriod(period);
-      if (teacher?.id) {
-        loadStatsData(teacher.id, period, currentCampusId);
-      }
-    },
-    [teacher, currentCampusId, loadStatsData],
+    [profile, currentRole],
   );
 
   // ============================================
   // 初始化
   // ============================================
   useEffect(() => {
-    // 按当前身份加载快捷入口与校区数据
     setQuickEntries(homeService.getQuickEntries(currentRole));
     fetchCampuses();
   }, [currentRole, fetchCampuses]);
 
-  // 当身份、登录状态或当前校区变化时重新加载数据
   useEffect(() => {
     loadData(currentCampusId);
   }, [profile, currentRole, currentCampusId, loadData]);
-
-  useEffect(() => {
-    loadOperationContent();
-  }, [loadOperationContent]);
 
   useDidShow(() => {
     if (isFirstMount.current) {
@@ -361,28 +205,7 @@ const Home: React.FC = () => {
       return;
     }
     loadData(currentCampusId);
-    loadOperationContent();
   });
-
-  useEffect(() => {
-    const popup = operationContent.placements.popups[0];
-    if (!popup || shownPopupIdsRef.current.includes(popup.id)) {
-      return;
-    }
-
-    shownPopupIdsRef.current = [...shownPopupIdsRef.current, popup.id];
-    Taro.showModal({
-      title: popup.title || '活动提醒',
-      content: getOperationSummary(popup),
-      confirmText: '去看看',
-      cancelText: '稍后',
-      success: (result) => {
-        if (result.confirm) {
-          void executeOperationAction(popup.actionConfig);
-        }
-      },
-    });
-  }, [executeOperationAction, operationContent]);
 
   // Tab 配置
   const TAB_OPTIONS: { key: HomeTab; label: string; badge?: number }[] = [
@@ -476,309 +299,227 @@ const Home: React.FC = () => {
     };
   }, []);
 
-  const noticeItem = operationContent.placements.notices[0] || null;
-  const floatingItem = operationContent.placements.floatings[0] || null;
+  const renderHeader = () => {
+    if (!isStaffRole(currentRole)) {
+      return (
+        <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
+          <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
+          <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">家长端首页</Text>
+          <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
+            当前联调阶段先展示通用运营内容{'\n'}
+            可从消息通知和个人中心继续使用家长侧能力
+          </Text>
+          <View className="mt-[24rpx] flex gap-[16rpx] w-full">
+            <View
+              className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
+              onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+            >
+              <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
+            </View>
+            <View
+              className="flex-1 rounded-full border border-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
+              onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
+            >
+              <Text className="text-[24rpx] font-medium text-primary">个人中心</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <>
+        {/* 机构背景图 */}
+        <View className="relative h-[480rpx] overflow-hidden">
+          <Image
+            src={ORG_COVER_IMAGE}
+            className="absolute inset-0 w-full h-full"
+            mode="aspectFill"
+          />
+          <View className="absolute inset-0 bg-black/35" />
+
+          {/* 通知铃铛 */}
+          <View
+            className="absolute right-[24rpx] z-10"
+            style={{ top: `${navSafeHeight - 4}px` }}
+            onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+          >
+            <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
+              <Icon name="mdi-bell-outline" size={44} color="white" />
+              {unreadCount > 0 && (
+                <View className="absolute top-[10rpx] right-[10rpx] w-[18rpx] h-[18rpx] bg-destructive rounded-full border-[2rpx] border-primary" />
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* 校区卡片 */}
+        <View className="relative z-30 -mt-[90rpx] mx-[28rpx]">
+          <View
+            className="bg-white/92 backdrop-blur-md rounded-[32rpx] p-[24rpx] shadow-campus press-scale"
+            onClick={handleOpenCampusSheet}
+          >
+            <View className="flex items-center gap-[20rpx]">
+              <View
+                className="w-[88rpx] h-[88rpx] rounded-[20rpx] center overflow-hidden shrink-0"
+                style={{
+                  background:
+                    currentCampus?.iconGradient || 'linear-gradient(135deg, #5EC8A8, #4AB893)',
+                }}
+              >
+                {currentCampus?.logo ? (
+                  <Image src={currentCampus.logo} className="w-full h-full" mode="aspectFill" />
+                ) : (
+                  <Text className="text-[40rpx]">{currentCampus?.icon || '🏢'}</Text>
+                )}
+              </View>
+
+              <View className="flex-1 min-w-0">
+                <View className="flex items-center gap-[12rpx] mb-[6rpx]">
+                  <Text className="text-[32rpx] font-bold text-foreground truncate">
+                    {currentCampus?.name || '未设置校区'}
+                  </Text>
+                  <View
+                    className={cn(
+                      'flex items-center gap-[6rpx] px-[12rpx] py-[2rpx] rounded-[8rpx]',
+                      isOpen ? 'bg-success-bg' : 'bg-muted',
+                    )}
+                  >
+                    <View
+                      className={cn(
+                        'w-[12rpx] h-[12rpx] rounded-full',
+                        isOpen ? 'bg-success' : 'bg-muted-foreground',
+                      )}
+                    />
+                    <Text
+                      className={cn(
+                        'text-[22rpx] font-medium',
+                        isOpen ? 'text-success' : 'text-muted-foreground',
+                      )}
+                    >
+                      {isOpen ? '营业中' : '休息中'}
+                    </Text>
+                  </View>
+                </View>
+                <View className="flex items-center gap-[4rpx]">
+                  <Icon name="mdi-map-marker-outline" size="xxs" color="mutedForeground" />
+                  <Text className="text-[24rpx] text-muted-foreground truncate">
+                    {currentCampus?.address || '暂无地址'}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex flex-col items-end gap-[4rpx] shrink-0">
+                <View className="flex items-center gap-[2rpx]">
+                  <Text className="text-[26rpx] font-semibold text-foreground">切换校区</Text>
+                  <Icon name="mdi-chevron-down" size="xs" color="foreground" />
+                </View>
+                {businessTime && (
+                  <Text className="text-[22rpx] text-muted-foreground">{businessTime}</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      </>
+    );
+  };
 
   return (
     <>
-      <View className={cn(`theme-${activeTheme}`, 'h-screen overflow-x-hidden bg-[var(--muted)]')}>
+      <View className={cn(`theme-${activeTheme}`, 'h-screen overflow-x-hidden bg-background')}>
         <ScrollView scrollY showScrollbar={false} className="h-full overflow-x-hidden no-scrollbar">
           <View className="min-h-full">
-            {/* ========== 渐变背景层 ========== */}
-            <View className="gradient-bg" />
-            <View className="gradient-fade" />
+            {renderHeader()}
 
-            {/* ========== 内容层 ========== */}
-            <View className="relative z-[200]">
-              {/* ===== 自定义导航栏：状态栏占位 + 机构/校区信息 + 胶囊安全区 ===== */}
-              <View
-                style={{ height: `${navSafeHeight}px` }}
-                className="flex items-end px-[32rpx] pb-[12rpx]"
-              >
-                <View className="flex items-center gap-[16rpx]">
-                  {/* 机构名称 */}
-                  <Text className="text-[32rpx] font-bold text-white truncate max-w-[200rpx]">
-                    {orgName || currentIdentity?.organizationName || BRAND_FALLBACK_ORG_NAME}
-                  </Text>
-                  {/* 校区选择器 - 点击展开下拉 */}
-                  <View className="relative shrink-0">
-                    <View
-                      className="flex items-center gap-[8rpx] py-[12rpx] pr-[12rpx] pl-[4rpx]"
-                      onClick={handleToggleCampusPicker}
-                    >
-                      <Icon name="mdi-map-marker" size="xs" color="white" />
-                      <Text className="text-[28rpx] text-white/90 truncate max-w-[160rpx]">
-                        {mainCampus?.name || '主校区'}
-                      </Text>
-                      <Icon
-                        name={showCampusPicker ? 'mdi-chevron-down' : 'mdi-chevron-right'}
-                        size="md"
-                        color="white"
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
+            {/* 内容区：校区卡片压住上半部分 */}
+            <View className="relative z-10 bg-transparent mx-[28rpx] pt-[0] pb-[200rpx]">
+              {/* 金刚区 */}
+              {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
 
-              {/* 通知铃铛 - 绝对定位，避免被胶囊按钮遮挡 */}
-              <View
-                className="absolute right-[32rpx]"
-                style={{ top: `${navSafeHeight - 4}px` }}
-                onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
-              >
-                <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
-                  <Icon name="mdi-bell-outline" size={44} color="white" />
-                  {unreadCount > 0 && (
-                    <View className="absolute top-[10rpx] right-[10rpx] w-[18rpx] h-[18rpx] bg-destructive rounded-full border-[2rpx] border-[hsl(var(--primary))]" />
-                  )}
-                </View>
-              </View>
-
-              {/* ===== 主标题 ===== */}
-              <View className="px-[40rpx] pt-[24rpx] pb-0">
-                <Text
-                  className="font-black text-white leading-tight tracking-tight"
-                  style={{ fontSize: `${greetingSize}rpx` }}
-                >
-                  你好~ {nickname || ROLE_LABEL[currentRole || 'teacher']}
-                </Text>
-              </View>
-
-              {/* ===== 统计卡片 + IP 形象 ===== */}
-              {isStaffRole(currentRole) ? (
-                <View className="stats-ip-wrapper">
-                  <Image
-                    className="ip-mascot"
-                    src="/assets/images/ip-mascot.png"
-                    mode="aspectFit"
-                  />
-                  <StatsOverview
-                    period={statsPeriod}
-                    onPeriodChange={handleStatsPeriodChange}
-                    data={statsData}
-                  />
-                </View>
-              ) : (
-                <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
-                  <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
-                  <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">
-                    {ROLE_LABEL[currentRole || 'parent']}端首页
-                  </Text>
-                  <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
-                    当前联调阶段先展示通用运营内容{'\n'}
-                    可从消息通知和个人中心继续使用家长侧能力
-                  </Text>
-                  <View className="mt-[24rpx] flex gap-[16rpx] w-full">
-                    <View
-                      className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
-                      onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
-                    >
-                      <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
-                    </View>
-                    <View
-                      className="flex-1 rounded-full border border-[hsl(var(--primary))] px-[24rpx] py-[18rpx] flex items-center justify-center"
-                      onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
-                    >
-                      <Text className="text-[24rpx] font-medium text-primary">个人中心</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <View className="relative z-[120] px-[32rpx] mt-[24rpx]">
-              {operationLoading ? (
-                <View className="rounded-[32rpx] bg-white/80 px-[28rpx] py-[36rpx] text-center">
-                  <Text className="text-[24rpx] text-muted-foreground">运营内容加载中...</Text>
-                </View>
-              ) : null}
-
-              {/* 广告位 - 圆形胶囊样式（默认隐藏，联调后由后端控制展示） */}
-              {!operationLoading && operationContent.placements.banners.length > 0 ? (
-                <View className="flex flex-wrap gap-[16rpx]">
-                  {operationContent.placements.banners.map((banner) => (
-                    <View
-                      key={banner.id}
-                      className="inline-flex items-center gap-[8rpx] rounded-full bg-[hsl(var(--primary)/0.1)] px-[24rpx] py-[14rpx] active:bg-[hsl(var(--primary)/0.15)] transition-colors duration-200"
-                      onClick={() => void handleOperationTap(banner)}
-                    >
-                      <Icon
-                        name="mdi-bullhorn-outline"
-                        size="xs"
-                        className="text-primary shrink-0"
-                      />
-                      <Text className="text-[24rpx] font-semibold text-primary whitespace-nowrap">
-                        {banner.title}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-
-              {!operationLoading && operationError ? (
-                <View className="mt-[16rpx] rounded-[24rpx] bg-card px-[24rpx] py-[20rpx] text-center">
-                  <Text className="text-[24rpx] text-muted-foreground">{operationError}</Text>
-                </View>
-              ) : null}
-            </View>
-
-            {/* ===== 金刚区（校长+教师显示） ===== */}
-            {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
-
-            {/* ===== Tab 切换栏 + 内容区 - 合并为同一白色容器，避免缝隙透出蓝色背景 ===== */}
-            <View className="relative z-[100] bg-card px-[32rpx] pb-[200rpx]">
-              {noticeItem ? (
-                <View
-                  className="mt-[24rpx] mb-[8rpx] rounded-[24rpx] bg-[hsl(var(--primary)/0.08)] px-[24rpx] py-[20rpx] flex items-start gap-[16rpx]"
-                  onClick={() => void handleOperationTap(noticeItem)}
-                >
-                  <Icon name="mdi-bullhorn-outline" size="sm" className="text-primary shrink-0" />
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-[26rpx] font-semibold text-foreground block">
-                      {noticeItem.title}
-                    </Text>
-                    <Text className="text-[22rpx] text-muted-foreground mt-[4rpx]">
-                      {getOperationSummary(noticeItem)}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-
-              {operationContent.placements.cards.length > 0 ? (
-                <View className="mt-[24rpx] flex flex-col gap-[20rpx]">
-                  {operationContent.placements.cards.map((card) => (
-                    <View
-                      key={card.id}
-                      className="rounded-[28rpx] bg-card shadow-card border-[2rpx] border-[hsl(var(--border))] overflow-hidden"
-                      onClick={() => void handleOperationTap(card)}
-                    >
-                      {card.coverImageUrl ? (
-                        <Image
-                          className="w-full h-[220rpx]"
-                          src={card.coverImageUrl}
-                          mode="aspectFill"
-                        />
-                      ) : null}
-                      <View className="px-[24rpx] py-[24rpx]">
-                        <Text className="text-[30rpx] font-bold text-foreground block">
-                          {card.title}
-                        </Text>
-                        <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] line-clamp-2">
-                          {getOperationSummary(card)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-
-              <View className="flex items-baseline gap-[24rpx] overflow-x-hidden py-[24rpx]">
-                {TAB_OPTIONS.map((tab) => (
-                  <View
-                    key={tab.key}
-                    className={
-                      homeSwiperCurrent === getHomeTabIndex(tab.key)
-                        ? 'tab-item-v14 active'
-                        : 'tab-item-v14'
-                    }
-                    onClick={() => handleHomeTabChange(tab.key)}
-                  >
-                    <Text>{tab.label}</Text>
-                    {tab.badge && tab.badge > 0 && (
-                      <View className="inline-block bg-destructive text-white text-[18rpx] font-bold px-[8rpx] rounded-[16rpx] min-w-[28rpx] h-[28rpx] leading-[28rpx] text-center ml-[4rpx]">
-                        <Text className="text-white text-[18rpx]">{tab.badge}</Text>
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </View>
-
-              {/* ===== Tab 内容区 ===== */}
-              {isStaffRole(currentRole) && (
-                <View
-                  onClick={() => scheduleHomeSwiperMeasure(getHomeTabByIndex(homeSwiperCurrent))}
-                >
-                  <Swiper
-                    current={homeSwiperCurrent}
-                    duration={HOME_TAB_SWIPER_DURATION}
-                    easingFunction="easeOutCubic"
-                    style={{ height: `${homeSwiperHeight}px` }}
-                    onChange={handleHomeSwiperChange}
-                    onAnimationFinish={handleHomeSwiperFinish}
-                  >
-                    <SwiperItem itemId="schedule">
-                      <View id="home-tab-panel-schedule">
-                        <TodayScheduleCard schedules={schedules} title="" />
-                      </View>
-                    </SwiperItem>
-                    <SwiperItem itemId="todo">
-                      <View id="home-tab-panel-todo" className="pt-[24rpx]">
-                        <TodoList items={todoItems} />
-                      </View>
-                    </SwiperItem>
-                    <SwiperItem itemId="recent">
-                      <View id="home-tab-panel-recent" className="pt-[24rpx]">
-                        <LessonConsumptionList
-                          sections={recentSections}
-                          emptyText="暂无消课记录"
-                          footerText="查看更多"
-                          onFooterClick={() =>
-                            Taro.navigateTo({ url: '/package-teacher/pages/attendance/index' })
+              {/* Tab 内容区 */}
+              <View className="px-[24rpx]">
+                {isStaffRole(currentRole) && (
+                  <>
+                    <View className="flex items-baseline gap-[24rpx] overflow-x-hidden py-[24rpx]">
+                      {TAB_OPTIONS.map((tab) => (
+                        <View
+                          key={tab.key}
+                          className={
+                            homeSwiperCurrent === getHomeTabIndex(tab.key)
+                              ? 'tab-item-v14 active'
+                              : 'tab-item-v14'
                           }
-                        />
-                      </View>
-                    </SwiperItem>
-                  </Swiper>
-                </View>
-              )}
+                          onClick={() => handleHomeTabChange(tab.key)}
+                        >
+                          <Text>{tab.label}</Text>
+                          {tab.badge && tab.badge > 0 && (
+                            <View className="inline-block bg-destructive text-white text-[18rpx] font-bold px-[8rpx] rounded-[16rpx] min-w-[28rpx] h-[28rpx] leading-[28rpx] text-center ml-[4rpx]">
+                              <Text className="text-white text-[18rpx]">{tab.badge}</Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+
+                    <View
+                      onClick={() =>
+                        scheduleHomeSwiperMeasure(getHomeTabByIndex(homeSwiperCurrent))
+                      }
+                    >
+                      <Swiper
+                        current={homeSwiperCurrent}
+                        duration={HOME_TAB_SWIPER_DURATION}
+                        easingFunction="easeOutCubic"
+                        style={{ height: `${homeSwiperHeight}px` }}
+                        onChange={handleHomeSwiperChange}
+                        onAnimationFinish={handleHomeSwiperFinish}
+                      >
+                        <SwiperItem itemId="schedule">
+                          <View id="home-tab-panel-schedule">
+                            <TodayScheduleCard schedules={schedules} title="" />
+                          </View>
+                        </SwiperItem>
+                        <SwiperItem itemId="todo">
+                          <View id="home-tab-panel-todo" className="pt-[24rpx]">
+                            <TodoList items={todoItems} />
+                          </View>
+                        </SwiperItem>
+                        <SwiperItem itemId="recent">
+                          <View id="home-tab-panel-recent" className="pt-[24rpx]">
+                            <LessonConsumptionList
+                              sections={recentSections}
+                              emptyText="暂无消课记录"
+                              footerText="查看更多"
+                              onFooterClick={() =>
+                                Taro.navigateTo({ url: '/package-teacher/pages/attendance/index' })
+                              }
+                            />
+                          </View>
+                        </SwiperItem>
+                      </Swiper>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
           </View>
         </ScrollView>
       </View>
 
-      {/* ===== 校区下拉菜单（fixed 定位避免被 ScrollView 裁剪） ===== */}
-      {showCampusPicker && (
-        <View
-          className="fixed inset-0 z-[9999]"
-          style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
-          onClick={() => setShowCampusPicker(false)}
-        >
-          <View
-            className="absolute left-[32rpx] top-[120rpx] bg-card rounded-[20rpx] shadow-float py-[8rpx] min-w-[240rpx] border-[2rpx] border-[hsl(var(--border))]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {campusOptions.length === 0 ? (
-              <View className="px-[24rpx] py-[16rpx]">
-                <Text className="text-[26rpx] text-muted-foreground">暂无校区</Text>
-              </View>
-            ) : (
-              campusOptions.map((campus) => (
-                <View
-                  key={campus.id}
-                  className={`px-[24rpx] py-[16rpx] text-[26rpx] ${campus.isMain ? 'text-[hsl(var(--primary))] font-bold' : 'text-foreground'}`}
-                  onClick={() => handleCampusSelect(campus)}
-                >
-                  <Text>
-                    {campus.name}
-                    {campus.isMain ? ' (主)' : ''}
-                  </Text>
-                </View>
-              ))
-            )}
-          </View>
-        </View>
+      {/* 校区切换 Sheet */}
+      {isStaffRole(currentRole) && (
+        <CampusSelectSheet
+          visible={showCampusSheet}
+          currentId={currentCampusId}
+          currentRole={currentRole}
+          campuses={campuses}
+          managedCampusIds={managedCampusIds}
+          lastVisitedId={lastVisitedCampusId}
+          onClose={handleCloseCampusSheet}
+          onConfirm={handleConfirmCampus}
+        />
       )}
-
-      {floatingItem ? (
-        <View
-          className="fixed right-[32rpx] bottom-[160rpx] z-[9998] max-w-[220rpx]"
-          onClick={() => void handleOperationTap(floatingItem)}
-        >
-          <View className="rounded-full bg-[hsl(var(--primary))] px-[24rpx] py-[18rpx] shadow-float">
-            <Text className="text-[24rpx] font-semibold text-white">{floatingItem.title}</Text>
-          </View>
-        </View>
-      ) : null}
 
       {/* 身份切换 Sheet */}
       <RoleSwitchSheet visible={roleSheetVisible} onClose={() => setRoleSheetVisible(false)} />

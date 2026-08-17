@@ -25,10 +25,11 @@ import { formatDateCN } from '@/utils/format';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
-type TabKey = 'profile' | 'packages' | 'records' | 'follow';
+type TabKey = 'profile' | 'consumption' | 'packages' | 'records' | 'follow';
 
 const STUDENT_DETAIL_TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: '资料' },
+  { key: 'consumption', label: '课程消耗' },
   { key: 'packages', label: '卡包' },
   { key: 'records', label: '出勤' },
   { key: 'follow', label: '跟进' },
@@ -36,9 +37,10 @@ const STUDENT_DETAIL_TABS: { key: TabKey; label: string }[] = [
 
 const STUDENT_DETAIL_TAB_INDEX_MAP: Record<TabKey, number> = {
   profile: 0,
-  packages: 1,
-  records: 2,
-  follow: 3,
+  consumption: 1,
+  packages: 2,
+  records: 3,
+  follow: 4,
 };
 
 const STUDENT_DETAIL_SWIPER_DURATION = 280;
@@ -94,6 +96,18 @@ function getPackageGiftHours(pkg: CoursePackage): number {
 function getPackagePurchasedHours(pkg: CoursePackage): number {
   return Math.max((pkg.total_hours || 0) - getPackageGiftHours(pkg), 0);
 }
+
+/** 课包已消耗课时 */
+function getPackageUsedHours(pkg: CoursePackage): number {
+  return Math.max((pkg.total_hours || 0) - (pkg.remaining_hours || 0), 0);
+}
+
+/** 课包状态映射（课程消耗展示用） */
+const PACKAGE_STATUS_MAP: Record<string, { label: string; className: string }> = {
+  active: { label: '使用中', className: 'bg-primary-15 text-primary' },
+  completed: { label: '已用完', className: 'bg-muted text-muted-foreground' },
+  expired: { label: '已过期', className: 'bg-destructive-10 text-destructive' },
+};
 
 function roundToCurrency(amount: number): number {
   return Math.round(Math.max(amount, 0) * 100) / 100;
@@ -302,6 +316,23 @@ const StudentDetail: React.FC = () => {
     () => (student?.course_packages || []).reduce((s, p) => s + (p.remaining_hours || 0), 0),
     [student],
   );
+
+  /** 课时包消耗汇总（课程消耗 Tab） */
+  const consumptionStats = useMemo(() => {
+    const total = packages.reduce((s, p) => s + (p.total_hours || 0), 0);
+    const remaining = packages.reduce((s, p) => s + (p.remaining_hours || 0), 0);
+    const used = Math.max(total - remaining, 0);
+    const percent = total > 0 ? Math.round((used / total) * 100) : 0;
+    return { total, used, remaining, percent };
+  }, [packages]);
+
+  /** 最近消课记录（课程消耗 Tab，按时间倒序，取前 8 条） */
+  const recentConsumptions = useMemo(() => {
+    return records
+      .filter((r) => (r.hours_used || 0) > 0 && r.status !== 'cancelled')
+      .sort((a, b) => (dayjs(a.lesson_date).isAfter(dayjs(b.lesson_date)) ? -1 : 1))
+      .slice(0, 8);
+  }, [records]);
 
   /** 会员卡课时/金额汇总 */
   const memberCardStats = useMemo(() => {
@@ -814,7 +845,7 @@ const StudentDetail: React.FC = () => {
               onClick={() => handleTabChange(tab.key)}
             >
               <Text
-                className={`text-[26rpx] ${
+                className={`text-[24rpx] ${
                   studentSwiperCurrent === STUDENT_DETAIL_TAB_INDEX_MAP[tab.key]
                     ? 'text-primary'
                     : ''
@@ -945,6 +976,157 @@ const StudentDetail: React.FC = () => {
                     <Text className="text-[26rpx] text-muted-foreground">
                       暂无家长绑定，点击「邀请绑定」分享给家长
                     </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </SwiperItem>
+
+        {/* 课程消耗 */}
+        <SwiperItem itemId="consumption">
+          <ScrollView scrollY className="h-full">
+            <View className="px-[32rpx] pt-[32rpx] pb-[200rpx] flex flex-col gap-[24rpx]">
+              {/* 消耗汇总 */}
+              <View className="bg-card rounded-[28rpx] p-[32rpx] shadow-soft">
+                <View className="flex items-center gap-[12rpx] mb-[28rpx]">
+                  <Icon name="mdi-chart-bar" size={28} color="primary" />
+                  <Text className="text-[30rpx] font-bold text-foreground">课程消耗</Text>
+                </View>
+                <View className="flex flex-row gap-[16rpx]">
+                  <View className="flex-1 center-col py-[20rpx] rounded-[20rpx] bg-muted">
+                    <Text className="text-[40rpx] font-bold text-foreground leading-none">
+                      {consumptionStats.total}
+                    </Text>
+                    <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">累计课时</Text>
+                  </View>
+                  <View className="flex-1 center-col py-[20rpx] rounded-[20rpx] bg-primary-bg">
+                    <Text className="text-[40rpx] font-bold text-primary leading-none">
+                      {consumptionStats.used}
+                    </Text>
+                    <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">已消耗</Text>
+                  </View>
+                  <View className="flex-1 center-col py-[20rpx] rounded-[20rpx] bg-amber-10">
+                    <Text className="text-[40rpx] font-bold text-warning leading-none">
+                      {consumptionStats.remaining}
+                    </Text>
+                    <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">剩余课时</Text>
+                  </View>
+                </View>
+                <View className="mt-[28rpx]">
+                  <View className="flex items-center justify-between mb-[12rpx]">
+                    <Text className="text-[24rpx] text-muted-foreground">总体消耗进度</Text>
+                    <Text className="text-[24rpx] text-primary font-medium">
+                      {consumptionStats.percent}%
+                    </Text>
+                  </View>
+                  <View className="h-[16rpx] rounded-full bg-muted overflow-hidden">
+                    <View
+                      className="h-full rounded-full bg-gradient-primary"
+                      style={{ width: `${Math.min(Math.max(consumptionStats.percent, 2), 100)}%` }}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* 课包明细 */}
+              <View className="bg-card rounded-[28rpx] p-[32rpx] shadow-soft">
+                <View className="flex items-center justify-between mb-[24rpx]">
+                  <View className="flex items-center gap-[12rpx]">
+                    <Icon name="mdi-book-open" size={28} color="primary" />
+                    <Text className="text-[30rpx] font-bold text-foreground">课包明细</Text>
+                  </View>
+                  <Text className="text-[24rpx] text-muted-foreground">
+                    共 {packages.length} 个
+                  </Text>
+                </View>
+                {packages.length === 0 ? (
+                  <Empty icon="mdi-package-variant" description="暂无课包" />
+                ) : (
+                  <View className="flex flex-col gap-[24rpx]">
+                    {packages.map((pkg) => {
+                      const used = getPackageUsedHours(pkg);
+                      const remaining = Math.max(Number(pkg.remaining_hours || 0), 0);
+                      const total = Math.max(Number(pkg.total_hours || 0), 0);
+                      const percent = total > 0 ? Math.round((used / total) * 100) : 0;
+                      const statusInfo =
+                        PACKAGE_STATUS_MAP[pkg.status] || PACKAGE_STATUS_MAP.active;
+                      const giftHours = getPackageGiftHours(pkg);
+                      return (
+                        <View key={pkg.id} className="bg-muted rounded-[20rpx] p-[24rpx]">
+                          <View className="flex items-start justify-between gap-[16rpx]">
+                            <View className="flex-1 min-w-0">
+                              <Text className="text-[28rpx] font-semibold text-foreground block truncate">
+                                {pkg.name}
+                              </Text>
+                              <Text className="text-[22rpx] text-muted-foreground mt-[6rpx] block">
+                                充值 {total - giftHours} 课时
+                                {giftHours > 0 ? ` · 赠送 ${giftHours} 课时` : ''}
+                              </Text>
+                            </View>
+                            <View
+                              className={cn(
+                                'py-[6rpx] px-[16rpx] rounded-full flex-shrink-0',
+                                statusInfo.className,
+                              )}
+                            >
+                              <Text className="text-[20rpx] font-medium">{statusInfo.label}</Text>
+                            </View>
+                          </View>
+                          <View className="mt-[20rpx]">
+                            <View className="flex items-center justify-between mb-[10rpx]">
+                              <Text className="text-[22rpx] text-muted-foreground">
+                                已用 {used} / 共 {total}
+                              </Text>
+                              <Text className="text-[22rpx] text-primary font-medium">
+                                剩余 {remaining} 课时
+                              </Text>
+                            </View>
+                            <View className="h-[14rpx] rounded-full bg-card overflow-hidden">
+                              <View
+                                className="h-full rounded-full bg-gradient-primary"
+                                style={{ width: `${Math.min(Math.max(percent, 2), 100)}%` }}
+                              />
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* 最近消课 */}
+              <View className="bg-card rounded-[28rpx] p-[32rpx] shadow-soft">
+                <View className="flex items-center gap-[12rpx] mb-[24rpx]">
+                  <Icon name="mdi-clock-outline" size={28} color="primary" />
+                  <Text className="text-[30rpx] font-bold text-foreground">最近消课</Text>
+                </View>
+                {recentConsumptions.length === 0 ? (
+                  <Empty icon="mdi-history" description="暂无消课记录" />
+                ) : (
+                  <View className="flex flex-col">
+                    {recentConsumptions.map((record, index) => (
+                      <View
+                        key={record.id}
+                        className={cn(
+                          'flex items-center gap-[16rpx] py-[20rpx]',
+                          index !== recentConsumptions.length - 1 && 'border-b border-border/60',
+                        )}
+                      >
+                        <View className="flex-1 min-w-0">
+                          <Text className="text-[26rpx] font-medium text-foreground block truncate">
+                            {record.course_package?.name || record.class_name || '课程消课'}
+                          </Text>
+                          <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block">
+                            {formatDateCN(record.lesson_date)}
+                          </Text>
+                        </View>
+                        <Text className="text-[28rpx] font-semibold text-primary flex-shrink-0">
+                          -{record.hours_used}课时
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 )}
               </View>

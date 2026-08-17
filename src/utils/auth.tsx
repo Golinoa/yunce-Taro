@@ -7,6 +7,7 @@ import Taro from '@tarojs/taro';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   addIdentity as addIdentityService,
+  getProfileExtra,
   getSession,
   loginByEmailCode,
   login,
@@ -17,6 +18,7 @@ import {
   registerStep3,
   restoreRegisterDrafts,
   switchIdentity as switchIdentityService,
+  updateProfile as updateProfileService,
   validateInviteCode as validateInviteCodeService,
   wechatLogin,
 } from '@/services/auth';
@@ -93,6 +95,30 @@ export interface AuthState {
 
   /** 验证邀请码 */
   validateInviteCode: (code: string) => Promise<{ valid: boolean; inviterName?: string }>;
+
+  /** 更新当前用户基础资料（昵称/头像/手机/邮箱/性别/生日/证件/地区/地址） */
+  updateProfile: (
+    patch: Partial<{
+      name: string;
+      nickname: string;
+      avatar_url: string;
+      phone: string;
+      email: string;
+      gender: 'male' | 'female' | 'other';
+      birthday: string;
+      id_card: string;
+      region: string;
+      address: string;
+    }>,
+  ) => Promise<{ error: { message: string } | null }>;
+  /** 获取用户扩展资料（性别/生日/证件/地区/地址） */
+  getProfileExtra: () => Promise<{
+    gender?: 'male' | 'female' | 'other';
+    birthday?: string;
+    id_card?: string;
+    region?: string;
+    address?: string;
+  }>;
 
   /** 刷新用户资料 */
   refreshProfile: () => Promise<void>;
@@ -405,6 +431,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return validateInviteCodeService(code);
   }, []);
 
+  // 更新基础资料
+  const updateProfile = useCallback<AuthState['updateProfile']>(
+    async (patch) => {
+      const result = await updateProfileService(patch);
+      if (result.error || !result.profile) return { error: result.error };
+      setProfile(result.profile);
+      persistAuth(result.profile, session);
+      return { error: null };
+    },
+    [session, persistAuth],
+  );
+
+  // 读取扩展资料
+  const getProfileExtraFn = useCallback(async () => {
+    if (!profile?.id) return {};
+    return getProfileExtra(profile.id);
+  }, [profile?.id]);
+
   // 刷新资料
   const refreshProfile = useCallback(async () => {
     try {
@@ -462,6 +506,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addIdentity,
       validateInviteCode,
       refreshProfile,
+      updateProfile,
+      getProfileExtra: getProfileExtraFn,
       signOut,
     }),
     [
@@ -485,6 +531,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addIdentity,
       validateInviteCode,
       refreshProfile,
+      updateProfile,
+      getProfileExtraFn,
       signOut,
     ],
   );

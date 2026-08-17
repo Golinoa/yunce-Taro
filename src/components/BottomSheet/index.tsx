@@ -30,14 +30,30 @@ export interface BottomSheetProps {
   onClose?: () => void;
   /** 子内容 */
   children: React.ReactNode;
-  /** 内容面板高度（默认 70vh），支持固定高度如 70vh / 600rpx */
+  /**
+   * 内容面板高度
+   * - 默认 70vh
+   * - 固定高度如 '80vh' / '600rpx'
+   * - 传 'auto' 时面板自适应内容高度（配合 maxHeightLimit 限制上限）
+   */
   height?: string;
-  /** 内容区最大高度（已废弃，请使用 height） */
+  /** @deprecated 请使用 height。旧字段保留兼容 */
   maxHeight?: string;
+  /**
+   * 面板上限高度（用于 height='auto' 时限制最大高度，避免遮罩盖全屏；如 '80vh'）
+   * 固定高度模式下不生效
+   */
+  maxHeightLimit?: string;
   /** 额外内容区类名 */
   className?: string;
   /** 内容区是否可滚动（默认 true） */
   scrollable?: boolean;
+  /**
+   * 内容容器是否撑满面板（h-full + flex-col）
+   * - true：业务组件需要内部 flex 布局（如 ScrollView flex-1 + 固定底部按钮）时使用
+   * - false（默认）：保留 block 布局
+   */
+  fillHeight?: boolean;
 }
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -48,8 +64,10 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   height,
   maxHeight,
+  maxHeightLimit,
   className,
   scrollable = true,
+  fillHeight = false,
 }) => {
   // 向后兼容：如果传了 show，则用 show 控制渲染、visible 控制动画
   // 否则用 visible 同时控制渲染和动画
@@ -93,13 +111,25 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
   if (!mounted) return null;
 
-  // 高度兼容：优先使用 height，其次 maxHeight，默认 70vh
-  // height="auto" 时内容自适应，不设固定高度
+  // 高度兼容：优先使用 height，其次 maxHeight（兼容旧调用），默认 70vh
+  // height="auto" 时内容自适应，可配合 maxHeightLimit 限制上限
   const isAutoHeight = height === 'auto';
-  const panelHeight = isAutoHeight ? undefined : height || maxHeight || '70vh';
-  const scrollAreaHeight = isAutoHeight ? undefined : `calc(${panelHeight} - 120rpx)`;
+  const fixedHeight = !isAutoHeight ? height || maxHeight || '70vh' : undefined;
+  const scrollAreaHeight = isAutoHeight ? undefined : `calc(${fixedHeight} - 120rpx)`;
 
-  const content = <View className="bg-white">{children}</View>;
+  // auto 模式下：内容自然撑开，用 maxHeightLimit 限制上限
+  // 固定高度模式下：高度固定为 fixedHeight
+  const panelStyle = isAutoHeight
+    ? maxHeightLimit
+      ? { maxHeight: maxHeightLimit }
+      : undefined
+    : { height: fixedHeight, maxHeight: fixedHeight };
+
+  const content = fillHeight ? (
+    <View className="bg-white h-full flex flex-col">{children}</View>
+  ) : (
+    <View className="bg-white">{children}</View>
+  );
 
   return (
     <View
@@ -131,7 +161,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           animating ? 'translate-y-0' : 'translate-y-full',
           className,
         )}
-        style={panelHeight ? { height: panelHeight, maxHeight: panelHeight } : undefined}
+        style={panelStyle}
         onClick={(e) => e.stopPropagation()}
         onTransitionEnd={handleTransitionEnd}
       >
@@ -148,7 +178,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
             className="bg-white"
             style={{ height: scrollAreaHeight, maxHeight: scrollAreaHeight }}
           >
-            <View className="bg-white">{children}</View>
+            <View className={cn('bg-white', fillHeight && 'h-full flex flex-col')}>{children}</View>
           </ScrollView>
         ) : (
           content

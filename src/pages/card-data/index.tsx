@@ -1,13 +1,13 @@
 import { View, Text, ScrollView } from '@tarojs/components';
-import React, { useCallback, useEffect, useState } from 'react';
 import cn from 'classnames';
+import React, { useCallback, useEffect, useState } from 'react';
+import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import Card from '@/components/Card';
+import type { CardDetailType } from '@/data/data-center';
+import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { dataCenterService } from '@/services/data-center';
-import type { CardDetailType } from '@/data/data-center';
 
 /**
  * 卡项数据详情页
@@ -147,14 +147,18 @@ const CardData: React.FC = () => {
                 <Text className="text-[24rpx] text-muted-foreground block mb-[8rpx]">剩余卡项</Text>
                 <Text className="text-[36rpx] font-bold text-foreground">
                   {data?.remainingCards || 0}
-                  <Text className="text-[24rpx] font-normal text-muted-foreground ml-[4rpx]">次</Text>
+                  <Text className="text-[24rpx] font-normal text-muted-foreground ml-[4rpx]">
+                    次
+                  </Text>
                 </Text>
               </View>
               <View className="bg-warning-bg rounded-[20rpx] p-[20rpx]">
                 <Text className="text-[24rpx] text-muted-foreground block mb-[8rpx]">卡片到期</Text>
                 <Text className="text-[36rpx] font-bold text-foreground">
                   {data?.expiringCards || 0}
-                  <Text className="text-[24rpx] font-normal text-muted-foreground ml-[4rpx]">张</Text>
+                  <Text className="text-[24rpx] font-normal text-muted-foreground ml-[4rpx]">
+                    张
+                  </Text>
                 </Text>
               </View>
             </View>

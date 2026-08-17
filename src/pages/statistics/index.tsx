@@ -1,13 +1,10 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useEffect, useState } from 'react';
 import cn from 'classnames';
+import React, { useCallback, useEffect, useState } from 'react';
+import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import Card from '@/components/Card';
-import { useThemeStore } from '@/stores/theme';
-import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { dataCenterService } from '@/services/data-center';
 import type {
   VenueOverviewType,
   RevenueTrendType,
@@ -16,6 +13,9 @@ import type {
   CardDataType,
   SalaryDataType,
 } from '@/data/data-center';
+import { dataCenterService } from '@/services/data-center';
+import { useThemeStore } from '@/stores/theme';
+import { useThemedNavigationBar } from '@/utils/navigation-bar';
 
 /**
  * 数据中心首页
@@ -117,18 +117,14 @@ const DataCenter: React.FC = () => {
   const renderChangeBadge = (change: number) => {
     const isPositive = change >= 0;
     return (
-      <View
-        className="inline-flex items-center gap-[4rpx] px-[12rpx] py-[4rpx] rounded-full bg-card/80 backdrop-blur-sm shadow-card"
-      >
+      <View className="inline-flex items-center gap-[4rpx] px-[12rpx] py-[4rpx] rounded-full bg-card/80 backdrop-blur-sm shadow-card">
         <Icon
           name={isPositive ? 'mdi-trending-up' : 'mdi-trending-down'}
           size={20}
           color={isPositive ? 'success' : 'destructive'}
         />
         <Text
-          className={`text-[20rpx] font-medium ${
-            isPositive ? 'text-success' : 'text-destructive'
-          }`}
+          className={`text-[20rpx] font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}
         >
           {isPositive ? '+' : ''}
           {change}%
@@ -205,7 +201,7 @@ const DataCenter: React.FC = () => {
             className="inline-flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[10rpx] rounded-full shadow-card press-scale"
             onClick={goHome}
           >
-            <Icon name="mdi-store" size={20} color="primary" />
+            <Icon name="mdi-office-building-outline" size={20} color="primary" />
             <Text className="text-[26rpx] text-foreground font-medium">
               {venueOverview?.venueName || '加载中'}
             </Text>
@@ -296,7 +292,9 @@ const DataCenter: React.FC = () => {
                   }`}
                 >
                   <Icon
-                    name={financeData.netIncomeChange >= 0 ? 'mdi-trending-up' : 'mdi-trending-down'}
+                    name={
+                      financeData.netIncomeChange >= 0 ? 'mdi-trending-up' : 'mdi-trending-down'
+                    }
                     size={18}
                     color={financeData.netIncomeChange >= 0 ? 'success' : 'destructive'}
                   />

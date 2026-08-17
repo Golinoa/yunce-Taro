@@ -355,7 +355,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
 
   return (
     <View className={cn('px-[24rpx] pt-[26rpx]', className)}>
-      <View className="flex items-center justify-between">
+      <View className="grid grid-cols-[1fr_auto_1fr] items-center gap-[12rpx]">
         <Picker
           mode="selector"
           range={yearOptions.map((year) => `${year}年`)}

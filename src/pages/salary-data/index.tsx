@@ -1,13 +1,13 @@
 import { View, Text, ScrollView } from '@tarojs/components';
-import React, { useCallback, useEffect, useState } from 'react';
 import cn from 'classnames';
+import React, { useCallback, useEffect, useState } from 'react';
+import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import Card from '@/components/Card';
+import type { SalaryDetailType } from '@/data/data-center';
+import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { dataCenterService } from '@/services/data-center';
-import type { SalaryDetailType } from '@/data/data-center';
 
 /**
  * 薪资数据详情页
@@ -77,9 +77,7 @@ const SalaryData: React.FC = () => {
                     style={{ height: `${heightPercent}%` }}
                   />
                 </View>
-                <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">
-                  {item.label}
-                </Text>
+                <Text className="text-[20rpx] text-muted-foreground mt-[8rpx]">{item.label}</Text>
               </View>
             );
           })}
@@ -100,18 +98,12 @@ const SalaryData: React.FC = () => {
             className="flex items-center gap-[16rpx] py-[16rpx] border-b-[2rpx] border-border last:border-b-0"
           >
             <View className="w-[56rpx] h-[56rpx] rounded-full bg-kpi-green flex items-center justify-center">
-              <Text className="text-[24rpx] text-white font-medium">
-                {coach.name.charAt(0)}
-              </Text>
+              <Text className="text-[24rpx] text-white font-medium">{coach.name.charAt(0)}</Text>
             </View>
             <View className="flex-1">
-              <Text className="text-[28rpx] font-medium text-foreground block">
-                {coach.name}
-              </Text>
+              <Text className="text-[28rpx] font-medium text-foreground block">{coach.name}</Text>
               <View className="flex items-center gap-[16rpx] mt-[4rpx]">
-                <Text className="text-[22rpx] text-muted-foreground">
-                  课时 {coach.hours}h
-                </Text>
+                <Text className="text-[22rpx] text-muted-foreground">课时 {coach.hours}h</Text>
                 <Text className="text-[22rpx] text-muted-foreground">
                   耗卡 {coach.cardConsumed}次
                 </Text>
@@ -169,7 +161,9 @@ const SalaryData: React.FC = () => {
                 </Text>
               </View>
               <View className="bg-warning-bg rounded-[20rpx] p-[20rpx]">
-                <Text className="text-[24rpx] text-muted-foreground block mb-[8rpx]">固定薪资成本</Text>
+                <Text className="text-[24rpx] text-muted-foreground block mb-[8rpx]">
+                  固定薪资成本
+                </Text>
                 <Text className="text-[36rpx] font-bold text-foreground">
                   ¥{data ? formatMoney(data.fixedCost) : '0'}
                 </Text>
@@ -191,12 +185,8 @@ const SalaryData: React.FC = () => {
 
           {/* 趋势图卡片 */}
           <Card>
-            <Text className="text-[30rpx] font-bold text-foreground block mb-[8rpx]">
-              薪资趋势
-            </Text>
-            <Text className="text-[24rpx] text-muted-foreground block mb-[16rpx]">
-              薪资变化
-            </Text>
+            <Text className="text-[30rpx] font-bold text-foreground block mb-[8rpx]">薪资趋势</Text>
+            <Text className="text-[24rpx] text-muted-foreground block mb-[16rpx]">薪资变化</Text>
             {renderTrendChart()}
           </Card>
 

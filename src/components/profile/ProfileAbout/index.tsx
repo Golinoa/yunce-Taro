@@ -1,45 +1,34 @@
 /**
  * ProfileAbout - 个人中心底部品牌关于入口
  *
- * 展示品牌 Logo 与「关于 XX」入口，点击跳转关于页（未实现时占位提示）。
+ * 展示品牌 Logo 与「关于 XX」入口，点击跳转关于页。
+ * 预期效果：Logo（圆形白底）+ 主题色文字横向居中排列。
  */
 import { View, Text, Image } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
-import Icon from '@/components/Icon';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
-import { APP_VERSION } from '@/constants/version';
 
 export interface ProfileAboutProps {
   /** 点击跳转关于页 */
   onClick?: () => void;
-  /** 版本号，默认读取 package.json */
-  version?: string;
   /** 额外类名 */
   className?: string;
 }
 
-const ProfileAbout: React.FC<ProfileAboutProps> = ({
-  onClick,
-  version = APP_VERSION,
-  className,
-}) => {
+const ProfileAbout: React.FC<ProfileAboutProps> = ({ onClick, className }) => {
   return (
     <View
       className={cn(
-        'flex flex-col items-center justify-center gap-[8rpx] py-[32rpx] active:opacity-70',
+        'mt-[24rpx] mb-[32rpx] mx-[32rpx] bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[24rpx] flex items-center justify-center gap-[16rpx] active:opacity-70 press-scale',
         className,
       )}
       onClick={onClick}
     >
-      <View className="flex items-center gap-[12rpx]">
-        <Image src={BRAND_LOGO} mode="aspectFit" className="w-[48rpx] h-[48rpx]" />
-        <Text className="text-[28rpx] font-medium text-profile-orange-soft">
-          关于{BRAND_NAME_ZH}
-        </Text>
-        <Icon name="mdi-chevron-right" size="xs" color="primaryLight" />
+      <View className="w-[56rpx] h-[56rpx] rounded-full bg-white center shadow-soft flex-shrink-0">
+        <Image src={BRAND_LOGO} mode="aspectFit" className="w-[44rpx] h-[44rpx] rounded-full" />
       </View>
-      <Text className="text-[22rpx] text-muted-foreground">正式版 版本号 {version}</Text>
+      <Text className="text-[30rpx] font-bold text-primary">关于{BRAND_NAME_ZH}</Text>
     </View>
   );
 };

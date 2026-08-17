@@ -14,6 +14,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
+import { APP_VERSION } from '@/constants/version';
 import { clearVisitedMap } from '@/services/onboarding';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
@@ -139,12 +140,16 @@ const SystemSettings: React.FC = () => {
           ))}
 
           {/* 场地预约开关 */}
-          {visibleItems.length > 0 && (
-            <View className="border-t border-border" />
-          )}
+          {visibleItems.length > 0 && <View className="border-t border-border" />}
           <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
             <Text className="text-[30rpx] text-foreground">场地预约</Text>
             <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
+          </View>
+
+          {/* 当前版本 */}
+          <View className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
+            <Text className="text-[30rpx] text-foreground">当前版本</Text>
+            <Text className="text-[28rpx] text-muted-foreground">v{APP_VERSION}</Text>
           </View>
         </View>
       </View>

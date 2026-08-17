@@ -383,8 +383,7 @@ export async function mockGetRevenueTrend(
       labels.push(`${date.month() + 1}月`);
     }
     const values = [
-      28500, 24800, 31200, 35600, 38900, 41200,
-      45800, 47800, 42500, 39800, 36800, 2980,
+      28500, 24800, 31200, 35600, 38900, 41200, 45800, 47800, 42500, 39800, 36800, 2980,
     ];
     data = labels.map((label, i) => ({ label, value: values[i] }));
     total = values.reduce((sum, v) => sum + v, 0);
@@ -486,10 +485,23 @@ export async function mockGetFinanceDetail(params: {
       return labels.map((label, i) => ({ label, value: values[i] }));
     }
     if (periodType === 'year') {
-      const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+      const months = [
+        '1月',
+        '2月',
+        '3月',
+        '4月',
+        '5月',
+        '6月',
+        '7月',
+        '8月',
+        '9月',
+        '10月',
+        '11月',
+        '12月',
+      ];
       const values = [
-        285000, 248000, 312000, 356000, 389000, 412000,
-        458000, 478000, 425000, 398000, 368000, 402000,
+        285000, 248000, 312000, 356000, 389000, 412000, 458000, 478000, 425000, 398000, 368000,
+        402000,
       ];
       return months.map((label, i) => ({ label, value: values[i] }));
     }
@@ -500,7 +512,7 @@ export async function mockGetFinanceDetail(params: {
       const d = dayjs().subtract(i, 'day');
       labels.push(`${d.date()}`);
       const base = 12000 + Math.sin(i * 0.3) * 3000;
-      const weekendBoost = (i % 7 === 0 || i % 7 === 6) ? 4000 : 0;
+      const weekendBoost = i % 7 === 0 || i % 7 === 6 ? 4000 : 0;
       values.push(Math.round(base + weekendBoost));
     }
     return labels.map((label, i) => ({ label, value: values[i] }));
@@ -517,10 +529,23 @@ export async function mockGetFinanceDetail(params: {
       return labels.map((label, i) => ({ label, value: values[i] }));
     }
     if (periodType === 'year') {
-      const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+      const months = [
+        '1月',
+        '2月',
+        '3月',
+        '4月',
+        '5月',
+        '6月',
+        '7月',
+        '8月',
+        '9月',
+        '10月',
+        '11月',
+        '12月',
+      ];
       const values = [
-        195000, 178000, 215000, 236000, 258000, 272000,
-        298000, 312000, 285000, 268000, 248000, 268420,
+        195000, 178000, 215000, 236000, 258000, 272000, 298000, 312000, 285000, 268000, 248000,
+        268420,
       ];
       return months.map((label, i) => ({ label, value: values[i] }));
     }
@@ -655,10 +680,23 @@ export async function mockGetSalaryDetail(params: {
 
   const trendData: RevenueTrendItem[] = (() => {
     if (periodType === 'year') {
-      const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+      const months = [
+        '1月',
+        '2月',
+        '3月',
+        '4月',
+        '5月',
+        '6月',
+        '7月',
+        '8月',
+        '9月',
+        '10月',
+        '11月',
+        '12月',
+      ];
       const values = [
-        98000, 102000, 115000, 118000, 122000, 128600,
-        135000, 142000, 128000, 118000, 112000, 125000,
+        98000, 102000, 115000, 118000, 122000, 128600, 135000, 142000, 128000, 118000, 112000,
+        125000,
       ];
       return months.map((label, i) => ({ label, value: values[i] }));
     }
