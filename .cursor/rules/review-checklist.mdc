@@ -1,0 +1,163 @@
+---
+description: 云策教务代码审查清单 — 代码生成/修改后 AI 自检 + 提交前人工审查。所有 PR 与代码改动必读。
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# 代码审查清单（Review Checklist）
+
+> **AI 自检**：每次生成/修改代码后，AI 必须先过一遍本清单，全部勾选才能交付。
+> **人工审查**：PR review 时同样使用本清单。
+
+## 1. 架构与分层
+
+- [ ] **依赖方向正确**：`types ← data ← services ← stores ← pages/components`
+- [ ] **页面/Store 只从 `@/services` 导入**，禁止直接 `import '@/data/...'`
+- [ ] **统一导出**：消费方只从 `@/services`、`@/stores`、`@/types`、`@/components` 导入
+- [ ] **状态机单向**：薪资 `pending → confirmed → paid`，禁止反向跳转
+- [ ] **状态机单向**：线索 `new → pending → booked → arrived/not_arrived → following → converted/closed`
+
+## 2. 样式铁律
+
+- [ ] **禁止创建 SCSS 文件**（已有 `src/styles/` 待迁移）
+- [ ] **禁止内联 style**（动态计算值如 ECharts 配置、动画进度除外）
+- [ ] **禁止 px/rem 单位**，全部 rpx（`text-[28rpx]`、`p-[20rpx]`）
+- [ ] **禁止硬编码色值**（`#3B6EF5`、`text-[#xxx]`、`bg-[#xxx]`）
+- [ ] **使用 Token**：`text-primary`、`bg-card`、`border-border`、`bg-primary-10`、`bg-amber-bg` 等
+- [ ] **类名拼接**用 `classnames`（默认导入 `cn`），禁止模板字符串
+- [ ] **新增样式规则**在 `uno.config.ts` 的 rules/shortcuts 中定义
+- [ ] **CSS 伪元素**（`::before` / `::after`）用 `<View>` 元素替代
+- [ ] `npm run check`（typecheck + lint + format）通过
+
+## 3. 组件铁律
+
+- [ ] **复用优先**：新 UI 前先查 `src/components/`，已存在则复用
+- [ ] **弹窗封装**：所有底部弹窗用 `<BottomSheet visible={...}>`，封装为独立 Sheet 组件
+- [ ] **单 prop 模式**：`visible` 单 prop，禁止 `show + visible` 双 prop
+- [ ] **禁止内联弹窗**：页面内禁止手写 `fixed inset-0 z-200` 蒙层
+- [ ] **输入框**用 `<FormInput>`，禁止裸 `<Input>`
+- [ ] **组件文件结构**：`ComponentName/index.tsx`，目录 PascalCase，文件名 kebab-case
+- [ ] **Props 接口** `export interface XxxProps`，禁止内联 `type`
+- [ ] **JSDoc** 含使用场景 + 功能说明
+- [ ] **事件命名** `handle` 前缀，回调 `on` 前缀
+- [ ] **useCallback/useMemo** 包裹回调/计算值，依赖数组完整
+
+## 4. 数据流铁律
+
+- [ ] **设计 Token 单一数据源**：颜色/间距等改 `src/theme.ts` → 同步 `src/app.scss`
+- [ ] **禁止硬编码业务文本**：月份用 `dayjs().month() + 1`，状态文本用映射表
+- [ ] **Mock 数据在 `src/data/`**：禁止在组件内硬编码 mock 数据
+- [ ] **Mock 函数前缀**：`mockLogin`、`mockGetSession`
+- [ ] **Service 命名**：`getList` / `getById` / `add` / `update` / `remove` / 业务动词
+- [ ] **批量操作**用 `batch` 前缀：`batchConfirm(ids)`
+- [ ] **联调切换**只需改 Service 层一行
+
+## 5. 类型与代码质量
+
+- [ ] **禁止隐式 any**（除非有明确注释）
+- [ ] **禁止 `@ts-ignore`**（用 `// eslint-disable-next-line` 或修复代码）
+- [ ] **禁止滥用 `as any`**（仅对接无类型第三方库时使用）
+- [ ] **Props 接口**必须 `export`
+- [ ] **可空字段**显式标注 `| null` / `| undefined`
+- [ ] **状态用字面量联合**：`'pending' | 'confirmed' | 'paid'`
+- [ ] **常量命名** `UPPER_SNAKE_CASE`，提取到文件顶部或 `src/data/`
+- [ ] **未使用变量**用 `_` 前缀
+- [ ] **复杂对象**用 `interface`，**简单联合**用 `type`
+- [ ] `npm run typecheck` 通过
+
+## 6. 工程化
+
+- [ ] **`npm run lint` 通过**（`src/ --ext .ts,.tsx`）
+- [ ] **`npm run format:check` 通过**
+- [ ] **`npm run typecheck` 通过**
+- [ ] **`npm run check` 全量通过**（typecheck + lint + format）
+- [ ] **husky pre-commit 钩子触发**：lint-staged 只检查暂存文件
+- [ ] **.ts/.tsx**：`eslint --fix` + `prettier --write`
+- [ ] **.scss/.css/.json/.md**：`prettier --write`
+
+## 7. 编译命令（强制）
+
+- [ ] **禁止直接 `npm run build:weapp`**（生产模式默认禁用 Mock → 网络异常）
+- [ ] **正确编译姿势**：
+
+  ```bash
+  Remove-Item -Recurse -Force .\dist
+  $env:VITE_USE_MOCK="true"; npm run build:weapp
+  ```
+
+- [ ] **开发模式**：`npm run dev:weapp`（自动 Mock + 热更新）
+- [ ] **dist 目录**每次编译前删除，避免残留旧代码
+
+## 8. 性能与体验
+
+- [ ] **长列表**用 `ScrollView` + 懒加载
+- [ ] **下拉刷新**用 `enablePullDownRefresh: true` + `usePullDownRefresh`
+- [ ] **上拉加载**用 `useReachBottom`
+- [ ] **Loading 态**：初始加载显示 `<PageContainer loading />`，避免空白
+- [ ] **Empty 态**：列表为空显示 `<Empty title="..." description="..." />`
+- [ ] **错误处理**：用 `Taro.showToast({ icon: 'none' })`，不用 `alert`
+- [ ] **异步竞态**：loading 标志防重复请求
+- [ ] **键盘遮挡**：弹窗内多输入框用 ScrollView 包裹
+- [ ] **图片优化**：用 `npm run optimize:images` 压缩图片
+
+## 9. 安全与隐私
+
+- [ ] **Token 管理**：存 Taro Storage，key `yunce-edu-auth-token`
+- [ ] **Token 过期检测**：`expires_at * 1000 < Date.now()` → 清除 + 跳登录
+- [ ] **401 自动跳转**登录页（由 `utils/request.ts` 处理）
+- [ ] **敏感信息**：不在代码中硬编码密钥、密码、Token
+- [ ] **日志安全**：用 `utils/logger.ts` 的 `logError`/`logWarn`，不直接 `console.log` 用户敏感数据
+
+## 10. 提交前最终检查
+
+| 命令 | 状态 |
+|---|---|
+| `npm run typecheck` | ☐ 通过 |
+| `npm run lint` | ☐ 通过 |
+| `npm run format:check` | ☐ 通过 |
+| `npm run check` | ☐ 通过 |
+| `Remove-Item .\dist -Recurse -Force; $env:VITE_USE_MOCK="true"; npm run build:weapp` | ☐ 通过 |
+
+## 11. 常见问题速查
+
+### 11.1 网络异常 / 登录失败
+
+**原因**：直接 `npm run build:weapp` 默认禁用 Mock → 请求失败。
+**解决**：删除 dist + `$env:VITE_USE_MOCK="true"; npm run build:weapp`。
+
+### 11.2 输入框被重置
+
+**原因**：受控 Input 的 `onInput` 只 setState 不返回 `e.detail.value`，PC 端微信小程序会重置。
+**解决**：用 `<FormInput>`（已内置保护），或在 onInput 中 `return e.detail.value`。
+
+### 11.3 弹窗内容闪烁 / 不消失
+
+**原因**：使用了 `show + visible` 双 prop 模式。
+**解决**：改为单 `visible` prop，或升级到最新 `BottomSheet`。
+
+### 11.4 SCSS 类名不生效
+
+**原因**：新增/修改 SCSS 文件但没有正确引入，或 UnoCSS shortcut 命名冲突。
+**解决**：删除 SCSS 文件，用 UnoCSS shortcut 替代。
+
+### 11.5 TypeScript 类型错误
+
+**原因**：可能改了 Service 返回类型但未更新调用方。
+**解决**：跑 `npm run typecheck` 全量检查，修完所有 error。
+
+### 11.6 样式 Token 不生效
+
+**原因**：改了 `src/theme.ts` 但忘了同步 `src/app.scss` 中的 CSS 变量。
+**解决**：改 `theme.ts` → 同步 `app.scss` → 全局生效。
+
+## 12. 文档与维护
+
+- [ ] **AGENTS.md 总纲** 与本规则保持一致
+- [ ] **Agents/{module}.md** 子规范与对应规则一致
+- [ ] **新增公共模式**时同步更新 `AGENTS.md` + 对应规则文件
+- [ ] **重大架构变更**在 `CODE_WIKI.md` 中更新
+
+---
+
+> **自检流程**：生成/修改代码 → 跑 `npm run check` → 过本清单 → 提交。
+> **审查流程**：PR 创建 → Reviewer 跑 `npm run check` → 逐项过清单 → 批准/驳回。

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>松果排课 · 品牌落地页样板</title>
+  <style>
+    /* ============================================================
+       松果排课 · 门店入驻落地页样板（H5）
+       —— 借鉴用途：视觉分层 / 动效 / 文案结构
+       主色：CSS 变量 --primary，可一键换主题
+       ============================================================ */
+    :root {
+      /* 主题色（blue） */
+      --primary: #3B6EF5;
+      --primary-glow: #6B95F5;
+      --primary-dark: #2563EB;
+      --primary-soft: #EAF0FF;
+      --primary-10: rgba(59, 110, 245, 0.10);
+      --primary-5: rgba(59, 110, 245, 0.05);
+
+      /* 中性色 */
+      --bg: #F6F7FB;
+      --card: #FFFFFF;
+      --text: #1A1A1A;
+      --text-2: #555555;
+      --text-3: #9AA1B0;
+      --border: #EEF0F4;
+      --danger: #EF4444;
+      --success: #10B981;
+
+      --radius-lg: 28px;
+      --radius-md: 20px;
+      --shadow-card: 0 2px 12px rgba(59, 110, 245, 0.06);
+      --shadow-elegant: 0 20px 60px -20px rgba(59, 110, 245, 0.35);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #E9ECF4;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    /* ============ 手机容器 ============ */
+    .phone {
+      width: 390px;
+      background: var(--bg);
+      border-radius: 44px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25), inset 0 0 0 8px #111;
+      position: relative;
+    }
+    /* 状态栏 + 胶囊 */
+    .statusbar {
+      height: 44px;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .phone-body {
+      height: 840px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+    .phone-body::-webkit-scrollbar { width: 0; }
+
+    /* ============ 通用 ============ */
+    .section { padding: 34px 24px; }
+    .sec-head { margin-bottom: 22px; }
+    .sec-eyebrow {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--primary); font-size: 13px; font-weight: 600;
+      letter-spacing: 1px; margin-bottom: 10px;
+    }
+    .sec-eyebrow::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--primary);
+    }
+    .sec-title { font-size: 21px; font-weight: 800; color: var(--text); line-height: 1.35; }
+
+    /* ============ Hero ============ */
+    .hero {
+      position: relative;
+      background: linear-gradient(135deg, var(--primary-glow) 0%, var(--primary) 50%, var(--primary-dark) 100%);
+      padding: 46px 28px 92px;
+      overflow: hidden;
+      text-align: center;
+    }
+    .hero::before, .hero::after {
+      content: ''; position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,0.10);
+    }
+    .hero::before { width: 280px; height: 280px; top: -90px; right: -90px; }
+    .hero::after { width: 220px; height: 220px; top: 140px; left: -110px; }
+    /* 呼吸光环装饰 */
+    .hero-ring {
+      position: absolute; width: 160px; height: 160px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.18);
+      top: 60px; right: -40px;
+      animation: ring-pulse 3s ease-in-out infinite;
+    }
+    @keyframes ring-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 0.6; }
+    }
+    .brand-row {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 30px; position: relative; z-index: 2;
+    }
+    .brand-logo {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #fff; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+      font-weight: 900; font-size: 22px; color: var(--primary);
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-6px);} }
+    .brand-name { font-size: 26px; font-weight: 900; color: #fff; letter-spacing: 2px; }
+    .slogan { font-size: 28px; font-weight: 900; color: #fff; line-height: 1.4; position: relative; z-index: 2; }
+    .slogan .dot { color: rgba(255,255,255,0.6); margin: 0 6px; }
+    .sub { font-size: 14px; color: rgba(255,255,255,0.88); margin-top: 16px; line-height: 1.8; position: relative; z-index: 2; }
+    /* Hero CTA */
+    .cta-row {
+      display: flex; gap: 14px; justify-content: center; margin-top: 34px; position: relative; z-index: 2;
+    }
+    .btn {
+      height: 52px; border-radius: 26px; display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 700; cursor: pointer; border: none;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary-solid {
+      flex: 1; background: #fff; color: var(--primary);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.14);
+    }
+    .btn-primary-solid:hover { box-shadow: 0 16px 32px rgba(0,0,0,0.2); }
+    .btn-ghost-white {
+      background: rgba(255,255,255,0.16); color: #fff;
+      border: 1px solid rgba(255,255,255,0.35);
+      backdrop-filter: blur(6px);
+    }
+
+    /* ============ 数据背书（叠在 Hero 下） ============ */
+    .stats {
+      margin: -52px 24px 0; position: relative; z-index: 10;
+      background: var(--card); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      display: flex; padding: 26px 8px;
+    }
+    .stat { flex: 1; text-align: center; position: relative; }
+    .stat + .stat::before {
+      content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+      width: 1px; height: 40px; background: var(--border);
+    }
+    .stat b { display: block; font-size: 24px; font-weight: 900; color: var(--primary); line-height: 1; }
+    .stat span { display: block; font-size: 12px; color: var(--text-3); margin-top: 10px; line-height: 1.3; }
+
+    /* ============ 痛点 ============ */
+    .pain-card { background: var(--card); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); overflow: hidden; }
+    .pain-item { display: flex; align-items: flex-start; gap: 14px; padding: 18px 18px; }
+    .pain-item + .pain-item { border-top: 1px solid var(--border); }
+    .pain-ic {
+      width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+      background: rgba(239, 68, 68, 0.07); display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .pain-item h4 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .pain-item p { font-size: 13px; color: var(--text-3); margin-top: 4px; line-height: 1.6; }
+    .pain-turn {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--primary-10); padding: 16px 18px;
+    }
+    .pain-turn b { font-size: 14px; color: var(--primary); font-weight: 700; }
+
+    /* ============ 功能 ============ */
+    .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .feat {
+      background: var(--card); border-radius: var(--radius-md); padding: 20px 18px;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .feat:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(59,110,245,0.12); }
+    .feat-ic {
+      width: 46px; height: 46px; border-radius: 14px; background: var(--primary-10);
+      display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 12px;
+    }
+    .feat h4 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .feat p { font-size: 12.5px; color: var(--text-3); margin-top: 6px; line-height: 1.6; }
+
+    /* ============ 选择理由 ============ */
+    .reason-card { background: var(--card); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 8px 20px; }
+    .reason { display: flex; align-items: center; gap: 16px; padding: 18px 0; }
+    .reason + .reason { border-top: 1px solid var(--border); }
+    .reason-ic {
+      width: 50px; height: 50px; border-radius: 50%; background: var(--primary-10); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .reason h4 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .reason p { font-size: 13px; color: var(--text-3); margin-top: 4px; line-height: 1.6; }
+
+    /* ============ 流程 ============ */
+    .steps { display: flex; gap: 14px; }
+    .step { flex: 1; }
+    .step-box {
+      border-radius: var(--radius-md); padding: 20px 16px; position: relative;
+      background: var(--card); box-shadow: var(--shadow-card);
+    }
+    .step:first-child .step-box {
+      background: linear-gradient(135deg, var(--primary-glow), var(--primary));
+      color: #fff; box-shadow: var(--shadow-elegant);
+    }
+    .step-no { font-size: 22px; font-weight: 900; opacity: 0.85; }
+    .step:first-child .step-no { color: rgba(255,255,255,0.9); }
+    .step:not(:first-child) .step-no { color: var(--primary); }
+    .step-box h4 { font-size: 15px; font-weight: 700; margin-top: 10px; }
+    .step:first-child .step-box h4 { color: #fff; }
+    .step:not(:first-child) .step-box h4 { color: var(--text); }
+    .step-box p { font-size: 12px; margin-top: 6px; line-height: 1.5; }
+    .step:first-child .step-box p { color: rgba(255,255,255,0.85); }
+    .step:not(:first-child) .step-box p { color: var(--text-3); }
+    /* 连接线 */
+    .step + .step .step-box::before {
+      content: ''; position: absolute; left: -14px; top: 50%; width: 14px; height: 2px;
+      background: var(--primary); opacity: 0.3;
+    }
+
+    /* ============ 收尾 CTA ============ */
+    .footer-cta {
+      background: linear-gradient(135deg, var(--primary-glow), var(--primary));
+      border-radius: var(--radius-lg); padding: 34px 24px; text-align: center;
+      box-shadow: var(--shadow-elegant); position: relative; overflow: hidden;
+    }
+    .footer-cta::before {
+      content: ''; position: absolute; width: 160px; height: 160px; border-radius: 50%;
+      background: rgba(255,255,255,0.12); top: -60px; right: -60px;
+    }
+    .footer-cta h3 { font-size: 22px; font-weight: 900; color: #fff; position: relative; }
+    .footer-cta p { font-size: 14px; color: rgba(255,255,255,0.85); margin-top: 10px; line-height: 1.7; position: relative; }
+    .footer-cta .btn-primary-solid { max-width: 300px; margin: 22px auto 0; }
+    .footer-cta small { display: block; margin-top: 14px; font-size: 12px; color: rgba(255,255,255,0.6); position: relative; }
+
+    /* ============ 底部悬浮按钮 ============ */
+    .floating {
+      position: sticky; bottom: 0; z-index: 40;
+      padding: 12px 24px 26px;
+      background: linear-gradient(180deg, rgba(246,247,251,0) 0%, var(--bg) 38%);
+    }
+    .floating .btn {
+      width: 100%; height: 54px; border-radius: 28px;
+      background: linear-gradient(135deg, var(--primary-glow), var(--primary));
+      color: #fff; box-shadow: 0 16px 34px rgba(59,110,245,0.4);
+      font-size: 18px;
+    }
+
+    /* ============ 借鉴标注面板（右侧，非手机内） ============ */
+    .notes {
+      position: sticky; top: 40px; align-self: flex-start;
+      width: 300px; background: #fff; border-radius: 20px; padding: 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08); margin-left: 32px;
+    }
+    .notes h2 { font-size: 18px; font-weight: 800; color: #111; margin-bottom: 6px; }
+    .notes > p { font-size: 13px; color: #888; line-height: 1.7; margin-bottom: 16px; }
+    .notes h3 { font-size: 14px; font-weight: 700; color: #333; margin: 16px 0 8px; }
+    .notes ul { list-style: none; }
+    .notes li {
+      font-size: 13px; color: #555; line-height: 1.7; padding-left: 18px; position: relative; margin-bottom: 4px;
+    }
+    .notes li::before { content: '•'; position: absolute; left: 4px; color: var(--primary); font-weight: 800; }
+    .notes .tip {
+      background: var(--primary-5); border-radius: 12px; padding: 12px 14px;
+      font-size: 12.5px; color: #444; line-height: 1.7; margin-top: 16px;
+    }
+    .theme-switch { display: flex; gap: 8px; margin-top: 12px; }
+    .theme-dot {
+      width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid #fff;
+      box-shadow: 0 0 0 1.5px #ddd; transition: transform 0.15s;
+    }
+    .theme-dot:hover { transform: scale(1.15); }
+    .theme-dot.blue { background: linear-gradient(135deg, #6B95F5, #2563EB); }
+    .theme-dot.coral { background: linear-gradient(135deg, #fb9b8f, #e85a4a); }
+    .theme-dot.orange { background: linear-gradient(135deg, #FCA45C, #e66d1a); }
+
+    @media (max-width: 860px) {
+      .notes { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="phone">
+    <!-- 状态栏 -->
+    <div class="statusbar">松果排课 · 品牌介绍</div>
+
+    <div class="phone-body">
+
+      <!-- ===== Hero ===== -->
+      <div class="hero">
+        <div class="hero-ring"></div>
+        <div class="brand-row">
+          <div class="brand-logo">SG</div>
+          <div class="brand-name">松果排课</div>
+        </div>
+        <div class="slogan">让场馆经营<span class="dot">·</span>更简单专业</div>
+        <div class="sub">约课、消课、售卡、算薪、管数据<br>一套系统，全流程搞定</div>
+        <div class="cta-row">
+          <div class="btn btn-primary-solid">立即入驻</div>
+          <div class="btn btn-ghost-white">了解产品</div>
+        </div>
+      </div>
+
+      <!-- ===== 数据背书 ===== -->
+      <div class="stats">
+        <div class="stat"><b>10+</b><span>核心业务<br>模块</span></div>
+        <div class="stat"><b>3 端</b><span>馆主·教师<br>家长</span></div>
+        <div class="stat"><b>1 账号</b><span>多身份<br>随时切换</span></div>
+        <div class="stat"><b>5 分钟</b><span>快速<br>上手</span></div>
+      </div>
+
+      <!-- ===== 痛点共鸣 ===== -->
+      <div class="section">
+        <div class="sec-head">
+          <div class="sec-eyebrow">你是否也这样</div>
+          <div class="sec-title">场馆经营，真的不该这么累</div>
+        </div>
+        <div class="pain-card">
+          <div class="pain-item">
+            <div class="pain-ic">📆</div>
+            <div><h4>约课靠群接龙，消课全靠手记</h4><p>谁上了课、还剩几节，月底对账对到崩溃</p></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-ic">💳</div>
+            <div><h4>售卡记录散落各处</h4><p>会员到期、余额多少，全靠拍脑袋回忆</p></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-ic">🗂️</div>
+            <div><h4>学员档案越积越乱</h4><p>课时、续费、请假信息东一块西一块</p></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-ic">🧮</div>
+            <div><h4>排课撞车、算薪要命</h4><p>调课靠嘴，底薪提成课时费算到半夜</p></div>
+          </div>
+          <div class="pain-turn">
+            <span style="color:var(--primary);font-size:20px;">✔</span>
+            <b>这些困扰，松果排课都能替你解决</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 核心功能 ===== -->
+      <div class="section">
+        <div class="sec-head">
+          <div class="sec-eyebrow">核心能力</div>
+          <div class="sec-title">一套系统，覆盖经营全流程</div>
+        </div>
+        <div class="feat-grid">
+          <div class="feat">
+            <div class="feat-ic">📅</div>
+            <h4>可视化排课</h4><p>日历课表一目了然，请假调课一键完成</p>
+          </div>
+          <div class="feat">
+            <div class="feat-ic">💳</div>
+            <h4>灵活卡项</h4><p>次卡·时间卡·储值卡，自动消课扣次</p>
+          </div>
+          <div class="feat">
+            <div class="feat-ic">👥</div>
+            <h4>会员档案</h4><p>课时、消课、续费记录全程可溯</p>
+          </div>
+          <div class="feat">
+            <div class="feat-ic">🧮</div>
+            <h4>自动算薪</h4><p>底薪提成课时费智能汇总，一键发放</p>
+          </div>
+          <div class="feat">
+            <div class="feat-ic">📊</div>
+            <h4>数据看板</h4><p>收支、耗卡、毛利多维分析辅助决策</p>
+          </div>
+          <div class="feat">
+            <div class="feat-ic">🔁</div>
+            <h4>多端协同</h4><p>馆主·教师·家长一账号切换，各司其职</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 选择理由 ===== -->
+      <div class="section">
+        <div class="sec-head">
+          <div class="sec-eyebrow">为什么选择我们</div>
+          <div class="sec-title">不是软件公司做给你用<br>而是馆主做给自己用</div>
+        </div>
+        <div class="reason-card">
+          <div class="reason">
+            <div class="reason-ic">❤️</div>
+            <div><h4>懂行业，不折腾</h4><p>由真实馆长、教练参与打磨，贴合每天的真实经营场景</p></div>
+          </div>
+          <div class="reason">
+            <div class="reason-ic">🚀</div>
+            <div><h4>上手快</h4><p>界面简洁克制，配置向导式引导，5 分钟即可跑通</p></div>
+          </div>
+          <div class="reason">
+            <div class="reason-ic">💰</div>
+            <div><h4>低成本</h4><p>轻量工具级投入，换掉繁琐表格与群聊，物超所值</p></div>
+          </div>
+          <div class="reason">
+            <div class="reason-ic">🔄</div>
+            <div><h4>持续进化</h4><p>每月迭代更新，认真倾听每一位场馆主的真实反馈</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 入驻流程 ===== -->
+      <div class="section">
+        <div class="sec-head">
+          <div class="sec-eyebrow">入驻流程</div>
+          <div class="sec-title">三步开启数字化经营</div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-box">
+              <div class="step-no">01</div>
+              <h4>填写申请</h4><p>提交门店基本信息</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-box">
+              <div class="step-no">02</div>
+              <h4>专人对接</h4><p>顾问 1 对 1 沟通需求</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-box">
+              <div class="step-no">03</div>
+              <h4>开通使用</h4><p>配置完成，即刻上手</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 收尾 CTA ===== -->
+      <div class="section">
+        <div class="footer-cta">
+          <h3>告别表格与群聊</h3>
+          <p>让松果排课帮你把场馆打理得井井有条</p>
+          <div class="btn btn-primary-solid" style="background:#fff;color:var(--primary);">立即入驻</div>
+          <small>限时免费体验 · 无需信用卡</small>
+        </div>
+      </div>
+
+      <!-- ===== 底部悬浮按钮 ===== -->
+      <div class="floating">
+        <div class="btn">门店入驻</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 借鉴标注面板 ===== -->
+  <aside class="notes">
+    <h2>落地页设计拆解</h2>
+    <p>这是「松果排课」门店入驻落地页的 HTML 样板，用于借鉴视觉层次与文案结构。</p>
+
+    <h3>一、结构节奏</h3>
+    <ul>
+      <li>Hero 强主张 → 数据背书（叠层）→ 痛点共鸣 → 功能 → 理由 → 流程 → 收尾 CTA</li>
+      <li>每个模块独立成 section，间距 34px 形成呼吸感</li>
+      <li>全程围绕「入驻」一个转化目标，CTA 出现 3 次</li>
+    </ul>
+
+    <h3>二、视觉技巧</h3>
+    <ul>
+      <li>主色存于 CSS 变量，右侧圆点可一键换主题</li>
+      <li>数据卡「叠」在 Hero 下缘（负 margin），制造层次</li>
+      <li>卡片 hover 上浮 + 阴影加深，增强可点击暗示</li>
+      <li>流程第一步高亮为主题渐变，形成引导视线</li>
+      <li>Hero 用光斑圆 + 呼吸圆环动画，克制不喧宾夺主</li>
+    </ul>
+
+    <h3>三、文案原则</h3>
+    <ul>
+      <li>只说真实能力，不虚构「服务 XX 万场馆」等数字</li>
+      <li>痛点用「第一人称抱怨」，引发共鸣而非说教</li>
+      <li>差异化定位一句话：「馆主做给自己用」</li>
+    </ul>
+
+    <h3>四、换主题试试</h3>
+    <div class="theme-switch">
+      <div class="theme-dot blue" onclick="setTheme('blue')"></div>
+      <div class="theme-dot coral" onclick="setTheme('coral')"></div>
+      <div class="theme-dot orange" onclick="setTheme('orange')"></div>
+    </div>
+
+    <div class="tip">
+      💡 手机端预览：直接打开本文件即可滚动查看完整页面。<br>
+      借鉴时可直接复制 .hero / .stats / .pain-card 等区块。
+    </div>
+  </aside>
+
+  <script>
+    function setTheme(key) {
+      var root = document.documentElement;
+      var themes = {
+        blue:   { primary: '#3B6EF5', glow: '#6B95F5', dark: '#2563EB', soft: '#EAF0FF' },
+        coral:  { primary: '#f97768', glow: '#fb9b8f', dark: '#e85a4a', soft: '#FEE4E0' },
+        orange: { primary: '#FF8A2A', glow: '#FCA45C', dark: '#e66d1a', soft: '#FFE4CC' }
+      };
+      var t = themes[key];
+      if (!t) return;
+      root.style.setProperty('--primary', t.primary);
+      root.style.setProperty('--primary-glow', t.glow);
+      root.style.setProperty('--primary-dark', t.dark);
+      root.style.setProperty('--primary-soft', t.soft);
+      root.style.setProperty('--primary-10', hexToRgba(t.primary, 0.10));
+      root.style.setProperty('--primary-5', hexToRgba(t.primary, 0.05));
+      // 阴影也跟随主题
+      root.style.setProperty('--shadow-card', '0 2px 12px ' + hexToRgba(t.primary, 0.06));
+      root.style.setProperty('--shadow-elegant', '0 20px 60px -20px ' + hexToRgba(t.primary, 0.35));
+    }
+    function hexToRgba(hex, alpha) {
+      var h = hex.replace('#', '');
+      var r = parseInt(h.substring(0, 2), 16);
+      var g = parseInt(h.substring(2, 4), 16);
+      var b = parseInt(h.substring(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+  </script>
+</body>
+</html>

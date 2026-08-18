@@ -1,0 +1,335 @@
+---
+description: 云策教务 Service 层规范 — Mock/Real 切换、统一导出、错误处理。新增接口或修改数据流时必读。
+globs: src/services/**/*.ts
+alwaysApply: false
+---
+
+# Service 层规范
+
+## 1. 分层架构
+
+```
+页面/组件/Store ──→ Service 层（接口契约）──→ Mock / API
+                          │
+                       Store 层（状态缓存）
+```
+
+- **Service 层**：`src/services/` — 接口契约，定义业务可用的操作
+- **Mock 层**：`src/data/` — 当前实现，联调时整体替换为 API 调用
+- **API 层**：`src/utils/request.ts` — Taro.request 封装，自动 Token / 401 跳转 / 超时
+
+**铁律：页面/组件/Store 只能从 `@/services` 导入，禁止直接引用 `@/data/*`。**
+
+## 2. 目录结构
+
+```
+src/services/
+├── index.ts          # 统一导出（页面/Store 只从此文件导入）
+├── auth.ts           # 认证
+├── student.ts        # 学员
+├── teacher.ts        # 教师
+├── campus.ts         # 校区
+├── home.ts           # 首页
+├── statistics.ts     # 统计
+├── lead.ts           # 线索
+├── feedback.ts       # 反馈
+├── upload.ts         # 上传
+└── temporary-reschedule.ts  # 临时调课
+```
+
+每个模块导出 Service 对象：
+
+```ts
+// services/teacher.ts
+export const teacherService = { ... };
+export const salaryModelService = { ... };
+export const salarySettingsService = { ... };
+export const teacherScheduleService = { ... };
+```
+
+## 3. Service 标准模板
+
+```ts
+// src/services/teacher.ts
+/**
+ * Service 层 — 教师管理 API
+ * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用
+ */
+import { get, post, put, del } from '@/utils/request';
+import {
+  mockGetTeachers,
+  mockAddTeacher,
+  mockUpdateTeacher,
+  mockConfirmSalary,
+} from '@/data/teacher';
+import type { TeacherUIModel, SalaryModel, Deduction } from '@/types/teacher';
+
+// ============================================
+// 教师 Service
+// ============================================
+export const teacherService = {
+  /** 获取教师列表 */
+  getList: (campusId?: string, month?: string) => mockGetTeachers(campusId, month),
+  // 联调时替换为：
+  // getList: (campusId?: string, month?: string) =>
+  //   get<TeacherUIModel[]>('/api/teachers', { campusId, month }),
+
+  /** 获取在职教师列表（用于班级表单选择器） */
+  getActiveList: (campusId?: string) => mockGetActiveTeachers(campusId),
+
+  /** 获取教师详情 */
+  getById: (id: string) => mockGetTeacherById(id),
+
+  /** 添加教师 */
+  add: (teacher: TeacherUIModel) => mockAddTeacher(teacher),
+
+  /** 更新教师信息 */
+  update: (id: string, updates: Partial<TeacherUIModel>) => mockUpdateTeacher(id, updates),
+
+  /** 确认薪资 */
+  confirmSalary: (id: string) => mockConfirmSalary(id),
+
+  /** 批量确认薪资 */
+  batchConfirm: (ids: string[]) => mockBatchConfirm(ids),
+
+  /** 发放薪资 */
+  executePay: (ids: string[], remark?: string, payMethod?: string) =>
+    mockExecutePay(ids, remark, payMethod),
+
+  /** 教师离职 */
+  resign: (id: string, resignType: string, reason?: string) =>
+    mockResignTeacher(id, resignType, reason),
+};
+
+// ============================================
+// 薪资模型 Service
+// ============================================
+export const salaryModelService = {
+  getList: () => mockGetSalaryModels(),
+  create: (model: SalaryModel) => mockCreateSalaryModel(model),
+  update: (id: string, model: Partial<SalaryModel>) => mockUpdateSalaryModel(id, model),
+};
+```
+
+## 4. 命名规范
+
+| 操作 | 方法名 | 示例 |
+|---|---|---|
+| 查询列表 | `getList` / `getAll` | `teacherService.getList()` |
+| 查询详情 | `getById` | `teacherService.getById(id)` |
+| 新增 | `add` / `create` | `teacherService.add(data)` |
+| 更新 | `update` | `teacherService.update(id, data)` |
+| 删除 | `remove` / `delete` | `teacherService.remove(id)` |
+| 业务操作 | 动词开头 | `teacherService.confirmSalary(id)` |
+| 批量操作 | `batch` 前缀 | `teacherService.batchConfirm(ids)` |
+| 发送类操作 | `send` 前缀 | `teacherService.sendSalarySlip(ids)` |
+
+## 5. 返回值规范
+
+```ts
+export const teacherService = {
+  // ✅ 列表返回完整类型
+  getList: () => mockGetTeachers(),                                    // → TeacherUIModel[]
+
+  // ✅ 单个返回对象或 null
+  getById: (id: string) => mockGetTeacherById(id),                    // → TeacherUIModel | null
+
+  // ✅ 操作类返回 void / boolean
+  confirmSalary: (id: string) => mockConfirmSalary(id),               // → void
+
+  // ✅ 异步返回 Promise<T>
+  getListAsync: async () => {
+    return await get<TeacherUIModel[]>('/api/teachers');
+  },
+};
+```
+
+## 6. 统一导出（`services/index.ts`）
+
+```ts
+// src/services/index.ts
+// 页面/Store 只从此文件导入
+
+export { teacherService, salaryModelService, salarySettingsService, teacherScheduleService } from './teacher';
+export { studentService, packageService, lessonRecordService, leaveService, classService, scheduleService, notificationService } from './student';
+export { campusService, salaryModelCampusService, payDaySettingsService, holidayService, businessHoursService, notifyService, campusDataService, subjectService } from './campus';
+export { authService } from './auth';
+export { homeService } from './home';
+export { statisticsService } from './statistics';
+export { leadService } from './lead';
+export { feedbackService } from './feedback';
+export { uploadService } from './upload';
+export { temporaryRescheduleService } from './temporary-reschedule';
+```
+
+### 导入规范
+
+```ts
+// ✅ 从统一出口导入
+import { teacherService } from '@/services';
+
+// ❌ 直接引用内部文件（破坏 Mock/Real 切换边界）
+import { teacherService } from '@/services/teacher';
+
+// ❌ 页面直接引用 mock（绕过 Service 层）
+import { mockGetTeachers } from '@/data/teacher';
+```
+
+## 7. Mock 数据规范
+
+### 文件结构
+
+```ts
+// src/data/teacher.ts
+
+// 1. 常量定义
+export const ROLE_OPTIONS = [...];
+export const SUBJECT_OPTIONS = [...];
+
+// 2. Mock 数据
+const MOCK_TEACHERS: TeacherUIModel[] = [...];
+
+// 3. Mock 函数（模拟异步，联调时替换）
+export function mockGetTeachers(): TeacherUIModel[] {
+  return MOCK_TEACHERS;
+}
+
+export function mockAddTeacher(teacher: TeacherUIModel): TeacherUIModel {
+  MOCK_TEACHERS.push(teacher);
+  return teacher;
+}
+
+export function mockConfirmSalary(id: string): void {
+  const t = MOCK_TEACHERS.find((x) => x.id === id);
+  if (t) t.salaryStatus = 'confirmed';
+}
+```
+
+### Mock 函数规范
+
+1. **函数名 `mock` 前缀** — `mockGetTeachers`、`mockAddTeacher`、`mockLogin`
+2. **类型完整** — Mock 数据必须符合对应 TypeScript 类型
+3. **可变数据** — Mock 函数直接操作内存数组，模拟增删改查
+4. **不要带 try/catch** — Mock 不会失败，错误处理留给 API 阶段
+
+## 8. 请求工具层（`utils/request.ts`）
+
+已封装的函数：
+
+| 函数 | 用途 |
+|---|---|
+| `request<T>(options)` | 核心请求函数 |
+| `get<T>(url, params?)` | GET 请求 |
+| `post<T>(url, data?)` | POST 请求 |
+| `put<T>(url, data?)` | PUT 请求 |
+| `del<T>(url, data?)` | DELETE 请求 |
+| `ApiError` | 自定义错误类 |
+| `ApiResponse<T>` | 统一响应格式 `{ code, data, message }` |
+
+### 响应格式约定
+
+```ts
+interface ApiResponse<T = unknown> {
+  code: number;    // 0 或 200 表示成功
+  data: T;         // 业务数据
+  message: string; // 提示信息
+}
+```
+
+`request.ts` 已处理：
+- ✅ 自动注入 Bearer Token
+- ✅ 401 → 清除 Token + 跳转登录
+- ✅ 超时（10s）
+- ✅ 错误抛出 `ApiError`
+
+## 9. 错误处理
+
+### Service 层不处理 UI 提示
+
+```ts
+// ✅ Service 层只抛出错误
+export const teacherService = {
+  confirmSalary: async (id: string) => {
+    // API 阶段由 request.ts 自动处理 401 等状态码
+    return await post(`/api/teachers/${id}/confirm-salary`);
+  },
+};
+```
+
+### 页面/Store 层处理 UI 提示
+
+```ts
+const handleConfirm = async () => {
+  try {
+    await teacherService.confirmSalary(id);
+    Taro.showToast({ title: '操作成功', icon: 'success' });
+  } catch (err) {
+    if (err instanceof ApiError) {
+      Taro.showToast({ title: err.message, icon: 'none' });
+    } else {
+      Taro.showToast({ title: '操作失败', icon: 'none' });
+    }
+  }
+};
+```
+
+## 10. Mock ↔ Real 切换
+
+### Mock 阶段
+
+```ts
+// Service 内部直接调 mock
+getList: () => mockGetTeachers(),
+```
+
+### 联调阶段（只改 Service 一行）
+
+```ts
+// 联调后替换为：
+getList: () => get<TeacherUIModel[]>('/api/teachers'),
+```
+
+**批量替换技巧**：
+
+```ts
+// 所有 Service 方法共用一个 USE_MOCK 标志（已存在）
+const USE_MOCK = process.env.VITE_USE_MOCK !== 'false';
+
+// Service 函数内部判断（已封装在 request.ts 内部）
+```
+
+### 编译命令
+
+```bash
+# ✅ 强制 Mock 编译（生产模式 + 手动开 Mock）
+$env:VITE_USE_MOCK="true"; npm run build:weapp
+
+# ✅ 开发模式（自动 Mock + watch）
+npm run dev:weapp
+
+# ❌ 禁止：直接 build:weapp（默认禁用 Mock → 网络异常）
+npm run build:weapp
+```
+
+## 11. 新增接口流程
+
+```
+1. types/xxx.ts         — 定义请求/响应类型
+2. data/xxx.ts          — 编写 mock 函数 + 常量
+3. services/xxx.ts      — 定义 Service 接口契约
+4. services/index.ts    — 追加导出
+5. 页面/Store 中通过 import { xxxService } from '@/services' 使用
+```
+
+## 12. 自检
+
+- [ ] 文件位于 `src/services/{module}.ts`
+- [ ] Service 对象导出：`export const xxxService = { ... }`
+- [ ] `src/services/index.ts` 统一导出（页面只从这里导入）
+- [ ] Service 函数命名符合规范（`getList`/`getById`/`add`/`update`/`remove`）
+- [ ] Service 内部调 mock 函数（mock 前缀）
+- [ ] 联调切换只改 Service 一行
+- [ ] Service 不处理 UI 提示，只抛错
+- [ ] 页面/Store 处理 UI 提示与错误
+- [ ] TypeScript 类型完整，泛型指定返回值类型
+- [ ] 类型从 `@/types` 导入，不重复定义

@@ -1,0 +1,409 @@
+---
+description: 云策教务页面开发规范 — 目录结构、生命周期、路由、Tab、列表/详情/表单页。新建或修改页面时必读。
+globs: src/pages/**/*.{tsx,ts}, src/package-*/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# 页面开发规范
+
+## 1. 目录结构
+
+### 主包页面（`src/pages/`）
+
+```
+src/pages/
+├── home/                  # 首页（Tab）
+├── schedule/              # 课表（Tab）
+├── statistics/            # 统计（Tab）
+├── profile/               # 我的（Tab）
+├── booking/               # 预约排课
+├── login/                 # 登录（含子页 forgot-account、forgot-password、contact-support）
+├── register/              # 注册（role-select、role-info）
+├── role-switch/           # 角色切换（add-role）
+├── notifications/         # 通知列表
+├── agreement/             # 协议
+└── index/                 # 引导页
+```
+
+### 分包页面（`src/package-*/`）
+
+```
+src/
+├── package-student/       # 学员管理（students、student-detail、student-form、student-transfer、parent-bind）
+├── package-teacher/       # 教师管理
+├── package-course/        # 课程/排课/套餐
+├── package-settings/      # 设置
+├── package-statistics/    # 预警详情
+└── package-lead/          # 试听线索
+```
+
+每个分包结构：
+
+```
+src/package-{name}/
+├── pages/
+│   └── page-name/
+│       ├── index.tsx          # 页面组件
+│       └── index.config.ts    # 页面配置
+```
+
+## 2. 文件命名
+
+| 类型 | 命名 |
+|---|---|
+| 页面目录 | kebab-case（`teacher-list/`、`student-detail/`） |
+| 页面组件 | `index.tsx` |
+| 页面配置 | `index.config.ts` |
+
+## 3. 页面注册流程
+
+新建页面三步：
+
+```
+1. 创建目录 src/pages/page-name/ 或 src/package-{x}/pages/page-name/
+2. 创建 index.tsx + index.config.ts
+3. 在 src/app.config.ts 注册：
+   - 主包页面：追加到 pages 数组
+   - 分包页面：在对应 subPackages 的 pages 数组追加
+   - Tab 页：在 tabBar.list 添加
+```
+
+### `app.config.ts` 示例
+
+```ts
+export default defineAppConfig({
+  pages: [
+    'pages/index/index',
+    'pages/home/index',
+    // ... 主包页面
+  ],
+  subPackages: [
+    {
+      root: 'package-student',
+      pages: ['pages/students/index', 'pages/student-detail/index'],
+    },
+    // ... 其他分包
+  ],
+  tabBar: {
+    list: [
+      { pagePath: 'pages/home/index', text: '首页' },
+      // ...
+    ],
+  },
+  preloadRule: {
+    'pages/schedule/index': { packages: ['package-lead'], network: 'all' },
+  },
+});
+```
+
+## 4. 页面组件模板
+
+```tsx
+// src/pages/teacher-list/index.tsx
+import React, { useState, useCallback } from 'react';
+import { View, Text } from '@tarojs/components';
+import Taro, { useLoad, useDidShow } from '@tarojs/taro';
+import PageContainer from '@/components/PageContainer';
+import TeacherCard from '@/components/teacher/TeacherCard';
+import { useTeacherStore } from '@/stores';
+import type { TeacherUIModel } from '@/types';
+
+/**
+ * TeacherListPage - 教师列表页
+ *
+ * 使用场景：校长/管理员在 Tab「我的」进入教师管理
+ * 功能：展示教师列表，支持筛选、新增、批量操作
+ */
+const TeacherListPage: React.FC = () => {
+  const teachers = useTeacherStore((s) => s.teachers);
+  const loading = useTeacherStore((s) => s.loading);
+  const fetchTeachers = useTeacherStore((s) => s.fetchTeachers);
+
+  // 页面加载时初始化（不传参）
+  useLoad(() => {
+    fetchTeachers();
+  });
+
+  // 页面显示时刷新（返回列表时刷新数据）
+  useDidShow(() => {
+    // 通常不需要每次显示都拉取，按需开启
+    // fetchTeachers();
+  });
+
+  const handleCardPress = useCallback((teacher: TeacherUIModel) => {
+    Taro.navigateTo({ url: `/package-teacher/pages/teacher-detail/index?id=${teacher.id}` });
+  }, []);
+
+  return (
+    <PageContainer title="教师管理" loading={loading}>
+      <View className="p-4 gap-3">
+        {teachers.map((t) => (
+          <TeacherCard key={t.id} teacher={t} onClick={handleCardPress} />
+        ))}
+      </View>
+    </PageContainer>
+  );
+};
+
+export default TeacherListPage;
+```
+
+### 页面配置模板
+
+```ts
+// src/pages/teacher-list/index.config.ts
+export default definePageConfig({
+  navigationBarTitleText: '教师管理',
+  navigationBarBackgroundColor: '#5EC8A8',  // 主色（蓝/绿/白）
+  navigationBarTextStyle: 'white',          // 'black' 或 'white'
+  enablePullDownRefresh: true,              // 需要下拉刷新时开启
+  backgroundColor: '#f8f9fa',
+});
+```
+
+## 5. 生命周期 Hooks
+
+| Hook | 用途 |
+|---|---|
+| `useLoad((options) => {})` | 页面加载时执行（接收路由参数 `options`），只触发一次 |
+| `useDidShow(() => {})` | 页面显示时执行（每次显示都触发，包括返回） |
+| `useReady(() => {})` | 页面首次渲染完毕，可访问真实 DOM |
+| `usePullDownRefresh(() => {})` | 下拉刷新回调 |
+| `useReachBottom(() => {})` | 上拉触底回调 |
+| `useDidHide(() => {})` | 页面隐藏时执行 |
+| `useUnload(() => {})` | 页面卸载时执行 |
+
+### 典型组合
+
+```tsx
+// 列表页：加载时拉数据，显示时不重复拉
+useLoad(() => {
+  fetchList();
+});
+
+// 详情页：需要响应路由参数变化时
+useLoad((options) => {
+  if (options.id) fetchDetail(options.id);
+});
+
+// 需要每次显示刷新（如提交后返回列表）
+useDidShow(() => {
+  fetchList();
+});
+
+// 下拉刷新
+const onRefresh = useCallback(async () => {
+  await fetchList();
+  Taro.stopPullDownRefresh();
+}, [fetchList]);
+usePullDownRefresh(onRefresh);
+
+// 上拉加载更多
+useReachBottom(() => {
+  if (hasMore && !loading) loadMore();
+});
+```
+
+## 6. 路由与导航
+
+### 跳转方式
+
+```ts
+import Taro from '@tarojs/taro';
+
+// 普通跳转（保留当前页）
+Taro.navigateTo({ url: '/pages/detail/index?id=123' });
+
+// 重定向（替换当前页）
+Taro.redirectTo({ url: '/pages/login/index' });
+
+// 切换 Tab 页
+Taro.switchTab({ url: '/pages/home/index' });
+
+// 关闭当前页跳转到某页
+Taro.navigateBack({ delta: 1 });
+
+// 启动页（最顶层）
+Taro.reLaunch({ url: '/pages/home/index' });
+```
+
+### 安全跳转工具
+
+```ts
+// 使用 src/utils/navigation.ts
+import { navigateTo, isTabBarPage } from '@/utils/navigation';
+
+// 自动判断 Tab / 普通页
+navigateTo('/pages/home/index');
+
+// 判断当前页是否 Tab
+if (isTabBarPage()) {
+  // ...
+}
+```
+
+### 路由参数
+
+```tsx
+// 传参
+Taro.navigateTo({
+  url: `/pages/teacher-detail/index?id=${id}&mode=edit`,
+});
+
+// 接参
+useLoad((options) => {
+  const { id, mode } = options;
+  // ...
+});
+```
+
+## 7. 列表页规范
+
+```tsx
+const ListPage: React.FC = () => {
+  const list = useTeacherStore((s) => s.teachers);
+  const loading = useTeacherStore((s) => s.loading);
+  const fetchTeachers = useTeacherStore((s) => s.fetchTeachers);
+
+  // 加载状态
+  if (loading && list.length === 0) {
+    return <PageContainer loading />;
+  }
+
+  // 空状态
+  if (!loading && list.length === 0) {
+    return (
+      <PageContainer>
+        <Empty title="暂无教师" description="点击右上角添加第一位教师" />
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer title="教师管理">
+      <ScrollView scrollY className="h-full">
+        <View className="p-4 gap-3">
+          {list.map((item) => (
+            <TeacherCard key={item.id} teacher={item} onClick={handleClick} />
+          ))}
+        </View>
+      </ScrollView>
+    </PageContainer>
+  );
+};
+```
+
+## 8. 详情页规范
+
+```tsx
+const DetailPage: React.FC = () => {
+  const [detail, setDetail] = useState<DetailType | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useLoad(async (options) => {
+    if (!options.id) {
+      Taro.showToast({ title: '参数错误', icon: 'none' });
+      Taro.navigateBack();
+      return;
+    }
+    try {
+      const data = await teacherService.getById(options.id);
+      setDetail(data);
+    } catch (err) {
+      Taro.showToast({ title: '加载失败', icon: 'none' });
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  if (loading) return <PageContainer loading />;
+  if (!detail) return <PageContainer><Empty title="数据不存在" /></PageContainer>;
+
+  return (
+    <PageContainer title={detail.name}>
+      {/* 详情内容 */}
+    </PageContainer>
+  );
+};
+```
+
+## 9. 表单页规范
+
+```tsx
+const FormPage: React.FC = () => {
+  const [form, setForm] = useState({ name: '', phone: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.name.trim()) newErrors.name = '请输入姓名';
+    if (!/^1\d{10}$/.test(form.phone)) newErrors.phone = '手机号格式错误';
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      Taro.showToast({ title: '请检查表单', icon: 'none' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await teacherService.add(form);
+      Taro.showToast({ title: '添加成功', icon: 'success' });
+      setTimeout(() => Taro.navigateBack(), 1500);
+    } catch (err) {
+      Taro.showToast({ title: '添加失败', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <PageContainer title="添加教师">
+      <View className="p-4 gap-4">
+        <FormInput
+          label="姓名"
+          required
+          value={form.name}
+          error={errors.name}
+          onInput={(e) => {
+            setForm((f) => ({ ...f, name: e.detail.value }));
+            setErrors((e2) => ({ ...e2, name: '' }));
+          }}
+        />
+        <FormInput
+          label="手机号"
+          required
+          value={form.phone}
+          error={errors.phone}
+          onInput={(e) => {
+            setForm((f) => ({ ...f, phone: e.detail.value }));
+            setErrors((e2) => ({ ...e2, phone: '' }));
+          }}
+        />
+        <View
+          className={cn(
+            'py-3 rounded-2xl text-center text-base font-semibold text-white bg-gradient-primary',
+            submitting && 'state-loading',
+          )}
+          onClick={handleSubmit}
+        >
+          {submitting ? '提交中...' : '提交'}
+        </View>
+      </View>
+    </PageContainer>
+  );
+};
+```
+
+## 10. 自检
+
+- [ ] 目录 kebab-case，文件 `index.tsx` + `index.config.ts`
+- [ ] 在 `app.config.ts` 注册路由（主包/分包/Tab）
+- [ ] 用 `<PageContainer>` 包裹（统一导航/标题/Loading）
+- [ ] 数据从 `@/services` 或 `@/stores` 获取，**不**直接 `import '@/data'`
+- [ ] 弹窗封装为独立 Sheet，**不**内联蒙层
+- [ ] 输入框用 `<FormInput>`，**不**裸 `<Input>`
+- [ ] 样式纯 UnoCSS + rpx + Token
+- [ ] 错误处理用 `Taro.showToast`，不用 `alert`
+- [ ] Loading/Empty 状态完整
+- [ ] 长列表使用 `ScrollView` + 懒加载

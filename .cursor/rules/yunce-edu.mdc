@@ -1,0 +1,109 @@
+---
+description: 云策教务（松果排课）Taro + React 小程序全局强制规范。每次生成或修改代码必须遵守。
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# 云策教务（yunce-edu）— 前端工程化铁律
+
+> 适用项目：`yunceTaro`（微信小程序「松果排课」）
+> 技术栈：Taro 4.1.9 + React 18 + TypeScript 5 + UnoCSS + Zustand
+> 完整规范手册：`AGENTS.md` 与 `Agents/*.md`，本规则是其 Cursor 化摘要。
+
+## 1. 技术栈锁定（禁止替换）
+
+| 项 | 规范 | 禁止 |
+|---|---|---|
+| 框架 | Taro 3/4 + React 18 函数组件 + Hooks | 类组件、Vue、其他框架 |
+| 语言 | TypeScript（`strictNullChecks: true`） | 隐式 `any`、`@ts-ignore`、`as any` 滥用 |
+| 样式 | UnoCSS 原子化类名 + rpx 单位 | SCSS 文件、内联 style（非动态值）、px/rem |
+| 状态 | Zustand | Redux、MobX、组件内 `useState` 管理跨页全局态 |
+| 日期 | dayjs | moment.js、硬编码月份/年份 |
+| 类名 | `classnames`（默认导入 `cn`） | 模板字符串拼 `className` |
+| 图标 | `<Icon name="mdi-xxx" />` + MDI 图标集 | 内联 SVG、`<image>` 图标 |
+| 弹窗 | `<BottomSheet visible={...}>` 单 prop | 手写 fixed 蒙层、双 prop 模式 |
+| 输入框 | `<FormInput>` | 直接使用裸 `<Input>` |
+
+## 2. 架构分层与依赖方向（绝对禁止反向）
+
+```
+types  ←  data  ←  services  ←  stores  ←  pages / components
+                                              ↑
+                                       utils（横向）
+```
+
+- 类型层最稳，被所有人依赖，不依赖任何层。
+- `data/` 只放 Mock，被 `services/` 引用。
+- 页面/组件/Store **只能**从 `@/services` 取数据，**禁止**直接 `import` `@/data/*`。
+- 所有目录必须有 `index.ts` 统一导出，消费方只走聚合入口（`@/services`、`@/stores`、`@/types`、`@/components`）。
+
+## 3. 文件/目录命名规范
+
+| 类型 | 命名 | 示例 |
+|---|---|---|
+| 页面目录 | kebab-case | `teacher-list/`、`student-detail/` |
+| 页面文件 | `index.tsx` + `index.config.ts` | `pages/teacher-list/index.tsx` |
+| 通用组件目录 | PascalCase | `BottomSheet/`、`FormInput/` |
+| 业务组件目录 | PascalCase | `TeacherCard/`、`AddTeacherSheet/` |
+| 组件文件 | `index.tsx` | `components/BottomSheet/index.tsx` |
+| 类型/Service/Store/工具 文件 | kebab-case | `types/teacher.ts`、`utils/request.ts` |
+| 事件处理函数 | `handle` 前缀 | `handleSubmit`、`handleClose` |
+| 常量 | `UPPER_SNAKE_CASE` | `AUTH_TOKEN_KEY` |
+| Mock 函数 | `mock` 前缀 | `mockLogin`、`mockGetSession` |
+| 批量操作 | `batch` 前缀 | `teacherService.batchConfirm(ids)` |
+
+## 4. 命令与提交约定
+
+```bash
+npm run lint           # ESLint
+npm run lint:fix       # 自动修复
+npm run format         # Prettier 格式化
+npm run typecheck      # tsc --noEmit
+npm run check          # typecheck + lint + format 全量
+```
+
+- 提交触发 husky + lint-staged：仅对暂存文件执行 `eslint --fix` + `prettier --write`。
+- 编译微信小程序**禁止**直接 `npm run build:weapp`（生产模式默认禁用 Mock → 网络异常）。正确姿势：
+
+```bash
+Remove-Item -Recurse -Force .\dist
+$env:VITE_USE_MOCK="true"; npm run build:weapp
+```
+
+- 调试模式直接 `npm run dev:weapp`（自动 Mock + watch）。
+
+## 5. 路径别名（必须使用）
+
+```ts
+import { teacherService } from '@/services';
+import { useTeacherStore } from '@/stores';
+import type { Teacher } from '@/types';
+import { hexColors } from '@/theme';
+import BottomSheet from '@/components/BottomSheet';
+```
+
+`tsconfig.json` 已声明：`@/*`、`@/pages/*`、`@/components/*`、`@/utils/*`、`@/types/*`、`@/services/*`、`@/stores/*`、`@/mock/*`（指向 `src/data/*`）。
+
+## 6. 自检清单（每次提交前 AI 必须过一遍）
+
+- [ ] 复用而非新建：是否已在 `src/components/` 找到现成组件？
+- [ ] 弹窗是否用 `BottomSheet` 封装为独立 Sheet？
+- [ ] 输入框是否走 `FormInput`（非裸 `<Input>`）？
+- [ ] 样式是否纯 UnoCSS 原子类 + rpx Token（无硬编码色值）？
+- [ ] 是否新增 SCSS 文件？（应迁移为 UnoCSS 后删除）
+- [ ] 是否使用内联 style 处理非动态值？（应改为类名）
+- [ ] 数据是否走 `@/services`？（禁止直接引用 `@/data`）
+- [ ] TypeScript 类型是否完整（无隐式 any）？
+- [ ] 是否为新增组件补 JSDoc（使用场景 + 功能说明）？
+
+详细子规范见同级规则文件：
+
+- `styles-unocss.mdc` — UnoCSS、Token、rpx
+- `components.mdc` — 组件复用与封装
+- `sheets.mdc` — BottomSheet 与业务 Sheet
+- `forms.mdc` — FormInput 与表单
+- `state-zustand.mdc` — Zustand Store
+- `service-layer.mdc` — Service / Mock / API
+- `pages.mdc` — 页面结构与生命周期
+- `typescript.mdc` — 类型规范
+- `review-checklist.mdc` — 完整审查清单

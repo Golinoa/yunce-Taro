@@ -1,0 +1,309 @@
+---
+description: 云策教务 TypeScript 类型规范 — 严格模式、类型定义、Props 接口模板。任何 TS 代码改动时必读。
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# TypeScript 类型规范
+
+## 1. tsconfig 关键配置
+
+```json
+{
+  "compilerOptions": {
+    "strictNullChecks": true,         // 必须开启
+    "noImplicitAny": false,           // 可隐式 any（但代码中禁止）
+    "noUnusedLocals": true,           // 禁止未使用的局部变量
+    "noUnusedParameters": true,       // 禁止未使用的参数（用 _ 前缀忽略）
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "resolveJsonModule": true
+  }
+}
+```
+
+## 2. 铁律
+
+1. **禁止隐式 any** — 所有参数、变量、返回值必须有类型。
+2. **禁止 `@ts-ignore`** — 用 `// eslint-disable-next-line` 或修复代码。
+3. **禁止滥用 `as any`** — 仅在对接无类型第三方库时使用，并写明注释。
+4. **`strictNullChecks: true`** — 所有可空值必须显式标注 `| null` 或 `| undefined`。
+5. **导出 Props/类型** — `export interface XxxProps` 而非内联 `type`。
+
+## 3. 类型文件结构
+
+```
+src/types/
+├── index.ts             # 统一导出（页面只从这里导入）
+├── profile.ts           # UserRole / Profile / AuthSession / Identity
+├── teacher.ts           # Teacher / TeacherUIModel / SalaryStatus / SalaryModel / Deduction
+├── student.ts           # Student / StudentParent
+├── class.ts             # Class / ClassDetail / ClassStudent / CheckinRecord
+├── course-package.ts    # CoursePackage / PackageStatus / FeeMethod / PackageTransaction
+├── schedule.ts          # Schedule / ScheduleColor / DayOfWeek
+├── lead.ts              # Lead / LeadStatus / LeadBooking / TrialSlotConfig / LeadFollowUp
+├── campus.ts            # CampusUIModel / CampusFormData / SalaryModel / PayDaySettings / Holiday
+├── lesson-record.ts     # LessonRecord
+├── leave-request.ts     # LeaveRequest / LeaveType / LeaveStatus
+├── notification.ts      # Notification / NotificationType
+├── feedback.ts          # Feedback
+├── subject.ts           # Subject
+├── temporary-reschedule.ts  # TemporaryReschedule
+└── onboarding.ts        # 入驻流程
+```
+
+### 统一导出（`types/index.ts`）
+
+```ts
+// src/types/index.ts
+export * from './profile';
+export * from './teacher';
+export * from './student';
+// ... 所有类型文件
+```
+
+**导入规范**：
+
+```ts
+// ✅ 从统一出口导入
+import type { TeacherUIModel, SalaryStatus } from '@/types';
+
+// ❌ 直接引用内部文件
+import type { TeacherUIModel } from '@/types/teacher';
+```
+
+## 4. 类型定义模板
+
+### 业务实体类型
+
+```ts
+// src/types/teacher.ts
+export type SalaryStatus = 'pending' | 'confirmed' | 'paid';
+export type TeacherStatus = 'active' | 'resigned' | 'suspended';
+export type DeductionType = 'deduction' | 'bonus';
+
+export interface Deduction {
+  id: string;
+  teacherId: string;
+  type: DeductionType;
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface Teacher {
+  id: string;
+  name: string;
+  phone: string;
+  subject: Subject;
+  campusId: string;
+  hireDate: string;
+}
+
+export interface TeacherUIModel extends Teacher {
+  // 计算字段
+  hours: number;
+  rate: number;
+  base: number;
+  attend: number;
+  perf: number;
+  deductions: Deduction[];
+
+  // 状态字段
+  salaryStatus: SalaryStatus;
+  status: TeacherStatus;
+
+  // 元数据
+  avatar?: string;
+  remark?: string;
+}
+```
+
+### Props 接口
+
+```ts
+// 组件 Props 必须 export
+export interface TeacherCardProps {
+  teacher: TeacherUIModel;
+  /** 是否可点击 */
+  clickable?: boolean;
+  /** 是否显示状态徽章 */
+  showStatus?: boolean;
+  onClick?: (teacher: TeacherUIModel) => void;
+  className?: string;
+}
+```
+
+### Service 请求/响应类型
+
+```ts
+// 请求参数
+export interface TeacherListParams {
+  campusId?: string;
+  month?: string;
+  status?: TeacherStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+// 响应数据
+export interface TeacherListResponse {
+  list: TeacherUIModel[];
+  total: number;
+  hasMore: boolean;
+}
+
+// 单一响应
+export interface TeacherDetailResponse extends TeacherUIModel {
+  schedules: Schedule[];
+  salaryHistory: SalaryRecord[];
+}
+```
+
+### 工具类型
+
+```ts
+// 分页响应通用
+export interface PageResponse<T> {
+  list: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+// 选择项
+export interface SelectOption<T = string> {
+  label: string;
+  value: T;
+  disabled?: boolean;
+}
+
+// 表单提交
+export type FormSubmitHandler<T> = (data: T) => void | Promise<void>;
+```
+
+## 5. 状态机类型（联合类型）
+
+```ts
+// ✅ 严格的字面量联合
+export type SalaryStatus = 'pending' | 'confirmed' | 'paid';
+
+// ✅ 状态机转换函数
+export function canTransitionTo(from: SalaryStatus, to: SalaryStatus): boolean {
+  const transitions: Record<SalaryStatus, SalaryStatus[]> = {
+    pending: ['confirmed'],
+    confirmed: ['paid'],
+    paid: [],
+  };
+  return transitions[from].includes(to);
+}
+```
+
+## 6. 空值与默认值
+
+```ts
+// ✅ 显式标注可空
+interface Teacher {
+  remark?: string;            // 可选（可不存在）
+  resignedAt: string | null;  // 可空（必须存在但可能为 null）
+}
+
+// ❌ 错误：可空字段忘了标注
+function getTeacherName(teacher: Teacher | null): string {
+  return teacher.name;  // ❌ teacher 可能为 null
+}
+
+// ✅ 正确
+function getTeacherName(teacher: Teacher | null): string {
+  return teacher?.name ?? '未知';
+}
+```
+
+## 7. 避免的写法
+
+```ts
+// ❌ any 滥用
+const data: any = await fetchData();
+data.foo.bar.baz();  // 不安全
+
+// ✅ 严格类型
+interface ApiData { foo: { bar: { baz: () => void } } }
+const data = await fetchData<ApiData>();
+data.foo.bar.baz();
+```
+
+```ts
+// ❌ 内联复杂类型
+function foo(x: { a: number; b: { c: string; d: number[] } }): void {}
+
+// ✅ 提取为 interface / type
+interface FooInput { a: number; b: { c: string; d: number[] } }
+function foo(x: FooInput): void {}
+```
+
+```ts
+// ❌ 循环依赖导致类型定义在两个文件互相 import
+// src/types/teacher.ts
+import type { Student } from './student';
+// src/types/student.ts
+import type { Teacher } from './teacher';
+
+// ✅ 提取共享类型或重新组织
+// src/types/common.ts
+export interface UserBase { id: string; name: string }
+```
+
+## 8. 第三方库类型
+
+```ts
+// ✅ 已有 @types 直接用
+import type { InputProps } from '@tarojs/components';
+
+// ✅ Taro API
+import Taro from '@tarojs/taro';
+Taro.navigateTo({ url: '...' });  // 类型已内置
+
+// ⚠️ 无类型第三方库
+// 1. 优先找 @types/xxx 包
+// 2. 自己写 .d.ts 声明
+// 3. 最后才用 // @ts-expect-error 并写明原因
+```
+
+## 9. ESLint 规则
+
+`tsconfig.json` + `.eslintrc.json` 已配置：
+
+```jsonc
+{
+  "@typescript-eslint/no-explicit-any": "warn",
+  "@typescript-eslint/no-unused-vars": ["warn", {
+    "argsIgnorePattern": "^_",
+    "varsIgnorePattern": "^_"
+  }],
+  "@typescript-eslint/ban-ts-comment": "warn",
+  "no-shadow": "off",
+  "@typescript-eslint/no-shadow": "warn"
+}
+```
+
+未使用变量用 `_` 前缀忽略：
+
+```ts
+// ✅ 忽略未使用参数
+const handleChange = (_e: Event, data: SomeType) => {
+  console.log(data);
+};
+```
+
+## 10. 自检
+
+- [ ] 所有函数参数、返回值有类型
+- [ ] Props 接口 `export interface XxxProps`
+- [ ] 业务类型位于 `src/types/{module}.ts`，通过 `@/types` 导出
+- [ ] 状态用字面量联合（`'pending' | 'confirmed' | 'paid'`）
+- [ ] 可空字段显式标注 `| null` / `| undefined`
+- [ ] 复杂对象用 `interface`，简单联合用 `type`
+- [ ] 禁止 `any` / `@ts-ignore`（除非有注释说明）
+- [ ] 第三方库类型缺失时优先找 `@types/*` 或写 `.d.ts`
+- [ ] `npm run typecheck` 通过

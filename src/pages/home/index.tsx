@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Image, Swiper, SwiperItem } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import dayjs from 'dayjs';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import KingKongSection from '@/components/home/KingKongSection';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
@@ -23,6 +23,7 @@ import type { CampusUIModel } from '@/types/campus';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
+import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -37,24 +38,6 @@ const ORG_COVER_IMAGE = '/assets/images/2.jpg';
 const getHomeTabIndex = (tab: HomeTab): number => HOME_TAB_ORDER.indexOf(tab);
 
 const getHomeTabByIndex = (index: number): HomeTab => HOME_TAB_ORDER[index] || 'schedule';
-
-/** 解析营业时间，返回 HH:mm 格式起止时间 */
-function parseBusinessHours(hours?: string): { start: string; end: string } | null {
-  if (!hours) return null;
-  const match = hours.match(/(\d{2}:\d{2}):\d{2}至(\d{2}:\d{2}):\d{2}/);
-  if (!match) return null;
-  return { start: match[1], end: match[2] };
-}
-
-/** 根据当前时间判断校区是否营业中 */
-function isCampusOpen(hours?: string): boolean {
-  const parsed = parseBusinessHours(hours);
-  if (!parsed) return true;
-  const now = dayjs();
-  const start = dayjs(`${now.format('YYYY-MM-DD')} ${parsed.start}`);
-  const end = dayjs(`${now.format('YYYY-MM-DD')} ${parsed.end}`);
-  return now.isAfter(start) && now.isBefore(end);
-}
 
 /**
  * Home - 机构端首页
@@ -355,71 +338,13 @@ const Home: React.FC = () => {
 
         {/* 校区卡片 */}
         <View className="relative z-30 -mt-[90rpx] mx-[28rpx]">
-          <View
-            className="bg-white/92 backdrop-blur-md rounded-[32rpx] p-[24rpx] shadow-campus press-scale"
+          <HomeCampusCard
+            campus={currentCampus}
+            businessTime={businessTime}
+            isOpen={isOpen}
             onClick={handleOpenCampusSheet}
-          >
-            <View className="flex items-center gap-[20rpx]">
-              <View
-                className="w-[88rpx] h-[88rpx] rounded-[20rpx] center overflow-hidden shrink-0"
-                style={{
-                  background:
-                    currentCampus?.iconGradient || 'linear-gradient(135deg, #5EC8A8, #4AB893)',
-                }}
-              >
-                {currentCampus?.logo ? (
-                  <Image src={currentCampus.logo} className="w-full h-full" mode="aspectFill" />
-                ) : (
-                  <Text className="text-[40rpx]">{currentCampus?.icon || '🏢'}</Text>
-                )}
-              </View>
-
-              <View className="flex-1 min-w-0">
-                <View className="flex items-center gap-[12rpx] mb-[6rpx]">
-                  <Text className="text-[32rpx] font-bold text-foreground truncate">
-                    {currentCampus?.name || '未设置校区'}
-                  </Text>
-                  <View
-                    className={cn(
-                      'flex items-center gap-[6rpx] px-[12rpx] py-[2rpx] rounded-[8rpx]',
-                      isOpen ? 'bg-success-bg' : 'bg-muted',
-                    )}
-                  >
-                    <View
-                      className={cn(
-                        'w-[12rpx] h-[12rpx] rounded-full',
-                        isOpen ? 'bg-success' : 'bg-muted-foreground',
-                      )}
-                    />
-                    <Text
-                      className={cn(
-                        'text-[22rpx] font-medium',
-                        isOpen ? 'text-success' : 'text-muted-foreground',
-                      )}
-                    >
-                      {isOpen ? '营业中' : '休息中'}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex items-center gap-[4rpx]">
-                  <Icon name="mdi-map-marker-outline" size="xxs" color="mutedForeground" />
-                  <Text className="text-[22rpx] text-muted-foreground truncate max-w-[240rpx]">
-                    {currentCampus?.address || '暂无地址'}
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex flex-col items-end gap-[4rpx] shrink-0">
-                <View className="flex items-center gap-[2rpx]">
-                  <Text className="text-[26rpx] font-semibold text-foreground">切换校区</Text>
-                  <Icon name="mdi-chevron-down" size="xs" color="foreground" />
-                </View>
-                {businessTime && (
-                  <Text className="text-[26rpx] text-muted-foreground">· {businessTime}</Text>
-                )}
-              </View>
-            </View>
-          </View>
+            className="shadow-campus"
+          />
         </View>
       </>
     );

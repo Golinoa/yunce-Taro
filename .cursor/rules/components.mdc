@@ -1,0 +1,158 @@
+---
+description: 云策教务组件开发规范 — 复用优先、Props 接口、JSDoc、文件结构。编写组件前必读。
+globs: src/components/**/*.tsx
+alwaysApply: false
+---
+
+# 组件开发规范
+
+## 1. 复用优先（铁律）
+
+**写任何 UI 之前必须先查 `src/components/`**。已沉淀的组件如下：
+
+### 通用基础组件
+
+| 组件 | 路径 | 用途 |
+|---|---|---|
+| `BottomSheet` | `components/BottomSheet/` | 底部弹窗（所有业务弹窗的基础容器） |
+| `FormInput` | `components/FormInput/` | 统一输入框（覆盖 default/capsule/ghost 三态） |
+| `Card` / `CardHeader` | `components/Card*/` | 卡片容器 |
+| `PageContainer` | `components/PageContainer/` | 页面容器（统一导航/标题） |
+| `Modal` / `ConfirmDialog` | `components/{Modal,ConfirmDialog}/` | 对话框 |
+| `Icon` | `components/Icon/` | MDI 图标（用 `<Icon name="mdi-xxx" />`） |
+| `Avatar` | `components/Avatar/` | 头像（含加载失败回退） |
+| `Empty` / `Loading` | — | 空/加载状态 |
+| `SegmentedControl` | — | 分段控制器 |
+| `ChipPicker` | — | 芯片选择器（单选/多选） |
+| `Stepper` | — | 数字步进器 |
+| `StarRating` | — | 星级评分 |
+| `CircleCheckbox` | — | 圆形复选框 |
+| `PickerItem` | — | 选择器项 |
+| `SheetInput` | — | 弹窗内输入框 |
+| `ActionButton` | — | 底部操作按钮 |
+| `QuestionHint` | — | 问号提示 |
+| `InstallmentPanel` | — | 分期面板 |
+| `AgreementDialog` / `AgreementSheet` | — | 协议相关 |
+| `CalendarMonthSheet` / `CalendarWeekSelector` | — | 日历选择 |
+| `ContactList` | — | 联系人列表 |
+| `RegisterStepper` | — | 注册步骤指示器 |
+| `RoleCard` / `RoleSwitchSheet` | — | 角色相关 |
+
+### 业务组件（按模块目录）
+
+`src/components/{home,schedule,booking,lesson,lead,student,teacher,statistics,package,profile,campus,class,proxy-booking,reschedule}/`
+
+常见示例：`TeacherCard`、`LeadCard`、`StatCard`、`KpiCard`、`BarChart`、`AddTeacherSheet`、`ConvertSheet`、`FollowUpSheet` 等。
+
+> ⚠️ 必须先用 Glob/Grep 检索再写，避免重复实现。
+
+## 2. 文件结构模板
+
+```
+src/components/
+├── ModuleName/                   # PascalCase
+│   └── ComponentName/            # PascalCase
+│       └── index.tsx             # 唯一文件
+```
+
+```tsx
+// src/components/teacher/AddTeacherSheet/index.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text } from '@tarojs/components';
+import BottomSheet from '@/components/BottomSheet';
+import FormInput from '@/components/FormInput';
+import cn from 'classnames';
+
+/**
+ * AddTeacherSheet - 添加教师弹窗
+ *
+ * 使用场景：在「教师列表」页右上角点击「添加教师」时触发
+ * 功能：录入教师基本信息（姓名、手机、科目、入职日期），提交后写入 Store
+ * 相关组件：与 EditTeacherSheet 复用同一份底部结构
+ */
+export interface AddTeacherSheetProps {
+  /** 是否可见（单 prop 模式） */
+  visible: boolean;
+  /** 提交回调 */
+  onConfirm: (payload: TeacherFormPayload) => void;
+  /** 关闭回调 */
+  onClose: () => void;
+}
+
+const AddTeacherSheet: React.FC<AddTeacherSheetProps> = ({
+  visible,
+  onConfirm,
+  onClose,
+}) => {
+  // ... 实现
+};
+
+export default AddTeacherSheet;
+```
+
+## 3. Props 接口设计原则
+
+1. **最小化**：只传必要数据，组件内部派生（如 `filter`、`sort`）。
+2. **回调命名**：`on{Event}` — `onClose`、`onConfirm`、`onChange`、`onSubmit`、`onSelect`。
+3. **布尔 Props**：语义化（无 `is` 前缀）— `disabled`、`loading`、`visible`、`readonly`。
+4. **可选 Props 提供默认值**：消费方无需判 `undefined`。
+5. **`children` 优先**：需要自定义内容用 `children`，否则用 Props 控制。
+6. **导出 Props 类型**：`export interface XxxProps`，便于消费方引用。
+
+## 4. 函数组件 & Hooks 规范
+
+- 一律函数组件，**禁止**类组件。
+- 复杂组件按职责拆分为自定义 Hook（`useXxx`），与 UI 解耦。
+- `useEffect` 依赖数组必须完整；如需刻意忽略，写明注释。
+- 事件处理函数：`const handleSubmit = useCallback(() => { ... }, [deps])`。
+- 计算值：`const filtered = useMemo(() => ..., [deps])`。
+- `useState` 仅用于组件**局部 UI 状态**（弹窗显隐、表单输入）；跨页全局态走 Zustand。
+
+## 5. 组件分层（目标）
+
+```
+src/components/
+├── base/          # 原子（Icon、Avatar、Button）— 未来迁移
+├── form/          # 表单（FormInput、ChipPicker、SegmentedControl）
+├── feedback/      # 反馈（BottomSheet、Toast、Empty、Loading）
+├── business/      # 业务（TeacherCard、StudentPickerSheet）
+└── layout/        # 布局（PageContainer、Card、CardHeader）
+```
+
+当前为扁平结构（按模块分目录）。**新增组件时按模块归类**，不要新建一级目录。
+
+## 6. JSDoc 强制
+
+每个组件文件顶部必须有 JSDoc，包含：
+
+1. **一行简介** — 组件是什么
+2. **使用场景** — 在哪个页面、什么操作触发
+3. **功能说明** — 具体做什么
+4. **（可选）相关组件** — 与哪些组件配合
+
+示例：
+
+```tsx
+/**
+ * TeacherCard - 教师卡片
+ *
+ * 使用场景：「教师列表」页、教师选择弹窗、班级表单选老师
+ * 功能：展示教师头像/姓名/科目/状态标签，支持左滑露出操作按钮
+ * 相关组件：SwappableScheduleCard（复用左滑容器）
+ */
+```
+
+## 7. 弹窗组件
+
+详见 `sheets.mdc` — 必须用 `BottomSheet` 封装为独立 Sheet，禁止页面内联。
+
+## 8. 自检
+
+- [ ] 已在 `src/components/` 检索，没有重复实现
+- [ ] 文件结构 `ComponentName/index.tsx`，目录 PascalCase
+- [ ] `export interface XxxProps` + `export default Xxx`
+- [ ] JSDoc 含使用场景 + 功能
+- [ ] 弹窗走 `BottomSheet` 单 `visible` prop
+- [ ] 样式纯 UnoCSS（无内联 style、无 px、无硬编码色）
+- [ ] 事件 `handle` 前缀，回调 `on` 前缀
+- [ ] TypeScript 类型完整，无隐式 any

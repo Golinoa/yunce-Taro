@@ -1,0 +1,219 @@
+---
+description: 云策教务表单/输入规范 — FormInput 强制使用、小程序 Input 陷阱。处理表单时必读。
+globs: **/*.{tsx,ts}
+alwaysApply: false
+---
+
+# 表单 / 输入规范
+
+## 1. 强制使用 `<FormInput>`（铁律）
+
+**禁止** 直接使用裸 `<Input>`。统一通过 `src/components/FormInput/`：
+
+```tsx
+import FormInput from '@/components/FormInput';
+
+<FormInput
+  label="姓名"
+  required
+  value={name}
+  onInput={(e) => setName(e.detail.value)}
+  placeholder="请输入姓名"
+  maxlength={20}
+/>
+```
+
+支持的 variant：
+
+| variant | 场景 | 示例 |
+|---|---|---|
+| `default` | 独立带边框输入框（默认） | 登录、注册、表单页 |
+| `capsule` | 胶囊搜索框（带搜索图标） | 列表页搜索栏 |
+| `ghost` | 无背景无边框，行内布局 | `FormCell` 左右结构 |
+
+## 2. Props 速查
+
+```ts
+export interface FormInputProps {
+  label?: string;            // 标签文字
+  required?: boolean;        // 是否必填（显示 *）
+  placeholder?: string;
+  value?: string;
+  onInput?: InputProps['onInput'];  // 必填，返回 e.detail.value
+  type?: InputProps['type'];        // text/number/idcard/digit/safe-password
+  maxlength?: number;
+  placeholderClass?: string;
+  error?: string;            // 错误文案（红色）
+  disabled?: boolean;
+  hint?: string;             // 灰色提示
+  prefix?: string;           // 前缀文字
+  suffix?: React.ReactNode;  // 后缀节点（图标/按钮）
+  prefixNode?: React.ReactNode; // 前缀节点（搜索图标）
+  multiline?: boolean;       // 多行（Textarea）
+  minHeight?: string;        // 多行高度，默认 120rpx
+  password?: boolean;        // 密码框
+  variant?: 'default' | 'capsule' | 'ghost';
+  inputStyle?: React.CSSProperties;
+}
+```
+
+## 3. 小程序 Input 陷阱（必读）
+
+### 3.1 受控值必须回传
+
+```tsx
+// ❌ 错误：onInput 只 setState 但不返回值 → PC 端微信小程序输入会被重置
+<Input value={value} onInput={(e) => setValue(e.detail.value)} />
+
+// ✅ 正确：onInput 内必须返回最新值
+<FormInput
+  value={value}
+  onInput={(e) => {
+    setValue(e.detail.value);
+    return e.detail.value;  // 必须 return，避免 PC 端重置
+  }}
+/>
+```
+
+> `FormInput` 已内置此保护（`handleInput` 中 `return e.detail.value`）。直接用 `FormInput` 即可避免此坑。
+
+### 3.2 输入法遮挡
+
+- 小程序键盘弹出会遮挡输入框，需要监听 `onKeyboardHeightChange` 或使用 `adjust-position`。
+- 弹窗内多输入框建议用 `ScrollView` 包裹，避免软键盘遮挡底部按钮。
+
+### 3.3 类型选择
+
+- 手机号：`type="number"` + 自定义校验（避免 `type="number"` 在 iOS 上无法输入 `+86` 等前缀）
+- 身份证：`type="idcard"`
+- 数字：`type="number"` 或 `type="digit"`（digit 支持小数）
+- 密码：`type="safe-password"` 或 `password={true}`
+
+### 3.4 永远不要在受控 input 上使用 `defaultValue`
+
+```tsx
+// ❌ 错误
+<Input value={value} defaultValue="初始值" />  // 冲突
+
+// ✅ 正确
+const [value, setValue] = useState('初始值');
+<Input value={value} onInput={(e) => setValue(e.detail.value)} />
+```
+
+## 4. 多行文本（Textarea）
+
+弹窗内多说文本/备注统一写法：
+
+```tsx
+<Textarea
+  className="w-full bg-muted rounded-xl p-3 text-sm min-h-[120rpx] text-foreground"
+  placeholder="请输入备注..."
+  value={remark}
+  onInput={(e) => setRemark(e.detail.value)}
+  maxlength={200}
+/>
+```
+
+或在 `FormInput` 上设置 `multiline` + `minHeight`：
+
+```tsx
+<FormInput
+  label="备注"
+  multiline
+  minHeight="160rpx"
+  value={remark}
+  onInput={(e) => setRemark(e.detail.value)}
+  maxlength={200}
+/>
+```
+
+## 5. 表单校验
+
+- 必填：`<FormInput required />` 仅显示 `*`，**不自动校验**。
+- 业务校验在 `handleSubmit` 中：
+
+```tsx
+const handleSubmit = () => {
+  if (!name.trim()) {
+    Taro.showToast({ title: '请输入姓名', icon: 'none' });
+    return;
+  }
+  if (!/^1\d{10}$/.test(phone)) {
+    Taro.showToast({ title: '手机号格式错误', icon: 'none' });
+    return;
+  }
+  // 提交...
+};
+```
+
+- 复杂校验（如完整表单）：用 `ajv`（已在依赖） + JSON Schema。
+- 错误回显：用 `FormInput` 的 `error` prop：
+
+```tsx
+<FormInput
+  label="手机号"
+  value={phone}
+  error={phoneError}      // "手机号格式错误"
+  onInput={(e) => {
+    setPhone(e.detail.value);
+    setPhoneError('');
+  }}
+/>
+```
+
+## 6. 表单布局
+
+### 6.1 独立表单（注册、新增页）
+
+```tsx
+<View className="px-4 py-6 gap-4">
+  <FormInput label="姓名" required value={name} onInput={...} />
+  <FormInput label="手机号" required value={phone} onInput={...} />
+  <FormInput label="邮箱" value={email} onInput={...} />
+  <View className="py-3 rounded-2xl text-center text-base font-semibold text-white bg-gradient-primary" onClick={handleSubmit}>
+    提交
+  </View>
+</View>
+```
+
+### 6.2 行内表单（详情页修改）
+
+```tsx
+{/* 用 ghost variant */}
+<FormInput variant="ghost" label="姓名" value={name} onInput={...} />
+
+{/* 或自定义 FormCell */}
+<View className="flex items-center px-4 py-3 border-b border-border">
+  <Text className="w-32 text-sm text-muted-foreground">姓名</Text>
+  <FormInput variant="ghost" className="flex-1" value={name} onInput={...} />
+</View>
+```
+
+### 6.3 弹窗内表单
+
+```tsx
+<BottomSheet visible={visible} title="新增教师" onClose={onClose}>
+  <View className="px-4 pb-6 gap-4">
+    <FormInput label="姓名" required value={name} onInput={...} />
+    <FormInput label="手机号" required value={phone} onInput={...} />
+    <View className="flex gap-3 mt-4">
+      <View className="flex-1 py-3 rounded-xl text-center bg-muted text-muted-foreground" onClick={onClose}>
+        取消
+      </View>
+      <View className="flex-1 py-3 rounded-xl text-center bg-primary text-white" onClick={handleSubmit}>
+        确认
+      </View>
+    </View>
+  </View>
+</BottomSheet>
+```
+
+## 7. 自检
+
+- [ ] 所有输入框走 `<FormInput>`，无裸 `<Input>`
+- [ ] `onInput` 返回 `e.detail.value`（已由 `FormInput` 内部处理）
+- [ ] 多行文本用 `Textarea` 或 `FormInput multiline`
+- [ ] 校验在 `handleSubmit` 中，`error` 回显到 `FormInput`
+- [ ] 弹窗内多输入框用 `ScrollView` 包裹防键盘遮挡
+- [ ] 表单提交走 Service 层
+- [ ] 错误提示统一 `Taro.showToast`，不用 `alert`
