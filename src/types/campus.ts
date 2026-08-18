@@ -65,6 +65,8 @@ export interface CampusUIModel {
   stats: CampusStats;
   /** 主营业态 */
   businessCategories: SelectedBusinessCategory[];
+  /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */
+  tags?: string[];
 }
 
 /** 校区统计数据 */
@@ -116,6 +118,8 @@ export interface CampusFormData {
   longitude?: number;
   /** 主营业态 */
   businessCategories?: SelectedBusinessCategory[];
+  /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */
+  tags?: string[];
 }
 
 // ============================================

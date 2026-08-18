@@ -95,7 +95,7 @@ const Index: React.FC = () => {
             campus={currentCampus}
             businessTime={businessTime}
             isOpen={isOpen}
-            onClick={handleOpenCampusSheet}
+            onSwitch={handleOpenCampusSheet}
             className="shadow-card"
           />
         </View>

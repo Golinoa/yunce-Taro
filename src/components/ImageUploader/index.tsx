@@ -105,7 +105,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       <Image className="w-full h-full" src={value} mode="aspectFill" lazyLoad />
       {/* 遮罩 + 预览眼睛 */}
       <View className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 active:opacity-100 transition-opacity">
-        <Icon name="mdi-eye-outline" size={48} color="white" />
+        <Icon name="mdi-eye" size={48} color="white" />
       </View>
       {/* 删除按钮 */}
       <View

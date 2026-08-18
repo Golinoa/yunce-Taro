@@ -342,7 +342,7 @@ const Home: React.FC = () => {
             campus={currentCampus}
             businessTime={businessTime}
             isOpen={isOpen}
-            onClick={handleOpenCampusSheet}
+            onSwitch={handleOpenCampusSheet}
             className="shadow-campus"
           />
         </View>

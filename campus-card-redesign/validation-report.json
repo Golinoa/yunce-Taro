@@ -1,0 +1,102 @@
+{
+  "success": true,
+  "outcome": "passed",
+  "repairable": true,
+  "terminalViolations": [],
+  "terminalBlockingSummary": null,
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.07.06.8",
+    "version_source": "unknown",
+    "runtime_skill_dir": null,
+    "recorded_at": null,
+    "expected_version": "2026.08.06.19.15.08",
+    "status": "mismatch",
+    "read_status": "ok"
+  },
+  "operatingMode": "free-explore",
+  "renderBlockingErrorCount": 0,
+  "softWarningCount": 4,
+  "renderBlockingErrors": [],
+  "errorSignatures": [],
+  "softWarnings": [
+    "[orchestration-summary] runtime-orchestration-summary.json is missing skillProvenance.name/version/version_source. Version provenance will be reported as observed_unknown by external evaluators.",
+    "[mobile-bottom-overlay] pages/index.html: bottom fixed/absolute CTA or navigation found. Ensure it has safe-area spacing and does not cover content. Evidence: class=\"fixed bottom-0 left-0 right-0 bg-card border-t border-border px-6 py-2 flex items-center justify-between\"",
+    "[html-quality] colors_and_type.css: free-explore radius tokens must stay within the restrained 2/4/8/12/16px scale; oversized or forbidden radius tokens found (--sg-radius-xl: 24px). Do not use 20px+ radii unless the user explicitly requested large rounded shapes.",
+    "[html-quality] index.html: Tailwind named color utilities are forbidden (bg-red-500, bg-blue-500, text-purple-500, bg-purple-500, bg-orange-100, text-orange-500, bg-amber-100, text-amber-500). Use brand CSS variables instead."
+  ],
+  "repairPlanHints": [],
+  "repairActionTable": [],
+  "errorCount": 0,
+  "warningCount": 4,
+  "errors": [],
+  "warnings": [
+    "[orchestration-summary] runtime-orchestration-summary.json is missing skillProvenance.name/version/version_source. Version provenance will be reported as observed_unknown by external evaluators.",
+    "[mobile-bottom-overlay] pages/index.html: bottom fixed/absolute CTA or navigation found. Ensure it has safe-area spacing and does not cover content. Evidence: class=\"fixed bottom-0 left-0 right-0 bg-card border-t border-border px-6 py-2 flex items-center justify-between\"",
+    "[html-quality] colors_and_type.css: free-explore radius tokens must stay within the restrained 2/4/8/12/16px scale; oversized or forbidden radius tokens found (--sg-radius-xl: 24px). Do not use 20px+ radii unless the user explicitly requested large rounded shapes.",
+    "[html-quality] index.html: Tailwind named color utilities are forbidden (bg-red-500, bg-blue-500, text-purple-500, bg-purple-500, bg-orange-100, text-orange-500, bg-amber-100, text-amber-500). Use brand CSS variables instead."
+  ],
+  "validationRunDisciplineStatus": {
+    "declared": true,
+    "restoreMode": false,
+    "maxFullValidationRuns": 2,
+    "validationHistoryCount": 0,
+    "repairLedgerCount": 0,
+    "softWarningsTriggerRepair": false,
+    "terminalState": null,
+    "nextAction": null,
+    "violations": [],
+    "success": true
+  },
+  "terminalState": null,
+  "nextCheck": {
+    "type": "finish-readiness",
+    "command": "node \"c:\\Users\\Agust\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs\" \"d:\\Coding\\yunce\\yunceTaro\\campus-card-redesign\" --check=all",
+    "fullValidationAllowed": false,
+    "reason": "workspace validation passed; run complete finish readiness before final delivery"
+  },
+  "repairBatch": [],
+  "repairContextPacket": {
+    "schema_version": "1.0",
+    "purpose": "small-context repair packet; read this before full validation-report.json",
+    "success": true,
+    "terminalState": null,
+    "skillProvenance": {
+      "name": "solo-design",
+      "version": "2026.07.06.8",
+      "version_source": "unknown",
+      "runtime_skill_dir": null,
+      "recorded_at": null,
+      "expected_version": "2026.08.06.19.15.08",
+      "status": "mismatch",
+      "read_status": "ok"
+    },
+    "renderBlockingErrorCount": 0,
+    "softWarningCount": 4,
+    "renderBlockingErrors": [],
+    "repairActionTable": [],
+    "nextCheck": {
+      "type": "finish-readiness",
+      "command": "node \"c:\\Users\\Agust\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs\" \"d:\\Coding\\yunce\\yunceTaro\\campus-card-redesign\" --check=all",
+      "fullValidationAllowed": false,
+      "reason": "workspace validation passed; run complete finish readiness before final delivery"
+    },
+    "forbidden": [
+      "do not read validator source",
+      "do not rerun full validation when nextCheck.fullValidationAllowed=false",
+      "do not start preview/browser unless user explicitly asks",
+      "do not hand-edit repair ledger fields"
+    ]
+  },
+  "projectFileHashes": {
+    ".design": "e8f9372e112cd473040d9faae9b19495cb5da3beb63c4086fe6febc8b1e94547",
+    "colors_and_type.css": "839933646086dc585507cc2626c5cfd8f6ec9302babd941b3dfd3678c4cc3cb9",
+    "runtime-orchestration-summary.json": "183dd13038c0b31facb3cc6a9b017ef7ab2cea6e267c39352a085b8cda2dabed",
+    "pages/index.html": "3b0ea069d272cdfc86c36d9cc84fdabfc2ba722515e943ac2c1f8f4b25d4b5fa",
+    "assets/banner-studio.jpg": "16cd77520da13f73dc3e715bdadc770fb44ddfa1c843298baa28b607498c360f"
+  },
+  "designDir": "d:\\Coding\\yunce\\yunceTaro\\campus-card-redesign",
+  "expectedPages": 1,
+  "requireInteractions": null,
+  "checkedAt": "2026-08-18T17:22:22.922Z"
+}

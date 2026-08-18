@@ -62,6 +62,7 @@ export interface Campus {
   address: string;
   /** 营业时间 */
   businessHours?: string;
+  /** 校区联系电话（Mock 使用固定测试号码） */
   phone: string;
   /** 门店介绍 */
   intro?: string;
@@ -76,6 +77,8 @@ export interface Campus {
   createdAt: string;
   /** 主营业态 */
   businessCategories?: { categoryId: string; subIds: string[] }[];
+  /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */
+  tags?: string[];
 }
 
 export const ORGANIZATIONS: Organization[] = [
@@ -102,10 +105,14 @@ export const CAMPUSES: Campus[] = [
     region: '浙江省-杭州市-西湖区',
     address: '杭州市西湖区文三路168号云策大厦1-3层',
     businessHours: '08:00:00至22:00:00',
-    phone: '0571-88886666',
+    phone: '13800138000',
     intro: '云策教育中心校区，专注艺术、体能、科创培训。',
     venueImages: [],
+    locationName: '云策大厦',
+    latitude: 30.2741,
+    longitude: 120.1551,
     createdAt: '2024-01-15T08:00:00Z',
+    tags: ['免费试听', '暑期特惠'],
   },
   {
     id: 'campus-east',
@@ -119,9 +126,12 @@ export const CAMPUSES: Campus[] = [
     region: '浙江省-杭州市-上城区',
     address: '杭州市上城区钱江新城丹桂街88号',
     businessHours: '08:00:00至22:00:00',
-    phone: '0571-88887777',
+    phone: '13800138001',
     intro: '',
     venueImages: [],
+    locationName: '钱江新城',
+    latitude: 30.251,
+    longitude: 120.212,
     createdAt: '2024-06-01T08:00:00Z',
   },
   {
@@ -136,9 +146,12 @@ export const CAMPUSES: Campus[] = [
     region: '浙江省-杭州市-余杭区',
     address: '杭州市余杭区未来科技城EFC欧美金融城',
     businessHours: '08:00:00至22:00:00',
-    phone: '0571-88889999',
+    phone: '13800138002',
     intro: '',
     venueImages: [],
+    locationName: 'EFC欧美金融城',
+    latitude: 30.28,
+    longitude: 119.997,
     createdAt: '2024-09-01T08:00:00Z',
   },
 ];

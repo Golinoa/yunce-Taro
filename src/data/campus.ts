@@ -223,6 +223,7 @@ function mapCampusToUI(index: number, campus = CAMPUSES[index]): CampusUIModel {
       revenueUnit: stats && stats.monthAmount >= 10000 ? '万' : '',
     },
     businessCategories: campus.businessCategories || [],
+    tags: campus.tags || [],
   };
 }
 
@@ -348,6 +349,7 @@ export async function mockAddCampus(data: CampusFormData): Promise<CampusUIModel
     longitude: data.longitude,
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
     businessCategories: data.businessCategories || [],
+    tags: data.tags || [],
   };
   mockCampusOverrides = [...getCampusList(), campus];
   return campus;
@@ -391,6 +393,7 @@ export async function mockUpdateCampus(
     intro: data.intro ?? current.intro,
     venueImages,
     businessCategories: data.businessCategories ?? current.businessCategories,
+    tags: data.tags ?? current.tags,
   };
 
   mockCampusOverrides = campuses.map((item) => (item.id === id ? updated : item));

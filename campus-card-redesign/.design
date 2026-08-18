@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "id": "page-index",
+      "title": "校区卡片",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1787072283000,
+      "canvasData": {
+        "x": 96,
+        "y": 72,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 953,
+          "viewportWidth": 375,
+          "sourceHash": "fnv1a-babd03fe",
+          "measuredAt": 1787073761392
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "image-001",
+      "title": "Banner 教室背景",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1787073000000,
+      "canvasData": {
+        "x": 0,
+        "y": 387,
+        "naturalSize": {
+          "width": 2560,
+          "height": 1440
+        }
+      },
+      "devMetadata": {
+        "imageSrc": "assets/banner-studio.jpg"
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": false,
+    "deviceType": "mobile",
+    "projectName": "校区卡片排版重设计"
+  }
+}
