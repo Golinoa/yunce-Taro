@@ -1,45 +1,50 @@
 /**
  * 关于页 pages/about/index
  *
- * 品牌介绍落地页（H5 风格，用于吸引场馆入驻）：
- * - Hero：品牌 Slogan + 价值主张 + 行动号召
- * - 数据背书：产品事实数据条
- * - 痛点共鸣：馆长/教练日常困扰 → 解决方案
- * - 核心功能：价值导向的六大能力
- * - 选择理由：差异化优势
- * - 入驻流程：三步走
- * - 底部悬浮「门店入驻」按钮
+ * 门店入驻引导页（品牌介绍落地页），从「我的」页「关于松果排课」按钮进入。
+ * 分区顺序（对齐优化版设计稿）：
+ *  Hero(蓝渐变 + 安全保障标签) → 数据背书(2×2) → 痛点共鸣 → 安全保障 →
+ *  核心功能(6) → 为什么选择我们(2) → 入驻流程(纵向三步) → 底部悬浮「免费开通门店」按钮。
+ * 已按优化版移除收尾 CTA 与 Footer；CTA 文案统一为「免费开通门店」。
  *
- * 全部使用 UnoCSS Token，随主题色（blue/coral/orange）联动。
+ * 技术约束：UnoCSS Token + rpx，随主题色(blue/coral/orange)联动；无 SCSS、无内联 style；
+ * 图标统一走 @/components/Icon（仅支持 MDI_ICONS 表内名称）。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback } from 'react';
-import Icon from '@/components/Icon';
+import Icon, { IconName } from '@/components/Icon';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { useThemeStore } from '@/stores/theme';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
+/** 图标 + 标题 + 描述 的通用条目结构 */
+interface InfoItem {
+  icon: IconName;
+  title: string;
+  desc: string;
+}
+
 /** 数据背书（均为产品真实能力，不虚构用户量） */
-const STATS = [
+const STATS: { value: string; label: string }[] = [
   { value: '10+', label: '核心业务模块' },
-  { value: '3 端', label: '馆主·教师·家长' },
+  { value: '3 端', label: '校长·教师·前台' },
+  { value: '5 分钟', label: '完成配置' },
   { value: '1 账号', label: '多身份随时切换' },
-  { value: '5 分钟', label: '快速上手' },
 ];
 
 /** 馆长/教练日常痛点 */
-const PAINS = [
+const PAINS: InfoItem[] = [
   {
     icon: 'mdi-calendar-clock-outline',
-    title: '约课靠群接龙，消课全靠手记',
+    title: '排课靠表格，撞车靠人工',
     desc: '谁上了课、还剩几节，月底对账对到崩溃',
   },
   {
     icon: 'mdi-credit-card-outline',
-    title: '售卡记录散落各处',
+    title: '售卡消课记录散落',
     desc: '会员到期、余额多少，全靠拍脑袋回忆',
   },
   {
@@ -49,13 +54,21 @@ const PAINS = [
   },
   {
     icon: 'mdi-calculator',
-    title: '排课撞车、算薪要命',
-    desc: '调课靠嘴，底薪提成课时费算到半夜',
+    title: '算薪费时还易错',
+    desc: '底薪、提成、课时费手动汇总，算到半夜',
   },
 ];
 
-/** 核心功能（价值导向） */
-const FEATURES = [
+/** 安全保障细则（端到端加密主张的支撑点） */
+const SECURITY_POINTS: InfoItem[] = [
+  { icon: 'mdi-lock', title: '全链路传输加密', desc: '数据全程加密，杜绝窃取篡改' },
+  { icon: 'mdi-shield-check', title: '数据归属机构', desc: '掌握数据主权，随时导出备份' },
+  { icon: 'mdi-account-group', title: '分级权限管控', desc: '校长、教师、前台按角色授权' },
+  { icon: 'mdi-clock-outline', title: '多重备份可审计', desc: '云端多重备份，异常可追溯' },
+];
+
+/** 核心功能（价值导向，与设计稿一致） */
+const FEATURES: InfoItem[] = [
   {
     icon: 'mdi-calendar-clock-outline',
     title: '可视化排课',
@@ -84,38 +97,28 @@ const FEATURES = [
   {
     icon: 'mdi-account-switch',
     title: '多端协同',
-    desc: '馆主·教师·家长一账号切换，各司其职',
+    desc: '校长·教师·前台一账号切换，各司其职',
   },
 ];
 
-/** 选择理由（差异化优势） */
-const REASONS = [
-  {
-    icon: 'mdi-heart-circle-outline',
-    title: '懂行业，不折腾',
-    desc: '由真实馆长、教练参与打磨，贴合每天的真实经营场景',
-  },
+/** 为什么选择我们（优化版精简为 2 张，与设计稿一致） */
+const WHY_CHOOSE: InfoItem[] = [
   {
     icon: 'mdi-rocket-launch',
-    title: '上手快',
-    desc: '界面简洁克制，配置向导式引导，5 分钟即可跑通',
+    title: '即开即用不折腾',
+    desc: '微信小程序打开即用，无需下载安装、无需维护服务器',
   },
   {
-    icon: 'mdi-cash-check',
-    title: '低成本',
-    desc: '轻量工具级投入，换掉繁琐表格与群聊，物超所值',
-  },
-  {
-    icon: 'mdi-update',
-    title: '持续进化',
-    desc: '每月迭代更新，认真倾听每一位场馆主的真实反馈',
+    icon: 'mdi-account',
+    title: '一直陪着你',
+    desc: '专属顾问一对一服务，按机构反馈每月迭代',
   },
 ];
 
 /** 入驻流程 */
-const STEPS = [
-  { step: '01', title: '填写申请', desc: '提交门店基本信息' },
-  { step: '02', title: '专人对接', desc: '顾问 1 对 1 沟通需求' },
+const STEPS: { step: string; title: string; desc: string }[] = [
+  { step: '01', title: '填写申请', desc: '提交机构基本信息' },
+  { step: '02', title: '专人对接', desc: '顾问 1 对 1 协助你完成配置' },
   { step: '03', title: '开通使用', desc: '配置完成，即刻上手' },
 ];
 
@@ -138,24 +141,29 @@ const About: React.FC = () => {
 
           <View className="relative z-10">
             {/* 品牌 */}
-            <View className="flex items-center justify-center gap-[12rpx] mb-[36rpx]">
+            <View className="flex items-center justify-center gap-[12rpx] mb-[28rpx]">
               <View className="w-[72rpx] h-[72rpx] rounded-full bg-white center shadow-soft">
                 <Text className="text-[34rpx] font-black text-primary">SG</Text>
               </View>
-              <Text className="text-[40rpx] font-black text-white tracking-wide">
-                {BRAND_NAME_ZH}
-              </Text>
+              <Text className="text-[40rpx] font-black text-white tracking-wide">{BRAND_NAME_ZH}</Text>
+            </View>
+
+            {/* 安全保障标签 */}
+            <View className="flex items-center justify-center mb-[20rpx]">
+              <View className="px-[16rpx] h-[40rpx] rounded-full bg-white/15 center">
+                <Text className="text-[22rpx] font-medium text-white/90">端到端加密 · 数据安全</Text>
+              </View>
             </View>
 
             {/* Slogan */}
             <Text className="block text-center text-[44rpx] font-black text-white leading-[1.35]">
-              让场馆经营
+              让机构的经营
               <Text className="mx-[8rpx] text-white/70">·</Text>
-              更简单专业
+              更简单更安全
             </Text>
             <Text className="block text-center text-[26rpx] text-white/85 mt-[20rpx] leading-relaxed">
-              约课、消课、售卡、算薪、管数据
-              <Text className="block">一套系统，全流程搞定</Text>
+              排课、消课、售卡、算薪、数据分析
+              <Text className="block">一套系统覆盖经营全流程，数据端到端加密</Text>
             </Text>
 
             {/* Hero CTA */}
@@ -163,26 +171,21 @@ const About: React.FC = () => {
               className="mt-[44rpx] h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg"
               onClick={handleEntry}
             >
-              <Text className="text-[32rpx] font-bold text-primary">立即入驻</Text>
+              <Text className="text-[32rpx] font-bold text-primary">免费开通门店</Text>
               <Icon name="mdi-chevron-right" size={28} color="primary" />
             </View>
           </View>
         </View>
 
-        {/* ===== 数据背书（叠在 Hero 下方） ===== */}
+        {/* ===== 数据背书（叠在 Hero 下方，2×2 网格对齐设计稿） ===== */}
         <View className="px-[32rpx] -mt-[48rpx] relative z-10">
-          <View className="bg-card rounded-[28rpx] shadow-card px-[16rpx] py-[28rpx] flex">
-            {STATS.map((item, index) => (
-              <View key={item.label} className="relative flex-1 center-col">
-                <Text className="text-[34rpx] font-black text-primary leading-none">
-                  {item.value}
-                </Text>
+          <View className="bg-card rounded-[28rpx] shadow-card px-[24rpx] py-[32rpx] grid grid-cols-2 gap-y-[32rpx]">
+            {STATS.map((item) => (
+              <View key={item.label} className="center-col">
+                <Text className="text-[34rpx] font-black text-primary leading-none">{item.value}</Text>
                 <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] text-center leading-tight">
                   {item.label}
                 </Text>
-                {index < STATS.length - 1 && (
-                  <View className="absolute right-0 top-1/2 -translate-y-1/2 w-[2rpx] h-[44rpx] bg-border" />
-                )}
               </View>
             ))}
           </View>
@@ -191,7 +194,7 @@ const About: React.FC = () => {
         <View className="px-[32rpx] pt-[40rpx] pb-[180rpx] flex flex-col gap-[44rpx]">
           {/* ===== 痛点共鸣 ===== */}
           <View>
-            <SectionHeader eyebrow="你是否也这样" title="场馆经营，真的不该这么累" />
+            <SectionHeader eyebrow="你是否也这样" title="机构的经营，不该这么累" />
             <View className="bg-card rounded-[28rpx] shadow-card overflow-hidden">
               {PAINS.map((item, index) => (
                 <View
@@ -205,9 +208,7 @@ const About: React.FC = () => {
                     <Icon name={item.icon} size={32} color="destructive" />
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-[28rpx] font-semibold text-foreground block">
-                      {item.title}
-                    </Text>
+                    <Text className="text-[28rpx] font-semibold text-foreground block">{item.title}</Text>
                     <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] leading-relaxed block">
                       {item.desc}
                     </Text>
@@ -224,20 +225,36 @@ const About: React.FC = () => {
             </View>
           </View>
 
-          {/* ===== 核心功能 ===== */}
+          {/* ===== 安全保障 ===== */}
           <View>
-            <SectionHeader eyebrow="核心能力" title="一套系统，覆盖经营全流程" />
-            <View className="flex flex-wrap gap-[20rpx]">
-              {FEATURES.map((item) => (
+            <SectionHeader eyebrow="安全保障" title="端到端加密，数据安全看得见" />
+            <Text className="text-[24rpx] text-muted-foreground leading-relaxed mb-[24rpx] block">
+              从学员档案到课时与财务数据，全程加密、按角色授权、随时可审计，安全不是口号而是机制。
+            </Text>
+            {/* 主主张卡 */}
+            <View className="bg-card rounded-[24rpx] shadow-card p-[32rpx] mb-[24rpx] flex items-start gap-[24rpx]">
+              <View className="w-[76rpx] h-[76rpx] rounded-[20rpx] bg-primary-10 center flex-shrink-0">
+                <Icon name="mdi-shield-check" size={36} color="primary" />
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-[30rpx] font-bold text-foreground block">端到端加密</Text>
+                <Text className="text-[24rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
+                  关键数据在离开设备前完成加密，密钥由机构独立掌控，机构以外任何第三方都无法读取明文。
+                </Text>
+              </View>
+            </View>
+            {/* 支撑点 2x2 */}
+            <View className="grid grid-cols-2 gap-[24rpx]">
+              {SECURITY_POINTS.map((item) => (
                 <View
                   key={item.title}
-                  className="w-[calc(50%-10rpx)] bg-card rounded-[24rpx] p-[26rpx] shadow-card"
+                  className="bg-card rounded-[24rpx] p-[32rpx] shadow-card"
                 >
-                  <View className="w-[64rpx] h-[64rpx] rounded-[20rpx] bg-primary-10 center mb-[16rpx]">
-                    <Icon name={item.icon} size={32} color="primary" />
+                  <View className="w-[68rpx] h-[68rpx] rounded-[20rpx] bg-primary-10 center mb-[20rpx]">
+                    <Icon name={item.icon} size={34} color="primary" />
                   </View>
                   <Text className="text-[28rpx] font-bold text-foreground block">{item.title}</Text>
-                  <Text className="text-[22rpx] text-muted-foreground mt-[8rpx] leading-relaxed block">
+                  <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
                     {item.desc}
                   </Text>
                 </View>
@@ -245,22 +262,65 @@ const About: React.FC = () => {
             </View>
           </View>
 
-          {/* ===== 选择理由 ===== */}
+          {/* ===== 核心功能 ===== */}
           <View>
-            <SectionHeader
-              eyebrow="为什么选择我们"
-              title="不是软件公司做给你用，而是馆主做给自己用"
-            />
-            <View className="bg-card rounded-[28rpx] shadow-card p-[28rpx] flex flex-col gap-[28rpx]">
-              {REASONS.map((item) => (
-                <View key={item.title} className="flex items-start gap-[20rpx]">
-                  <View className="w-[72rpx] h-[72rpx] rounded-full bg-primary-10 center flex-shrink-0">
+            <SectionHeader eyebrow="核心能力" title="一套系统，覆盖经营全流程" />
+            <View className="grid grid-cols-2 gap-[24rpx]">
+              {FEATURES.map((item) => (
+                <View
+                  key={item.title}
+                  className="bg-card rounded-[24rpx] p-[32rpx] shadow-card"
+                >
+                  <View className="w-[68rpx] h-[68rpx] rounded-[20rpx] bg-primary-10 center mb-[20rpx]">
                     <Icon name={item.icon} size={34} color="primary" />
                   </View>
+                  <Text className="text-[28rpx] font-bold text-foreground block">{item.title}</Text>
+                  <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
+                    {item.desc}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* ===== 为什么选择我们 ===== */}
+          <View>
+            <SectionHeader eyebrow="为什么选择我们" title="为什么机构选择松果排课" />
+            <View className="grid grid-cols-2 gap-[24rpx]">
+              {WHY_CHOOSE.map((item) => (
+                <View
+                  key={item.title}
+                  className="bg-card rounded-[24rpx] p-[32rpx] shadow-card"
+                >
+                  <View className="w-[68rpx] h-[68rpx] rounded-[20rpx] bg-primary-10 center mb-[20rpx]">
+                    <Icon name={item.icon} size={34} color="primary" />
+                  </View>
+                  <Text className="text-[28rpx] font-bold text-foreground block">{item.title}</Text>
+                  <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
+                    {item.desc}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* ===== 入驻流程（纵向 3 步列表，对齐设计稿） ===== */}
+          <View>
+            <SectionHeader eyebrow="入驻流程" title="三步开启数字化经营" />
+            <View className="bg-card rounded-[28rpx] shadow-card overflow-hidden">
+              {STEPS.map((item, index) => (
+                <View
+                  key={item.step}
+                  className={cn(
+                    'flex items-start gap-[24rpx] px-[28rpx] py-[26rpx]',
+                    index < STEPS.length - 1 && 'border-b border-border/60',
+                  )}
+                >
+                  <Text className="w-[56rpx] flex-shrink-0 text-[34rpx] font-black text-primary leading-none">
+                    {item.step}
+                  </Text>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-[28rpx] font-bold text-foreground block">
-                      {item.title}
-                    </Text>
+                    <Text className="text-[28rpx] font-semibold text-foreground block">{item.title}</Text>
                     <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] leading-relaxed block">
                       {item.desc}
                     </Text>
@@ -268,56 +328,6 @@ const About: React.FC = () => {
                 </View>
               ))}
             </View>
-          </View>
-
-          {/* ===== 入驻流程 ===== */}
-          <View>
-            <SectionHeader eyebrow="入驻流程" title="三步开启数字化经营" />
-            <View className="flex gap-[16rpx]">
-              {STEPS.map((item, index) => (
-                <View key={item.step} className="flex-1">
-                  <View
-                    className={cn(
-                      'rounded-[24rpx] p-[24rpx]',
-                      index === 0 ? 'bg-gradient-primary shadow-elegant' : 'bg-card shadow-card',
-                    )}
-                  >
-                    <Text
-                      className={cn(
-                        'text-[30rpx] font-black leading-none',
-                        index === 0 ? 'text-white/90' : 'text-primary',
-                      )}
-                    >
-                      {item.step}
-                    </Text>
-                    <Text
-                      className={cn(
-                        'block text-[26rpx] font-bold mt-[16rpx]',
-                        index === 0 ? 'text-white' : 'text-foreground',
-                      )}
-                    >
-                      {item.title}
-                    </Text>
-                    <Text
-                      className={cn(
-                        'block text-[22rpx] mt-[8rpx] leading-relaxed',
-                        index === 0 ? 'text-white/80' : 'text-muted-foreground',
-                      )}
-                    >
-                      {item.desc}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* ===== 收尾 CTA ===== */}
-          <View className="bg-gradient-primary rounded-[28rpx] p-[36rpx] text-center shadow-elegant">
-            <Text className="block text-[34rpx] font-black text-white">告别表格与群聊</Text>
-            <Text className="block text-[26rpx] text-white/85 mt-[12rpx]">
-              让{BRAND_NAME_ZH}帮你把场馆打理得井井有条
-            </Text>
           </View>
         </View>
       </ScrollView>
@@ -328,7 +338,8 @@ const About: React.FC = () => {
           className="h-[92rpx] rounded-[28rpx] bg-gradient-primary center shadow-lg press-scale"
           onClick={handleEntry}
         >
-          <Text className="text-[32rpx] font-bold text-white">门店入驻</Text>
+          <Icon name="mdi-office-building" size={28} color="white" />
+          <Text className="text-[32rpx] font-bold text-white ml-[8rpx]">免费开通门店</Text>
         </View>
       </View>
     </View>
@@ -336,15 +347,31 @@ const About: React.FC = () => {
 };
 
 /**
- * 分区标题：小眉标 + 主标题
+ * 分区标题：主题色渐变背景卡片，居中白色大字标题。
+ * 用于各内容分区的醒目区隔。
  */
-const SectionHeader: React.FC<{ eyebrow: string; title: string }> = ({ eyebrow, title }) => (
-  <View className="mb-[20rpx]">
-    <View className="flex items-center gap-[8rpx] mb-[12rpx]">
-      <View className="w-[8rpx] h-[8rpx] rounded-full bg-primary" />
-      <Text className="text-[22rpx] font-medium text-primary tracking-wide">{eyebrow}</Text>
+export interface SectionHeaderProps {
+  /** 小眉标文案，如「核心能力」 */
+  eyebrow: string;
+  /** 分区主标题 */
+  title: string;
+}
+
+const SectionHeader: React.FC<SectionHeaderProps> = ({ eyebrow, title }) => (
+  <View className="mb-[24rpx]">
+    <View className="relative overflow-hidden rounded-[24rpx] px-[32rpx] py-[28rpx] center-col border border-white/30 bg-primary/60 backdrop-blur-md shadow-soft">
+      {/* 弥散渐变光斑 */}
+      <View className="absolute -top-[40rpx] -left-[40rpx] w-[160rpx] h-[160rpx] rounded-full bg-white/25 blur-[40rpx]" />
+      <View className="absolute -bottom-[50rpx] -right-[30rpx] w-[180rpx] h-[180rpx] rounded-full bg-white/20 blur-[50rpx]" />
+      <View className="absolute top-[20rpx] right-[60rpx] w-[80rpx] h-[80rpx] rounded-full bg-white/15 blur-[30rpx]" />
+
+      <View className="relative z-10 center-col">
+        {eyebrow && (
+          <Text className="text-[22rpx] font-medium text-white/85 mb-[8rpx]">{eyebrow}</Text>
+        )}
+        <Text className="text-[36rpx] font-bold text-white leading-snug text-center">{title}</Text>
+      </View>
     </View>
-    <Text className="block text-[32rpx] font-bold text-foreground leading-snug">{title}</Text>
   </View>
 );
 

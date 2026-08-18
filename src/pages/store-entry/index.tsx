@@ -2,12 +2,10 @@
  * 门店入驻申请页 pages/store-entry/index
  *
  * 由品牌介绍页底部「门店入驻」按钮进入，用于收集场馆入驻信息：
- * - 门店名称、门店类型
- * - 省市区（系统 Picker）+ 详细地址
- * - 地图定位（chooseLocation）
+ * - 门店名称、省市区、门店类型、详细地址、地图定位
  * - 入驻协议同意 + 提交
  *
- * 全部使用 UnoCSS Token，随主题色联动。
+ * 布局对齐参考设计稿：单一卡片表单，标签在输入框上方，字段顺序自上而下。
  */
 import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -17,27 +15,23 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { BRAND_NAME_ZH } from '@/constants/brand';
+import { storeEntryService } from '@/services/store-entry';
+import type { StoreType } from '@/types/store-entry';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /** 门店类型选项 */
-const VENUE_TYPE_OPTIONS = [
-  '格斗馆',
-  '瑜伽馆',
-  '舞蹈教室',
-  '少儿体适能',
-  '私教工作室',
-  '康复拉伸',
-  '其他',
-];
+const VENUE_TYPE_OPTIONS = ['总店', '分店'];
 
 interface FormState {
   name: string;
-  type: string;
+  type: StoreType | '';
   region: string[];
   address: string;
   locationName: string;
   latitude: number;
   longitude: number;
+  contactName: string;
+  contactPhone: string;
   agreed: boolean;
 }
 
@@ -46,65 +40,138 @@ interface FormErrors {
   type?: string;
   region?: string;
   address?: string;
+  contactName?: string;
+  contactPhone?: string;
   agreed?: string;
 }
 
-/**
- * 表单行容器：左标签 + 右侧内容，行间细分割线
- */
-function FieldRow({
-  label,
-  required,
-  right,
-  onClick,
-}: {
-  label: string;
-  required?: boolean;
-  right: React.ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <View
-      className={cn(
-        'flex items-center min-h-[104rpx] px-[32rpx] border-b border-border/60 last:border-b-0',
-        onClick && 'press-scale',
-      )}
-      onClick={onClick}
-    >
-      <View className="w-[180rpx] flex-shrink-0 flex items-center gap-[4rpx]">
-        <Text className="text-[28rpx] text-muted-foreground">{label}</Text>
-        {required && <Text className="text-[28rpx] text-destructive">*</Text>}
-      </View>
-      <View className="flex-1 flex items-center justify-end overflow-hidden">{right}</View>
-    </View>
-  );
+interface ParsedAddress {
+  province: string;
+  city: string;
+  district: string;
+  detail: string;
 }
 
-/** 右侧箭头 */
-function RowArrow() {
-  return <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />;
+/**
+ * 从中文完整地址中解析省、市、区、详细地址
+ *
+ * 支持普通省份与直辖市，无法解析时返回 null。
+ */
+function parseChineseAddress(address: string): ParsedAddress | null {
+  if (!address) return null;
+
+  // 直辖市：北京市/上海市/天津市/重庆市（详细地址可为空）
+  const municipalityMatch = address.match(
+    /^(北京市|天津市|上海市|重庆市)(.+?(?:区|县|旗))(?:\\s*)(.*)$/,
+  );
+  if (municipalityMatch) {
+    return {
+      province: municipalityMatch[1],
+      city: municipalityMatch[1],
+      district: municipalityMatch[2],
+      detail: municipalityMatch[3] || '',
+    };
+  }
+
+  // 标准：河南省洛阳市栾川县...（详细地址可为空）
+  const match = address.match(
+    /^(.+?(?:省|自治区))(.+?(?:市|地区|自治州|盟))(.+?(?:区|县|旗))(?:\\s*)(.*)$/,
+  );
+  if (match) {
+    return {
+      province: match[1],
+      city: match[2],
+      district: match[3],
+      detail: match[4] || '',
+    };
+  }
+
+  // 降级：兼容缺少「省」后缀的情况，如「河南洛阳栾川县...」
+  const fallbackMatch = address.match(
+    /^(.+?)(?:省)?(.+?(?:市|地区|自治州|盟))(.+?(?:区|县|旗))(?:\\s*)(.*)$/,
+  );
+  if (fallbackMatch) {
+    const province = fallbackMatch[1].endsWith('省') ? fallbackMatch[1] : `${fallbackMatch[1]}省`;
+    return {
+      province,
+      city: fallbackMatch[2],
+      district: fallbackMatch[3],
+      detail: fallbackMatch[4] || '',
+    };
+  }
+
+  return null;
 }
 
 /** 选择框占位/显示文本 */
 function SelectValue({ value, placeholder }: { value?: string; placeholder: string }) {
   return (
     <Text
-      className={cn('text-[30rpx] truncate', value ? 'text-foreground' : 'text-muted-foreground')}
+      className={cn('text-[32rpx] truncate', value ? 'text-foreground' : 'text-muted-foreground')}
     >
       {value || placeholder}
     </Text>
   );
 }
 
+/** 表单选择行：标签在上，下方为点击区域（带边框背景） */
+function FormSelect({
+  label,
+  required,
+  placeholder,
+  value,
+  error,
+  children,
+  onClick,
+}: {
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  value?: string;
+  error?: string;
+  children?: React.ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <View className="mb-[28rpx]">
+      <View className="flex flex-row items-center gap-1 mb-[12rpx]">
+        <Text className="text-sm text-muted-foreground font-medium">{label}</Text>
+        {required && <Text className="text-base text-destructive">*</Text>}
+      </View>
+      <View
+        className={cn(
+          'w-full flex flex-row items-center justify-between py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light',
+          error && 'border-destructive',
+          onClick && 'press-scale',
+        )}
+        onClick={onClick}
+      >
+        {children || <SelectValue value={value} placeholder={placeholder} />}
+        <Icon name="mdi-chevron-down" size={24} color="mutedForeground" />
+      </View>
+      {error && (
+        <View className="flex flex-row items-center gap-1 mt-[8rpx]">
+          <View className="w-[28rpx] h-[28rpx] rounded-full bg-destructive flex items-center justify-center flex-shrink-0">
+            <Text className="text-white text-[20rpx] font-bold leading-none">!</Text>
+          </View>
+          <Text className="text-xs text-destructive">{error}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 const StoreEntry: React.FC = () => {
   const [form, setForm] = useState<FormState>({
     name: '',
-    type: '',
+    type: '总店',
     region: [],
     address: '',
     locationName: '',
     latitude: 0,
     longitude: 0,
+    contactName: '',
+    contactPhone: '',
     agreed: false,
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -114,7 +181,6 @@ const StoreEntry: React.FC = () => {
 
   const updateForm = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    // 清除对应字段错误
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }, []);
 
@@ -132,6 +198,14 @@ const StoreEntry: React.FC = () => {
     if (!form.address.trim()) {
       next.address = '请输入详细地址';
     }
+    if (!form.contactName.trim()) {
+      next.contactName = '请输入负责人称呼';
+    }
+    if (!form.contactPhone.trim()) {
+      next.contactPhone = '请输入负责人手机号';
+    } else if (!/^1[3-9]\d{9}$/.test(form.contactPhone.trim())) {
+      next.contactPhone = '手机号格式不正确';
+    }
     if (!form.agreed) {
       next.agreed = '请阅读并同意入驻协议';
     }
@@ -143,23 +217,26 @@ const StoreEntry: React.FC = () => {
     Taro.chooseLocation({
       success: (res) => {
         if (!res) return;
-        updateForm('locationName', res.name || res.address || '');
+        const locationName = res.name || res.address || '';
+        updateForm('locationName', locationName);
+        updateForm('address', locationName);
         updateForm('latitude', res.latitude ?? 0);
         updateForm('longitude', res.longitude ?? 0);
-        // 如果详细地址为空，自动填充地址作为参考
-        if (!form.address.trim() && res.address) {
-          updateForm('address', res.address);
+
+        // 优先从地点名称中解析省市区；解析到则自动填充，解析不到保持用户手动选择
+        const parsed = parseChineseAddress(res.name) || parseChineseAddress(res.address);
+        if (parsed) {
+          updateForm('region', [parsed.province, parsed.city, parsed.district]);
         }
       },
       fail: (err) => {
-        // 用户取消或授权拒绝时不提示错误
         if (err?.errMsg?.includes('cancel') || err?.errMsg?.includes('auth')) return;
         Taro.showToast({ title: '定位失败，请重试', icon: 'none' });
       },
     }).catch(() => {
       // 吞掉 Promise rejection
     });
-  }, [form.address, updateForm]);
+  }, [updateForm]);
 
   const handleSubmit = useCallback(async () => {
     if (!validate()) {
@@ -167,41 +244,57 @@ const StoreEntry: React.FC = () => {
       return;
     }
 
-    setSubmitting(true);
-    // 模拟提交，实际联调时替换为 Service 调用
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setSubmitting(false);
+    if (!form.type) {
+      setErrors((prev) => ({ ...prev, type: '请选择门店类型' }));
+      return;
+    }
 
-    Taro.showModal({
-      title: '提交成功',
-      content: `感谢您对${BRAND_NAME_ZH}的信任，工作人员将在 1-3 个工作日内与您联系。`,
-      showCancel: false,
-      success: () => {
-        Taro.navigateBack();
-      },
-    });
-  }, [validate]);
+    setSubmitting(true);
+    try {
+      await storeEntryService.submit({
+        name: form.name.trim(),
+        type: form.type,
+        region: form.region.filter(Boolean),
+        address: form.address.trim(),
+        locationName: form.locationName,
+        latitude: form.latitude || undefined,
+        longitude: form.longitude || undefined,
+        contactName: form.contactName.trim(),
+        contactPhone: form.contactPhone.trim(),
+      });
+
+      Taro.showModal({
+        title: '提交成功',
+        content: `感谢您对${BRAND_NAME_ZH}的信任，工作人员将在 1-3 个工作日内与您联系。`,
+        showCancel: false,
+        success: () => {
+          Taro.navigateBack();
+        },
+      });
+    } catch {
+      Taro.showToast({ title: '提交失败，请稍后重试', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [validate, form]);
 
   return (
-    <PageContainer safeBottom className="flex flex-col">
+    <PageContainer safeBottom className="flex flex-col bg-background">
       <ScrollView scrollY className="flex-1" showScrollbar={false}>
-        <View className="px-[32rpx] py-[32rpx] flex flex-col gap-[24rpx] pb-[200rpx]">
-          {/* 顶部说明 */}
-          <View className="bg-gradient-primary rounded-[28rpx] p-[32rpx] shadow-elegant">
-            <Text className="text-[36rpx] font-bold text-white">开启智慧场馆经营</Text>
-            <Text className="text-[26rpx] text-white/90 mt-[12rpx] leading-relaxed block">
-              填写下方信息申请入驻，审核通过后即可使用{BRAND_NAME_ZH}全部管理功能。
+        <View className="px-[32rpx] pt-[32rpx] pb-[200rpx] flex flex-col gap-[24rpx]">
+          {/* 顶部标题区 */}
+          <View className="mb-[8rpx]">
+            <Text className="text-[44rpx] font-bold text-foreground leading-tight">注册门店账户</Text>
+            <Text className="text-[28rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
+              请填写资料，我们将在2个工作日内审核
             </Text>
           </View>
 
-          {/* 基础信息卡片 */}
-          <View className="bg-card rounded-[28rpx] shadow-card overflow-hidden">
-            <View className="px-[32rpx] py-[24rpx] border-b border-border/60">
-              <Text className="text-[30rpx] font-bold text-foreground">门店信息</Text>
-            </View>
-
+          {/* 统一表单卡片 */}
+          <View className="bg-card rounded-[28rpx] shadow-card p-[32rpx]">
+            {/* 门店名称 */}
             <FormInput
-              className="px-[32rpx] py-[24rpx]"
+              className="mb-0"
               label="门店名称"
               required
               placeholder="请输入门店名称"
@@ -210,106 +303,144 @@ const StoreEntry: React.FC = () => {
               error={errors.name}
             />
 
-            {/* 门店类型 */}
-            <View className="px-[32rpx] py-[24rpx]">
-              <View className="flex items-center gap-[4rpx] mb-[16rpx]">
-                <Text className="text-sm text-muted-foreground font-medium">门店类型</Text>
+            {/* 地图定位：默认唯一可见的地址入口 */}
+            <View className="mb-[28rpx]">
+              <View className="flex flex-row items-center gap-1 mb-[12rpx]">
+                <Text className="text-sm text-muted-foreground font-medium">地图定位</Text>
                 <Text className="text-base text-destructive">*</Text>
               </View>
-              <View className="flex flex-wrap gap-[16rpx]">
-                {VENUE_TYPE_OPTIONS.map((item) => {
-                  const active = form.type === item;
-                  return (
-                    <View
-                      key={item}
-                      className={cn('chip', active ? 'chip-active' : 'chip-inactive')}
-                      onClick={() => updateForm('type', item)}
-                    >
-                      <Text>{item}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-              {errors.type && (
-                <View className="flex flex-row items-center gap-1 mt-[12rpx]">
-                  <View className="w-[28rpx] h-[28rpx] rounded-full bg-destructive flex items-center justify-center flex-shrink-0">
-                    <Text className="text-white text-[20rpx] font-bold leading-none">!</Text>
-                  </View>
-                  <Text className="text-xs text-destructive">{errors.type}</Text>
+              <View
+                className={cn(
+                  'w-full flex flex-row items-center justify-between py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light press-scale',
+                  errors.region && 'border-destructive',
+                )}
+                onClick={handleChooseLocation}
+              >
+                <View className="flex flex-row items-center gap-[12rpx] overflow-hidden">
+                  <Icon name="mdi-map-marker-outline" size={28} color="primary" />
+                  <Text
+                    className={cn(
+                      'text-[32rpx] truncate',
+                      form.locationName ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {form.locationName || '选择门店地址'}
+                  </Text>
                 </View>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+              </View>
+              {!form.locationName && (
+                <Text className="text-[22rpx] text-muted-foreground mt-[8rpx] ml-[8rpx]">
+                  选择定位后将自动填写地址信息
+                </Text>
               )}
-            </View>
-          </View>
-
-          {/* 地址信息卡片 */}
-          <View className="bg-card rounded-[28rpx] shadow-card overflow-hidden">
-            <View className="px-[32rpx] py-[24rpx] border-b border-border/60">
-              <Text className="text-[30rpx] font-bold text-foreground">地址信息</Text>
-            </View>
-
-            <FieldRow
-              label="所在地区"
-              required
-              right={
-                <Picker
-                  mode="region"
-                  value={
-                    form.region.length >= 3
-                      ? [form.region[0], form.region[1], form.region[2]]
-                      : undefined
-                  }
-                  onChange={(e) => {
-                    const value = (e.detail.value || []) as string[];
-                    updateForm('region', value.filter(Boolean));
-                  }}
-                >
-                  <View className="flex items-center justify-end gap-[8rpx]">
-                    <SelectValue value={regionText} placeholder="请选择省市区" />
-                    <RowArrow />
-                  </View>
-                </Picker>
-              }
-            />
-            {errors.region && (
-              <View className="px-[32rpx] pb-[16rpx]">
-                <View className="flex flex-row items-center gap-1">
+              {errors.region && !form.locationName && (
+                <View className="flex flex-row items-center gap-1 mt-[8rpx]">
                   <View className="w-[28rpx] h-[28rpx] rounded-full bg-destructive flex items-center justify-center flex-shrink-0">
                     <Text className="text-white text-[20rpx] font-bold leading-none">!</Text>
                   </View>
                   <Text className="text-xs text-destructive">{errors.region}</Text>
                 </View>
-              </View>
+              )}
+            </View>
+
+            {/* 选择定位后自动展开：省市区 + 详细地址 */}
+            {form.locationName && (
+              <>
+                {/* 地址：省市区 */}
+                <View className="mb-[28rpx]">
+                  <View className="flex flex-row items-center gap-1 mb-[12rpx]">
+                    <Text className="text-sm text-muted-foreground font-medium">地址</Text>
+                    <Text className="text-base text-destructive">*</Text>
+                  </View>
+                  <Picker
+                    mode="region"
+                    value={
+                      form.region.length >= 3
+                        ? [form.region[0], form.region[1], form.region[2]]
+                        : undefined
+                    }
+                    onChange={(e) => {
+                      const value = (e.detail.value || []) as string[];
+                      updateForm('region', value.filter(Boolean));
+                    }}
+                  >
+                    <View
+                      className={cn(
+                        'w-full flex flex-row items-center justify-between py-[22rpx] px-[28rpx] rounded-2xl bg-primary-5 border-[3rpx] border-border-light press-scale',
+                        errors.region && 'border-destructive',
+                      )}
+                    >
+                      <SelectValue value={regionText} placeholder="省、市、区" />
+                      <Icon name="mdi-chevron-down" size={24} color="mutedForeground" />
+                    </View>
+                  </Picker>
+                  {errors.region && (
+                    <View className="flex flex-row items-center gap-1 mt-[8rpx]">
+                      <View className="w-[28rpx] h-[28rpx] rounded-full bg-destructive flex items-center justify-center flex-shrink-0">
+                        <Text className="text-white text-[20rpx] font-bold leading-none">!</Text>
+                      </View>
+                      <Text className="text-xs text-destructive">{errors.region}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* 详细地址 */}
+                <FormInput
+                  className="mb-0"
+                  label="详细地址"
+                  required
+                  placeholder="填写具体地址即可，省市区无需重复填写"
+                  value={form.address}
+                  onInput={(e) => updateForm('address', e.detail.value || '')}
+                  error={errors.address}
+                  multiline
+                  minHeight="120rpx"
+                />
+              </>
             )}
 
+            {/* 门店类型 */}
+            <Picker
+              mode="selector"
+              range={VENUE_TYPE_OPTIONS}
+              value={VENUE_TYPE_OPTIONS.findIndex((item) => item === form.type)}
+              onChange={(e) => {
+                const index = typeof e.detail.value === 'number' ? e.detail.value : 0;
+                updateForm('type', (VENUE_TYPE_OPTIONS[index] || '') as StoreType | '');
+              }}
+            >
+              <FormSelect
+                label="门店类型"
+                required
+                placeholder="请选择门店类型"
+                value={form.type}
+                error={errors.type}
+              />
+            </Picker>
+
+            {/* 负责人称呼 */}
             <FormInput
-              className="px-[32rpx] py-[24rpx]"
-              label="详细地址"
+              className="mb-0"
+              label="负责人称呼"
               required
-              placeholder="请输入街道、门牌号等"
-              value={form.address}
-              onInput={(e) => updateForm('address', e.detail.value || '')}
-              error={errors.address}
-              multiline
-              minHeight="100rpx"
+              placeholder="请输入负责人称呼"
+              value={form.contactName}
+              onInput={(e) => updateForm('contactName', e.detail.value || '')}
+              error={errors.contactName}
             />
 
-            <FieldRow
-              label="地图定位"
-              right={
-                <View className="flex items-center justify-end gap-[8rpx] overflow-hidden">
-                  <Icon name="mdi-map-marker-outline" size={28} color="primary" />
-                  <Text
-                    className={cn(
-                      'text-[30rpx] truncate',
-                      form.locationName ? 'text-foreground' : 'text-muted-foreground',
-                    )}
-                  >
-                    {form.locationName || '点击定位'}
-                  </Text>
-                  <RowArrow />
-                </View>
-              }
-              onClick={handleChooseLocation}
+            {/* 负责人手机号 */}
+            <FormInput
+              className="mb-0"
+              label="负责人联系方式"
+              required
+              placeholder="请输入负责人手机号"
+              value={form.contactPhone}
+              onInput={(e) => updateForm('contactPhone', e.detail.value || '')}
+              error={errors.contactPhone}
+              type="number"
+              maxlength={11}
             />
           </View>
 
@@ -328,8 +459,7 @@ const StoreEntry: React.FC = () => {
             </View>
             <Text className="text-[26rpx] text-muted-foreground leading-relaxed flex-1">
               我已阅读并同意
-              <Text className="text-primary font-medium">《门店入驻协议》</Text>
-              ，确认提交的信息真实有效。
+              <Text className="text-primary font-medium">《{BRAND_NAME_ZH}门店小程序使用协议》</Text>
             </Text>
           </View>
           {errors.agreed && (
@@ -344,7 +474,7 @@ const StoreEntry: React.FC = () => {
       <View className="fixed left-0 right-0 bottom-0 px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[16rpx] bg-gradient-to-t from-background via-background to-transparent z-50">
         <View
           className={cn(
-            'h-[92rpx] rounded-[28rpx] center shadow-lg press-scale',
+            'h-[92rpx] rounded-[24rpx] center shadow-lg press-scale',
             submitting ? 'bg-muted' : 'bg-gradient-primary',
           )}
           onClick={submitting ? undefined : handleSubmit}

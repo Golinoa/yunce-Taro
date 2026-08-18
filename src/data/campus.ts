@@ -213,6 +213,9 @@ function mapCampusToUI(index: number, campus = CAMPUSES[index]): CampusUIModel {
     rentDueDay: isMain ? 28 : 15 + (index % 10),
     intro: campus.intro,
     venueImages: campus.venueImages,
+    locationName: campus.locationName,
+    latitude: campus.latitude,
+    longitude: campus.longitude,
     stats: {
       students: stats?.studentCount || 0,
       teachers: stats?.teacherCount || 0,
@@ -340,6 +343,9 @@ export async function mockAddCampus(data: CampusFormData): Promise<CampusUIModel
     rentDueDay: data.rentDueDay ?? 15,
     intro: data.intro,
     venueImages: data.venueImages,
+    locationName: data.locationName,
+    latitude: data.latitude,
+    longitude: data.longitude,
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
     businessCategories: data.businessCategories || [],
   };

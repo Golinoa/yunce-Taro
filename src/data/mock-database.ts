@@ -67,6 +67,12 @@ export interface Campus {
   intro?: string;
   /** 场馆图片 URL 列表 */
   venueImages?: string[];
+  /** 地图定位名称 */
+  locationName?: string;
+  /** 纬度 */
+  latitude?: number;
+  /** 经度 */
+  longitude?: number;
   createdAt: string;
   /** 主营业态 */
   businessCategories?: { categoryId: string; subIds: string[] }[];

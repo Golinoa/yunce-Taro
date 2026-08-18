@@ -403,7 +403,7 @@ const Home: React.FC = () => {
                 </View>
                 <View className="flex items-center gap-[4rpx]">
                   <Icon name="mdi-map-marker-outline" size="xxs" color="mutedForeground" />
-                  <Text className="text-[24rpx] text-muted-foreground truncate">
+                  <Text className="text-[22rpx] text-muted-foreground truncate max-w-[240rpx]">
                     {currentCampus?.address || '暂无地址'}
                   </Text>
                 </View>
@@ -415,7 +415,7 @@ const Home: React.FC = () => {
                   <Icon name="mdi-chevron-down" size="xs" color="foreground" />
                 </View>
                 {businessTime && (
-                  <Text className="text-[22rpx] text-muted-foreground">{businessTime}</Text>
+                  <Text className="text-[26rpx] text-muted-foreground">· {businessTime}</Text>
                 )}
               </View>
             </View>

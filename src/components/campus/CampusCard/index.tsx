@@ -108,6 +108,23 @@ const CampusCard: React.FC<CampusCardProps> = ({
     onDataClick?.(campus.id);
   }, [campus.id, onDataClick]);
 
+  /** 点击地址/定位图标，打开地图查看位置 */
+  const handleOpenLocation = useCallback(() => {
+    if (!campus.latitude || !campus.longitude) {
+      Taro.showToast({ title: '暂无定位信息', icon: 'none' });
+      return;
+    }
+    Taro.openLocation({
+      latitude: campus.latitude,
+      longitude: campus.longitude,
+      name: campus.locationName || campus.name,
+      address: campus.address,
+      fail: () => {
+        Taro.showToast({ title: '无法打开地图', icon: 'none' });
+      },
+    });
+  }, [campus.address, campus.latitude, campus.locationName, campus.longitude, campus.name]);
+
   return (
     <View className="relative bg-white rounded-[40rpx] shadow-soft p-[44rpx] mb-[20rpx] overflow-hidden border-[2rpx] border-border">
       {/* 右上角三角装饰 + 小圆点 */}
@@ -198,11 +215,19 @@ const CampusCard: React.FC<CampusCardProps> = ({
         </View>
       )}
 
-      {/* 地址 — 有值才显示 */}
-      {campus.address && (
-        <View className="flex flex-row items-center gap-[12rpx] mt-[16rpx]">
+      {/* 地址 / 定位 — 有点击值才显示，点击打开地图 */}
+      {(campus.address || campus.locationName) && (
+        <View
+          className="flex flex-row items-center gap-[12rpx] mt-[16rpx] press-bg -mx-[12rpx] px-[12rpx] py-[8rpx] rounded-[16rpx]"
+          onClick={handleOpenLocation}
+        >
           <Icon name="mdi-map-marker" size="sm" color="primary" />
-          <Text className="text-[24rpx] text-muted-foreground flex-1">{campus.address}</Text>
+          <Text className="text-[24rpx] text-muted-foreground flex-1 truncate">
+            {campus.locationName || campus.address}
+          </Text>
+          {campus.latitude && campus.longitude && (
+            <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+          )}
         </View>
       )}
 

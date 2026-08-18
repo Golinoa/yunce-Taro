@@ -55,6 +55,12 @@ export interface CampusUIModel {
   intro?: string;
   /** 场馆图片 URL 列表 */
   venueImages?: string[];
+  /** 地图定位名称（由 wx.chooseLocation 选择） */
+  locationName?: string;
+  /** 纬度 */
+  latitude?: number;
+  /** 经度 */
+  longitude?: number;
   /** 统计数据 */
   stats: CampusStats;
   /** 主营业态 */
@@ -102,6 +108,12 @@ export interface CampusFormData {
   intro?: string;
   /** 场馆图片 URL 列表 */
   venueImages?: string[];
+  /** 地图定位名称（由 wx.chooseLocation 选择） */
+  locationName?: string;
+  /** 纬度 */
+  latitude?: number;
+  /** 经度 */
+  longitude?: number;
   /** 主营业态 */
   businessCategories?: SelectedBusinessCategory[];
 }
