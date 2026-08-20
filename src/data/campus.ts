@@ -598,6 +598,25 @@ export async function mockDeleteSubject(id: string): Promise<boolean> {
   return true;
 }
 
+export async function mockUpdateSubject(
+  id: string,
+  data: Partial<SubjectFormData>,
+): Promise<Subject | null> {
+  await delay();
+  const list = ensureSubjects();
+  const idx = list.findIndex((item) => item.id === id);
+  if (idx < 0) return null;
+  const updated: Subject = {
+    ...list[idx],
+    name: data.name ?? list[idx].name,
+    icon: data.icon ?? list[idx].icon,
+    color: data.color ?? list[idx].color,
+    iconGradient: data.iconGradient ?? list[idx].iconGradient,
+  };
+  mockSubjects = list.map((item) => (item.id === id ? updated : item));
+  return updated;
+}
+
 // ============================================
 // 场地 / 教室
 // ============================================

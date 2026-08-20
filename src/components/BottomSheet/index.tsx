@@ -132,16 +132,9 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   );
 
   return (
-    <View
-      className="fixed inset-0 z-200"
-      // 最外层也拦截点击，防止事件穿透到下层页面元素
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose?.();
-      }}
-      catchMove
-    >
-      {/* 遮罩层 — 始终保持可点击背景，bg-black/0 确保小程序中接收 tap 事件 */}
+    <View className="fixed inset-0 z-200">
+      {/* 遮罩层 — 始终保持可点击背景，bg-black/0 确保小程序中接收 tap 事件；
+          仅遮罩层 catchMove，阻止背景页面滚动，同时不阻塞内容面板内的 PickerView/ScrollView */}
       <View
         className={cn(
           'absolute inset-0 transition-all duration-300',
@@ -153,7 +146,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         }}
         catchMove
       />
-      {/* 内容面板 — 阻止点击冒泡到遮罩层 */}
+      {/* 内容面板 — 阻止点击冒泡到遮罩层；不 catchMove，避免拦截内部 PickerView/ScrollView 滚动 */}
       <View
         className={cn(
           'absolute bottom-0 left-0 right-0 rounded-t-[40rpx] bg-white overflow-hidden',

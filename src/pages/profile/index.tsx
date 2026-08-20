@@ -211,6 +211,11 @@ const Profile: React.FC = () => {
     Taro.navigateTo({ url: '/package-course/pages/course-management/index' });
   }, []);
 
+  // 进入科目管理页
+  const handleSubjectManage = useCallback(() => {
+    Taro.navigateTo({ url: '/package-course/pages/subject-management/index' });
+  }, []);
+
   // 进入卡种管理页
   const handleCardManage = useCallback(() => {
     Taro.navigateTo({ url: '/package-course/pages/card-management/index' });
@@ -286,6 +291,11 @@ const Profile: React.FC = () => {
         onClick: handleCourseManage,
       },
       {
+        label: '科目管理',
+        icon: 'mdi-book-education-outline' as const,
+        onClick: handleSubjectManage,
+      },
+      {
         label: '卡种管理',
         icon: 'mdi-credit-card-outline' as const,
         onClick: handleCardManage,
@@ -300,11 +310,6 @@ const Profile: React.FC = () => {
         icon: 'mdi-email-outline' as const,
         onClick: handlePlaceholder,
       },
-      {
-        label: '促销工具',
-        icon: 'mdi-bullhorn-outline' as const,
-        onClick: handlePlaceholder,
-      },
     ],
     [
       handleNavigate,
@@ -312,8 +317,41 @@ const Profile: React.FC = () => {
       handleVenueManage,
       handleTeacherManage,
       handleCourseManage,
+      handleSubjectManage,
       handleCardManage,
     ],
+  );
+
+  // 营销活动占位提示
+  const handleMarketingPlaceholder = useCallback(() => {
+    Taro.showToast({ title: '努力开发中，下个版本见', icon: 'none' });
+  }, []);
+
+  // 教师视图：营销活动（秒杀/拼团/优惠券/邀请有礼）
+  const marketingItems = useMemo(
+    () => [
+      {
+        label: '秒杀',
+        icon: 'mdi-flash-outline' as const,
+        onClick: handleMarketingPlaceholder,
+      },
+      {
+        label: '拼团',
+        icon: 'mdi-account-multiple-outline' as const,
+        onClick: handleMarketingPlaceholder,
+      },
+      {
+        label: '优惠券',
+        icon: 'mdi-ticket-outline' as const,
+        onClick: handleMarketingPlaceholder,
+      },
+      {
+        label: '邀请有礼',
+        icon: 'mdi-gift-outline' as const,
+        onClick: handleMarketingPlaceholder,
+      },
+    ],
+    [handleMarketingPlaceholder],
   );
 
   // 教师视图：系统管理
@@ -553,6 +591,7 @@ const Profile: React.FC = () => {
             ) : (
               <ProfileGrid className="mt-[24rpx]" title="店铺管理" items={teacherStoreItems} />
             )}
+            <ProfileGrid className="mt-[24rpx]" title="营销活动" items={marketingItems} />
             <ProfileGrid className="mt-[24rpx]" title="系统管理" items={teacherSystemItems} />
           </>
         )}

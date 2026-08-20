@@ -8,6 +8,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
 import FormInput from '@/components/FormInput';
@@ -90,7 +91,7 @@ const CategoryFormPage: React.FC = () => {
   const [independentDisplay, setIndependentDisplay] = useState(true);
 
   // 加载与提交状态
-  const [loading, setLoading] = useState(isEdit);
+  const { loading, setLoading } = useDelayedLoading();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [categoryData, setCategoryData] = useState<CourseCategoryConfig | null>(null);

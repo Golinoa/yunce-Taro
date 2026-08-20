@@ -1,6 +1,7 @@
 import { View, Text, Input, Picker, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
@@ -75,7 +76,7 @@ const ClassForm: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const categories = useCourseCategoryStore((state) => state.categories);
   const fetchCategories = useCourseCategoryStore((state) => state.fetchList);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);

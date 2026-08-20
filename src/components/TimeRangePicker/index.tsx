@@ -61,7 +61,7 @@ const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
     onConfirm(`${startHour}:${startMinute}:00至${endHour}:${endMinute}:00`);
   }, [selected, onConfirm]);
 
-  const columnClass = useMemo(() => 'text-[34rpx] leading-[96rpx] text-center text-foreground', []);
+  const columnClass = useMemo(() => 'text-[34rpx] text-center text-foreground', []);
 
   return (
     <BottomSheet visible={visible} onClose={onCancel} height="70vh">
@@ -69,7 +69,7 @@ const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
         {/* 头部 */}
         <View className="flex flex-row items-center justify-between px-[32rpx] py-[24rpx] border-b-[2rpx] border-border">
           <Text
-            className="text-[30rpx] text-muted-foreground press-bg px-[16rpy]"
+            className="text-[30rpx] text-muted-foreground press-bg px-[16rpx]"
             onClick={onCancel}
           >
             取消
@@ -85,11 +85,12 @@ const TimeRangePicker: React.FC<TimeRangePickerProps> = ({
 
         {/* 选择器 */}
         <View className="flex-1 flex items-center justify-center">
+          {/* 微信：PickerView indicator 高度禁用 rpx（会被忽略退回 34px），须用 px，与 item 96rpx@375=48px 对齐 */}
           <PickerView
             className="w-full h-[480rpx]"
             value={selected}
             onChange={handleChange}
-            indicatorStyle="height: 96rpx;"
+            indicatorStyle="height: 48px;"
           >
             <PickerViewColumn>
               {HOURS.map((item) => (

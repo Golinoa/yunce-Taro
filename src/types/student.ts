@@ -24,6 +24,8 @@ export interface Student {
   campus_id?: string;
   /** 所属校区名称（冗余展示） */
   campus_name?: string;
+  /** 已加入的班级 ID 列表（空表示尚未排班） */
+  class_ids?: string[];
   status?: 'active' | 'deleted';
   created_at: string;
   updated_at: string;

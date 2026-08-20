@@ -76,22 +76,23 @@ const TimePickerSheet: React.FC<TimePickerSheetProps> = ({
           </Text>
         </View>
 
+        {/* 微信：PickerView indicator 高度禁用 rpx（会被忽略退回 34px），须用 px，与 item 96rpx@375=48px 对齐 */}
         <PickerView
           className="h-[480rpx]"
-          indicatorStyle="height: 96rpx; line-height: 96rpx;"
+          indicatorStyle="height: 48px; line-height: 48px;"
           value={selected}
           onChange={handleChange}
         >
           <PickerViewColumn>
             {HOURS.map((h) => (
-              <View key={h} className="center h-[96rpx]">
+              <View key={h} className="center">
                 <Text className="text-[34rpx] text-foreground">{h}</Text>
               </View>
             ))}
           </PickerViewColumn>
           <PickerViewColumn>
             {MINUTES.map((m) => (
-              <View key={m} className="center h-[96rpx]">
+              <View key={m} className="center">
                 <Text className="text-[34rpx] text-foreground">{m}</Text>
               </View>
             ))}

@@ -1,6 +1,7 @@
 import { View, Text, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -69,7 +70,7 @@ const RecordsPage: React.FC = () => {
 
   const [records, setRecords] = useState<LessonRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
 
   const [quickRange, setQuickRange] = useState<QuickRange>('month');

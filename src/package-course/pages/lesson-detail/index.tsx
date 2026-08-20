@@ -2,6 +2,7 @@ import { View, Text, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
@@ -120,7 +121,7 @@ const LessonDetail: React.FC = () => {
   const [previewSchedule, setPreviewSchedule] = useState<Schedule | null>(null);
   const [previewClass, setPreviewClass] = useState<Class | null>(null);
   const [previewStudents, setPreviewStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [showRevokeSheet, setShowRevokeSheet] = useState(false);

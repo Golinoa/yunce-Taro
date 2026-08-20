@@ -1,6 +1,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import Avatar from '@/components/Avatar';
 import Loading from '@/components/Loading';
@@ -32,7 +33,7 @@ const ClassCheckin: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [leaveIds, setLeaveIds] = useState<string[]>([]);
   const [hoursUsed, setHoursUsed] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [submitting, setSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {

@@ -1,6 +1,7 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
@@ -28,7 +29,7 @@ const CardData: React.FC = () => {
   const [data, setData] = useState<CardDetailType | null>(null);
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
   const [detailTab, setDetailTab] = useState<'sold' | 'consumed'>('sold');
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useDelayedLoading();
 
   /** 加载数据 */
   const loadData = useCallback(async () => {

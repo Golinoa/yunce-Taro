@@ -1,6 +1,7 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { type ScheduleItem } from '@/components/InstallmentPanel';
 import { studentService, packageService, subjectService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
@@ -60,7 +61,7 @@ export function usePackageForm() {
   const isEdit = !!packageId;
 
   // ===== 加载状态 =====
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);

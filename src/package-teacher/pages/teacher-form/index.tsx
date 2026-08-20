@@ -4,7 +4,7 @@
  * 用于新增或编辑员工信息，包含：
  * - 头像、身份、姓名、手机、性别、生日
  * - 老师简介
- * - 教师宣传图（最多 5 张，单张不超过 2M）
+ * - 教师宣传图（最多 5 张，单张不超过 5M）
  * - 私教设置：是否展示在私教老师列表
  *
  * 进入编辑态时首次弹出「私教展示提醒」引导。
@@ -347,7 +347,7 @@ const TeacherFormPage: React.FC = () => {
             value={form.promoImages}
             onChange={(value) => updateField('promoImages', value)}
             maxCount={5}
-            maxSizeMB={2}
+            maxSizeMB={5}
             placeholder="上传"
           />
         </View>

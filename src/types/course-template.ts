@@ -51,6 +51,8 @@ export interface CourseTemplate {
   subjectName?: string;
   /** 年龄组 */
   ageGroup?: 'child' | 'teen' | 'adult' | 'mix';
+  /** 自定义年龄组名称（ageGroup 为自定义时存原文，展示用） */
+  customAgeGroup?: string;
   /** 新客体验价（分） */
   experiencePrice?: number;
   /** 单价（分） */
@@ -71,6 +73,8 @@ export interface CourseTemplate {
   allowCheckinRoles?: CheckinRole[];
   /** 课程难度 */
   level?: ClassLevel;
+  /** 自定义课程难度名称（level 为自定义时存原文，展示用） */
+  customLevel?: string;
   /** 课程简介 */
   description?: string;
   /** 是否线上课 */
@@ -81,6 +85,20 @@ export interface CourseTemplate {
   homeImage?: string;
   /** 课程背景图 */
   backgroundImage?: string;
+  /** 班课-授课老师 ID */
+  teacherId?: string;
+  /** 班课-授课老师名称（冗余展示） */
+  teacherName?: string;
+  /** 班课-助教 ID */
+  assistantId?: string;
+  /** 班课-助教名称（冗余展示） */
+  assistantName?: string;
+  /** 班课-上课学员 ID 列表 */
+  studentIds?: string[];
+  /** 班课-上课开始时间 HH:mm */
+  classStartTime?: string;
+  /** 班课-上课结束时间 HH:mm */
+  classEndTime?: string;
   /** 创建时间 */
   createdAt: string;
   /** 更新时间 */
@@ -102,7 +120,11 @@ export interface CourseTemplateFormData {
   capacity: number;
   color?: string;
   subjectId?: string;
+  /** 所属科目名称（冗余展示，由表单从科目列表查找填入） */
+  subjectName?: string;
   ageGroup?: 'child' | 'teen' | 'adult' | 'mix';
+  /** 表单内「+ 新增年龄组」自定义项 label（仅表单态，不入主数据） */
+  customAgeGroup?: string;
   experiencePrice?: number;
   price?: number;
   minOpenCount?: number;
@@ -113,9 +135,25 @@ export interface CourseTemplateFormData {
   studentSelfCheckin?: 'follow_category' | 'allow' | 'forbid';
   allowCheckinRoles?: CheckinRole[];
   level?: ClassLevel;
+  /** 表单内「+ 新增课程难度」自定义项 label（仅表单态，不入主数据） */
+  customLevel?: string;
   description?: string;
   isOnline?: boolean;
   onlineMeetingId?: string;
   homeImage?: string;
   backgroundImage?: string;
+  /** 班课-授课老师 ID */
+  teacherId?: string;
+  /** 班课-授课老师名称（冗余展示） */
+  teacherName?: string;
+  /** 班课-助教 ID */
+  assistantId?: string;
+  /** 班课-助教名称（冗余展示） */
+  assistantName?: string;
+  /** 班课-上课学员 ID 列表 */
+  studentIds?: string[];
+  /** 班课-上课开始时间 HH:mm */
+  classStartTime?: string;
+  /** 班课-上课结束时间 HH:mm */
+  classEndTime?: string;
 }

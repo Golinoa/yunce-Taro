@@ -8,6 +8,7 @@ import { ScrollView, View, Text, InputProps } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import CategoryMultiSheet from '@/components/course/CategoryMultiSheet';
 import FormInput from '@/components/FormInput';
@@ -25,8 +26,10 @@ import {
   COMMISSION_OPTIONS,
   WEEKDAY_OPTIONS,
 } from '@/data/card-type';
+import { subjectService } from '@/services/campus';
 import { cardTypeService } from '@/services/card-type';
 import { useCourseCategoryStore } from '@/stores/course-category';
+import type { Subject } from '@/types/campus';
 import type {
   CardType,
   CardTypeBookingMethod,
@@ -53,7 +56,8 @@ type PickerType =
   | 'onlinePurchase'
   | 'studentIdentityLimit'
   | 'isGiftCard'
-  | 'allowTransfer';
+  | 'allowTransfer'
+  | 'subject';
 
 /** 布尔选择选项 */
 const BOOLEAN_OPTIONS: PickerOption[] = [
@@ -102,7 +106,7 @@ const CardFormPage: React.FC = () => {
   const { categories, fetchList: fetchCategories } = useCourseCategoryStore();
 
   // 加载状态
-  const [loading, setLoading] = useState(isEdit || isCopy);
+  const { loading, setLoading } = useDelayedLoading();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -118,6 +122,10 @@ const CardFormPage: React.FC = () => {
   const [price, setPrice] = useState('');
   const [freezeCount, setFreezeCount] = useState('0');
   const [freezeDays, setFreezeDays] = useState('0');
+
+  // 关联科目
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectId, setSubjectId] = useState('');
 
   // 高级设置展开
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -156,6 +164,7 @@ const CardFormPage: React.FC = () => {
     setScopes(data.scopes);
     setBookingMethod(data.bookingMethod);
     setCategoryIds(data.categoryIds ?? []);
+    setSubjectId(data.subjectId || '');
     setCount(data.count ? String(data.count) : '');
     setValidDays(String(data.validDays));
     setPrice(data.price ? (data.price / 100).toFixed(2) : '');
@@ -183,6 +192,14 @@ const CardFormPage: React.FC = () => {
   useEffect(() => {
     void fetchCategories();
   }, [fetchCategories]);
+
+  // 加载科目列表（用于「关联科目」选择）
+  useEffect(() => {
+    subjectService
+      .getList()
+      .then(setSubjects)
+      .catch(() => setSubjects([]));
+  }, []);
 
   // 加载编辑/复制数据
   useEffect(() => {
@@ -238,6 +255,19 @@ const CardFormPage: React.FC = () => {
           value: commissionCalc,
           onConfirm: (value: string) => setCommissionCalc(value),
         };
+      case 'subject': {
+        // 关联科目：第一个固定为「通用」，value 为空字符串表示不限制科目
+        const options: PickerOption[] = [
+          { label: '通用（全部科目）', value: '' },
+          ...subjects.map((s) => ({ label: s.name, value: s.id })),
+        ];
+        return {
+          title: '关联科目',
+          options,
+          value: subjectId,
+          onConfirm: (value: string) => setSubjectId(value),
+        };
+      }
       case 'onlinePurchase':
         return {
           title: '线上购买',
@@ -279,6 +309,8 @@ const CardFormPage: React.FC = () => {
     studentIdentityLimit,
     isGiftCard,
     allowTransfer,
+    subjects,
+    subjectId,
   ]);
 
   const openPicker = useCallback((type: PickerType) => {
@@ -359,6 +391,8 @@ const CardFormPage: React.FC = () => {
       allowTransfer,
       usageLimit: Number(usageLimit) || 0,
       commissionCalc,
+      subjectId: subjectId || undefined,
+      subjectName: subjects.find((s) => s.id === subjectId)?.name,
     };
 
     try {
@@ -410,6 +444,8 @@ const CardFormPage: React.FC = () => {
     allowTransfer,
     usageLimit,
     commissionCalc,
+    subjects,
+    subjectId,
   ]);
 
   const handleDelete = useCallback(async () => {
@@ -449,6 +485,7 @@ const CardFormPage: React.FC = () => {
     (o) => o.value === cardCategory,
   )?.label;
   const selectedCommissionLabel = COMMISSION_OPTIONS.find((o) => o.value === commissionCalc)?.label;
+  const selectedSubjectLabel = subjects.find((s) => s.id === subjectId)?.name;
 
   return (
     <PageContainer safeBottom>
@@ -532,6 +569,22 @@ const CardFormPage: React.FC = () => {
                           .filter((cat) => categoryIds.includes(cat.id))
                           .map((cat) => cat.name)
                           .join(' / ') || '请选择分类'}
+                  </Text>
+                </FormRow>
+
+                <FormRow
+                  label="关联科目"
+                  hint="该会员卡关联的科目，用于按科目区分卡种"
+                  required
+                  onClick={() => openPicker('subject')}
+                >
+                  <Text
+                    className={cn(
+                      'text-[30rpx]',
+                      selectedSubjectLabel ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {selectedSubjectLabel || '通用（全部科目）'}
                   </Text>
                 </FormRow>
               </>

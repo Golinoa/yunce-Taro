@@ -2,7 +2,7 @@
  * StoreOnboarding - 店铺管理配置引导卡片
  *
  * 用于教师角色个人中心「店铺管理」区域：
- * - 6 项基础配置（门店/场地/员工/课程/卡种/薪资）未全部完成时展示引导态
+ * - 7 项基础配置（门店/场地/员工/课程/科目/卡种/薪资）未全部完成时展示引导态
  * - 显示进度条、「配置进度 X/6」、步骤角标
  * - 未完成步骤逐个雷达扩散光圈闪烁，引导用户按顺序配置
  * - 全部完成后由页面切换回普通 8 宫格（ProfileGrid）
@@ -16,9 +16,8 @@ import type { StoreOnboardingStep } from '@/types/onboarding';
 import type { StoreOnboardingProps } from './types';
 
 // 引导态中不参与步骤统计的固定入口
-const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-email-outline' | 'mdi-bullhorn-outline' }> = [
+const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-email-outline' }> = [
   { label: '学员信箱', icon: 'mdi-email-outline' },
-  { label: '促销工具', icon: 'mdi-bullhorn-outline' },
 ];
 
 // 进度条宽度映射（6 等分，避免内联 style）

@@ -2,6 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useLoad } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -128,7 +129,7 @@ const RechargeRecordsPage: React.FC = () => {
   const currentUserId = profile?.id || '';
 
   const [records, setRecords] = useState<PackageTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [filterStudentId, setFilterStudentId] = useState('');
   const [typeFilter, setTypeFilter] = useState<TransactionFilterType>('all');
   const [routeStudentId, setRouteStudentId] = useState('');

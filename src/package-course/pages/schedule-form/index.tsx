@@ -2,6 +2,7 @@ import { View, Text, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
@@ -174,7 +175,7 @@ const ScheduleForm: React.FC = () => {
   const isEdit = !!scheduleId;
   const isRescheduleMode = isEdit && formMode === 'reschedule';
 
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);

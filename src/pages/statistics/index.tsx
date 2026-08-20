@@ -2,6 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
@@ -41,7 +42,7 @@ const DataCenter: React.FC = () => {
   const [cardData, setCardData] = useState<CardDataType | null>(null);
   const [salaryData, setSalaryData] = useState<SalaryDataType | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useDelayedLoading();
 
   /** 加载所有数据 */
   const loadData = useCallback(async () => {

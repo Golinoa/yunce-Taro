@@ -1,7 +1,9 @@
 import { useDidShow, useDidHide } from '@tarojs/taro';
 import React from 'react';
+import PrivacyPopup from '@/components/PrivacyPopup';
 import { useThemeStore } from '@/stores/theme';
 import { AuthProvider } from '@/utils/auth';
+import { initPrivacy } from '@/utils/privacy';
 import 'uno.css';
 
 /**
@@ -45,6 +47,9 @@ import './app.scss';
 // 应用启动时立即从本地存储初始化主题，避免首屏闪烁
 useThemeStore.getState().initTheme();
 
+// 启动时注册微信隐私授权监听并按需主动弹窗（满足《个人信息保护指引》合规）
+initPrivacy();
+
 const App: React.FC<{ children?: React.ReactNode }> = (props) => {
   useDidShow(() => {
     // App 可见
@@ -54,7 +59,12 @@ const App: React.FC<{ children?: React.ReactNode }> = (props) => {
     // App 隐藏
   });
 
-  return <AuthProvider>{props.children}</AuthProvider>;
+  return (
+    <AuthProvider>
+      {props.children}
+      <PrivacyPopup />
+    </AuthProvider>
+  );
 };
 
 export default App;

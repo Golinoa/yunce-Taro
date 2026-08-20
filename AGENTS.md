@@ -84,10 +84,14 @@ git commit
 
 ## 七、编译铁律
 
-**每次代码修改完成后，必须删除 dist 目录并用 Mock 模式重新编译：**
+**每次代码修改完成后，必须删除 dist 目录并用 Mock 模式重新编译。若"改了代码小程序里没生效"，必须连 webpack 持久化缓存一起清掉再编：**
 
 ```bash
+# 常规（仅删除 dist 重编）
 $env:VITE_USE_MOCK="true"; npm run build:weapp
+
+# 干净重编（清 dist + 清 webpack 缓存，遇到"改了没反应"必用）
+$env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 ```
 
 ### 为什么必须这样做？
@@ -102,12 +106,14 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp
 | 命令 | 说明 |
 |------|------|
 | `$env:VITE_USE_MOCK="true"; npm run build:weapp` | 强制开启 Mock，生产模式编译（推荐） |
+| `$env:VITE_USE_MOCK="true"; npm run build:weapp:clean` | 清 dist + 清 webpack 缓存后全量重编（"改了没反应"时用） |
 | `npm run dev:weapp` | 开发模式，自动开启 Mock + 热更新 |
 
 ### 禁止的做法
 
 - ❌ 直接使用 `npm run build:weapp`（会禁用 Mock，导致网络异常）
 - ❌ 不删除 dist 目录直接编译（可能残留旧代码）
+- ❌ "改了代码没生效"时只删 dist 不删 webpack 缓存（`node_modules/.cache/webpack/weapp`）——该缓存可能不随源码失效，会把旧代码喂进产物
 
 ## 八、审查清单
 
@@ -122,6 +128,21 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp
 - [ ] TypeScript 类型是否完整（无隐式 any）？
 
 ---
+
+## 九、小程序 PickerView 铁律
+
+所有使用微信原生 `PickerView` / `picker-view` 的滚轮选择器（日期、时间、范围、分类等）必须遵守：
+
+1. **`indicator-style` 的高度必须用 `px` 单位**——
+   写 `rpx` 会被微信**静默忽略**并退回默认 `34px`，导致选中框高度异常、各 item 行高不一致、滚动时选中行不居中、整体"不丝滑/错位"。
+2. **px 与 rpx 的换算**：设计稿 item 高度 `96rpx`（@375 基准）→ 微信须写 `48px`。
+   ```tsx
+   <PickerView indicatorStyle="height: 48px; line-height: 48px;" ... />
+   ```
+3. **`picker-view-column` 内子 view 的高度由 `indicator-style` 自动决定**，在子元素样式里写高度无效，无需（也不该）再写 `h-[96rpx]` 去强行对齐。
+4. 涉及文件（改一处须全改）：`PickerSheet`、`DatePickerSheet`、`TimePickerSheet`、`TimeRangePicker`、`teacher/MonthPickerSheet`。
+
+> 排查方式：`grep -rn 'indicatorStyle' src/` 确认所有命中都是 `px`，无一例 `rpx`。
 
 ## 详细规则索引
 

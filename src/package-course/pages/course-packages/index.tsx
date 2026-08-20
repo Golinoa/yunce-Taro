@@ -2,6 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
 import PageContainer from '@/components/PageContainer';
@@ -34,7 +35,7 @@ const CoursePackagesPage: React.FC = () => {
   const invalidatePackageTemplates = usePackageTemplateStore((state) => state.invalidate);
 
   const [templates, setTemplates] = useState<CoursePackageTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
 
   // 弹窗状态（创建/编辑共用）
   const [modalVisible, setModalVisible] = useState(false);

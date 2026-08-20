@@ -124,6 +124,22 @@ const CourseManagementPage: React.FC = () => {
     Taro.navigateTo({ url: `/package-course/pages/course-form/index?id=${id}` });
   }, []);
 
+  const handleCourseLongPress = useCallback(
+    (template: CourseTemplate) => {
+      void Taro.showActionSheet({
+        itemList: ['编辑课程', '删除课程'],
+        itemColor: '#1a1a1a',
+      }).then((res) => {
+        if (res.tapIndex === 0) {
+          handleEdit(template.id);
+        } else if (res.tapIndex === 1) {
+          setDeleteTarget(template);
+        }
+      });
+    },
+    [handleEdit],
+  );
+
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -159,8 +175,7 @@ const CourseManagementPage: React.FC = () => {
         scrollY
         enhanced
         scrollWithAnimation
-        className="h-screen"
-        style={{ paddingBottom: 'calc(160rpx + env(safe-area-inset-bottom))' }}
+        className="h-screen pb-[calc(160rpx+env(safe-area-inset-bottom))]"
       >
         {/* Tab 分类栏 */}
         <View className="sticky top-0 z-10 bg-background py-[24rpx] px-[32rpx]">
@@ -171,10 +186,9 @@ const CourseManagementPage: React.FC = () => {
               enhanced
               showScrollbar={false}
               scrollWithAnimation
-              className="flex-1 min-w-0"
-              style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
+              className="flex-1 min-w-0 overflow-hidden whitespace-nowrap"
             >
-              <View className="flex flex-row items-center" style={{ display: 'inline-flex' }}>
+              <View className="flex flex-row items-center inline-flex">
                 {tabs.map((tab) => {
                   const isActive = activeCategoryId === tab.key;
                   return (
@@ -254,6 +268,7 @@ const CourseManagementPage: React.FC = () => {
                   key={template.id}
                   className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
                   onClick={() => handleEdit(template.id)}
+                  onLongPress={() => handleCourseLongPress(template)}
                 >
                   <View className="flex-1 min-w-0 flex flex-row items-center gap-[20rpx]">
                     {/* 颜色标识 */}

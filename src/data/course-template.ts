@@ -125,6 +125,11 @@ let MOCK_TEMPLATES: CourseTemplate[] = [
     level: 'basic',
     description: '零基础素描入门，培养观察力与造型能力。',
     isOnline: false,
+    // 已排入 10 名学员，编辑时若将容量改到 10 以下应触发「人数超限」拦截
+    studentIds: [
+      'stu-001', 'stu-002', 'stu-003', 'stu-004', 'stu-005',
+      'stu-006', 'stu-007', 'stu-008', 'stu-009', 'stu-010',
+    ],
     createdAt: '2026-07-01T10:00:00Z',
     updatedAt: '2026-07-15T10:00:00Z',
   },
@@ -244,7 +249,7 @@ export async function mockCreateCourseTemplate(
     status: 'active',
     createdAt: nowISO(),
     updatedAt: nowISO(),
-    subjectName: SUBJECT_OPTIONS.find((s) => s.value === data.subjectId)?.label,
+    // subjectName 由 FormData 传入（从科目管理数据源查找）
   };
   MOCK_TEMPLATES.unshift(created);
   return created;
@@ -260,9 +265,7 @@ export async function mockUpdateCourseTemplate(
   const updated: CourseTemplate = {
     ...MOCK_TEMPLATES[idx],
     ...data,
-    subjectName: data.subjectId
-      ? SUBJECT_OPTIONS.find((s) => s.value === data.subjectId)?.label
-      : MOCK_TEMPLATES[idx].subjectName,
+    subjectName: data.subjectName ?? MOCK_TEMPLATES[idx].subjectName,
     updatedAt: nowISO(),
   };
   MOCK_TEMPLATES[idx] = updated;

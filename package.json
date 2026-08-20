@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build:weapp": "taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
+    "build:weapp:clean": "node scripts/clean-weapp-cache.mjs && taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
     "build:swan": "taro build --type swan",
     "build:alipay": "taro build --type alipay",
     "build:tt": "taro build --type tt",

@@ -176,7 +176,7 @@ export function filterStudentsByActor(actorId: string): Student[] {
     return DB_STUDENTS.filter((student) => scope.studentIds.includes(student.id));
   }
 
-  if (scope.role === 'principal') {
+  if (scope.role === 'principal' || scope.role === 'admin') {
     return DB_STUDENTS.filter((student) => scope.campusIds.includes(student.campusId));
   }
 
@@ -214,7 +214,7 @@ export function filterClassesByActor(actorId: string): Class[] {
     return DB_CLASSES.filter((cls) => classIds.has(cls.id));
   }
 
-  if (scope.role === 'principal') {
+  if (scope.role === 'principal' || scope.role === 'admin') {
     return DB_CLASSES.filter((cls) => scope.campusIds.includes(cls.campusId));
   }
 
@@ -241,7 +241,7 @@ export function filterSchedulesByActor(actorId: string) {
     return SCHEDULES.filter((schedule) => classIds.has(schedule.classId || ''));
   }
 
-  if (scope.role === 'principal') {
+  if (scope.role === 'principal' || scope.role === 'admin') {
     return SCHEDULES.filter((schedule) => scope.campusIds.includes(schedule.campusId));
   }
 
@@ -272,7 +272,7 @@ export function filterLessonRecordsByActor(actorId: string) {
     return LESSON_RECORDS.filter((record) => scope.studentIds.includes(record.studentId));
   }
 
-  if (scope.role === 'principal') {
+  if (scope.role === 'principal' || scope.role === 'admin') {
     return LESSON_RECORDS.filter((record) => scope.campusIds.includes(record.campusId));
   }
 

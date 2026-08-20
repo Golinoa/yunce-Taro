@@ -41,10 +41,14 @@ export interface FormRowProps {
   multiline?: boolean;
   /** 字段错误提示 */
   error?: string;
+  /** 字段下方辅助说明文案（如「留空不限制人数」） */
+  helperText?: string;
   /** 自定义右侧内容（非 editable 模式有效，渲染时替代 FormInput） */
   children?: React.ReactNode;
   /** 点击整行回调（选择模式） */
   onClick?: () => void;
+  /** 是否显示底部分割线（默认 true；分组卡片内的最后一行可设为 false 避免穿出 Card 边界） */
+  border?: boolean;
 }
 
 const FormRow: React.FC<FormRowProps> = ({
@@ -59,14 +63,16 @@ const FormRow: React.FC<FormRowProps> = ({
   suffix,
   multiline = false,
   error,
+  helperText,
   children,
   onClick,
+  border = true,
 }) => {
   // 选择器行：有自定义 children 且非编辑态（这类行不会切换 editable，安全使用条件渲染）
   const hasCustomChildren = !editable && children;
 
   return (
-    <View className="flex flex-col border-b-[2rpx] border-border/30 py-[24rpx]">
+    <View className={cn('flex flex-col py-[24rpx]', border && 'border-b-[2rpx] border-border/30')}>
       <View
         className={cn('flex flex-row items-center', onClick && 'press-scale')}
         onClick={onClick}
@@ -91,10 +97,7 @@ const FormRow: React.FC<FormRowProps> = ({
           </View>
         ) : multiline && !editable ? (
           /* 多行只读展示 */
-          <View
-            className="flex-1 min-w-0 bg-primary-5 rounded-[16rpx] px-[20rpx] py-[16rpx] mt-[12rpx]"
-            style={{ minHeight: '120rpx' }}
-          >
+          <View className="flex-1 min-w-0 min-h-[120rpx] bg-primary-5 rounded-[16rpx] px-[20rpx] py-[16rpx] mt-[12rpx]">
             <Text
               className={cn(
                 'text-[30rpx] leading-relaxed',
@@ -146,6 +149,16 @@ const FormRow: React.FC<FormRowProps> = ({
             </View>
           </View>
         )}
+      </View>
+
+      {/* 辅助说明 - 始终渲染，无内容时隐藏 */}
+      <View
+        className={cn(
+          'flex flex-row items-center mt-[8rpx]',
+          !helperText && 'opacity-0 h-0 overflow-hidden',
+        )}
+      >
+        <Text className="text-[24rpx] text-muted-foreground">{helperText || ''}</Text>
       </View>
 
       {/* 错误提示 - 始终渲染，用 CSS 控制显隐 */}

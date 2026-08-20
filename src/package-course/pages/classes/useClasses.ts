@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService } from '@/services';
 import { teacherService } from '@/services/teacher';
 import { useStudentStore, useClassStore, usePackageTemplateStore } from '@/stores';
@@ -76,7 +77,7 @@ export function useClasses() {
   const fetchPackageTemplatesByTeacher = usePackageTemplateStore((state) => state.fetchByTeacher);
 
   const [classes, setClasses] = useState<Class[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');

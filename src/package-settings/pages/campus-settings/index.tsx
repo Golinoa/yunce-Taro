@@ -522,13 +522,13 @@ const CampusSettings: React.FC = () => {
             <Text className="text-[24rpx] text-muted-foreground">场馆图最多 5 张</Text>
           </View>
           <Text className="text-[22rpx] text-muted-foreground mb-[20rpx]">
-            Logo 建议 200×200px · 场馆图建议 750×420px · 单张不超过 2M
+            Logo 建议 200×200px · 场馆图建议 750×420px · 单张不超过 5M
           </Text>
           <View className="flex flex-row flex-wrap gap-[20rpx]">
             <ImageUploader
               value={form.logo}
               placeholder="logo"
-              maxSizeMB={2}
+              maxSizeMB={5}
               onChange={(value) => updateField('logo', value)}
             />
             {form.venueImages.map((url, index) => (
@@ -536,7 +536,7 @@ const CampusSettings: React.FC = () => {
                 key={`${url}-${index}`}
                 value={url}
                 placeholder="场馆图片"
-                maxSizeMB={2}
+                maxSizeMB={5}
                 onChange={(value) => {
                   const next = [...form.venueImages];
                   if (value) {
@@ -551,7 +551,7 @@ const CampusSettings: React.FC = () => {
             {form.venueImages.length < 5 && (
               <ImageUploader
                 placeholder="场馆图片"
-                maxSizeMB={2}
+                maxSizeMB={5}
                 onChange={(value) => {
                   if (value) {
                     updateField('venueImages', [...form.venueImages, value]);

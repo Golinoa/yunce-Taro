@@ -3,7 +3,14 @@ import type { IconName } from '@/components/Icon';
 /**
  * 店铺管理 onboarding 步骤标识
  */
-export type StoreOnboardingStepKey = 'campus' | 'venue' | 'staff' | 'course' | 'package' | 'salary';
+export type StoreOnboardingStepKey =
+  | 'campus'
+  | 'venue'
+  | 'staff'
+  | 'course'
+  | 'subject'
+  | 'package'
+  | 'salary';
 
 /**
  * 店铺管理 onboarding 单步配置项

@@ -98,6 +98,10 @@ export interface CardType {
   stats: CardTypeStats;
   /** 适用校区数量，0=不限 */
   campusCount?: number;
+  /** 关联科目 ID */
+  subjectId?: string;
+  /** 关联科目名称（冗余展示） */
+  subjectName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -132,4 +136,8 @@ export interface CardTypeFormData {
   usageLimit: number;
   commissionCalc: string;
   backgroundImage?: string;
+  /** 关联科目 ID */
+  subjectId?: string;
+  /** 关联科目名称（冗余展示） */
+  subjectName?: string;
 }

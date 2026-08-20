@@ -2,6 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
@@ -71,7 +72,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
     }
   }, [routerParams]);
 
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [saving, setSaving] = useState(false);
   const [classes, setClasses] = useState<Class[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);

@@ -70,6 +70,8 @@ export default defineAppConfig({
         'pages/class-form/index',
         'pages/class-checkin/index',
         'pages/course-management/index',
+        'pages/subject-management/index',
+        'pages/subject-form/index',
         'pages/card-management/index',
         'pages/card-form/index',
         'pages/card-member-list/index',
@@ -137,6 +139,15 @@ export default defineAppConfig({
       ],
     },
   ],
+  /** 隐私受限接口声明（微信隐私合规强制要求，未声明会 101 失败） */
+  requiredPrivateInfos: ['chooseLocation'],
+  /**
+   * 隐私授权检查开关。
+   * - true：chooseMedia / chooseLocation 等隐私接口在用户未同意隐私协议前会被微信直接拦截。
+   * - 当前临时关闭（false）：公众平台《个人信息保护指引》还在配置中未发布生效，
+   *   开启会导致真机选图/定位等接口被拦截且弹窗不弹出。待隐私指引审核发布生效后改回 true。
+   */
+  __usePrivacyCheck__: false,
   /** 进入课表页后预下载 package-lead 分包，加速「排课/预约」Tab 切换 */
   preloadRule: {
     'pages/schedule/index': {

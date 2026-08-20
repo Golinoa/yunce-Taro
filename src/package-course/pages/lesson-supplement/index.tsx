@@ -1,6 +1,7 @@
 import { View, Text, Textarea, Input, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -87,7 +88,7 @@ const LessonSupplementPage: React.FC = () => {
   const [addStudentKeyword, setAddStudentKeyword] = useState('');
   const [hoursUsed, setHoursUsed] = useState(1);
   const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [submitting, setSubmitting] = useState(false);
 
   const handleSafeGoBack = useCallback(() => {

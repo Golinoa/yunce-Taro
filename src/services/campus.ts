@@ -28,6 +28,7 @@ import {
   mockGetSubjects,
   mockGetSubjectById,
   mockAddSubject,
+  mockUpdateSubject,
   mockDeleteSubject,
   mockGetVenues,
   mockGetVenueById,
@@ -256,6 +257,10 @@ export const subjectService = {
 
   /** 添加科目 */
   add: (data: SubjectFormData): Promise<Subject> => mockAddSubject(data),
+
+  /** 更新科目 */
+  update: async (id: string, data: Partial<SubjectFormData>): Promise<Subject | null> =>
+    (await mockUpdateSubject(id, data)) ?? null,
 
   /** 删除科目 */
   delete: (id: string): Promise<boolean> => mockDeleteSubject(id),

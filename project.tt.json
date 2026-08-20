@@ -1,7 +1,7 @@
 {
   "miniprogramRoot": "./",
-  "projectname": "taro_template",
-  "description": "taro_template",
+  "projectname": "SONGGUO-SCHEDULE",
+  "description": "松果排课教务小程序",
   "appid": "touristappid",
   "setting": {
     "urlCheck": true,

@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro';
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
 import type { Class, ClassDetail, CheckinRecord } from '@/types/class';
@@ -98,7 +99,7 @@ export function useClassDetail(): UseClassDetailReturn {
 
   const [classInfo, setClassInfo] = useState<ClassDetail | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [endingClass, setEndingClass] = useState(false);

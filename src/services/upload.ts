@@ -41,12 +41,18 @@ function getToken(): string | null {
   }
 }
 
-/** mock 上传：返回固定占位 URL */
-async function mockUploadFile(_filePath: string, filename: string): Promise<UploadResult> {
+/**
+ * mock 上传：直接把本地文件路径作为占位 URL 返回
+ * 开发模式下不真正上传，但本地稳定路径（wxfile://usr/uploads/...）可被 <Image> 正常渲染，
+ * 保证「选图预览」与「再次进入回填显示」在开发者工具 / 真机 mock 下都能看到图片。
+ * 联调 / 生产环境走下方真实 Taro.uploadFile，返回七牛可访问 URL；
+ * 此时需在小程序后台将 CDN 域名加入「downloadFile 合法域名」白名单，否则真机加载不出。
+ */
+async function mockUploadFile(filePath: string, filename: string): Promise<UploadResult> {
   // 模拟网络延迟
   await new Promise((r) => setTimeout(r, 500));
   return {
-    url: `https://cdn.yunce.app/mock/${Date.now()}-${filename}`,
+    url: filePath,
     filename,
   };
 }

@@ -1,6 +1,7 @@
 import { View, Text, Picker, Textarea } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
@@ -43,7 +44,7 @@ const LeaveRequestPage: React.FC = () => {
 
   // ====== 教师视图状态 ======
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useDelayedLoading();
   const [errorMsg, setErrorMsg] = useState('');
   // 审批操作中状态：记录正在处理的请假 id 与动作
   const [processingId, setProcessingId] = useState<{

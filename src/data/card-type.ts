@@ -5,6 +5,7 @@
  */
 
 import { DEFAULT_CATEGORY_IDS } from '@/data/course-category';
+import { SUBJECTS } from '@/data/mock-database';
 import type {
   CardType,
   CardTypeBookingMethod,
@@ -147,6 +148,8 @@ let MOCK_CARD_TYPES: CardType[] = [
     bookingMethod: 'course',
     categoryIds: [DEFAULT_CATEGORY_IDS.group],
     applicableCourseRange: '团课',
+    subjectId: 'sub-art',
+    subjectName: SUBJECTS.find((s) => s.id === 'sub-art')?.name,
     count: 40,
     validDays: 380,
     price: 298000,
@@ -188,6 +191,8 @@ let MOCK_CARD_TYPES: CardType[] = [
     bookingMethod: 'course',
     categoryIds: [DEFAULT_CATEGORY_IDS.group],
     applicableCourseRange: '团课',
+    subjectId: 'sub-calligraphy',
+    subjectName: SUBJECTS.find((s) => s.id === 'sub-calligraphy')?.name,
     count: 40,
     validDays: 380,
     price: 328000,
@@ -229,6 +234,8 @@ let MOCK_CARD_TYPES: CardType[] = [
     bookingMethod: 'teacher',
     categoryIds: [DEFAULT_CATEGORY_IDS.private],
     applicableCourseRange: '私教',
+    subjectId: '',
+    subjectName: '通用（全部科目）',
     count: 10,
     validDays: 90,
     price: 199000,
@@ -270,6 +277,8 @@ let MOCK_CARD_TYPES: CardType[] = [
     bookingMethod: 'course',
     categoryIds: [DEFAULT_CATEGORY_IDS.group],
     applicableCourseRange: '团课',
+    subjectId: 'sub-dance',
+    subjectName: SUBJECTS.find((s) => s.id === 'sub-dance')?.name,
     validDays: 30,
     price: 99000,
     freezeCount: 0,
@@ -310,6 +319,8 @@ let MOCK_CARD_TYPES: CardType[] = [
     bookingMethod: 'course',
     categoryIds: [],
     applicableCourseRange: '全部课程',
+    subjectId: '',
+    subjectName: '通用（全部科目）',
     validDays: 365,
     price: 100000,
     freezeCount: 0,

@@ -13,6 +13,12 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
   // 正式联调或发版时，显式传入 VITE_USE_MOCK=false 即可切到真实接口。
   const useMock = process.env.VITE_USE_MOCK ?? 'true';
   const apiBaseUrl = process.env.TARO_API_BASE_URL ?? '/api/app/v1';
+  // 构建目标平台（taro build --type xxx）。weapp 为纯小程序，组件编译为原生组件，
+  // 不需要 @tarojs/plugin-html（该插件仅用于 H5/HTML 渲染）。
+  // 排除它可避免其在初始化阶段覆盖写 node_modules 内 runtime.js —— 该写操作在当前
+  // 执行环境下被拦截（无法覆盖/删除已有文件），会导致构建必挂。H5 构建仍保留。
+  const typeIdx = process.argv.indexOf('--type');
+  const isWeappBuild = typeIdx >= 0 && process.argv[typeIdx + 1] === 'weapp';
   const baseConfig: UserConfigExport<'webpack5'> = {
     projectName: 'yunce-edu',
     date: '2025-12-10',
@@ -25,7 +31,7 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
     },
     sourceRoot: 'src',
     outputRoot: process.env.TARO_OUTPUT_DIR || 'dist',
-    plugins: ['@tarojs/plugin-html'],
+    plugins: isWeappBuild ? [] : ['@tarojs/plugin-html'],
     defineConstants: {
       'process.env.TARO_API_BASE_URL': JSON.stringify(apiBaseUrl),
       'process.env.VITE_USE_MOCK': JSON.stringify(useMock),

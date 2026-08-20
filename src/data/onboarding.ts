@@ -16,7 +16,7 @@ import type {
 import { STORE_ONBOARDING_VISITED_KEY } from '@/utils/auth';
 
 // ============================================
-// 店铺配置 6 步骤页面「页面介绍弹框 - 不再提醒」存储 Key
+// 店铺配置 7 步骤页面「页面介绍弹框 - 不再提醒」存储 Key
 // 统一维护，便于重置引导流程时一并清除
 // ============================================
 export const PAGE_INTRO_STORAGE_KEYS: Record<StoreOnboardingStepKey, string> = {
@@ -24,6 +24,7 @@ export const PAGE_INTRO_STORAGE_KEYS: Record<StoreOnboardingStepKey, string> = {
   venue: 'venue_list_intro_hidden',
   staff: 'teacher_list_intro_hidden',
   course: 'course_management_intro_hidden',
+  subject: 'subject_management_intro_hidden',
   package: 'card_management_intro_hidden',
   salary: 'salary_home_intro_hidden',
 };
@@ -61,6 +62,12 @@ const STEP_META_LIST: Array<{
     label: '课程管理',
     icon: 'mdi-book-open-variant-outline',
     route: '/package-course/pages/course-management/index',
+  },
+  {
+    key: 'subject',
+    label: '科目管理',
+    icon: 'mdi-book-education-outline',
+    route: '/package-course/pages/subject-management/index',
   },
   {
     key: 'package',

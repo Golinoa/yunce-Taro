@@ -1006,6 +1006,7 @@ function mapMockStudent(student: NonNullable<MockStudent>): Student {
     campus_name:
       (student as { campusName?: string }).campusName ||
       (student as { campus_name?: string }).campus_name,
+    class_ids: (student as { classIds?: string[] }).classIds || [],
     avatar_url: (student as { avatar_url?: string }).avatar_url,
     status: student.status === 'active' ? 'active' : 'deleted',
     created_at: student.createdAt,
