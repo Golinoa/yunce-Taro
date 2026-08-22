@@ -111,31 +111,6 @@ export const MOCK_PARENT_TREND: ChartDataItem[] = MONTHLY_STATS.slice(0, 6).map(
   unit: '课时',
 }));
 
-/** 运营预警数据 */
-export const MOCK_OPERATION_ALERTS: AlertItem[] = [
-  {
-    id: 'op1',
-    title: '课时不足预警',
-    type: 'operation',
-    level: 'warning',
-    desc: '多名学员剩余课时偏低，建议优先跟进续费',
-    count: 5,
-    details: [
-      { id: 'd1', name: '张小明', info: '剩余 8 课时', refId: 'stu-003' },
-      { id: 'd2', name: '李子轩', info: '剩余 12 课时', refId: 'stu-001' },
-    ],
-  },
-  {
-    id: 'op2',
-    title: '本周消课高峰',
-    type: 'operation',
-    level: 'primary',
-    desc: '本周末部分时段消课集中，建议提前排班',
-    count: 1,
-    details: [{ id: 'd3', name: '周六 14:00-16:00', info: '预计消课 12 节' }],
-  },
-];
-
 /** 财务预警数据 */
 export const MOCK_FINANCE_ALERTS: AlertItem[] = [
   {

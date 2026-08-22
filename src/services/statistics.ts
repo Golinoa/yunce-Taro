@@ -30,8 +30,6 @@ import {
   mockGetOperationAlerts,
   MOCK_PARENT_TREND,
   MOCK_PAYMENT_RANK,
-  MOCK_OPERATION_ALERTS,
-  MOCK_FINANCE_ALERTS,
 } from '@/data/statistics';
 import { get } from '@/utils/request';
 
@@ -171,10 +169,6 @@ function normalizeAlertItem(alert: AlertItem): AlertItem {
   };
 }
 
-function getAllAlertFallbacks(): AlertItem[] {
-  return [...MOCK_OPERATION_ALERTS, ...MOCK_FINANCE_ALERTS].map(normalizeAlertItem);
-}
-
 // ============================================
 // 同步 Fallback 数据（空数据时的默认展示）
 // ============================================
@@ -214,14 +208,14 @@ function getExpenseRatiosFallback(): { label: string; ratio: number; barClass: s
   }));
 }
 
-/** 运营视图预警 fallback */
-function getOperationAlertsFallback(): AlertItem[] {
-  return MOCK_OPERATION_ALERTS.map(normalizeAlertItem);
+/** 运营视图预警 fallback（实时计算，与 getAlerts 同源，消除 L-17-A 静态常量直返） */
+async function getOperationAlertsFallback(): Promise<AlertItem[]> {
+  return (await mockGetOperationAlerts()).map(normalizeAlertItem);
 }
 
-/** 财务视图预警 fallback */
-function getFinanceAlertsFallback(): AlertItem[] {
-  return MOCK_FINANCE_ALERTS.map(normalizeAlertItem);
+/** 财务视图预警 fallback（实时计算，与 getAlerts 同源） */
+async function getFinanceAlertsFallback(): Promise<AlertItem[]> {
+  return (await mockGetFinanceAlerts()).map(normalizeAlertItem);
 }
 
 function getOperationKpiFallback(): OperationKpiItem {
@@ -366,7 +360,8 @@ export const statisticsService = {
    * 详情页统一走 Service，避免页面直接依赖 @/data/statistics
    */
   getAlertById: async (alertId: string): Promise<AlertItem | null> => {
-    const alert = getAllAlertFallbacks().find((item) => item.id === alertId);
+    const [op, fin] = await Promise.all([mockGetOperationAlerts(), mockGetFinanceAlerts()]);
+    const alert = [...op, ...fin].map(normalizeAlertItem).find((item) => item.id === alertId);
     return alert || null;
   },
   // ---------- 同步 Fallback ----------
