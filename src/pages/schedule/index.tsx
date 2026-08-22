@@ -1836,15 +1836,17 @@ const SchedulePage: React.FC = () => {
       const dateSlots = openClassSlots[dateStr] || {};
       const isDateLoading = loadingOpenSlotDates.has(dateStr);
       const isDateError = errorOpenSlotDates.has(dateStr);
+      // 用户口径（2026-08-23）：休息（rest）不产生约课，列表不渲染 rest 卡片；
+      // 全天休息的日期自然显示"当前日期暂无开放预约时段"空态
       const allSlots = Object.values(dateSlots)
         .flat()
+        .filter((s) => s.status !== 'rest')
         .sort(
           (left, right) =>
             parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time),
         );
       const summaryFullSlots = allSlots.filter((s) => s.status === 'full').length;
       const summaryActiveSlots = allSlots.filter((s) => s.status === 'active').length;
-      const summaryRestSlots = allSlots.filter((s) => s.status === 'rest').length;
       const openClassMap = openClasses.reduce<Record<string, Class>>((acc, cls) => {
         acc[cls.id] = cls;
         return acc;
@@ -1871,15 +1873,6 @@ const SchedulePage: React.FC = () => {
                   个，
                   <Text className="ml-[8rpx]">可预约：</Text>
                   <Text className="font-semibold text-schedule-header">{summaryActiveSlots}</Text>个
-                  {summaryRestSlots > 0 ? (
-                    <>
-                      ，<Text className="ml-[8rpx]">休息：</Text>
-                      <Text className="font-semibold text-foreground-secondary">
-                        {summaryRestSlots}
-                      </Text>
-                      个
-                    </>
-                  ) : null}
                 </Text>
               </View>
 

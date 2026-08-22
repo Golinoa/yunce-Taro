@@ -1298,9 +1298,15 @@ export async function mockGetSlotsByClass(
 /** 获取指定班级集合存在开放预约时段的日期列表 */
 export async function mockGetOpenSlotDates(classIds: string[]): Promise<string[]> {
   await delay();
-  const dateSet = new Set<string>();
+  // 用户口径（2026-08-23）：休息（rest）不产生约课——
+  // 仅当天存在非 rest 时段时才标记为可约日期（全天休息的日期不出现）
+  const hasBookable = new Map<string, boolean>();
   CLASS_BOOKING_SLOTS.filter((slot) => classIds.includes(slot.class_id)).forEach((slot) => {
-    dateSet.add(slot.lesson_date);
+    if (slot.status !== 'rest') hasBookable.set(slot.lesson_date, true);
+  });
+  const dateSet = new Set<string>();
+  hasBookable.forEach((bookable, date) => {
+    if (bookable) dateSet.add(date);
   });
   return Array.from(dateSet).sort();
 }
