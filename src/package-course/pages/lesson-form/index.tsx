@@ -12,6 +12,7 @@ import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import StarRating from '@/components/StarRating';
 import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import { checkThresholdAlert } from '@/data/operation-alert';
 import {
   studentService,
   packageService,
@@ -1332,7 +1333,14 @@ const LessonForm: React.FC = () => {
       } catch (e) {
         logError('audit lesson.record', e);
       }
-      handleSubmitSuccessReturn('消课成功');
+      // 预警：扣课时后剩余降到阈值 → 立即提醒一次（去重）
+      const alertHit =
+        checkThresholdAlert(
+          selectedStudent.id,
+          createdRecord.remaining_hours ??
+            Math.max((matchedPackage.remaining_hours ?? 0) - hoursUsed, 0),
+        ) === 'triggered';
+      handleSubmitSuccessReturn(alertHit ? '消课成功，课时不足已提醒' : '消课成功');
     } catch (err) {
       logError('submit lesson', err);
       Taro.showToast({ title: '提交失败，请重试', icon: 'none' });

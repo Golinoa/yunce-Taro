@@ -16,6 +16,7 @@ import {
 } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { lessonDebtService } from '@/services/lesson-debt';
+import { countTriggeredAlerts } from '@/services/operation-alert';
 import { useStudentStore } from '@/stores';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -92,6 +93,8 @@ const ClassCheckin: React.FC = () => {
     setSubmitting(true);
     const successList: string[] = [];
     const failList: { name: string; reason: string }[] = [];
+    /** 扣课时后剩余：用于预警"触发即提醒一次"判定 */
+    const alertItems: { studentId: string; remainingHours: number }[] = [];
 
     try {
       for (const stu of presentStudents) {
@@ -186,6 +189,12 @@ const ClassCheckin: React.FC = () => {
             });
           }
           successList.push(stu.name);
+          // 预警触发判定（扣课时后剩余降到阈值 → 提醒一次，重复进入不计数）
+          alertItems.push({
+            studentId: stu.id,
+            remainingHours:
+              createdRecord.remaining_hours ?? Math.max((pkg.remaining_hours ?? 0) - hoursUsed, 0),
+          });
         } catch (err) {
           logError('batchCheckin single student', err);
           failList.push({ name: stu.name, reason: '消课失败' });
@@ -193,13 +202,20 @@ const ClassCheckin: React.FC = () => {
       }
 
       // 汇总结果提示
+      // 预警：扣课时后剩余降到阈值 → 立即提醒一次（去重，不重复推送）
+      const triggeredAlertCount = successList.length > 0 ? countTriggeredAlerts(alertItems) : 0;
+      const alertSuffix = triggeredAlertCount > 0 ? `，${triggeredAlertCount}名课时不足已提醒` : '';
+
       if (failList.length === 0) {
-        Taro.showToast({ title: `已完成 ${successList.length} 名学生消课`, icon: 'success' });
+        Taro.showToast({
+          title: `已完成 ${successList.length} 名学生消课${alertSuffix}`,
+          icon: 'success',
+        });
       } else if (successList.length === 0) {
         Taro.showToast({ title: '全部消课失败', icon: 'none' });
       } else {
         Taro.showToast({
-          title: `${successList.length}人成功，${failList.length}人失败`,
+          title: `${successList.length}人成功，${failList.length}人失败${alertSuffix}`,
           icon: 'none',
           duration: 3000,
         });

@@ -7,9 +7,11 @@ import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerItem from '@/components/PickerItem';
+import { checkThresholdAlert } from '@/data/operation-alert';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService, lessonRecordService, scheduleService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
+import { clearStudentAlert } from '@/services/operation-alert';
 import { useStudentStore } from '@/stores';
 import type { Class } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -309,6 +311,14 @@ const LessonDetail: React.FC = () => {
       } catch (e) {
         logError('audit lesson.revoke', e);
       }
+      // 预警联动：撤销消课 → 课时回补（剩余回升）→ 清除该学员提醒记录，之后再次下降可重新提醒
+      if (record?.student_id) {
+        try {
+          clearStudentAlert(record.student_id);
+        } catch (e) {
+          logError('operation alert clear', e);
+        }
+      }
       Taro.showToast({ title: '已撤销', icon: 'success' });
       setShowRevokeSheet(false);
       setRevokeReason('');
@@ -353,7 +363,24 @@ const LessonDetail: React.FC = () => {
         } catch (e) {
           logError('audit lesson.edit_hours', e);
         }
-        Taro.showToast({ title: '已保存，差额已同步课包', icon: 'success' });
+        // 预警联动：追扣课时（剩余下降）→ 降到阈值立即提醒一次（去重）；
+        // 回补课时（剩余回升）→ 清除该学员提醒记录，之后再次下降可重新提醒
+        try {
+          const finalHours = updated.remaining_hours ?? v;
+          if (v > (record?.hours_used ?? 0)) {
+            const hit = checkThresholdAlert(updated.student_id, finalHours) === 'triggered';
+            Taro.showToast({
+              title: hit ? '已保存，课时不足已提醒' : '已保存，差额已同步课包',
+              icon: 'success',
+            });
+          } else {
+            clearStudentAlert(updated.student_id);
+            Taro.showToast({ title: '已保存，差额已同步课包', icon: 'success' });
+          }
+        } catch (e) {
+          logError('operation alert check', e);
+          Taro.showToast({ title: '已保存，差额已同步课包', icon: 'success' });
+        }
         setShowEditSheet(false);
         await loadRecord();
         if (profile?.id) invalidateStudents(profile.id);
