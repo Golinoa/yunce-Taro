@@ -144,9 +144,15 @@ const NOW = new Date();
 const CUR_YEAR = NOW.getFullYear();
 const CUR_MONTH = NOW.getMonth() + 1;
 
-/** Mock 数据仅覆盖的月份范围 — 仅 7、8 月有数据 */
-const MOCK_MIN_MONTH_KEY = `${CUR_YEAR}-07`;
-const MOCK_MAX_MONTH_KEY = `${CUR_YEAR}-08`;
+/** 薪资月份可选范围：以当前月为基准的前后窗口，消除硬编码 07/08 与真实时钟的错位（L-04） */
+function shiftMonthKey(base: string, delta: number): string {
+  const [y, m] = base.split('-').map(Number);
+  const total = y * 12 + (m - 1) + delta;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+}
+const MOCK_CURRENT_MONTH_KEY = `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}`;
+const MOCK_MIN_MONTH_KEY = shiftMonthKey(MOCK_CURRENT_MONTH_KEY, -2);
+const MOCK_MAX_MONTH_KEY = shiftMonthKey(MOCK_CURRENT_MONTH_KEY, 1);
 
 const ACCESS_SCOPE_TEXT_MAP: Record<TeacherAccessScope, string> = {
   self: '仅自己授课',

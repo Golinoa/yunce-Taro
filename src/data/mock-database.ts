@@ -15,12 +15,12 @@ import type { TeacherUIModel } from '@/types/teacher';
 // 常量
 // ============================================
 
-/** 当前时间基准 */
-export const NOW = new Date('2026-06-22T12:00:00Z');
-export const CUR_YEAR = 2026;
-export const CUR_MONTH = 6;
-export const CUR_DAY = 22;
-export const CUR_WEEKDAY = 1; // 周一
+/** 当前时间基准（统一以真实设备时钟为准，禁止硬编码历史月份，消除 L-04 时间基准分裂） */
+export const NOW = new Date();
+export const CUR_YEAR = NOW.getFullYear();
+export const CUR_MONTH = NOW.getMonth() + 1;
+export const CUR_DAY = NOW.getDate();
+export const CUR_WEEKDAY = ((NOW.getDay() + 6) % 7) + 1; // 周一=1 … 周日=7
 
 /** 测试账号列表（登录页提示用） */
 export interface TestAccount {
