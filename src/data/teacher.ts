@@ -691,6 +691,52 @@ export function getManagedTeachers(): TeacherUIModel[] {
   return _teachers || [];
 }
 
+// ============================================
+// 跨月内存存储（修复 L-01：非当前月视图读写同一份持久化数据，避免跨月静默丢失）
+// ============================================
+const monthlyTeachers: Record<string, TeacherUIModel[]> = {};
+
+function currentMonthKey(): string {
+  return `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}`;
+}
+
+interface MonthStore {
+  month: string;
+  isCurrent: boolean;
+  get: () => TeacherUIModel[];
+  set: (next: TeacherUIModel[]) => void;
+}
+
+/**
+ * 解析某月份对应的教师数据存储：
+ * - 当前月 → 唯一可写源 `_teachers`
+ * - 其它月 → 持久化的 `monthlyTeachers[month]`（首次访问由 genMonthSnapshot 种子，之后读写同一份，跨月不再静态重置）
+ */
+function useMonthStore(month?: string): MonthStore {
+  const key = month && month !== currentMonthKey() ? month : currentMonthKey();
+  if (key === currentMonthKey()) {
+    return {
+      month: key,
+      isCurrent: true,
+      get: () => _teachers,
+      set: (next) => {
+        _teachers = next;
+      },
+    };
+  }
+  if (!monthlyTeachers[key]) {
+    monthlyTeachers[key] = genMonthSnapshot(key);
+  }
+  return {
+    month: key,
+    isCurrent: false,
+    get: () => monthlyTeachers[key],
+    set: (next) => {
+      monthlyTeachers[key] = next;
+    },
+  };
+}
+
 /** 教师增删改后同步统一教师视图（mock-database.TEACHERS） */
 function syncUnifiedTeachers() {
   syncTeacherView();
@@ -794,7 +840,8 @@ export async function mockGetTeachers(
     return [];
   }
 
-  let teachers = month && month !== currentMonthKey ? genMonthSnapshot(month) : [..._teachers];
+  let teachers =
+    month && month !== currentMonthKey ? useMonthStore(month).get() : [..._teachers];
   if (campusId) {
     teachers = teachers.filter((t) => t.campusIds?.includes(campusId));
   }
@@ -824,7 +871,10 @@ async function normalizePromoImages(images?: string[]): Promise<string[]> {
 }
 
 /** 添加教师 */
-export async function mockAddTeacher(teacher: TeacherUIModel): Promise<TeacherUIModel> {
+export async function mockAddTeacher(
+  teacher: TeacherUIModel,
+  month?: string,
+): Promise<TeacherUIModel> {
   await delay(200);
   const promoImages = await normalizePromoImages(teacher.promoImages);
 
@@ -855,8 +905,9 @@ export async function mockAddTeacher(teacher: TeacherUIModel): Promise<TeacherUI
     salaryRule,
     salaryTemplateId,
   };
-  _teachers = [..._teachers, newTeacher];
-  syncUnifiedTeachers(); // 新增教师同步到统一教师视图（班级/排课/统计立即可见）
+  const store = useMonthStore(month);
+  store.set([...store.get(), newTeacher]);
+  if (store.isCurrent) syncUnifiedTeachers(); // 新增教师同步到统一教师视图（班级/排课/统计立即可见）
   return newTeacher;
 }
 
@@ -864,41 +915,50 @@ export async function mockAddTeacher(teacher: TeacherUIModel): Promise<TeacherUI
 export async function mockUpdateTeacher(
   id: string,
   updates: Partial<TeacherUIModel>,
+  month?: string,
 ): Promise<TeacherUIModel | null> {
   await delay(200);
-  const idx = _teachers.findIndex((t) => t.id === id);
+  const store = useMonthStore(month);
+  let arr = store.get();
+  const idx = arr.findIndex((t) => t.id === id);
   if (idx === -1) return null;
   const promoImages =
     updates.promoImages !== undefined ? await normalizePromoImages(updates.promoImages) : undefined;
-  _teachers[idx] = {
-    ..._teachers[idx],
+  arr[idx] = {
+    ...arr[idx],
     ...updates,
     ...(promoImages !== undefined ? { promoImages } : {}),
   };
-  _teachers = [..._teachers];
-  syncUnifiedTeachers(); // 教师信息变更同步到统一视图（学员/班级关联名实时更新）
-  return _teachers[idx];
+  arr = [...arr];
+  store.set(arr);
+  if (store.isCurrent) syncUnifiedTeachers(); // 教师信息变更同步到统一视图（学员/班级关联名实时更新）
+  return arr[idx];
 }
 
 /** 确认薪资 */
-export async function mockConfirmSalary(id: string): Promise<boolean> {
+export async function mockConfirmSalary(id: string, month?: string): Promise<boolean> {
   await delay(150);
-  const idx = _teachers.findIndex((t) => t.id === id);
+  const store = useMonthStore(month);
+  const arr = store.get();
+  const idx = arr.findIndex((t) => t.id === id);
   if (idx === -1) return false;
-  if (normalizeSalaryStatus(_teachers[idx].salaryStatus) === 'pending') {
-    _teachers[idx] = { ..._teachers[idx], salaryStatus: 'confirmed' };
-    _teachers = [..._teachers];
+  if (normalizeSalaryStatus(arr[idx].salaryStatus) === 'pending') {
+    arr[idx] = { ...arr[idx], salaryStatus: 'confirmed' };
+    store.set([...arr]);
   }
   return true;
 }
 
 /** 批量确认薪资 */
-export async function mockBatchConfirm(ids: string[]): Promise<boolean> {
+export async function mockBatchConfirm(ids: string[], month?: string): Promise<boolean> {
   await delay(200);
-  _teachers = _teachers.map((t) => {
-    const status = normalizeSalaryStatus(t.salaryStatus);
-    return ids.includes(t.id) && status === 'pending' ? { ...t, salaryStatus: 'confirmed' } : t;
-  });
+  const store = useMonthStore(month);
+  store.set(
+    store.get().map((t) => {
+      const status = normalizeSalaryStatus(t.salaryStatus);
+      return ids.includes(t.id) && status === 'pending' ? { ...t, salaryStatus: 'confirmed' } : t;
+    }),
+  );
   return true;
 }
 
@@ -918,14 +978,17 @@ export async function mockExecutePay(
   ids: string[],
   remark?: string,
   payMethod?: string,
+  month?: string,
 ): Promise<boolean> {
   await delay(200);
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  const monthKey = `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}`;
+  const monthKey = month ?? `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}`;
   const finalPayMethod = (payMethod || 'other') as PayMethod;
-  _teachers = _teachers.map((t) => {
-    const status = normalizeSalaryStatus(t.salaryStatus);
-    if (ids.includes(t.id) && status === 'sending') {
+  const store = useMonthStore(month);
+  store.set(
+    store.get().map((t) => {
+      const status = normalizeSalaryStatus(t.salaryStatus);
+      if (ids.includes(t.id) && status === 'sending') {
       const total =
         t.base +
         t.hours * t.rate +
@@ -955,15 +1018,21 @@ export async function mockExecutePay(
       };
     }
     return t;
-  });
+  }));
   return true;
 }
 
 /** 发送工资单（供老师核对） */
-export async function mockSendSalarySlip(ids: string[], remark?: string): Promise<SendResult> {
+export async function mockSendSalarySlip(
+  ids: string[],
+  remark?: string,
+  month?: string,
+): Promise<SendResult> {
   await delay(300);
   const result: SendResult = { success: [], failed: [] };
-  _teachers = _teachers.map((t) => {
+  const store = useMonthStore(month);
+  store.set(
+    store.get().map((t) => {
     const status = normalizeSalaryStatus(t.salaryStatus);
     if (!ids.includes(t.id) || status !== 'confirmed') return t;
     // 模拟极少数发送失败（没有关注公众号）
@@ -978,7 +1047,7 @@ export async function mockSendSalarySlip(ids: string[], remark?: string): Promis
       salaryStatus: 'sending' as const,
       payRemark: remark || t.payRemark,
     };
-  });
+  }));
   return result;
 }
 
