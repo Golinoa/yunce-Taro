@@ -9,6 +9,7 @@ import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
 import type { UserRole } from '@/types/profile';
 import type { DayOfWeek } from '@/types/schedule';
 import { getManagedTeachers } from '@/data/teacher';
+import type { TeacherUIModel } from '@/data/teacher';
 
 // ============================================
 // 常量
@@ -576,6 +577,10 @@ export interface Teacher {
   managedSubjectIds?: string[];
   role: 'lead' | 'assist' | 'parttime';
   status: 'active' | 'resigned';
+  /** 薪资状态（来自管理库，统一视图同步展示） */
+  salaryStatus?: TeacherUIModel['salaryStatus'];
+  /** 扣款/补发明细（来自管理库，统一视图同步展示） */
+  deductions?: TeacherUIModel['deductions'];
   joinedAt: string;
   totalHours: number;
   monthHours: number;
@@ -669,7 +674,9 @@ function buildTeacherView(): Teacher[] {
       name: m.name || base.name,
       phone: m.phone || base.phone,
       role: m.role,
-      status: 'active',
+      status: m.status,
+      salaryStatus: m.salaryStatus,
+      deductions: m.deductions,
       subjects: m.subject
         ? base.subjects.includes(m.subject)
           ? base.subjects
@@ -685,11 +692,13 @@ function buildTeacherView(): Teacher[] {
         name: m.name || m.id,
         phone: m.phone || '',
         subjects: m.subject ? [m.subject] : [],
-        campusIds: [],
-        canCrossCampus: false,
+        campusIds: m.campusIds || [],
+        canCrossCampus: m.canCrossCampus || false,
         accessScope: 'self',
         role: m.role,
-        status: 'active',
+        status: m.status,
+        salaryStatus: m.salaryStatus,
+        deductions: m.deductions,
         joinedAt: new Date().toISOString(),
         totalHours: 0,
         monthHours: 0,
