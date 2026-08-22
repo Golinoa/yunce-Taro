@@ -1,20 +1,12 @@
 import { View, Text, Picker, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
 import React from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import SheetInput, { SheetPickerItem, SheetSelectItem, SheetTag } from '@/components/SheetInput';
-import type { ClassColor, ClassIcon, ClassType, TeachMode } from '@/types/class';
-import type { CoursePackageTemplate } from '@/types/course-package';
+import type { ClassColor, ClassIcon, TeachMode } from '@/types/class';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
-import {
-  WEEKDAYS,
-  TEACH_MODES,
-  PACKAGE_TYPE_LABELS,
-  CLASS_ICONS,
-  CLASS_GRADIENT,
-} from './useClasses';
+import { WEEKDAYS, TEACH_MODES, CLASS_ICONS, CLASS_GRADIENT } from './useClasses';
 
 interface CreateClassSheetProps {
   show: boolean;
@@ -23,8 +15,6 @@ interface CreateClassSheetProps {
   // 表单
   name: string;
   setName: (v: string) => void;
-  classType: ClassType;
-  setClassType: (v: ClassType) => void;
   teachMode: TeachMode;
   setTeachMode: (v: TeachMode) => void;
   weekdays: string[];
@@ -33,10 +23,6 @@ interface CreateClassSheetProps {
   setStartTime: (v: string) => void;
   endTime: string;
   setEndTime: (v: string) => void;
-  startDate: string;
-  setStartDate: (v: string) => void;
-  endDate: string;
-  setEndDate: (v: string) => void;
   teachers: string[];
   toggleTeacher: (t: string) => void;
   teacherOptions: TeacherUIModel[];
@@ -46,14 +32,6 @@ interface CreateClassSheetProps {
   canCreate: boolean;
   submitBlockedReason: string;
   handleCreate: () => void;
-  // 课程包
-  selectedPackageId: string;
-  setSelectedPackageId: (v: string) => void;
-  packageTemplates: CoursePackageTemplate[];
-  showPackagePicker: boolean;
-  setShowPackagePicker: (v: boolean) => void;
-  packagePickerVisible: boolean;
-  setPackagePickerVisible: (v: boolean) => void;
   // 学员选择器
   showStudentPicker: boolean;
   pickerVisible: boolean;
@@ -78,8 +56,6 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
   onClose,
   name,
   setName,
-  classType,
-  setClassType,
   teachMode,
   setTeachMode,
   weekdays,
@@ -88,10 +64,6 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
   setStartTime,
   endTime,
   setEndTime,
-  startDate,
-  setStartDate,
-  endDate,
-  setEndDate,
   teachers,
   toggleTeacher,
   teacherOptions,
@@ -101,13 +73,6 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
   canCreate,
   submitBlockedReason,
   handleCreate,
-  selectedPackageId,
-  setSelectedPackageId,
-  packageTemplates,
-  showPackagePicker,
-  setShowPackagePicker,
-  packagePickerVisible,
-  setPackagePickerVisible,
   showStudentPicker,
   pickerVisible,
   openStudentPicker,
@@ -212,72 +177,7 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
           </View>
         </View>
 
-        {/* 上课类型 */}
-        <View className="mb-7">
-          <View className="text-sm text-muted-foreground mb-3 font-medium">上课类型</View>
-          <View className="flex gap-3">
-            <View>
-              <SheetTag
-                selected={classType === 'unlimited'}
-                onClick={() => setClassType('unlimited')}
-              >
-                循环上课
-              </SheetTag>
-            </View>
-            <View>
-              <SheetTag selected={classType === 'limited'} onClick={() => setClassType('limited')}>
-                课时制
-              </SheetTag>
-            </View>
-          </View>
-        </View>
-
-        {/* 关联课程包（仅课时制） */}
-        {classType === 'limited' && (
-          <View className="mb-7">
-            <View className="text-sm text-muted-foreground mb-3 font-medium">关联课程包</View>
-            <SheetSelectItem
-              onClick={() => {
-                setShowPackagePicker(true);
-                setTimeout(() => setPackagePickerVisible(true), 50);
-              }}
-            >
-              {selectedPackageId ? (
-                (() => {
-                  const pkg = packageTemplates.find((p) => p.id === selectedPackageId);
-                  return pkg ? (
-                    <>
-                      <View className="flex-1">
-                        <View className="text-md font-medium text-foreground">{pkg.name}</View>
-                        <View className="text-[20rpx] text-muted-foreground mt-1">
-                          ¥{pkg.price} · {pkg.lesson_count}课时 · {pkg.duration}分钟
-                        </View>
-                      </View>
-                      <Text className="text-sm text-muted-foreground">✕</Text>
-                    </>
-                  ) : null;
-                })()
-              ) : (
-                <>
-                  <Text className="text-md text-muted-foreground">选择课程包</Text>
-                  <Text className="ml-auto text-sm text-muted-foreground">›</Text>
-                </>
-              )}
-            </SheetSelectItem>
-            {packageTemplates.length === 0 && (
-              <View
-                className="mt-4 text-sm text-primary font-medium py-5 px-6 rounded-[24rpx] border-[2rpx] border-dashed border-primary bg-primary-bg text-center"
-                onClick={() =>
-                  Taro.navigateTo({ url: '/package-course/pages/course-packages/index' })
-                }
-              >
-                + 快捷添加课程包
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* 上课时间 */}
+        {/* 上课时间（用户口径 2026-08-23：班级不再区分循环上课/课时制，课时与循环统一在排课功能设置） */}
         <View className="mb-7">
           <View className="text-sm text-muted-foreground mb-3 font-medium">上课时间</View>
           <View className="flex gap-3 flex-wrap">
@@ -316,33 +216,6 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
             </View>
           )}
         </View>
-
-        {/* 上课日期范围（仅课时制） */}
-        {classType === 'limited' && (
-          <View className="mb-7">
-            <View className="text-sm text-muted-foreground mb-3 font-medium">上课日期范围</View>
-            <View className="flex gap-4">
-              <View className="flex-1 min-w-0">
-                <Picker
-                  mode="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.detail.value)}
-                >
-                  <SheetPickerItem className={startDate ? '' : 'text-muted-foreground'}>
-                    {startDate || '开始日期'}
-                  </SheetPickerItem>
-                </Picker>
-              </View>
-              <View className="flex-1 min-w-0">
-                <Picker mode="date" value={endDate} onChange={(e) => setEndDate(e.detail.value)}>
-                  <SheetPickerItem className={endDate ? '' : 'text-muted-foreground'}>
-                    {endDate || '结束日期'}
-                  </SheetPickerItem>
-                </Picker>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* 授课老师 */}
         <View className="mb-7">
@@ -461,113 +334,6 @@ const CreateClassSheet: React.FC<CreateClassSheetProps> = ({
                 onClick={confirmStudentPicker}
               >
                 确认添加
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* ===== 课程包选择器弹窗 ===== */}
-      {showPackagePicker && (
-        <View
-          className={`fixed inset-0 z-200 transition-colors duration-300 ${packagePickerVisible ? 'bg-black/45' : 'bg-transparent'}`}
-        >
-          <View
-            className={`absolute inset-0 ${packagePickerVisible ? 'bottom-[70%]' : 'bottom-full'}`}
-            onClick={() => {
-              setPackagePickerVisible(false);
-              setTimeout(() => setShowPackagePicker(false), 300);
-            }}
-          />
-          <View
-            className={`absolute bottom-0 left-0 right-0 rounded-t-[40rpx] max-h-[70vh] flex flex-col transition-transform duration-300 ease-in-out bg-white ${packagePickerVisible ? 'translate-y-0' : 'translate-y-full'}`}
-          >
-            <View className="py-8 px-10 flex items-center justify-between border-b-d5e8e0">
-              <Text className="text-[32rpx] font-semibold text-foreground">选择课程包</Text>
-              <View
-                className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center"
-                onClick={() => {
-                  setPackagePickerVisible(false);
-                  setTimeout(() => setShowPackagePicker(false), 300);
-                }}
-              >
-                <Text className="text-sm text-muted-foreground">✕</Text>
-              </View>
-            </View>
-            <ScrollView scrollY className="flex-1 max-h-[50vh]">
-              <View className="px-10 py-6">
-                {packageTemplates.map((pkg) => {
-                  const selected = selectedPackageId === pkg.id;
-                  const typeLabel = PACKAGE_TYPE_LABELS[pkg.type] || '课时包';
-                  return (
-                    <View
-                      key={pkg.id}
-                      className={`py-6 rounded-[24rpx] mb-4 border-[4rpx] ${selected ? 'border-primary bg-primary-bg' : ''}`}
-                      style={
-                        selected
-                          ? undefined
-                          : { backgroundColor: '#f5faf8', borderColor: '#D5E8E0' }
-                      }
-                      onClick={() => setSelectedPackageId(selected ? '' : pkg.id)}
-                    >
-                      <View className="flex items-center justify-between">
-                        <View className="flex-1">
-                          <View className="flex items-center gap-3">
-                            <Text className="text-md font-semibold text-foreground">
-                              {pkg.name}
-                            </Text>
-                            <View className="text-[20rpx] text-primary bg-primary-bg py-0_d5 px-3 rounded-lg font-medium">
-                              {typeLabel}
-                            </View>
-                          </View>
-                          <View className="text-[22rpx] text-muted-foreground mt-2">
-                            ¥{pkg.price} · {pkg.lesson_count}课时 · {pkg.duration}分钟/节
-                          </View>
-                          {pkg.description && (
-                            <View className="text-[20rpx] text-muted-foreground mt-1">
-                              {pkg.description}
-                            </View>
-                          )}
-                        </View>
-                        {selected && <Text className="text-[32rpx] text-primary font-bold">✓</Text>}
-                      </View>
-                    </View>
-                  );
-                })}
-                {packageTemplates.length === 0 && (
-                  <View className="py-20 text-center">
-                    <Text className="text-[26rpx] text-muted-foreground block mb-6">
-                      暂无课程包
-                    </Text>
-                    <View
-                      className="text-[26rpx] text-primary font-medium py-4 px-8 rounded-[28rpx] bg-primary-bg inline-block"
-                      onClick={() =>
-                        Taro.navigateTo({ url: '/package-course/pages/course-packages/index' })
-                      }
-                    >
-                      去添加课程包
-                    </View>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-            <View className="py-6 px-10 pb-[68rpx] flex gap-4 border-t-d5e8e0">
-              <View
-                className="flex-1 py-5 rounded-[28rpx] text-muted-foreground text-md font-medium text-center bg-f5faf8 border-d5e8e0"
-                onClick={() =>
-                  Taro.navigateTo({ url: '/package-course/pages/course-packages/index' })
-                }
-              >
-                + 新建课程包
-              </View>
-              <View
-                className="flex-1 py-5 rounded-[28rpx] bg-gradient-primary text-white text-md font-semibold text-center"
-                onClick={() => {
-                  setPackagePickerVisible(false);
-                  setTimeout(() => setShowPackagePicker(false), 300);
-                }}
-              >
-                确认
               </View>
             </View>
           </View>

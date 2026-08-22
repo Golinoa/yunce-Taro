@@ -34,8 +34,6 @@ const ClassesPage: React.FC = () => {
     closeCreateSheet,
     name,
     setName,
-    classType,
-    setClassType,
     teachMode,
     setTeachMode,
     weekdays,
@@ -44,10 +42,6 @@ const ClassesPage: React.FC = () => {
     setStartTime,
     endTime,
     setEndTime,
-    startDate,
-    setStartDate,
-    endDate,
-    setEndDate,
     teachers,
     toggleTeacher,
     teacherOptions,
@@ -58,13 +52,6 @@ const ClassesPage: React.FC = () => {
     submitBlockedReason,
     canCreate,
     handleCreate,
-    selectedPackageId,
-    setSelectedPackageId,
-    packageTemplates,
-    showPackagePicker,
-    setShowPackagePicker,
-    packagePickerVisible,
-    setPackagePickerVisible,
     showStudentPicker,
     pickerVisible,
     openStudentPicker,
@@ -81,21 +68,6 @@ const ClassesPage: React.FC = () => {
     setIcon,
     reload,
   } = useClasses();
-
-  /** 格式化日期为短格式 M/D */
-  const formatShortDate = (dateStr?: string): string => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
-
-  // 渲染类型标签
-  const renderTypeTag = (cls: { type: string; total_lessons?: number }) => {
-    if (cls.type === 'unlimited') {
-      return <View className="tag-primary">循环</View>;
-    }
-    return <View className="tag-amber">{cls.total_lessons ?? 0}课时</View>;
-  };
 
   // 渲染状态标签
   const renderStatusTag = (cls: { status: string }) => {
@@ -220,8 +192,6 @@ const ClassesPage: React.FC = () => {
             onClose={closeCreateSheet}
             name={name}
             setName={setName}
-            classType={classType}
-            setClassType={setClassType}
             teachMode={teachMode}
             setTeachMode={setTeachMode}
             weekdays={weekdays}
@@ -230,10 +200,6 @@ const ClassesPage: React.FC = () => {
             setStartTime={setStartTime}
             endTime={endTime}
             setEndTime={setEndTime}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
             teachers={teachers}
             toggleTeacher={toggleTeacher}
             teacherOptions={teacherOptions}
@@ -241,13 +207,6 @@ const ClassesPage: React.FC = () => {
             scheduleText={scheduleText}
             saving={saving}
             handleCreate={handleCreate}
-            selectedPackageId={selectedPackageId}
-            setSelectedPackageId={setSelectedPackageId}
-            packageTemplates={packageTemplates}
-            showPackagePicker={showPackagePicker}
-            setShowPackagePicker={setShowPackagePicker}
-            packagePickerVisible={packagePickerVisible}
-            setPackagePickerVisible={setPackagePickerVisible}
             showStudentPicker={showStudentPicker}
             pickerVisible={pickerVisible}
             openStudentPicker={openStudentPicker}
@@ -287,8 +246,6 @@ const ClassesPage: React.FC = () => {
           onClose={closeCreateSheet}
           name={name}
           setName={setName}
-          classType={classType}
-          setClassType={setClassType}
           teachMode={teachMode}
           setTeachMode={setTeachMode}
           weekdays={weekdays}
@@ -297,10 +254,6 @@ const ClassesPage: React.FC = () => {
           setStartTime={setStartTime}
           endTime={endTime}
           setEndTime={setEndTime}
-          startDate={startDate}
-          setStartDate={setStartDate}
-          endDate={endDate}
-          setEndDate={setEndDate}
           teachers={teachers}
           toggleTeacher={toggleTeacher}
           teacherOptions={teacherOptions}
@@ -310,13 +263,6 @@ const ClassesPage: React.FC = () => {
           canCreate={canCreate}
           submitBlockedReason={submitBlockedReason}
           handleCreate={handleCreate}
-          selectedPackageId={selectedPackageId}
-          setSelectedPackageId={setSelectedPackageId}
-          packageTemplates={packageTemplates}
-          showPackagePicker={showPackagePicker}
-          setShowPackagePicker={setShowPackagePicker}
-          packagePickerVisible={packagePickerVisible}
-          setPackagePickerVisible={setPackagePickerVisible}
           showStudentPicker={showStudentPicker}
           pickerVisible={pickerVisible}
           openStudentPicker={openStudentPicker}
@@ -468,7 +414,6 @@ const ClassesPage: React.FC = () => {
                               {cls.name}
                             </Text>
                             {renderStatusTag(cls)}
-                            {renderTypeTag(cls)}
                           </View>
                           {/* 详情行：人数 + 时间/日期 */}
                           <View className="flex items-center gap-[20rpx] mt-[8rpx]">
@@ -478,15 +423,8 @@ const ClassesPage: React.FC = () => {
                                 {cls.student_count}人
                               </Text>
                             </View>
-                            {/* 课时制显示日期范围，无限课时显示排课时间 */}
-                            {cls.type !== 'unlimited' && cls.start_date && cls.end_date ? (
-                              <View className="flex items-center gap-[6rpx]">
-                                <Icon name="mdi-clock-outline" size={22} color="mutedForeground" />
-                                <Text className="text-[20rpx] text-muted-foreground truncate">
-                                  {formatShortDate(cls.start_date)}-{formatShortDate(cls.end_date)}
-                                </Text>
-                              </View>
-                            ) : cls.schedule ? (
+                            {/* 上课时间（用户口径 2026-08-23：班级不再分课时制/循环，统一显示排课时间） */}
+                            {cls.schedule ? (
                               <View className="flex items-center gap-[6rpx]">
                                 <Icon name="mdi-clock-outline" size={22} color="mutedForeground" />
                                 <Text className="text-[20rpx] text-muted-foreground truncate">
@@ -514,8 +452,6 @@ const ClassesPage: React.FC = () => {
         onClose={closeCreateSheet}
         name={name}
         setName={setName}
-        classType={classType}
-        setClassType={setClassType}
         teachMode={teachMode}
         setTeachMode={setTeachMode}
         weekdays={weekdays}
@@ -524,10 +460,6 @@ const ClassesPage: React.FC = () => {
         setStartTime={setStartTime}
         endTime={endTime}
         setEndTime={setEndTime}
-        startDate={startDate}
-        setStartDate={setStartDate}
-        endDate={endDate}
-        setEndDate={setEndDate}
         teachers={teachers}
         toggleTeacher={toggleTeacher}
         teacherOptions={teacherOptions}
@@ -537,13 +469,6 @@ const ClassesPage: React.FC = () => {
         canCreate={canCreate}
         submitBlockedReason={submitBlockedReason}
         handleCreate={handleCreate}
-        selectedPackageId={selectedPackageId}
-        setSelectedPackageId={setSelectedPackageId}
-        packageTemplates={packageTemplates}
-        showPackagePicker={showPackagePicker}
-        setShowPackagePicker={setShowPackagePicker}
-        packagePickerVisible={packagePickerVisible}
-        setPackagePickerVisible={setPackagePickerVisible}
         showStudentPicker={showStudentPicker}
         pickerVisible={pickerVisible}
         openStudentPicker={openStudentPicker}

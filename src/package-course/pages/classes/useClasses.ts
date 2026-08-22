@@ -3,10 +3,9 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService } from '@/services';
 import { teacherService } from '@/services/teacher';
-import { useStudentStore, useClassStore, usePackageTemplateStore } from '@/stores';
+import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
-import type { Class, ClassColor, ClassIcon, ClassType, TeachMode } from '@/types/class';
-import type { CoursePackageTemplate } from '@/types/course-package';
+import type { Class, ClassColor, ClassIcon, TeachMode } from '@/types/class';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -59,13 +58,6 @@ export const TEACH_MODES: { key: TeachMode; label: string }[] = [
   { key: 'large_class', label: '大班' },
 ];
 
-export const PACKAGE_TYPE_LABELS: Record<string, string> = {
-  hour_package: '课时包',
-  term: '期课',
-  monthly: '月卡',
-  trial: '体验课',
-};
-
 export function useClasses() {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
@@ -74,7 +66,6 @@ export function useClasses() {
   const invalidateClasses = useClassStore((state) => state.invalidate);
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
   const invalidateStudents = useStudentStore((state) => state.invalidate);
-  const fetchPackageTemplatesByTeacher = usePackageTemplateStore((state) => state.fetchByTeacher);
 
   const [classes, setClasses] = useState<Class[]>([]);
   const { loading, setLoading } = useDelayedLoading();
@@ -88,13 +79,10 @@ export function useClasses() {
 
   // 创建班级表单
   const [name, setName] = useState('');
-  const [classType, setClassType] = useState<ClassType>('unlimited');
   const [teachMode, setTeachMode] = useState<TeachMode>('small_class');
   const [weekdays, setWeekdays] = useState<string[]>([]);
   const [startTime, setStartTime] = useState('14:00');
   const [endTime, setEndTime] = useState('15:30');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [teachers, setTeachers] = useState<string[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
@@ -105,12 +93,6 @@ export function useClasses() {
 
   // 在职教师列表
   const [teacherOptions, setTeacherOptions] = useState<TeacherUIModel[]>([]);
-
-  // 课程包
-  const [selectedPackageId, setSelectedPackageId] = useState('');
-  const [packageTemplates, setPackageTemplates] = useState<CoursePackageTemplate[]>([]);
-  const [showPackagePicker, setShowPackagePicker] = useState(false);
-  const [packagePickerVisible, setPackagePickerVisible] = useState(false);
 
   // 学员选择器
   const [showStudentPicker, setShowStudentPicker] = useState(false);
@@ -199,11 +181,6 @@ export function useClasses() {
       .catch((err) => {
         logError('load class students', err);
       });
-    const packagesPromise = fetchPackageTemplatesByTeacher(currentUserId)
-      .then((list) => setPackageTemplates(list))
-      .catch((err) => {
-        logError('load class package templates', err);
-      });
     const teachersPromise = teacherService
       .getActiveList(currentCampusId)
       .then(setTeacherOptions)
@@ -211,7 +188,7 @@ export function useClasses() {
         logError('load class teachers', err);
       });
     // #region debug-point H2:classes-preload-end
-    Promise.allSettled([studentsPromise, packagesPromise, teachersPromise]).then(() => {
+    Promise.allSettled([studentsPromise, teachersPromise]).then(() => {
       reportLocalDebug({
         hypothesisId: 'H2',
         location: 'src/package-course/pages/classes/useClasses.ts:preload',
@@ -223,13 +200,7 @@ export function useClasses() {
       });
     });
     // #endregion
-  }, [
-    profile,
-    currentUserId,
-    currentCampusId,
-    fetchPackageTemplatesByTeacher,
-    fetchStudentsByTeacher,
-  ]);
+  }, [profile, currentUserId, currentCampusId, fetchStudentsByTeacher]);
 
   // 筛选后的班级列表
   const filteredClasses = useMemo(() => {
@@ -321,16 +292,12 @@ export function useClasses() {
   // ===== 创建班级弹窗 =====
   const openCreateSheet = useCallback(() => {
     setName('');
-    setClassType('unlimited');
     setTeachMode('small_class');
     setWeekdays([]);
     setStartTime('14:00');
     setEndTime('15:30');
-    setStartDate('');
-    setEndDate('');
     setTeachers(currentUserId ? [currentUserId] : []);
     setSelectedStudentIds([]);
-    setSelectedPackageId('');
     setColor('primary');
     setIcon('piano');
     setSaving(false);
@@ -395,22 +362,8 @@ export function useClasses() {
     if (!startTime || !endTime) return '请选择完整的上课时段';
     if (startTime >= endTime) return '结束时间需晚于开始时间';
     if (USE_MOCK && teachers.length === 0) return '请选择授课老师';
-    if (classType === 'limited' && !selectedPackageId) return '请选择课程包';
-    if (classType === 'limited' && startDate && endDate && startDate > endDate) {
-      return '结束日期不能早于开始日期';
-    }
     return null;
-  }, [
-    classType,
-    endDate,
-    endTime,
-    name,
-    selectedPackageId,
-    startDate,
-    startTime,
-    teachers,
-    weekdays,
-  ]);
+  }, [endTime, name, startTime, teachers, weekdays]);
 
   const submitBlockedReason = useMemo(() => validate() || '', [validate]);
   const canCreate = useMemo(() => !submitBlockedReason && !saving, [saving, submitBlockedReason]);
@@ -426,12 +379,11 @@ export function useClasses() {
     setSaving(true);
     try {
       const schedule = scheduleText;
-      const selectedPkg =
-        classType === 'limited' ? packageTemplates.find((p) => p.id === selectedPackageId) : null;
       const baseData = {
         teacher_id: currentUserId,
         name: name.trim(),
-        type: classType,
+        // 班级不再区分循环上课/课时制（用户口径 2026-08-23），统一默认 unlimited
+        type: 'unlimited' as const,
         teach_mode: teachMode,
         status: 'active' as const,
         schedule,
@@ -444,13 +396,6 @@ export function useClasses() {
         used_lessons: 0,
         student_count: selectedStudentIds.length,
         campus_id: currentCampusId,
-        ...(classType === 'limited' && selectedPkg
-          ? {
-              total_lessons: selectedPkg.lesson_count,
-              start_date: startDate,
-              end_date: endDate,
-            }
-          : { total_lessons: undefined }),
       };
       const cls = await classService.create(baseData);
       if (cls && selectedStudentIds.length > 0)
@@ -467,16 +412,12 @@ export function useClasses() {
     }
   }, [
     name,
-    classType,
     teachMode,
     weekdays,
     startTime,
     endTime,
     teachers,
-    startDate,
-    endDate,
     selectedStudentIds,
-    selectedPackageId,
     scheduleText,
     color,
     icon,
@@ -486,7 +427,6 @@ export function useClasses() {
     saving,
     closeCreateSheet,
     loadClasses,
-    packageTemplates,
     invalidateClasses,
     invalidateStudents,
   ]);
@@ -514,8 +454,6 @@ export function useClasses() {
     closeCreateSheet,
     name,
     setName,
-    classType,
-    setClassType,
     teachMode,
     setTeachMode,
     weekdays,
@@ -524,10 +462,6 @@ export function useClasses() {
     setStartTime,
     endTime,
     setEndTime,
-    startDate,
-    setStartDate,
-    endDate,
-    setEndDate,
     teachers,
     toggleTeacher,
     teacherOptions,
@@ -542,14 +476,6 @@ export function useClasses() {
     setColor,
     icon,
     setIcon,
-    // 课程包
-    selectedPackageId,
-    setSelectedPackageId,
-    packageTemplates,
-    showPackagePicker,
-    setShowPackagePicker,
-    packagePickerVisible,
-    setPackagePickerVisible,
     // 学员选择器
     showStudentPicker,
     pickerVisible,

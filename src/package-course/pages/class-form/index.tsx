@@ -10,7 +10,6 @@ import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
-import SegmentedControl from '@/components/SegmentedControl';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
@@ -19,7 +18,7 @@ import { teacherService } from '@/services/teacher';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import type { CampusUIModel, Room } from '@/types/campus';
-import type { Class, ClassScheduleMode, ClassType } from '@/types/class';
+import type { Class, ClassScheduleMode } from '@/types/class';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -36,7 +35,6 @@ const USE_MOCK =
 /** 表单错误 */
 interface FormErrors {
   name?: string;
-  totalLessons?: string;
   weekdays?: string;
   teachers?: string;
 }
@@ -56,13 +54,9 @@ const ClassForm: React.FC = () => {
 
   // ===== 表单字段 =====
   const [name, setName] = useState('');
-  const [classType, setClassType] = useState<ClassType>('unlimited');
-  const [totalLessons, setTotalLessons] = useState('');
   const [weekdays, setWeekdays] = useState<string[]>([]);
   const [startTime, setStartTime] = useState('14:00');
   const [endTime, setEndTime] = useState('15:30');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [teachers, setTeachers] = useState<string[]>([]);
   const [teacherOptions, setTeacherOptions] = useState<TeacherUIModel[]>([]);
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
@@ -131,13 +125,9 @@ const ClassForm: React.FC = () => {
 
         setCurrentClass(cls);
         setName(cls.name);
-        setClassType(cls.type === 'ended' ? 'unlimited' : cls.type);
-        setTotalLessons(cls.total_lessons ? String(cls.total_lessons) : '');
         setWeekdays(cls.weekdays || []);
         setStartTime(cls.start_time || '14:00');
         setEndTime(cls.end_time || '15:30');
-        setStartDate(cls.start_date || '');
-        setEndDate(cls.end_date || '');
         setTeachers(cls.teachers?.length ? cls.teachers : currentUserId ? [currentUserId] : []);
         setCampusId(cls.campus_id || mainCampusId);
         setRoom(cls.room || '');
@@ -148,13 +138,9 @@ const ClassForm: React.FC = () => {
 
       setCurrentClass(null);
       setName('');
-      setClassType('unlimited');
-      setTotalLessons('');
       setWeekdays([]);
       setStartTime('14:00');
       setEndTime('15:30');
-      setStartDate('');
-      setEndDate('');
       setTeachers(currentUserId ? [currentUserId] : []);
       setCampusId(mainCampusId);
       setRoom('');
@@ -241,26 +227,8 @@ const ClassForm: React.FC = () => {
     if (startTime >= endTime) return '结束时间必须晚于开始时间';
     if (USE_MOCK && !teachers.length) return '请选择授课老师';
 
-    if (classType === 'limited') {
-      const lessonCount = parseInt(totalLessons, 10);
-      if (!totalLessons.trim()) return '请输入总课时数';
-      if (Number.isNaN(lessonCount) || lessonCount <= 0) return '请输入有效的课时数';
-      if (startDate && endDate && startDate > endDate) return '结束日期不能早于开始日期';
-    }
-
     return '';
-  }, [
-    classType,
-    currentUserId,
-    endDate,
-    endTime,
-    name,
-    startDate,
-    startTime,
-    teachers,
-    totalLessons,
-    weekdays,
-  ]);
+  }, [currentUserId, endTime, name, startTime, teachers, weekdays]);
 
   const canSubmit = useMemo(
     () => !loading && !loadError && !notFound && !submitBlockedReason,
@@ -290,20 +258,9 @@ const ClassForm: React.FC = () => {
       errs.weekdays = errs.weekdays || '结束时间必须晚于开始时间';
     }
 
-    if (classType === 'limited') {
-      const n = parseInt(totalLessons);
-      if (!totalLessons || isNaN(n) || n <= 0) {
-        errs.totalLessons = '请输入有效的课时数';
-      }
-      // 课时制日期范围校验
-      if (startDate && endDate && startDate > endDate) {
-        errs.totalLessons = errs.totalLessons || '结束日期不能早于开始日期';
-      }
-    }
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [name, weekdays, teachers, classType, totalLessons, startTime, endTime, startDate, endDate]);
+  }, [name, weekdays, teachers, startTime, endTime]);
 
   // 清除某个字段的错误
   const clearError = useCallback((field: keyof FormErrors) => {
@@ -368,7 +325,8 @@ const ClassForm: React.FC = () => {
       const baseData = {
         teacher_id: currentUserId,
         name: name.trim(),
-        type: classType,
+        // 班级不再区分循环上课/课时制（用户口径 2026-08-23），统一默认 unlimited
+        type: 'unlimited' as const,
         status: 'active' as const,
         schedule,
         weekdays,
@@ -383,9 +341,6 @@ const ClassForm: React.FC = () => {
         room: room || undefined,
         category_id: categoryId || undefined,
         schedule_mode: scheduleMode,
-        ...(classType === 'limited'
-          ? { total_lessons: parseInt(totalLessons), start_date: startDate, end_date: endDate }
-          : {}),
       };
 
       if (isEdit && classId) {
@@ -435,14 +390,10 @@ const ClassForm: React.FC = () => {
     isEdit,
     classId,
     name,
-    classType,
     weekdays,
     startTime,
     endTime,
     teachers,
-    totalLessons,
-    startDate,
-    endDate,
     selectedStudentIds,
     scheduleText,
     submitBlockedReason,
@@ -579,46 +530,7 @@ const ClassForm: React.FC = () => {
               )}
             </View>
 
-            {/* 上课类型 */}
-            <View className="flex flex-col">
-              <View className="flex items-center gap-1 mb-[12rpx]">
-                <Text className="text-sm text-muted-foreground font-medium">上课类型</Text>
-              </View>
-              <SegmentedControl
-                options={[
-                  { label: '循环上课', value: 'unlimited' },
-                  { label: '课时制', value: 'limited' },
-                ]}
-                value={classType}
-                onChange={(val) => {
-                  setClassType(val as ClassType);
-                  clearError('totalLessons');
-                }}
-              />
-              <View className="flex gap-[12rpx] mt-3">
-                <View className="flex-1 py-2 px-3 rounded-xl bg-primary-5">
-                  <Text className="text-xs text-primary font-medium">
-                    {classType === 'unlimited' ? '长期班，不限课时' : '特训班，有限课时'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* 总课时数（仅课时制） */}
-            {classType === 'limited' && (
-              <FormInput
-                label="总课时数"
-                required
-                type="number"
-                placeholder="如：16"
-                value={totalLessons}
-                onInput={(e) => {
-                  setTotalLessons(e.detail.value || '');
-                  clearError('totalLessons');
-                }}
-                error={errors.totalLessons}
-              />
-            )}
+            {/* 上课类型（用户口径 2026-08-23：班级不再区分循环上课/课时制，课时与循环统一在排课功能设置） */}
           </View>
         </Card>
 
@@ -694,45 +606,6 @@ const ClassForm: React.FC = () => {
             {scheduleText && (
               <View className="py-3 px-4 rounded-xl bg-primary-5">
                 <Text className="text-sm text-primary font-medium">{scheduleText}</Text>
-              </View>
-            )}
-
-            {/* 上课日期范围（仅课时制） */}
-            {classType === 'limited' && (
-              <View className="flex flex-col">
-                <View className="flex items-center gap-1 mb-[12rpx]">
-                  <Text className="text-sm text-muted-foreground font-medium">上课日期范围</Text>
-                </View>
-                <View className="flex gap-4">
-                  <Picker
-                    mode="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.detail.value);
-                      clearError('totalLessons');
-                    }}
-                  >
-                    <View
-                      className={`flex-1 py-[22rpx] px-[28rpx] rounded-2xl flex items-center justify-center bg-f5faf8-border-d5e8e0 ${startDate ? 'text-foreground' : 'text-muted-foreground'}`}
-                    >
-                      <Text className="text-base">{startDate || '开始日期'}</Text>
-                    </View>
-                  </Picker>
-                  <Picker
-                    mode="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.detail.value);
-                      clearError('totalLessons');
-                    }}
-                  >
-                    <View
-                      className={`flex-1 py-[22rpx] px-[28rpx] rounded-2xl flex items-center justify-center bg-f5faf8-border-d5e8e0 ${endDate ? 'text-foreground' : 'text-muted-foreground'}`}
-                    >
-                      <Text className="text-base">{endDate || '结束日期'}</Text>
-                    </View>
-                  </Picker>
-                </View>
               </View>
             )}
           </View>
