@@ -129,7 +129,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
 
   if (schedules.length === 0) {
     return (
-      <View className="px-[28rpx] mt-[24rpx] mb-[16rpx] bg-card">
+      <View className="px-[28rpx] mt-[24rpx] mb-[16rpx]">
         {title ? (
           <Text className="text-[28rpx] font-bold text-foreground mb-[20rpx] block">{title}</Text>
         ) : null}
@@ -142,7 +142,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
   }
 
   return (
-    <View className="px-[28rpx] mt-[24rpx] mb-[16rpx] bg-card">
+    <View className="px-[28rpx] mt-[24rpx] mb-[16rpx]">
       {title ? (
         <Text className="text-[28rpx] font-bold text-foreground mb-[20rpx] block">{title}</Text>
       ) : null}

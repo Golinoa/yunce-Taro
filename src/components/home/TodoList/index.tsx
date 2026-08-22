@@ -37,7 +37,7 @@ const ICON_BG_MAP: Record<string, string> = {
 const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
   if (items.length === 0) {
     return (
-      <View className="py-[80rpx] text-center">
+      <View className="bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[60rpx] text-center">
         <Text className="text-muted-foreground text-[28rpx]">暂无待办事项</Text>
       </View>
     );
