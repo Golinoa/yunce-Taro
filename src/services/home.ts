@@ -404,6 +404,7 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     start_time: schedule.startTime,
     end_time: schedule.endTime,
     room: schedule.room,
+    color: schedule.color,
     status: getScheduleStatus(schedule, checkedCount, totalCount),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

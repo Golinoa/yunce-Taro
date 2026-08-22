@@ -4,6 +4,7 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
+import { scheduleColors } from '@/theme';
 import type { Schedule, CourseStatus } from '@/types/schedule';
 
 export interface TodayScheduleCardProps {
@@ -129,9 +130,11 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
 
   if (schedules.length === 0) {
     return (
-      <View className="px-[28rpx] mt-[24rpx] mb-[16rpx]">
+      <View className="mt-[24rpx] mb-[16rpx]">
         {title ? (
-          <Text className="text-[28rpx] font-bold text-foreground mb-[20rpx] block">{title}</Text>
+          <Text className="px-[28rpx] text-[28rpx] font-bold text-foreground mb-[20rpx] block">
+            {title}
+          </Text>
         ) : null}
         <View className="bg-card rounded-[24rpx] shadow-card py-[48rpx] flex flex-col items-center">
           <Icon name="mdi-clipboard-text" size="lg" color="muted" />
@@ -142,9 +145,11 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
   }
 
   return (
-    <View className="px-[28rpx] mt-[24rpx] mb-[16rpx]">
+    <View className="mt-[24rpx] mb-[16rpx]">
       {title ? (
-        <Text className="text-[28rpx] font-bold text-foreground mb-[20rpx] block">{title}</Text>
+        <Text className="px-[28rpx] text-[28rpx] font-bold text-foreground mb-[20rpx] block">
+          {title}
+        </Text>
       ) : null}
 
       <View className="flex flex-col gap-[20rpx]">
@@ -181,24 +186,56 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
               }}
             >
               <View className="flex">
-                {/* 左侧时间区 - 设计稿统一橙色配色，仅状态覆盖背景 */}
-                <View
-                  className={cn(
-                    'w-[152rpx] shrink-0 flex flex-col items-center justify-center py-[24rpx] border-r',
-                    TIME_AREA_STYLE.bg,
-                    TIME_AREA_STYLE.border,
-                    getTimeBgClass(status),
-                  )}
-                >
-                  <Text className={cn('text-[24rpx] font-bold', TIME_AREA_STYLE.text)}>
-                    {item.start_time}
-                  </Text>
-                  {/* 分割线 - 设计稿统一 bg-orange-200 */}
-                  <View className="w-[16rpx] h-[2rpx] my-[4rpx] bg-[hsl(var(--warning)/0.3)]" />
-                  <Text className={cn('text-[24rpx] font-bold opacity-60', TIME_AREA_STYLE.text)}>
-                    {item.end_time}
-                  </Text>
-                </View>
+                {/* 左侧时间区 - 优先班级颜色（排课 color），无 color 时回退统一橙色；状态覆盖仍生效 */}
+                {(() => {
+                  const timeStatusClass = getTimeBgClass(status);
+                  // 状态（urgent/done/ended）有专属背景时优先状态色；否则用班级颜色；再回退橙色
+                  const colorKey =
+                    !timeStatusClass && item.color && scheduleColors[item.color]
+                      ? item.color
+                      : null;
+                  const colorStyle = colorKey
+                    ? {
+                        backgroundColor: scheduleColors[colorKey].bg,
+                        borderColor: scheduleColors[colorKey].text,
+                      }
+                    : undefined;
+                  const timeTextClass = colorKey ? '' : TIME_AREA_STYLE.text;
+                  const timeTextStyle = colorKey
+                    ? { color: scheduleColors[colorKey].text }
+                    : undefined;
+                  return (
+                    <View
+                      className={cn(
+                        'w-[152rpx] shrink-0 flex flex-col items-center justify-center py-[24rpx] border-r',
+                        !colorKey && TIME_AREA_STYLE.bg,
+                        !colorKey && TIME_AREA_STYLE.border,
+                        timeStatusClass,
+                      )}
+                      style={colorStyle}
+                    >
+                      <Text
+                        className={cn('text-[24rpx] font-bold', timeTextClass)}
+                        style={timeTextStyle}
+                      >
+                        {item.start_time}
+                      </Text>
+                      {/* 分割线：无班级颜色时用统一橙色，有班级颜色时用班级色覆盖 */}
+                      <View
+                        className="w-[16rpx] h-[2rpx] my-[4rpx] bg-[hsl(var(--warning)/0.3)]"
+                        style={
+                          colorKey ? { backgroundColor: scheduleColors[colorKey].text } : undefined
+                        }
+                      />
+                      <Text
+                        className={cn('text-[24rpx] font-bold opacity-60', timeTextClass)}
+                        style={timeTextStyle}
+                      >
+                        {item.end_time}
+                      </Text>
+                    </View>
+                  );
+                })()}
 
                 {/* 右侧内容区 - 对齐设计稿 px-3=24rpx py-3=24rpx */}
                 <View className="flex-1 px-[24rpx] py-[24rpx] flex items-center justify-between gap-[16rpx]">
