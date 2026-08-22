@@ -7,6 +7,7 @@ import {
   COURSE_PACKAGES as DB_PACKAGES,
   STUDENTS as DB_STUDENTS,
   TEACHERS as DB_TEACHERS,
+  getScheduledClassIdSet,
 } from '@/data/mock-database';
 import {
   mockGetStudentsByTeacher,
@@ -89,6 +90,7 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Notification, NotificationType } from '@/types/notification';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
+import { notWired } from '@/utils/not-wired';
 import { del, get, post, put } from '@/utils/request';
 
 const USE_MOCK =
@@ -2114,6 +2116,14 @@ export const classService = {
   },
   getStudentCount: async (classId: string) =>
     USE_MOCK ? mockGetClassStudentCount(classId) : (await classService.getStudents(classId)).length,
+  /**
+   * 获取所有"已排课"的班级 id 列表（用于课程管理·班课列表区分已/未排课）
+   * 真实后端：联调时按 teacher/admin 权限返回
+   */
+  getScheduledClassIds: async (): Promise<string[]> => {
+    if (!USE_MOCK) notWired('classService.getScheduledClassIds');
+    return Array.from(getScheduledClassIdSet());
+  },
   create: async (data: Omit<Class, 'id' | 'created_at' | 'updated_at'>) => {
     if (!USE_MOCK) {
       const created = await post<BackendClassListItem>('/classes', {

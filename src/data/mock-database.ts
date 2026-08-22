@@ -2865,6 +2865,17 @@ export const SCHEDULES: Schedule[] = [
   },
 ];
 
+/** 获取所有已排课的班级 id 集合（用于课程管理·班课列表区分"已/未排课"） */
+export function getScheduledClassIdSet(): Set<string> {
+  const set = new Set<string>();
+  for (const schedule of SCHEDULES) {
+    if (schedule.status === 'scheduled' && schedule.classId) {
+      set.add(schedule.classId);
+    }
+  }
+  return set;
+}
+
 // ============================================
 // 9. 消课记录（历史数据：过去12个月）
 // ============================================
