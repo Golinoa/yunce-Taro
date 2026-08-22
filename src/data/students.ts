@@ -1121,11 +1121,25 @@ export async function mockAddStudentsToClass(classId: string, studentIds: string
 }
 
 export async function mockTransferStudent(
-  _classId: string,
-  _targetClassId: string,
-  _studentId: string,
+  classId: string,
+  targetClassId: string,
+  studentId: string,
 ) {
   await delay();
+  const student = DB_STUDENTS.find((s) => s.id === studentId);
+  if (student) {
+    // 从源班移除关联
+    if (student.classIds.includes(classId)) {
+      student.classIds = student.classIds.filter((id) => id !== classId);
+    }
+    // 加入目标班（避免重复关联）
+    if (!student.classIds.includes(targetClassId)) {
+      student.classIds = [...student.classIds, targetClassId];
+    }
+    // 同步源班与目标班的在读人数
+    syncClassStudentCount(classId);
+    syncClassStudentCount(targetClassId);
+  }
   return true;
 }
 
