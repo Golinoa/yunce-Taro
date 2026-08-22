@@ -3,6 +3,8 @@
  *
  * 按课程类型（班课 / 团课 / 私教）展示课程模板列表，
  * 支持新增课程，首次进入展示「第 4 步：建课程」引导弹窗。
+ * 班课 tab 额外展示「排课中的班课」（活跃班级实例），保证排课与课程管理链路打通
+ * （用户口径 2026-08-23：排课的课程必须出现在课程管理的班课里）。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
@@ -14,16 +16,33 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import { DEFAULT_COURSE_CATEGORIES } from '@/data/course-template';
+import { classService } from '@/services';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useCourseTemplateStore } from '@/stores/course-template';
+import type { Class } from '@/types/class';
 import type { CourseTemplate } from '@/types/course-template';
+import { useAuth } from '@/utils/auth';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.course;
 const CATEGORY_TIP_KEY = 'course_management_category_tip_hidden';
 
+/** 班级颜色 → 色条 hex（与班级管理/课表一致） */
+const CLASS_BAR_COLORS: Record<string, string> = {
+  primary: '#5EC8A8',
+  accent: '#e88aaa',
+  amber: '#d4a24e',
+  info: '#6ba3d6',
+  purple: '#9b7ed8',
+  teal: '#4FC3B7',
+  red: '#E57373',
+  lavender: '#A08CD2',
+};
+
 /** 课程管理列表页 */
 const CourseManagementPage: React.FC = () => {
+  const { profile } = useAuth();
+  const currentTeacherId = profile?.teacher_profile?.id || profile?.id || '';
   const {
     templates,
     loading,
@@ -34,6 +53,9 @@ const CourseManagementPage: React.FC = () => {
     remove,
   } = useCourseTemplateStore();
   const { categories, activeCategoryId, fetchList, setActiveCategoryId } = useCourseCategoryStore();
+
+  /** 排课中的活跃班级（班课 tab 展示，保证与排课链路打通） */
+  const [activeClasses, setActiveClasses] = useState<Class[]>([]);
 
   // 删除确认弹窗
   const [deleteTarget, setDeleteTarget] = useState<CourseTemplate | null>(null);
@@ -64,6 +86,13 @@ const CourseManagementPage: React.FC = () => {
   }, [categories]);
 
   useDidShow(() => {
+    // 排课中的活跃班级（班课 tab 展示，链路打通）
+    if (currentTeacherId) {
+      void classService
+        .getByTeacher(currentTeacherId)
+        .then((list) => setActiveClasses(list.filter((c) => c.status === 'active')))
+        .catch(() => setActiveClasses([]));
+    }
     void fetchList().then(() => {
       // 确保激活分类有效：如果当前 activeCategoryId 不在列表中，自动选第一个
       const { categories: latestCategories, activeCategoryId: currentId } =
@@ -156,8 +185,12 @@ const CourseManagementPage: React.FC = () => {
 
   const countText = useMemo(() => {
     const label = activeCategoryItem?.name ?? '课程';
+    // 班课 tab：模板 + 排课中的班级
+    if (activeCategoryItem?.mode === 'class' && activeClasses.length > 0) {
+      return `${templates.length} 个${label}模板 · ${activeClasses.length} 个排课中的班课`;
+    }
     return `${templates.length} 个${label}课程`;
-  }, [templates.length, activeCategoryItem]);
+  }, [templates.length, activeCategoryItem, activeClasses.length]);
 
   if (loading && templates.length === 0) {
     return (
@@ -253,6 +286,52 @@ const CourseManagementPage: React.FC = () => {
 
         {/* 课程列表 */}
         <View className="px-[32rpx] pb-[40rpx]">
+          {/* 排课中的班课（仅班课 tab；保证排课与课程管理链路打通） */}
+          {activeCategoryItem?.mode === 'class' && activeClasses.length > 0 && (
+            <View className="mb-[24rpx]">
+              <Text className="mb-[16rpx] block text-[24rpx] font-medium text-muted-foreground">
+                排课中的班课（{activeClasses.length}）
+              </Text>
+              <View className="flex flex-col gap-[16rpx]">
+                {activeClasses.map((cls) => (
+                  <View
+                    key={cls.id}
+                    className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
+                    onClick={() =>
+                      Taro.navigateTo({
+                        url: `/package-course/pages/class-detail/index?id=${encodeURIComponent(cls.id)}`,
+                      })
+                    }
+                  >
+                    <View className="flex-1 min-w-0 flex flex-row items-center gap-[20rpx]">
+                      <View
+                        className="w-[16rpx] h-[60rpx] rounded-full shrink-0"
+                        style={{
+                          backgroundColor: CLASS_BAR_COLORS[cls.color] || 'hsl(var(--primary))',
+                        }}
+                      />
+                      <View className="min-w-0">
+                        <View className="flex flex-row items-center gap-[12rpx]">
+                          <Text className="text-[30rpx] font-medium text-foreground truncate">
+                            {cls.name}
+                          </Text>
+                          <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                            <Text className="text-[20rpx] text-primary">排课中</Text>
+                          </View>
+                        </View>
+                        <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
+                          {cls.student_count ?? 0} 名学员 · 已上 {cls.used_lessons ?? 0}/
+                          {cls.total_lessons ?? 0} 课时
+                        </Text>
+                      </View>
+                    </View>
+                    <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {error && templates.length === 0 ? (
             <Empty
               description={error}
