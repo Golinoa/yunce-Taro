@@ -76,6 +76,12 @@ export interface Lead {
   owner_lock_status: OwnerLockStatus;
   /** 归属锁定原因 */
   owner_lock_reason?: OwnerLockReason;
+  /** 最近一次强制改派原因（锁定态经 reassignLead 改派时记录，消除 L-14-A） */
+  reassign_reason?: string;
+  /** 最近一次改派操作人 ID */
+  reassign_operator_id?: string;
+  /** 最近一次改派时间 */
+  reassign_at?: string;
   /** 线索状态 */
   status: LeadStatus;
   /** 首次触达时间 */

@@ -13,6 +13,7 @@ import {
   mockCreateLeadFromInvite,
   mockUpdateLeadStatus,
   mockUpdateLead,
+  mockReassignLead,
   mockDeleteLead,
   mockCreateLeadBooking,
   mockBatchCreateProxyBookings,
@@ -125,10 +126,26 @@ export async function updateLeadStatus(
 }
 
 /** 更新线索信息 */
-export async function updateLead(leadId: string, data: Partial<Lead>): Promise<Lead | null> {
-  if (USE_MOCK) return mockUpdateLead(leadId, data);
+export async function updateLead(
+  leadId: string,
+  data: Partial<Lead>,
+  options?: { forceReassign?: boolean },
+): Promise<Lead | null> {
+  if (USE_MOCK) return mockUpdateLead(leadId, data, options);
   // TODO: return put<Lead>(`/leads/${leadId}`, data);
-  return mockUpdateLead(leadId, data);
+  return mockUpdateLead(leadId, data, options);
+}
+
+/** 线索改派（专用入口，锁定态需显式 forceReassign，记录改派原因与审计） */
+export async function reassignLead(
+  leadId: string,
+  newOwnerId: string,
+  reason: string,
+  opts?: { forceReassign?: boolean; operatorId?: string },
+): Promise<Lead | null> {
+  if (USE_MOCK) return mockReassignLead(leadId, newOwnerId, reason, opts);
+  // TODO: return put<Lead>(`/leads/${leadId}/reassign`, { new_owner_id: newOwnerId, reason, ...opts });
+  return mockReassignLead(leadId, newOwnerId, reason, opts);
 }
 
 /** 删除线索 */
@@ -386,6 +403,7 @@ export const leadService = {
   createLeadFromInvite,
   updateLeadStatus,
   updateLead,
+  reassignLead,
   deleteLead,
   createLeadBooking,
   batchCreateProxyBookings,

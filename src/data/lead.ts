@@ -1150,12 +1150,53 @@ export async function mockUpdateLeadStatus(
 }
 
 /** 更新线索信息 */
-export async function mockUpdateLead(leadId: string, data: Partial<Lead>): Promise<Lead | null> {
+export async function mockUpdateLead(
+  leadId: string,
+  data: Partial<Lead>,
+  options?: { forceReassign?: boolean },
+): Promise<Lead | null> {
   await delay();
   const lead = LEADS.find((l) => l.id === leadId);
   if (!lead) return null;
 
+  // L-14-A 守卫：锁定态下禁止任意改派归属，避免 owner_lock_status 形同虚设。
+  // 归属变更必须经由专用 reassignLead 并显式传入 forceReassign（消除 L-14-A）。
+  const wantsReassign =
+    data.owner_teacher_id !== undefined && data.owner_teacher_id !== lead.owner_teacher_id;
+  if (wantsReassign && lead.owner_lock_status === 'locked' && !options?.forceReassign) {
+    throw new Error(
+      '线索归属已锁定（owner_lock_status=locked），禁止直接改派；如需改派请调用 reassignLead 并显式传入 forceReassign',
+    );
+  }
+
   Object.assign(lead, data, { updated_at: dayjs().toISOString() });
+  return lead;
+}
+
+/**
+ * 线索改派（专用入口，L-14 修复）
+ * 锁定态下必须经显式 forceReassign 才能改写归属，并记录改派原因与操作人审计，
+ * 取代任意 updateLead 改归属，统一归属变更入口。
+ */
+export async function mockReassignLead(
+  leadId: string,
+  newOwnerId: string,
+  reason: string,
+  opts?: { forceReassign?: boolean; operatorId?: string },
+): Promise<Lead | null> {
+  await delay();
+  const lead = LEADS.find((l) => l.id === leadId);
+  if (!lead) return null;
+
+  if (lead.owner_lock_status === 'locked' && !opts?.forceReassign) {
+    throw new Error('线索归属已锁定，需显式传入 forceReassign=true 才能强制改派');
+  }
+
+  lead.owner_teacher_id = newOwnerId;
+  lead.reassign_reason = reason;
+  lead.reassign_operator_id = opts?.operatorId;
+  lead.reassign_at = dayjs().toISOString();
+  lead.updated_at = lead.reassign_at;
   return lead;
 }
 
