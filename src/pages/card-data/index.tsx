@@ -73,7 +73,7 @@ const CardData: React.FC = () => {
 
     return (
       <View className="flex flex-col gap-[20rpx]">
-        {list.map((item, index) => (
+        {list.map((item) => (
           <View key={item.id} className="flex flex-col gap-[8rpx]">
             <View className="flex items-center justify-between">
               <Text className="text-[28rpx] font-medium text-foreground">{item.cardName}</Text>

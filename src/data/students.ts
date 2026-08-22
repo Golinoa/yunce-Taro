@@ -478,7 +478,7 @@ export async function mockCreateSchedule(
   data: Partial<(typeof SCHEDULES)[0]>,
 ): Promise<(typeof SCHEDULES)[0]> {
   await delay();
-  return {
+  const created: (typeof SCHEDULES)[0] = {
     id: `schedule-${Date.now()}`,
     classId: data.classId || '',
     teacherId: data.teacherId || '',
@@ -492,6 +492,8 @@ export async function mockCreateSchedule(
     semesterName: '2025学年',
     createdAt: new Date().toISOString(),
   };
+  SCHEDULES.push(created); // 写回共享数组：新排课立即出现在课表/日历
+  return created;
 }
 
 export async function mockUpdateSchedule(
@@ -499,13 +501,18 @@ export async function mockUpdateSchedule(
   data: Partial<(typeof SCHEDULES)[0]>,
 ): Promise<(typeof SCHEDULES)[0] | undefined> {
   await delay();
-  const schedule = SCHEDULES.find((s) => s.id === id);
-  if (!schedule) return undefined;
-  return { ...schedule, ...data };
+  const index = SCHEDULES.findIndex((s) => s.id === id);
+  if (index === -1) return undefined;
+  const updated = { ...SCHEDULES[index], ...data };
+  SCHEDULES[index] = updated; // 写回
+  return updated;
 }
 
-export async function mockDeleteSchedule(_id: string): Promise<boolean> {
+export async function mockDeleteSchedule(id: string): Promise<boolean> {
   await delay();
+  const index = SCHEDULES.findIndex((s) => s.id === id);
+  if (index === -1) return false;
+  SCHEDULES.splice(index, 1); // 真实移除
   return true;
 }
 
@@ -537,21 +544,31 @@ export async function mockGetNotificationsByReceiver(
   return NOTIFICATIONS.filter((n) => n.receiverId === receiverId);
 }
 
-export async function mockMarkNotificationAsRead(_id: string): Promise<boolean> {
+export async function mockMarkNotificationAsRead(id: string): Promise<boolean> {
   await delay();
+  const target = NOTIFICATIONS.find((n) => n.id === id);
+  if (!target) return false;
+  target.isRead = true; // 写回：已读状态跨页面一致
   return true;
 }
 
-export async function mockMarkAllNotificationsAsRead(_receiverId: string): Promise<boolean> {
+export async function mockMarkAllNotificationsAsRead(receiverId: string): Promise<boolean> {
   await delay();
-  return true;
+  let count = 0;
+  for (const n of NOTIFICATIONS) {
+    if (n.receiverId === receiverId && !n.isRead) {
+      n.isRead = true;
+      count++;
+    }
+  }
+  return count > 0;
 }
 
 export async function mockSendNotification(
   data: Partial<(typeof NOTIFICATIONS)[0]>,
 ): Promise<(typeof NOTIFICATIONS)[0]> {
   await delay();
-  return {
+  const notification = {
     id: `notif-${Date.now()}`,
     type: 'system' as const,
     title: data.title || '系统通知',
@@ -560,6 +577,8 @@ export async function mockSendNotification(
     isRead: false,
     createdAt: new Date().toISOString(),
   };
+  NOTIFICATIONS.unshift(notification); // 写回：接收方通知列表立即可见
+  return notification;
 }
 
 // ============================================
@@ -619,12 +638,25 @@ export async function mockCreateStudent(data: any) {
 
 export async function mockUpdateStudent(studentId: string, data: any) {
   await delay();
-  const student = DB_STUDENTS.find((s) => s.id === studentId);
-  return student ? { ...student, ...data } : undefined;
+  const index = DB_STUDENTS.findIndex((s) => s.id === studentId);
+  if (index === -1) return undefined;
+  const updated = { ...DB_STUDENTS[index], ...data };
+  DB_STUDENTS[index] = updated; // 写回共享数组，保证跨页面一致
+  return updated;
 }
 
-export async function mockDeleteStudent(_studentId: string) {
+export async function mockDeleteStudent(studentId: string) {
   await delay();
+  const index = DB_STUDENTS.findIndex((s) => s.id === studentId);
+  if (index === -1) return false;
+  DB_STUDENTS.splice(index, 1); // 真实移除
+  // 级联清理：该学员的课包 + 家长绑定（课次记录保留，属历史数据）
+  for (let i = DB_PACKAGES.length - 1; i >= 0; i--) {
+    if (DB_PACKAGES[i].studentId === studentId) DB_PACKAGES.splice(i, 1);
+  }
+  for (let i = STUDENT_PARENTS.length - 1; i >= 0; i--) {
+    if (STUDENT_PARENTS[i].studentId === studentId) STUDENT_PARENTS.splice(i, 1);
+  }
   return true;
 }
 
@@ -747,23 +779,49 @@ export async function mockGetPackageById(packageId: string) {
 
 export async function mockCreatePackage(data: any) {
   await delay();
-  return { id: `pkg-${Date.now()}`, ...data };
+  const created = { id: `pkg-${Date.now()}`, ...data };
+  DB_PACKAGES.push(created); // 写回：办卡/购买后学员课包立即可见
+  return created;
 }
 
 export async function mockUpdatePackage(packageId: string, data: any) {
   await delay();
-  const pkg = DB_PACKAGES.find((p) => p.id === packageId);
-  return pkg ? { ...pkg, ...data } : undefined;
+  const index = DB_PACKAGES.findIndex((p) => p.id === packageId);
+  if (index === -1) return undefined;
+  const updated = { ...DB_PACKAGES[index], ...data };
+  DB_PACKAGES[index] = updated; // 写回
+  return updated;
 }
 
 export async function mockDeductPackageHours(packageId: string, hours: number) {
   await delay();
-  const pkg = DB_PACKAGES.find((p) => p.id === packageId);
+  const index = DB_PACKAGES.findIndex((p) => p.id === packageId);
+  const pkg = DB_PACKAGES[index];
   if (!pkg) throw new Error('Package not found');
-  return {
-    pkg,
-    deduct: { purchasedHours: hours, bonusHours: 0 },
+  const deductHours = Math.min(hours, pkg.remainingHours || 0);
+  const updated: CoursePackage = {
+    ...pkg,
+    usedHours: (pkg.usedHours || 0) + deductHours,
+    remainingHours: Math.max((pkg.remainingHours || 0) - deductHours, 0),
+    purchasedHours: Math.max((pkg.purchasedHours || 0) - deductHours, 0),
+    status:
+      Math.max((pkg.remainingHours || 0) - deductHours, 0) <= 0 && pkg.status === 'active'
+        ? 'finished'
+        : pkg.status,
   };
+  DB_PACKAGES[index] = updated; // 写回：剩余课时真实扣减
+  return {
+    pkg: updated,
+    deduct: { purchasedHours: deductHours, bonusHours: 0 },
+  };
+}
+
+/** 同步班级 studentCount 字段（与学员 classIds 实际数量保持一致） */
+function syncClassStudentCount(classId: string) {
+  const cls = DB_CLASSES.find((c) => c.id === classId);
+  if (!cls) return;
+  const count = DB_STUDENTS.filter((s) => s.classIds.includes(classId)).length;
+  cls.studentCount = count;
 }
 
 export async function mockGetActivePackagesByStudent(studentId: string) {
@@ -888,6 +946,25 @@ export async function mockCreateLessonRecord(data: any) {
     ...data,
   };
   LESSON_RECORDS.unshift(record);
+  // 模拟真实后端行为：创建消课记录时自动扣减对应课包课时
+  const packageId = data.packageId || data.package_id;
+  const hours = Number(data.hours ?? data.hours_used) || 0;
+  if (packageId && hours > 0) {
+    const pkgIndex = DB_PACKAGES.findIndex((p) => p.id === packageId);
+    if (pkgIndex >= 0) {
+      const pkg = DB_PACKAGES[pkgIndex];
+      DB_PACKAGES[pkgIndex] = {
+        ...pkg,
+        usedHours: (pkg.usedHours || 0) + hours,
+        remainingHours: Math.max((pkg.remainingHours || 0) - hours, 0),
+        purchasedHours: Math.max((pkg.purchasedHours || 0) - hours, 0),
+        status:
+          Math.max((pkg.remainingHours || 0) - hours, 0) <= 0 && pkg.status === 'active'
+            ? 'finished'
+            : pkg.status,
+      };
+    }
+  }
   return record;
 }
 
@@ -972,27 +1049,74 @@ export async function mockGetClassStudentCount(classId: string) {
 
 export async function mockCreateClass(data: any) {
   await delay();
-  return { id: `class-${Date.now()}`, ...data };
+  const created: Class = {
+    id: `class-${Date.now()}`,
+    name: data.name || '',
+    teacherId: data.teacherId || data.lead_teacher_id || '',
+    campusId: data.campusId || '',
+    subjectId: data.subjectId || '',
+    type: data.type || 'limited',
+    scheduleMode: data.scheduleMode,
+    schedule: data.schedule || '',
+    weekdays: data.weekdays || [],
+    startTime: data.startTime || '09:00',
+    endTime: data.endTime || '10:00',
+    usedLessons: data.usedLessons || 0,
+    status: data.status || 'active',
+    startDate: data.startDate || new Date().toISOString().split('T')[0],
+    color: data.color || 'primary',
+    icon: data.icon || 'book',
+    studentCount: 0,
+    pricePerLesson: data.pricePerLesson || 0,
+    createdAt: new Date().toISOString(),
+    ...data,
+  };
+  DB_CLASSES.push(created); // 写回：新建班级立即出现在班级列表
+  return created;
 }
 
 export async function mockUpdateClass(classId: string, data: any) {
   await delay();
-  const cls = DB_CLASSES.find((c) => c.id === classId);
-  return cls ? { ...cls, ...data } : undefined;
+  const index = DB_CLASSES.findIndex((c) => c.id === classId);
+  if (index === -1) return undefined;
+  const updated = { ...DB_CLASSES[index], ...data };
+  DB_CLASSES[index] = updated; // 写回
+  return updated;
 }
 
-export async function mockDeleteClass(_classId: string) {
+export async function mockDeleteClass(classId: string) {
   await delay();
+  const index = DB_CLASSES.findIndex((c) => c.id === classId);
+  if (index === -1) return false;
+  DB_CLASSES.splice(index, 1); // 真实移除
+  // 级联：从所有学员的 classIds 中移除该班级
+  for (const student of DB_STUDENTS) {
+    if (student.classIds.includes(classId)) {
+      student.classIds = student.classIds.filter((id) => id !== classId);
+    }
+  }
   return true;
 }
 
-export async function mockRemoveStudentFromClass(_classId: string, _studentId: string) {
+export async function mockRemoveStudentFromClass(classId: string, studentId: string) {
   await delay();
+  const student = DB_STUDENTS.find((s) => s.id === studentId);
+  if (student && student.classIds.includes(classId)) {
+    student.classIds = student.classIds.filter((id) => id !== classId); // 真实移除关联
+  }
+  syncClassStudentCount(classId);
   return true;
 }
 
-export async function mockAddStudentsToClass(_classId: string, _studentIds: string[]) {
+export async function mockAddStudentsToClass(classId: string, studentIds: string[]) {
   await delay();
+  for (const sid of studentIds) {
+    const student = DB_STUDENTS.find((s) => s.id === sid);
+    if (student && !student.classIds.includes(classId)) {
+      student.classIds = [...student.classIds, classId]; // 真实建立关联
+    }
+  }
+  syncClassStudentCount(classId);
   return true;
 }
 

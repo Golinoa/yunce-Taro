@@ -14,6 +14,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import PickerSheet from '@/components/PickerSheet';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { storeEntryService } from '@/services/store-entry';
 import type { StoreType } from '@/types/store-entry';
@@ -176,6 +177,7 @@ const StoreEntry: React.FC = () => {
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [typePickerVisible, setTypePickerVisible] = useState(false); // 门店类型弹窗（PickerSheet）
 
   const regionText = useMemo(() => form.region.filter(Boolean).join(' '), [form.region]);
 
@@ -284,7 +286,9 @@ const StoreEntry: React.FC = () => {
         <View className="px-[32rpx] pt-[32rpx] pb-[200rpx] flex flex-col gap-[24rpx]">
           {/* 顶部标题区 */}
           <View className="mb-[8rpx]">
-            <Text className="text-[44rpx] font-bold text-foreground leading-tight">注册门店账户</Text>
+            <Text className="text-[44rpx] font-bold text-foreground leading-tight">
+              注册门店账户
+            </Text>
             <Text className="text-[28rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
               请填写资料，我们将在2个工作日内审核
             </Text>
@@ -401,23 +405,14 @@ const StoreEntry: React.FC = () => {
             )}
 
             {/* 门店类型 */}
-            <Picker
-              mode="selector"
-              range={VENUE_TYPE_OPTIONS}
-              value={VENUE_TYPE_OPTIONS.findIndex((item) => item === form.type)}
-              onChange={(e) => {
-                const index = typeof e.detail.value === 'number' ? e.detail.value : 0;
-                updateForm('type', (VENUE_TYPE_OPTIONS[index] || '') as StoreType | '');
-              }}
-            >
-              <FormSelect
-                label="门店类型"
-                required
-                placeholder="请选择门店类型"
-                value={form.type}
-                error={errors.type}
-              />
-            </Picker>
+            <FormSelect
+              label="门店类型"
+              required
+              placeholder="请选择门店类型"
+              value={form.type}
+              error={errors.type}
+              onClick={() => setTypePickerVisible(true)}
+            />
 
             {/* 负责人称呼 */}
             <FormInput
@@ -459,7 +454,9 @@ const StoreEntry: React.FC = () => {
             </View>
             <Text className="text-[26rpx] text-muted-foreground leading-relaxed flex-1">
               我已阅读并同意
-              <Text className="text-primary font-medium">《{BRAND_NAME_ZH}门店小程序使用协议》</Text>
+              <Text className="text-primary font-medium">
+                《{BRAND_NAME_ZH}门店小程序使用协议》
+              </Text>
             </Text>
           </View>
           {errors.agreed && (
@@ -484,6 +481,16 @@ const StoreEntry: React.FC = () => {
           </Text>
         </View>
       </View>
+
+      {/* 门店类型（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={typePickerVisible}
+        title="门店类型"
+        options={VENUE_TYPE_OPTIONS.map((v) => ({ label: v, value: v }))}
+        value={form.type || ''}
+        onClose={() => setTypePickerVisible(false)}
+        onConfirm={(v) => updateForm('type', v as StoreType | '')}
+      />
     </PageContainer>
   );
 };

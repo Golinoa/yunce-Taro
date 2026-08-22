@@ -73,7 +73,7 @@ const Profile: React.FC = () => {
   const [storeOnboardingHidden, setStoreOnboardingHidden] = useState<boolean | null>(null);
 
   // 会员开通状态（TODO: 后续接入接口）
-  const [isMembershipActive] = useState(false);
+  const [isMembershipActive] = useState(true);
 
   // 加载家长绑定的学生
   const loadStudents = useCallback(async () => {
@@ -465,7 +465,7 @@ const Profile: React.FC = () => {
       {
         label: '使用帮助',
         icon: 'mdi-help-circle-outline' as const,
-        onClick: () => handleNavigate('/package-settings/pages/help/index'),
+        onClick: () => handleNavigate('/package-student/pages/help/index'),
       },
       {
         label: '平台客服',
@@ -531,31 +531,18 @@ const Profile: React.FC = () => {
             </Text>
           </View>
 
-          {/* 右侧斜切按钮区 */}
+          {/* 右侧斜切按钮区：开通/已开通统一主色样式 */}
           <View
-            className={cn(
-              'w-[220rpx] h-full relative flex flex-col items-center justify-center press-opacity',
-              isMembershipActive ? 'bg-foreground/10' : 'bg-primary',
-            )}
+            className="w-[220rpx] h-full relative flex flex-col items-center justify-center press-opacity bg-primary"
             style={{
               clipPath: 'polygon(24rpx 0, 100% 0, 100% 100%, 0 100%)',
             }}
           >
-            <Text
-              className={cn(
-                'text-[30rpx] font-bold',
-                isMembershipActive ? 'text-foreground' : 'text-primary-foreground',
-              )}
-            >
+            <Text className="text-[30rpx] font-bold text-primary-foreground">
               {isMembershipActive ? '立即查看' : '立即开通'}
             </Text>
-            <Text
-              className={cn(
-                'text-[20rpx] mt-[10rpx]',
-                isMembershipActive ? 'text-foreground/60' : 'text-primary-foreground/75',
-              )}
-            >
-              {isMembershipActive ? '有效期至 2026-12-31' : '已有 2,333 人开通'}
+            <Text className="text-[20rpx] mt-[10rpx] text-primary-foreground/75">
+              {isMembershipActive ? '有效期至 2030-12-31' : '已有 2,333 人开通'}
             </Text>
           </View>
         </View>

@@ -23,8 +23,8 @@ const MOCK_COURSES: MyCourseItem[] = [
     date: '2026-06-25',
     startTime: '09:00',
     endTime: '10:30',
-    room: '中心校区 201 教室',
-    campusName: '中心校区',
+    room: '曦绘艺术 201 教室',
+    campusName: '曦绘艺术',
   },
   {
     id: 'mc-002',
@@ -35,8 +35,8 @@ const MOCK_COURSES: MyCourseItem[] = [
     date: '2026-06-26',
     startTime: '14:00',
     endTime: '15:00',
-    room: '中心校区 305 教室',
-    campusName: '中心校区',
+    room: '曦绘艺术 305 教室',
+    campusName: '曦绘艺术',
   },
   {
     id: 'mc-003',
@@ -60,8 +60,8 @@ const MOCK_COURSES: MyCourseItem[] = [
     date: '2026-06-20',
     startTime: '15:00',
     endTime: '16:30',
-    room: '中心校区 203 教室',
-    campusName: '中心校区',
+    room: '曦绘艺术 203 教室',
+    campusName: '曦绘艺术',
     evaluateDeadline: '2026-06-30',
   },
   {
@@ -73,8 +73,8 @@ const MOCK_COURSES: MyCourseItem[] = [
     date: '2026-06-18',
     startTime: '09:30',
     endTime: '10:30',
-    room: '中心校区 301 教室',
-    campusName: '中心校区',
+    room: '曦绘艺术 301 教室',
+    campusName: '曦绘艺术',
   },
 ];
 

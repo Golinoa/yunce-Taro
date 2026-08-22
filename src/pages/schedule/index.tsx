@@ -1527,9 +1527,12 @@ const SchedulePage: React.FC = () => {
     selectedDate,
   ]);
 
-  const handleCreateSchedule = useCallback(() => {
-    Taro.navigateTo({ url: '/package-course/pages/schedule-form/index' });
-  }, []);
+  const handleCreateSchedule = useCallback((sourceMode?: string) => {
+    const mode = sourceMode || activeTab?.mode || 'class';
+    Taro.navigateTo({
+      url: `/package-course/pages/schedule-form/index?sourceMode=${encodeURIComponent(mode)}`,
+    });
+  }, [activeTab?.mode]);
 
   /** 预约视图：打开老师预约开关列表弹窗 */
   const handleManageBookingConfig = useCallback(() => {
@@ -2161,7 +2164,7 @@ const SchedulePage: React.FC = () => {
                         'flex items-center justify-center rounded-full border py-[12rpx] transition-colors active:scale-95 shrink-0',
                         !isLast && 'mr-[16rpx]',
                         isActive
-                          ? 'border-schedule-header bg-schedule-header shadow-md'
+                          ? 'border-primary/55 bg-primary/10'
                           : 'border-border bg-card',
                       )}
                       style={{ width: `${TAB_WIDTH_RPX}rpx` }}
@@ -2170,7 +2173,7 @@ const SchedulePage: React.FC = () => {
                       <Text
                         className={cn(
                           'text-[28rpx] font-medium',
-                          isActive ? 'text-primary-foreground' : 'text-foreground-secondary',
+                          isActive ? 'text-primary' : 'text-foreground-secondary',
                         )}
                       >
                         {tab.label}
@@ -2463,17 +2466,20 @@ const SchedulePage: React.FC = () => {
           </Swiper>
         )}
 
-        {/* 悬浮加号按钮：班课进入排课表单，私教打开老师预约开关弹窗；团课使用卡片内加号 */}
-        {(activeTab?.mode === 'class' || activeTab?.mode === 'private') &&
+        {/* 悬浮排课按钮：班课/团课进入排课表单，私教打开老师预约开关弹窗 */}
+        {(activeTab?.mode === 'class' || activeTab?.mode === 'group' || activeTab?.mode === 'private') &&
           activeTab?.type === 'category' && (
             <View
               className="fixed bottom-[160rpx] right-[32rpx] z-100"
               onClick={
-                activeTab?.mode === 'class' ? handleCreateSchedule : handleManageBookingConfig
+                activeTab?.mode === 'private'
+                  ? handleManageBookingConfig
+                  : () => handleCreateSchedule(activeTab?.mode)
               }
             >
-              <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-full bg-schedule-attend shadow-schedule-fab">
+              <View className="flex h-[80rpx] items-center justify-center rounded-full bg-schedule-attend shadow-schedule-fab pl-[24rpx] pr-[32rpx] gap-[8rpx]">
                 <Icon name="mdi-plus" size="md" color="hsl(var(--primary-foreground))" />
+                <Text className="text-[26rpx] font-medium text-primary-foreground">排课</Text>
               </View>
             </View>
           )}

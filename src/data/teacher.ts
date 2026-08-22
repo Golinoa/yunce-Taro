@@ -14,6 +14,8 @@ import type {
 } from '@/types/teacher';
 import { normalizeSalaryStatus } from '@/types/teacher';
 import { isTempImagePath, uploadImage } from '@/utils/image-upload';
+// 循环依赖（mock-database ↔ data/teacher）：仅在函数内/宏任务延迟后调用 syncTeacherView，初始化期安全
+import { syncTeacherView } from '@/data/mock-database';
 
 // ============================================
 // 常量池
@@ -34,7 +36,7 @@ export const AVATAR_COLORS = [
 /** 校区列表 */
 export const CAMPUS_OPTIONS = [
   { label: '全部校区', value: 'all' },
-  { label: '中心校区', value: 'center' },
+  { label: '曦绘艺术', value: 'center' },
   { label: '南区分校', value: 'south' },
   { label: '东区分校', value: 'east' },
 ];
@@ -679,9 +681,31 @@ export const mockScheduleData: Record<
 // Mock 数据库（内存存储，支持增删改查）
 // ============================================
 
-let _teachers: TeacherUIModel[] = [...mockTeachers];
+// 教师管理库唯一数据源。用 var（无 TDZ）+ getter 兜底，容忍 ESM 循环初始化顺序差异
+var _teachers: TeacherUIModel[] = [...mockTeachers];
 let _salaryModels: SalaryModel[] = [...mockSalaryModels];
 let _settings: SalarySettings = { ...mockSalarySettings };
+
+/** 教师管理库唯一数据源 getter（供 mock-database 派生统一教师视图；初始化未完成时返回空数组） */
+export function getManagedTeachers(): TeacherUIModel[] {
+  return _teachers || [];
+}
+
+/** 教师增删改后同步统一教师视图（mock-database.TEACHERS） */
+function syncUnifiedTeachers() {
+  syncTeacherView();
+}
+
+// 首次同步：模块求值完成后延迟到宏任务，确保 mock-database 已完成初始化
+if (typeof setTimeout !== 'undefined') {
+  setTimeout(() => {
+    try {
+      syncUnifiedTeachers();
+    } catch {
+      // 初始化竞态下静默（视图首次构建已含基础数据）
+    }
+  }, 0);
+}
 
 /** 模拟网络延迟 */
 function delay(ms: number = 80): Promise<void> {
@@ -832,6 +856,7 @@ export async function mockAddTeacher(teacher: TeacherUIModel): Promise<TeacherUI
     salaryTemplateId,
   };
   _teachers = [..._teachers, newTeacher];
+  syncUnifiedTeachers(); // 新增教师同步到统一教师视图（班级/排课/统计立即可见）
   return newTeacher;
 }
 
@@ -851,6 +876,7 @@ export async function mockUpdateTeacher(
     ...(promoImages !== undefined ? { promoImages } : {}),
   };
   _teachers = [..._teachers];
+  syncUnifiedTeachers(); // 教师信息变更同步到统一视图（学员/班级关联名实时更新）
   return _teachers[idx];
 }
 
@@ -974,6 +1000,7 @@ export async function mockResignTeacher(
         }
       : t,
   );
+  syncUnifiedTeachers(); // 离职教师同步到统一视图
   return true;
 }
 

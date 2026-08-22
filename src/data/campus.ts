@@ -50,6 +50,12 @@ export const CAMPUS_TYPE_MAP: Record<
   CampusType,
   { label: string; tagBg: string; tagText: string; dotColor: string }
 > = {
+  main: {
+    label: '总校区',
+    tagBg: 'bg-primary-bg',
+    tagText: 'text-primary',
+    dotColor: 'bg-primary',
+  },
   self: {
     label: '自营校区',
     tagBg: 'bg-primary-bg',

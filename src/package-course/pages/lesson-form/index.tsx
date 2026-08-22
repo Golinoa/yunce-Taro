@@ -8,6 +8,7 @@ import ClassSelector from '@/components/lesson/ClassSelector';
 import StudentCard from '@/components/lesson/StudentCard';
 import PageContainer from '@/components/PageContainer';
 import PickerItem from '@/components/PickerItem';
+import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import StarRating from '@/components/StarRating';
 import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
@@ -451,6 +452,11 @@ const LessonForm: React.FC = () => {
   const [campusId, setCampusId] = useState(currentCampusId);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [room, setRoom] = useState('');
+  /** 统一弹窗选择器（PickerSheet 标准组件）：teacher/campus/room */
+  const [selector, setSelector] = useState<{
+    visible: boolean;
+    type: 'teacher' | 'campus' | 'room' | null;
+  }>({ visible: false, type: null });
 
   // ===== 班级模式：搜索/扣费/筛选 =====
   const [studentSearchKeyword, setStudentSearchKeyword] = useState('');
@@ -799,15 +805,6 @@ const LessonForm: React.FC = () => {
     [teacherOptions, selectedTeachingTeacherId],
   );
 
-  const selectedTeachingTeacherIndex = useMemo(
-    () =>
-      Math.max(
-        0,
-        teacherOptions.findIndex((teacher) => teacher.id === selectedTeachingTeacherId),
-      ),
-    [teacherOptions, selectedTeachingTeacherId],
-  );
-
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) || null,
     [classes, selectedClassId],
@@ -834,27 +831,6 @@ const LessonForm: React.FC = () => {
   const pageTitle = useMemo(() => {
     return mode === 'class' ? '班级消课' : '课时消课';
   }, [mode]);
-
-  const campusPickerOptions = useMemo(
-    () => ['请选择校区', ...campusOptions.map((item) => item.name)],
-    [campusOptions],
-  );
-  const campusIndex = useMemo(() => {
-    const index = campusOptions.findIndex((item) => item.id === campusId);
-    return Math.max(0, index + 1);
-  }, [campusOptions, campusId]);
-  const roomOptions = useMemo(() => {
-    const activeNames = rooms.filter((item) => item.status === 'active').map((item) => item.name);
-    const options = [...activeNames];
-    if (room && !options.includes(room)) {
-      options.unshift(room);
-    }
-    return ['请选择', ...options];
-  }, [rooms, room]);
-  const roomIndex = useMemo(() => {
-    const index = roomOptions.findIndex((item) => item === room);
-    return Math.max(0, index);
-  }, [roomOptions, room]);
 
   // ===== 班级模式：加载班级学员 =====
   const loadClassStudents = useCallback(
@@ -1891,29 +1867,20 @@ const LessonForm: React.FC = () => {
                     <Text className="text-lg text-foreground">主讲老师</Text>
                     <Text className="text-lg text-destructive">*</Text>
                   </View>
-                  <Picker
-                    mode="selector"
-                    range={teacherOptions.map((teacher) => teacher.name)}
-                    value={selectedTeachingTeacherIndex}
-                    onChange={(e) => {
-                      const nextTeacher = teacherOptions[Number(e.detail.value || 0)];
-                      if (nextTeacher?.id) {
-                        setSelectedTeachingTeacherId(nextTeacher.id);
-                      }
-                    }}
+                  <View
+                    className="border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden press-scale"
+                    onClick={() => setSelector({ visible: true, type: 'teacher' })}
                   >
-                    <View className="border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
-                      <View className="flex-1 min-w-0">
-                        <Text className="text-lg text-foreground truncate block">
-                          {selectedTeachingTeacher?.name || profile?.name || '请选择主讲老师'}
-                        </Text>
-                        <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block truncate">
-                          默认当前操作人，可改为其他老师
-                        </Text>
-                      </View>
-                      <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-lg text-foreground truncate block">
+                        {selectedTeachingTeacher?.name || profile?.name || '请选择主讲老师'}
+                      </Text>
+                      <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block truncate">
+                        默认当前操作人，可改为其他老师
+                      </Text>
                     </View>
-                  </Picker>
+                    <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                  </View>
                 </View>
 
                 {/* 消课课时 */}
@@ -1956,42 +1923,22 @@ const LessonForm: React.FC = () => {
                 <View className="mx-[24rpx] mb-6 bg-white rounded-2xl p-5 shadow-soft">
                   <Text className="text-lg text-foreground">上课地点</Text>
                   <View className="flex flex-col gap-5 mt-3">
-                    <Picker
-                      mode="selector"
-                      range={campusPickerOptions}
-                      value={campusIndex}
-                      onChange={(e) => {
-                        const index = Number(e.detail.value);
-                        if (index === 0) {
-                          setCampusId('');
-                        } else {
-                          setCampusId(campusOptions[index - 1]?.id || '');
-                        }
-                        setRoom('');
-                      }}
+                    <View
+                      className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden press-scale"
+                      onClick={() => setSelector({ visible: true, type: 'campus' })}
                     >
-                      <View className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
-                        <Text className="text-lg text-foreground">
-                          {campusOptions.find((item) => item.id === campusId)?.name || '请选择校区'}
-                        </Text>
-                        <Icon name="mdi-chevron-right" size="sm" color="muted" />
-                      </View>
-                    </Picker>
-                    <Picker
-                      mode="selector"
-                      range={roomOptions}
-                      value={roomIndex}
-                      onChange={(e) => {
-                        const index = Number(e.detail.value);
-                        const value = roomOptions[index];
-                        setRoom(value === '请选择' ? '' : value);
-                      }}
+                      <Text className="text-lg text-foreground">
+                        {campusOptions.find((item) => item.id === campusId)?.name || '请选择校区'}
+                      </Text>
+                      <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                    </View>
+                    <View
+                      className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden press-scale"
+                      onClick={() => setSelector({ visible: true, type: 'room' })}
                     >
-                      <View className="flex-1 border-2 border-input rounded-2xl py-3 px-5 bg-background shadow-soft flex items-center justify-between overflow-hidden">
-                        <Text className="text-lg text-foreground">{room || '请选择教室'}</Text>
-                        <Icon name="mdi-chevron-right" size="sm" color="muted" />
-                      </View>
-                    </Picker>
+                      <Text className="text-lg text-foreground">{room || '请选择教室'}</Text>
+                      <Icon name="mdi-chevron-right" size="sm" color="muted" />
+                    </View>
                   </View>
                 </View>
 
@@ -2490,6 +2437,49 @@ const LessonForm: React.FC = () => {
           />
         )}
       </View>
+
+      {/* 统一弹窗选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={selector.visible}
+        title={
+          selector.type === 'teacher'
+            ? '选择主讲老师'
+            : selector.type === 'campus'
+              ? '选择校区'
+              : '选择教室'
+        }
+        options={
+          selector.type === 'teacher'
+            ? teacherOptions.map((t): PickerOption => ({ label: t.name, value: t.id }))
+            : selector.type === 'campus'
+              ? [
+                  { label: '请选择', value: '' },
+                  ...campusOptions.map((c): PickerOption => ({ label: c.name, value: c.id })),
+                ]
+              : [
+                  { label: '请选择', value: '' },
+                  ...rooms
+                    .filter((r) => r.status === 'active')
+                    .map((r): PickerOption => ({ label: r.name, value: r.name })),
+                ]
+        }
+        value={
+          selector.type === 'teacher'
+            ? selectedTeachingTeacherId
+            : selector.type === 'campus'
+              ? campusId
+              : room
+        }
+        onClose={() => setSelector((prev) => ({ ...prev, visible: false }))}
+        onConfirm={(v) => {
+          if (selector.type === 'teacher') setSelectedTeachingTeacherId(v);
+          else if (selector.type === 'campus') {
+            setCampusId(v);
+            setRoom('');
+          } else setRoom(v);
+          setSelector((prev) => ({ ...prev, visible: false }));
+        }}
+      />
     </PageContainer>
   );
 };

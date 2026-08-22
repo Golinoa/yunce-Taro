@@ -294,9 +294,6 @@ export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise
   let finalPath = tempFile.tempFilePath;
   // canvas 兜底转存的产物已直接落在 USER_DATA_PATH，无需再持久化
   let finalPathPersisted = false;
-  // TEMP-DIAG: 裁剪链路诊断信息（定位「裁剪后无预览」问题，问题解决后整段移除）
-  const diag: string[] = [];
-
   // 仅在需要裁剪时才调用 wx.cropImage；API 不可用或异常时静默回退原图
   if (cropScale) {
     const needCrop = await shouldCropImage(finalPath, cropScale);
@@ -314,7 +311,6 @@ export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise
             await delay(FILE_FLUSH_RETRY_DELAY_MS);
             loadable = await isLoadableImagePath(croppedPath);
             if (loadable) {
-              diag.push('首次校验失败,重试后可加载(落盘延迟)');
             }
           }
           if (sandboxOk && loadable) {
@@ -329,9 +325,7 @@ export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise
               '[image-upload] 裁剪结果路径不可用（疑似安卓 cropImage 绝对路径 bug），尝试 canvas 转存',
               croppedPath,
             );
-            diag.push(`产物非沙箱/不可加载: ${croppedPath}`);
             const repaired = await repairUnreadableCropViaCanvas(croppedPath);
-            diag.push(`canvas转存: ${repaired ? `成功 ${repaired}` : '失败'}`);
             if (repaired) {
               finalPath = repaired;
               finalPathPersisted = true;
@@ -341,7 +335,6 @@ export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise
           }
         } catch (err) {
           const errMsg = (err as { errMsg?: string })?.errMsg || '';
-          diag.push(`crop异常: ${errMsg || String(err)}`);
           if (errMsg.toLowerCase().includes('cancel')) {
             // 用户在裁剪界面取消，与选图取消同等处理
             throw new ImageCancelError();
@@ -362,36 +355,25 @@ export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise
   // 端到端兜底 + 竞态重试：持久化产物若无法加载（如 copyFile 在源文件尚未落盘完成时
   // 拷到 0 字节/半截文件），等待落盘后重试校验、必要时重新拷贝，绝不让预览变空白。
   if (await isLoadableImagePath(persisted)) {
-    showCropDiagIfNeeded(diag);
     return persisted;
   }
   console.warn('[image-upload] 持久化产物不可加载，等待落盘后重试', persisted);
-  diag.push(`持久化首次校验失败: ${persisted}`);
   await delay(FILE_FLUSH_RETRY_DELAY_MS);
   if (await isLoadableImagePath(persisted)) {
-    diag.push('等待后重试可加载(落盘延迟)');
-    showCropDiagIfNeeded(diag);
     return persisted;
   }
   // 持久化产物确实损坏：源文件若可加载，重新拷贝一次
   if (!finalPathPersisted && (await isLoadableImagePath(finalPath))) {
     const retryPersisted = await persistTempFile(finalPath);
     if (await isLoadableImagePath(retryPersisted)) {
-      diag.push(`重新拷贝成功: ${retryPersisted}`);
-      showCropDiagIfNeeded(diag);
       return retryPersisted;
     }
-    diag.push(`重新拷贝仍不可加载: ${retryPersisted}`);
-    showCropDiagIfNeeded(diag);
     return finalPath;
   }
   // 最后兜底：源文件可加载就用源文件，否则只能返回持久化产物
   if (await isLoadableImagePath(finalPath)) {
-    showCropDiagIfNeeded(diag);
     return finalPath;
   }
-  diag.push(`源路径也不可加载: ${finalPath}`);
-  showCropDiagIfNeeded(diag);
   return persisted;
 }
 
@@ -401,21 +383,6 @@ const FILE_FLUSH_RETRY_DELAY_MS = 400;
 /** 简易延时 */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * TEMP-DIAG: 裁剪链路诊断弹窗（仅异常路径会记录诊断信息并弹出，
- * 正常路径静默。问题定位后连同 diag 收集逻辑一并移除）。
- */
-function showCropDiagIfNeeded(diag: string[]): void {
-  if (diag.length === 0) return;
-  console.log('[image-upload] 裁剪诊断:', diag.join(' | '));
-  void Taro.showModal({
-    title: '裁剪诊断(临时)',
-    content: diag.join('\n'),
-    showCancel: false,
-    confirmText: '知道了',
-  });
 }
 
 /**

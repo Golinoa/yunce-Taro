@@ -8,6 +8,7 @@ import type { Venue, Room } from '@/types/campus';
 import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
 import type { UserRole } from '@/types/profile';
 import type { DayOfWeek } from '@/types/schedule';
+import { getManagedTeachers } from '@/data/teacher';
 
 // ============================================
 // 常量
@@ -96,17 +97,17 @@ export const CAMPUSES: Campus[] = [
   {
     id: 'campus-center',
     organizationId: 'org-yunce',
-    name: '中心校区',
+    name: '曦绘艺术',
     code: 'XC0001',
     type: 'main',
     logo: '/assets/images/sgpk.png',
     licenseName: '杭州云策教育科技有限公司',
-    contactName: '张校长',
+    contactName: '万老师',
     region: '浙江省-杭州市-西湖区',
     address: '杭州市西湖区文三路168号云策大厦1-3层',
     businessHours: '08:00:00至22:00:00',
     phone: '13800138000',
-    intro: '云策教育中心校区，专注艺术、体能、科创培训。',
+    intro: '云策教育曦绘艺术，专注艺术、体能、科创培训。',
     venueImages: [],
     locationName: '云策大厦',
     latitude: 30.2741,
@@ -191,7 +192,7 @@ export const VENUES: Venue[] = [
 ];
 
 export const ROOMS: Room[] = [
-  // 中心校区 - 云策大厦主馆
+  // 曦绘艺术 - 云策大厦主馆
   {
     id: 'room-center-101',
     venueId: 'venue-center-001',
@@ -381,7 +382,7 @@ export const USERS: User[] = [
     username: 'principal1',
     password: '123456',
     email: 'principal1@yunce.com',
-    name: '张校长',
+    name: '万老师',
     phone: '13800000001',
     createdAt: '2024-01-01T00:00:00Z',
   },
@@ -495,7 +496,7 @@ export const IDENTITIES: Identity[] = [
     campusIds: ['campus-center', 'campus-east', 'campus-west'],
     isDefault: true,
   },
-  // 张老师 - 主讲钢琴，主要在中心校区
+  // 张老师 - 主讲钢琴，主要在曦绘艺术
   {
     id: 'identity-teacher-001',
     userId: 'user-teacher-001',
@@ -504,7 +505,7 @@ export const IDENTITIES: Identity[] = [
     campusIds: ['campus-center'],
     isDefault: true,
   },
-  // 李老师 - 主讲声乐，在中心校区和城东校区
+  // 李老师 - 主讲声乐，在曦绘艺术和城东校区
   {
     id: 'identity-teacher-002',
     userId: 'user-teacher-002',
@@ -581,7 +582,7 @@ export interface Teacher {
   pendingSalary: number;
 }
 
-export const TEACHERS: Teacher[] = [
+const BASE_TEACHERS: Teacher[] = [
   {
     id: 'teacher-001',
     userId: 'user-teacher-001',
@@ -653,6 +654,62 @@ export const TEACHERS: Teacher[] = [
 ];
 
 // ============================================
+// 教师统一视图：以教师管理库（data/teacher）为单一可写源
+// 保留本库关联字段（userId/campusIds 等），管理库业务字段覆盖同名教师，
+// 管理库新增教师自动并入；管理库 CRUD 后调用 syncTeacherView() 原位刷新
+// ============================================
+
+function buildTeacherView(): Teacher[] {
+  const managed = getManagedTeachers();
+  const result: Teacher[] = BASE_TEACHERS.map((base) => {
+    const m = managed.find((t) => t.id === base.id);
+    if (!m) return base;
+    return {
+      ...base,
+      name: m.name || base.name,
+      phone: m.phone || base.phone,
+      role: m.role,
+      status: 'active',
+      subjects: m.subject
+        ? base.subjects.includes(m.subject)
+          ? base.subjects
+          : [...base.subjects, m.subject]
+        : base.subjects,
+    };
+  });
+  for (const m of managed) {
+    if (!BASE_TEACHERS.some((b) => b.id === m.id)) {
+      result.push({
+        id: m.id,
+        userId: `user-${m.id}`,
+        name: m.name || m.id,
+        phone: m.phone || '',
+        subjects: m.subject ? [m.subject] : [],
+        campusIds: [],
+        canCrossCampus: false,
+        accessScope: 'self',
+        role: m.role,
+        status: 'active',
+        joinedAt: new Date().toISOString(),
+        totalHours: 0,
+        monthHours: 0,
+        pendingSalary: 0,
+      });
+    }
+  }
+  return result;
+}
+
+/** 教师统一视图（实时派生） */
+export const TEACHERS: Teacher[] = buildTeacherView();
+
+/** 管理库 CRUD 后调用：原位刷新视图，引用不变，关联方即时可见 */
+export function syncTeacherView() {
+  const view = buildTeacherView();
+  TEACHERS.splice(0, TEACHERS.length, ...view);
+}
+
+// ============================================
 // 4. 科目
 // ============================================
 
@@ -711,7 +768,7 @@ export interface Class {
 }
 
 export const CLASSES: Class[] = [
-  // 中心校区 - 张老师
+  // 曦绘艺术 - 张老师
   {
     id: 'cls-001',
     name: '钢琴入门A班',
@@ -782,7 +839,7 @@ export const CLASSES: Class[] = [
     pricePerLesson: 120,
     createdAt: '2025-02-20T00:00:00Z',
   },
-  // 中心校区 - 李老师
+  // 曦绘艺术 - 李老师
   {
     id: 'cls-004',
     name: '声乐初级班',
@@ -952,7 +1009,7 @@ export const CLASSES: Class[] = [
     pricePerLesson: 150,
     createdAt: '2025-09-20T00:00:00Z',
   },
-  // 中心校区 - 张老师（开放预约）
+  // 曦绘艺术 - 张老师（开放预约）
   {
     id: 'cls-011',
     name: '钢琴启蒙体验班',
@@ -980,6 +1037,35 @@ export const CLASSES: Class[] = [
     studentCount: 0,
     pricePerLesson: 150,
     createdAt: '2026-06-01T00:00:00Z',
+  },
+  // 曦绘艺术 - 张老师（开放预约）
+  {
+    id: 'cls-012',
+    name: '吉他弹唱班',
+    teacherId: 'teacher-001',
+    teachers: ['teacher-001'],
+    campusId: 'campus-center',
+    subjectId: 'sub-vocal',
+    categoryId: 'cat-group',
+    type: 'limited',
+    scheduleMode: 'open',
+    autoOpenType: 'full',
+    minOpenCount: 4,
+    level: 'basic',
+    schedule: '周一、周四 17:00-18:30',
+    weekdays: [1, 4],
+    startTime: '17:00',
+    endTime: '18:30',
+    totalLessons: 32,
+    usedLessons: 8,
+    status: 'active',
+    startDate: '2026-07-01',
+    endDate: '2026-12-31',
+    color: 'amber',
+    icon: 'music',
+    studentCount: 6,
+    pricePerLesson: 130,
+    createdAt: '2026-07-01T00:00:00Z',
   },
 ];
 
@@ -1011,7 +1097,7 @@ export interface Student {
 
 export const STUDENTS: Student[] = [
   // ============================================
-  // 中心校区(36人) - 张老师
+  // 曦绘艺术(36人) - 张老师
   // ============================================
   // cls-001 钢琴入门A班 (6人, 周一、周三)
   {

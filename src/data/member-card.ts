@@ -1,6 +1,7 @@
 /**
  * 会员卡记录 Mock 数据
  */
+import { COURSE_PACKAGES, type CoursePackage } from '@/data/mock-database';
 import type { CardType } from '@/types/card-type';
 import type { CardTypeStatKey, MemberCard, MemberCardDetail } from '@/types/member-card';
 
@@ -168,8 +169,24 @@ export const mockUpdateMemberCard = async (
   await new Promise((resolve) => setTimeout(resolve, 200));
   const index = MOCK_MEMBER_CARDS.findIndex((item) => item.id === id);
   if (index === -1) return null;
-  MOCK_MEMBER_CARDS[index] = { ...MOCK_MEMBER_CARDS[index], ...data };
-  return MOCK_MEMBER_CARDS[index];
+  const prev = MOCK_MEMBER_CARDS[index];
+  MOCK_MEMBER_CARDS[index] = { ...prev, ...data };
+  const updated = MOCK_MEMBER_CARDS[index];
+
+  // 打通：次卡剩余次数调整 → 同步学员课包剩余课时（差额法，避免覆盖消课已扣减值）
+  if (updated.cardTypeKind === 'count' && data.remainingCount !== undefined && updated.studentId) {
+    const pkg = COURSE_PACKAGES.find(
+      (p) => p.studentId === updated.studentId && p.name.includes('会员卡'),
+    );
+    if (pkg) {
+      const diff = (data.remainingCount || 0) - (prev.remainingCount || 0);
+      pkg.remainingHours = Math.max((pkg.remainingHours || 0) + diff, 0);
+      pkg.usedHours = Math.max((pkg.totalHours || 0) - pkg.remainingHours, 0);
+      if (pkg.remainingHours <= 0) pkg.status = 'finished';
+    }
+  }
+
+  return updated;
 };
 
 /** 生成唯一会员卡 ID */
@@ -230,5 +247,31 @@ export const mockIssueMemberCard = async (
   };
 
   MOCK_MEMBER_CARDS.unshift(card);
+
+  // 打通：次卡发卡同步为学员创建课包（学员"剩余课时/次数"与会员卡联动）
+  if (cardType.kind === 'count' && (cardType.count || 0) > 0 && base.studentId) {
+    const count = cardType.count || 0;
+    const pkg: CoursePackage = {
+      id: `pkg-${Date.now()}`,
+      studentId: base.studentId,
+      classId: '',
+      name: `${cardType.name}（会员卡）`,
+      type: 'hour_package',
+      subjectId: '',
+      totalHours: count,
+      purchasedHours: count,
+      bonusHours: 0,
+      usedHours: 0,
+      remainingHours: count,
+      pricePerHour: cardType.price ? Math.round(cardType.price / count) : 0,
+      totalAmount: cardType.price || 0,
+      paymentMethod: 'wechat',
+      status: 'active',
+      purchaseDate: purchaseAt.split(' ')[0],
+      expireDate: expiredAt,
+    };
+    COURSE_PACKAGES.push(pkg);
+  }
+
   return card;
 };

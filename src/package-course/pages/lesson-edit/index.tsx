@@ -12,6 +12,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import { scheduleService, roomService } from '@/services';
 import { teacherService } from '@/services/teacher';
 import { useCampusStore } from '@/stores/campus';
@@ -56,6 +57,11 @@ const LessonEdit: React.FC = () => {
   const [campusId, setCampusId] = useState('');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [room, setRoom] = useState('');
+  /** 统一弹窗选择器（PickerSheet 标准组件）：teacher/assistant/campus/room */
+  const [selector, setSelector] = useState<{
+    visible: boolean;
+    type: 'teacher' | 'assistant' | 'campus' | 'room' | null;
+  }>({ visible: false, type: null });
   const [content, setContent] = useState('');
   const [remark, setRemark] = useState('');
 
@@ -130,16 +136,6 @@ const LessonEdit: React.FC = () => {
     loadRooms();
   }, [campusId]);
 
-  const campusPickerOptions = useMemo(
-    () => ['请选择校区', ...campusOptions.map((item) => item.name)],
-    [campusOptions],
-  );
-
-  const campusIndex = useMemo(() => {
-    const index = campusOptions.findIndex((item) => item.id === campusId);
-    return Math.max(0, index + 1);
-  }, [campusOptions, campusId]);
-
   const teacherOptions = useMemo(
     () => [{ id: '', name: '请选择' }, ...teachers.map((t) => ({ id: t.id, name: t.name }))],
     [teachers],
@@ -166,20 +162,6 @@ const LessonEdit: React.FC = () => {
         assistantTeacherOptions.findIndex((t) => t.id === assistantTeacherId),
       ),
     [assistantTeacherOptions, assistantTeacherId],
-  );
-
-  const roomOptions = useMemo(() => {
-    const activeNames = rooms.filter((item) => item.status === 'active').map((item) => item.name);
-    const options = [...activeNames];
-    if (room && !options.includes(room)) {
-      options.unshift(room);
-    }
-    return ['请选择', ...options];
-  }, [rooms, room]);
-
-  const roomIndex = useMemo(
-    () => Math.max(0, roomOptions.indexOf(room || '请选择')),
-    [roomOptions, room],
   );
 
   const validate = useCallback((): string => {
@@ -321,52 +303,35 @@ const LessonEdit: React.FC = () => {
 
           {/* 上课老师 */}
           <FormField label="上课老师" required>
-            <Picker
-              mode="selector"
-              range={teacherOptions.map((t) => t.name)}
-              value={teacherIndex}
-              onChange={(e) => {
-                const index = Number(e.detail.value);
-                setTeacherId(teacherOptions[index]?.id || '');
-              }}
+            <View
+              className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx] press-scale"
+              onClick={() => setSelector({ visible: true, type: 'teacher' })}
             >
-              <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
-                <Text
-                  className={cn(
-                    'text-base',
-                    teacherId ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {teacherOptions[teacherIndex]?.name || '请选择上课老师'}
-                </Text>
-                <Icon name="mdi-chevron-right" size="sm" color="muted" />
-              </View>
-            </Picker>
+              <Text
+                className={cn('text-base', teacherId ? 'text-foreground' : 'text-muted-foreground')}
+              >
+                {teacherOptions[teacherIndex]?.name || '请选择上课老师'}
+              </Text>
+              <Icon name="mdi-chevron-right" size="sm" color="muted" />
+            </View>
           </FormField>
 
           {/* 上课助教 */}
           <FormField label="上课助教">
-            <Picker
-              mode="selector"
-              range={assistantTeacherOptions.map((t) => t.name)}
-              value={assistantTeacherIndex}
-              onChange={(e) => {
-                const index = Number(e.detail.value);
-                setAssistantTeacherId(assistantTeacherOptions[index]?.id || '');
-              }}
+            <View
+              className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx] press-scale"
+              onClick={() => setSelector({ visible: true, type: 'assistant' })}
             >
-              <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
-                <Text
-                  className={cn(
-                    'text-base',
-                    assistantTeacherId ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {assistantTeacherOptions[assistantTeacherIndex]?.name || '请选择上课助教'}
-                </Text>
-                <Icon name="mdi-chevron-right" size="sm" color="muted" />
-              </View>
-            </Picker>
+              <Text
+                className={cn(
+                  'text-base',
+                  assistantTeacherId ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {assistantTeacherOptions[assistantTeacherIndex]?.name || '请选择上课助教'}
+              </Text>
+              <Icon name="mdi-chevron-right" size="sm" color="muted" />
+            </View>
           </FormField>
 
           {/* 老师上课课时 */}
@@ -384,56 +349,34 @@ const LessonEdit: React.FC = () => {
           {/* 上课校区 */}
           {campusOptions.length > 0 && (
             <FormField label="上课校区">
-              <Picker
-                mode="selector"
-                range={campusPickerOptions}
-                value={campusIndex}
-                onChange={(e) => {
-                  const index = Number(e.detail.value);
-                  if (index === 0) {
-                    setCampusId('');
-                  } else {
-                    setCampusId(campusOptions[index - 1]?.id || '');
-                  }
-                  setRoom('');
-                }}
+              <View
+                className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx] press-scale"
+                onClick={() => setSelector({ visible: true, type: 'campus' })}
               >
-                <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
-                  <Text
-                    className={cn(
-                      'text-base',
-                      campusId ? 'text-foreground' : 'text-muted-foreground',
-                    )}
-                  >
-                    {campusOptions.find((item) => item.id === campusId)?.name || '请选择上课校区'}
-                  </Text>
-                  <Icon name="mdi-chevron-down" size="sm" color="muted" />
-                </View>
-              </Picker>
+                <Text
+                  className={cn(
+                    'text-base',
+                    campusId ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  {campusOptions.find((item) => item.id === campusId)?.name || '请选择上课校区'}
+                </Text>
+                <Icon name="mdi-chevron-down" size="sm" color="muted" />
+              </View>
             </FormField>
           )}
 
           {/* 上课教室 */}
           <FormField label="上课教室">
-            <Picker
-              mode="selector"
-              range={roomOptions}
-              value={roomIndex}
-              onChange={(e) => {
-                const index = Number(e.detail.value);
-                const value = roomOptions[index];
-                setRoom(value === '请选择' ? '' : value);
-              }}
+            <View
+              className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx] press-scale"
+              onClick={() => setSelector({ visible: true, type: 'room' })}
             >
-              <View className="flex items-center justify-between rounded-2xl border-[3rpx] border-border-light bg-primary-5 px-[28rpx] py-[22rpx]">
-                <Text
-                  className={cn('text-base', room ? 'text-foreground' : 'text-muted-foreground')}
-                >
-                  {room || '请选择上课教室'}
-                </Text>
-                <Icon name="mdi-chevron-down" size="sm" color="muted" />
-              </View>
-            </Picker>
+              <Text className={cn('text-base', room ? 'text-foreground' : 'text-muted-foreground')}>
+                {room || '请选择上课教室'}
+              </Text>
+              <Icon name="mdi-chevron-down" size="sm" color="muted" />
+            </View>
           </FormField>
 
           {/* 上课内容 */}
@@ -482,6 +425,56 @@ const LessonEdit: React.FC = () => {
           </Text>
         </View>
       </View>
+
+      {/* 统一弹窗选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={selector.visible}
+        title={
+          selector.type === 'teacher'
+            ? '选择上课老师'
+            : selector.type === 'assistant'
+              ? '选择上课助教'
+              : selector.type === 'campus'
+                ? '选择上课校区'
+                : '选择上课教室'
+        }
+        options={
+          selector.type === 'teacher'
+            ? teacherOptions.map((t): PickerOption => ({ label: t.name, value: t.id }))
+            : selector.type === 'assistant'
+              ? assistantTeacherOptions.map((t): PickerOption => ({ label: t.name, value: t.id }))
+              : selector.type === 'campus'
+                ? [
+                    { label: '请选择', value: '' },
+                    ...campusOptions.map((c): PickerOption => ({ label: c.name, value: c.id })),
+                  ]
+                : [
+                    { label: '请选择', value: '' },
+                    ...rooms
+                      .filter((r) => r.status === 'active')
+                      .map((r): PickerOption => ({ label: r.name, value: r.name })),
+                  ]
+        }
+        value={
+          selector.type === 'teacher'
+            ? teacherId
+            : selector.type === 'assistant'
+              ? assistantTeacherId
+              : selector.type === 'campus'
+                ? campusId
+                : room
+        }
+        onClose={() => setSelector((prev) => ({ ...prev, visible: false }))}
+        onConfirm={(v) => {
+          if (selector.type === 'teacher') setTeacherId(v);
+          else if (selector.type === 'assistant') setAssistantTeacherId(v);
+          else if (selector.type === 'campus') {
+            setCampusId(v);
+            setRoom('');
+          } else setRoom(v);
+          setSelector((prev) => ({ ...prev, visible: false }));
+        }}
+      />
     </PageContainer>
   );
 };

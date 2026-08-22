@@ -93,7 +93,7 @@ export const MOCK_TEACHER_RANK: ChartDataItem[] = TEACHERS.map((t) => ({
 /** 校区业绩排行 */
 export const MOCK_CAMPUS_RANK: ChartDataItem[] = CAMPUS_STATS.map((c) => {
   const campusNames: Record<string, string> = {
-    'campus-center': '中心校区',
+    'campus-center': '曦绘艺术',
     'campus-east': '城东校区',
     'campus-west': '城西校区',
   };

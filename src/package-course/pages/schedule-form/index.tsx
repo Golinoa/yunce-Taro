@@ -1,16 +1,35 @@
-import { View, Text, Picker } from '@tarojs/components';
+/**
+ * 新增排课页 package-course/pages/schedule-form/index
+ *
+ * 设计参考：新增排课截图（班级名称、排课规则切换、开始日期、重复方式、
+ *           上课周几多选、上课时间多组+/-、常用时间段、自动签到、保存）
+ *
+ * 核心业务逻辑：
+ *   - 班课（class）：课程内容/人员已提前配置，排课 = 决定「这个班什么时候上」
+ *   - 团课（group）：设置开放时段等学员预约，排课 = 「放出哪些时段可约」
+ *   - 选中班级后，同步展示关键信息（已扣课时、老师、学员）
+ *
+ * 入参：sourceMode=class|group（来自课表页 FAB 按钮的来源 Tab）
+ * 入参：id=xxx（编辑模式，已有排课 ID）
+ * 入参：mode=reschedule（调课模式）
+ */
+
+import { View, Text, Picker, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
+import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
+import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
+import PickerSheet, { PickerOption } from '@/components/PickerSheet';
+import Stepper from '@/components/Stepper';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
   notificationService,
@@ -23,7 +42,8 @@ import {
 } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
-import type { CampusUIModel, Room } from '@/types/campus';
+import { subjectService } from '@/services/campus';
+import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { Schedule, ScheduleColor, DayOfWeek } from '@/types/schedule';
 import type { Student } from '@/types/student';
@@ -33,43 +53,21 @@ import { logError } from '@/utils/logger';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { withRouteGuard } from '@/utils/route-guard';
 
-const DAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-const DAY_VALUES: DayOfWeek[] = [1, 2, 3, 4, 5, 6, 7];
+/* ======================== 常量 ======================== */
 
-const COLOR_OPTIONS: { key: ScheduleColor; label: string; emoji: string }[] = [
-  { key: 'primary', label: '薄荷绿', emoji: '🟢' },
-  { key: 'info', label: '天空蓝', emoji: '🔵' },
-  { key: 'accent', label: '棉花粉', emoji: '🩷' },
-  { key: 'lavender', label: '珍珠紫', emoji: '🟣' },
-];
+/** 重复方式 */
 
-const REMINDER_OPTIONS = [
-  { value: 0, label: '不提醒' },
-  { value: 5, label: '提前5分钟' },
-  { value: 15, label: '提前15分钟' },
-  { value: 30, label: '提前30分钟' },
-  { value: 60, label: '提前1小时' },
-];
-
-const COMMON_TIME_RANGES = [
-  { start: '09:00', end: '10:00', label: '09:00-10:00' },
-  { start: '10:30', end: '11:30', label: '10:30-11:30' },
-  { start: '14:00', end: '15:00', label: '14:00-15:00' },
-  { start: '19:00', end: '20:00', label: '19:00-20:00' },
-];
 const MIN_DURATION_MINUTES = 30;
-const FORM_SECTION_TITLE_CLASS =
-  'mb-[12rpx] block pl-[6rpx] text-[22rpx] font-medium text-[#98a2b3]';
-const FORM_CARD_CLASS = 'overflow-hidden rounded-[18rpx] border border-[#eceff3] bg-white';
-const FORM_CELL_CLASS = 'flex min-h-[88rpx] items-center justify-between px-[24rpx]';
-const FORM_CELL_LABEL_CLASS = 'text-[28rpx] text-[#111827]';
-const FORM_CELL_VALUE_CLASS = 'text-[26rpx] text-[#98a2b3]';
-const FORM_ARROW_CLASS = 'text-[24rpx] text-[#c7ced9]';
+
+/** 课程类型选项（班课=内容人员已定，排课决定何时上；团课=放时段等预约） */
+const SCHEDULE_TYPE_OPTIONS = ['班课', '团课'] as const;
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
     ? process.env.VITE_USE_MOCK !== 'false'
     : true;
+
+/* ======================== 工具函数 ======================== */
 
 function getNextDateByDayOfWeek(dayOfWeek: DayOfWeek, baseDate = dayjs()): dayjs.Dayjs {
   const currentDate = baseDate.startOf('day');
@@ -78,39 +76,15 @@ function getNextDateByDayOfWeek(dayOfWeek: DayOfWeek, baseDate = dayjs()): dayjs
   return currentDate.add(diff >= 0 ? diff : diff + 7, 'day');
 }
 
-function getDurationHours(startTime: string, endTime: string): string {
-  const [startHour, startMinute] = startTime.split(':').map(Number);
-  const [endHour, endMinute] = endTime.split(':').map(Number);
-  if (
-    !Number.isFinite(startHour) ||
-    !Number.isFinite(startMinute) ||
-    !Number.isFinite(endHour) ||
-    !Number.isFinite(endMinute)
-  ) {
-    return '0';
-  }
-  const startTotal = startHour * 60 + startMinute;
-  const endTotal = endHour * 60 + endMinute;
-  if (endTotal <= startTotal) {
-    return '0';
-  }
-  const hours = (endTotal - startTotal) / 60;
-  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
-}
-
 function parseTimeToMinutes(time: string): number {
-  const [hour, minute] = time.split(':').map(Number);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
-    return 0;
-  }
-  return hour * 60 + minute;
+  const [h, m] = time.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  return h * 60 + m;
 }
 
-function formatMinutesToTime(totalMinutes: number): string {
-  const safeMinutes = Math.max(0, Math.min(24 * 60 - 1, totalMinutes));
-  const hour = Math.floor(safeMinutes / 60);
-  const minute = safeMinutes % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+function formatMinutesToTime(m: number): string {
+  const s = Math.max(0, Math.min(24 * 60 - 1, m));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 function getTeacherSelectionInfo(params: {
@@ -129,73 +103,91 @@ function getTeacherSelectionInfo(params: {
     fallbackAssistantTeacherId,
     fallbackAssistantTeacherName,
   } = params;
-  const teacherIds = classInfo?.teachers?.length
+  const tIds = classInfo?.teachers?.length
     ? classInfo.teachers
     : classInfo?.teacher_id
       ? [classInfo.teacher_id]
       : [];
-  const teachers = teacherIds
-    .map((id) => teacherById[id])
-    .filter((item): item is TeacherUIModel => Boolean(item));
-  const leadTeacher =
-    teachers.find((item) => item.role !== 'assist') ||
+  const teachers = tIds.map((id) => teacherById[id]).filter(Boolean);
+  const lead =
+    teachers.find((t) => t.role !== 'assist') ||
     (classInfo?.teacher_id ? teacherById[classInfo.teacher_id] : undefined) ||
     (fallbackTeacherId ? teacherById[fallbackTeacherId] : undefined);
-  const assistantTeacher =
-    teachers.find((item) => item.role === 'assist' && item.id !== leadTeacher?.id) ||
+  const assist =
+    teachers.find((t) => t.role === 'assist' && t.id !== lead?.id) ||
     (fallbackAssistantTeacherId ? teacherById[fallbackAssistantTeacherId] : undefined);
-
   return {
-    leadTeacherId: leadTeacher?.id || fallbackTeacherId || '',
-    leadTeacherName: leadTeacher?.name || fallbackTeacherName || '待分配',
-    assistantTeacherId: assistantTeacher?.id || fallbackAssistantTeacherId || '',
-    assistantTeacherName: assistantTeacher?.name || fallbackAssistantTeacherName || '未安排',
+    leadTeacherId: lead?.id || fallbackTeacherId || '',
+    leadTeacherName: lead?.name || fallbackTeacherName || '待分配',
+    assistantTeacherId: assist?.id || fallbackAssistantTeacherId || '',
+    assistantTeacherName: assist?.name || fallbackAssistantTeacherName || '未安排',
   };
 }
+
+/** 时间槽组 */
+interface TimeSlotPair {
+  id: number;
+  start: string;
+  end: string;
+}
+
+/* ======================== 主组件 ======================== */
 
 const ScheduleForm: React.FC = () => {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
   const currentTeacherName = profile?.name || '当前老师';
-  const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
-  const fetchClassesByTeacher = useClassStore((state) => state.fetchByTeacher);
+  const fetchStudentsByTeacher = useStudentStore((s) => s.fetchByTeacher);
+  const invalidateStudents = useStudentStore((s) => s.invalidate);
+  const fetchClassesByTeacher = useClassStore((s) => s.fetchByTeacher);
   const { currentCampusId } = useCampusStore();
 
-  const routerParams = useMemo(() => {
-    const instance = Taro.getCurrentInstance();
-    return instance?.router?.params || {};
-  }, []);
-
+  /* ---- 路由参数 ---- */
+  const routerParams = useMemo(() => Taro.getCurrentInstance()?.router?.params || {}, []);
   const scheduleId = useMemo(() => decodeURIComponent(routerParams.id || ''), [routerParams]);
   const formMode = useMemo(() => decodeURIComponent(routerParams.mode || ''), [routerParams]);
   const lessonDateParam = useMemo(
     () => decodeURIComponent(routerParams.lessonDate || ''),
     [routerParams],
   );
+  /** 来源模式：class=班课排课，group=团课排课 */
+  const sourceMode = useMemo(
+    () => decodeURIComponent(routerParams.sourceMode || 'class'),
+    [routerParams],
+  );
   const isEdit = !!scheduleId;
   const isRescheduleMode = isEdit && formMode === 'reschedule';
 
+  /* ---- 状态 ---- */
   const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [deleting] = useState(false);
   const [originalSchedule, setOriginalSchedule] = useState<Schedule | null>(null);
 
-  const [students, setStudents] = useState<Student[]>([]);
+  /* 数据列表 */
   const [classes, setClasses] = useState<Class[]>([]);
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([]);
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
+
+  /* 表单字段 —— 对齐参考图 */
+  const [classId, setClassId] = useState('');
+  const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [selectedDays] = useState<DayOfWeek[]>([1]); // 多选
+  const [timeSlots, setTimeSlots] = useState<TimeSlotPair[]>([
+    { id: 1, start: '09:00', end: '10:00' },
+  ]);
+
+  /* 原有字段（保留兼容） */
   const [campusId, setCampusId] = useState('');
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [, setRooms] = useState<Room[]>([]);
   const [room, setRoom] = useState('');
   const [calendarVisible, setCalendarVisible] = useState(false);
-
-  const [mode, setMode] = useState<'student' | 'class'>('student');
+  const [mode, setMode] = useState<'student' | 'class'>('class');
   const [studentId, setStudentId] = useState('');
-  const [classId, setClassId] = useState('');
-  const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek>(1);
+  const [, setDayOfWeek] = useState<DayOfWeek>(1);
   const [selectedDateValue, setSelectedDateValue] = useState(dayjs().format('YYYY-MM-DD'));
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:30');
@@ -205,33 +197,56 @@ const ScheduleForm: React.FC = () => {
   const [note, setNote] = useState('');
   const [reminderMinutes, setReminderMinutes] = useState(0);
 
+  /* ---- 统一排课表单字段（班课/团课共用） ---- */
+  const [scheduleType, setScheduleType] = useState<'class' | 'group'>(
+    sourceMode === 'group' ? 'group' : 'class',
+  );
+  const [consumedHours, setConsumedHours] = useState(1); // 消耗课时（步进器）
+  /** 选中课程的学员列表（只读展示） */
+  const [classStudents, setClassStudents] = useState<Student[]>([]);
+  /** 全部学员池（学员选择弹窗搜索用） */
+  const [students, setStudents] = useState<Student[]>([]);
+  /** 科目列表（学员选择弹窗筛选用） */
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  /** 弹窗选择器可见性（统一使用 PickerSheet 标准组件） */
+  const [typePickerVisible, setTypePickerVisible] = useState(false);
+  const [classPickerVisible, setClassPickerVisible] = useState(false);
+  const [teacherPickerVisible, setTeacherPickerVisible] = useState(false);
+  const [assistantPickerVisible, setAssistantPickerVisible] = useState(false);
+  /** 是否团课模式 */
+  const isGroupMode = scheduleType === 'group';
+
+  /* ---- 数据加载 ---- */
   const loadFormData = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     setNotFound(false);
-
     if (!currentUserId) {
-      setLoadError('未获取到登录信息，请重新进入页面');
+      setLoadError('未获取到登录信息');
       setLoading(false);
       return;
     }
-
     try {
-      const [stuList, clsList, scheduleList, teacherList, campusList] = await Promise.all([
+      const [stuList, clsList, schList, tchList, campList] = await Promise.all([
         fetchStudentsByTeacher(currentUserId),
         fetchClassesByTeacher(currentUserId),
         scheduleService.getByTeacher(currentUserId),
         teacherService.getList(),
         campusService.getList(),
       ]);
+      // 全部学员池（供学员选择弹窗搜索）
       setStudents(stuList);
+      // 科目列表（供学员选择弹窗按科目筛选）
+      subjectService
+        .getList()
+        .then(setSubjects)
+        .catch(() => setSubjects([]));
       setClasses(clsList);
-      setAllSchedules(scheduleList);
-      setTeachers(teacherList);
-      setCampusOptions(campusList);
-
-      const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
-      const fallbackCampusId = currentCampusId || mainCampusId || campusList[0]?.id || '';
+      setAllSchedules(schList);
+      setTeachers(tchList);
+      setCampusOptions(campList);
+      const mainCampusId = campList.find((c) => c.isMain)?.id || '';
+      const fbCampusId = currentCampusId || mainCampusId || campList[0]?.id || '';
 
       if (isEdit && scheduleId) {
         const sch = await scheduleService.getById(scheduleId);
@@ -239,32 +254,37 @@ const ScheduleForm: React.FC = () => {
           setNotFound(true);
           return;
         }
-
-        const sourceLessonDate =
+        const srcDate =
           lessonDateParam && dayjs(lessonDateParam).isValid()
             ? dayjs(lessonDateParam).startOf('day')
             : getNextDateByDayOfWeek(sch.day_of_week).startOf('day');
-
         if (isRescheduleMode) {
           const today = dayjs().startOf('day');
-          if (sourceLessonDate.isBefore(today)) {
-            Taro.showToast({ title: '已结束的课程不支持调课', icon: 'none', duration: 2000 });
+          if (srcDate.isBefore(today)) {
+            Taro.showToast({ title: '已结束的课程不支持调课', icon: 'none' });
             setTimeout(() => Taro.navigateBack(), 1500);
             setLoading(false);
             return;
           }
         }
-
-        const defaultTargetDate = isRescheduleMode
-          ? getDefaultRescheduleTargetDate(sourceLessonDate.format('YYYY-MM-DD'))
-          : sourceLessonDate;
-
         setOriginalSchedule(sch);
         setMode(!USE_MOCK || sch.class_id ? 'class' : 'student');
         if (sch.student_id) setStudentId(sch.student_id);
         if (sch.class_id) setClassId(sch.class_id);
-        setDayOfWeek((defaultTargetDate.day() || 7) as DayOfWeek);
-        setSelectedDateValue(defaultTargetDate.format('YYYY-MM-DD'));
+        setDayOfWeek(
+          (dayjs(
+            isRescheduleMode
+              ? getDefaultRescheduleTargetDate(srcDate.format('YYYY-MM-DD'))
+              : srcDate,
+          ).day() || 7) as DayOfWeek,
+        );
+        setSelectedDateValue(
+          dayjs(
+            isRescheduleMode
+              ? getDefaultRescheduleTargetDate(srcDate.format('YYYY-MM-DD'))
+              : srcDate,
+          ).format('YYYY-MM-DD'),
+        );
         setStartTime(sch.start_time);
         setEndTime(sch.end_time);
         setSelectedTeachingTeacherId(sch.teacher_id || currentUserId);
@@ -272,22 +292,20 @@ const ScheduleForm: React.FC = () => {
         setColor(sch.color || 'primary');
         setNote(sch.note || '');
         setReminderMinutes(sch.reminder_minutes || 0);
-
-        const classCampusId = sch.class_id
+        const cCampusId = sch.class_id
           ? clsList.find((c) => c.id === sch.class_id)?.campus_id
           : undefined;
-        setCampusId(classCampusId || fallbackCampusId);
+        setCampusId(cCampusId || fbCampusId);
         setRoom(sch.room || '');
       } else {
         setOriginalSchedule(null);
         if (stuList.length > 0) setStudentId(stuList[0].id);
-        if (clsList.length > 0) setClassId(clsList[0].id);
+        // 课程名称不默认选中，由用户主动选择
         if (!USE_MOCK) setMode('class');
         setSelectedDateValue(dayjs().format('YYYY-MM-DD'));
+        setStartDate(dayjs().format('YYYY-MM-DD'));
         setSelectedTeachingTeacherId(currentUserId);
-        setSelectedAssistantTeacherId('');
-        setCampusId(fallbackCampusId);
-        setRoom('');
+        setCampusId(fbCampusId);
       }
     } catch (err) {
       logError('init schedule form', err);
@@ -295,213 +313,129 @@ const ScheduleForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [
-    currentUserId,
-    currentCampusId,
-    fetchClassesByTeacher,
-    fetchStudentsByTeacher,
-    isEdit,
-    isRescheduleMode,
-    lessonDateParam,
-    scheduleId,
-  ]);
+  }, [currentUserId, currentCampusId, isEdit, isRescheduleMode, lessonDateParam, scheduleId]);
 
   useEffect(() => {
     void loadFormData();
   }, [loadFormData]);
 
-  // 根据选中校区加载教室列表
+  /* 校区 → 教室联动 */
   useEffect(() => {
-    const loadRooms = async () => {
-      if (!campusId) {
-        setRooms([]);
-        return;
-      }
-      try {
-        const list = await roomService.getList({ campusId });
-        setRooms(list);
-      } catch (err) {
-        logError('schedule-form load rooms', err);
-        setRooms([]);
-      }
-    };
-    loadRooms();
-  }, [campusId]);
-
-  const handleModeChange = useCallback((nextMode: 'student' | 'class') => {
-    if (!USE_MOCK && nextMode === 'student') {
-      Taro.showToast({ title: '真实联调阶段仅支持班级排课', icon: 'none' });
+    if (!campusId) {
+      setRooms([]);
       return;
     }
-    setMode(nextMode);
-  }, []);
+    roomService
+      .getList({ campusId })
+      .then(setRooms)
+      .catch(() => setRooms([]));
+  }, [campusId]);
 
-  const studentPickerData = useMemo(() => students.map((item) => item.name), [students]);
-  const classPickerData = useMemo(() => classes.map((item) => item.name), [classes]);
-  const campusPickerOptions = useMemo(
-    () => ['请选择校区', ...campusOptions.map((item) => item.name)],
-    [campusOptions],
-  );
-  const campusIndex = useMemo(() => {
-    const index = campusOptions.findIndex((item) => item.id === campusId);
-    return Math.max(0, index + 1);
-  }, [campusOptions, campusId]);
-  const roomOptions = useMemo(() => {
-    const activeNames = rooms.filter((item) => item.status === 'active').map((item) => item.name);
-    const options = [...activeNames];
-    if (room && !options.includes(room)) {
-      options.unshift(room);
-    }
-    return ['请选择', ...options];
-  }, [rooms, room]);
-  const roomIndex = useMemo(
-    () => Math.max(0, roomOptions.indexOf(room || '请选择')),
-    [roomOptions, room],
-  );
-  const teacherById = useMemo(
-    () =>
-      teachers.reduce<Record<string, TeacherUIModel>>((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {}),
-    [teachers],
-  );
-  const selectedStudentIdx = useMemo(
-    () => students.findIndex((item) => item.id === studentId),
-    [studentId, students],
-  );
-  const selectedClassIdx = useMemo(
-    () => classes.findIndex((item) => item.id === classId),
-    [classId, classes],
-  );
-  const selectedStudent = useMemo(
-    () => students.find((item) => item.id === studentId) || null,
-    [studentId, students],
-  );
+  /* ---- 计算属性 ---- */
   const selectedClass = useMemo(
-    () => classes.find((item) => item.id === classId) || null,
+    () => classes.find((c) => c.id === classId) || null,
     [classId, classes],
   );
 
-  // 班级课程时，随班级切换同步校区并清空教室
+  /* 班级切换 → 同步校区 */
   useEffect(() => {
     if (mode !== 'class') return;
-    const classCampusId = selectedClass?.campus_id;
-    if (classCampusId && classCampusId !== campusId) {
-      setCampusId(classCampusId);
+    const cc = selectedClass?.campus_id;
+    if (cc && cc !== campusId) {
+      setCampusId(cc);
       setRoom('');
     }
   }, [mode, selectedClass, campusId]);
 
-  const originalScheduleText = useMemo(() => {
-    if (!originalSchedule) {
-      return '';
-    }
-    return `${DAY_LABELS[originalSchedule.day_of_week - 1]} ${originalSchedule.start_time}-${originalSchedule.end_time}`;
-  }, [originalSchedule]);
-  const currentTargetName = useMemo(() => {
-    if (mode === 'class') {
-      return selectedClass?.name || '请选择班级';
-    }
-    return selectedStudent?.name || '请选择学员';
-  }, [mode, selectedClass, selectedStudent]);
-  const leadTeacherOptions = useMemo(
+  const teacherById = useMemo(
     () =>
-      teachers.filter((item) => item.role !== 'assist' || item.id === selectedTeachingTeacherId),
-    [selectedTeachingTeacherId, teachers],
+      teachers.reduce<Record<string, TeacherUIModel>>((a, t) => {
+        a[t.id] = t;
+        return a;
+      }, {}),
+    [teachers],
   );
-  const assistantTeacherOptions = useMemo(
-    () =>
-      teachers.filter(
-        (item) =>
-          item.id !== selectedTeachingTeacherId &&
-          (item.role === 'assist' || item.id === selectedAssistantTeacherId),
-      ),
-    [selectedAssistantTeacherId, selectedTeachingTeacherId, teachers],
-  );
-  const selectedTeachingTeacher = useMemo(
-    () => teachers.find((item) => item.id === selectedTeachingTeacherId) || null,
-    [selectedTeachingTeacherId, teachers],
-  );
-  const selectedAssistantTeacher = useMemo(
-    () => teachers.find((item) => item.id === selectedAssistantTeacherId) || null,
-    [selectedAssistantTeacherId, teachers],
-  );
-  const selectedTeachingTeacherIndex = useMemo(
-    () =>
-      Math.max(
-        0,
-        leadTeacherOptions.findIndex((item) => item.id === selectedTeachingTeacherId),
-      ),
-    [leadTeacherOptions, selectedTeachingTeacherId],
-  );
-  const selectedAssistantTeacherIndex = useMemo(
-    () =>
-      Math.max(
-        0,
-        assistantTeacherOptions.findIndex((item) => item.id === selectedAssistantTeacherId),
-      ),
-    [assistantTeacherOptions, selectedAssistantTeacherId],
-  );
-  const durationHoursText = useMemo(
-    () => getDurationHours(startTime, endTime),
-    [endTime, startTime],
-  );
+
+  /** 当前选中的班级信息（用于展示卡片） */
+  const classInfoCard = useMemo(() => {
+    if (!selectedClass) return null;
+    const ti = getTeacherSelectionInfo({
+      classInfo: selectedClass,
+      teacherById,
+      fallbackTeacherId: selectedTeachingTeacherId || currentUserId,
+      fallbackTeacherName: currentTeacherName,
+    });
+    return {
+      name: selectedClass.name,
+      studentCount: selectedClass.student_count || 0,
+      usedLessons: selectedClass.used_lessons || 0,
+      totalLessons:
+        ((selectedClass as unknown as Record<string, unknown>).total_lessons as
+          | number
+          | undefined) ?? null,
+      pricePerLesson: selectedClass.pricePerLesson || 0,
+      teacherName: ti.leadTeacherName,
+      assistantName: ti.assistantTeacherName || undefined,
+      campusName:
+        selectedClass.campus_name ||
+        campusOptions.find((c) => c.id === selectedClass.campus_id)?.name ||
+        '',
+      scheduleMode: selectedClass.schedule_mode,
+    };
+  }, [
+    selectedClass,
+    teacherById,
+    selectedTeachingTeacherId,
+    currentUserId,
+    currentTeacherName,
+    campusOptions,
+  ]);
+
+  /* 是否已有真实时间组（非默认占位 09:00-10:00） */
+  const hasRealTimeSlots =
+    timeSlots.length > 0 && timeSlots.some((ts) => ts.start !== '09:00' || ts.end !== '10:00');
+
   const sourceLessonDateText = useMemo(() => {
-    if (lessonDateParam && dayjs(lessonDateParam).isValid()) {
+    if (lessonDateParam && dayjs(lessonDateParam).isValid())
       return dayjs(lessonDateParam).format('YYYY-MM-DD');
-    }
     return originalSchedule
       ? getNextDateByDayOfWeek(originalSchedule.day_of_week).format('YYYY-MM-DD')
       : '';
   }, [lessonDateParam, originalSchedule]);
-  const sourceLessonWeekdayText = useMemo(() => {
-    if (!sourceLessonDateText || !dayjs(sourceLessonDateText).isValid()) {
-      return '';
-    }
-    const weekday = (dayjs(sourceLessonDateText).day() || 7) as DayOfWeek;
-    return DAY_LABELS[weekday - 1];
-  }, [sourceLessonDateText]);
-  const rescheduleSummaryTeacherText = useMemo(() => {
-    const teacherNames = [
-      selectedTeachingTeacher?.name || originalSchedule?.teacher_name || currentTeacherName,
-      selectedAssistantTeacher?.name || originalSchedule?.assistant_teacher_name || '',
-    ].filter(Boolean);
-    return teacherNames.join(' / ');
-  }, [
-    currentTeacherName,
-    originalSchedule?.assistant_teacher_name,
-    originalSchedule?.teacher_name,
-    selectedAssistantTeacher?.name,
-    selectedTeachingTeacher?.name,
-  ]);
-  const scheduleWeekdaySet = useMemo(() => {
-    return new Set(allSchedules.map((item) => item.day_of_week));
-  }, [allSchedules]);
+
+  const scheduleWeekdaySet = useMemo(
+    () => new Set(allSchedules.map((s) => s.day_of_week)),
+    [allSchedules],
+  );
   const getDateDotType = useCallback(
     (date: dayjs.Dayjs): CalendarDotType => {
-      const weekday = (date.day() || 7) as Schedule['day_of_week'];
-      if (!scheduleWeekdaySet.has(weekday)) {
-        return 'none';
-      }
+      const wd = (date.day() || 7) as Schedule['day_of_week'];
+      if (!scheduleWeekdaySet.has(wd)) return 'none';
       return date.isBefore(dayjs(), 'day') ? 'past' : 'active';
     },
     [scheduleWeekdaySet],
   );
 
+  /* 时间校验 */
   useEffect(() => {
-    if (parseTimeToMinutes(endTime) - parseTimeToMinutes(startTime) >= MIN_DURATION_MINUTES) {
-      return;
-    }
-    setEndTime(formatMinutesToTime(parseTimeToMinutes(startTime) + MIN_DURATION_MINUTES));
-  }, [endTime, startTime]);
+    setTimeSlots((prev) =>
+      prev.map((ts) => {
+        if (parseTimeToMinutes(ts.end) - parseTimeToMinutes(ts.start) < MIN_DURATION_MINUTES) {
+          return {
+            ...ts,
+            end: formatMinutesToTime(parseTimeToMinutes(ts.start) + MIN_DURATION_MINUTES),
+          };
+        }
+        return ts;
+      }),
+    );
+  }, []); // 仅初始化时校验
 
+  /* 班级切换 → 自动填充老师 */
   useEffect(() => {
-    if (teachers.length === 0) {
-      return;
-    }
+    if (teachers.length === 0) return;
     if (mode === 'class') {
-      const teacherInfo = getTeacherSelectionInfo({
+      const ti = getTeacherSelectionInfo({
         classInfo: selectedClass,
         teacherById,
         fallbackTeacherId: originalSchedule?.teacher_id || currentUserId,
@@ -509,8 +443,8 @@ const ScheduleForm: React.FC = () => {
         fallbackAssistantTeacherId: originalSchedule?.assistant_teacher_id,
         fallbackAssistantTeacherName: originalSchedule?.assistant_teacher_name,
       });
-      setSelectedTeachingTeacherId(teacherInfo.leadTeacherId || currentUserId);
-      setSelectedAssistantTeacherId(teacherInfo.assistantTeacherId);
+      setSelectedTeachingTeacherId(ti.leadTeacherId || currentUserId);
+      setSelectedAssistantTeacherId(ti.assistantTeacherId);
       return;
     }
     setSelectedTeachingTeacherId(currentUserId);
@@ -519,191 +453,216 @@ const ScheduleForm: React.FC = () => {
     currentTeacherName,
     currentUserId,
     mode,
-    originalSchedule?.assistant_teacher_id,
-    originalSchedule?.assistant_teacher_name,
-    originalSchedule?.teacher_id,
-    originalSchedule?.teacher_name,
+    originalSchedule,
     selectedClass,
     teacherById,
     teachers.length,
   ]);
 
+  /* 班级切换 → 拉取学员列表（只读展示） */
+  useEffect(() => {
+    if (!classId) {
+      setClassStudents([]);
+      return;
+    }
+    classService
+      .getStudents(classId)
+      .then(setClassStudents)
+      .catch(() => setClassStudents([]));
+  }, [classId]);
+
+  /* ---- 操作方法 ---- */
+
+  /** 添加一组时间 */
+  const addTimeSlot = useCallback(() => {
+    setTimeSlots((prev) => [...prev, { id: Date.now(), start: '10:00', end: '11:00' }]);
+  }, []);
+
+  /** 删除一组时间 */
+  const removeTimeSlot = useCallback((id: number) => {
+    setTimeSlots((prev) => (prev.length > 1 ? prev.filter((ts) => ts.id !== id) : prev));
+  }, []);
+
+  /** 更新某组时间的起/止 */
+  const updateTimeSlot = useCallback((id: number, field: 'start' | 'end', val: string) => {
+    setTimeSlots((prev) => prev.map((ts) => (ts.id === id ? { ...ts, [field]: val } : ts)));
+  }, []);
+
+  /* ---- 课程信息编辑同步 ---- */
+
+  /**
+   * 上课学员变更（移除/添加）：实时同步到班级（classService），
+   * 并刷新当前页 classStudents + store 让课程管理页面同步生效。
+   */
+  const handleStudentsChange = useCallback(
+    async (newIds: string[]) => {
+      if (!classId) return;
+      const oldIds = classStudents.map((s) => s.id);
+      const toRemove = oldIds.filter((id) => !newIds.includes(id));
+      const toAdd = newIds.filter((id) => !oldIds.includes(id));
+      try {
+        for (const sid of toRemove) {
+          await classService.removeStudent(classId, sid);
+        }
+        if (toAdd.length > 0) {
+          await classService.addStudents(classId, toAdd);
+        }
+        // 重新拉取本班学员（确保头像/姓名/课时为最新）
+        const fresh = await classService.getStudents(classId);
+        setClassStudents(fresh);
+        // 刷新 store，让其他页面（课程管理/班级详情）看到最新结果
+        invalidateStudents(currentUserId);
+        Taro.showToast({ title: '已同步到课程管理', icon: 'success', duration: 1200 });
+      } catch (err) {
+        logError('同步班级学员失败', err);
+        Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
+      }
+    },
+    [classId, classStudents, currentUserId, invalidateStudents],
+  );
+
+  /** 调整授课老师 */
+  const handleTeacherConfirm = useCallback((v: string) => {
+    setSelectedTeachingTeacherId(v);
+    setTeacherPickerVisible(false);
+  }, []);
+
+  /** 调整助教 */
+  const handleAssistantConfirm = useCallback((v: string) => {
+    setSelectedAssistantTeacherId(v);
+    setAssistantPickerVisible(false);
+  }, []);
+
+  /* ---- 提交校验 ---- */
   const submitBlockedReason = useMemo(() => {
-    if (!currentUserId) return '未获取到登录信息，请重新进入页面';
-    if (mode === 'student' && !USE_MOCK) return '真实联调阶段仅支持班级排课';
-    if (mode === 'student' && !students.length) return '暂无可排学员';
-    if (mode === 'student' && !studentId) return '请选择学员';
-    if (mode === 'class' && !classes.length && !classId) return '暂无可排班级';
+    if (!currentUserId) return '未获取到登录信息';
+    if (mode === 'student' && !USE_MOCK) return '真实联调仅支持班级排课';
     if (mode === 'class' && !classId) return '请选择班级';
-    if (!selectedDateValue) return '请选择上课日期';
-    if (!startTime || !endTime) return '请选择完整的上课时间';
-    if (startTime >= endTime) return '结束时间需晚于开始时间';
+    if (!startDate) return '请选择开始日期';
+    if (selectedDays.length === 0) return '请至少选择一个上课周几';
+    if (timeSlots.some((ts) => !ts.start || !ts.end)) return '请填写完整的上课时间';
+    if (timeSlots.some((ts) => ts.start >= ts.end)) return '结束时间需晚于开始时间';
     if (!selectedTeachingTeacherId) return '请选择主讲老师';
     return '';
-  }, [
-    classId,
-    classes.length,
-    currentUserId,
-    endTime,
-    mode,
-    selectedDateValue,
-    selectedTeachingTeacherId,
-    startTime,
-    studentId,
-    students.length,
-  ]);
+  }, [classId, currentUserId, mode, selectedDays, selectedTeachingTeacherId, startDate, timeSlots]);
 
   const canSubmit = useMemo(
     () => !loading && !loadError && !notFound && !submitBlockedReason,
     [loadError, loading, notFound, submitBlockedReason],
   );
-  const pageTitle = useMemo(() => {
-    if (isRescheduleMode) {
-      return '调课';
-    }
-    return isEdit ? '编辑排课' : '创建排课';
-  }, [isEdit, isRescheduleMode]);
-  const submitButtonText = useMemo(() => {
-    if (saving) {
-      return isRescheduleMode ? '保存中...' : '保存中...';
-    }
-    return '保存';
-  }, [isRescheduleMode, saving]);
 
+  /* ---- 通知 ---- */
   const handleNotifyStudentAndParents = useCallback(
-    async (targetStudentId: string, title: string, content: string) => {
+    async (sid: string, title: string, content: string) => {
       try {
         await notificationService.send({
           sender_id: currentUserId,
-          receiver_id: targetStudentId,
+          receiver_id: sid,
           title,
           content,
-          related_id: targetStudentId,
+          related_id: sid,
         });
-      } catch (err) {
-        logError('scheduleForm notify student', err);
+      } catch {
+        /* ignore */
       }
-
       try {
-        const parents = await studentService.getParents(targetStudentId);
-        for (const binding of parents) {
-          await notificationService.send({
-            sender_id: currentUserId,
-            receiver_id: binding.parent_id,
-            title,
-            content,
-            related_id: targetStudentId,
-          });
+        const parents = await studentService.getParents(sid);
+        for (const p of parents) {
+          try {
+            await notificationService.send({
+              sender_id: currentUserId,
+              receiver_id: p.parent_id,
+              title,
+              content,
+              related_id: sid,
+            });
+          } catch {
+            /* ignore */
+          }
         }
-      } catch (err) {
-        logError('scheduleForm notify parents', err);
+      } catch {
+        /* ignore */
       }
     },
     [currentUserId],
   );
 
+  /* ---- 保存 ---- */
   const handleSave = useCallback(async () => {
-    if (saving) {
-      return;
-    }
-
+    if (saving) return;
     if (submitBlockedReason) {
       Taro.showToast({ title: submitBlockedReason, icon: 'none' });
       return;
     }
 
+    /* 调课分支 */
     if (isRescheduleMode) {
       if (!originalSchedule) {
         Taro.showToast({ title: '未找到原课程信息', icon: 'none' });
         return;
       }
-
-      const sourceDate = sourceLessonDateText;
-      const targetDate = selectedDateValue;
-      if (!sourceDate || !dayjs(sourceDate).isValid()) {
+      const sd = sourceLessonDateText,
+        td = selectedDateValue;
+      if (!sd || !dayjs(sd).isValid()) {
         Taro.showToast({ title: '原上课日期异常', icon: 'none' });
         return;
       }
-      const noDateChange = targetDate === sourceDate;
-      const noTimeChange =
-        startTime === originalSchedule.start_time && endTime === originalSchedule.end_time;
-      if (noDateChange && noTimeChange) {
+      const noDate = td === sd,
+        noTime = startTime === originalSchedule.start_time && endTime === originalSchedule.end_time;
+      if (noDate && noTime) {
         Taro.showToast({ title: '请至少调整日期或时间', icon: 'none' });
         return;
       }
-
-      const adjustedSchedule: Schedule = {
-        ...originalSchedule,
-        start_time: startTime,
-        end_time: endTime,
-      };
-
-      const conflictItems = await temporaryRescheduleService.checkDateConflict({
+      const adj: Schedule = { ...originalSchedule, start_time: startTime, end_time: endTime };
+      const conflicts = await temporaryRescheduleService.checkDateConflict({
         teacherId: currentUserId,
-        sourceDate,
-        targetDate,
-        movingSchedules: [adjustedSchedule],
+        sourceDate: sd,
+        targetDate: td,
+        movingSchedules: [adj],
         allSchedules,
       });
-      if (conflictItems.length > 0) {
-        Taro.showToast({
-          title: '目标日期存在时间冲突',
-          icon: 'none',
-          duration: 3000,
-        });
+      if (conflicts.length > 0) {
+        Taro.showToast({ title: '目标日期存在时间冲突', icon: 'none', duration: 3000 });
         return;
       }
-
       setSaving(true);
       try {
         await temporaryRescheduleService.saveBatch({
           teacherId: currentUserId,
-          sourceDate,
-          targetDate,
-          schedules: [adjustedSchedule],
+          sourceDate: sd,
+          targetDate: td,
+          schedules: [adj],
         });
-
-        const originalText =
-          `${dayjs(sourceDate).format('MM月DD日')} ` +
-          `${originalSchedule.start_time}-${originalSchedule.end_time}`;
-        const updatedText = `${dayjs(targetDate).format('MM月DD日')} ${startTime}-${endTime}`;
+        const ot = `${dayjs(sd).format('MM月DD日')} ${originalSchedule.start_time}-${originalSchedule.end_time}`;
+        const nt = `${dayjs(td).format('MM月DD日')} ${startTime}-${endTime}`;
         if (mode === 'class' && classId) {
-          const classStudents = await classService.getStudents(classId);
-          const title = '调课通知';
-          const content = `${selectedClass?.name || '班级课程'} 已由 ${originalText} 调整为 ${updatedText}，仅本次课程生效。`;
-          for (const student of classStudents) {
-            await handleNotifyStudentAndParents(student.id, title, content);
-          }
+          const cs = await classService.getStudents(classId);
+          for (const s of cs)
+            await handleNotifyStudentAndParents(
+              s.id,
+              '调课通知',
+              `${selectedClass?.name || '班级课程'} 已由 ${ot} 调整为 ${nt}，仅本次生效。`,
+            );
         }
-        if (mode === 'student' && studentId) {
-          await handleNotifyStudentAndParents(
-            studentId,
-            '调课通知',
-            `${selectedStudent?.name || '您的课程'} 已由 ${originalText} 调整为 ${updatedText}，仅本次课程生效。`,
-          );
-        }
-
         Taro.showToast({ title: '调课成功', icon: 'success' });
         setTimeout(() => Taro.navigateBack(), 1200);
-      } catch (err) {
-        logError('scheduleForm single reschedule', err);
-        Taro.showToast({ title: '调课失败，请重试', icon: 'none' });
+      } catch {
+        Taro.showToast({ title: '调课失败', icon: 'none' });
       } finally {
         setSaving(false);
       }
       return;
     }
 
-    const targetDayOfWeek = (dayjs(selectedDateValue).day() || 7) as DayOfWeek;
-
+    /* 创建/编辑排课 */
+    const targetDow = (dayjs(selectedDateValue).day() || 7) as DayOfWeek;
     const hasConflict = await scheduleService.checkConflict(
       currentUserId,
-      targetDayOfWeek,
+      targetDow,
       startTime,
       endTime,
       isEdit ? scheduleId : undefined,
     );
-
     const doSave = async () => {
       setSaving(true);
       try {
@@ -712,7 +671,7 @@ const ScheduleForm: React.FC = () => {
           assistant_teacher_id: selectedAssistantTeacherId || undefined,
           student_id: mode === 'student' ? studentId : undefined,
           class_id: mode === 'class' ? classId : undefined,
-          day_of_week: targetDayOfWeek,
+          day_of_week: targetDow,
           start_time: startTime,
           end_time: endTime,
           room: room || undefined,
@@ -720,41 +679,20 @@ const ScheduleForm: React.FC = () => {
           note: note.trim() || undefined,
           reminder_minutes: reminderMinutes,
         };
-
         if (isEdit) {
           await scheduleService.update(scheduleId, data);
-          if (isRescheduleMode) {
-            const originalText = originalScheduleText || '原排课';
-            const updatedText = `${selectedDateValue} ${startTime}-${endTime}`;
-            if (mode === 'class' && classId) {
-              const classStudents = await classService.getStudents(classId);
-              const title = '调课通知';
-              const content = `${selectedClass?.name || '班级课程'} 已由 ${originalText} 调整为 ${updatedText}，请留意最新上课安排。`;
-              for (const student of classStudents) {
-                await handleNotifyStudentAndParents(student.id, title, content);
-              }
-            }
-            if (mode === 'student' && studentId) {
-              await handleNotifyStudentAndParents(
-                studentId,
-                '调课通知',
-                `${selectedStudent?.name || '您的课程'} 已由 ${originalText} 调整为 ${updatedText}，请留意最新上课安排。`,
-              );
-            }
-          }
-          Taro.showToast({ title: isRescheduleMode ? '调课成功' : '更新成功', icon: 'success' });
+          Taro.showToast({ title: '更新成功', icon: 'success' });
         } else {
           await scheduleService.create(data as Omit<Schedule, 'id' | 'created_at' | 'updated_at'>);
           Taro.showToast({ title: '添加成功', icon: 'success' });
         }
         setTimeout(() => Taro.navigateBack(), 1200);
-      } catch (err) {
-        Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+      } catch {
+        Taro.showToast({ title: '保存失败', icon: 'none' });
       } finally {
         setSaving(false);
       }
     };
-
     if (hasConflict) {
       const { confirm } = await Taro.showModal({
         title: '时间冲突',
@@ -762,7 +700,6 @@ const ScheduleForm: React.FC = () => {
       });
       if (!confirm) return;
     }
-
     await doSave();
   }, [
     allSchedules,
@@ -776,7 +713,6 @@ const ScheduleForm: React.FC = () => {
     mode,
     note,
     originalSchedule,
-    originalScheduleText,
     reminderMinutes,
     room,
     saving,
@@ -784,7 +720,6 @@ const ScheduleForm: React.FC = () => {
     selectedAssistantTeacherId,
     selectedClass?.name,
     selectedDateValue,
-    selectedStudent?.name,
     selectedTeachingTeacherId,
     startTime,
     studentId,
@@ -792,31 +727,8 @@ const ScheduleForm: React.FC = () => {
     sourceLessonDateText,
   ]);
 
-  const handleDelete = useCallback(async () => {
-    if (deleting) {
-      return;
-    }
-
-    const { confirm } = await Taro.showModal({
-      title: '确认删除',
-      content: '删除后课程数据将无法恢复，是否确认删除？',
-      confirmColor: '#ef4444',
-    });
-    if (!confirm) return;
-
-    setDeleting(true);
-    try {
-      await scheduleService.remove(scheduleId);
-      Taro.showToast({ title: '已删除', icon: 'success' });
-      setTimeout(() => Taro.navigateBack(), 1200);
-    } catch {
-      Taro.showToast({ title: '删除失败', icon: 'none' });
-    } finally {
-      setDeleting(false);
-    }
-  }, [deleting, scheduleId]);
-
-  if (loading) {
+  /* ---- 渲染：加载态 ---- */
+  if (loading)
     return (
       <PageContainer>
         <View className="flex items-center justify-center pt-[200rpx]">
@@ -824,12 +736,10 @@ const ScheduleForm: React.FC = () => {
         </View>
       </PageContainer>
     );
-  }
-
-  if (loadError) {
+  if (loadError)
     return (
       <PageContainer>
-        <View className="min-h-screen bg-[#f7f7f7] px-8 flex items-center justify-center">
+        <View className="min-h-screen bg-muted px-8 flex items-center justify-center">
           <Empty
             icon="mdi-alert-circle"
             description={loadError}
@@ -839,594 +749,287 @@ const ScheduleForm: React.FC = () => {
         </View>
       </PageContainer>
     );
-  }
-
-  if (notFound) {
+  if (notFound)
     return (
       <PageContainer>
-        <View className="min-h-screen bg-[#f7f7f7] px-8 flex items-center justify-center">
+        <View className="min-h-screen bg-muted px-8 flex items-center justify-center">
           <Empty
             icon="mdi-calendar-blank"
             description="未找到对应排课信息"
-            actionText="返回上一页"
+            actionText="返回"
             onAction={() => Taro.navigateBack()}
           />
         </View>
       </PageContainer>
     );
-  }
 
+  /* ======================== 主渲染 ======================== */
   return (
-    <PageContainer safeBottom className={isRescheduleMode ? 'bg-[#f6f8fc]' : 'bg-[#f5f6f8]'}>
-      <View
-        className={`min-h-screen pb-[220rpx] ${isRescheduleMode ? 'bg-[#f6f8fc]' : 'bg-[#f5f6f8]'}`}
-      >
-        {isRescheduleMode ? null : null}
-
-        <View className={`px-[24rpx] pt-[24rpx] ${isRescheduleMode ? '' : ''}`}>
-          {isRescheduleMode ? (
-            <>
-              <WorkflowHeaderCard
-                eyebrow="单次调课"
-                title="确认调课"
-                tone="green"
-                hintLines={[
-                  '仅调整本次课程日期，不改变长期排课规则',
-                  '确认后会自动通知相关学员和家长',
-                ]}
-              >
-                <View className="flex items-center gap-[12rpx] rounded-[20rpx] bg-[#f4fffa] px-[18rpx] py-[18rpx]">
-                  <View className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-[#e8f7ee]">
-                    <Icon name="mdi-swap-horizontal" size="xs" color="#16a34a" />
-                  </View>
-                  <Text className="text-[24rpx] font-medium text-foreground-secondary">
-                    {dayjs(sourceLessonDateText).isValid()
-                      ? `${dayjs(sourceLessonDateText).format('MM月DD日')} ${sourceLessonWeekdayText}`
-                      : '原上课日期'}
-                  </Text>
-                  <Icon name="mdi-arrow-right" size="xs" color="mutedForeground" />
-                  <Text className="text-[24rpx] font-semibold text-[#16a34a]">
-                    {dayjs(selectedDateValue).format('MM月DD日')}
-                  </Text>
-                </View>
-
+    <PageContainer safeBottom className="bg-muted">
+      <ScrollView scrollY className="h-screen" enhanced showScrollbar={false}>
+        <View className="min-h-screen pb-[240rpx]">
+          {/* ===================== 统一排课表单（班课/团课共用） ===================== */}
+          {/* 设计要点：课程类型 → 课程名称 → 消耗课时(步进器) → 上课时间； */}
+          {/* 引用信息（老师/助教/时长/难度）选中课程后带出，折叠到上课时间下方展示 */}
+          <>
+            {/* 主表单 —— 单一大圆角白卡片 */}
+            <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card">
+              {/* 1. 课程类型（班课/团课） */}
+              <View className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60">
+                <Text className="text-[28rpx] text-foreground">课程类型</Text>
                 <View
-                  className="mt-[14rpx] rounded-[24rpx] border border-[#dff3e8] bg-[#f4fffa] px-[22rpx] py-[22rpx]"
-                  onClick={() => setCalendarVisible(true)}
+                  className="flex items-center gap-[8rpx]"
+                  onClick={() => setTypePickerVisible(true)}
                 >
-                  <View className="flex items-center justify-between">
-                    <View className="flex items-center gap-[14rpx]">
-                      <View className="flex h-[72rpx] w-[72rpx] items-center justify-center rounded-[20rpx] bg-[#e4fff1]">
-                        <Icon name="mdi-calendar-check" size="md" color="#16a34a" />
-                      </View>
-                      <Text className="text-[34rpx] font-semibold text-foreground">
-                        {dayjs(selectedDateValue).format('YYYY年MM月DD日')}
-                      </Text>
-                    </View>
-                    <View className="flex items-center gap-[8rpx]">
-                      <Text className="text-[24rpx] font-medium text-[#16a34a]">点击选择</Text>
-                      <Icon name="mdi-chevron-right" size="sm" color="#16a34a" />
-                    </View>
-                  </View>
-                </View>
-
-                <View className="mt-[14rpx] rounded-[20rpx] border border-[#e1f5e8] bg-[#fbfffc] px-[20rpx] py-[18rpx]">
-                  <View className="flex items-center justify-between">
-                    <Text className="text-[24rpx] font-medium text-[#4b5563]">时间调整</Text>
-                    <View className="rounded-full bg-[#edfdf3] px-[14rpx] py-[6rpx]">
-                      <Text className="text-[22rpx] font-medium text-[#16a34a]">
-                        {durationHoursText} 课时
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="mt-[14rpx] flex items-center gap-[12rpx]">
-                    <Picker
-                      mode="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.detail.value)}
-                    >
-                      <View className="flex-1 rounded-[18rpx] border border-[#dff3e8] bg-white px-[18rpx] py-[16rpx]">
-                        <Text className="block text-[22rpx] text-muted-foreground">开始</Text>
-                        <View className="mt-[6rpx] flex items-center justify-between">
-                          <Text className="text-[30rpx] font-semibold text-foreground">
-                            {startTime}
-                          </Text>
-                          <Icon name="mdi-chevron-right" size="sm" color="#16a34a" />
-                        </View>
-                      </View>
-                    </Picker>
-                    <Picker
-                      mode="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.detail.value)}
-                    >
-                      <View className="flex-1 rounded-[18rpx] border border-[#dff3e8] bg-white px-[18rpx] py-[16rpx]">
-                        <Text className="block text-[22rpx] text-muted-foreground">结束</Text>
-                        <View className="mt-[6rpx] flex items-center justify-between">
-                          <Text className="text-[30rpx] font-semibold text-foreground">
-                            {endTime}
-                          </Text>
-                          <Icon name="mdi-chevron-right" size="sm" color="#16a34a" />
-                        </View>
-                      </View>
-                    </Picker>
-                  </View>
-                </View>
-              </WorkflowHeaderCard>
-
-              <View className="mt-[24rpx] rounded-[28rpx] bg-white px-[24rpx] py-[22rpx] shadow-card">
-                <View className="flex items-center justify-between">
-                  <View>
-                    <Text className="text-[30rpx] font-semibold text-foreground">
-                      {mode === 'class' ? '调课班级' : '调课学员'}
-                    </Text>
-                    <Text className="mt-[6rpx] block text-[24rpx] text-muted-foreground">
-                      共 1 节课
-                    </Text>
-                  </View>
-                  <View className="rounded-full bg-[#edfdf3] px-[18rpx] py-[10rpx]">
-                    <Text className="text-[24rpx] font-medium text-[#16a34a]">
-                      {durationHoursText} 课时
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="mt-[16rpx] flex flex-col gap-[16rpx]">
-                <View className="rounded-[26rpx] bg-white px-[24rpx] py-[24rpx] shadow-card">
-                  <View className="flex items-center justify-between gap-[16rpx]">
-                    <Text className="truncate text-[32rpx] font-semibold text-foreground">
-                      {currentTargetName}
-                    </Text>
-                    <View className="rounded-full bg-[#f4f7fb] px-[14rpx] py-[8rpx]">
-                      <Text className="flex-shrink-0 text-[22rpx] text-muted-foreground">
-                        {mode === 'class' ? `${selectedClass?.student_count || 0}人` : '单课'}
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="mt-[14rpx] flex items-center gap-[10rpx]">
-                    <Icon name="mdi-account-outline" size="xs" color="mutedForeground" />
-                    <Text className="text-[25rpx] text-muted-foreground">
-                      {rescheduleSummaryTeacherText || '未分配老师'}
-                    </Text>
-                  </View>
-                  <View className="mt-[10rpx] flex items-center gap-[10rpx]">
-                    <Icon name="mdi-clock-outline" size="xs" color="mutedForeground" />
-                    <Text className="text-[25rpx] text-muted-foreground">
-                      {startTime}-{endTime}
-                    </Text>
-                  </View>
-                  {note ? (
-                    <View className="mt-[10rpx] flex items-start gap-[10rpx]">
-                      <Icon name="mdi-note-text-outline" size="xs" color="mutedForeground" />
-                      <Text className="flex-1 text-[25rpx] text-muted-foreground">{note}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </>
-          ) : (
-            <>
-              <View className="mb-[18rpx] px-[6rpx]">
-                <Text className="block text-[34rpx] font-semibold text-[#111827]">{pageTitle}</Text>
-                <Text className="mt-[4rpx] block text-[22rpx] leading-[32rpx] text-[#98a2b3]">
-                  维护班级或学员的常规排课信息
-                </Text>
-              </View>
-
-              <View className="mb-[24rpx]">
-                <Text className={FORM_SECTION_TITLE_CLASS}>课程类型</Text>
-                <View className="flex gap-[14rpx]">
-                  <View
-                    className={`flex-1 rounded-[16rpx] border px-[24rpx] py-[22rpx] text-center ${mode === 'student' ? 'border-[#f97361] bg-[#fff7f5]' : 'border-[#eceff3] bg-white'}`}
-                    onClick={() => handleModeChange('student')}
-                  >
-                    <Text
-                      className={`block text-[28rpx] font-medium ${mode === 'student' ? 'text-[#f97361]' : 'text-[#374151]'}`}
-                    >
-                      单人课程
-                    </Text>
-                  </View>
-                  <View
-                    className={`flex-1 rounded-[16rpx] border px-[24rpx] py-[22rpx] text-center ${mode === 'class' ? 'border-[#f97361] bg-[#fff7f5]' : 'border-[#eceff3] bg-white'}`}
-                    onClick={() => handleModeChange('class')}
-                  >
-                    <Text
-                      className={`block text-[28rpx] font-medium ${mode === 'class' ? 'text-[#f97361]' : 'text-[#374151]'}`}
-                    >
-                      班级课程
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="mb-[24rpx]">
-                <Text className={FORM_SECTION_TITLE_CLASS}>基础信息</Text>
-                <View className={FORM_CARD_CLASS}>
-                  {mode === 'student' ? (
-                    <Picker
-                      mode="selector"
-                      range={studentPickerData}
-                      value={selectedStudentIdx >= 0 ? selectedStudentIdx : 0}
-                      onChange={(e) => {
-                        const index = Number(e.detail.value);
-                        if (students[index]) {
-                          setStudentId(students[index].id);
-                        }
-                      }}
-                    >
-                      <View className={FORM_CELL_CLASS}>
-                        <Text className={FORM_CELL_LABEL_CLASS}>学员名称</Text>
-                        <View className="flex items-center gap-[12rpx]">
-                          <Text
-                            className={
-                              selectedStudent
-                                ? 'text-[28rpx] text-[#111827]'
-                                : FORM_CELL_VALUE_CLASS
-                            }
-                          >
-                            {selectedStudent?.name || '请选择'}
-                          </Text>
-                          <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
-                        </View>
-                      </View>
-                    </Picker>
-                  ) : (
-                    <Picker
-                      mode="selector"
-                      range={classPickerData}
-                      value={selectedClassIdx >= 0 ? selectedClassIdx : 0}
-                      onChange={(e) => {
-                        const index = Number(e.detail.value);
-                        if (classes[index]) {
-                          setClassId(classes[index].id);
-                        }
-                      }}
-                    >
-                      <View className={FORM_CELL_CLASS}>
-                        <Text className={FORM_CELL_LABEL_CLASS}>班级名称</Text>
-                        <View className="flex items-center gap-[12rpx]">
-                          <Text
-                            className={
-                              selectedClass ? 'text-[28rpx] text-[#111827]' : FORM_CELL_VALUE_CLASS
-                            }
-                          >
-                            {selectedClass?.name || '请选择'}
-                          </Text>
-                          <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
-                        </View>
-                      </View>
-                    </Picker>
-                  )}
-
-                  <View className="border-t border-[#f1f5f9] px-[24rpx] py-[18rpx]">
-                    <Text className="mb-[14rpx] block text-[28rpx] text-[#111827]">上课日</Text>
-                    <View className="flex gap-[10rpx]">
-                      {DAY_VALUES.map((item, index) => {
-                        const active = dayOfWeek === item;
-                        return (
-                          <View
-                            key={item}
-                            className={`flex-1 rounded-[14rpx] border px-[8rpx] py-[16rpx] text-center ${active ? 'border-[#f97361] bg-[#fff7f5]' : 'border-[#e5e7eb] bg-[#fafafa]'}`}
-                            onClick={() => setDayOfWeek(item)}
-                          >
-                            <Text
-                              className={`text-[24rpx] font-medium ${active ? 'text-[#f97361]' : 'text-[#4b5563]'}`}
-                            >
-                              {DAY_LABELS[index]}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-
-                  <View className="border-t border-[#f1f5f9] px-[24rpx] py-[18rpx]">
-                    <Text className="mb-[14rpx] block text-[28rpx] text-[#111827]">上课时间</Text>
-                    <View className="flex items-center gap-[12rpx]">
-                      <Picker
-                        mode="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.detail.value)}
-                      >
-                        <View className="flex h-[82rpx] flex-1 items-center justify-between rounded-[14rpx] border border-[#eef2f6] bg-[#f8fafc] px-[20rpx]">
-                          <Text className="text-[28rpx] text-[#111827]">{startTime}</Text>
-                          <Text className={FORM_ARROW_CLASS}>▼</Text>
-                        </View>
-                      </Picker>
-                      <Text className="text-[24rpx] text-[#9ca3af]">至</Text>
-                      <Picker
-                        mode="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.detail.value)}
-                      >
-                        <View className="flex h-[82rpx] flex-1 items-center justify-between rounded-[14rpx] border border-[#eef2f6] bg-[#f8fafc] px-[20rpx]">
-                          <Text className="text-[28rpx] text-[#111827]">{endTime}</Text>
-                          <Text className={FORM_ARROW_CLASS}>▼</Text>
-                        </View>
-                      </Picker>
-                    </View>
-                    <View className="mt-[14rpx] flex flex-wrap gap-[12rpx]">
-                      {COMMON_TIME_RANGES.map((item) => {
-                        const active = startTime === item.start && endTime === item.end;
-                        return (
-                          <View
-                            key={item.label}
-                            className={`rounded-full px-[18rpx] py-[10rpx] ${active ? 'bg-[#fff1ee]' : 'border border-[#e5e7eb] bg-white'}`}
-                            onClick={() => {
-                              setStartTime(item.start);
-                              setEndTime(item.end);
-                            }}
-                          >
-                            <Text
-                              className={`text-[22rpx] ${active ? 'text-[#f97361]' : 'text-[#6b7280]'}`}
-                            >
-                              {item.label}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View className="mb-[24rpx]">
-                <Text className={FORM_SECTION_TITLE_CLASS}>授课老师</Text>
-                <View className={FORM_CARD_CLASS}>
-                  <Picker
-                    mode="selector"
-                    range={leadTeacherOptions.map((item) => item.name)}
-                    value={selectedTeachingTeacherIndex}
-                    onChange={(e) => {
-                      const index = Number(e.detail.value);
-                      if (leadTeacherOptions[index]) {
-                        const nextTeacherId = leadTeacherOptions[index].id;
-                        setSelectedTeachingTeacherId(nextTeacherId);
-                        if (selectedAssistantTeacherId === nextTeacherId) {
-                          setSelectedAssistantTeacherId('');
-                        }
-                      }
-                    }}
-                  >
-                    <View className={FORM_CELL_CLASS}>
-                      <Text className={FORM_CELL_LABEL_CLASS}>主讲老师</Text>
-                      <View className="flex items-center gap-[12rpx]">
-                        <Text className="text-[28rpx] text-[#111827]">
-                          {selectedTeachingTeacher?.name || currentTeacherName || '请选择'}
-                        </Text>
-                        <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
-                      </View>
-                    </View>
-                  </Picker>
-
-                  {assistantTeacherOptions.length > 0 ? (
-                    <Picker
-                      mode="selector"
-                      range={assistantTeacherOptions.map((item) => item.name)}
-                      value={selectedAssistantTeacherIndex}
-                      onChange={(e) => {
-                        const index = Number(e.detail.value);
-                        if (assistantTeacherOptions[index]) {
-                          setSelectedAssistantTeacherId(assistantTeacherOptions[index].id);
-                        }
-                      }}
-                    >
-                      <View className="border-t border-[#f1f5f9]">
-                        <View className={FORM_CELL_CLASS}>
-                          <Text className={FORM_CELL_LABEL_CLASS}>上课助教</Text>
-                          <View className="flex items-center gap-[12rpx]">
-                            <Text
-                              className={
-                                selectedAssistantTeacher
-                                  ? 'text-[28rpx] text-[#111827]'
-                                  : FORM_CELL_VALUE_CLASS
-                              }
-                            >
-                              {selectedAssistantTeacher?.name || '请选择'}
-                            </Text>
-                            <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </Picker>
-                  ) : (
-                    <View className="border-t border-[#f1f5f9]">
-                      <View className={FORM_CELL_CLASS}>
-                        <Text className={FORM_CELL_LABEL_CLASS}>上课助教</Text>
-                        <Text className={FORM_CELL_VALUE_CLASS}>请选择</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              <View className="mb-[24rpx]">
-                <Text className={FORM_SECTION_TITLE_CLASS}>上课地点</Text>
-                <View className={FORM_CARD_CLASS}>
-                  <Picker
-                    mode="selector"
-                    range={campusPickerOptions}
-                    value={campusIndex}
-                    onChange={(e) => {
-                      const index = Number(e.detail.value);
-                      if (index === 0) {
-                        setCampusId('');
-                      } else {
-                        setCampusId(campusOptions[index - 1]?.id || '');
-                      }
-                      setRoom('');
-                    }}
-                  >
-                    <View className={FORM_CELL_CLASS}>
-                      <Text className={FORM_CELL_LABEL_CLASS}>上课校区</Text>
-                      <View className="flex items-center gap-[12rpx]">
-                        <Text
-                          className={
-                            campusId ? 'text-[28rpx] text-[#111827]' : FORM_CELL_VALUE_CLASS
-                          }
-                        >
-                          {campusOptions.find((item) => item.id === campusId)?.name || '请选择'}
-                        </Text>
-                        <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
-                      </View>
-                    </View>
-                  </Picker>
-
-                  <View className="border-t border-[#f1f5f9]">
-                    <Picker
-                      mode="selector"
-                      range={roomOptions}
-                      value={roomIndex}
-                      onChange={(e) => {
-                        const index = Number(e.detail.value);
-                        const value = roomOptions[index];
-                        setRoom(value === '请选择' ? '' : value);
-                      }}
-                    >
-                      <View className={FORM_CELL_CLASS}>
-                        <Text className={FORM_CELL_LABEL_CLASS}>上课教室</Text>
-                        <View className="flex items-center gap-[12rpx]">
-                          <Text
-                            className={room ? 'text-[28rpx] text-[#111827]' : FORM_CELL_VALUE_CLASS}
-                          >
-                            {room || '请选择'}
-                          </Text>
-                          <Text className={FORM_ARROW_CLASS}>{'>'}</Text>
-                        </View>
-                      </View>
-                    </Picker>
-                  </View>
-                </View>
-              </View>
-
-              <View className="mb-[24rpx]">
-                <Text className={FORM_SECTION_TITLE_CLASS}>课时信息</Text>
-                <View className={FORM_CARD_CLASS}>
-                  <View className={FORM_CELL_CLASS}>
-                    <Text className={FORM_CELL_LABEL_CLASS}>授课课时</Text>
-                    <Text className="text-[28rpx] text-[#111827]">{durationHoursText}</Text>
-                  </View>
-                  <View className="border-t border-[#f1f5f9]">
-                    <View className={FORM_CELL_CLASS}>
-                      <Text className={FORM_CELL_LABEL_CLASS}>授课扣金额</Text>
-                      <Text className="text-[28rpx] text-[#111827]">0</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View className="mb-[24rpx]">
-                <Text className={FORM_SECTION_TITLE_CLASS}>附加设置</Text>
-                <View className="rounded-[18rpx] border border-[#eceff3] bg-white px-[20rpx] py-[20rpx]">
-                  <Text className="mb-[14rpx] block text-[26rpx] text-[#111827]">颜色标签</Text>
-                  <View className="flex gap-[10rpx]">
-                    {COLOR_OPTIONS.map((item) => (
-                      <View
-                        key={item.key}
-                        className={`flex-1 rounded-[14rpx] border px-[10rpx] py-[16rpx] text-center ${color === item.key ? 'border-[#f97361] bg-[#fff7f5]' : 'border-[#eceff3] bg-[#fafafa]'}`}
-                        onClick={() => setColor(item.key)}
-                      >
-                        <Text className="block text-[34rpx]">{item.emoji}</Text>
-                        <Text
-                          className={`mt-[6rpx] block text-[20rpx] ${color === item.key ? 'text-[#f97361]' : 'text-[#6b7280]'}`}
-                        >
-                          {item.label}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <Text className="mb-[14rpx] mt-[22rpx] block text-[26rpx] text-[#111827]">
-                    课前提醒
+                  <Text className="text-[28rpx] text-foreground">
+                    {SCHEDULE_TYPE_OPTIONS[isGroupMode ? 1 : 0]}
                   </Text>
-                  <View className="flex flex-wrap gap-[12rpx]">
-                    {REMINDER_OPTIONS.map((item) => (
-                      <View
-                        key={item.value}
-                        className={`rounded-full px-[18rpx] py-[10rpx] ${reminderMinutes === item.value ? 'bg-[#fff1ee]' : 'border border-[#e5e7eb] bg-white'}`}
-                        onClick={() => setReminderMinutes(item.value)}
-                      >
-                        <Text
-                          className={`text-[22rpx] ${reminderMinutes === item.value ? 'text-[#f97361]' : 'text-[#6b7280]'}`}
-                        >
-                          {item.label}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <Text className="mb-[14rpx] mt-[22rpx] block text-[26rpx] text-[#111827]">
-                    备注
-                  </Text>
-                  <View className="rounded-[14rpx] border border-[#eef2f6] bg-[#f8fafc] px-[20rpx] py-[22rpx]">
-                    <Text
-                      className={
-                        note ? 'text-[26rpx] text-[#111827]' : 'text-[26rpx] text-[#9ca3af]'
-                      }
-                    >
-                      {note || '可选备注'}
-                    </Text>
-                  </View>
+                  <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
                 </View>
               </View>
-            </>
-          )}
-        </View>
 
-        {isRescheduleMode ? (
-          <View className="fixed bottom-0 left-0 right-0 border-t border-input bg-background px-[24rpx] py-[18rpx] pb-safe-bar">
-            <ActionButton
-              text={saving ? '提交中...' : '确认调课'}
-              fixed={false}
-              onClick={handleSave}
-              disabled={saving}
-            />
-          </View>
-        ) : (
-          <View className="fixed bottom-0 left-0 right-0 border-t border-[#eef2f7] bg-white px-[24rpx] py-[18rpx] pb-safe-bar">
-            {!canSubmit && submitBlockedReason ? (
-              <View className="absolute left-[24rpx] right-[24rpx] top-[-64rpx] rounded-[16rpx] bg-white px-4 py-3 shadow-soft">
-                <Text className="text-sm text-muted-foreground">{submitBlockedReason}</Text>
-              </View>
-            ) : null}
-            <View className="flex gap-[16rpx]">
-              <ActionButton
-                text={submitButtonText}
-                fixed={false}
-                onClick={handleSave}
-                disabled={!canSubmit || saving || deleting}
-              />
-              {isEdit ? (
+              {/* 2. 课程名称（选择对应课程，选中后带出老师/助教/时长/难度） */}
+              <View className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60">
+                <Text className="text-[28rpx] text-foreground">课程名称</Text>
                 <View
-                  className={`flex min-w-[144rpx] items-center justify-center rounded-[14rpx] border px-[28rpx] ${saving || deleting ? 'border-border bg-muted' : 'border-[#fca5a5] bg-white'}`}
-                  onClick={saving || deleting ? undefined : handleDelete}
+                  className="flex items-center gap-[8rpx]"
+                  onClick={() => setClassPickerVisible(true)}
                 >
                   <Text
-                    className={`text-[26rpx] font-medium ${saving || deleting ? 'text-muted-foreground' : 'text-[#ef4444]'}`}
+                    className={cn(
+                      'text-[28rpx]',
+                      selectedClass ? 'text-foreground' : 'text-muted-foreground',
+                    )}
                   >
-                    {deleting ? '删除中...' : '删除'}
+                    {selectedClass?.name || '请选择'}
                   </Text>
+                  <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
                 </View>
-              ) : null}
+              </View>
+
+              {/* 2.5 授课老师 / 助教（选中课程后显示，与课程信息同一卡片不分割） */}
+              {selectedClass && (
+                <>
+                  <View
+                    className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60"
+                    onClick={() => setTeacherPickerVisible(true)}
+                  >
+                    <Text className="text-[28rpx] text-foreground">授课老师</Text>
+                    <View className="flex items-center gap-[8rpx]">
+                      <Text
+                        className={cn(
+                          'text-[28rpx]',
+                          classInfoCard?.teacherName ? 'text-foreground' : 'text-muted-foreground',
+                        )}
+                      >
+                        {classInfoCard?.teacherName || '请选择'}
+                      </Text>
+                      <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                    </View>
+                  </View>
+                  <View
+                    className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60"
+                    onClick={() => setAssistantPickerVisible(true)}
+                  >
+                    <Text className="text-[28rpx] text-foreground">助教</Text>
+                    <View className="flex items-center gap-[8rpx]">
+                      <Text
+                        className={cn(
+                          'text-[28rpx]',
+                          classInfoCard?.assistantName
+                            ? 'text-foreground'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        {classInfoCard?.assistantName || '未安排'}
+                      </Text>
+                      <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* 3. 消耗课时（加减步进器） */}
+              <View className="flex items-center justify-between px-[32rpx] py-[32rpx]">
+                <Text className="text-[28rpx] text-foreground">消耗课时</Text>
+                <Stepper
+                  value={consumedHours}
+                  min={0.5}
+                  max={99}
+                  step={0.5}
+                  onChange={setConsumedHours}
+                />
+              </View>
             </View>
+
+            {/* 上课时间 —— 独立区域（虚线加号卡片） */}
+            <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[32rpx]">
+              <Text className="mb-[24rpx] block text-[28rpx] font-medium text-foreground">
+                上课时间
+              </Text>
+              <View
+                className="flex min-h-[260rpx] flex-col items-center justify-center rounded-[16rpx] border-[2rpx] border-dashed border-border bg-muted/60"
+                onClick={addTimeSlot}
+              >
+                {hasRealTimeSlots ? (
+                  <View className="w-full px-[24rpx] pb-[20rpx]">
+                    {timeSlots.map((ts) => (
+                      <View
+                        key={ts.id}
+                        className="mb-[16rpx] flex items-center justify-between rounded-[12rpx] bg-card px-[24rpx] py-[18rpx] shadow-sm"
+                      >
+                        <View className="flex items-center gap-[16rpx]">
+                          <Picker
+                            mode="time"
+                            value={ts.start}
+                            onChange={(e) => updateTimeSlot(ts.id, 'start', e.detail.value)}
+                          >
+                            <View className="rounded-[8rpx] bg-primary/10 px-[18rpx] py-[10rpx]">
+                              <Text className="text-[26rpx] font-semibold text-primary">
+                                {ts.start}
+                              </Text>
+                            </View>
+                          </Picker>
+                          <Text className="text-[24rpx] text-muted-foreground">~</Text>
+                          <Picker
+                            mode="time"
+                            value={ts.end}
+                            onChange={(e) => updateTimeSlot(ts.id, 'end', e.detail.value)}
+                          >
+                            <View className="rounded-[8rpx] bg-primary/10 px-[18rpx] py-[10rpx]">
+                              <Text className="text-[26rpx] font-semibold text-primary">
+                                {ts.end}
+                              </Text>
+                            </View>
+                          </Picker>
+                        </View>
+                        {timeSlots.length > 1 && (
+                          <View
+                            className="flex h-[44rpx] w-[44rpx] items-center justify-center rounded-full bg-error/10"
+                            onClick={() => removeTimeSlot(ts.id)}
+                          >
+                            <Icon name="mdi-close" size={20} color="error" />
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <>
+                    <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-[#FF8A2A] shadow-md">
+                      <Icon name="mdi-plus" size={40} color="#ffffff" />
+                    </View>
+                    <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">
+                      添加上课时间
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {/* 上课学员：选中课程后显示（核心可编辑区块） */}
+            {selectedClass && (
+              <View className="mx-[24rpx] mt-[24rpx]">
+                <ClassStudentsCard
+                  studentIds={classStudents.map((s) => s.id)}
+                  students={classStudents}
+                  allStudents={students}
+                  subjectId={selectedClass?.subject_id}
+                  subjects={subjects}
+                  onChange={handleStudentsChange}
+                />
+              </View>
+            )}
+          </>
+        </View>
+      </ScrollView>
+
+      {/* ====== 底部操作栏 ====== */}
+      <View className="fixed bottom-0 left-0 right-0 border-t border-border bg-card px-[28rpx] py-[18rpx] pb-safe-bar">
+        {!canSubmit && submitBlockedReason && (
+          <View className="absolute left-[28rpx] right-[28rpx] top-[-64rpx] rounded-[16rpx] bg-background px-[20rpx] py-[14rpx] shadow-soft">
+            <Text className="text-[24rpx] text-muted-foreground">{submitBlockedReason}</Text>
           </View>
         )}
-        {isRescheduleMode ? (
-          <CalendarMonthSheet
-            visible={calendarVisible}
-            title="选择新日期"
-            selectedDate={dayjs(selectedDateValue)}
-            onClose={() => setCalendarVisible(false)}
-            onSelect={(date) => {
-              setSelectedDateValue(date.format('YYYY-MM-DD'));
-              setDayOfWeek((date.day() || 7) as DayOfWeek);
-            }}
-            getDateDotType={getDateDotType}
-            disablePastDates
-          />
-        ) : null}
+        <ActionButton
+          text={saving ? '保存中...' : '保存'}
+          fixed={false}
+          onClick={handleSave}
+          disabled={!canSubmit || saving || deleting}
+        />
       </View>
+
+      {/* 日历弹窗 */}
+      <CalendarMonthSheet
+        visible={calendarVisible}
+        title="选择开始日期"
+        selectedDate={dayjs(startDate)}
+        onClose={() => setCalendarVisible(false)}
+        onSelect={(d) => {
+          setStartDate(d.format('YYYY-MM-DD'));
+          setSelectedDateValue(d.format('YYYY-MM-DD'));
+          setDayOfWeek((d.day() || 7) as DayOfWeek);
+        }}
+        getDateDotType={getDateDotType}
+        disablePastDates
+      />
+
+      {/* 课程类型选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={typePickerVisible}
+        title="课程类型"
+        options={[
+          { label: '班课', value: 'class' },
+          { label: '团课', value: 'group' },
+        ]}
+        value={isGroupMode ? 'group' : 'class'}
+        onClose={() => setTypePickerVisible(false)}
+        onConfirm={(v) => setScheduleType(v === 'group' ? 'group' : 'class')}
+      />
+
+      {/* 课程名称选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={classPickerVisible}
+        title="选择课程"
+        options={classes.map((c): PickerOption => ({ label: c.name, value: c.id }))}
+        value={classId}
+        onClose={() => setClassPickerVisible(false)}
+        onConfirm={(v) => setClassId(v)}
+      />
+
+      {/* 授课老师选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={teacherPickerVisible}
+        title="选择授课老师"
+        options={[
+          { label: '待分配', value: '' },
+          ...teachers
+            .filter((t) => t.role !== 'assist' || t.id === selectedTeachingTeacherId)
+            .map((t): PickerOption => ({ label: t.name, value: t.id })),
+        ]}
+        value={selectedTeachingTeacherId}
+        onClose={() => setTeacherPickerVisible(false)}
+        onConfirm={handleTeacherConfirm}
+      />
+
+      {/* 助教选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={assistantPickerVisible}
+        title="选择助教"
+        options={[
+          { label: '未安排', value: '' },
+          ...teachers
+            .filter(
+              (t) =>
+                t.id !== selectedTeachingTeacherId &&
+                (t.role === 'assist' || t.id === selectedAssistantTeacherId),
+            )
+            .map((t): PickerOption => ({ label: t.name, value: t.id })),
+        ]}
+        value={selectedAssistantTeacherId}
+        onClose={() => setAssistantPickerVisible(false)}
+        onConfirm={handleAssistantConfirm}
+      />
     </PageContainer>
   );
 };

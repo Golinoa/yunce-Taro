@@ -1395,11 +1395,24 @@ function mapLessonRecordInput(
     hours: data.hours_used || 0,
     status,
     note: data.content,
+    packageId: data.package_id || '', // 保留课包关联，供 mock 扣减课时（模拟后端自动扣减）
     createdAt: new Date().toISOString(),
   };
 }
 
 const studentServicePackagesCache = new Map<string, CoursePackage[]>();
+
+/**
+ * 失效学员课包缓存（消课/办卡/充值/退卡后调用，保证剩余课时实时一致）
+ * @param studentId 指定学员；缺省清空全部
+ */
+export function invalidatePackagesCache(studentId?: string) {
+  if (studentId) {
+    studentServicePackagesCache.delete(studentId);
+  } else {
+    studentServicePackagesCache.clear();
+  }
+}
 
 // ============================================
 // Mock 数据（从 @/data/students 迁移，作为唯一数据源）
@@ -1907,7 +1920,10 @@ export const lessonRecordService = {
       return mapBackendLessonRecord(created);
     }
 
-    return mapMockLessonRecord(await mockCreateLessonRecord(mapLessonRecordInput(data)));
+    const created = await mockCreateLessonRecord(mapLessonRecordInput(data));
+    // 消课扣减课包后失效该学员课时缓存，保证详情/列表实时一致
+    invalidatePackagesCache(data.student_id);
+    return mapMockLessonRecord(created);
   },
 
   /** 获取单条消课记录 */

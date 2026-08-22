@@ -7,6 +7,7 @@ import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import PickerSheet from '@/components/PickerSheet';
 import { studentService, leaveService } from '@/services';
 import type { LeaveRequest, LeaveType, LeaveStatus } from '@/types/leave-request';
 import { isStaffRole, useAuth } from '@/utils/auth';
@@ -55,6 +56,7 @@ const LeaveRequestPage: React.FC = () => {
   // ====== 家长视图状态 ======
   const [children, setChildren] = useState<Array<{ id: string; name: string }>>([]);
   const [studentId, setStudentId] = useState('');
+  const [childPickerVisible, setChildPickerVisible] = useState(false); // 选择孩子弹窗（PickerSheet）
   const [leaveType, setLeaveType] = useState<LeaveType>('leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -431,7 +433,6 @@ const LeaveRequestPage: React.FC = () => {
   }
 
   // ====== 家长提交视图 ======
-  const childNames = children.map((c) => c.name);
   const selectedChildIdx = children.findIndex((c) => c.id === studentId);
 
   return (
@@ -446,22 +447,15 @@ const LeaveRequestPage: React.FC = () => {
           {children.length > 1 && (
             <View className="mb-7">
               <Text className="text-lg text-foreground font-medium block mb-3">选择孩子</Text>
-              <Picker
-                mode="selector"
-                range={childNames}
-                value={selectedChildIdx >= 0 ? selectedChildIdx : 0}
-                onChange={(e) => {
-                  const idx = Number(e.detail.value);
-                  if (children[idx]) setStudentId(children[idx].id);
-                }}
+              <View
+                className="flex items-center justify-between py-6 px-7 rounded-3xl border border-input bg-white shadow-soft press-scale"
+                onClick={() => setChildPickerVisible(true)}
               >
-                <View className="flex items-center justify-between py-6 px-7 rounded-3xl border border-input bg-white shadow-soft">
-                  <Text className="text-lg text-foreground">
-                    {selectedChildIdx >= 0 ? children[selectedChildIdx].name : '请选择'}
-                  </Text>
-                  <Text className="text-base text-muted-foreground">▼</Text>
-                </View>
-              </Picker>
+                <Text className="text-lg text-foreground">
+                  {selectedChildIdx >= 0 ? children[selectedChildIdx].name : '请选择'}
+                </Text>
+                <Text className="text-base text-muted-foreground">▼</Text>
+              </View>
             </View>
           )}
 
@@ -564,6 +558,16 @@ const LeaveRequestPage: React.FC = () => {
           />
         </View>
       </View>
+
+      {/* 选择孩子（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={childPickerVisible}
+        title="选择孩子"
+        options={children.map((c) => ({ label: c.name, value: c.id }))}
+        value={studentId}
+        onClose={() => setChildPickerVisible(false)}
+        onConfirm={(v) => setStudentId(v)}
+      />
     </PageContainer>
   );
 };

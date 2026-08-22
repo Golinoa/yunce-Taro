@@ -98,6 +98,8 @@ export interface Class {
   subject_id?: string;
   /** 课程分类 ID（决定约课首页 Tab 归属） */
   category_id?: string;
+  /** 单次课时费（元），薪资/报价展示用 */
+  pricePerLesson?: number;
 }
 
 /**

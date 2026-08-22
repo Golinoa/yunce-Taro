@@ -276,7 +276,16 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
   );
 
   return (
-    <BottomSheet visible={visible} title={title} onClose={onClose} height="90vh" fillHeight>
+    <BottomSheet
+      visible={visible}
+      title={title}
+      onClose={onClose}
+      height="90vh"
+      fillHeight
+      // 关键：禁用外层 BottomSheet 的 ScrollView 包裹，由本组件内部 flex-1 ScrollView 管理学员列表
+      // 否则嵌套 ScrollView 会导致内层点击失效、滚动卡顿
+      scrollable={false}
+    >
       <View className="flex flex-col h-full px-[32rpx]">
         {/* 搜索栏 */}
         <View className="shrink-0 flex flex-row items-center gap-[16rpx] pt-[8rpx] pb-[24rpx]">

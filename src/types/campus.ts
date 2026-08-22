@@ -10,8 +10,8 @@ import type { SelectedBusinessCategory } from '@/constants/business-categories';
 // 校区类型
 // ============================================
 
-/** 校区经营类型 */
-export type CampusType = 'self' | 'partner';
+/** 校区经营类型（main=总店，与 mock-database 的 Campus.type 对齐） */
+export type CampusType = 'main' | 'self' | 'partner';
 
 /** 合作模式（仅合作校区） */
 export type PartnerMode = 'hourly_share' | 'venue_rental';

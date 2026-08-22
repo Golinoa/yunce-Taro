@@ -8,6 +8,7 @@ import {
   mockIssueMemberCard,
   mockUpdateMemberCard,
 } from '@/data/member-card';
+import { invalidatePackagesCache } from '@/services/student';
 import type { CardType } from '@/types/card-type';
 import type { CardTypeStatKey, MemberCard, MemberCardDetail } from '@/types/member-card';
 
@@ -53,7 +54,10 @@ export const memberCardService = {
       // TODO: 联调时替换为真实 API
       // return await put<MemberCardDetail | null>(`/member-cards/${id}`, data);
     }
-    return mockUpdateMemberCard(id, data);
+    const updated = await mockUpdateMemberCard(id, data);
+    // 次卡剩余次数调整会联动学员课包课时，失效该学员缓存
+    if (updated) invalidatePackagesCache(updated.studentId);
+    return updated;
   },
 
   /** 为学员发放会员卡 */
@@ -69,6 +73,9 @@ export const memberCardService = {
       // TODO: 联调时替换为真实 API
       // return await post<MemberCardDetail>('/member-cards', data);
     }
-    return mockIssueMemberCard(data);
+    const created = await mockIssueMemberCard(data);
+    // 发卡可能同步创建学员课包，失效该学员缓存
+    invalidatePackagesCache(data.studentId);
+    return created;
   },
 };

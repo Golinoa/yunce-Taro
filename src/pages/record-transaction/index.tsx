@@ -22,10 +22,11 @@ const RecordTransaction: React.FC = () => {
   const [amount, setAmount] = useState('0');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<(ExpenseCategoryType | IncomeCategoryType)[]>([]);
-  const [date, setDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [note, setNote] = useState('');
+  // 以下三项在提交时读取但无 UI 修改入口，保留为常量避免死状态
+  const date = dayjs().format('YYYY-MM-DD');
+  const note = '';
   const [showAmortization, setShowAmortization] = useState(false);
-  const [amortizationPeriod, setAmortizationPeriod] = useState('');
+  const amortizationPeriod = '';
   const [submitting, setSubmitting] = useState(false);
 
   /** 加载分类数据 */

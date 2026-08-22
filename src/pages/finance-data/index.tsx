@@ -69,11 +69,6 @@ const FinanceData: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  /** 返回上一页 */
-  const handleBack = useCallback(() => {
-    Taro.navigateBack();
-  }, []);
-
   /** 切换周期 */
   const handlePeriodChange = useCallback((value: string) => {
     setPeriod(value as 'day' | 'month' | 'year');

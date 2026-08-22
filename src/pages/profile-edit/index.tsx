@@ -18,10 +18,17 @@ import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
+import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { lessonRecordService, packageService, studentService } from '@/services';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import {
+  chooseImageTemp,
+  deleteTempImage,
+  isImageCancelError,
+  isTempImagePath,
+} from '@/utils/image-upload';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type Gender = 'male' | 'female' | 'other';
@@ -32,8 +39,6 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'female', label: '女' },
   { value: 'other', label: '其他' },
 ];
-
-const GENDER_PICKER_RANGE = GENDER_OPTIONS.map((item) => item.label);
 
 /** 关系选项（添加子女） */
 const RELATION_OPTIONS = ['儿子', '女儿', '其他'];
@@ -112,9 +117,6 @@ const ProfileEdit: React.FC = () => {
   });
   const [saving, setSaving] = useState(false);
 
-  const [showAvatarSheet, setShowAvatarSheet] = useState(false);
-  const [avatarInput, setAvatarInput] = useState('');
-
   // 加载个人资料（基础字段 + 扩展字段）
   useEffect(() => {
     const load = async () => {
@@ -131,16 +133,10 @@ const ProfileEdit: React.FC = () => {
           region: extra.region || '',
           address: extra.address || '',
         });
-        setAvatarInput(profile.avatar_url || '');
       }
     };
     load();
   }, [profile, fetchExtra]);
-
-  // 打开头像弹窗时同步输入框
-  useEffect(() => {
-    if (showAvatarSheet) setAvatarInput(draft.avatar_url);
-  }, [showAvatarSheet, draft.avatar_url]);
 
   const updateField = useCallback(
     <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => {
@@ -149,17 +145,49 @@ const ProfileEdit: React.FC = () => {
     [],
   );
 
-  // 头像确认 / 重置
-  const handleAvatarConfirm = useCallback(() => {
-    updateField('avatar_url', avatarInput.trim());
-    setShowAvatarSheet(false);
-  }, [avatarInput, updateField]);
+  /** 个人头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与子女头像一致） */
+  const handleAvatarPick = useCallback(async () => {
+    try {
+      const tempPath = await chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' });
+      // 替换图片：删掉旧的本地临时文件，避免本地存储累积
+      if (isTempImagePath(draft.avatar_url)) deleteTempImage(draft.avatar_url);
+      updateField('avatar_url', tempPath);
+    } catch (err) {
+      if (isImageCancelError(err)) return;
+      const message = err instanceof Error ? err.message : '选择图片失败';
+      if (message.includes('超过') || message.includes('限制')) {
+        void Taro.showModal({
+          title: '图片过大',
+          content: message,
+          showCancel: false,
+          confirmText: '知道了',
+        });
+      } else {
+        Taro.showToast({ title: message, icon: 'none' });
+      }
+    }
+  }, [draft.avatar_url, updateField]);
 
-  const handleAvatarReset = useCallback(() => {
-    updateField('avatar_url', '');
-    setAvatarInput('');
-    setShowAvatarSheet(false);
-  }, [updateField]);
+  /** 个人头像点击：未选→直接选相册；已选→弹「查看图片/重新选择/删除头像」 */
+  const handleAvatarClick = useCallback(() => {
+    if (!draft.avatar_url) {
+      void handleAvatarPick();
+      return;
+    }
+    void Taro.showActionSheet({
+      itemList: ['查看图片', '重新选择', '删除头像'],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          void Taro.previewImage({ current: draft.avatar_url, urls: [draft.avatar_url] });
+        } else if (res.tapIndex === 1) {
+          void handleAvatarPick();
+        } else if (res.tapIndex === 2) {
+          if (isTempImagePath(draft.avatar_url)) deleteTempImage(draft.avatar_url);
+          updateField('avatar_url', '');
+        }
+      },
+    });
+  }, [draft.avatar_url, handleAvatarPick, updateField]);
 
   // 保存
   const handleSave = useCallback(async () => {
@@ -273,6 +301,55 @@ const ProfileEdit: React.FC = () => {
     avatar_url: '',
   });
   const [adding, setAdding] = useState(false);
+  /** 统一弹窗选择器（PickerSheet 标准组件）：gender/relation/childGender */
+  const [selector, setSelector] = useState<{
+    visible: boolean;
+    type: 'gender' | 'relation' | 'childGender' | null;
+  }>({ visible: false, type: null });
+
+  /** 子女头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与个人头像一致） */
+  const handleChildAvatarPick = useCallback(async () => {
+    try {
+      const tempPath = await chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' });
+      // 替换图片：删掉旧的本地临时文件，避免本地存储累积
+      if (isTempImagePath(childForm.avatar_url)) deleteTempImage(childForm.avatar_url);
+      setChildForm((prev) => ({ ...prev, avatar_url: tempPath }));
+    } catch (err) {
+      if (isImageCancelError(err)) return;
+      const message = err instanceof Error ? err.message : '选择图片失败';
+      if (message.includes('超过') || message.includes('限制')) {
+        void Taro.showModal({
+          title: '图片过大',
+          content: message,
+          showCancel: false,
+          confirmText: '知道了',
+        });
+      } else {
+        Taro.showToast({ title: message, icon: 'none' });
+      }
+    }
+  }, [childForm.avatar_url]);
+
+  /** 子女头像点击：未选→直接选相册；已选→弹「查看图片/重新选择/删除头像」 */
+  const handleChildAvatarClick = useCallback(() => {
+    if (!childForm.avatar_url) {
+      void handleChildAvatarPick();
+      return;
+    }
+    void Taro.showActionSheet({
+      itemList: ['查看图片', '重新选择', '删除头像'],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          void Taro.previewImage({ current: childForm.avatar_url, urls: [childForm.avatar_url] });
+        } else if (res.tapIndex === 1) {
+          void handleChildAvatarPick();
+        } else if (res.tapIndex === 2) {
+          if (isTempImagePath(childForm.avatar_url)) deleteTempImage(childForm.avatar_url);
+          setChildForm((prev) => ({ ...prev, avatar_url: '' }));
+        }
+      },
+    });
+  }, [childForm.avatar_url, handleChildAvatarPick]);
 
   const resetChildForm = useCallback(() => {
     setChildForm({
@@ -323,10 +400,6 @@ const ProfileEdit: React.FC = () => {
     }
   }, [childForm, resetChildForm, profile?.id]);
 
-  // 当前选中的性别索引（用于 Picker）
-  const profileGenderIndex = GENDER_OPTIONS.findIndex((item) => item.value === draft.gender);
-  const childGenderIndex = GENDER_OPTIONS.findIndex((item) => item.value === childForm.gender);
-
   return (
     <View className="min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]">
       {/* ====== 顶部导航 + 分段 Tab ====== */}
@@ -367,17 +440,23 @@ const ProfileEdit: React.FC = () => {
           <View className="px-[32rpx] pt-[24rpx] flex flex-col gap-[24rpx] pb-[40rpx]">
             {/* 基础信息表单 */}
             <View className="bg-card rounded-[28rpx] py-[8rpx] shadow-soft overflow-hidden">
-              {/* 头像：左侧标签 + 右侧小头像 */}
+              {/* 头像：点击直接选相册/拍照；已上传可查看/重选/删除 */}
               <FieldRow
                 label="头像"
-                onClick={() => setShowAvatarSheet(true)}
+                onClick={handleAvatarClick}
                 right={
                   <View className="flex items-center gap-[8rpx]">
-                    <Avatar
-                      name={draft.nickname || profile?.name || '我'}
-                      avatarUrl={draft.avatar_url || BRAND_LOGO}
-                      size="md"
-                    />
+                    <View className="relative">
+                      <Avatar
+                        name={draft.nickname || profile?.name || '我'}
+                        avatarUrl={draft.avatar_url || BRAND_LOGO}
+                        size="md"
+                      />
+                      {/* 相机小角标，提示可点击上传 */}
+                      <View className="absolute -bottom-[4rpx] -right-[4rpx] w-[32rpx] h-[32rpx] rounded-full bg-primary border-[2rpx] border-card flex items-center justify-center">
+                        <Icon name="mdi-camera" size={18} color="white" />
+                      </View>
+                    </View>
                     <RowArrow />
                   </View>
                 }
@@ -407,24 +486,16 @@ const ProfileEdit: React.FC = () => {
               <FieldRow
                 label="性别"
                 right={
-                  <Picker
-                    mode="selector"
-                    range={GENDER_PICKER_RANGE}
-                    value={profileGenderIndex >= 0 ? profileGenderIndex : 0}
-                    onChange={(e) => {
-                      const index = Number(e.detail.value);
-                      const selected = GENDER_OPTIONS[index];
-                      if (selected) updateField('gender', selected.value);
-                    }}
+                  <View
+                    className="flex items-center justify-end gap-[8rpx] press-scale"
+                    onClick={() => setSelector({ visible: true, type: 'gender' })}
                   >
-                    <View className="flex items-center justify-end gap-[8rpx]">
-                      <SelectValue
-                        value={draft.gender ? GENDER_LABEL[draft.gender] : undefined}
-                        placeholder="请选择"
-                      />
-                      <RowArrow />
-                    </View>
-                  </Picker>
+                    <SelectValue
+                      value={draft.gender ? GENDER_LABEL[draft.gender] : undefined}
+                      placeholder="请选择"
+                    />
+                    <RowArrow />
+                  </View>
                 }
               />
               <FieldRow
@@ -626,41 +697,6 @@ const ProfileEdit: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* ====== 更换头像弹窗 ====== */}
-      <BottomSheet
-        visible={showAvatarSheet}
-        title="更换头像"
-        onClose={() => setShowAvatarSheet(false)}
-        height="auto"
-        maxHeightLimit="60vh"
-      >
-        <View className="px-[32rpx] pb-[40rpx]">
-          <Text className="text-[24rpx] text-muted-foreground mb-[20rpx] block">
-            当前版本暂不支持直接拍照/相册上传，请填写图片 URL
-          </Text>
-          <FormInput
-            label="头像 URL"
-            placeholder="https://..."
-            value={avatarInput}
-            onInput={(e) => setAvatarInput(e.detail.value || '')}
-          />
-          <View className="flex gap-[20rpx] mt-[24rpx]">
-            <View
-              className="flex-1 py-[24rpx] rounded-2xl bg-muted center active:bg-muted/70 press-scale"
-              onClick={handleAvatarReset}
-            >
-              <Text className="text-[28rpx] font-medium text-muted-foreground">默认头像</Text>
-            </View>
-            <View
-              className="flex-1 py-[24rpx] rounded-2xl bg-gradient-primary center shadow-elegant active:opacity-90 press-scale"
-              onClick={handleAvatarConfirm}
-            >
-              <Text className="text-[28rpx] font-semibold text-white">确认</Text>
-            </View>
-          </View>
-        </View>
-      </BottomSheet>
-
       {/* ====== 添加子女弹窗 ====== */}
       <BottomSheet
         visible={showAddSheet}
@@ -670,29 +706,10 @@ const ProfileEdit: React.FC = () => {
         maxHeightLimit="75vh"
       >
         <View className="px-[32rpx] pb-[40rpx]">
-          {/* 头像：圆形上传元素 */}
+          {/* 头像：圆形上传元素（相册/拍照 1:1 裁剪，可重选/删除） */}
           <FieldRow
             label="头像"
-            onClick={() => {
-              Taro.chooseImage({
-                count: 1,
-                sizeType: ['compressed'],
-                sourceType: ['album', 'camera'],
-                success: (res) => {
-                  const tempPath = res.tempFilePaths?.[0];
-                  if (tempPath) {
-                    setChildForm((prev) => ({ ...prev, avatar_url: tempPath }));
-                  }
-                },
-                fail: (err) => {
-                  // 用户取消选择时不提示错误
-                  if (err?.errMsg?.includes('cancel')) return;
-                  Taro.showToast({ title: '选择图片失败', icon: 'none' });
-                },
-              }).catch(() => {
-                // 吞掉 Promise rejection，避免微信开发者工具上报未捕获异常
-              });
-            }}
+            onClick={handleChildAvatarClick}
             right={
               <View className="flex items-center gap-[8rpx]">
                 {childForm.avatar_url ? (
@@ -750,50 +767,29 @@ const ProfileEdit: React.FC = () => {
               </View>
             }
             right={
-              <Picker
-                mode="selector"
-                range={RELATION_OPTIONS}
-                value={Math.max(RELATION_OPTIONS.indexOf(childForm.relation), 0)}
-                onChange={(e) => {
-                  const index = Number(e.detail.value);
-                  const selected = RELATION_OPTIONS[index];
-                  if (!selected) return;
-                  // 关系与性别联动：儿子→男，女儿→女，其他→不修改
-                  let nextGender = childForm.gender;
-                  if (selected === '儿子') nextGender = 'male';
-                  else if (selected === '女儿') nextGender = 'female';
-                  setChildForm((prev) => ({ ...prev, relation: selected, gender: nextGender }));
-                }}
+              <View
+                className="flex items-center justify-end gap-[8rpx] press-scale"
+                onClick={() => setSelector({ visible: true, type: 'relation' })}
               >
-                <View className="flex items-center justify-end gap-[8rpx]">
-                  <SelectValue value={childForm.relation} placeholder="请选择" />
-                  <RowArrow />
-                </View>
-              </Picker>
+                <SelectValue value={childForm.relation} placeholder="请选择" />
+                <RowArrow />
+              </View>
             }
           />
           {/* 性别 */}
           <FieldRow
             label="性别"
             right={
-              <Picker
-                mode="selector"
-                range={GENDER_PICKER_RANGE}
-                value={childGenderIndex >= 0 ? childGenderIndex : 0}
-                onChange={(e) => {
-                  const index = Number(e.detail.value);
-                  const selected = GENDER_OPTIONS[index];
-                  if (selected) setChildForm((prev) => ({ ...prev, gender: selected.value }));
-                }}
+              <View
+                className="flex items-center justify-end gap-[8rpx] press-scale"
+                onClick={() => setSelector({ visible: true, type: 'childGender' })}
               >
-                <View className="flex items-center justify-end gap-[8rpx]">
-                  <SelectValue
-                    value={childForm.gender ? GENDER_LABEL[childForm.gender] : undefined}
-                    placeholder="请选择"
-                  />
-                  <RowArrow />
-                </View>
-              </Picker>
+                <SelectValue
+                  value={childForm.gender ? GENDER_LABEL[childForm.gender] : undefined}
+                  placeholder="请选择"
+                />
+                <RowArrow />
+              </View>
             }
           />
           {/* 生日 */}
@@ -828,6 +824,39 @@ const ProfileEdit: React.FC = () => {
           </View>
         </View>
       </BottomSheet>
+
+      {/* 统一弹窗选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={selector.visible}
+        title={selector.type === 'relation' ? '选择关系' : '选择性别'}
+        options={
+          selector.type === 'relation'
+            ? RELATION_OPTIONS.map((r): PickerOption => ({ label: r, value: r }))
+            : GENDER_OPTIONS.map((g): PickerOption => ({ label: g.label, value: g.value }))
+        }
+        value={
+          selector.type === 'gender'
+            ? draft.gender
+            : selector.type === 'relation'
+              ? childForm.relation
+              : childForm.gender
+        }
+        onClose={() => setSelector((prev) => ({ ...prev, visible: false }))}
+        onConfirm={(v) => {
+          if (selector.type === 'gender') {
+            updateField('gender', v as Gender);
+          } else if (selector.type === 'relation') {
+            // 关系与性别联动：儿子→男，女儿→女，其他→不修改
+            let nextGender = childForm.gender;
+            if (v === '儿子') nextGender = 'male';
+            else if (v === '女儿') nextGender = 'female';
+            setChildForm((prev) => ({ ...prev, relation: v, gender: nextGender }));
+          } else {
+            setChildForm((prev) => ({ ...prev, gender: v as Gender }));
+          }
+          setSelector((prev) => ({ ...prev, visible: false }));
+        }}
+      />
     </View>
   );
 };

@@ -262,7 +262,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           className={cn(
             'mt-[8rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full',
             selected
-              ? 'bg-schedule-calendar-selected'
+              ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
               : today
                 ? 'bg-schedule-calendar-today'
                 : 'bg-transparent',
@@ -310,7 +310,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             className={cn(
               'flex h-[64rpx] w-[64rpx] flex-col items-center justify-center rounded-full',
               isSelected
-                ? 'bg-schedule-calendar-selected'
+                ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
                 : isToday
                   ? 'bg-schedule-calendar-today'
                   : 'bg-transparent',

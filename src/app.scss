@@ -145,12 +145,12 @@ page {
   --schedule-page: hsl(var(--background));
 
   // --- 课表日历语义色（接入主题系统，随主题切换） ---
-  // 选中态使用强调色，今日态使用主题色，形成主次对比
-  --schedule-calendar-selected-bg: hsl(var(--accent));
-  --schedule-calendar-selected-text: hsl(var(--accent-foreground));
+  // 选中态使用主题色(primary)实心 + 白色描边（G 方案），与"回到今天"浅底形成对比
+  --schedule-calendar-selected-bg: hsl(var(--primary));
+  --schedule-calendar-selected-text: hsl(var(--primary-foreground));
   --schedule-calendar-today-bg: hsl(var(--primary) / 0.12);
   --schedule-calendar-today-text: hsl(var(--primary));
-  --schedule-calendar-dot: hsl(var(--accent));
+  --schedule-calendar-dot: hsl(var(--primary));
   --schedule-calendar-outside-text: hsl(var(--muted-foreground));
 
   // --- 我的页语义色（接入主题系统，随主题切换） ---
@@ -317,11 +317,11 @@ page {
   --schedule-page: hsl(var(--background));
 
   // --- 课表日历语义色（随主题切换） ---
-  --schedule-calendar-selected-bg: hsl(var(--accent));
-  --schedule-calendar-selected-text: hsl(var(--accent-foreground));
+  --schedule-calendar-selected-bg: hsl(var(--primary));
+  --schedule-calendar-selected-text: hsl(var(--primary-foreground));
   --schedule-calendar-today-bg: hsl(var(--primary) / 0.12);
   --schedule-calendar-today-text: hsl(var(--primary));
-  --schedule-calendar-dot: hsl(var(--accent));
+  --schedule-calendar-dot: hsl(var(--primary));
   --schedule-calendar-outside-text: hsl(var(--muted-foreground));
 
   // --- 我的页语义色（随主题切换，作用域内引用主题色） ---
@@ -421,11 +421,11 @@ page {
   --schedule-page: hsl(var(--background));
 
   // --- 课表日历语义色（随主题切换） ---
-  --schedule-calendar-selected-bg: hsl(var(--accent));
-  --schedule-calendar-selected-text: hsl(var(--accent-foreground));
+  --schedule-calendar-selected-bg: hsl(var(--primary));
+  --schedule-calendar-selected-text: hsl(var(--primary-foreground));
   --schedule-calendar-today-bg: hsl(var(--primary) / 0.12);
   --schedule-calendar-today-text: hsl(var(--primary));
-  --schedule-calendar-dot: hsl(var(--accent));
+  --schedule-calendar-dot: hsl(var(--primary));
   --schedule-calendar-outside-text: hsl(var(--muted-foreground));
 
   // --- 我的页语义色（随主题切换，作用域内引用主题色） ---

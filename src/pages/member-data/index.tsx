@@ -270,7 +270,7 @@ const MemberData: React.FC = () => {
               会员明细
             </Text>
             <View className="flex flex-col gap-[12rpx]">
-              {data?.detailList.map((item, index) => (
+              {data?.detailList.map((item) => (
                 <View
                   key={item.id}
                   className="flex items-center gap-[16rpx] py-[16rpx] border-b-[2rpx] border-border last:border-b-0"

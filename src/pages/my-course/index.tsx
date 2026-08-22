@@ -8,7 +8,7 @@
  * 全部使用 UnoCSS Token，随主题色联动。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useLoad } from '@tarojs/taro';
+import Taro, { useDidShow, getCurrentInstance } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +21,20 @@ import { myCourseService } from '@/services';
 import type { MyCourseItem, MyCourseStatus } from '@/services/my-course';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
+import { useThemeStore } from '@/stores/theme';
+
+/** 从路由参数读取目标 Tab（兼容首次进入与栈内复用再次进入） */
+function readTabFromRouter(): MyCourseStatus | undefined {
+  const tab = getCurrentInstance()?.router?.params?.tab as MyCourseStatus | undefined;
+  return TABS.some((t) => t.key === tab) ? tab : undefined;
+}
+
+/** 主题 key → CSS 类名映射（对应 app.scss 里 .theme-orange / .theme-coral 选择器） */
+const THEME_CLASS_MAP: Record<string, string> = {
+  orange: 'theme-orange',
+  coral: 'theme-coral',
+  blue: '',
+};
 
 const TABS: { key: MyCourseStatus; label: string }[] = [
   { key: 'booked', label: '已预约' },
@@ -53,7 +67,9 @@ function formatCourseTime(date: string, startTime: string, endTime: string): str
 const MyCourse: React.FC = () => {
   usePrimaryNavigationBar();
 
-  const [activeTab, setActiveTab] = useState<MyCourseStatus>('booked');
+  const [activeTab, setActiveTab] = useState<MyCourseStatus>(
+    () => readTabFromRouter() ?? 'booked'
+  );
   const [list, setList] = useState<MyCourseItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -61,13 +77,17 @@ const MyCourse: React.FC = () => {
   const [evaluateSheetVisible, setEvaluateSheetVisible] = useState(false);
   const [evaluateCourse, setEvaluateCourse] = useState<MyCourseItem | null>(null);
 
-  // 解析路由参数，进入指定 Tab
-  useLoad((options) => {
-    const tab = options?.tab as MyCourseStatus | undefined;
-    if (tab && TABS.some((t) => t.key === tab)) {
+  // 解析路由参数（每次页面显示重新读取，兼容栈内复用场景）
+  useDidShow(() => {
+    const tab = readTabFromRouter();
+    if (tab) {
       setActiveTab(tab);
     }
   });
+
+  // 读取当前主题，用于在最外层容器添加 theme class
+  const { activeTheme } = useThemeStore();
+  const themeClass = THEME_CLASS_MAP[activeTheme] || '';
 
   // 加载课程列表
   const loadList = useCallback(async () => {
@@ -212,7 +232,7 @@ const MyCourse: React.FC = () => {
   );
 
   return (
-    <View className="min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]">
+    <View className={cn('min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]', themeClass)}>
       {/* ====== 顶部 Tab ====== */}
       <View className="sticky top-0 z-50 bg-card border-b border-border px-[32rpx] pt-[12rpx] pb-[16rpx]">
         <SegmentedControl

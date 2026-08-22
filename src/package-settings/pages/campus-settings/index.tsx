@@ -13,7 +13,7 @@ import BusinessCategoryPicker from '@/components/business/BusinessCategoryPicker
 import Empty from '@/components/Empty';
 import FormCell from '@/components/FormCell';
 import FormInput from '@/components/FormInput';
-import ImageUploader from '@/components/ImageUploader';
+import CourseImageUploader from '@/components/CourseImageUploader';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PageIntroSheet from '@/components/PageIntroSheet';
@@ -30,6 +30,7 @@ import TagEditSheet from './TagEditSheet';
 
 /** 校区类型展示文本 */
 const CAMPUS_TYPE_TEXT: Record<CampusType, string> = {
+  main: '总校区',
   self: '自营校区',
   partner: '合作机构',
 };
@@ -515,7 +516,7 @@ const CampusSettings: React.FC = () => {
           />
         </View>
 
-        {/* 门店图片：Logo + 场馆图片 */}
+        {/* 门店图片：Logo（小图）+ 背景图（大图）+ 更多场馆图（小图） */}
         <View className="bg-white rounded-[32rpx] p-[32rpx]">
           <View className="flex flex-row items-center justify-between mb-[8rpx]">
             <Text className="text-[32rpx] font-semibold text-foreground">门店图片</Text>
@@ -524,41 +525,81 @@ const CampusSettings: React.FC = () => {
           <Text className="text-[22rpx] text-muted-foreground mb-[20rpx]">
             Logo 建议 200×200px · 场馆图建议 750×420px · 单张不超过 5M
           </Text>
-          <View className="flex flex-row flex-wrap gap-[20rpx]">
-            <ImageUploader
+
+          {/* 门店 Logo：小方图（1:1 裁剪） */}
+          <View className="mb-[24rpx]">
+            <Text className="text-[26rpx] font-medium text-foreground mb-[12rpx]">门店 Logo</Text>
+            <CourseImageUploader
               value={form.logo}
-              placeholder="logo"
+              title="上传 Logo"
+              layout="square"
+              squareSizeRpx={160}
               maxSizeMB={5}
               onChange={(value) => updateField('logo', value)}
             />
-            {form.venueImages.map((url, index) => (
-              <ImageUploader
-                key={`${url}-${index}`}
-                value={url}
-                placeholder="场馆图片"
-                maxSizeMB={5}
-                onChange={(value) => {
-                  const next = [...form.venueImages];
-                  if (value) {
-                    next[index] = value;
-                  } else {
-                    next.splice(index, 1);
-                  }
-                  updateField('venueImages', next);
-                }}
-              />
-            ))}
-            {form.venueImages.length < 5 && (
-              <ImageUploader
-                placeholder="场馆图片"
-                maxSizeMB={5}
-                onChange={(value) => {
-                  if (value) {
-                    updateField('venueImages', [...form.venueImages, value]);
-                  }
-                }}
-              />
-            )}
+          </View>
+
+          {/* 门店背景图：首张场馆图，整宽大图（16:9 裁剪） */}
+          <View className="mb-[24rpx]">
+            <Text className="text-[26rpx] font-medium text-foreground mb-[12rpx]">门店背景图</Text>
+            <CourseImageUploader
+              value={form.venueImages[0] || ''}
+              title="上传背景图"
+              subtitle="750×420 横图效果最佳"
+              layout="fullWidth"
+              maxSizeMB={5}
+              onChange={(value) => {
+                const next = [...form.venueImages];
+                if (value) {
+                  next[0] = value;
+                } else {
+                  next.shift(); // 删除首张（背景）
+                }
+                updateField('venueImages', next);
+              }}
+            />
+          </View>
+
+          {/* 更多场馆图：小图网格 */}
+          <View>
+            <Text className="text-[26rpx] font-medium text-foreground mb-[12rpx]">
+              更多场馆图片
+            </Text>
+            <View className="flex flex-row flex-wrap gap-[20rpx]">
+              {form.venueImages.slice(1).map((url, index) => (
+                <CourseImageUploader
+                  key={`${url}-${index}`}
+                  value={url}
+                  title="更换"
+                  layout="square"
+                  squareSizeRpx={200}
+                  maxSizeMB={5}
+                  onChange={(value) => {
+                    const next = [...form.venueImages];
+                    const realIdx = index + 1;
+                    if (value) {
+                      next[realIdx] = value;
+                    } else {
+                      next.splice(realIdx, 1);
+                    }
+                    updateField('venueImages', next);
+                  }}
+                />
+              ))}
+              {form.venueImages.length - 1 < 4 && (
+                <CourseImageUploader
+                  title="上传"
+                  layout="square"
+                  squareSizeRpx={200}
+                  maxSizeMB={5}
+                  onChange={(value) => {
+                    if (value) {
+                      updateField('venueImages', [...form.venueImages, value]);
+                    }
+                  }}
+                />
+              )}
+            </View>
           </View>
         </View>
       </View>

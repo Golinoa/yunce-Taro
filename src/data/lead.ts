@@ -5,7 +5,7 @@
  * 联调时 Service 层只需改一行切换为 API 调用。
  */
 import dayjs from 'dayjs';
-import { CLASSES, COURSE_PACKAGES, STUDENTS } from '@/data/mock-database';
+import { CLASSES, COURSE_PACKAGES, STUDENTS, type Student } from '@/data/mock-database';
 import type {
   Lead,
   LeadBooking,
@@ -376,7 +376,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '钢琴启蒙班',
     subject_name: '钢琴',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-001',
     teacher_name: '张老师',
     lesson_date: dayjs().format('YYYY-MM-DD'),
@@ -400,7 +400,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '创意美术班',
     subject_name: '声乐',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-002',
     teacher_name: '李老师',
     lesson_date: dayjs().format('YYYY-MM-DD'),
@@ -422,7 +422,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '少儿舞蹈班',
     subject_name: '舞蹈',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-001',
     teacher_name: '张老师',
     lesson_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
@@ -447,7 +447,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '书法入门班',
     subject_name: '乐理',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-001',
     teacher_name: '张老师',
     lesson_date: dayjs().subtract(2, 'day').format('YYYY-MM-DD'),
@@ -472,7 +472,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '钢琴启蒙班',
     subject_name: '钢琴',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-001',
     teacher_name: '张老师',
     lesson_date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -494,7 +494,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '少儿舞蹈班',
     subject_name: '舞蹈',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-001',
     teacher_name: '王老师',
     lesson_date: dayjs().format('YYYY-MM-DD'),
@@ -519,7 +519,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     course_name: '书法入门班',
     subject_name: '声乐',
     campus_id: 'campus-center',
-    campus_name: '中心校区',
+    campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-002',
     teacher_name: '李老师',
     lesson_date: dayjs().subtract(3, 'day').format('YYYY-MM-DD'),
@@ -544,7 +544,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-001',
       teacherName: '王老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-piano-01',
       courseName: '钢琴启蒙班',
       subjectName: '钢琴',
@@ -553,7 +553,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-002',
       teacherName: '李老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-vocal-01',
       courseName: '声乐小组课',
       subjectName: '声乐',
@@ -562,7 +562,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-003',
       teacherName: '张老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-piano-02',
       courseName: '钢琴进阶班',
       subjectName: '钢琴',
@@ -571,7 +571,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-004',
       teacherName: '陈老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-calligraphy-01',
       courseName: '书法入门班',
       subjectName: '书法',
@@ -580,7 +580,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-006',
       teacherName: '周老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-guitar-01',
       courseName: '吉他入门班',
       subjectName: '吉他',
@@ -589,7 +589,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-007',
       teacherName: '吴老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-dance-01',
       courseName: '少儿舞蹈班',
       subjectName: '舞蹈',
@@ -598,7 +598,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-009',
       teacherName: '刘老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-violin-01',
       courseName: '小提琴启蒙班',
       subjectName: '小提琴',
@@ -607,7 +607,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-011',
       teacherName: '郑老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-piano-03',
       courseName: '钢琴考级班',
       subjectName: '钢琴',
@@ -616,7 +616,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-013',
       teacherName: '何老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-art-01',
       courseName: '美术创意课',
       subjectName: '美术',
@@ -625,7 +625,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       teacherId: 'teacher-020',
       teacherName: '曹老师',
       campusId: 'campus-center',
-      campusName: '中心校区',
+      campusName: '曦绘艺术',
       courseId: 'course-piano-04',
       courseName: '钢琴基础班',
       subjectName: '钢琴',
@@ -683,7 +683,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       course_name: '钢琴启蒙班',
       subject_name: '钢琴',
       campus_id: 'campus-center',
-      campus_name: '中心校区',
+      campus_name: '曦绘艺术',
       teacher_id: 'teacher-001',
       teacher_name: '王老师',
       lesson_date: today.format('YYYY-MM-DD'),
@@ -704,7 +704,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       course_name: '声乐小组课',
       subject_name: '声乐',
       campus_id: 'campus-center',
-      campus_name: '中心校区',
+      campus_name: '曦绘艺术',
       teacher_id: 'teacher-002',
       teacher_name: '李老师',
       lesson_date: today.format('YYYY-MM-DD'),
@@ -725,7 +725,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       course_name: '钢琴进阶班',
       subject_name: '钢琴',
       campus_id: 'campus-center',
-      campus_name: '中心校区',
+      campus_name: '曦绘艺术',
       teacher_id: 'teacher-003',
       teacher_name: '张老师',
       lesson_date: today.format('YYYY-MM-DD'),
@@ -1616,11 +1616,42 @@ export async function mockCreateConversion(params: {
 }): Promise<LeadConversion> {
   await delay();
 
+  const lead = LEADS.find((l) => l.id === params.leadId);
+
+  // 打通：新学员转化时，若传入的是临时学员 ID（TS- 前缀），自动按线索信息创建正式学员
+  let studentId = params.studentId;
+  if (params.conversionType === 'new_student' && lead) {
+    const existing = STUDENTS.find((s) => s.id === studentId);
+    if (!existing) {
+      const created: Student = {
+        id: `stu-${Date.now()}`,
+        name: lead.child_name || '',
+        nickname: lead.child_nickname,
+        relation: '',
+        gender: lead.child_gender || 'male',
+        birthday: '',
+        phone: lead.parent_phone || '',
+        address: '',
+        parentId: lead.parent_user_id || '',
+        campusId: '',
+        teacherId: lead.first_invite_teacher_id || lead.booking_teacher_id || '',
+        classIds: [],
+        totalHours: 0,
+        remainingHours: 0,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        note: `由线索「${lead.child_name}」转化`,
+      };
+      STUDENTS.push(created);
+      studentId = created.id;
+    }
+  }
+
   const conversion: LeadConversion = {
     id: nextConversionId(),
     lead_id: params.leadId,
     conversion_type: params.conversionType,
-    student_id: params.studentId,
+    student_id: studentId,
     merge_to_student_id: params.mergeToStudentId,
     operator_id: params.operatorId,
     note: params.note,
@@ -1630,7 +1661,6 @@ export async function mockCreateConversion(params: {
   LEAD_CONVERSIONS.push(conversion);
 
   // 更新线索状态为已转化
-  const lead = LEADS.find((l) => l.id === params.leadId);
   if (lead) {
     lead.status = 'converted';
     lead.converted_at = dayjs().toISOString();
@@ -1762,7 +1792,7 @@ export async function mockGetTrialCourseSlots(campusId?: string): Promise<TrialC
           teacherId: 'user-teacher-001',
           teacherName: '王老师',
           campusId: 'campus-center',
-          campusName: '中心校区',
+          campusName: '曦绘艺术',
           lessonDate: dateStr,
           startTime: '10:00',
           endTime: '11:00',
@@ -1796,7 +1826,7 @@ export async function mockGetTrialCourseSlots(campusId?: string): Promise<TrialC
           teacherId: 'user-teacher-003',
           teacherName: '赵老师',
           campusId: 'campus-center',
-          campusName: '中心校区',
+          campusName: '曦绘艺术',
           lessonDate: dateStr,
           startTime: '16:00',
           endTime: '17:00',
@@ -1815,7 +1845,7 @@ export async function mockGetTrialCourseSlots(campusId?: string): Promise<TrialC
         teacherId: 'user-teacher-001',
         teacherName: '王老师',
         campusId: 'campus-center',
-        campusName: '中心校区',
+        campusName: '曦绘艺术',
         lessonDate: dateStr,
         startTime: '09:00',
         endTime: '10:30',
@@ -1828,7 +1858,7 @@ export async function mockGetTrialCourseSlots(campusId?: string): Promise<TrialC
 
   if (campusId) {
     return slots.filter((s) => {
-      if (campusId === 'campus-center') return s.campusName === '中心校区';
+      if (campusId === 'campus-center') return s.campusName === '曦绘艺术';
       if (campusId === 'campus-east') return s.campusName === '东校区';
       return true;
     });

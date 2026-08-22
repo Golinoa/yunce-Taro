@@ -4,7 +4,7 @@
  * 用于创建或编辑课程模板，支持基础信息和高级设置。
  * 所有字段采用左标签右输入/值的行内布局。
  */
-import { ScrollView, View, Text, Image } from '@tarojs/components';
+import { ScrollView, View, Text } from '@tarojs/components';
 import Taro, { useUnload } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +12,7 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
+import CourseImageUploader from '@/components/CourseImageUploader';
 import FormInput from '@/components/FormInput';
 import FormRow from '@/components/FormRow';
 import Icon from '@/components/Icon';
@@ -43,13 +44,7 @@ import type {
 } from '@/types/course-template';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
-import {
-  chooseImageTemp,
-  deleteTempImage,
-  isImageCancelError,
-  isTempImagePath,
-  uploadImage,
-} from '@/utils/image-upload';
+import { uploadImage } from '@/utils/image-upload';
 
 /** 表单字段错误 */
 interface FormErrors {
@@ -117,158 +112,6 @@ function setLeaveGuard(enabled: boolean): void {
  * 分组小标题：主题色竖线 + 文字（语义：分组类型，颜色随主题切换而变化）
  * 同一文件内复用 6 次，避免重复 JSX
  */
-/**
- * 课程图片上传子组件
- *
- * 与通用 ImageUploader 不同：
- * - 提供「整宽（如背景图 405×190 横图）」与「方形（如课程封面 1/3 宽）」两种布局
- * - 中央 + 号 + 主副文案完全按设计稿还原（除了颜色，蓝色品牌主色）
- * - 已上传图片占满整框（aspectFill），右上角悬浮删除按钮
- */
-type CourseImageUploaderProps = {
-  /** 当前图片 URL，未上传时为空 */
-  value?: string;
-  /** 图片变更回调，删除时回 undefined */
-  onChange: (value?: string) => void;
-  /** 占位标题（如「上传背景图」） */
-  title: string;
-  /** 占位副标题（如「上传后可预览和更换」） */
-  subtitle?: string;
-  /** 布局：fullWidth=整宽容器 / square=方形容器 */
-  layout?: 'fullWidth' | 'square';
-  /** 方形模式的尺寸（rpx），默认 200 */
-  squareSizeRpx?: number;
-  /** 最大文件大小（MB），默认 5 */
-  maxSizeMB?: number;
-  /** 选图前记录页面滚动位置（由父组件传入的 ref），用于原生选图/裁剪浮层关闭后恢复 */
-  scrollTopRef?: React.MutableRefObject<number>;
-  /** 选图完成后恢复页面滚动位置 */
-  onScrollRestore?: (top: number) => void;
-};
-
-const CourseImageUploader: React.FC<CourseImageUploaderProps> = ({
-  value,
-  onChange,
-  title,
-  subtitle,
-  layout = 'fullWidth',
-  squareSizeRpx = 200,
-  maxSizeMB = 5,
-  scrollTopRef,
-  onScrollRestore,
-}) => {
-  const cropScale: keyof Taro.cropImage.CropScale = layout === 'fullWidth' ? '16:9' : '1:1';
-
-  const handleChoose = useCallback(async () => {
-    // 选图/裁剪是原生浮层（wx.chooseMedia / wx.cropImage），关闭时微信会重置内层
-    // ScrollView 滚动位置导致页面跳回顶部。先记录当前位置，选图完成后再恢复。
-    const savedTop = scrollTopRef?.current ?? 0;
-    try {
-      const tempPath = await chooseImageTemp({ maxSizeMB, cropScale });
-      // 替换图片：先删掉旧的本地临时文件，避免 uploads 目录累积
-      if (isTempImagePath(value)) deleteTempImage(value);
-      onChange(tempPath);
-      onScrollRestore?.(savedTop);
-    } catch (err) {
-      if (isImageCancelError(err)) return;
-      const message = err instanceof Error ? err.message : '选择图片失败';
-      if (message.includes('超过') || message.includes('限制')) {
-        void Taro.showModal({
-          title: '图片过大',
-          content: message,
-          showCancel: false,
-          confirmText: '知道了',
-        });
-      } else {
-        Taro.showToast({ title: message, icon: 'none' });
-      }
-    }
-  }, [maxSizeMB, cropScale, onChange, scrollTopRef, onScrollRestore, value]);
-
-  const handleDelete = useCallback(
-    async (e: { stopPropagation: () => void }) => {
-      e.stopPropagation();
-      const { confirm } = await Taro.showModal({
-        title: '删除图片',
-        content: '删除后约课首页的课程卡将恢复默认背景。确定删除吗？',
-        confirmColor: '#EF4444',
-      });
-      if (!confirm) return;
-      // 删除时同步清理本地临时文件
-      if (isTempImagePath(value)) deleteTempImage(value);
-      onChange(undefined);
-    },
-    [onChange, value],
-  );
-
-  const handlePreview = useCallback(() => {
-    if (!value) return;
-    void Taro.previewImage({ current: value, urls: [value] });
-  }, [value]);
-
-  /** 已上传：渲染图片预览 + 删除按钮，整宽模式 aspectFill 充满，square 同理 */
-  if (value) {
-    if (layout === 'fullWidth') {
-      return (
-        <View
-          className="w-full h-[320rpx] rounded-[24rpx] overflow-hidden relative border-[2rpx] border-border press-scale"
-          onClick={handlePreview}
-        >
-          <Image className="w-full h-full" src={value} mode="aspectFill" />
-          <View
-            className="absolute top-[16rpx] right-[16rpx] w-[56rpx] h-[56rpx] rounded-full bg-black/50 flex items-center justify-center z-10 active:opacity-70"
-            onClick={handleDelete}
-          >
-            <Icon name="mdi-close" size={32} color="white" />
-          </View>
-        </View>
-      );
-    }
-    return (
-      <View
-        className="rounded-[24rpx] overflow-hidden relative border-[2rpx] border-border press-scale"
-        style={{ width: `${squareSizeRpx}rpx`, height: `${squareSizeRpx}rpx` }}
-        onClick={handlePreview}
-      >
-        <Image className="w-full h-full" src={value} mode="aspectFill" />
-        <View
-          className="absolute top-[8rpx] right-[8rpx] w-[44rpx] h-[44rpx] rounded-full bg-black/50 flex items-center justify-center z-10 active:opacity-70"
-          onClick={handleDelete}
-        >
-          <Icon name="mdi-close" size={26} color="white" />
-        </View>
-      </View>
-    );
-  }
-
-  /** 未上传：按布局渲染虚线占位区 */
-  if (layout === 'fullWidth') {
-    return (
-      <View
-        className="w-full h-[320rpx] rounded-[24rpx] border-[2rpx] border-dashed border-primary/40 flex flex-col items-center justify-center gap-[12rpx] active:opacity-70 bg-primary/5"
-        onClick={handleChoose}
-      >
-        <View className="w-[96rpx] h-[96rpx] rounded-full bg-primary/15 flex items-center justify-center">
-          <Icon name="mdi-plus" size={56} color="primary" />
-        </View>
-        <Text className="text-[28rpx] font-semibold text-primary">{title}</Text>
-        {subtitle && <Text className="text-[24rpx] text-muted-foreground">{subtitle}</Text>}
-      </View>
-    );
-  }
-  return (
-    <View
-      className="rounded-[24rpx] border-[2rpx] border-dashed border-primary/40 flex flex-col items-center justify-center gap-[12rpx] active:opacity-70 bg-primary/5"
-      style={{ width: `${squareSizeRpx}rpx`, height: `${squareSizeRpx}rpx` }}
-      onClick={handleChoose}
-    >
-      <View className="w-[72rpx] h-[72rpx] rounded-full bg-primary/15 flex items-center justify-center">
-        <Icon name="mdi-plus" size={42} color="primary" />
-      </View>
-      <Text className="text-[24rpx] font-medium text-primary">{title}</Text>
-    </View>
-  );
-};
 
 const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
   <View className="flex flex-row items-center gap-[12rpx] pb-[24rpx]">
@@ -330,7 +173,9 @@ const CourseFormPage: React.FC = () => {
     try {
       Taro.setStorageSync(`course-form-img-bg-${formStorageScope}`, backgroundImage || '');
       Taro.setStorageSync(`course-form-img-home-${formStorageScope}`, homeImage || '');
-    } catch {/* 静默 */}
+    } catch {
+      /* 静默 */
+    }
   }, [backgroundImage, homeImage, formStorageScope]);
 
   // 自定义年龄组 / 自定义课程难度（picker 内新增）
@@ -372,9 +217,9 @@ const CourseFormPage: React.FC = () => {
   /** 班课模式：隐藏开课与价格/预约规则/签到规则，改为班课信息区块 */
   const isClassMode = category === 'class';
 
-// 加载状态：使用延迟显示 Hook，仅当请求超过阈值未完成时才显示骨架屏，
-// 避免每次进页面都闪一下加载占位（mock/缓存数据通常很快返回）。
-const { loading, setLoading } = useDelayedLoading();
+  // 加载状态：使用延迟显示 Hook，仅当请求超过阈值未完成时才显示骨架屏，
+  // 避免每次进页面都闪一下加载占位（mock/缓存数据通常很快返回）。
+  const { loading, setLoading } = useDelayedLoading();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -412,7 +257,9 @@ const { loading, setLoading } = useDelayedLoading();
       const persistedHome = Taro.getStorageSync(`course-form-img-home-${formStorageScope}`);
       if (typeof persistedBg === 'string') setBackgroundImage(persistedBg);
       if (typeof persistedHome === 'string') setHomeImage(persistedHome);
-    } catch {/* 静默 */}
+    } catch {
+      /* 静默 */
+    }
     if (persistedLoaded && isEdit) {
       // 已加载过课程详情（webview 重载场景），直接跳过骨架屏与接口请求
       setLoading(false);
@@ -449,7 +296,9 @@ const { loading, setLoading } = useDelayedLoading();
         // 标记当前课程详情已加载，供 webview 重载场景跳过骨架屏
         try {
           Taro.setStorageSync(`course-form-loaded-${formStorageScope}`, true);
-        } catch {/* 静默 */}
+        } catch {
+          /* 静默 */
+        }
       })
       .finally(() => setLoading(false));
   }, [courseId, isEdit, fetchList, formStorageScope]);
@@ -974,7 +823,9 @@ const { loading, setLoading } = useDelayedLoading();
         Taro.removeStorageSync(`course-form-loaded-${formStorageScope}`);
         Taro.removeStorageSync(`course-form-img-bg-${formStorageScope}`);
         Taro.removeStorageSync(`course-form-img-home-${formStorageScope}`);
-      } catch {/* 静默 */}
+      } catch {
+        /* 静默 */
+      }
       // 延时返回让「保存成功」toast 可见；若期间用户已手动返回（页面已销毁）则跳过，
       // 避免在上一页再触发一次 navigateBack 造成「连退两层」。
       setTimeout(() => {

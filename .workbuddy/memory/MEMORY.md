@@ -6,16 +6,17 @@
 - Mock 模式必须带 `VITE_USE_MOCK=true`，否则生产模式禁用 Mock 导致网络异常 / 登录失败。
 - 仅当“代码改了小程序里没生效”时才用 `build:weapp:clean` 清缓存（用户已说平时不要）。
 
-## ⚠️ 环境删除拦截（构建必读，2026-08-20 发现）
-- 本机**文件系统拦截了所有 `unlink`/`rm` 删除操作**（含 `dangerouslyDisableSandbox` 也无效），`fs.unlinkSync` 被转成「安全删除→回收站」并以 `EPERM` 失败；但 **`writeFileSync` 覆盖写（truncate）与 `fs.renameSync` 重命名都正常**。
-- **后果**：`rm -rf dist` 删不掉；Taro 构建开头 `emptyOutputDir` 调 `unlink` 清旧 `dist` 必 `EPERM` 失败。
-- **正确编译流程（绕过删除拦截）**：用受管 node 把旧 `dist` **重命名移走**（不删），让 Taro 全新创建 `dist`：
+## ⚠️ 删除操作权限（构建必读，2026-08-20 修正）
+- **实测结论（20:41）**：独立删除命令（Bash 跑 node `fs.rmSync({recursive,force})`）在**获得 Sandbox bypass / escalation-approved 权限**时可成功删除目录（已实测删掉全部 `dist_bak_*` 与 `_dtest_bak/`，释放约 27MB+）。
+- 之前“本机拦截所有 rm/unlink（EPERM）”论断**已过时**：当时在受限沙箱内，删除被转安全删除→回收站并以 EPERM 失败；现在命令会触发 sandbox bypass，删除可行。**若遇 EPERM，请求 sandbox-bypass 提升权限后再删，或退化为 `rename` 到 `_archive/` 兜底。**
+- **编译流程注意**：Taro 编译开头 `emptyOutputDir` 仍走 `unlink` 清旧 `dist`；为稳妥，编译前仍建议用受管 node 把旧 `dist` **重命名移走**（不删）再编（流程见下）。但普通文件/备份删除已可直接 `rm`。
+- **正确编译流程（绕开删除）**：用受管 node 把旧 `dist` **重命名移走**（不删），让 Taro 全新创建 `dist`：
   ```powershell
   $env:VITE_USE_MOCK='true'; $env:NODE_OPTIONS='--max-old-space-size=4096'
   & "C:\Users\Agust\.workbuddy\binaries\node\versions\22.22.2\node.exe" -e "const fs=require('fs'); const p='D:/Coding/yunce/yunceTaro/dist'; if(fs.existsSync(p)){ fs.renameSync(p, p+'_bak_'+Date.now()); }"
   npm run build:weapp
   ```
-- `dist_bak_*` 旧目录无法删除（删除被拦），只能累积，无害（磁盘占用），不要试图 `rm` 它们。
+- `dist_bak_*`：现已实测可删（需 sandbox bypass 权限）；之前“必须保留、不要 rm”的结论作废。普通环境若被拦，请求提升权限后 `rm -rf` 即可。
 - `config/index.ts` 已对 weapp 构建**排除 `@tarojs/plugin-html`**（该插件每次构建覆盖写 `node_modules/.../runtime.js` 也会踩删除拦截；项目纯 weapp 不需要它，无 `dangerouslySetInnerHTML`/`WebView` 用法）。
 
 ## 编译卡死根因（避坑）

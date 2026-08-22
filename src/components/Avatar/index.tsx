@@ -38,7 +38,7 @@ export interface AvatarProps {
   /** 头像图片 URL（优先于文字头像） */
   avatarUrl?: string;
   /** 尺寸 */
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'mlg' | 'lg' | 'xl';
   /** 额外类名 */
   className?: string;
   /** 点击事件 */
@@ -48,6 +48,7 @@ export interface AvatarProps {
 const SIZE_MAP = {
   sm: { container: 'w-12 h-12', text: 'text-xs' }, // 48rpx
   md: { container: 'w-[68rpx] h-[68rpx]', text: 'text-[26rpx]' }, // 68rpx
+  mlg: { container: 'w-[72rpx] h-[72rpx]', text: 'text-[26rpx]' }, // 72rpx（介于 md 与 lg 之间，网格密集场景使用）
   lg: { container: 'w-20 h-20', text: 'text-lg' }, // 80rpx
   xl: { container: 'w-40 h-40', text: 'text-[60rpx]' }, // 160rpx
 } as const;

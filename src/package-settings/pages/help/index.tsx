@@ -1,19 +1,22 @@
 /**
- * 使用帮助页 package-settings/pages/help/index
+ * 使用帮助页 package-settings/pages/help/index（教师端）
  *
- * 信息采用三级分层结构：
- *   一级 功能模块（学员与家庭 / 课程与出勤 / 门店与经营）——卡片入口，带图标、副标题与问题数
- *   二级 子分组（如「学员档案」「家庭协作」）——进入模块后按主题归并，带强调色小标题
- *   三级 单个问答——手风琴展开
- * 全部使用 UnoCSS Token，随主题色联动。
+ * 参考 UI 设计稿风格重构：
+ *   头部：Hi~ 问候 + 副标题 + 装饰图标
+ *   功能入口：3 个分类卡片横排（点击切换当前展示模块）
+ *   内容区：手风琴式问答列表（点击展开/收起答案）
+ *   底部：电话客服 + 在线咨询 双入口（轻量统一风格）
+ * 保留原生导航栏，标题「使用帮助」。全部使用 UnoCSS Token，随主题色联动。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
-import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
-import { withRouteGuard } from '@/utils/route-guard';
+import Dialog from '@/components/Dialog';
+import { useThemeStore } from '@/stores/theme';
+
+const CUSTOMER_WECHAT = 'by3737337';
 
 interface FAQItem {
   id: string;
@@ -30,7 +33,6 @@ interface FAQSubGroup {
 interface FAQModule {
   id: string;
   title: string;
-  subtitle: string;
   icon: string;
   subgroups: FAQSubGroup[];
 }
@@ -39,7 +41,6 @@ const FAQ_MODULES: FAQModule[] = [
   {
     id: 'student-family',
     title: '学员与家庭',
-    subtitle: '学员档案、家庭协作一目了然',
     icon: 'mdi-account-group-outline',
     subgroups: [
       {
@@ -83,7 +84,6 @@ const FAQ_MODULES: FAQModule[] = [
   {
     id: 'course-attendance',
     title: '课程与出勤',
-    subtitle: '排课、消课、请假全覆盖',
     icon: 'mdi-calendar-check-outline',
     subgroups: [
       {
@@ -121,7 +121,6 @@ const FAQ_MODULES: FAQModule[] = [
   {
     id: 'store-operation',
     title: '门店与经营',
-    subtitle: '从开店配置到经营看板',
     icon: 'mdi-cog-outline',
     subgroups: [
       {
@@ -162,7 +161,7 @@ const FAQ_MODULES: FAQModule[] = [
             id: 'data-security',
             question: '学员和家长数据安全吗？',
             answer:
-              '云策教务采用分角色权限管理，教师只能查看自己校区和班级的学员数据，家长只能查看自己绑定的子女信息。敏感操作如充值、请假等均需身份校验，确保数据安全。',
+              '松果排课采用分角色权限管理，教师只能查看自己校区和班级的学员数据，家长只能查看自己绑定的子女信息。敏感操作如充值、请假等均需身份校验，确保数据安全。',
           },
         ],
       },
@@ -170,175 +169,260 @@ const FAQ_MODULES: FAQModule[] = [
   },
 ];
 
-function FAQAccordion({ items }: { items: FAQItem[] }) {
-  const [openId, setOpenId] = useState<string | null>(null);
+/** 主题 key → CSS 类名映射 */
+const THEME_CLASS_MAP: Record<string, string> = {
+  orange: 'theme-orange',
+  coral: 'theme-coral',
+  blue: '',
+};
 
-  const handleToggle = useCallback((id: string) => {
-    setOpenId((prev) => (prev === id ? null : id));
-  }, []);
-
-  return (
-    <View className="flex flex-col gap-[16rpx]">
-      {items.map((item) => {
-        const isOpen = openId === item.id;
-        return (
-          <View
-            key={item.id}
-            className="bg-card rounded-[24rpx] shadow-card overflow-hidden press-scale"
-            onClick={() => handleToggle(item.id)}
-          >
-            <View className="flex items-center justify-between p-[28rpx]">
-              <Text className="flex-1 text-[28rpx] font-semibold text-foreground leading-relaxed pr-[16rpx]">
-                {item.question}
-              </Text>
-              <View
-                className={cn(
-                  'w-[44rpx] h-[44rpx] rounded-full bg-primary/10 center flex-shrink-0 transition-transform duration-200',
-                  isOpen && 'rotate-180',
-                )}
-              >
-                <Icon name="mdi-chevron-down" size={24} color="primary" />
-              </View>
-            </View>
-            {isOpen && (
-              <View className="px-[28rpx] pb-[28rpx] pt-[4rpx]">
-                <View className="h-[1rpx] bg-border/60 mb-[20rpx]" />
-                <Text className="text-[26rpx] text-muted-foreground leading-relaxed">
-                  {item.answer}
-                </Text>
-              </View>
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function SubGroupSection({ subgroup }: { subgroup: FAQSubGroup }) {
-  return (
-    <View className="mt-[32rpx] first:mt-[8rpx]">
-      <View className="flex items-center gap-[12rpx] mb-[16rpx]">
-        <View className="w-[6rpx] h-[24rpx] rounded-[3rpx] bg-primary" />
-        <Text className="text-[28rpx] font-bold text-foreground">{subgroup.title}</Text>
-      </View>
-      <FAQAccordion items={subgroup.items} />
-    </View>
-  );
+/** 将模块的所有子分组问答扁平化为编号列表 */
+function flattenModuleItems(module: FAQModule): { item: FAQItem; subgroupTitle: string }[] {
+  const result: { item: FAQItem; subgroupTitle: string }[] = [];
+  module.subgroups.forEach((sg) => {
+    sg.items.forEach((item) => {
+      result.push({ item, subgroupTitle: sg.title });
+    });
+  });
+  return result;
 }
 
 const Help: React.FC = () => {
-  usePrimaryNavigationBar();
+  const { activeTheme } = useThemeStore();
+  const themeClass = THEME_CLASS_MAP[activeTheme] || '';
 
-  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  // 默认选中第一个模块
+  const [activeModuleId, setActiveModuleId] = useState<string>(FAQ_MODULES[0].id);
+
+  // 手风琴：当前展开的问答 ID 集合（支持多开或单开，这里用单开更符合常见交互）
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // 展开全部 / 收起全部
+  const [expandAll, setExpandAll] = useState(false);
+
+  const [serviceVisible, setServiceVisible] = useState(false);
 
   const activeModule = useMemo(
-    () => FAQ_MODULES.find((m) => m.id === activeModuleId) ?? null,
+    () => FAQ_MODULES.find((m) => m.id === activeModuleId) ?? FAQ_MODULES[0],
     [activeModuleId],
   );
 
-  const handleModuleClick = useCallback((id: string) => {
-    setActiveModuleId(id);
-  }, []);
-
-  const handleBack = useCallback(() => {
-    setActiveModuleId(null);
-  }, []);
+  const flatItems = useMemo(() => flattenModuleItems(activeModule), [activeModule]);
 
   const handleFeedback = useCallback(() => {
     Taro.navigateTo({ url: '/package-settings/pages/feedback/index' });
   }, []);
 
+  /** 手风琴切换：点击同一项收起，点击不同项展开 */
+  const handleToggleItem = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandAll(false);
+  }, []);
+
+  /** 展开全部 / 收起全部 */
+  const handleToggleAll = useCallback(() => {
+    setExpandAll((prev) => {
+      if (prev) {
+        setExpandedId(null);
+        return false;
+      }
+      setExpandedId('__all__');
+      return true;
+    });
+  }, []);
+
+  const isExpanded = useCallback(
+    (id: string) => expandAll || expandedId === id,
+    [expandAll, expandedId],
+  );
+
+  const handleCopyWechat = useCallback(() => {
+    Taro.setClipboardData({
+      data: CUSTOMER_WECHAT,
+      success: () => setServiceVisible(false),
+    });
+  }, []);
+
   return (
-    <View className="min-h-screen bg-background flex flex-col">
-      {/* ====== 顶部标题区 ====== */}
-      <View className="bg-background px-[32rpx] pt-[32rpx] pb-[24rpx]">
-        {activeModule ? (
-          <View className="relative h-[56rpx] flex items-center">
-            <View
-              className="absolute left-0 flex items-center justify-center w-[56rpx] h-[56rpx] rounded-full bg-muted press-scale"
-              onClick={handleBack}
-            >
-              <Icon name="mdi-chevron-left" size={36} color="foreground" />
-            </View>
-            <Text className="w-full text-center text-[34rpx] font-bold text-foreground">
-              {activeModule.title}
+    <View className={cn('min-h-screen bg-background flex flex-col', themeClass)}>
+      {/* ====== 头部（Hi~ 问候 + 副标题 + 装饰图标） ====== */}
+      <View className="bg-background px-[32rpx] pt-[48rpx] pb-[20rpx]">
+        <View className="flex items-start justify-between">
+          <View className="flex-1 pr-[16rpx]">
+            <Text className="text-[44rpx] font-bold text-foreground leading-tight">
+              Hi~，有什么可以帮您！
+            </Text>
+            <Text className="mt-[12rpx] text-[26rpx] text-muted-foreground leading-relaxed block">
+              常见问题一站式查询，快速上手松果排课
             </Text>
           </View>
-        ) : (
-          <View className="relative h-[56rpx] flex items-center justify-center">
-            <Text className="text-[34rpx] font-bold text-foreground">使用帮助</Text>
-          </View>
-        )}
-
-        {!activeModule && (
-          <View className="mt-[48rpx]">
-            <Text className="text-[48rpx] font-bold text-foreground leading-tight">
-              你好，需要什么帮助？
-            </Text>
-            <Text className="mt-[16rpx] text-[28rpx] text-muted-foreground leading-relaxed">
-              从了解功能到开店配置，这里都能找到答案
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* ====== 内容区 ====== */}
-      <ScrollView scrollY className="flex-1" showScrollbar={false}>
-        <View className="px-[32rpx] pt-[16rpx] pb-[48rpx]">
-          {activeModule ? (
-            <View>
-              {activeModule.subgroups.map((subgroup) => (
-                <SubGroupSection key={subgroup.id} subgroup={subgroup} />
-              ))}
-            </View>
-          ) : (
-            <View className="flex flex-col gap-[24rpx]">
-              {FAQ_MODULES.map((module) => {
-                const count = module.subgroups.reduce((sum, sg) => sum + sg.items.length, 0);
-                return (
-                  <View
-                    key={module.id}
-                    className="bg-card rounded-[24rpx] p-[28rpx] shadow-card flex items-center gap-[24rpx] press-scale"
-                    onClick={() => handleModuleClick(module.id)}
-                  >
-                    <View className="w-[96rpx] h-[96rpx] rounded-[24rpx] bg-primary/10 center flex-shrink-0">
-                      <Icon name={module.icon} size={48} color="primary" />
-                    </View>
-                    <View className="flex-1 min-w-0 flex flex-col gap-[8rpx]">
-                      <Text className="text-[32rpx] font-bold text-foreground leading-tight">
-                        {module.title}
-                      </Text>
-                      <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-                        {module.subtitle}
-                      </Text>
-                    </View>
-                    <View className="flex flex-col items-end gap-[8rpx] flex-shrink-0">
-                      <Text className="text-[22rpx] text-primary font-medium">{count} 个问题</Text>
-                      <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {/* 底部提示 */}
-          <View className="mt-[48rpx] text-center">
-            <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-              还有疑问？可联系你的门店，或到「我的 → 学员信箱」留言反馈
-            </Text>
-            <Text
-              className="mt-[16rpx] inline-block text-[26rpx] font-medium text-primary press-scale"
-              onClick={handleFeedback}
-            >
-              去反馈
-            </Text>
+          {/* 装饰图标 */}
+          <View className="w-[100rpx] h-[100rpx] rounded-[28rpx] bg-primary/10 center flex-shrink-0 mt-[8rpx]">
+            <Icon name="mdi-headset" size={48} color="primary" />
           </View>
         </View>
+      </View>
+
+      {/* ====== 功能入口：3 个分类卡片横排 ====== */}
+      <View className="px-[32rpx] pt-[16rpx] pb-[4rpx]">
+        <View className="flex gap-[20rpx]">
+          {FAQ_MODULES.map((module) => {
+            const isActive = module.id === activeModuleId;
+            return (
+              <View
+                key={module.id}
+                className={cn(
+                  'flex-1 flex flex-col items-center py-[24rpx] rounded-[20rpx] press-scale transition-colors duration-200',
+                  isActive ? 'bg-primary/10 ring-2 ring-primary/30' : 'bg-card shadow-card',
+                )}
+                onClick={() => setActiveModuleId(module.id)}
+              >
+                <View
+                  className={cn(
+                    'w-[80rpx] h-[80rpx] rounded-[18rpx] center mb-[12rpx]',
+                    isActive ? 'bg-primary' : 'bg-primary/10',
+                  )}
+                >
+                  <Icon
+                    name={module.icon}
+                    size={36}
+                    color={isActive ? '#ffffff' : 'primary'}
+                  />
+                </View>
+                <Text
+                  className={cn(
+                    'text-[24rpx] font-medium leading-tight text-center',
+                    isActive ? 'text-primary' : 'text-foreground',
+                  )}
+                >
+                  {module.title}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* ====== 内容区：手风琴式问答列表 ====== */}
+      <ScrollView scrollY className="flex-1 mt-[24rpx]" showScrollbar={false}>
+        <View className="px-[32rpx] pt-[8rpx] pb-[24rpx]">
+          {/* 模块标题 */}
+          <View className="flex items-center justify-between mb-[24rpx]">
+            <Text className="text-[30rpx] font-bold text-foreground">常见问题</Text>
+            <Text className="text-[24rpx] text-muted-foreground">{activeModule.title}</Text>
+          </View>
+
+          {/* 手风琴列表 */}
+          <View className="bg-card rounded-[24rpx] shadow-card overflow-hidden">
+            {flatItems.map(({ item, subgroupTitle }, idx) => {
+              const open = isExpanded(item.id);
+              return (
+                <View key={item.id} className="border-b border-border/40 last:border-b-0">
+                  {/* 问题行（点击展开/收起） */}
+                  <View
+                    className="flex items-center px-[32rpx] py-[32rpx] press-scale"
+                    onClick={() => handleToggleItem(item.id)}
+                  >
+                    <Text className="w-[44rpx] text-[28rpx] font-bold flex-shrink-0 text-primary text-center">
+                      {idx + 1}
+                    </Text>
+                    <View className="flex-1 min-w-0 ml-[16rpx]">
+                      <Text
+                        className={cn(
+                          'text-[28rpx] leading-relaxed',
+                          open ? 'font-semibold text-primary' : 'text-foreground',
+                        )}
+                      >
+                        {item.question}
+                      </Text>
+                      {!open && (
+                        <Text className="mt-[6rpx] text-[24rpx] text-muted-foreground line-clamp-1">
+                          {subgroupTitle}
+                        </Text>
+                      )}
+                    </View>
+                    <Icon
+                      name={open ? 'mdi-chevron-up' : 'mdi-chevron-right'}
+                      size={28}
+                      color={open ? 'primary' : 'mutedForeground'}
+                      className="ml-[12rpx] flex-shrink-0 transition-transform duration-200"
+                    />
+                  </View>
+
+                  {/* 答案展开区 */}
+                  {open && (
+                    <View className="px-[32rpx] pb-[32rpx] ml-[60rpx]">
+                      <View className="border-l-[3rpx] border-primary/30 pl-[24rpx]">
+                        <Text className="text-[27rpx] text-foreground/85 leading-[1.75]">
+                          {item.answer}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+
+          {/* 展开 / 收起 全部 */}
+          {flatItems.length > 4 && (
+            <View
+              className="mt-[28rpx] flex items-center justify-center gap-[6rpx] press-scale py-[8rpx]"
+              onClick={handleToggleAll}
+            >
+              <Text className="text-[26rpx] text-muted-foreground">
+                {expandAll ? '收起全部' : '展开全部'}
+              </Text>
+              <Icon
+                name={expandAll ? 'mdi-chevron-up' : 'mdi-chevron-down'}
+                size={24}
+                color="mutedForeground"
+              />
+            </View>
+          )}
+        </View>
       </ScrollView>
+
+      {/* ====== 底部：电话客服 + 在线咨询（轻量统一） ====== */}
+      <View className="px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[20rpx] border-t border-border/40 bg-background">
+        <View className="flex gap-[24rpx]">
+          <View
+            className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
+            onClick={() => setServiceVisible(true)}
+          >
+            <Icon name="mdi-phone-outline" size={28} color="foreground" />
+            <Text className="text-[28rpx] font-medium text-foreground">电话客服</Text>
+          </View>
+          <View
+            className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
+            onClick={handleFeedback}
+          >
+            <Icon name="mdi-chat-processing-outline" size={28} color="foreground" />
+            <Text className="text-[28rpx] font-medium text-foreground">在线咨询</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ====== 客服微信号弹框 ====== */}
+      <Dialog visible={serviceVisible} onClose={() => setServiceVisible(false)} maskClosable>
+        <View className="bg-card rounded-[32rpx] w-[560rpx] px-[40rpx] py-[44rpx] flex flex-col items-center">
+          <Text className="text-[32rpx] font-bold text-foreground">联系客服</Text>
+          <Text className="mt-[24rpx] text-[26rpx] text-muted-foreground leading-relaxed text-center">
+            请添加客服微信，备注你的问题即可获得帮助
+          </Text>
+          <View
+            className="mt-[32rpx] w-full bg-background rounded-[20rpx] py-[28rpx] flex items-center justify-center gap-[16rpx] press-scale"
+            onClick={handleCopyWechat}
+          >
+            <Text className="text-[36rpx] font-bold text-primary tracking-wide">
+              {CUSTOMER_WECHAT}
+            </Text>
+            <Icon name="mdi-content-copy" size={32} color="primary" />
+          </View>
+          <Text className="mt-[20rpx] text-[22rpx] text-muted-foreground">点击上方微信号即可复制</Text>
+        </View>
+      </Dialog>
     </View>
   );
 };
 
-export default withRouteGuard(Help);
+export default Help;

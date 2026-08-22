@@ -1028,6 +1028,7 @@ export default defineConfig({
     'bg-schedule-calendar-dot': { background: 'var(--schedule-calendar-dot)' },
     'text-schedule-calendar-outside': { color: 'var(--schedule-calendar-outside-text)' },
     'shadow-schedule-today': { 'box-shadow': '0 8rpx 20rpx hsl(var(--primary) / 0.08)' },
+    'shadow-schedule-selected': { 'box-shadow': '0 6rpx 16rpx hsl(var(--primary) / 0.32)' },
 
     // ===== 注册页装饰效果 =====
     'bg-register-deco': {
