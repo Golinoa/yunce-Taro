@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
+import { calcTotal } from '@/data/teacher';
 import type { TeacherUIModel } from '@/types/teacher';
+
+// calcTotal 必须在 mock 之后导入，确保 teacher.ts 初始化期不触发循环依赖
 
 /**
  * 桩掉 mock-database：阻止其顶层 buildTeacherView() 触发循环依赖初始化
@@ -15,9 +18,6 @@ vi.mock('@/data/mock-database', () => ({
   CUR_DAY: new Date().getDate(),
   CUR_WEEKDAY: 1,
 }));
-
-// calcTotal 必须在 mock 之后导入，确保 teacher.ts 初始化期不触发循环依赖
-import { calcTotal } from '@/data/teacher';
 
 /**
  * calcTotal 回归测试（对应修复 B-01：实发金额与展示金额共用同一算法）
@@ -108,5 +108,25 @@ describe('calcTotal（B-01 实发金额算法）', () => {
     });
     // 8000 + 4800 + 600 + 300 - 1200 - 0 - 200 + 500 + 300 = 13100
     expect(calcTotal(t)).toBe(13100);
+  });
+
+  it('A-01 NaN/undefined 防御：缺失字段返回确定值而非 NaN', () => {
+    // hours/rate 缺失时课时费按 0 计，结果仍为有限数
+    expect(Number.isNaN(calcTotal(makeTeacher({})))).toBe(false);
+    // NaN 输入被兜底为 0
+    expect(
+      calcTotal(
+        makeTeacher({
+          base: Number.NaN,
+          hours: Number.NaN,
+          rate: Number.NaN,
+          attend: Number.NaN,
+          perf: Number.NaN,
+          deductions: [{ type: 'deduct', amount: Number.NaN }],
+        }),
+      ),
+    ).toBe(0);
+    // 空分类课时费数组 → 0 课时费（保持原语义）
+    expect(calcTotal(makeTeacher({ base: 100, categoryLessonFees: [] }))).toBe(100);
   });
 });

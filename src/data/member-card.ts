@@ -166,7 +166,9 @@ export const mockGetMemberCardsByStudent = async (
   studentId: string,
 ): Promise<MemberCardDetail[]> => {
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return MOCK_MEMBER_CARDS.filter((item) => item.studentId === studentId).map(syncCardRemainingCount);
+  return MOCK_MEMBER_CARDS.filter((item) => item.studentId === studentId).map(
+    syncCardRemainingCount,
+  );
 };
 
 /**
@@ -316,3 +318,25 @@ export const mockIssueMemberCard = async (
 
   return card;
 };
+
+/**
+ * 划扣欠课（P1，2026-08-22）：从会员卡关联课包剩余课时中抵扣欠课。
+ * @returns 未抵完的欠课课时（新卡课时 < 欠课时则返回差值，剩余欠课保留）
+ */
+export function deductCardDebtHours(cardId: string, hours: number): number {
+  let remainingDeduct = Math.max(Number(hours) || 0, 0);
+  const linked = COURSE_PACKAGES.filter((p) => p.memberCardId === cardId);
+  for (const pkg of linked) {
+    if (remainingDeduct <= 0) break;
+    const idx = COURSE_PACKAGES.findIndex((p) => p.id === pkg.id);
+    if (idx < 0) continue;
+    const take = Math.min(remainingDeduct, pkg.remainingHours || 0);
+    COURSE_PACKAGES[idx] = {
+      ...COURSE_PACKAGES[idx],
+      remainingHours: Math.max((pkg.remainingHours || 0) - take, 0),
+      usedHours: (pkg.usedHours || 0) + take,
+    };
+    remainingDeduct -= take;
+  }
+  return remainingDeduct;
+}

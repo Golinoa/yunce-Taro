@@ -21,10 +21,13 @@ import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import ResignSheet from '@/components/teacher/ResignSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
+import { auditLogService } from '@/services/audit-log';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { ResignType, TeacherStatus, TeacherUIModel } from '@/types/teacher';
+import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type StatusTab = Extract<TeacherStatus, 'active' | 'resigned'>;
@@ -38,6 +41,7 @@ const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.staff;
 
 const TeacherListPage: React.FC = () => {
   useCardNavigationBar();
+  const { profile } = useAuth();
   const { activeTheme } = useThemeStore();
   const { teachers, loading, error, fetchAll, resignTeacher, updateTeacher } = useTeacherStore();
   const [activeTab, setActiveTab] = useState<StatusTab>('active');
@@ -100,6 +104,26 @@ const TeacherListPage: React.FC = () => {
       setResignSubmitting(true);
       try {
         await resignTeacher(resignTarget.id, type, reason);
+        // 审计日志（用户口径 2026-08-22）：教师离职属人事变更
+        try {
+          await auditLogService.record({
+            action: 'staff.resign',
+            operatorId: profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'teacher',
+            targetId: resignTarget.id,
+            detail: `教师离职：「${resignTarget.name}」（${type === 'quit' ? '主动离职' : type === 'dismiss' ? '机构辞退' : type === 'expire' ? '合同到期' : '其他'}）${reason ? `，原因：${reason}` : ''}`,
+            meta: {
+              teacherId: resignTarget.id,
+              teacherName: resignTarget.name,
+              resignType: type,
+              reason: reason || undefined,
+            },
+          });
+        } catch (e) {
+          logError('audit staff.resign', e);
+        }
         Taro.showToast({ title: '已标记离职', icon: 'success' });
         setResignTarget(null);
         // 切换到已离职 Tab，避免在职列表闪烁空态
@@ -110,7 +134,7 @@ const TeacherListPage: React.FC = () => {
         setResignSubmitting(false);
       }
     },
-    [resignTarget, resignTeacher],
+    [resignTarget, resignTeacher, profile],
   );
 
   // 删除确认

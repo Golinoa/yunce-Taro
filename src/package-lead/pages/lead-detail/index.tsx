@@ -20,13 +20,15 @@ import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_SOURCE_META, FOLLOW_UP_ACTION_META, TRIAL_MODE_META } from '@/constants/lead';
 import { leadService } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { useLeadStore } from '@/stores/lead';
 import type { Lead, LeadFollowUp, LeadBooking } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const LeadDetailPage: React.FC = () => {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { invalidate } = useLeadStore();
   const navSafeHeight = useNavSafeHeight();
 
@@ -113,6 +115,26 @@ const LeadDetailPage: React.FC = () => {
       if (!lead) return;
       try {
         await leadService.createFollowUp({ ...params, leadId: lead.id, operatorId: userId || '' });
+        // 审计日志（用户口径 2026-08-22）：线索跟进（谁跟进了谁）属重要运营数据
+        try {
+          await auditLogService.record({
+            action: 'lead.follow',
+            operatorId: userId || profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'lead',
+            targetId: lead.id,
+            detail: `线索跟进：跟进「${lead.child_name}」- ${params.content.slice(0, 24)}${params.content.length > 24 ? '…' : ''}`,
+            meta: {
+              leadId: lead.id,
+              leadName: lead.child_name,
+              action: params.action,
+              content: params.content,
+            },
+          });
+        } catch (e) {
+          logError('audit lead.follow', e);
+        }
         setShowFollowUp(false);
         invalidate(userId || '');
         loadData(lead.id);
@@ -121,7 +143,7 @@ const LeadDetailPage: React.FC = () => {
         Taro.showToast({ title: '添加失败', icon: 'none' });
       }
     },
-    [lead, userId, invalidate, loadData],
+    [lead, userId, invalidate, loadData, profile],
   );
 
   const handleConvertSubmit = useCallback(
@@ -141,6 +163,21 @@ const LeadDetailPage: React.FC = () => {
           operatorId: userId || '',
           note: params.note,
         });
+        // 审计日志（用户口径 2026-08-22）：线索转化（谁转化了谁）属重要运营数据
+        try {
+          await auditLogService.record({
+            action: 'lead.convert',
+            operatorId: userId || profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'lead',
+            targetId: lead.id,
+            detail: `线索转化：学员「${lead.child_name}」转为正式学员`,
+            meta: { leadId: lead.id, leadName: lead.child_name, studentId: lead.trial_student_id },
+          });
+        } catch (e) {
+          logError('audit lead.convert', e);
+        }
         await leadService.updateLeadStatus(lead.id, 'closed');
         setShowConvert(false);
         invalidate(userId || '');
@@ -150,7 +187,7 @@ const LeadDetailPage: React.FC = () => {
         Taro.showToast({ title: '开卡失败', icon: 'none' });
       }
     },
-    [lead, userId, invalidate, loadData],
+    [lead, userId, invalidate, loadData, profile],
   );
 
   const handlePhone = useCallback(() => {

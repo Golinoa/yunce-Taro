@@ -1,12 +1,12 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import Avatar from '@/components/Avatar';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import Stepper from '@/components/Stepper';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
   packageService,
@@ -14,6 +14,8 @@ import {
   studentService,
   notificationService,
 } from '@/services';
+import { auditLogService } from '@/services/audit-log';
+import { lessonDebtService } from '@/services/lesson-debt';
 import { useStudentStore } from '@/stores';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -30,6 +32,8 @@ const ClassCheckin: React.FC = () => {
   }, []);
 
   const [className, setClassName] = useState('');
+  /** 班级科目（P1：签到消课按科目检索课包） */
+  const [classSubjectId, setClassSubjectId] = useState<string | undefined>(undefined);
   const [students, setStudents] = useState<Student[]>([]);
   const [leaveIds, setLeaveIds] = useState<string[]>([]);
   const [hoursUsed, setHoursUsed] = useState(1);
@@ -41,7 +45,10 @@ const ClassCheckin: React.FC = () => {
     setLoading(true);
     try {
       const cls = await classService.getById(classId);
-      if (cls) setClassName(cls.name);
+      if (cls) {
+        setClassName(cls.name);
+        setClassSubjectId(cls.subject_id);
+      }
       const stuList = await classService.getStudents(classId);
       setStudents(stuList);
     } catch (err) {
@@ -49,7 +56,7 @@ const ClassCheckin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [classId]);
+  }, [classId, setLoading]);
 
   useEffect(() => {
     loadData();
@@ -76,7 +83,7 @@ const ClassCheckin: React.FC = () => {
     setLeaveIds(students.map((s) => s.id));
   }, [students]);
 
-  // 批量消课
+  // 批量消课（P1：课包按科目检索，科目课包不足时让老师选 欠课上课/划扣其他课包/取消）
   const handleBatchCheckin = useCallback(async () => {
     if (presentStudents.length === 0) {
       Taro.showToast({ title: '至少需要一名学生参与消课', icon: 'none' });
@@ -89,12 +96,73 @@ const ClassCheckin: React.FC = () => {
     try {
       for (const stu of presentStudents) {
         try {
-          // 查找可用套餐
           const packages = await packageService.getActiveByStudent(stu.id);
-          const pkg = packages.find((p) => p.remaining_hours >= hoursUsed);
+
+          // 1) 优先按班级科目检索课包
+          const subjectPackages = classSubjectId
+            ? packages.filter((p) => p.subject_id === classSubjectId)
+            : packages;
+          let pkg =
+            subjectPackages.find((p) => (p.remaining_hours || 0) >= hoursUsed) ||
+            packages.find((p) => (p.remaining_hours || 0) >= hoursUsed);
+
+          // 2) 科目课包不足 → 弹窗让老师处理
           if (!pkg) {
-            failList.push({ name: stu.name, reason: '课时不足' });
-            continue;
+            const handle: 'debt' | 'transfer' | 'skip' = await new Promise((resolve) => {
+              Taro.showActionSheet({
+                itemList: ['欠课上课', '划扣其他课包', '取消'],
+                success: (res) => {
+                  if (res.tapIndex === 0) resolve('debt');
+                  else if (res.tapIndex === 1) resolve('transfer');
+                  else resolve('skip');
+                },
+                fail: () => resolve('skip'),
+              });
+            });
+
+            if (handle === 'debt') {
+              // 欠课上课：课时照记，不扣课包（package_id 传空不触发扣减），欠课记入台账
+              const createdRecord = await lessonRecordService.create({
+                teacher_id: currentUserId,
+                student_id: stu.id,
+                package_id: '',
+                lesson_date: new Date().toISOString().split('T')[0],
+                hours_used: hoursUsed,
+                content: `${className} 欠课上课`,
+              });
+              await lessonDebtService.addDebt({
+                studentId: stu.id,
+                subjectId: classSubjectId,
+                hours: hoursUsed,
+                sourceRecordId: createdRecord.id,
+              });
+              successList.push(`${stu.name}(欠课)`);
+              continue;
+            }
+
+            if (handle === 'transfer') {
+              // 划扣其他课包：列出可划扣课包（剩余>0）让老师选
+              const candidates = packages.filter((p) => (p.remaining_hours || 0) > 0);
+              if (candidates.length === 0) {
+                failList.push({ name: stu.name, reason: '无课包可划扣' });
+                continue;
+              }
+              const chosenIdx: number = await new Promise((resolve) => {
+                Taro.showActionSheet({
+                  itemList: candidates.map((p) => `${p.name}（剩 ${p.remaining_hours} 课时）`),
+                  success: (res) => resolve(res.tapIndex),
+                  fail: () => resolve(-1),
+                });
+              });
+              if (chosenIdx < 0 || chosenIdx >= candidates.length) {
+                failList.push({ name: stu.name, reason: '未选择划扣课包' });
+                continue;
+              }
+              pkg = candidates[chosenIdx];
+            } else {
+              failList.push({ name: stu.name, reason: '课时不足未处理' });
+              continue;
+            }
           }
 
           const createdRecord = await lessonRecordService.create({
@@ -137,6 +205,23 @@ const ClassCheckin: React.FC = () => {
         });
       }
 
+      // 审计日志（用户口径 2026-08-22）：点名签到属重要日志，批量汇总记一条；学员消课明细在消课记录中可查
+      if (successList.length > 0) {
+        try {
+          await auditLogService.record({
+            action: 'lesson.checkin',
+            operatorId: currentUserId || profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'class_checkin',
+            detail: `点名签到：班级「${className}」签到 ${successList.length} 名学员（${hoursUsed} 课时/人）`,
+            meta: { className, studentCount: successList.length, hoursPerStudent: hoursUsed },
+          });
+        } catch (e) {
+          logError('audit lesson.checkin', e);
+        }
+      }
+
       invalidateStudents(currentUserId);
       setTimeout(() => Taro.navigateBack(), 1500);
     } catch (err) {
@@ -145,7 +230,15 @@ const ClassCheckin: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [presentStudents, className, currentUserId, hoursUsed, invalidateStudents]);
+  }, [
+    presentStudents,
+    className,
+    classSubjectId,
+    currentUserId,
+    hoursUsed,
+    invalidateStudents,
+    profile,
+  ]);
 
   if (loading) {
     return (

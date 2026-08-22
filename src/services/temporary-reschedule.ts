@@ -212,12 +212,10 @@ export const temporaryRescheduleService = {
       created_at: now,
       updated_at: now,
     }));
-    const replaceKeys = new Set(
-      nextItems.map((item) => `${item.schedule_id}__${item.source_date}`),
-    );
-    const preserved = readStorage().filter(
-      (item) => !replaceKeys.has(`${item.schedule_id}__${item.source_date}`),
-    );
+    // L-12-A：覆盖键用 schedule_id（同一条排课全局唯一），而非 `${schedule_id}__${source_date}`。
+    // 同一排课被 A→B 后又 C→D 调动时，旧记录（B）也会被清除，避免双订。
+    const replaceKeys = new Set(nextItems.map((item) => item.schedule_id));
+    const preserved = readStorage().filter((item) => !replaceKeys.has(item.schedule_id));
     writeStorage([...preserved, ...nextItems]);
     return nextItems;
   },

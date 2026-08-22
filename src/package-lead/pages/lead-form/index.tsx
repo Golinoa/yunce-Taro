@@ -11,9 +11,11 @@ import ActionButton from '@/components/ActionButton';
 import FormInput from '@/components/FormInput';
 import PageContainer from '@/components/PageContainer';
 import { leadService } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFormData } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 
 /** 性别选项 */
 const GENDER_OPTIONS = [
@@ -67,6 +69,22 @@ const LeadFormPage: React.FC = () => {
     try {
       const lead = await leadService.createLead(form, teacherId);
 
+      // 审计日志（用户口径 2026-08-22）：线索创建（谁邀请/录入）属重要运营数据
+      try {
+        await auditLogService.record({
+          action: 'lead.create',
+          operatorId: teacherId || profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'lead',
+          targetId: lead.id,
+          detail: `新建线索：学员「${form.child_name}」${form.parent_phone ? `（家长 ${form.parent_phone}）` : ''}`,
+          meta: { leadId: lead.id, childName: form.child_name, parentPhone: form.parent_phone },
+        });
+      } catch (e) {
+        logError('audit lead.create', e);
+      }
+
       // 去重提示
       if (lead.duplicate_hint) {
         Taro.showModal({
@@ -89,7 +107,7 @@ const LeadFormPage: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [form, userId, invalidate]);
+  }, [form, userId, invalidate, profile]);
 
   return (
     <PageContainer>

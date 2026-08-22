@@ -4,13 +4,17 @@
  */
 import { clearVisitedMap, mockGetStoreProgress, PAGE_INTRO_STORAGE_KEYS } from '@/data/onboarding';
 import type { StoreOnboardingProgress } from '@/types/onboarding';
-// import { get } from '@/utils/request';
+import { notWired } from '@/utils/not-wired';
+
+const USE_MOCK =
+  typeof process !== 'undefined' && typeof process.env !== 'undefined'
+    ? process.env.VITE_USE_MOCK !== 'false'
+    : true;
 
 export const onboardingService = {
   /** 获取教师视图店铺管理配置进度 */
-  getStoreProgress: (): Promise<StoreOnboardingProgress> => mockGetStoreProgress(),
-  // 联调时替换为:
-  // getStoreProgress: () => get<StoreOnboardingProgress>('/api/onboarding/store-progress'),
+  getStoreProgress: (): Promise<StoreOnboardingProgress> =>
+    USE_MOCK ? mockGetStoreProgress() : notWired('onboarding.getStoreProgress'),
 };
 
 // 页面介绍弹框存储 Key 常量，页面层统一引用 services 出口

@@ -16,9 +16,12 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_NAME_ZH } from '@/constants/brand';
+import { auditLogService } from '@/services/audit-log';
 import { storeEntryService } from '@/services/store-entry';
 import { useCampusStore } from '@/stores/campus';
 import type { StoreType } from '@/types/store-entry';
+import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /** 门店类型选项 */
@@ -164,6 +167,7 @@ function FormSelect({
 }
 
 const StoreEntry: React.FC = () => {
+  const { profile } = useAuth();
   const [form, setForm] = useState<FormState>({
     name: '',
     type: '总店',
@@ -280,6 +284,26 @@ const StoreEntry: React.FC = () => {
       // mock 同步建校区即开通（status: 'approved'）→ 提示校区已创建可见；
       // 真实后端仅提交申请单（status: 'pending'）→ 提示等待人工审核。
       const isOpened = result.status === 'approved';
+      // 审计日志（用户口径 2026-08-22）：门店入驻申请属机构扩张运营数据
+      try {
+        await auditLogService.record({
+          action: 'store.apply',
+          operatorId: profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'store',
+          targetId: result.campusId || '',
+          detail: `门店入驻申请：「${form.name.trim()}」（${form.type}）`,
+          meta: {
+            storeName: form.name.trim(),
+            type: form.type,
+            status: result.status,
+            campusId: result.campusId || undefined,
+          },
+        });
+      } catch (e) {
+        logError('audit store.apply', e);
+      }
       Taro.showModal({
         title: isOpened ? '入驻成功' : '提交成功',
         content: isOpened
@@ -295,7 +319,7 @@ const StoreEntry: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [validate, form]);
+  }, [validate, form, profile]);
 
   return (
     <PageContainer safeBottom className="flex flex-col bg-background">

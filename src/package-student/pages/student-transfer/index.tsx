@@ -8,6 +8,7 @@ import PageContainer from '@/components/PageContainer';
 import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { classService, studentService } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { useClassStore, useStudentStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
 import type { Class } from '@/types/class';
@@ -140,6 +141,26 @@ const StudentTransferPage: React.FC = () => {
     setSubmitting(true);
     try {
       await classService.transferStudent(currentClass.id, selectedTargetClass.id, student.id);
+      // 审计日志（用户口径 2026-08-22）：学员调班属重要运营数据
+      try {
+        await auditLogService.record({
+          action: 'student.transfer',
+          operatorId: currentUserId || profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'student',
+          targetId: student.id,
+          detail: `学员调班：「${student.name}」从「${currentClass.name}」调入「${selectedTargetClass.name}」`,
+          meta: {
+            studentId: student.id,
+            studentName: student.name,
+            fromClass: currentClass.id,
+            toClass: selectedTargetClass.id,
+          },
+        });
+      } catch (e) {
+        logError('audit student.transfer', e);
+      }
       invalidateClasses(currentUserId);
       invalidateStudents(currentUserId);
       Taro.showToast({ title: '调班成功', icon: 'success' });
@@ -160,6 +181,7 @@ const StudentTransferPage: React.FC = () => {
     selectedTargetClass,
     student,
     submitting,
+    profile,
   ]);
 
   if (loading) {

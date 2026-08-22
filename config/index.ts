@@ -1,17 +1,22 @@
-import { defineConfig, type UserConfigExport } from '@tarojs/cli';
 import path from 'node:path';
+import { defineConfig, type UserConfigExport } from '@tarojs/cli';
+import UnoCSS from '@unocss/webpack';
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
 import devConfig from './dev';
 import prodConfig from './prod';
-import UnoCSS from '@unocss/webpack';
 
 const packageJson = require('../package.json') as { version: string };
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
-  // 当前项目处于前端高频联调阶段，默认启用 mock。
-  // 正式联调或发版时，显式传入 VITE_USE_MOCK=false 即可切到真实接口。
-  const useMock = process.env.VITE_USE_MOCK ?? 'true';
+  // 默认关闭 mock（生产安全）：联调/开发时显式传入 VITE_USE_MOCK=true 才启用 mock。
+  // 生产构建若误带 VITE_USE_MOCK=true 会被强制关闭并告警（G-01 守卫）。
+  let useMock = process.env.VITE_USE_MOCK ?? 'false';
+  // G-01 守卫：生产环境禁止携带 mock，避免线上使用假数据。
+  if (process.env.NODE_ENV === 'production' && useMock === 'true') {
+    console.warn('[G-01] 生产构建检测到 VITE_USE_MOCK=true，已强制关闭 mock 以保证线上数据真实。');
+    useMock = 'false';
+  }
   const apiBaseUrl = process.env.TARO_API_BASE_URL ?? '/api/app/v1';
   // 构建目标平台（taro build --type xxx）。weapp 为纯小程序，组件编译为原生组件，
   // 不需要 @tarojs/plugin-html（该插件仅用于 H5/HTML 渲染）。
@@ -86,7 +91,11 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
             name: 'yunce-weapp-cache',
             cacheDirectory: path.resolve(__dirname, '../node_modules/.cache/webpack/weapp'),
             buildDependencies: {
-              config: [__filename, path.resolve(__dirname, './dev.ts'), path.resolve(__dirname, './prod.ts')],
+              config: [
+                __filename,
+                path.resolve(__dirname, './dev.ts'),
+                path.resolve(__dirname, './prod.ts'),
+              ],
             },
           },
         });
@@ -136,7 +145,11 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
             name: 'yunce-h5-cache',
             cacheDirectory: path.resolve(__dirname, '../node_modules/.cache/webpack/h5'),
             buildDependencies: {
-              config: [__filename, path.resolve(__dirname, './dev.ts'), path.resolve(__dirname, './prod.ts')],
+              config: [
+                __filename,
+                path.resolve(__dirname, './dev.ts'),
+                path.resolve(__dirname, './prod.ts'),
+              ],
             },
           },
         });

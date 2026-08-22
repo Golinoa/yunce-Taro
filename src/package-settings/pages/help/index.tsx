@@ -12,8 +12,8 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
-import Icon from '@/components/Icon';
 import Dialog from '@/components/Dialog';
+import Icon from '@/components/Icon';
 import { useThemeStore } from '@/stores/theme';
 
 const CUSTOMER_WECHAT = 'by3737337';
@@ -282,11 +282,7 @@ const Help: React.FC = () => {
                     isActive ? 'bg-primary' : 'bg-primary/10',
                   )}
                 >
-                  <Icon
-                    name={module.icon}
-                    size={36}
-                    color={isActive ? '#ffffff' : 'primary'}
-                  />
+                  <Icon name={module.icon} size={36} color={isActive ? '#ffffff' : 'primary'} />
                 </View>
                 <Text
                   className={cn(
@@ -389,7 +385,7 @@ const Help: React.FC = () => {
             className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
             onClick={() => setServiceVisible(true)}
           >
-            <Icon name="mdi-phone-outline" size={28} color="foreground" />
+            <Icon name="mdi-phone" size={28} color="foreground" />
             <Text className="text-[28rpx] font-medium text-foreground">电话客服</Text>
           </View>
           <View
@@ -418,7 +414,9 @@ const Help: React.FC = () => {
             </Text>
             <Icon name="mdi-content-copy" size={32} color="primary" />
           </View>
-          <Text className="mt-[20rpx] text-[22rpx] text-muted-foreground">点击上方微信号即可复制</Text>
+          <Text className="mt-[20rpx] text-[22rpx] text-muted-foreground">
+            点击上方微信号即可复制
+          </Text>
         </View>
       </Dialog>
     </View>

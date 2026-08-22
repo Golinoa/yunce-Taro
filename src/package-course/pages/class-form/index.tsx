@@ -1,7 +1,6 @@
 import { View, Text, Input, Picker, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
@@ -12,7 +11,9 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import SegmentedControl from '@/components/SegmentedControl';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { campusService, roomService } from '@/services/campus';
 import { teacherService } from '@/services/teacher';
 import { useStudentStore, useClassStore } from '@/stores';
@@ -165,7 +166,7 @@ const ClassForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [classId, currentUserId, isEdit, fetchStudentsByTeacher, fetchCategories]);
+  }, [classId, currentUserId, isEdit, fetchStudentsByTeacher, fetchCategories, setLoading]);
 
   useEffect(() => {
     void reload();
@@ -403,6 +404,21 @@ const ClassForm: React.FC = () => {
           await classService.addStudents(cls.id, selectedStudentIds);
         invalidateClasses(currentUserId);
         invalidateStudents(currentUserId);
+        // 审计日志（用户口径 2026-08-22）：创建班级属重要操作
+        try {
+          await auditLogService.record({
+            action: 'class.create',
+            operatorId: currentUserId || profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'class',
+            targetId: cls?.id,
+            detail: `创建班级：「${name.trim()}」（${selectedStudentIds.length} 名学员）`,
+            meta: { classId: cls?.id, name: name.trim(), studentCount: selectedStudentIds.length },
+          });
+        } catch (e) {
+          logError('audit class.create', e);
+        }
       }
 
       Taro.showToast({ title: isEdit ? '保存成功' : '创建成功', icon: 'success' });
@@ -440,6 +456,7 @@ const ClassForm: React.FC = () => {
     scheduleMode,
     invalidateClasses,
     invalidateStudents,
+    profile,
   ]);
 
   // ===== 渲染 =====

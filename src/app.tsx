@@ -1,8 +1,10 @@
-import { useDidShow, useDidHide } from '@tarojs/taro';
+import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import React from 'react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import PrivacyPopup from '@/components/PrivacyPopup';
 import { useThemeStore } from '@/stores/theme';
 import { AuthProvider } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { initPrivacy } from '@/utils/privacy';
 import 'uno.css';
 
@@ -50,6 +52,13 @@ useThemeStore.getState().initTheme();
 // 启动时注册微信隐私授权监听并按需主动弹窗（满足《个人信息保护指引》合规）
 initPrivacy();
 
+// H-02：全局未捕获错误兜底上报（经 utils/logger 门控，生产可剥离）
+if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {
+  Taro.onError((err) => {
+    logError('app.onError', err);
+  });
+}
+
 const App: React.FC<{ children?: React.ReactNode }> = (props) => {
   useDidShow(() => {
     // App 可见
@@ -60,10 +69,13 @@ const App: React.FC<{ children?: React.ReactNode }> = (props) => {
   });
 
   return (
-    <AuthProvider>
-      {props.children}
-      <PrivacyPopup />
-    </AuthProvider>
+    // B-01(工程)：全局错误边界，渲染异常降级为错误页而非白屏
+    <ErrorBoundary>
+      <AuthProvider>
+        {props.children}
+        <PrivacyPopup />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

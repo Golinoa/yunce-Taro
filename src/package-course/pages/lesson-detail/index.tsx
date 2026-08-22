@@ -2,19 +2,20 @@ import { View, Text, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useEffect } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerItem from '@/components/PickerItem';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService, lessonRecordService, scheduleService } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { useStudentStore } from '@/stores';
 import type { Class } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
-import { isStaffRole, useAuth } from '@/utils/auth';
+import { isAdmin, isStaffRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -89,6 +90,9 @@ function canRevoke(record: LessonRecord, role?: string): { allowed: boolean; rea
 const LessonDetail: React.FC = () => {
   const { profile } = useAuth();
   const isTeacher = isStaffRole(profile?.currentContext?.role);
+  // 高权限操作（编辑课时）仅限管理角色：管理员 / 校长（用户口径 2026-08-22）
+  const isManager =
+    isAdmin(profile?.currentContext?.role) || profile?.currentContext?.role === 'principal';
   const currentTeacherId = profile?.teacher_profile?.id || profile?.id || '';
   const invalidateStudents = useStudentStore((state) => state.invalidate);
   const routeParams = Taro.getCurrentInstance().router?.params || {};
@@ -125,6 +129,10 @@ const LessonDetail: React.FC = () => {
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [showRevokeSheet, setShowRevokeSheet] = useState(false);
+  /** P4：编辑课时（弹窗输入新课时，保存后差额回补/追扣课包） */
+  const [showEditSheet, setShowEditSheet] = useState(false);
+  const [editHours, setEditHours] = useState('');
+  const [updating, setUpdating] = useState(false);
   const [revokeReason, setRevokeReason] = useState('');
   const [revoking, setRevoking] = useState(false);
 
@@ -286,6 +294,21 @@ const LessonDetail: React.FC = () => {
     try {
       await lessonRecordService.revoke(recordId, profile?.id || '', revokeReason.trim());
       if (profile?.id) invalidateStudents(profile.id);
+      // 审计日志（用户口径 2026-08-22）：撤销消课属关键操作，仅追加、不可修改
+      try {
+        await auditLogService.record({
+          action: 'lesson.revoke',
+          operatorId: profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'lesson_record',
+          targetId: recordId,
+          detail: `撤销消课：消课记录（${record?.hours_used ?? 0} 课时），原因：${revokeReason.trim()}`,
+          meta: { recordId, hours: record?.hours_used ?? 0, reason: revokeReason.trim() },
+        });
+      } catch (e) {
+        logError('audit lesson.revoke', e);
+      }
       Taro.showToast({ title: '已撤销', icon: 'success' });
       setShowRevokeSheet(false);
       setRevokeReason('');
@@ -297,7 +320,53 @@ const LessonDetail: React.FC = () => {
     } finally {
       setRevoking(false);
     }
-  }, [recordId, profile, revokeReason, invalidateStudents, loadRecord]);
+  }, [recordId, profile, revokeReason, invalidateStudents, loadRecord, record]);
+
+  /** P4：修改消课课时（差额自动回补/追扣课包） */
+  const handleUpdateHours = useCallback(async () => {
+    const v = Number(editHours);
+    if (!Number.isFinite(v) || v < 0) {
+      Taro.showToast({ title: '请输入不小于 0 的课时数', icon: 'none' });
+      return;
+    }
+    setUpdating(true);
+    try {
+      const updated = await lessonRecordService.update(recordId, { hours: v });
+      if (updated) {
+        // 审计日志（用户口径 2026-08-22）：编辑课时属高权限操作，仅管理角色可执行，仅追加、不可修改
+        try {
+          await auditLogService.record({
+            action: 'lesson.edit_hours',
+            operatorId: profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'lesson_record',
+            targetId: recordId,
+            detail: `编辑课时：消课记录课时 ${record?.hours_used ?? 0} → ${v}`,
+            meta: {
+              recordId,
+              before: record?.hours_used ?? 0,
+              after: v,
+              studentId: record?.student_id,
+            },
+          });
+        } catch (e) {
+          logError('audit lesson.edit_hours', e);
+        }
+        Taro.showToast({ title: '已保存，差额已同步课包', icon: 'success' });
+        setShowEditSheet(false);
+        await loadRecord();
+        if (profile?.id) invalidateStudents(profile.id);
+      } else {
+        Taro.showToast({ title: '记录不存在', icon: 'none' });
+      }
+    } catch (err) {
+      logError('update lesson record', err);
+      Taro.showToast({ title: '保存失败', icon: 'none' });
+    } finally {
+      setUpdating(false);
+    }
+  }, [editHours, recordId, profile, invalidateStudents, loadRecord, record]);
 
   if (loading) {
     return (
@@ -676,6 +745,21 @@ const LessonDetail: React.FC = () => {
           </View>
         </View>
 
+        {/* 编辑课时（高权限：仅管理员/校长可操作，操作记入操作日志） */}
+        {isManager && record.revoke_status !== 'revoked' && (
+          <View className="mt-[16rpx]">
+            <View
+              className="rounded-[18rpx] py-[22rpx] flex items-center justify-center press-scale bg-primary/10 border border-primary"
+              onClick={() => {
+                setEditHours(String(record.hours_used ?? 0));
+                setShowEditSheet(true);
+              }}
+            >
+              <Text className="text-[30rpx] font-semibold text-primary">编辑课时</Text>
+            </View>
+          </View>
+        )}
+
         {/* 撤销按钮 */}
         {isTeacher &&
           record.revoke_status !== 'revoked' &&
@@ -708,6 +792,51 @@ const LessonDetail: React.FC = () => {
               </View>
             );
           })()}
+
+        {/* 编辑课时弹窗（P4） */}
+        <BottomSheet
+          visible={showEditSheet}
+          title="编辑课时"
+          onClose={() => setShowEditSheet(false)}
+        >
+          <View className="px-[32rpx] py-[32rpx]">
+            <Text className="text-[28rpx] text-muted-foreground leading-relaxed">
+              修改本次消课课时。保存后会自动对关联课包做差额处理：改大追扣、改小回补。
+            </Text>
+            <View className="mt-[32rpx] bg-muted rounded-[24rpx] px-[24rpx] py-[24rpx]">
+              <Input
+                className="text-[28rpx] text-foreground"
+                type="digit"
+                placeholder="请输入新课时"
+                value={editHours}
+                onInput={(e) => setEditHours(e.detail.value)}
+                maxlength={6}
+              />
+            </View>
+            <View className="flex gap-[24rpx] mt-[48rpx]">
+              <View
+                className="flex-1 py-[22rpx] rounded-[24rpx] bg-muted items-center press-scale"
+                onClick={() => setShowEditSheet(false)}
+              >
+                <Text className="text-[30rpx] text-foreground">取消</Text>
+              </View>
+              <View
+                className={`flex-1 py-[22rpx] rounded-[24rpx] items-center press-scale ${
+                  !updating ? 'bg-primary' : 'bg-muted'
+                }`}
+                onClick={!updating ? handleUpdateHours : undefined}
+              >
+                <Text
+                  className={`text-[30rpx] font-semibold ${
+                    !updating ? 'text-primary-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  {updating ? '保存中...' : '保存'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </BottomSheet>
 
         {/* 撤销确认弹窗 */}
         <BottomSheet

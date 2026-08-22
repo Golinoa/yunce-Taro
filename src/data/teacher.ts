@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { syncTeacherView } from '@/data/mock-database';
 import type {
   TeacherUIModel,
   SalaryModel,
@@ -15,7 +16,6 @@ import type {
 import { normalizeSalaryStatus } from '@/types/teacher';
 import { isTempImagePath, uploadImage } from '@/utils/image-upload';
 // 循环依赖（mock-database ↔ data/teacher）：仅在函数内/宏任务延迟后调用 syncTeacherView，初始化期安全
-import { syncTeacherView } from '@/data/mock-database';
 
 // ============================================
 // 常量池
@@ -193,16 +193,16 @@ function genPayHistory(
 // ============================================
 
 const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[] = [
-  // 在职 - 不同身份
+  // 在职 - 与登录账号体系对齐（BASE_TEACHERS/USERS/IDENTITIES：teacher-00x = 张/李/王/赵老师）
   {
     id: 'teacher-001',
-    name: '王校长',
+    name: '张老师',
     avatar: '',
-    identity: 'principal',
+    identity: 'teacher',
     role: 'lead',
     roleText: '主讲',
     subject: '钢琴',
-    phone: '13800000001',
+    phone: '13800000011',
     hours: 42,
     students: 18,
     classes: 6,
@@ -213,7 +213,7 @@ const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[]
     salaryStatus: 'pending',
     modelIdx: 0,
     color: AVATAR_COLORS[0],
-    initial: '王',
+    initial: '张',
     deductions: [],
     lateFine: 2,
     otherFine: 0,
@@ -233,7 +233,7 @@ const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[]
     role: 'lead',
     roleText: '主讲',
     subject: '声乐',
-    phone: '13900000002',
+    phone: '13800000012',
     hours: 36,
     students: 15,
     classes: 5,
@@ -254,13 +254,13 @@ const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[]
   },
   {
     id: 'teacher-003',
-    name: '张老师',
+    name: '王老师',
     avatar: '',
-    identity: 'assistant',
-    role: 'assist',
-    roleText: '助教',
-    subject: '钢琴',
-    phone: '13700000003',
+    identity: 'teacher',
+    role: 'lead',
+    roleText: '主讲',
+    subject: '舞蹈',
+    phone: '13800000013',
     hours: 24,
     students: 10,
     classes: 4,
@@ -271,23 +271,23 @@ const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[]
     salaryStatus: 'confirmed',
     modelIdx: 1,
     color: AVATAR_COLORS[2],
-    initial: '张',
+    initial: '王',
     deductions: [],
     status: 'active',
-    campusIds: ['campus-center'],
+    campusIds: ['campus-east'],
     canCrossCampus: false,
-    campus: 'center',
+    campus: 'east',
     payHistory: genPayHistory(3, 3600, 300),
   },
   {
     id: 'teacher-004',
-    name: '赵前台',
+    name: '赵老师',
     avatar: '',
-    identity: 'reception',
-    role: 'parttime',
-    roleText: '前台',
-    subject: '',
-    phone: '13500000004',
+    identity: 'teacher',
+    role: 'lead',
+    roleText: '主讲',
+    subject: '书法',
+    phone: '13800000014',
     hours: 0,
     students: 0,
     classes: 0,
@@ -301,10 +301,42 @@ const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[]
     initial: '赵',
     deductions: [],
     status: 'active',
-    campusIds: ['campus-center'],
+    campusIds: ['campus-west'],
     canCrossCampus: false,
-    campus: 'center',
+    campus: 'west',
     payHistory: genPayHistory(3, 2400, 200),
+  },
+  // 机构创建者（万老师）：跨校区授课（与 USERS.user-principal-001 对应）
+  {
+    id: 'teacher-principal-001',
+    name: '万老师',
+    avatar: '',
+    identity: 'principal',
+    role: 'lead',
+    roleText: '主讲',
+    subject: '',
+    phone: '13800000001',
+    hours: 42,
+    students: 18,
+    classes: 6,
+    base: 3000,
+    rate: 100,
+    attend: 500,
+    perf: 700,
+    salaryStatus: 'pending',
+    modelIdx: 0,
+    color: AVATAR_COLORS[0],
+    initial: '万',
+    deductions: [],
+    lateFine: 0,
+    otherFine: 0,
+    bonusAmount: 0,
+    socialInsurance: 0,
+    status: 'active',
+    campusIds: ['campus-center', 'campus-east', 'campus-west'],
+    canCrossCampus: true,
+    campus: 'center',
+    payHistory: genPayHistory(3, 8600, 800),
   },
   // 已离职
   {
@@ -688,7 +720,7 @@ export const mockScheduleData: Record<
 // ============================================
 
 // 教师管理库唯一数据源。用 var（无 TDZ）+ getter 兜底，容忍 ESM 循环初始化顺序差异
-var _teachers: TeacherUIModel[] = [...mockTeachers];
+let _teachers: TeacherUIModel[] = [...mockTeachers];
 let _salaryModels: SalaryModel[] = [...mockSalaryModels];
 let _settings: SalarySettings = { ...mockSalarySettings };
 
@@ -846,8 +878,7 @@ export async function mockGetTeachers(
     return [];
   }
 
-  let teachers =
-    month && month !== currentMonthKey ? useMonthStore(month).get() : [..._teachers];
+  let teachers = month && month !== currentMonthKey ? useMonthStore(month).get() : [..._teachers];
   if (campusId) {
     teachers = teachers.filter((t) => t.campusIds?.includes(campusId));
   }
@@ -982,17 +1013,21 @@ function genSerialNo(): string {
 /** 发放薪资 */
 /** 计算教师薪资总额（含扣款/补发）；UI 展示与 mockExecutePay 实发共用同一算法，消除 B-01 实发≠展示 */
 export function calcTotal(t: TeacherUIModel): number {
-  const lessonFee =
-    t.categoryLessonFees?.reduce((sum, item) => sum + item.amount, 0) ?? t.hours * t.rate;
-  let total = t.base + lessonFee + t.attend + t.perf;
+  // A-01：所有数值入口做 Number 兜底，NaN/undefined/空集合返回确定值而非 NaN
+  const categorySum = t.categoryLessonFees?.reduce(
+    (sum, item) => sum + (Number(item.amount) || 0),
+    0,
+  );
+  const lessonFee = categorySum ?? (Number(t.hours) || 0) * (Number(t.rate) || 0);
+  let total = (Number(t.base) || 0) + lessonFee + (Number(t.attend) || 0) + (Number(t.perf) || 0);
   total -= t.socialInsurance || 0;
   total -= t.lateFine || 0;
   total -= t.otherFine || 0;
   total += t.bonusAmount || 0;
   t.deductions.forEach((d) => {
-    total += d.type === 'bonus' ? d.amount : -d.amount;
+    total += d.type === 'bonus' ? Number(d.amount) || 0 : -(Number(d.amount) || 0);
   });
-  return Math.max(0, total);
+  return Number.isFinite(total) ? Math.max(0, total) : 0;
 }
 
 export async function mockExecutePay(
@@ -1010,31 +1045,32 @@ export async function mockExecutePay(
     store.get().map((t) => {
       const status = normalizeSalaryStatus(t.salaryStatus);
       if (ids.includes(t.id) && status === 'sending') {
-      const total = calcTotal(t);
-      const serialNo = genSerialNo();
-      return {
-        ...t,
-        salaryStatus: 'archived' as const,
-        payRemark: remark || '',
-        payMethod: finalPayMethod,
-        paidAt: now,
-        serialNo,
-        payHistory: [
-          ...(t.payHistory || []),
-          {
-            month: monthKey,
-            amount: Math.max(0, total),
-            status: 'archived' as const,
-            paidAt: now,
-            remark,
-            payMethod: finalPayMethod,
-            serialNo,
-          },
-        ],
-      };
-    }
-    return t;
-  }));
+        const total = calcTotal(t);
+        const serialNo = genSerialNo();
+        return {
+          ...t,
+          salaryStatus: 'archived' as const,
+          payRemark: remark || '',
+          payMethod: finalPayMethod,
+          paidAt: now,
+          serialNo,
+          payHistory: [
+            ...(t.payHistory || []),
+            {
+              month: monthKey,
+              amount: Math.max(0, total),
+              status: 'archived' as const,
+              paidAt: now,
+              remark,
+              payMethod: finalPayMethod,
+              serialNo,
+            },
+          ],
+        };
+      }
+      return t;
+    }),
+  );
   return true;
 }
 
@@ -1049,21 +1085,22 @@ export async function mockSendSalarySlip(
   const store = useMonthStore(month);
   store.set(
     store.get().map((t) => {
-    const status = normalizeSalaryStatus(t.salaryStatus);
-    if (!ids.includes(t.id) || status !== 'confirmed') return t;
-    // 模拟极少数发送失败（没有关注公众号）
-    if (t.id === 'teacher-004') {
-      result.failed.push({ id: t.id, name: t.name, reason: '未关注公众号' });
-    } else {
-      result.success.push(t.id);
-    }
-    // 发送成功或失败都进入「确认中」状态，失败仅做提醒
-    return {
-      ...t,
-      salaryStatus: 'sending' as const,
-      payRemark: remark || t.payRemark,
-    };
-  }));
+      const status = normalizeSalaryStatus(t.salaryStatus);
+      if (!ids.includes(t.id) || status !== 'confirmed') return t;
+      // 模拟极少数发送失败（没有关注公众号）
+      if (t.id === 'teacher-004') {
+        result.failed.push({ id: t.id, name: t.name, reason: '未关注公众号' });
+      } else {
+        result.success.push(t.id);
+      }
+      // 发送成功或失败都进入「确认中」状态，失败仅做提醒
+      return {
+        ...t,
+        salaryStatus: 'sending' as const,
+        payRemark: remark || t.payRemark,
+      };
+    }),
+  );
   return result;
 }
 
@@ -1157,9 +1194,11 @@ export async function mockUpdateSalaryModel(
 
   // 工资模型切换后，按薪资状态处理教师历史数据一致性
   // 规则：已发放 → 冻结不变；已确认未发放 → 可重算；待确认 → 按新模型计算
+  // B-04：教师以 modelIdx 关联工资模型（数组下标）。模型列表仅追加/原位更新、从不重排，
+  // 故 findIndex 结果稳定；若未来支持删除/排序模型，需改为在教师上存 modelId 稳定外键。
   const newModel = _salaryModels[idx];
   _teachers = _teachers.map((t) => {
-    if (t.modelIdx !== _salaryModels.findIndex((m) => m.id === id)) return t;
+    if (t.modelIdx !== idx) return t;
     // 仅更新待确认教师的费率参数，已核对及之后状态保持不变
     if (normalizeSalaryStatus(t.salaryStatus) === 'pending') {
       return {

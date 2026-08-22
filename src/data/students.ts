@@ -949,7 +949,10 @@ export async function mockCreateLessonRecord(data: any) {
   // 模拟真实后端行为：创建消课记录时自动扣减对应课包课时
   const packageId = data.packageId || data.package_id;
   const hours = Number(data.hours ?? data.hours_used) || 0;
+  // 2026-08-22：统一落驼峰字段（hours/packageId），与种子记录一致，供撤销/删除回补与展示消费
+  record.hours = hours;
   if (packageId && hours > 0) {
+    record.packageId = packageId;
     const pkgIndex = DB_PACKAGES.findIndex((p) => p.id === packageId);
     if (pkgIndex >= 0) {
       const pkg = DB_PACKAGES[pkgIndex];
@@ -957,7 +960,8 @@ export async function mockCreateLessonRecord(data: any) {
         ...pkg,
         usedHours: (pkg.usedHours || 0) + hours,
         remainingHours: Math.max((pkg.remainingHours || 0) - hours, 0),
-        purchasedHours: Math.max((pkg.purchasedHours || 0) - hours, 0),
+        // L-13-B：purchasedHours（已购课时）不随消课减少，仅剩余/已用课时变化；
+        // 保持"购课统计"口径 = 历史购买总量。业务口径待用户确认。
         status:
           Math.max((pkg.remainingHours || 0) - hours, 0) <= 0 && pkg.status === 'active'
             ? 'finished'
@@ -968,12 +972,38 @@ export async function mockCreateLessonRecord(data: any) {
   return record;
 }
 
+/** 回补课包课时（撤销/删除消课记录共用） */
+function refundPackageHours(recordId: string): boolean {
+  const record = LESSON_RECORDS.find((r) => r.id === recordId);
+  if (!record) return false;
+  const packageId = record.packageId;
+  const hours = record.hours || 0;
+  if (packageId && hours > 0) {
+    const pkgIndex = DB_PACKAGES.findIndex((p) => p.id === packageId);
+    if (pkgIndex >= 0) {
+      const pkg = DB_PACKAGES[pkgIndex];
+      DB_PACKAGES[pkgIndex] = {
+        ...pkg,
+        // 2026-08-22 修复：撤销/删除消课记录必须回补课时，否则"记录没了课时不回来"对不上
+        usedHours: Math.max((pkg.usedHours || 0) - hours, 0),
+        remainingHours: (pkg.remainingHours || 0) + hours,
+        status: pkg.status === 'finished' ? 'active' : pkg.status,
+      };
+    }
+  }
+  return true;
+}
+
 export async function mockRevokeLessonRecord(
-  _recordId: string,
+  recordId: string,
   _operatorId: string,
   _reason: string,
 ) {
   await delay();
+  // 2026-08-22 修复：原为空实现（return true 什么都不做）→ 回补课时并移除记录
+  if (!refundPackageHours(recordId)) return false;
+  const index = LESSON_RECORDS.findIndex((r) => r.id === recordId);
+  if (index >= 0) LESSON_RECORDS.splice(index, 1);
   return true;
 }
 
@@ -982,14 +1012,49 @@ export async function mockGetLessonRecordById(recordId: string) {
   return LESSON_RECORDS.find((r) => r.id === recordId);
 }
 
-export async function mockDeleteLessonRecord(_recordId: string) {
+export async function mockDeleteLessonRecord(recordId: string) {
   await delay();
-  const index = LESSON_RECORDS.findIndex((record) => record.id === _recordId);
+  // 2026-08-22 修复：删除消课记录同时回补课包课时
+  refundPackageHours(recordId);
+  const index = LESSON_RECORDS.findIndex((record) => record.id === recordId);
   if (index >= 0) {
     LESSON_RECORDS.splice(index, 1);
     return true;
   }
   return false;
+}
+
+/** 修改消课记录（P4，2026-08-22）：改课时 → 对关联课包做差额回补/追扣 */
+export async function mockUpdateLessonRecord(
+  recordId: string,
+  updates: { hours?: number; note?: string },
+) {
+  await delay();
+  const record = LESSON_RECORDS.find((r) => r.id === recordId);
+  if (!record) return null;
+
+  const oldHours = record.hours || 0;
+  const newHours = updates.hours !== undefined ? Math.max(Number(updates.hours) || 0, 0) : oldHours;
+  const diff = newHours - oldHours;
+
+  record.hours = newHours;
+  if (updates.note !== undefined) record.note = updates.note;
+
+  // 差额同步到关联课包：改大 → 追扣（remaining 减 diff）；改小 → 回补（remaining 加 diff）
+  if (record.packageId && diff !== 0) {
+    const pkgIndex = DB_PACKAGES.findIndex((p) => p.id === record.packageId);
+    if (pkgIndex >= 0) {
+      const pkg = DB_PACKAGES[pkgIndex];
+      const nextRemaining = (pkg.remainingHours || 0) - diff;
+      DB_PACKAGES[pkgIndex] = {
+        ...pkg,
+        usedHours: Math.max((pkg.usedHours || 0) + diff, 0),
+        remainingHours: Math.max(nextRemaining, 0),
+        status: nextRemaining <= 0 && pkg.status === 'active' ? 'finished' : pkg.status,
+      };
+    }
+  }
+  return record;
 }
 
 export async function mockGetLeavesByStudent(studentId: string) {
@@ -1147,14 +1212,12 @@ export async function mockEndClass(classId: string) {
   await delay();
   const classItem = DB_CLASSES.find((c) => c.id === classId);
   if (classItem) {
-    // 标记班级为已结束
+    // 标记班级为已结束（停止后续排课/考勤入口）
+    // 业务口径（用户确认 2026-08-22）：班级结束【不】从学员 classIds 中移除学员关联。
+    // - 「下课 / 排课结束」→ 不移除（班课固定循环上课，课程与班级人数可不一致，可能有补课/临时试听）
+    // - 「班级解散」→ 走 mockDeleteClass（删除班课即解散，学员解除分班并收解散通知）
+    // 注：本函数当前无页面调用方，保留为"结束排课周期"预留接口。
     classItem.status = 'ended';
-    // 级联：从所有学员的 classIds 中移除该班级，结束班级不再关联在读学员
-    for (const student of DB_STUDENTS) {
-      if (student.classIds.includes(classId)) {
-        student.classIds = student.classIds.filter((id) => id !== classId);
-      }
-    }
     syncClassStudentCount(classId);
   }
   return true;

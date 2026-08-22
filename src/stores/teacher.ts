@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import { create } from 'zustand';
+import { calcTotal } from '@/data/teacher';
 import {
   teacherService,
   salaryModelService,
@@ -7,7 +8,6 @@ import {
   salaryTemplateService,
   teacherSalaryRuleService,
 } from '@/services/teacher';
-import { calcTotal } from '@/data/teacher';
 import type {
   TeacherUIModel,
   TeacherFilter,
@@ -193,15 +193,27 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   // ===== 薪资操作 =====
   confirmSalary: async (id) => {
-    await teacherService.confirmSalary(id);
-    const teachers = await teacherService.getList();
-    set({ teachers });
+    try {
+      await teacherService.confirmSalary(id);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.confirmSalary', err);
+      set({ error: '薪资确认失败，请重试' });
+      throw err;
+    }
   },
 
   batchConfirm: async (ids) => {
-    await teacherService.batchConfirm(ids);
-    const teachers = await teacherService.getList();
-    set({ teachers, selectedIds: [] });
+    try {
+      await teacherService.batchConfirm(ids);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers, selectedIds: [] });
+    } catch (err) {
+      logError('teacherStore.batchConfirm', err);
+      set({ error: '批量确认失败，请重试' });
+      throw err;
+    }
   },
 
   setPendingPayAction: (action) => set({ pendingPayAction: action }),
@@ -210,9 +222,15 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     const { pendingPayAction } = get();
     if (!pendingPayAction) return;
     const { ids } = pendingPayAction;
-    await teacherService.executePay(ids, remark, payMethod);
-    const teachers = await teacherService.getList();
-    set({ teachers, pendingPayAction: null, selectedIds: [] });
+    try {
+      await teacherService.executePay(ids, remark, payMethod);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers, pendingPayAction: null, selectedIds: [] });
+    } catch (err) {
+      logError('teacherStore.executePay', err);
+      set({ error: '薪资发放失败，请重试' });
+      throw err;
+    }
   },
 
   setPendingSendAction: (action) => set({ pendingSendAction: action }),
@@ -221,10 +239,16 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     const { pendingSendAction } = get();
     if (!pendingSendAction) return { success: [], failed: [] };
     const { ids } = pendingSendAction;
-    const result = await teacherService.sendSalarySlip(ids, remark);
-    const teachers = await teacherService.getList();
-    set({ teachers, pendingSendAction: null });
-    return result;
+    try {
+      const result = await teacherService.sendSalarySlip(ids, remark);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers, pendingSendAction: null });
+      return result;
+    } catch (err) {
+      logError('teacherStore.executeSend', err);
+      set({ error: '工资单发送失败，请重试' });
+      throw err;
+    }
   },
 
   // ===== 选择 =====
@@ -251,39 +275,75 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   // ===== 教师操作 =====
   addTeacher: async (teacher) => {
-    await teacherService.add(teacher);
-    const teachers = await teacherService.getList();
-    set({ teachers });
+    try {
+      await teacherService.add(teacher);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.addTeacher', err);
+      set({ error: '新增教师失败，请重试' });
+      throw err;
+    }
   },
 
   updateTeacher: async (id, updates) => {
-    await teacherService.update(id, updates);
-    const teachers = await teacherService.getList();
-    set({ teachers });
+    try {
+      await teacherService.update(id, updates);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.updateTeacher', err);
+      set({ error: '更新教师失败，请重试' });
+      throw err;
+    }
   },
 
   resignTeacher: async (id, resignType, reason) => {
-    await teacherService.resign(id, resignType, reason);
-    const teachers = await teacherService.getList();
-    set({ teachers });
+    try {
+      await teacherService.resign(id, resignType, reason);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.resignTeacher', err);
+      set({ error: '离职操作失败，请重试' });
+      throw err;
+    }
   },
 
   addDeduction: async (teacherId, deduction) => {
-    await teacherService.addDeduction(teacherId, deduction);
-    const teachers = await teacherService.getList(undefined, get().salaryMonth);
-    set({ teachers });
+    try {
+      await teacherService.addDeduction(teacherId, deduction);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.addDeduction', err);
+      set({ error: '添加扣款/补发失败，请重试' });
+      throw err;
+    }
   },
 
   updateDeduction: async (teacherId, deductionId, updates) => {
-    await teacherService.updateDeduction(teacherId, deductionId, updates);
-    const teachers = await teacherService.getList(undefined, get().salaryMonth);
-    set({ teachers });
+    try {
+      await teacherService.updateDeduction(teacherId, deductionId, updates);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.updateDeduction', err);
+      set({ error: '更新扣款/补发失败，请重试' });
+      throw err;
+    }
   },
 
   deleteDeduction: async (teacherId, deductionId) => {
-    await teacherService.deleteDeduction(teacherId, deductionId);
-    const teachers = await teacherService.getList(undefined, get().salaryMonth);
-    set({ teachers });
+    try {
+      await teacherService.deleteDeduction(teacherId, deductionId);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.deleteDeduction', err);
+      set({ error: '删除扣款/补发失败，请重试' });
+      throw err;
+    }
   },
 
   // ===== 设置 =====
@@ -332,7 +392,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     const result = await salaryTemplateService.apply(templateId, teacherIds);
     if (result.success) {
       const [teachers, salaryTemplates] = await Promise.all([
-        teacherService.getList(),
+        teacherService.getList(undefined, get().salaryMonth),
         salaryTemplateService.getList(),
       ]);
       set({ teachers, salaryTemplates });
@@ -349,7 +409,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   updateTeacherSalaryRule: async (teacherId, config, templateId) => {
     const ok = await teacherSalaryRuleService.update(teacherId, config, templateId);
     if (ok) {
-      const teachers = await teacherService.getList();
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
       set({ teachers });
     }
     return ok;
@@ -358,7 +418,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   copySalaryRuleToTeachers: async (sourceTeacherId, targetTeacherIds) => {
     const result = await teacherSalaryRuleService.copyToTeachers(sourceTeacherId, targetTeacherIds);
     if (result.success) {
-      const teachers = await teacherService.getList();
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
       set({ teachers });
     }
     return result;

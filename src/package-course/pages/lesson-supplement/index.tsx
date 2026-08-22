@@ -1,13 +1,13 @@
 import { View, Text, Textarea, Input, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
   lessonRecordService,
@@ -16,6 +16,7 @@ import {
   scheduleService,
   studentService,
 } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { useStudentStore } from '@/stores';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
@@ -167,7 +168,7 @@ const LessonSupplementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [classId, currentUserId, handleSafeGoBack, lessonDate, scheduleId]);
+  }, [classId, currentUserId, handleSafeGoBack, lessonDate, scheduleId, setLoading]);
 
   useEffect(() => {
     loadData();
@@ -401,6 +402,23 @@ const LessonSupplementPage: React.FC = () => {
         }
       }
 
+      // 审计日志（用户口径 2026-08-22）：单人补课/补录属重要日志（循环后汇总一条）
+      if (successList.length > 0) {
+        try {
+          await auditLogService.record({
+            action: 'lesson.record',
+            operatorId: currentUserId || profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'lesson_record',
+            detail: `补课登记：${successList.length > 1 ? `学员 ${successList.join('、')}` : `学员「${successList[0]}」`} 补课 ${hoursUsed} 课时`,
+            meta: { count: successList.length, names: successList, hours: hoursUsed },
+          });
+        } catch (e) {
+          logError('audit lesson.record', e);
+        }
+      }
+
       if (failList.length === 0) {
         Taro.showToast({ title: `已补录 ${successList.length} 人`, icon: 'success' });
       } else if (successList.length === 0) {
@@ -442,7 +460,7 @@ const LessonSupplementPage: React.FC = () => {
     lessonTime,
     matchedPackageByStudent,
     note,
-    profile?.id,
+    profile,
     scheduleInfo?.assistant_teacher_id,
     scheduleInfo?.teacher_id,
     selectedStudents,

@@ -2,6 +2,7 @@
  * 会员卡记录 Service 层
  */
 import {
+  deductCardDebtHours,
   mockGetMemberCardById,
   mockGetMemberCardsByCardType,
   mockGetMemberCardsByStudent,
@@ -77,5 +78,14 @@ export const memberCardService = {
     // 发卡可能同步创建学员课包，失效该学员缓存
     invalidatePackagesCache(data.studentId);
     return created;
+  },
+
+  /** 划扣欠课（P1，2026-08-22）：从该卡关联课包剩余课时抵扣欠课，返回未抵完课时 */
+  deductDebt: async (cardId: string, hours: number): Promise<number> => {
+    if (!USE_MOCK) {
+      // TODO: 联调时替换为真实 API
+      // return await post<number>(`/member-cards/${cardId}/deduct-debt`, { hours });
+    }
+    return deductCardDebtHours(cardId, hours);
   },
 };

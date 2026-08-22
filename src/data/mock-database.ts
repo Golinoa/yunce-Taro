@@ -4,11 +4,11 @@
  * 所有 Mock 数据的单一数据源，保证数据一致性和关联性
  * 数据时间跨度：2025年7月 - 2026年6月（共12个月）
  */
+import { getManagedTeachers } from '@/data/teacher';
 import type { Venue, Room } from '@/types/campus';
 import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
 import type { UserRole } from '@/types/profile';
 import type { DayOfWeek } from '@/types/schedule';
-import { getManagedTeachers } from '@/data/teacher';
 import type { TeacherUIModel } from '@/types/teacher';
 
 // ============================================
@@ -656,6 +656,24 @@ const BASE_TEACHERS: Teacher[] = [
     monthHours: 28,
     pendingSalary: 4800,
   },
+  // 机构创建者（万老师）：拥有教师身份，跨校区授课（与 USERS.user-principal-001 对应）
+  {
+    id: 'teacher-principal-001',
+    userId: 'user-principal-001',
+    name: '万老师',
+    phone: '138****0001',
+    subjects: [],
+    campusIds: ['campus-center', 'campus-east', 'campus-west'],
+    canCrossCampus: true,
+    accessScope: 'org',
+    managedSubjectIds: [],
+    role: 'lead',
+    status: 'active',
+    joinedAt: '2024-01-01T00:00:00Z',
+    totalHours: 486,
+    monthHours: 42,
+    pendingSalary: 8600,
+  },
 ];
 
 // ============================================
@@ -675,7 +693,7 @@ function buildTeacherView(): Teacher[] {
       userId: base?.userId ?? `user-${m.id}`,
       name: m.name || m.id,
       phone: m.phone || '',
-      subjects: m.subject ? [m.subject] : base?.subjects ?? [],
+      subjects: m.subject ? [m.subject] : (base?.subjects ?? []),
       campusIds: m.campusIds ?? base?.campusIds ?? [],
       canCrossCampus: m.canCrossCampus ?? base?.canCrossCampus ?? false,
       accessScope: base?.accessScope ?? 'self',
@@ -836,7 +854,7 @@ export const CLASSES: Class[] = [
     id: 'cls-004',
     name: '声乐初级班',
     teacherId: 'teacher-002',
-    teachers: ['teacher-002', 'teacher-012'],
+    teachers: ['teacher-002'],
     campusId: 'campus-center',
     subjectId: 'sub-vocal',
     categoryId: 'cat-group',
@@ -864,7 +882,7 @@ export const CLASSES: Class[] = [
     id: 'cls-005',
     name: '童声合唱团',
     teacherId: 'teacher-002',
-    teachers: ['teacher-002', 'teacher-012'],
+    teachers: ['teacher-002'],
     campusId: 'campus-center',
     subjectId: 'sub-vocal',
     categoryId: 'cat-group',
@@ -2571,6 +2589,64 @@ export const COURSE_PACKAGES: CoursePackage[] = [
     expireDate: '2026-06-30T00:00:00Z',
     note: '试听课学员',
   },
+  // 2026-08-22 修复：国画基础班(stu-063/064/068)补充课包，与 6/28 补课示例记录(已消2课时)对账
+  {
+    id: 'pkg-012',
+    studentId: 'stu-063',
+    classId: 'cls-010',
+    name: '国画课包',
+    type: 'hour_package',
+    subjectId: 'sub-art',
+    totalHours: 24,
+    purchasedHours: 24,
+    bonusHours: 0,
+    usedHours: 2,
+    remainingHours: 22,
+    pricePerHour: 120,
+    totalAmount: 2880,
+    paymentMethod: 'wechat',
+    status: 'active',
+    purchaseDate: '2025-09-01T00:00:00Z',
+    expireDate: '2026-09-01T00:00:00Z',
+  },
+  {
+    id: 'pkg-013',
+    studentId: 'stu-064',
+    classId: 'cls-010',
+    name: '国画课包',
+    type: 'hour_package',
+    subjectId: 'sub-art',
+    totalHours: 24,
+    purchasedHours: 24,
+    bonusHours: 0,
+    usedHours: 2,
+    remainingHours: 22,
+    pricePerHour: 120,
+    totalAmount: 2880,
+    paymentMethod: 'wechat',
+    status: 'active',
+    purchaseDate: '2025-09-01T00:00:00Z',
+    expireDate: '2026-09-01T00:00:00Z',
+  },
+  {
+    id: 'pkg-014',
+    studentId: 'stu-068',
+    classId: 'cls-010',
+    name: '国画课包',
+    type: 'hour_package',
+    subjectId: 'sub-art',
+    totalHours: 24,
+    purchasedHours: 24,
+    bonusHours: 0,
+    usedHours: 2,
+    remainingHours: 22,
+    pricePerHour: 120,
+    totalAmount: 2880,
+    paymentMethod: 'wechat',
+    status: 'active',
+    purchaseDate: '2025-09-01T00:00:00Z',
+    expireDate: '2026-09-01T00:00:00Z',
+  },
 ];
 
 // ============================================
@@ -2792,6 +2868,8 @@ export interface LessonRecord {
   note?: string;
   /** 上课教室 */
   room?: string;
+  /** 消耗的课包 ID（2026-08-22 新增：撤销/删除消课记录时据此回补课时） */
+  packageId?: string;
   createdAt: string;
 }
 
@@ -2801,9 +2879,41 @@ export interface LessonRecord {
 // 2. 95% checked，3% absent，2% leave
 // 3. 时间从2025-07-01到2026-06-22
 // 4. 只为班级startDate之后的日期生成记录
+// 5. 【2026-08-22 修复】按学员课包对账：Σ 已消课时(checked/makeup) === Σ 课包 usedHours
+//    —— 固定示例记录（预览/补课/个人示例）先从预算中扣除，保证 LESSON_RECORDS 与课包剩余课时自洽；
+//    课包课时用尽后，签到记录按 0 课时（赠课/免课时场景），不再凭空多扣。
 function generateLessonRecords(): LessonRecord[] {
   const records: LessonRecord[] = [];
   let recordId = 10000;
+
+  // 固定示例记录（预览/补课/个人示例）也计入已消课时，先从各学员预算中扣除
+  const fixedRecords: LessonRecord[] = [
+    ...createLessonCardPreviewRecords(),
+    ...createLessonSupplementPreviewRecords(),
+    createSamplePersonalLessonRecord(),
+  ];
+  const budgetByStudent = new Map<string, number>();
+  for (const student of STUDENTS) {
+    const pkgUsed = COURSE_PACKAGES.filter((p) => p.studentId === student.id).reduce(
+      (sum, p) => sum + (p.usedHours || 0),
+      0,
+    );
+    const fixedUsed = fixedRecords
+      .filter(
+        (r) => r.studentId === student.id && (r.status === 'checked' || r.status === 'makeup'),
+      )
+      .reduce((sum, r) => sum + (r.hours || 0), 0);
+    budgetByStudent.set(student.id, Math.max(pkgUsed - fixedUsed, 0));
+  }
+
+  const computeClassHours = (cls: (typeof CLASSES)[number]): number =>
+    cls.endTime && cls.startTime
+      ? (parseInt(cls.endTime.split(':')[0]) * 60 +
+          parseInt(cls.endTime.split(':')[1]) -
+          parseInt(cls.startTime.split(':')[0]) * 60 -
+          parseInt(cls.startTime.split(':')[1])) /
+        60
+      : 1.5;
 
   for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
     const year = CUR_MONTH - monthOffset <= 0 ? CUR_YEAR - 1 : CUR_YEAR;
@@ -2826,24 +2936,23 @@ function generateLessonRecords(): LessonRecord[] {
         // 检查班级是否已经开始
         if (dateStr < cls.startDate) return;
 
+        const classHours = computeClassHours(cls);
         const classStudents = STUDENTS.filter((s) => s.classIds.includes(cls.id));
         classStudents.forEach((student) => {
           const rand = Math.random();
           let status: LessonRecord['status'] = 'checked';
-          let hours =
-            cls.endTime && cls.startTime
-              ? (parseInt(cls.endTime.split(':')[0]) * 60 +
-                  parseInt(cls.endTime.split(':')[1]) -
-                  parseInt(cls.startTime.split(':')[0]) * 60 -
-                  parseInt(cls.startTime.split(':')[1])) /
-                60
-              : 1.5;
           if (rand > 0.97) {
             status = 'absent';
-            hours = 0;
           } else if (rand > 0.95) {
             status = 'leave';
-            hours = 0;
+          }
+
+          let hours = 0;
+          if (status === 'checked') {
+            const budget = budgetByStudent.get(student.id) ?? 0;
+            // 课包仍有余额才扣课时；用尽后签到按 0 课时（赠课/免课时）
+            hours = Math.min(classHours, budget);
+            budgetByStudent.set(student.id, budget - hours);
           }
 
           records.push({
@@ -3009,7 +3118,14 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
 }
 
 function createLessonSupplementPreviewRecords(): LessonRecord[] {
-  const supplementDate = '2026-06-28';
+  // P5（2026-08-22）：示例日期动态靠拢最近的非周日，避免固定 6/28 逐渐过时
+  const supplementDate = (() => {
+    const d = new Date();
+    while (d.getDay() === 0) d.setDate(d.getDate() - 1); // 周日往前推
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+      d.getDate(),
+    ).padStart(2, '0')}`;
+  })();
 
   return [
     {

@@ -2,8 +2,8 @@
  * 系统设置页 package-settings/pages/system-settings/index
  *
  * 所有角色均可进入，内部设置项按角色权限过滤显示：
- * - 通用项（操作记录、用户协议）：所有角色可见
- * - 管理员专属项（主题颜色、课表管理、定时备份、重置新手引导）：仅管理员可见
+ * - 通用项（操作日志、用户协议）：所有角色可见（操作日志按角色只看自己/全部员工）
+ * - 管理员专属项（主题颜色、角色权限、定时备份、重置新手引导）：仅管理员可见
  *
  * 视觉风格：简洁文字列表，无图标无描述，右侧箭头/开关。
  */
@@ -18,6 +18,7 @@ import { APP_VERSION } from '@/constants/version';
 import { clearVisitedMap } from '@/services/onboarding';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
+import { getAlertThreshold } from '@/utils/alert-config';
 import { isAdmin, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
@@ -28,17 +29,24 @@ interface SettingItem {
   route: string;
   /** 仅管理员可见 */
   adminOnly?: boolean;
+  /** 管理角色可见（管理员 / 校长） */
+  managerOnly?: boolean;
 }
 
 /** 系统设置全量分组 */
 const ALL_SETTING_ITEMS: SettingItem[] = [
   {
-    title: '操作记录',
-    route: '',
+    title: '操作日志',
+    route: '/package-settings/pages/audit-log/index',
   },
   {
     title: '主题颜色',
     route: '/package-settings/pages/theme-settings/index',
+  },
+  {
+    title: '角色权限',
+    route: '/package-settings/pages/permission-settings/index',
+    adminOnly: true,
   },
   {
     title: '定时备份',
@@ -64,10 +72,12 @@ const SystemSettings: React.FC = () => {
   const { signOut, currentRole } = useAuth();
   const { activeTheme } = useThemeStore();
   const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
+  const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
 
   // 页面显示时读取最新开关状态
   useDidShow(() => {
     setVenueBookingEnabledState(getVenueBookingEnabled());
+    setAlertThresholdState(getAlertThreshold());
   });
 
   const handleVenueBookingChange = useCallback((enabled: boolean) => {
@@ -75,11 +85,20 @@ const SystemSettings: React.FC = () => {
     setVenueBookingEnabled(enabled);
   }, []);
 
-  // 按角色过滤设置项：adminOnly 的仅管理员可见，其余通用
-  const visibleItems = useMemo(
-    () => ALL_SETTING_ITEMS.filter((item) => !item.adminOnly || isAdmin(currentRole)),
-    [currentRole],
-  );
+  /** 预警阈值配置：跳转到专用表单页（用户口径 2026-08-22：单独页面，非弹框） */
+  const handleAlertThresholdChange = useCallback(() => {
+    Taro.navigateTo({
+      url: '/package-settings/pages/threshold-config/index',
+    });
+  }, []);
+
+  // 按角色过滤设置项：adminOnly 的仅管理员可见；managerOnly 的管理角色（管理员/校长）可见；其余通用
+  const visibleItems = useMemo(() => {
+    const isManager = isAdmin(currentRole) || currentRole === 'principal';
+    return ALL_SETTING_ITEMS.filter(
+      (item) => (!item.adminOnly || isAdmin(currentRole)) && (!item.managerOnly || isManager),
+    );
+  }, [currentRole]);
 
   const handleNavigate = useCallback(
     (route: string) => {
@@ -145,6 +164,19 @@ const SystemSettings: React.FC = () => {
             <Text className="text-[30rpx] text-foreground">场地预约</Text>
             <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
           </View>
+
+          {/* 运营预警阈值配置（adminOnly） */}
+          {isAdmin(currentRole) && (
+            <View
+              className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg border-t border-border"
+              onClick={handleAlertThresholdChange}
+            >
+              <Text className="text-[30rpx] text-foreground">课时不足预警阈值</Text>
+              <Text className="text-[28rpx] text-muted-foreground">
+                ≤ {alertThreshold} 课时触发
+              </Text>
+            </View>
+          )}
 
           {/* 当前版本 */}
           <View className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">

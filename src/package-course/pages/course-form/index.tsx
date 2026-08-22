@@ -8,10 +8,9 @@ import { ScrollView, View, Text } from '@tarojs/components';
 import Taro, { useUnload } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
+import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import CourseImageUploader from '@/components/CourseImageUploader';
 import FormInput from '@/components/FormInput';
 import FormRow from '@/components/FormRow';
@@ -19,7 +18,6 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
-import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import {
   AGE_GROUP_OPTIONS,
   CHECKIN_ROLE_OPTIONS,
@@ -27,6 +25,7 @@ import {
   DEADLINE_OPTIONS,
   STUDENT_SELF_CHECKIN_OPTIONS,
 } from '@/data/course-template';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';
@@ -187,7 +186,6 @@ const CourseFormPage: React.FC = () => {
   const [studentIds, setStudentIds] = useState<string[]>([]);
   // 班课学员列表
   const [studentList, setStudentList] = useState<Student[]>([]);
-  const [studentLoading, setStudentLoading] = useState(false);
 
   // 科目列表（从科目管理数据源获取）
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -236,9 +234,6 @@ const CourseFormPage: React.FC = () => {
   // 角色多选弹窗
   const [rolePickerVisible, setRolePickerVisible] = useState(false);
   const [roleTemp, setRoleTemp] = useState<CheckinRole[]>([]);
-
-  // 班课-学员多选弹窗
-  const [studentSelectVisible, setStudentSelectVisible] = useState(false);
 
   // 页面滚动位置保护：BottomSheet 等 fixed 弹窗关闭后，微信会重置 ScrollView 滚动位置，
   // 记录当前 scrollTop 并在弹窗关闭后恢复，避免用户被强制拉回顶部。
@@ -312,10 +307,7 @@ const CourseFormPage: React.FC = () => {
   // 班课模式：加载学员列表（依赖当前教师身份）
   useEffect(() => {
     if (!isClassMode || !profile?.id) return;
-    setStudentLoading(true);
-    fetchByTeacher(profile.id)
-      .then(setStudentList)
-      .finally(() => setStudentLoading(false));
+    fetchByTeacher(profile.id).then(setStudentList);
   }, [isClassMode, profile?.id, fetchByTeacher]);
 
   // 容纳人数不再按分类自动填充默认值，保持留空即「不限制人数」。
@@ -323,14 +315,14 @@ const CourseFormPage: React.FC = () => {
 
   // 弹窗关闭后恢复 ScrollView 滚动位置
   useEffect(() => {
-    if (!picker.visible && !colorPickerVisible && !rolePickerVisible && !studentSelectVisible) {
+    if (!picker.visible && !colorPickerVisible && !rolePickerVisible) {
       // 使用 setTimeout 让 DOM 完成重绘后再恢复，避免闪动
       const timer = setTimeout(() => {
         setScrollTop(scrollTopRef.current);
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [picker.visible, colorPickerVisible, rolePickerVisible, studentSelectVisible]);
+  }, [picker.visible, colorPickerVisible, rolePickerVisible]);
 
   // 页面销毁（返回 / 切走销毁）时清理本会话持久化到 USER_DATA_PATH/uploads 的临时图片，
   // 避免反复上传-删除、或未保存退出导致本地文件无限累积。已保存的课程图片此时
@@ -967,7 +959,7 @@ const CourseFormPage: React.FC = () => {
               error={errors.duration}
             />
 
-            {/* 容纳人数：非必填，留空表示不限制人数 */}
+            {/* 容纳人数：非必填，留空表示不限制人数（placeholder 已提示，不再重复 helperText） */}
             <FormRow
               label="容纳人数（人）"
               editable
@@ -976,7 +968,6 @@ const CourseFormPage: React.FC = () => {
               onInput={handleCapacityInput}
               inputType="number"
               error={errors.capacity}
-              helperText="留空不限制人数"
             />
           </Card>
 
@@ -1069,109 +1060,17 @@ const CourseFormPage: React.FC = () => {
                 </Card>
               )}
 
-              {/* 上课学员（仅班课模式，独立卡片） */}
+              {/* 上课学员（仅班课模式，统一使用 ClassStudentsCard 共享组件） */}
               {isClassMode && (
-                <Card className="p-[32rpx]">
-                  {/* 头部：标题 + 人数徽标 + 添加/管理 */}
-                  <View className="flex flex-row items-center justify-between mb-[16rpx]">
-                    <View className="flex flex-row items-center gap-[12rpx]">
-                      <View className="w-[6rpx] h-[28rpx] rounded-[4rpx] bg-warning" />
-                      <Text className="text-[28rpx] font-semibold text-foreground">上课学员</Text>
-                      <View className="px-[14rpx] py-[4rpx] rounded-full bg-primary/10">
-                        <Text className="text-[22rpx] font-medium text-primary">
-                          {studentIds.length} 人
-                        </Text>
-                      </View>
-                    </View>
-                    <View
-                      className="flex flex-row items-center gap-[6rpx] active:opacity-70 press-scale"
-                      onClick={() => setStudentSelectVisible(true)}
-                    >
-                      <Icon name="mdi-plus" size={28} color="primary" />
-                      <Text className="text-[26rpx] font-medium text-primary">
-                        {studentIds.length > 0 ? '管理' : '添加'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text className="text-[24rpx] text-muted-foreground leading-relaxed mb-[32rpx]">
-                    从学员库中选择参加本次班课的学员，可随时增减。
-                  </Text>
-
-                  {/* 已选学员网格：一行 4 个，间距宽松，信息放大 */}
-                  {selectedStudents.length > 0 ? (
-                    <View className="grid grid-cols-4 gap-x-[20rpx] gap-y-[32rpx]">
-                      {selectedStudents.map((student) => {
-                        const remaining =
-                          student.course_packages?.reduce(
-                            (sum, pkg) => sum + (pkg.remaining_hours || 0),
-                            0,
-                          ) || 0;
-                        return (
-                          <View
-                            key={student.id}
-                            className="flex flex-col items-center gap-[12rpx] relative"
-                          >
-                            <Avatar name={student.name} avatarUrl={student.avatar_url} size="lg" />
-                            {/* 移除按钮 */}
-                            <View
-                              className="absolute -top-[8rpx] -right-[8rpx] w-[36rpx] h-[36rpx] rounded-full bg-destructive border-[2rpx] border-card flex items-center justify-center active:opacity-70 z-10"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const { confirm } = await Taro.showModal({
-                                  title: '移除学员',
-                                  content: `确定将「${student.name}」从这个班级中移出吗？`,
-                                  confirmColor: '#EF4444',
-                                  confirmText: '移出',
-                                });
-                                if (!confirm) return;
-                                setStudentIds((prev) => prev.filter((i) => i !== student.id));
-                              }}
-                            >
-                              <Icon name="mdi-close" size={20} color="white" />
-                            </View>
-                            <Text className="text-[26rpx] text-foreground text-center truncate w-full">
-                              {student.name}
-                            </Text>
-                            <Text
-                              className={cn(
-                                'text-[22rpx]',
-                                remaining > 0
-                                  ? 'text-muted-foreground'
-                                  : 'text-muted-foreground/70',
-                              )}
-                            >
-                              {remaining} 课时
-                            </Text>
-                          </View>
-                        );
-                      })}
-
-                      {/* 继续添加按钮：紧跟学员头像，符合操作习惯 */}
-                      <View
-                        className="flex flex-col items-center gap-[12rpx] active:opacity-70 press-scale"
-                        onClick={() => setStudentSelectVisible(true)}
-                      >
-                        <View className="w-[80rpx] h-[80rpx] rounded-full bg-primary/10 flex items-center justify-center border-[2rpx] border-dashed border-primary/40">
-                          <Icon name="mdi-plus" size={42} color="primary" />
-                        </View>
-                        <Text className="text-[26rpx] text-primary text-center">添加</Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <View
-                      className="flex flex-col items-center justify-center gap-[16rpx] py-[48rpx] rounded-[20rpx] border-[2rpx] border-dashed border-border active:opacity-70 press-scale"
-                      onClick={() => setStudentSelectVisible(true)}
-                    >
-                      <View className="w-[80rpx] h-[80rpx] rounded-full bg-primary/10 flex items-center justify-center">
-                        <Icon name="mdi-plus" size={40} color="primary" />
-                      </View>
-                      <Text className="text-[24rpx] text-primary font-medium active:opacity-70">
-                        点击此处添加
-                      </Text>
-                    </View>
-                  )}
-                </Card>
+                <ClassStudentsCard
+                  studentIds={studentIds}
+                  students={selectedStudents}
+                  allStudents={studentList}
+                  subjectId={subjectId}
+                  subjects={subjects}
+                  maxSelectable={Number(capacity) > 0 ? Number(capacity) : undefined}
+                  onChange={setStudentIds}
+                />
               )}
 
               {/* 非班课模式：开课与价格 / 预约规则 / 签到规则 */}
@@ -1523,18 +1422,7 @@ const CourseFormPage: React.FC = () => {
         </View>
       </BottomSheet>
 
-      {/* 班课-学员多选弹窗：按课程科目预筛选，并受容纳人数上限约束 */}
-      <StudentMultiSelectSheet
-        visible={studentSelectVisible}
-        students={studentList}
-        selectedIds={studentIds}
-        loading={studentLoading}
-        subjectId={subjectId}
-        subjects={subjects}
-        maxSelectable={Number(capacity) > 0 ? Number(capacity) : undefined}
-        onClose={() => setStudentSelectVisible(false)}
-        onConfirm={(ids) => setStudentIds(ids)}
-      />
+      {/* 学员多选弹窗由上方 ClassStudentsCard 内部管理，无需在此单独渲染 */}
     </PageContainer>
   );
 };

@@ -107,10 +107,6 @@ const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({
         </View>
       </View>
 
-      <Text className="text-[24rpx] text-muted-foreground leading-relaxed mb-[48rpx]">
-        从学员库中选择参加本次班课的学员，可随时增减。
-      </Text>
-
       {/* 学员网格：4 列；最后一项为「继续添加」入口 */}
       {selectedStudents.length > 0 ? (
         <View className="grid grid-cols-4 gap-x-[20rpx] gap-y-[32rpx]">

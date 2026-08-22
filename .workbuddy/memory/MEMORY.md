@@ -19,6 +19,15 @@
 - `dist_bak_*`：现已实测可删（需 sandbox bypass 权限）；之前“必须保留、不要 rm”的结论作废。普通环境若被拦，请求提升权限后 `rm -rf` 即可。
 - `config/index.ts` 已对 weapp 构建**排除 `@tarojs/plugin-html`**（该插件每次构建覆盖写 `node_modules/.../runtime.js` 也会踩删除拦截；项目纯 weapp 不需要它，无 `dangerouslySetInnerHTML`/`WebView` 用法）。
 
+## Git 推送约定（2026-08-22 实测）
+- **推送命令**：`GIT_TERMINAL_PROMPT=0 git push origin master`。本仓库 `.git/config` 已配 `credential.helper=""` + `credential.helper=wincred`（GCM 在非交互 shell 返回空凭据会卡死；wincred 直接读 Windows 凭据管理器 `git:https://gitee.com`，账户 15890006269）。
+- **推送后 `[gone]` 现象**：沙箱会把 git ref 事务视为删除操作，隔离 `.git/refs/remotes/origin/` 整目录——推送成功但本地跟踪引用消失。修复（每次照做即可）：
+  ```bash
+  mkdir -p .git/refs/remotes/origin && printf '<最新sha>\n' > .git/refs/remotes/origin/master
+  ```
+- **git 仓库损坏恢复套路**：`bad object HEAD` 时 → ① `git update-ref refs/heads/master <origin/master sha>`；② `rm .git/index && git read-tree HEAD` 重建索引；③ 工作区 `git add -A` 重新提交。工作区文件是唯一可信源。
+- commit 作者邮箱 `151536422@qq.com` 与 Gitee 认证账户 `15890006269` 是两回事，不要混淆。
+
 ## 编译卡死根因（避坑）
 - 后台编译任务被中断后 `node`/`taro` 进程可能僵死（实测挂 9~11 小时），锁住 `dist` 与日志，导致后续编译卡死/残缺/ENOENT。
 - 跑编译前先 `ps aux | grep node` 确认无残留进程；有就用 `TaskStop` 停掉对应后台任务再编。

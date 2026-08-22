@@ -1,8 +1,11 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
+import { auditLogService } from '@/services/audit-log';
 import { useTeacherStore, calcTotal } from '@/stores/teacher';
 import type { SalaryModel } from '@/types/teacher';
+import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 
 /** 主Tab类型 */
 export type MainTab = 'teacher' | 'salary' | 'schedule';
@@ -46,6 +49,7 @@ export const TAB_CONFIG: { key: MainTab; label: string; icon: string }[] = [
  */
 export function useTeacherList() {
   // ===== Store =====
+  const { profile } = useAuth();
   const {
     filter,
     setFilter,
@@ -273,10 +277,24 @@ export function useTeacherList() {
   const handlePayConfirm = useCallback(
     async (remark: string) => {
       await executePay(remark);
+      // 审计日志（用户口径 2026-08-22）：薪资发放属关键财务操作
+      try {
+        await auditLogService.record({
+          action: 'salary.pay',
+          operatorId: profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'salary_batch',
+          detail: `薪资发放：发放所选员工薪资${remark ? `（备注：${remark}）` : ''}`,
+          meta: { remark: remark || undefined },
+        });
+      } catch (e) {
+        logError('audit salary.pay', e);
+      }
       setPaySheetVisible(false);
       Taro.showToast({ title: '发放成功', icon: 'success' });
     },
-    [executePay],
+    [executePay, profile],
   );
 
   const handleMonthSelect = useCallback((year: number, month: number) => {

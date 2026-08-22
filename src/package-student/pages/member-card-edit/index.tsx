@@ -7,8 +7,10 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import { auditLogService } from '@/services/audit-log';
 import { memberCardService } from '@/services/member-card';
 import type { MemberCardDetail } from '@/types/member-card';
+import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -102,6 +104,7 @@ const FormRow: React.FC<FormRowProps> = ({
  * - 卡号为系统派发，不可修改
  */
 const MemberCardEditPage: React.FC = () => {
+  const { profile } = useAuth();
   const cardId = useMemo(() => {
     const instance = Taro.getCurrentInstance();
     return decodeURIComponent(instance?.router?.params?.id || '');
@@ -178,6 +181,33 @@ const MemberCardEditPage: React.FC = () => {
 
       const updated = await memberCardService.update(card.id, updateData);
       if (updated) {
+        // 审计日志（用户口径 2026-08-22）：会员卡充值/调整剩余属关键财务操作
+        try {
+          const kindLabel =
+            card.cardTypeKind === 'count'
+              ? `剩余次数调整为 ${remainingCount} 次`
+              : card.cardTypeKind === 'time'
+                ? `剩余天数调整为 ${remainingDays} 天`
+                : `余额调整为 ¥${remainingAmount}`;
+          await auditLogService.record({
+            action: 'card.recharge',
+            operatorId: profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'member_card',
+            targetId: card.id,
+            detail: `充值/调整会员卡：「${cardTypeName || '会员卡'}」（${kindLabel}）`,
+            meta: {
+              cardId: card.id,
+              cardTypeKind: card.cardTypeKind,
+              remainingCount,
+              remainingDays,
+              remainingAmount,
+            },
+          });
+        } catch (e) {
+          logError('audit card.recharge', e);
+        }
         Taro.showToast({ title: '保存成功', icon: 'success' });
         setTimeout(() => {
           Taro.navigateBack();
@@ -200,6 +230,7 @@ const MemberCardEditPage: React.FC = () => {
     remainingCount,
     remainingDays,
     remainingAmount,
+    profile,
   ]);
 
   if (loading) {

@@ -4,11 +4,15 @@
  */
 import { mockSubmitStoreEntry } from '@/data/store-entry';
 import type { StoreEntryFormData, StoreEntryResult } from '@/types/store-entry';
-// import { post } from '@/utils/request';
+import { notWired } from '@/utils/not-wired';
+
+const USE_MOCK =
+  typeof process !== 'undefined' && typeof process.env !== 'undefined'
+    ? process.env.VITE_USE_MOCK !== 'false'
+    : true;
 
 export const storeEntryService = {
   /** 提交门店入驻申请 */
-  submit: (data: StoreEntryFormData): Promise<StoreEntryResult> => mockSubmitStoreEntry(data),
-  // 联调时替换为:
-  // submit: (data: StoreEntryFormData) => post<StoreEntryResult>('/api/store-entries', data),
+  submit: (data: StoreEntryFormData): Promise<StoreEntryResult> =>
+    USE_MOCK ? mockSubmitStoreEntry(data) : notWired('storeEntry.submit'),
 };

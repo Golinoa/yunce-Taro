@@ -22,10 +22,13 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
+import { auditLogService } from '@/services/audit-log';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { Gender, TeacherIdentity, TeacherUIModel } from '@/types/teacher';
+import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = 'teacher_form_intro_v1';
@@ -60,6 +63,7 @@ const DEFAULT_IDENTITY_TO_ROLE: Record<TeacherIdentity, TeacherUIModel['role']> 
 
 const TeacherFormPage: React.FC = () => {
   useCardNavigationBar();
+  const { profile } = useAuth();
   const { id } = useRouter().params;
   const isEdit = !!id;
   const { activeTheme } = useThemeStore();
@@ -200,6 +204,20 @@ const TeacherFormPage: React.FC = () => {
           deductions: [],
           status: 'active',
         } as TeacherUIModel);
+        // 审计日志（用户口径 2026-08-22）：新增教师属人事变更
+        try {
+          await auditLogService.record({
+            action: 'staff.add',
+            operatorId: profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'teacher',
+            detail: `新增教师：「${base.name?.trim()}」（${identityLabel}）`,
+            meta: { teacherName: base.name?.trim(), identity: form.identity },
+          });
+        } catch (e) {
+          logError('audit staff.add', e);
+        }
         Taro.showToast({ title: '添加成功', icon: 'success' });
       }
       setTimeout(() => Taro.navigateBack(), 800);
@@ -208,7 +226,7 @@ const TeacherFormPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher]);
+  }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher, profile]);
 
   if (isEdit && loading && !formInitializedRef.current) {
     return (

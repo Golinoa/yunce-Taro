@@ -9,7 +9,9 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import { auditLogService } from '@/services/audit-log';
 import { cardTypeService } from '@/services/card-type';
+import { lessonDebtService } from '@/services/lesson-debt';
 import { memberCardService } from '@/services/member-card';
 import { studentService } from '@/services/student';
 import type { CardType, CardTypeKind } from '@/types/card-type';
@@ -135,6 +137,46 @@ const MemberCardIssuePage: React.FC = () => {
     return true;
   }, [selectedCardType, purchasePrice, freezeCount, freezeDays]);
 
+  /** P1：处理学员未结欠课（划扣抵扣 / 平账豁免），UI 提醒老师选择 */
+  const handlePendingDebt = useCallback(async (sid: string) => {
+    try {
+      const debts = lessonDebtService.getPendingByStudent(sid);
+      const totalDebt = debts.reduce((sum, d) => sum + d.hours, 0);
+      if (totalDebt <= 0) return;
+
+      const action = await new Promise<number>((resolve) => {
+        Taro.showActionSheet({
+          itemList: ['划扣抵扣', '平账豁免'],
+          success: (res) => resolve(res.tapIndex),
+          fail: () => resolve(-1),
+        });
+      });
+
+      if (action === 0) {
+        // 划扣：取刚发的最新一张卡，从关联课包剩余抵扣欠课，未抵完部分保留
+        const cards = await memberCardService.getByStudent(sid);
+        const latestCard = cards[0];
+        if (latestCard) {
+          const notCovered = await memberCardService.deductDebt(latestCard.id, totalDebt);
+          const settled = await lessonDebtService.settleByStudent(
+            sid,
+            'deduct',
+            totalDebt - notCovered,
+          );
+          Taro.showToast({
+            title: `已划扣 ${settled.settledHours} 课时抵欠课`,
+            icon: 'none',
+          });
+        }
+      } else if (action === 1) {
+        const settled = await lessonDebtService.settleByStudent(sid, 'waive');
+        Taro.showToast({ title: `已平账 ${settled.settledHours} 课时欠课`, icon: 'none' });
+      }
+    } catch (err) {
+      logError('MemberCardIssuePage handlePendingDebt', err);
+    }
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (!student || !selectedCardType) return;
     if (!validate()) return;
@@ -155,6 +197,24 @@ const MemberCardIssuePage: React.FC = () => {
         cardNo: cardNo.trim() || undefined,
         remark: remark.trim() || undefined,
       });
+
+      // P1（2026-08-22）：发卡后若该学员有未结欠课，提醒老师选择「划扣抵扣 / 平账豁免」
+      await handlePendingDebt(student.id);
+      // 审计日志（用户口径 2026-08-22）：开卡属关键财务操作
+      try {
+        await auditLogService.record({
+          action: 'card.issue',
+          operatorId: profile?.id || '',
+          operatorName: currentUserName || profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'member_card',
+          targetId: selectedCardType.id,
+          detail: `会员开卡：学员「${student.name}」开「${selectedCardType.name}」`,
+          meta: { studentId: student.id, cardTypeName: selectedCardType.name },
+        });
+      } catch (e) {
+        logError('audit card.issue', e);
+      }
       Taro.showToast({ title: '开卡成功', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1200);
     } catch (error) {
@@ -163,7 +223,17 @@ const MemberCardIssuePage: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [currentUserName, purchasePrice, cardNo, remark, selectedCardType, student, validate]);
+  }, [
+    currentUserName,
+    purchasePrice,
+    cardNo,
+    remark,
+    selectedCardType,
+    student,
+    validate,
+    handlePendingDebt,
+    profile,
+  ]);
 
   if (loading) {
     return (

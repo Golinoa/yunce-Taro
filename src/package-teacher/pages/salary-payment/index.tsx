@@ -18,6 +18,7 @@ import Icon from '@/components/Icon';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import MonthPickerSheet from '@/components/teacher/MonthPickerSheet';
 import SendSalarySheet from '@/components/teacher/SendSalarySheet';
+import { auditLogService } from '@/services/audit-log';
 import { useTeacherStore, calcTotal } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
@@ -28,6 +29,8 @@ import {
   type SendResult,
   type TeacherUIModel,
 } from '@/types/teacher';
+import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const PAGE_INTRO_KEY = 'salary_payment_intro_hidden';
@@ -122,6 +125,7 @@ const SalaryStatusExplainSheet: React.FC<{ visible: boolean; onClose: () => void
 
 const SalaryPaymentPage: React.FC = () => {
   useCardNavigationBar();
+  const { profile } = useAuth();
   const { teachers, fetchAll, setSalaryMonth, batchConfirm, setPendingSendAction, executeSend } =
     useTeacherStore();
   const { activeTheme } = useThemeStore();
@@ -249,13 +253,27 @@ const SalaryPaymentPage: React.FC = () => {
     setSending(true);
     try {
       await batchConfirm(pendingIds);
+      // 审计日志（用户口径 2026-08-22）：薪资核对属关键财务操作
+      try {
+        await auditLogService.record({
+          action: 'salary.confirm',
+          operatorId: profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'salary_batch',
+          detail: `薪资核对：一键核对 ${pendingIds.length} 位员工薪资`,
+          meta: { count: pendingIds.length },
+        });
+      } catch (e) {
+        logError('audit salary.confirm', e);
+      }
       Taro.showToast({ title: '已核对', icon: 'success' });
     } catch {
       Taro.showToast({ title: '核对失败，请重试', icon: 'none' });
     } finally {
       setSending(false);
     }
-  }, [activeTheme, visibleTeachers, batchConfirm]);
+  }, [activeTheme, visibleTeachers, batchConfirm, profile]);
 
   /** 发送工资单：直接发放并弹窗展示结果 */
   const handleOpenSendSheet = useCallback(async () => {
@@ -273,13 +291,29 @@ const SalaryPaymentPage: React.FC = () => {
     try {
       const result = await executeSend();
       setSendResult(result);
+      // 审计日志（用户口径 2026-08-22）：发送工资单属关键财务操作
+      try {
+        const okCount = result?.success?.length ?? 0;
+        const failCount = result?.failed?.length ?? 0;
+        await auditLogService.record({
+          action: 'salary.send_slip',
+          operatorId: profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'salary_batch',
+          detail: `发送工资单：成功 ${okCount} 份${failCount > 0 ? `，失败 ${failCount} 份` : ''}`,
+          meta: { successCount: okCount, failedCount: failCount },
+        });
+      } catch (e) {
+        logError('audit salary.send_slip', e);
+      }
     } catch {
       Taro.showToast({ title: '发送失败，请重试', icon: 'none' });
       setSendResult({ success: [], failed: [] });
     } finally {
       setSending(false);
     }
-  }, [visibleTeachers, setPendingSendAction, executeSend]);
+  }, [visibleTeachers, setPendingSendAction, executeSend, profile]);
 
   /** 切换课时费/提成展开状态 */
   const toggleExpand = useCallback((teacherId: string, key: 'lesson' | 'commission') => {

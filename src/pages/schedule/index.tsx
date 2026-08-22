@@ -29,6 +29,7 @@ import {
   temporaryRescheduleService,
   venueBookingService,
 } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { useCampusStore } from '@/stores/campus';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useThemeStore } from '@/stores/theme';
@@ -1479,6 +1480,27 @@ const SchedulePage: React.FC = () => {
         setBatchClassSheetVisible(false);
         setBatchSelectedClassIds([]);
 
+        // 审计日志（用户口径 2026-08-22）：解散班级属高影响操作（解除学员分班+发通知）
+        if (successIds.length > 0) {
+          try {
+            const names = selectedBatchClasses
+              .filter((c) => successIds.includes(c.id))
+              .map((c) => c.name);
+            await auditLogService.record({
+              action: 'class.dissolve',
+              operatorId: profile?.id || '',
+              operatorName: profile?.name || '未知',
+              operatorRole: profile?.currentContext?.role || 'unknown',
+              targetType: 'class',
+              targetId: successIds.join(','),
+              detail: `解散班级 ${successIds.length} 个：${names.join('、')}`,
+              meta: { classIds: successIds, classNames: names },
+            });
+          } catch (e) {
+            logError('audit class.dissolve', e);
+          }
+        }
+
         if (failedNames.length === 0) {
           Taro.showToast({ title: `已删除 ${successIds.length} 个班级`, icon: 'success' });
         } else if (successIds.length === 0) {
@@ -1521,18 +1543,23 @@ const SchedulePage: React.FC = () => {
     dangerActionState.type,
     notifyStudentAndParents,
     profile?.id,
+    profile?.name,
+    profile?.currentContext?.role,
     scheduleById,
     selectedBatchClasses,
     selectedClassId,
     selectedDate,
   ]);
 
-  const handleCreateSchedule = useCallback((sourceMode?: string) => {
-    const mode = sourceMode || activeTab?.mode || 'class';
-    Taro.navigateTo({
-      url: `/package-course/pages/schedule-form/index?sourceMode=${encodeURIComponent(mode)}`,
-    });
-  }, [activeTab?.mode]);
+  const handleCreateSchedule = useCallback(
+    (sourceMode?: string) => {
+      const mode = sourceMode || activeTab?.mode || 'class';
+      Taro.navigateTo({
+        url: `/package-course/pages/schedule-form/index?sourceMode=${encodeURIComponent(mode)}`,
+      });
+    },
+    [activeTab?.mode],
+  );
 
   /** 预约视图：打开老师预约开关列表弹窗 */
   const handleManageBookingConfig = useCallback(() => {
@@ -2163,9 +2190,7 @@ const SchedulePage: React.FC = () => {
                       className={cn(
                         'flex items-center justify-center rounded-full border py-[12rpx] transition-colors active:scale-95 shrink-0',
                         !isLast && 'mr-[16rpx]',
-                        isActive
-                          ? 'border-primary/55 bg-primary/10'
-                          : 'border-border bg-card',
+                        isActive ? 'border-primary/55 bg-primary/10' : 'border-border bg-card',
                       )}
                       style={{ width: `${TAB_WIDTH_RPX}rpx` }}
                       onClick={() => handleMainTabChange(tab.key, index)}
@@ -2467,7 +2492,9 @@ const SchedulePage: React.FC = () => {
         )}
 
         {/* 悬浮排课按钮：班课/团课进入排课表单，私教打开老师预约开关弹窗 */}
-        {(activeTab?.mode === 'class' || activeTab?.mode === 'group' || activeTab?.mode === 'private') &&
+        {(activeTab?.mode === 'class' ||
+          activeTab?.mode === 'group' ||
+          activeTab?.mode === 'private') &&
           activeTab?.type === 'category' && (
             <View
               className="fixed bottom-[160rpx] right-[32rpx] z-100"

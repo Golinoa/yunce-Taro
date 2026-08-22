@@ -48,11 +48,15 @@ import type {
   LeadFilterTab,
   TrialSlotConfig,
 } from '@/types/lead';
+import { notWired } from '@/utils/not-wired';
 
 // ============================================
 // Mock 开关：联调时改为 false 即可切换到 API
 // ============================================
-const USE_MOCK = true;
+const USE_MOCK =
+  typeof process !== 'undefined' && typeof process.env !== 'undefined'
+    ? process.env.VITE_USE_MOCK !== 'false'
+    : true;
 
 // ============================================
 // 线索 CRUD
@@ -62,15 +66,13 @@ const USE_MOCK = true;
 export async function getLeadsByTeacher(teacherId: string): Promise<Lead[]> {
   if (USE_MOCK) return mockGetLeadsByTeacher(teacherId);
   // TODO: 联调时替换为 API
-  // return get<Lead[]>(`/leads?teacher_id=${teacherId}`);
-  return mockGetLeadsByTeacher(teacherId);
+  return notWired('lead.getLeadsByTeacher');
 }
 
 /** 获取线索详情 */
 export async function getLeadById(leadId: string): Promise<Lead | null> {
   if (USE_MOCK) return mockGetLeadById(leadId);
-  // TODO: return get<Lead>(`/leads/${leadId}`);
-  return mockGetLeadById(leadId);
+  return notWired('lead.getLeadById');
 }
 
 /** 获取线索卡片列表（带筛选） */
@@ -79,22 +81,19 @@ export async function getLeadCards(
   filterTab?: LeadFilterTab,
 ): Promise<LeadCardModel[]> {
   if (USE_MOCK) return mockGetLeadCardsByTeacher(teacherId, filterTab);
-  // TODO: return get<LeadCardModel[]>(`/leads/cards?teacher_id=${teacherId}&filter=${filterTab}`);
-  return mockGetLeadCardsByTeacher(teacherId, filterTab);
+  return notWired('lead.getLeadCards');
 }
 
 /** 获取线索统计摘要 */
 export async function getLeadSummary(teacherId: string): Promise<LeadSummary> {
   if (USE_MOCK) return mockGetLeadSummary(teacherId);
-  // TODO: return get<LeadSummary>(`/leads/summary?teacher_id=${teacherId}`);
-  return mockGetLeadSummary(teacherId);
+  return notWired('lead.getLeadSummary');
 }
 
 /** 创建线索（手动录入） */
 export async function createLead(data: LeadFormData, teacherId: string): Promise<Lead> {
   if (USE_MOCK) return mockCreateLead(data, teacherId);
-  // TODO: return post<Lead>('/leads', { ...data, creator_teacher_id: teacherId });
-  return mockCreateLead(data, teacherId);
+  return notWired('lead.createLead');
 }
 
 /** 通过邀约链接创建线索（家长注册后自动触发） */
@@ -110,8 +109,7 @@ export async function createLeadFromInvite(params: {
   sourceCourseId?: string;
 }): Promise<Lead> {
   if (USE_MOCK) return mockCreateLeadFromInvite(params);
-  // TODO: return post<Lead>('/leads/invite', params);
-  return mockCreateLeadFromInvite(params);
+  return notWired('lead.createLeadFromInvite');
 }
 
 /** 更新线索状态 */
@@ -121,8 +119,7 @@ export async function updateLeadStatus(
   extra?: { closed_reason?: string },
 ): Promise<Lead | null> {
   if (USE_MOCK) return mockUpdateLeadStatus(leadId, status, extra);
-  // TODO: return put<Lead>(`/leads/${leadId}/status`, { status, ...extra });
-  return mockUpdateLeadStatus(leadId, status, extra);
+  return notWired('lead.updateLeadStatus');
 }
 
 /** 更新线索信息 */
@@ -132,8 +129,7 @@ export async function updateLead(
   options?: { forceReassign?: boolean },
 ): Promise<Lead | null> {
   if (USE_MOCK) return mockUpdateLead(leadId, data, options);
-  // TODO: return put<Lead>(`/leads/${leadId}`, data);
-  return mockUpdateLead(leadId, data, options);
+  return notWired('lead.updateLead');
 }
 
 /** 线索改派（专用入口，锁定态需显式 forceReassign，记录改派原因与审计） */
@@ -144,15 +140,13 @@ export async function reassignLead(
   opts?: { forceReassign?: boolean; operatorId?: string },
 ): Promise<Lead | null> {
   if (USE_MOCK) return mockReassignLead(leadId, newOwnerId, reason, opts);
-  // TODO: return put<Lead>(`/leads/${leadId}/reassign`, { new_owner_id: newOwnerId, reason, ...opts });
-  return mockReassignLead(leadId, newOwnerId, reason, opts);
+  return notWired('lead.reassignLead');
 }
 
 /** 删除线索 */
 export async function deleteLead(leadId: string): Promise<boolean> {
   if (USE_MOCK) return mockDeleteLead(leadId);
-  // TODO: return del(`/leads/${leadId}`);
-  return mockDeleteLead(leadId);
+  return notWired('lead.deleteLead');
 }
 
 // ============================================
@@ -184,8 +178,7 @@ export async function createLeadBooking(params: {
   note?: string;
 }): Promise<LeadBooking> {
   if (USE_MOCK) return mockCreateLeadBooking(params);
-  // TODO: return post<LeadBooking>('/leads/bookings', params);
-  return mockCreateLeadBooking(params);
+  return notWired('lead.createLeadBooking');
 }
 
 /** 根据班级快速预约试听（课表卡片入口） */
@@ -202,15 +195,13 @@ export async function bookTrialByClass(params: {
   note?: string;
 }): Promise<LeadBooking> {
   if (USE_MOCK) return mockBookTrialByClass(params);
-  // TODO: return post<LeadBooking>('/leads/bookings/by-class', params);
-  return mockBookTrialByClass(params);
+  return notWired('lead.bookTrialByClass');
 }
 
 /** 获取线索的预约列表 */
 export async function getLeadBookings(leadId: string): Promise<LeadBooking[]> {
   if (USE_MOCK) return mockGetLeadBookings(leadId);
-  // TODO: return get<LeadBooking[]>(`/leads/${leadId}/bookings`);
-  return mockGetLeadBookings(leadId);
+  return notWired('lead.getLeadBookings');
 }
 
 /** 获取老师的所有试听预约（用于课表标记试听班级） */
@@ -219,22 +210,19 @@ export async function getLeadBookingsByTeacher(
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
   if (USE_MOCK) return mockGetLeadBookingsByTeacher(teacherId, params);
-  // TODO: return get<LeadBooking[]>('/leads/bookings', { teacher_id: teacherId, ...params });
-  return mockGetLeadBookingsByTeacher(teacherId, params);
+  return notWired('lead.getLeadBookingsByTeacher');
 }
 
 /** 取消试听预约 */
 export async function cancelLeadBooking(bookingId: string): Promise<LeadBooking | null> {
   if (USE_MOCK) return mockCancelLeadBooking(bookingId);
-  // TODO: return put<LeadBooking>(`/leads/bookings/${bookingId}/cancel`);
-  return mockCancelLeadBooking(bookingId);
+  return notWired('lead.cancelLeadBooking');
 }
 
 /** 恢复已取消的试听预约 */
 export async function restoreLeadBooking(bookingId: string): Promise<LeadBooking | null> {
   if (USE_MOCK) return mockRestoreLeadBooking(bookingId);
-  // TODO: return put<LeadBooking>(`/leads/bookings/${bookingId}/restore`);
-  return mockRestoreLeadBooking(bookingId);
+  return notWired('lead.restoreLeadBooking');
 }
 
 /** 更新试听预约 */
@@ -254,8 +242,7 @@ export async function updateLeadBooking(
   },
 ): Promise<LeadBooking | null> {
   if (USE_MOCK) return mockUpdateLeadBooking(bookingId, data);
-  // TODO: return put<LeadBooking>(`/leads/bookings/${bookingId}`, data);
-  return mockUpdateLeadBooking(bookingId, data);
+  return notWired('lead.updateLeadBooking');
 }
 
 // ============================================
@@ -265,8 +252,7 @@ export async function updateLeadBooking(
 /** 获取线索的跟进记录 */
 export async function getLeadFollowUps(leadId: string): Promise<LeadFollowUp[]> {
   if (USE_MOCK) return mockGetLeadFollowUps(leadId);
-  // TODO: return get<LeadFollowUp[]>(`/leads/${leadId}/follow-ups`);
-  return mockGetLeadFollowUps(leadId);
+  return notWired('lead.getLeadFollowUps');
 }
 
 /** 创建跟进记录 */
@@ -280,8 +266,7 @@ export async function createFollowUp(params: {
   operatorName?: string;
 }): Promise<LeadFollowUp> {
   if (USE_MOCK) return mockCreateFollowUp(params);
-  // TODO: return post<LeadFollowUp>(`/leads/${params.leadId}/follow-ups`, params);
-  return mockCreateFollowUp(params);
+  return notWired('lead.createFollowUp');
 }
 
 // ============================================
@@ -291,8 +276,7 @@ export async function createFollowUp(params: {
 /** 获取线索的转化记录 */
 export async function getLeadConversions(leadId: string): Promise<LeadConversion[]> {
   if (USE_MOCK) return mockGetLeadConversions(leadId);
-  // TODO: return get<LeadConversion[]>(`/leads/${leadId}/conversions`);
-  return mockGetLeadConversions(leadId);
+  return notWired('lead.getLeadConversions');
 }
 
 /** 创建转化记录（转正式学员） */
@@ -305,8 +289,7 @@ export async function createConversion(params: {
   note?: string;
 }): Promise<LeadConversion> {
   if (USE_MOCK) return mockCreateConversion(params);
-  // TODO: return post<LeadConversion>(`/leads/${params.leadId}/conversions`, params);
-  return mockCreateConversion(params);
+  return notWired('lead.createConversion');
 }
 
 // ============================================
@@ -316,8 +299,7 @@ export async function createConversion(params: {
 /** 获取试听可预约课程列表 */
 export async function getTrialCourseSlots(campusId?: string): Promise<TrialCourseSlot[]> {
   if (USE_MOCK) return mockGetTrialCourseSlots(campusId);
-  // TODO: return get<TrialCourseSlot[]>(`/leads/trial-slots?campus_id=${campusId}`);
-  return mockGetTrialCourseSlots(campusId);
+  return notWired('lead.getTrialCourseSlots');
 }
 
 // ============================================
@@ -330,15 +312,13 @@ export async function getTrialSlotConfigs(
   campusId?: string,
 ): Promise<TrialSlotConfig[]> {
   if (USE_MOCK) return mockGetTrialSlotConfigs(teacherId, campusId);
-  // TODO: return get<TrialSlotConfig[]>(`/trial-slot-configs?teacher_id=${teacherId}&campus_id=${campusId}`);
-  return mockGetTrialSlotConfigs(teacherId, campusId);
+  return notWired('lead.getTrialSlotConfigs');
 }
 
 /** 获取独立试听时段详情 */
 export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfig | null> {
   if (USE_MOCK) return mockGetTrialSlotConfigById(id);
-  // TODO: return get<TrialSlotConfig>(`/trial-slot-configs/${id}`);
-  return mockGetTrialSlotConfigById(id);
+  return notWired('lead.getTrialSlotConfigById');
 }
 
 /** 创建独立试听时段 */
@@ -346,8 +326,7 @@ export async function createTrialSlotConfig(
   data: Omit<TrialSlotConfig, 'id' | 'current_count' | 'created_at' | 'updated_at'>,
 ): Promise<TrialSlotConfig> {
   if (USE_MOCK) return mockCreateTrialSlotConfig(data);
-  // TODO: return post<TrialSlotConfig>('/trial-slot-configs', data);
-  return mockCreateTrialSlotConfig(data);
+  return notWired('lead.createTrialSlotConfig');
 }
 
 /** 更新独立试听时段 */
@@ -356,15 +335,13 @@ export async function updateTrialSlotConfig(
   data: Partial<TrialSlotConfig>,
 ): Promise<TrialSlotConfig | null> {
   if (USE_MOCK) return mockUpdateTrialSlotConfig(id, data);
-  // TODO: return put<TrialSlotConfig>(`/trial-slot-configs/${id}`, data);
-  return mockUpdateTrialSlotConfig(id, data);
+  return notWired('lead.updateTrialSlotConfig');
 }
 
 /** 删除独立试听时段 */
 export async function deleteTrialSlotConfig(id: string): Promise<boolean> {
   if (USE_MOCK) return mockDeleteTrialSlotConfig(id);
-  // TODO: return del(`/trial-slot-configs/${id}`);
-  return mockDeleteTrialSlotConfig(id);
+  return notWired('lead.deleteTrialSlotConfig');
 }
 
 /** 批量创建代约预约（支持会员+线索混合） */
@@ -386,8 +363,7 @@ export async function batchCreateProxyBookings(params: {
   note?: string;
 }): Promise<LeadBooking[]> {
   if (USE_MOCK) return mockBatchCreateProxyBookings(params);
-  // TODO: return post<LeadBooking[]>('/leads/bookings/batch-proxy', params);
-  return mockBatchCreateProxyBookings(params);
+  return notWired('lead.batchCreateProxyBookings');
 }
 
 // ============================================

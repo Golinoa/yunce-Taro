@@ -204,6 +204,7 @@ export async function mockLogin(
       return (
         (normalizeValue(u.username) === normalizedAccount ||
           normalizeValue(u.email || '') === normalizedAccount) &&
+        // C-02：明文密码比对仅限 mock 数据层（USERS 种子），真实联调必须由后端做哈希/加盐校验，前端严禁复刻此逻辑
         u.password === password
       );
     }) || null;

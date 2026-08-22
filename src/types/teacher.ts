@@ -29,6 +29,9 @@ export type TeacherAccessScope = 'self' | 'subject' | 'org';
 export type Gender = 'male' | 'female' | 'other';
 
 /** 薪资状态流转：待核对 → 已核对 → 确认中 → 已确认 → 已归档 */
+// L-05 说明：实际实现为四态 pending→confirmed→sending→archived；
+// teacher_confirmed（员工已确认工资单）为保留状态，当前 mock 流从不置位，
+// UI 仅做防御性兼容（SALARY_STATUS_META/薪资明细页），联调时若后端引入该态需同步实现流转。
 export type SalaryStatus = 'pending' | 'confirmed' | 'sending' | 'teacher_confirmed' | 'archived';
 
 /** 薪资状态元数据（标签文案/颜色/步骤图标） */

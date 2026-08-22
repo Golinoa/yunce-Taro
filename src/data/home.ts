@@ -337,7 +337,9 @@ export async function mockGetTeacher(userId: string) {
   const teacher = TEACHERS.find((t) => t.userId === userId);
   if (!teacher) {
     const scope = getActorScope(userId);
-    if (scope.role !== 'principal') return null;
+    // 机构创建者(admin)/校长(principal) 无教师档案时，返回「所辖校区教师聚合」摘要，
+    // 保证首页今日课表/待办等按管理员权限展示（2026-08-22 用户实测修复）。
+    if (scope.role !== 'principal' && scope.role !== 'admin') return null;
 
     const visibleTeachers = TEACHERS.filter((item) =>
       item.campusIds.some((campusId) => scope.campusIds.includes(campusId)),

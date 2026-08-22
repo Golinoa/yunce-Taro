@@ -24,6 +24,7 @@ import {
   teacherService,
   leadService,
 } from '@/services';
+import { auditLogService } from '@/services/audit-log';
 import { campusService, roomService } from '@/services/campus';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
@@ -1310,6 +1311,27 @@ const LessonForm: React.FC = () => {
       }
 
       invalidateStudents(currentUserId);
+      // 审计日志（用户口径 2026-08-22）：单人消课属重要日志
+      try {
+        await auditLogService.record({
+          action: 'lesson.record',
+          operatorId: currentUserId || profile?.id || '',
+          operatorName: profile?.name || '未知',
+          operatorRole: profile?.currentContext?.role || 'unknown',
+          targetType: 'lesson_record',
+          targetId: createdRecord.id,
+          detail: `单人消课：学员「${selectedStudent.name}」消课 ${hoursUsed} 课时（课包「${matchedPackage?.name || matchedPackage.id}」${isCrossSubject ? '，跨科目' : ''}）`,
+          meta: {
+            studentId: selectedStudent.id,
+            studentName: selectedStudent.name,
+            packageId: matchedPackage.id,
+            hours: hoursUsed,
+            crossSubject: isCrossSubject || false,
+          },
+        });
+      } catch (e) {
+        logError('audit lesson.record', e);
+      }
       handleSubmitSuccessReturn('消课成功');
     } catch (err) {
       logError('submit lesson', err);

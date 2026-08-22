@@ -41,6 +41,7 @@ import {
   mockRevokeLessonRecord,
   mockGetLessonRecordById,
   mockDeleteLessonRecord,
+  mockUpdateLessonRecord,
   mockGetLeavesByStudent,
   mockGetLeavesByTeacher,
   mockCreateLeaveRequest,
@@ -1949,6 +1950,26 @@ export const lessonRecordService = {
     }
 
     return mockDeleteLessonRecord(recordId);
+  },
+
+  /** 修改消课记录（P4，2026-08-22）：改课时 → 差额回补/追扣关联课包 */
+  update: async (
+    recordId: string,
+    updates: { hours?: number; note?: string },
+  ): Promise<LessonRecord | null> => {
+    if (!USE_MOCK) {
+      const updated = await put<BackendLessonRecordDetailResponse>(
+        `/lesson-records/${recordId}`,
+        buildLessonRecordPayload({
+          hours: updates.hours,
+          note: updates.note,
+        } as unknown as Omit<LessonRecord, 'id' | 'created_at' | 'updated_at'>),
+      );
+      return mapBackendLessonRecord(updated);
+    }
+
+    const updated = await mockUpdateLessonRecord(recordId, updates);
+    return updated ? mapMockLessonRecord(updated) : null;
   },
 
   /** 撤销消课记录（恢复课包余额，按扣减来源分别回加） */

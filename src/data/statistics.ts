@@ -3,7 +3,7 @@
  * 使用统一数据源 src/data/mock-database.ts 和 src/data/mock/statistics-base.ts
  */
 import Taro from '@tarojs/taro';
-import type { AlertItem as StatisticsAlertItem } from '@/components/statistics/AlertSheet';
+import { getAlertThreshold } from '@/utils/alert-config';
 import {
   MONTHLY_STATS,
   CAMPUS_STATS,
@@ -21,6 +21,12 @@ import {
 function delay(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * 运营预警「课时不足」默认值（用户口径 2026-08-22：5 课时）。
+ * 运行时读取系统设置中保存的配置（见 utils/alert-config.ts），未配置时用本默认值。
+ */
+export const OPERATION_ALERT_THRESHOLD_HOURS = 5;
 
 function getCurrentActorId(): string {
   try {
@@ -53,11 +59,6 @@ interface ChartDataItem {
   label: string;
   value: number;
   unit: string;
-}
-
-/** 预警项目类型 */
-interface AlertItem extends StatisticsAlertItem {
-  type: 'operation' | 'finance';
 }
 
 /** 课时趋势（近12个月） */
@@ -111,18 +112,7 @@ export const MOCK_PARENT_TREND: ChartDataItem[] = MONTHLY_STATS.slice(0, 6).map(
   unit: '课时',
 }));
 
-/** 财务预警数据 */
-export const MOCK_FINANCE_ALERTS: AlertItem[] = [
-  {
-    id: 'fin1',
-    title: '本月收入趋势',
-    type: 'finance',
-    level: 'primary',
-    desc: '本月营收保持上升，可继续追踪高转化科目',
-    count: 1,
-    details: [{ id: 'd4', name: '较上月', info: '+12.5%' }],
-  },
-];
+// 财务预警已改为实时计算（mockGetFinanceAlerts 遍历课包 expireDate），不再依赖静态常量。
 
 export async function mockGetLessonTrend(): Promise<ChartDataItem[]> {
   await delay();
@@ -239,8 +229,12 @@ export async function mockGetExpenseRatios() {
 
 export async function mockGetOperationAlerts() {
   await delay();
+  const threshold = getAlertThreshold();
   const visibleStudents = getVisibleStudents()
-    .filter((student) => student.remainingHours <= 12)
+    // 预警规则（用户口径 2026-08-22 确认）：
+    // ① 常规提醒：剩余课时 ≤ 阈值（可配置，默认 5）→ 提醒续费；
+    // ② 强制提醒：剩余 0 课时（最后一节课已用完）→ 无论阈值设多少，都必须提醒一次。
+    .filter((student) => student.remainingHours <= threshold || student.remainingHours <= 0)
     .sort((a, b) => a.remainingHours - b.remainingHours)
     .slice(0, 5);
 
@@ -258,18 +252,25 @@ export async function mockGetOperationAlerts() {
     ];
   }
 
+  const hasExhausted = visibleStudents.some((s) => s.remainingHours <= 0);
+
   return [
     {
       id: 'op-low-hours',
-      title: '课时不足预警',
+      title: hasExhausted ? '课时不足/已用尽预警' : '课时不足预警',
       type: 'operation' as const,
       level: 'warning' as const,
-      desc: '以下学员剩余课时较低，建议尽快安排续费沟通',
+      desc: hasExhausted
+        ? '以下学员课时不足或已用尽，请尽快安排续费沟通'
+        : '以下学员剩余课时较低，建议尽快安排续费沟通',
       count: visibleStudents.length,
       details: visibleStudents.map((student) => ({
         id: `detail-${student.id}`,
         name: student.name,
-        info: `剩余 ${student.remainingHours} 课时`,
+        info:
+          student.remainingHours <= 0
+            ? '课时已用尽，请尽快续费'
+            : `剩余 ${student.remainingHours} 课时`,
         refId: student.id,
       })),
     },
@@ -284,7 +285,17 @@ export async function mockGetFinanceAlerts() {
     .slice(0, 3);
 
   if (!expiringPackages.length) {
-    return MOCK_FINANCE_ALERTS;
+    return [
+      {
+        id: 'fin-stable',
+        title: '财务状态稳定',
+        type: 'finance' as const,
+        level: 'primary' as const,
+        desc: '当前无临近到期课包，可继续关注续费与转化',
+        count: 1,
+        details: [{ id: 'stable-1', name: '无课包紧急到期预警', info: '可继续跟进转化与续费' }],
+      },
+    ];
   }
 
   return [
