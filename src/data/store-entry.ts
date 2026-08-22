@@ -21,8 +21,10 @@ function delay(ms = 80): Promise<void> {
 /**
  * 提交门店入驻申请
  *
- * mock 环境下直接创建校区，便于立即在校区卡片查看定位；
- * 真实联调时只向 /api/store-entries 提交申请单即可。
+ * mock 环境下同步创建校区并立即开通（status: 'approved'），
+ * 便于在校区卡片中即时查看定位；
+ * 真实联调时只向 /api/store-entries 提交申请单，返回 status: 'pending' 等待人工审核。
+ * 二者语义通过 status 区分，页面成功文案据此统一（见 pages/store-entry）。
  */
 export async function mockSubmitStoreEntry(data: StoreEntryFormData): Promise<StoreEntryResult> {
   await delay();
@@ -46,7 +48,8 @@ export async function mockSubmitStoreEntry(data: StoreEntryFormData): Promise<St
 
   return {
     id: `entry-${Date.now()}`,
-    status: 'pending',
+    // mock 同步建校区即视为已开通，与真实后端的 'pending' 申请单语义区分
+    status: 'approved',
     campusId: campus.id,
   };
 }

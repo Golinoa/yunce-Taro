@@ -17,6 +17,7 @@ import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { storeEntryService } from '@/services/store-entry';
+import { useCampusStore } from '@/stores/campus';
 import type { StoreType } from '@/types/store-entry';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -253,7 +254,7 @@ const StoreEntry: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await storeEntryService.submit({
+      const result = await storeEntryService.submit({
         name: form.name.trim(),
         type: form.type,
         region: form.region.filter(Boolean),
@@ -265,9 +266,25 @@ const StoreEntry: React.FC = () => {
         contactPhone: form.contactPhone.trim(),
       });
 
+      // L-18-A：提交成功后主动刷新校区列表，并将新校区纳入可见范围，
+      // 避免「入驻成功却看不到校区」。仅当数据层实际创建了校区（campusId 存在）时刷新。
+      if (result.campusId) {
+        await useCampusStore.getState().fetchCampuses();
+        const { allowedCampusIds } = useCampusStore.getState();
+        if (!allowedCampusIds.includes(result.campusId)) {
+          useCampusStore.getState().setAllowedCampusIds([...allowedCampusIds, result.campusId]);
+        }
+      }
+
+      // L-18-B：成功文案与数据层实际行为统一——
+      // mock 同步建校区即开通（status: 'approved'）→ 提示校区已创建可见；
+      // 真实后端仅提交申请单（status: 'pending'）→ 提示等待人工审核。
+      const isOpened = result.status === 'approved';
       Taro.showModal({
-        title: '提交成功',
-        content: `感谢您对${BRAND_NAME_ZH}的信任，工作人员将在 1-3 个工作日内与您联系。`,
+        title: isOpened ? '入驻成功' : '提交成功',
+        content: isOpened
+          ? `门店入驻成功，校区「${form.name}」已创建，可在校区列表中查看。`
+          : `感谢您对${BRAND_NAME_ZH}的信任，工作人员将在 1-3 个工作日内与您联系。`,
         showCancel: false,
         success: () => {
           Taro.navigateBack();
