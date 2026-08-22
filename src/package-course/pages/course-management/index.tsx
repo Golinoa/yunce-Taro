@@ -201,189 +201,182 @@ const CourseManagementPage: React.FC = () => {
   }
 
   return (
-    <PageContainer safeBottom>
-      <ScrollView
-        scrollY
-        enhanced
-        scrollWithAnimation
-        className="h-screen pb-[calc(160rpx+env(safe-area-inset-bottom))]"
-      >
-        {/* Tab 分类栏 */}
-        <View className="sticky top-0 z-10 bg-background py-[24rpx] px-[32rpx]">
-          <View className="flex flex-row items-center">
-            {/* 分类标签滚动区 */}
-            <ScrollView
-              scrollX
-              enhanced
-              showScrollbar={false}
-              scrollWithAnimation
-              className="flex-1 min-w-0 overflow-hidden whitespace-nowrap"
-            >
-              <View className="flex flex-row items-center inline-flex">
-                {tabs.map((tab) => {
-                  const isActive = activeCategoryId === tab.key;
-                  return (
-                    <View
-                      key={tab.key}
+    <PageContainer safeBottom className="overflow-hidden">
+      {/* 用户口径（2026-08-23）：移除整页 ScrollView 与分类横向 ScrollView 的嵌套双滚动条，
+          改为原生页面滚动（与班级管理等页面一致），仅保留分类横向滚动区 */}
+      {/* Tab 分类栏 */}
+      <View className="sticky top-0 z-10 bg-background py-[24rpx] px-[32rpx]">
+        <View className="flex flex-row items-center">
+          {/* 分类标签滚动区 */}
+          <ScrollView
+            scrollX
+            enhanced
+            showScrollbar={false}
+            scrollWithAnimation
+            className="flex-1 min-w-0 overflow-hidden whitespace-nowrap"
+          >
+            <View className="flex flex-row items-center inline-flex">
+              {tabs.map((tab) => {
+                const isActive = activeCategoryId === tab.key;
+                return (
+                  <View
+                    key={tab.key}
+                    className={cn(
+                      'shrink-0 min-w-[120rpx] flex flex-col items-center justify-center mr-[32rpx] py-[8rpx] press-scale',
+                    )}
+                    onClick={() => handleCategoryChange(tab.key)}
+                    onLongPress={() => handleCategoryLongPress(tab.key)}
+                  >
+                    <Text
                       className={cn(
-                        'shrink-0 min-w-[120rpx] flex flex-col items-center justify-center mr-[32rpx] py-[8rpx] press-scale',
+                        'text-[30rpx] font-medium leading-none',
+                        isActive ? 'text-primary' : 'text-muted-foreground',
                       )}
-                      onClick={() => handleCategoryChange(tab.key)}
-                      onLongPress={() => handleCategoryLongPress(tab.key)}
                     >
-                      <Text
-                        className={cn(
-                          'text-[30rpx] font-medium leading-none',
-                          isActive ? 'text-primary' : 'text-muted-foreground',
-                        )}
-                      >
-                        {tab.label}
-                      </Text>
-                      {/* 下划线始终占位，未选中时透明 */}
-                      <View
-                        className={cn(
-                          'mt-[12rpx] w-[40rpx] h-[6rpx] rounded-full',
-                          isActive ? 'bg-primary' : 'bg-transparent',
-                        )}
-                      />
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            {/* 新增分类按钮 - 固定右侧 */}
-            <View
-              className="shrink-0 ml-[16rpx] px-[24rpx] py-[12rpx] rounded-[12rpx] bg-primary press-scale"
-              onClick={() => Taro.navigateTo({ url: '/package-course/pages/category-form/index' })}
-            >
-              <Text className="text-[26rpx] font-medium text-white">新增分类</Text>
+                      {tab.label}
+                    </Text>
+                    {/* 下划线始终占位，未选中时透明 */}
+                    <View
+                      className={cn(
+                        'mt-[12rpx] w-[40rpx] h-[6rpx] rounded-full',
+                        isActive ? 'bg-primary' : 'bg-transparent',
+                      )}
+                    />
+                  </View>
+                );
+              })}
             </View>
+          </ScrollView>
+
+          {/* 新增分类按钮 - 固定右侧 */}
+          <View
+            className="shrink-0 ml-[16rpx] px-[24rpx] py-[12rpx] rounded-[12rpx] bg-primary press-scale"
+            onClick={() => Taro.navigateTo({ url: '/package-course/pages/category-form/index' })}
+          >
+            <Text className="text-[26rpx] font-medium text-white">新增分类</Text>
           </View>
-
-          {/* 分类编辑轻提示 - 靠近标签、可关闭、不遮挡列表 */}
-          {showCategoryTip && (
-            <View className="mt-[20rpx] py-[16rpx] px-[20rpx] rounded-[12rpx] bg-primary/5 flex flex-row items-center justify-between">
-              <View className="flex flex-row items-center gap-[12rpx] flex-1 min-w-0">
-                <Icon name="mdi-information-outline" size={24} color="primary" />
-                <Text className="text-[24rpx] text-primary leading-[34rpx]">
-                  小提示：长按分类标签可编辑
-                </Text>
-              </View>
-              <View className="shrink-0 p-[8rpx] press-scale" onClick={handleDismissCategoryTip}>
-                <Icon name="mdi-close" size={24} color="primary" />
-              </View>
-            </View>
-          )}
         </View>
 
-        {/* 课程列表（用户口径 2026-08-23：移除统计文案+班级卡片外层包装，直接合并到一个 flex 列表） */}
-        <View className="px-[32rpx] pb-[40rpx]">
-          {(() => {
-            const isClassTab = activeCategoryItem?.mode === 'class';
-            const showClasses = isClassTab && activeClasses.length > 0;
-            const showTemplates = templates.length > 0;
-            if (!showClasses && !showTemplates) {
-              if (error && templates.length === 0) {
-                return (
-                  <Empty
-                    description={error}
-                    actionText="重新加载"
-                    onAction={() => void fetchByCategoryId(activeTemplateCategoryId)}
-                  />
-                );
-              }
+        {/* 分类编辑轻提示 - 靠近标签、可关闭、不遮挡列表 */}
+        {showCategoryTip && (
+          <View className="mt-[20rpx] py-[16rpx] px-[20rpx] rounded-[12rpx] bg-primary/5 flex flex-row items-center justify-between">
+            <View className="flex flex-row items-center gap-[12rpx] flex-1 min-w-0">
+              <Icon name="mdi-information-outline" size={24} color="primary" />
+              <Text className="text-[24rpx] text-primary leading-[34rpx]">
+                小提示：长按分类标签可编辑
+              </Text>
+            </View>
+            <View className="shrink-0 p-[8rpx] press-scale" onClick={handleDismissCategoryTip}>
+              <Icon name="mdi-close" size={24} color="primary" />
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* 课程列表（用户口径 2026-08-23：移除统计文案+班级卡片外层包装，直接合并到一个 flex 列表） */}
+      <View className="px-[32rpx] pb-[calc(220rpx+env(safe-area-inset-bottom))]">
+        {(() => {
+          const isClassTab = activeCategoryItem?.mode === 'class';
+          const showClasses = isClassTab && activeClasses.length > 0;
+          const showTemplates = templates.length > 0;
+          if (!showClasses && !showTemplates) {
+            if (error && templates.length === 0) {
               return (
                 <Empty
-                  description={`暂无${activeCategoryItem?.name ?? '课程'}课程，点击底部添加`}
+                  description={error}
+                  actionText="重新加载"
+                  onAction={() => void fetchByCategoryId(activeTemplateCategoryId)}
                 />
               );
             }
             return (
-              <View className="flex flex-col gap-[20rpx]">
-                {/* 排课中的班课（无外层包装，直接拼接在主列表） */}
-                {showClasses &&
-                  activeClasses.map((cls) => {
-                    const hasSchedule = scheduledClassIds.has(cls.id);
-                    return (
-                      <View
-                        key={`cls-${cls.id}`}
-                        className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
-                        onClick={() =>
-                          Taro.navigateTo({
-                            // 未排课 → 编辑班级（class-form）；已排课 → 班级详情
-                            url: hasSchedule
-                              ? `/package-course/pages/class-detail/index?id=${encodeURIComponent(cls.id)}`
-                              : `/package-course/pages/class-form/index?id=${encodeURIComponent(cls.id)}`,
-                          })
-                        }
-                      >
-                        <View className="flex-1 min-w-0 flex flex-row items-center gap-[20rpx]">
-                          <View
-                            className="w-[16rpx] h-[88rpx] rounded-full shrink-0"
-                            style={{
-                              backgroundColor: CLASS_BAR_COLORS[cls.color] || 'hsl(var(--primary))',
-                            }}
-                          />
-                          <View className="min-w-0 flex-1">
-                            <View className="flex flex-row items-center gap-[12rpx]">
-                              {/* 班级名称小字（用户口径 2026-08-23：简约为主，名称小字） */}
-                              <Text className="text-[26rpx] font-medium text-foreground truncate">
-                                {cls.name}
-                              </Text>
-                              {/* 仅未排课班级加"未排课"标签（主题色提醒，用户口径 2026-08-23） */}
-                              {!hasSchedule && (
-                                <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
-                                  <Text className="text-[20rpx] text-primary">未排课</Text>
-                                </View>
-                              )}
-                            </View>
-                            <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
-                              {cls.student_count ?? 0} 名学员 · 已上 {cls.used_lessons ?? 0}/
-                              {cls.total_lessons ?? 0} 课时
-                            </Text>
-                          </View>
-                        </View>
-                        <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
-                      </View>
-                    );
-                  })}
-                {/* 班课模板（模板=未排课的课程母版，班课 tab 下显示"未排课"提醒标签） */}
-                {showTemplates &&
-                  templates.map((template) => (
+              <Empty description={`暂无${activeCategoryItem?.name ?? '课程'}课程，点击底部添加`} />
+            );
+          }
+          return (
+            <View className="flex flex-col gap-[20rpx]">
+              {/* 排课中的班课（无外层包装，直接拼接在主列表） */}
+              {showClasses &&
+                activeClasses.map((cls) => {
+                  const hasSchedule = scheduledClassIds.has(cls.id);
+                  return (
                     <View
-                      key={`tpl-${template.id}`}
+                      key={`cls-${cls.id}`}
                       className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
-                      onClick={() => handleEdit(template.id)}
-                      onLongPress={() => handleCourseLongPress(template)}
+                      onClick={() =>
+                        Taro.navigateTo({
+                          // 未排课 → 编辑班级（class-form）；已排课 → 班级详情
+                          url: hasSchedule
+                            ? `/package-course/pages/class-detail/index?id=${encodeURIComponent(cls.id)}`
+                            : `/package-course/pages/class-form/index?id=${encodeURIComponent(cls.id)}`,
+                        })
+                      }
                     >
                       <View className="flex-1 min-w-0 flex flex-row items-center gap-[20rpx]">
                         <View
-                          className="w-[16rpx] h-[60rpx] rounded-full shrink-0"
-                          style={{ backgroundColor: template.color || 'hsl(var(--primary))' }}
+                          className="w-[16rpx] h-[88rpx] rounded-full shrink-0"
+                          style={{
+                            backgroundColor: CLASS_BAR_COLORS[cls.color] || 'hsl(var(--primary))',
+                          }}
                         />
                         <View className="min-w-0 flex-1">
                           <View className="flex flex-row items-center gap-[12rpx]">
-                            <Text className="text-[30rpx] font-medium text-foreground truncate">
-                              {template.name}
+                            {/* 班级名称小字（用户口径 2026-08-23：简约为主，名称小字） */}
+                            <Text className="text-[26rpx] font-medium text-foreground truncate">
+                              {cls.name}
                             </Text>
-                            {/* 模板无排课关联 → 视为未排课（主题色提醒） */}
-                            <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
-                              <Text className="text-[20rpx] text-primary">未排课</Text>
-                            </View>
+                            {/* 仅未排课班级加"未排课"标签（主题色提醒，用户口径 2026-08-23） */}
+                            {!hasSchedule && (
+                              <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                                <Text className="text-[20rpx] text-primary">未排课</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
+                            {cls.student_count ?? 0} 名学员 · 已上 {cls.used_lessons ?? 0}/
+                            {cls.total_lessons ?? 0} 课时
+                          </Text>
+                        </View>
+                      </View>
+                      <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
+                    </View>
+                  );
+                })}
+              {/* 班课模板（模板=未排课的课程母版，班课 tab 下显示"未排课"提醒标签） */}
+              {showTemplates &&
+                templates.map((template) => (
+                  <View
+                    key={`tpl-${template.id}`}
+                    className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
+                    onClick={() => handleEdit(template.id)}
+                    onLongPress={() => handleCourseLongPress(template)}
+                  >
+                    <View className="flex-1 min-w-0 flex flex-row items-center gap-[20rpx]">
+                      <View
+                        className="w-[16rpx] h-[60rpx] rounded-full shrink-0"
+                        style={{ backgroundColor: template.color || 'hsl(var(--primary))' }}
+                      />
+                      <View className="min-w-0 flex-1">
+                        <View className="flex flex-row items-center gap-[12rpx]">
+                          <Text className="text-[30rpx] font-medium text-foreground truncate">
+                            {template.name}
+                          </Text>
+                          {/* 模板无排课关联 → 视为未排课（主题色提醒） */}
+                          <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                            <Text className="text-[20rpx] text-primary">未排课</Text>
                           </View>
                         </View>
                       </View>
-                      <View className="flex flex-row items-center shrink-0">
-                        <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
-                      </View>
                     </View>
-                  ))}
-              </View>
-            );
-          })()}
-        </View>
-      </ScrollView>
+                    <View className="flex flex-row items-center shrink-0">
+                      <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
+                    </View>
+                  </View>
+                ))}
+            </View>
+          );
+        })()}
+      </View>
 
       {/* 底部新增课程按钮 */}
       <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))]">
