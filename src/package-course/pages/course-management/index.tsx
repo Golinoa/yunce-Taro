@@ -331,10 +331,10 @@ const CourseManagementPage: React.FC = () => {
                               <Text className="text-[26rpx] font-medium text-foreground truncate">
                                 {cls.name}
                               </Text>
-                              {/* 仅未排课班级加"未排课"标签 */}
+                              {/* 仅未排课班级加"未排课"标签（主题色提醒，用户口径 2026-08-23） */}
                               {!hasSchedule && (
-                                <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-muted">
-                                  <Text className="text-[20rpx] text-muted-foreground">未排课</Text>
+                                <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                                  <Text className="text-[20rpx] text-primary">未排课</Text>
                                 </View>
                               )}
                             </View>
@@ -348,7 +348,7 @@ const CourseManagementPage: React.FC = () => {
                       </View>
                     );
                   })}
-                {/* 班课模板 */}
+                {/* 班课模板（模板=未排课的课程母版，班课 tab 下显示"未排课"提醒标签） */}
                 {showTemplates &&
                   templates.map((template) => (
                     <View
@@ -362,9 +362,17 @@ const CourseManagementPage: React.FC = () => {
                           className="w-[16rpx] h-[60rpx] rounded-full shrink-0"
                           style={{ backgroundColor: template.color || 'hsl(var(--primary))' }}
                         />
-                        <Text className="text-[32rpx] font-medium text-foreground truncate">
-                          {template.name}
-                        </Text>
+                        <View className="min-w-0 flex-1">
+                          <View className="flex flex-row items-center gap-[12rpx]">
+                            <Text className="text-[30rpx] font-medium text-foreground truncate">
+                              {template.name}
+                            </Text>
+                            {/* 模板无排课关联 → 视为未排课（主题色提醒） */}
+                            <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                              <Text className="text-[20rpx] text-primary">未排课</Text>
+                            </View>
+                          </View>
+                        </View>
                       </View>
                       <View className="flex flex-row items-center shrink-0">
                         <Icon name="mdi-chevron-right" size={32} color="mutedForeground" />
