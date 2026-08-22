@@ -1143,8 +1143,20 @@ export async function mockTransferStudent(
   return true;
 }
 
-export async function mockEndClass(_classId: string) {
+export async function mockEndClass(classId: string) {
   await delay();
+  const classItem = DB_CLASSES.find((c) => c.id === classId);
+  if (classItem) {
+    // 标记班级为已结束
+    classItem.status = 'ended';
+    // 级联：从所有学员的 classIds 中移除该班级，结束班级不再关联在读学员
+    for (const student of DB_STUDENTS) {
+      if (student.classIds.includes(classId)) {
+        student.classIds = student.classIds.filter((id) => id !== classId);
+      }
+    }
+    syncClassStudentCount(classId);
+  }
   return true;
 }
 
