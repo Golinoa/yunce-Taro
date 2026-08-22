@@ -44,7 +44,6 @@ export interface UseClassDetailReturn {
   isEnded: boolean;
   isUnlimited: boolean;
   checkinRecords: CheckinRecord[];
-  endingClass: boolean;
   addingStudents: boolean;
   transferring: boolean;
 
@@ -81,7 +80,6 @@ export interface UseClassDetailReturn {
   goLessonForm: () => void;
   goEdit: () => void;
   goStudentDetail: (id: string) => void;
-  handleEndClass: () => Promise<void>;
   handleStudentLongPress: (studentId: string, studentName: string) => void;
 }
 
@@ -102,7 +100,6 @@ export function useClassDetail(): UseClassDetailReturn {
   const { loading, setLoading } = useDelayedLoading();
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
-  const [endingClass, setEndingClass] = useState(false);
   const [addingStudents, setAddingStudents] = useState(false);
   const [transferring, setTransferring] = useState(false);
 
@@ -175,7 +172,7 @@ export function useClassDetail(): UseClassDetailReturn {
     } finally {
       setLoading(false);
     }
-  }, [classId, currentUserId]);
+  }, [classId, currentUserId, setLoading]);
 
   useEffect(() => {
     loadData();
@@ -190,8 +187,9 @@ export function useClassDetail(): UseClassDetailReturn {
   }, [classId]);
 
   const goEdit = useCallback(() => {
+    // 用户口径（2026-08-23）：编辑统一走「编辑课程页面」（course-form 班级模式），不再跳 class-form 表单页
     Taro.navigateTo({
-      url: `/package-course/pages/class-form/index?id=${encodeURIComponent(classId)}`,
+      url: `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&type=class`,
     });
   }, [classId]);
 
@@ -200,28 +198,6 @@ export function useClassDetail(): UseClassDetailReturn {
       url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(id)}`,
     });
   }, []);
-
-  const handleEndClass = useCallback(async () => {
-    if (!classInfo || endingClass) return;
-    const { confirm } = await Taro.showModal({
-      title: '结课',
-      content: `确认将「${classInfo.name}」标记为已结课？`,
-      confirmColor: '#9b7ed8',
-    });
-    if (!confirm) return;
-
-    setEndingClass(true);
-    try {
-      await classService.end(classId);
-      invalidateClasses(currentUserId);
-      Taro.showToast({ title: '已结课', icon: 'success' });
-      await loadData();
-    } catch {
-      Taro.showToast({ title: '操作失败', icon: 'none' });
-    } finally {
-      setEndingClass(false);
-    }
-  }, [classId, classInfo, endingClass, loadData, invalidateClasses, currentUserId]);
 
   // ===== 调班弹窗 =====
   const handleOpenTransfer = useCallback(
@@ -388,7 +364,6 @@ export function useClassDetail(): UseClassDetailReturn {
     isEnded,
     isUnlimited,
     checkinRecords,
-    endingClass,
     addingStudents,
     transferring,
     showAddSheet,
@@ -417,7 +392,6 @@ export function useClassDetail(): UseClassDetailReturn {
     goLessonForm,
     goEdit,
     goStudentDetail,
-    handleEndClass,
     handleStudentLongPress,
   };
 }

@@ -24,7 +24,6 @@ const ClassDetail: React.FC = () => {
     isEnded,
     isUnlimited,
     checkinRecords,
-    endingClass,
     addingStudents,
     transferring,
     showAddSheet,
@@ -49,7 +48,6 @@ const ClassDetail: React.FC = () => {
     goLessonForm,
     goEdit,
     goStudentDetail,
-    handleEndClass,
     handleStudentLongPress,
   } = detail;
 
@@ -348,14 +346,10 @@ const ClassDetail: React.FC = () => {
 
         {/* ====== 底部操作栏 ====== */}
         <View className="fixed bottom-0 left-0 right-0 px-5 py-4 bg-white/95 backdrop-blur-sm border-t border-input flex gap-3 z-50">
-          {addingStudents || transferring || endingClass ? (
+          {addingStudents || transferring ? (
             <View className="absolute left-5 right-5 top-[-64rpx] rounded-[16rpx] bg-white/95 px-4 py-3 shadow-soft">
               <Text className="text-sm text-muted-foreground">
-                {addingStudents
-                  ? '正在添加学员，请稍候...'
-                  : transferring
-                    ? '正在调班，请稍候...'
-                    : '正在结课，请稍候...'}
+                {addingStudents ? '正在添加学员，请稍候...' : '正在调班，请稍候...'}
               </Text>
             </View>
           ) : null}
@@ -366,30 +360,20 @@ const ClassDetail: React.FC = () => {
           ) : (
             <>
               <View
-                className={`btn-primary flex-1 ${addingStudents || transferring || endingClass ? 'bg-border' : 'shadow-elegant bg-gradient-primary'}`}
-                onClick={addingStudents || transferring || endingClass ? undefined : goLessonForm}
+                className={`btn-primary flex-1 ${addingStudents || transferring ? 'bg-border' : 'shadow-elegant bg-gradient-primary'}`}
+                onClick={addingStudents || transferring ? undefined : goLessonForm}
               >
                 <Text
-                  className={`text-base font-semibold ${addingStudents || transferring || endingClass ? 'text-muted-foreground' : 'text-white'}`}
+                  className={`text-base font-semibold ${addingStudents || transferring ? 'text-muted-foreground' : 'text-white'}`}
                 >
                   消课
                 </Text>
               </View>
               <View
-                className={`btn-primary flex-1 border ${addingStudents || transferring || endingClass ? 'border-border bg-muted' : 'border-input bg-white'}`}
-                onClick={addingStudents || transferring || endingClass ? undefined : goEdit}
+                className={`btn-primary flex-1 border ${addingStudents || transferring ? 'border-border bg-muted' : 'border-input bg-white'}`}
+                onClick={addingStudents || transferring ? undefined : goEdit}
               >
                 <Text className="text-base font-semibold text-muted-foreground">编辑</Text>
-              </View>
-              <View
-                className={`btn-primary flex-1 border ${addingStudents || transferring || endingClass ? 'border-border bg-muted' : 'border-purple bg-white'}`}
-                onClick={addingStudents || transferring || endingClass ? undefined : handleEndClass}
-              >
-                <Text
-                  className={`text-base font-semibold ${addingStudents || transferring || endingClass ? 'text-muted-foreground' : 'text-purple'}`}
-                >
-                  {endingClass ? '结课中...' : '结课'}
-                </Text>
               </View>
             </>
           )}

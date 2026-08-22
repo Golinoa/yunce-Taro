@@ -26,6 +26,7 @@ import {
   STUDENT_SELF_CHECKIN_OPTIONS,
 } from '@/data/course-template';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import { classService } from '@/services';
 import { subjectService } from '@/services/campus';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';
@@ -34,6 +35,7 @@ import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
 import type { Subject } from '@/types/campus';
 import { CLASS_LEVEL_LABELS } from '@/types/class';
+import type { Class } from '@/types/class';
 import type { CourseCategoryConfig } from '@/types/course-category';
 import type {
   CheckinRole,
@@ -44,6 +46,26 @@ import type {
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { uploadImage } from '@/utils/image-upload';
+
+/** 班级色 key → 课程模板色值（COURSE_COLOR_OPTIONS 内就近取值，班级模式回填用） */
+const CLASS_COLOR_TO_FORM_HEX: Record<string, string> = {
+  primary: '#10B981',
+  red: '#EF4444',
+  amber: '#F59E0B',
+  purple: '#8B5CF6',
+  info: '#0EA5E9',
+  teal: '#14B8A6',
+};
+
+/** 课程模板色值 → 班级色 key（班级模式保存回班级用） */
+const FORM_HEX_TO_CLASS_COLOR: Record<string, string> = {
+  '#10B981': 'primary',
+  '#EF4444': 'red',
+  '#F59E0B': 'amber',
+  '#8B5CF6': 'purple',
+  '#0EA5E9': 'info',
+  '#14B8A6': 'teal',
+};
 
 /** 表单字段错误 */
 interface FormErrors {
@@ -128,6 +150,10 @@ const CourseFormPage: React.FC = () => {
   const instance = Taro.getCurrentInstance();
   const courseId = decodeURIComponent(instance?.router?.params?.id || '');
   const isEdit = !!courseId;
+  // 班级模式（用户口径 2026-08-23）：课程管理页「未排课班级」与班级详情页「编辑」
+  // 统一走本页编辑班级数据（type=class），编辑入口不再散落于 class-form / 弹窗
+  const editType = decodeURIComponent(instance?.router?.params?.type || '');
+  const isClassEdit = isEdit && editType === 'class';
 
   // 基础字段
   const [name, setName] = useState('');
@@ -199,8 +225,9 @@ const CourseFormPage: React.FC = () => {
     [categories, categoryId],
   );
   const category = useMemo<CourseCategory>(
-    () => selectedCategory?.mode ?? 'class',
-    [selectedCategory],
+    // 班级模式：统一按班课模式渲染（名称/分类/颜色/老师/学员），不展示模板专属字段
+    () => (isClassEdit ? 'class' : (selectedCategory?.mode ?? 'class')),
+    [selectedCategory, isClassEdit],
   );
 
   /** 已选上课学员（从学员列表中按 id 匹配，用于独立卡片展示） */
@@ -239,6 +266,40 @@ const CourseFormPage: React.FC = () => {
   // 记录当前 scrollTop 并在弹窗关闭后恢复，避免用户被强制拉回顶部。
   const [scrollTop, setScrollTop] = useState(0);
   const scrollTopRef = useRef(0);
+
+  /**
+   * 班级模式回填（用户口径 2026-08-23：班级编辑统一走本页）：
+   * 名称/分类/颜色/老师/助教/学员来自班级数据，模板专属字段用默认值（班级模式不展示）。
+   */
+  const fillClassForm = useCallback((cls: Class, students: Student[]) => {
+    setName(cls.name);
+    setCategoryId(cls.category_id || '');
+    setColor(CLASS_COLOR_TO_FORM_HEX[cls.color] || COURSE_COLOR_OPTIONS[0]);
+    setSubjectId(cls.subject_id || '');
+    setTeacherId(cls.teachers?.[0] || cls.teacher_id || '');
+    setAssistantId(cls.teachers?.[1] || '');
+    setStudentIds(students.map((s) => s.id));
+    // 模板专属字段默认值（班级模式不渲染对应 UI，仅保证表单数据完整）
+    setDuration('60');
+    setCapacity('');
+    setAgeGroup('mix');
+    setCustomAgeGroups([]);
+    setLevel('all');
+    setCustomLevels([]);
+    setExperiencePrice('');
+    setPrice('');
+    setMinOpenCount('');
+    setBookingDeadline('60');
+    setCancelQueueTime('60');
+    setNonCancelTime('120');
+    setAutoCheckin('follow_category');
+    setStudentSelfCheckin('follow_category');
+    setAllowCheckinRoles(['teacher', 'receptionist']);
+    setDescription('');
+    setBackgroundImage('');
+    setHomeImage('');
+    captureBaselineRef.current = true;
+  }, []);
 
   // 加载分类列表，编辑时加载课程详情
   useEffect(() => {
@@ -282,6 +343,20 @@ const CourseFormPage: React.FC = () => {
     // setLoading(true) 由 useDelayedLoading 延迟处理：请求在阈值内完成则
     // 完全不显示骨架屏，仅网络差/加载过慢时才让用户看到加载占位。
     setLoading(true);
+    if (isClassEdit) {
+      // 班级模式：加载班级数据填充表单（编辑入口统一）
+      Promise.all([classService.getById(courseId), classService.getStudents(courseId)])
+        .then(([cls, students]) => {
+          if (cls) fillClassForm(cls, students);
+          try {
+            Taro.setStorageSync(`course-form-loaded-${formStorageScope}`, true);
+          } catch {
+            /* 静默 */
+          }
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
     courseTemplateService
       .getById(courseId)
       .then((data) => {
@@ -296,7 +371,7 @@ const CourseFormPage: React.FC = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, [courseId, isEdit, fetchList, formStorageScope]);
+  }, [courseId, isEdit, isClassEdit, fetchList, formStorageScope, fillClassForm, setLoading]);
 
   // 加载科目列表和教师列表
   useEffect(() => {
@@ -800,7 +875,24 @@ const CourseFormPage: React.FC = () => {
     };
 
     try {
-      if (isEdit) {
+      if (isClassEdit) {
+        // 班级模式（用户口径 2026-08-23）：更新班级基础信息 + 学员增删同步
+        const currentStudents = await classService.getStudents(courseId);
+        const currentIds = currentStudents.map((s) => s.id);
+        const toAdd = studentIds.filter((id) => !currentIds.includes(id));
+        const toRemove = currentIds.filter((id) => !studentIds.includes(id));
+        const classColor = (FORM_HEX_TO_CLASS_COLOR[color] || 'primary') as Class['color'];
+        await classService.update(courseId, {
+          name: name.trim(),
+          color: classColor,
+          teacher_id: teacherId,
+          teachers: [teacherId, assistantId].filter(Boolean),
+          category_id: categoryId || undefined,
+        });
+        for (const sid of toAdd) await classService.addStudents(courseId, [sid]);
+        for (const sid of toRemove) await classService.removeStudent(courseId, sid);
+        Taro.showToast({ title: '保存成功', icon: 'success' });
+      } else if (isEdit) {
         await update(courseId, formData);
         Taro.showToast({ title: '保存成功', icon: 'success' });
       } else {
@@ -861,6 +953,8 @@ const CourseFormPage: React.FC = () => {
     assistantId,
     studentIds,
     isClassMode,
+    isClassEdit,
+    formStorageScope,
   ]);
 
   const handleDelete = useCallback(async () => {
@@ -872,7 +966,12 @@ const CourseFormPage: React.FC = () => {
     if (!confirm) return;
     setDeleting(true);
     try {
-      await remove(courseId);
+      // 班级模式删除班级，模板模式删除课程模板（用户口径 2026-08-23：编辑统一走本页）
+      if (isClassEdit) {
+        await classService.remove(courseId);
+      } else {
+        await remove(courseId);
+      }
       Taro.showToast({ title: '已删除', icon: 'success' });
       setLeaveGuard(false);
       guardArmedRef.current = false;
@@ -884,7 +983,7 @@ const CourseFormPage: React.FC = () => {
     } finally {
       setDeleting(false);
     }
-  }, [courseId, name, remove]);
+  }, [courseId, name, remove, isClassEdit]);
 
   if (loading) {
     return (
@@ -933,8 +1032,8 @@ const CourseFormPage: React.FC = () => {
               </Text>
             </FormRow>
 
-            {/* 班课模式：所属科目 */}
-            {isClassMode && (
+            {/* 班课模式：所属科目（班级模式隐藏模板专属字段） */}
+            {isClassMode && !isClassEdit && (
               <FormRow label="所属科目" required onClick={() => openPicker('subject')}>
                 <Text
                   className={cn(
@@ -947,28 +1046,32 @@ const CourseFormPage: React.FC = () => {
               </FormRow>
             )}
 
-            {/* 课程时长 */}
-            <FormRow
-              label="课程时长（分）"
-              required
-              editable
-              placeholder="请输入课程时长"
-              value={duration}
-              onInput={(e) => setDuration(e.detail.value)}
-              inputType="number"
-              error={errors.duration}
-            />
+            {/* 课程时长（班级模式隐藏：班级时长由排课/课程包承载） */}
+            {!isClassEdit && (
+              <FormRow
+                label="课程时长（分）"
+                required
+                editable
+                placeholder="请输入课程时长"
+                value={duration}
+                onInput={(e) => setDuration(e.detail.value)}
+                inputType="number"
+                error={errors.duration}
+              />
+            )}
 
             {/* 容纳人数：非必填，留空表示不限制人数（placeholder 已提示，不再重复 helperText） */}
-            <FormRow
-              label="容纳人数（人）"
-              editable
-              placeholder="留空不限制人数"
-              value={capacity}
-              onInput={handleCapacityInput}
-              inputType="number"
-              error={errors.capacity}
-            />
+            {!isClassEdit && (
+              <FormRow
+                label="容纳人数（人）"
+                editable
+                placeholder="留空不限制人数"
+                value={capacity}
+                onInput={handleCapacityInput}
+                inputType="number"
+                error={errors.capacity}
+              />
+            )}
           </Card>
 
           {/* 高级设置展开按钮 - 保留现状 */}
@@ -1192,74 +1295,78 @@ const CourseFormPage: React.FC = () => {
                 </>
               )}
 
-              {/* 5. 课程介绍 */}
-              <Card className="p-[32rpx]">
-                <SectionTitle title="课程介绍" />
-                <FormInput
-                  label="课程简介"
-                  placeholder="暂无"
-                  value={description}
-                  onInput={(e) => setDescription(e.detail.value)}
-                  multiline
-                  minHeight="200rpx"
-                />
-              </Card>
+              {/* 5. 课程介绍（班级模式隐藏模板专属字段） */}
+              {!isClassEdit && (
+                <Card className="p-[32rpx]">
+                  <SectionTitle title="课程介绍" />
+                  <FormInput
+                    label="课程简介"
+                    placeholder="暂无"
+                    value={description}
+                    onInput={(e) => setDescription(e.detail.value)}
+                    multiline
+                    minHeight="200rpx"
+                  />
+                </Card>
+              )}
 
-              {/* 6. 课程图片：背景图整宽上传框 + 封面左文字右方框 */}
-              <Card className="p-[32rpx]">
-                <SectionTitle title="课程图片" />
-                <View className="flex flex-col gap-[40rpx]">
-                  {/* 课程背景图：整宽上传框 */}
-                  <View className="flex flex-col gap-[16rpx]">
-                    <View className="flex flex-row items-center gap-[12rpx]">
-                      <Text className="text-[30rpx] font-medium text-foreground">课程背景图</Text>
-                      <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
-                        <Text className="text-[22rpx] text-primary font-medium">约课首页</Text>
+              {/* 6. 课程图片：背景图整宽上传框 + 封面左文字右方框（班级模式隐藏） */}
+              {!isClassEdit && (
+                <Card className="p-[32rpx]">
+                  <SectionTitle title="课程图片" />
+                  <View className="flex flex-col gap-[40rpx]">
+                    {/* 课程背景图：整宽上传框 */}
+                    <View className="flex flex-col gap-[16rpx]">
+                      <View className="flex flex-row items-center gap-[12rpx]">
+                        <Text className="text-[30rpx] font-medium text-foreground">课程背景图</Text>
+                        <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
+                          <Text className="text-[22rpx] text-primary font-medium">约课首页</Text>
+                        </View>
                       </View>
-                    </View>
-                    <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-                      显示在首页课程卡底尾。建议使用 405×190 横图，未上传将使用默认背景。
-                    </Text>
-                    <CourseImageUploader
-                      value={backgroundImage}
-                      onChange={(v) => setBackgroundImage(v ?? '')}
-                      title="上传背景图"
-                      subtitle="上传后可预览和更换"
-                      layout="fullWidth"
-                      scrollTopRef={scrollTopRef}
-                      onScrollRestore={(t) => setScrollTop(t)}
-                    />
-                  </View>
-
-                  <View className="h-[1rpx] bg-border/30" />
-
-                  {/* 课程封面：左文字说明 + 右方形上传框（卡片内嵌两栏） */}
-                  <View className="flex flex-col gap-[16rpx]">
-                    <View className="flex flex-row items-center gap-[12rpx]">
-                      <Text className="text-[30rpx] font-medium text-foreground">课程封面</Text>
-                      <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
-                        <Text className="text-[22rpx] text-primary font-medium">分享使用</Text>
-                      </View>
-                    </View>
-                    <View className="flex flex-row items-start gap-[24rpx]">
-                      <View className="flex-1 min-w-0">
-                        <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-                          用于分享课程、生成课表推荐等场景，推荐清晰方图。未上传不影响首页背景图。
-                        </Text>
-                      </View>
+                      <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+                        显示在首页课程卡底尾。建议使用 405×190 横图，未上传将使用默认背景。
+                      </Text>
                       <CourseImageUploader
-                        value={homeImage}
-                        onChange={(v) => setHomeImage(v ?? '')}
-                        title="上传封面"
-                        layout="square"
-                        squareSizeRpx={200}
+                        value={backgroundImage}
+                        onChange={(v) => setBackgroundImage(v ?? '')}
+                        title="上传背景图"
+                        subtitle="上传后可预览和更换"
+                        layout="fullWidth"
                         scrollTopRef={scrollTopRef}
                         onScrollRestore={(t) => setScrollTop(t)}
                       />
                     </View>
+
+                    <View className="h-[1rpx] bg-border/30" />
+
+                    {/* 课程封面：左文字说明 + 右方形上传框（卡片内嵌两栏） */}
+                    <View className="flex flex-col gap-[16rpx]">
+                      <View className="flex flex-row items-center gap-[12rpx]">
+                        <Text className="text-[30rpx] font-medium text-foreground">课程封面</Text>
+                        <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
+                          <Text className="text-[22rpx] text-primary font-medium">分享使用</Text>
+                        </View>
+                      </View>
+                      <View className="flex flex-row items-start gap-[24rpx]">
+                        <View className="flex-1 min-w-0">
+                          <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+                            用于分享课程、生成课表推荐等场景，推荐清晰方图。未上传不影响首页背景图。
+                          </Text>
+                        </View>
+                        <CourseImageUploader
+                          value={homeImage}
+                          onChange={(v) => setHomeImage(v ?? '')}
+                          title="上传封面"
+                          layout="square"
+                          squareSizeRpx={200}
+                          scrollTopRef={scrollTopRef}
+                          onScrollRestore={(t) => setScrollTop(t)}
+                        />
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </Card>
+                </Card>
+              )}
             </View>
           )}
         </View>

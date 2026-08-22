@@ -305,10 +305,10 @@ const CourseManagementPage: React.FC = () => {
                       className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
                       onClick={() =>
                         Taro.navigateTo({
-                          // 未排课 → 编辑班级（class-form）；已排课 → 班级详情
+                          // 用户口径（2026-08-23）：已排课 → 班级详情；未排课 → 统一进编辑课程页面（班级模式，无弹窗）
                           url: hasSchedule
                             ? `/package-course/pages/class-detail/index?id=${encodeURIComponent(cls.id)}`
-                            : `/package-course/pages/class-form/index?id=${encodeURIComponent(cls.id)}`,
+                            : `/package-course/pages/course-form/index?id=${encodeURIComponent(cls.id)}&type=class`,
                         })
                       }
                     >
