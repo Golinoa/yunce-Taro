@@ -7,6 +7,7 @@ import {
   salaryTemplateService,
   teacherSalaryRuleService,
 } from '@/services/teacher';
+import { calcTotal } from '@/data/teacher';
 import type {
   TeacherUIModel,
   TeacherFilter,
@@ -21,20 +22,8 @@ import type {
 } from '@/types/teacher';
 import { logError } from '@/utils/logger';
 
-/** 计算教师薪资总额（含扣款/补发） */
-export function calcTotal(t: TeacherUIModel): number {
-  const lessonFee =
-    t.categoryLessonFees?.reduce((sum, item) => sum + item.amount, 0) ?? t.hours * t.rate;
-  let total = t.base + lessonFee + t.attend + t.perf;
-  total -= t.socialInsurance || 0;
-  total -= t.lateFine || 0;
-  total -= t.otherFine || 0;
-  total += t.bonusAmount || 0;
-  t.deductions.forEach((d) => {
-    total += d.type === 'bonus' ? d.amount : -d.amount;
-  });
-  return Math.max(0, total);
-}
+/** 薪资总额算法（与 mockExecutePay 共用同一实现，消除 B-01 实发≠展示） */
+export { calcTotal };
 
 interface TeacherState {
   teachers: TeacherUIModel[];

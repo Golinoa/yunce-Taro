@@ -980,6 +980,21 @@ function genSerialNo(): string {
 }
 
 /** 发放薪资 */
+/** 计算教师薪资总额（含扣款/补发）；UI 展示与 mockExecutePay 实发共用同一算法，消除 B-01 实发≠展示 */
+export function calcTotal(t: TeacherUIModel): number {
+  const lessonFee =
+    t.categoryLessonFees?.reduce((sum, item) => sum + item.amount, 0) ?? t.hours * t.rate;
+  let total = t.base + lessonFee + t.attend + t.perf;
+  total -= t.socialInsurance || 0;
+  total -= t.lateFine || 0;
+  total -= t.otherFine || 0;
+  total += t.bonusAmount || 0;
+  t.deductions.forEach((d) => {
+    total += d.type === 'bonus' ? d.amount : -d.amount;
+  });
+  return Math.max(0, total);
+}
+
 export async function mockExecutePay(
   ids: string[],
   remark?: string,
@@ -995,12 +1010,7 @@ export async function mockExecutePay(
     store.get().map((t) => {
       const status = normalizeSalaryStatus(t.salaryStatus);
       if (ids.includes(t.id) && status === 'sending') {
-      const total =
-        t.base +
-        t.hours * t.rate +
-        t.attend +
-        t.perf +
-        t.deductions.reduce((s, d) => s + (d.type === 'bonus' ? d.amount : -d.amount), 0);
+      const total = calcTotal(t);
       const serialNo = genSerialNo();
       return {
         ...t,
