@@ -779,7 +779,7 @@ function genMonthSnapshot(month: string): TeacherUIModel[] {
   const isFuture = month > currentMonthKey;
   const isPast = month < currentMonthKey;
 
-  return mockTeachers.map((t) => {
+  return _teachers.map((t) => {
     // 基于月份和教师 ID 生成该教师的确定性因子
     const teacherSeed = monthSeed(`${month}-${t.id}`);
     const factor = 0.7 + teacherSeed * 0.6; // 0.7 ~ 1.3
