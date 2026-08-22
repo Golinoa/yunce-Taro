@@ -659,54 +659,37 @@ const BASE_TEACHERS: Teacher[] = [
 ];
 
 // ============================================
-// 教师统一视图：以教师管理库（data/teacher）为单一可写源
-// 保留本库关联字段（userId/campusIds 等），管理库业务字段覆盖同名教师，
-// 管理库新增教师自动并入；管理库 CRUD 后调用 syncTeacherView() 原位刷新
+// 教师统一视图：合并优先级 = 管理库(_teachers)为唯一权威源，BASE_TEACHERS 仅补充管理库缺失的
+// 视图关联字段（managedSubjectIds/accessScope/userId/joinedAt/totalHours/monthHours/pendingSalary）。
+// 管理库的 name/role/status/subjects/campusIds/salaryStatus/deductions 100% 生效，不被 BASE 覆盖；
+// BASE 不再作为主数据基底，消除同 ID（teacher-001 等）双主数据分裂（L-03）。
 // ============================================
 
 function buildTeacherView(): Teacher[] {
   const managed = getManagedTeachers();
-  const result: Teacher[] = BASE_TEACHERS.map((base) => {
-    const m = managed.find((t) => t.id === base.id);
-    if (!m) return base;
+  // 管理库为基底（权威源），BASE 仅补缺字段
+  return managed.map((m) => {
+    const base = BASE_TEACHERS.find((b) => b.id === m.id);
     return {
-      ...base,
-      name: m.name || base.name,
-      phone: m.phone || base.phone,
+      id: m.id,
+      userId: base?.userId ?? `user-${m.id}`,
+      name: m.name || m.id,
+      phone: m.phone || '',
+      subjects: m.subject ? [m.subject] : base?.subjects ?? [],
+      campusIds: m.campusIds ?? base?.campusIds ?? [],
+      canCrossCampus: m.canCrossCampus ?? base?.canCrossCampus ?? false,
+      accessScope: base?.accessScope ?? 'self',
+      managedSubjectIds: base?.managedSubjectIds,
       role: m.role,
       status: m.status,
       salaryStatus: m.salaryStatus,
       deductions: m.deductions,
-      subjects: m.subject
-        ? base.subjects.includes(m.subject)
-          ? base.subjects
-          : [...base.subjects, m.subject]
-        : base.subjects,
+      joinedAt: base?.joinedAt ?? new Date().toISOString(),
+      totalHours: base?.totalHours ?? 0,
+      monthHours: base?.monthHours ?? 0,
+      pendingSalary: base?.pendingSalary ?? 0,
     };
   });
-  for (const m of managed) {
-    if (!BASE_TEACHERS.some((b) => b.id === m.id)) {
-      result.push({
-        id: m.id,
-        userId: `user-${m.id}`,
-        name: m.name || m.id,
-        phone: m.phone || '',
-        subjects: m.subject ? [m.subject] : [],
-        campusIds: m.campusIds || [],
-        canCrossCampus: m.canCrossCampus || false,
-        accessScope: 'self',
-        role: m.role,
-        status: m.status,
-        salaryStatus: m.salaryStatus,
-        deductions: m.deductions,
-        joinedAt: new Date().toISOString(),
-        totalHours: 0,
-        monthHours: 0,
-        pendingSalary: 0,
-      });
-    }
-  }
-  return result;
 }
 
 /** 教师统一视图（实时派生） */
