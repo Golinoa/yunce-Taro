@@ -246,6 +246,18 @@ const Home: React.FC = () => {
     [scheduleHomeSwiperMeasure],
   );
 
+  /** 手动点「已读」：记录后从待办列表移除（用户口径 2026-08-23） */
+  const handleMarkTodoRead = useCallback((todoId: string) => {
+    void homeService
+      .markTodoRead(todoId)
+      .then(() => {
+        setTodoItems((prev) => prev.filter((item) => item.id !== todoId));
+      })
+      .catch((err) => {
+        logError('Home markTodoRead', err);
+      });
+  }, []);
+
   const handleHomeSwiperChange = useCallback(
     (event: { detail?: { current?: number } }) => {
       const current = event.detail?.current ?? 0;
@@ -407,7 +419,7 @@ const Home: React.FC = () => {
                         </SwiperItem>
                         <SwiperItem itemId="todo">
                           <View id="home-tab-panel-todo" className="pt-[24rpx]">
-                            <TodoList items={todoItems} />
+                            <TodoList items={todoItems} onMarkRead={handleMarkTodoRead} />
                           </View>
                         </SwiperItem>
                         <SwiperItem itemId="recent">

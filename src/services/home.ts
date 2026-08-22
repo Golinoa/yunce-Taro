@@ -36,7 +36,9 @@ import type {
 import { CLASSES, COURSE_PACKAGES, LESSON_RECORDS, STUDENTS, TEACHERS } from '@/data/mock-database';
 import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
+import { notWired } from '@/utils/not-wired';
 import { get } from '@/utils/request';
+import { isTodoRead, markTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
 import { statisticsService } from './statistics';
 
 const USE_MOCK =
@@ -282,6 +284,36 @@ function mapAlertToHomeTodoItem(alert: {
     iconBg: 'alert',
     url: `/package-statistics/pages/alert-detail/index?alertId=${encodeURIComponent(alert.id)}`,
   };
+}
+
+/**
+ * 运营预警（课时不足）→ 学员级待办（用户口径 2026-08-23）：
+ * 每个应预警学员一条「课时续费提醒」，手动点已读后不再出现（不重复推送）。
+ * 已读记录存储于 utils/todo-read（mock），联调后迁移后端。
+ */
+function mapOperationAlertToStudentTodos(alert: {
+  id: string;
+  level: 'danger' | 'warning' | 'primary';
+  title: string;
+  desc: string;
+  count: number;
+  details: { name: string; info: string; refId?: string }[];
+}): HomeTodoItem[] {
+  const todos: HomeTodoItem[] = [];
+  for (const detail of alert.details) {
+    if (!detail.refId) continue;
+    const todoId = rechargeAlertTodoId(detail.refId);
+    // 手动已读后不再出现（同一轮不重复推送）
+    if (isTodoRead(todoId)) continue;
+    todos.push({
+      id: todoId,
+      title: `「${detail.name}」课时续费提醒`,
+      desc: detail.info,
+      icon: 'mdi-alert-circle-outline',
+      iconBg: 'alert',
+    });
+  }
+  return todos;
 }
 
 function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] {
@@ -751,7 +783,12 @@ export const homeService = {
       statisticsService.getAlerts(getCurrentAlertQueryParams('operation')).catch(() => []),
       statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch(() => []),
     ]);
-    const alertTodoItems = [...operationAlertList, ...financeAlertList].map(mapAlertToHomeTodoItem);
+    // 运营预警（课时不足）→ 学员级待办（过滤已读）；财务预警 → 预警级待办（过滤已读）
+    const operationTodos = operationAlertList.flatMap(mapOperationAlertToStudentTodos);
+    const financeTodos = financeAlertList
+      .map(mapAlertToHomeTodoItem)
+      .filter((todo) => !isTodoRead(todo.id));
+    const alertTodoItems = [...operationTodos, ...financeTodos];
 
     if (!USE_MOCK && role === 'teacher') {
       try {
@@ -767,7 +804,16 @@ export const homeService = {
       }
     }
 
-    return [...alertTodoItems, ...(await mockGetTodoItems(teacherId, campusId)).map(mapTodoItem)];
+    const fixedTodos = (await mockGetTodoItems(teacherId, campusId))
+      .map(mapTodoItem)
+      .filter((todo) => !isTodoRead(todo.id));
+    return [...alertTodoItems, ...fixedTodos];
+  },
+
+  /** 标记待办为已读（用户手动点已读 → 不再出现） */
+  markTodoRead: async (todoId: string): Promise<void> => {
+    if (!USE_MOCK) notWired('home.markTodoRead');
+    markTodoRead(todoId);
   },
 
   /** 获取最近消课记录 */

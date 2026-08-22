@@ -15,6 +15,8 @@ export interface TodoItem {
 
 export interface TodoListProps {
   items: TodoItem[];
+  /** 手动点「已读」回调（用户口径 2026-08-23：预警提醒进待办，需手动已读） */
+  onMarkRead?: (todoId: string) => void;
 }
 
 /** 图标背景渐变映射（使用 theme token） */
@@ -32,7 +34,7 @@ const ICON_BG_MAP: Record<string, string> = {
  * - 图标 + 标题 + 描述 + 箭头
  * - 图标配色：alert(红橙预警)、leave(橙/warning)、hours(红/destructive)、checkin(绿/success)
  */
-const TodoList: React.FC<TodoListProps> = ({ items }) => {
+const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
   if (items.length === 0) {
     return (
       <View className="py-[80rpx] text-center">
@@ -61,6 +63,17 @@ const TodoList: React.FC<TodoListProps> = ({ items }) => {
             </Text>
             <Text className="text-[22rpx] text-muted-foreground">{item.desc}</Text>
           </View>
+          {onMarkRead && (
+            <View
+              className="px-[20rpx] py-[10rpx] rounded-full bg-muted active:opacity-70 press-scale"
+              onClick={(e) => {
+                e.stopPropagation?.();
+                onMarkRead(item.id);
+              }}
+            >
+              <Text className="text-[24rpx] text-muted-foreground">已读</Text>
+            </View>
+          )}
           <Text className="text-[hsl(var(--border))] text-[32rpx]">›</Text>
         </View>
       ))}

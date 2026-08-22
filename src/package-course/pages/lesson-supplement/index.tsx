@@ -17,7 +17,6 @@ import {
   studentService,
 } from '@/services';
 import { auditLogService } from '@/services/audit-log';
-import { countTriggeredAlerts } from '@/services/operation-alert';
 import { useStudentStore } from '@/stores';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
@@ -338,8 +337,6 @@ const LessonSupplementPage: React.FC = () => {
     setSubmitting(true);
     const successList: string[] = [];
     const failList: { name: string; reason: string }[] = [];
-    /** 补课扣课时后剩余：预警"触发即提醒一次"判定 */
-    const alertItems: { studentId: string; remainingHours: number }[] = [];
     const contentText = note.trim() ? `补录签到：${note.trim()}` : '补录签到';
 
     try {
@@ -399,13 +396,6 @@ const LessonSupplementPage: React.FC = () => {
           }
 
           successList.push(student.name);
-          // 预警触发判定（补课扣课时后剩余降到阈值 → 提醒一次）
-          alertItems.push({
-            studentId: student.id,
-            remainingHours:
-              createdRecord.remaining_hours ??
-              Math.max((matchedPackage?.remaining_hours ?? 0) - hoursUsed, 0),
-          });
         } catch (error) {
           logError('LessonSupplement create single record', error);
           failList.push({ name: student.name, reason: '补录失败' });
@@ -430,16 +420,14 @@ const LessonSupplementPage: React.FC = () => {
       }
 
       // 预警：补课扣课时后剩余降到阈值 → 立即提醒一次（去重）
-      const triggeredAlertCount = successList.length > 0 ? countTriggeredAlerts(alertItems) : 0;
-      const alertSuffix = triggeredAlertCount > 0 ? `，${triggeredAlertCount}名课时不足已提醒` : '';
-
+      // （预警提醒走首页待办事项：补课扣课时后剩余降到阈值 → 首页「课时续费提醒」待办，手动点已读）
       if (failList.length === 0) {
-        Taro.showToast({ title: `已补录 ${successList.length} 人${alertSuffix}`, icon: 'success' });
+        Taro.showToast({ title: `已补录 ${successList.length} 人`, icon: 'success' });
       } else if (successList.length === 0) {
         Taro.showToast({ title: '补录失败，请重试', icon: 'none' });
       } else {
         Taro.showToast({
-          title: `${successList.length}人成功，${failList.length}人失败${alertSuffix}`,
+          title: `${successList.length}人成功，${failList.length}人失败`,
           icon: 'none',
           duration: 3000,
         });

@@ -9,11 +9,11 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { auditLogService } from '@/services/audit-log';
 import { memberCardService } from '@/services/member-card';
-import { clearStudentAlert } from '@/services/operation-alert';
 import type { MemberCardDetail } from '@/types/member-card';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { clearTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
 
 function formatCurrencyYuan(fen?: number): string {
   if (fen === undefined || fen === null) return '0.00';
@@ -209,10 +209,10 @@ const MemberCardEditPage: React.FC = () => {
         } catch (e) {
           logError('audit card.recharge', e);
         }
-        // 预警联动：充值/加课时后剩余回升 → 清除该学员"课时不足"提醒记录，之后再次下降可重新提醒
+        // 预警联动：充值/加课时后剩余回升 → 清除该学员「课时续费提醒」待办已读记录，之后再次下降可重新在首页待办提醒
         if (card.studentId) {
           try {
-            clearStudentAlert(card.studentId);
+            clearTodoRead(rechargeAlertTodoId(card.studentId));
           } catch (e) {
             logError('operation alert clear', e);
           }
