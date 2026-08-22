@@ -9,7 +9,7 @@ import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
 import type { UserRole } from '@/types/profile';
 import type { DayOfWeek } from '@/types/schedule';
 import { getManagedTeachers } from '@/data/teacher';
-import type { TeacherUIModel } from '@/data/teacher';
+import type { TeacherUIModel } from '@/types/teacher';
 
 // ============================================
 // 常量
@@ -2365,6 +2365,8 @@ export interface CoursePackage {
   purchaseDate: string;
   expireDate?: string;
   note?: string;
+  /** 关联会员卡 ID（次卡发卡时建立，用于「剩余次数 ↔ 剩余课时」双向同步，消除脆弱的 name 字符串匹配） */
+  memberCardId?: string;
 }
 
 export const COURSE_PACKAGES: CoursePackage[] = [

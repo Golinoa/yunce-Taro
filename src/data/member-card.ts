@@ -5,6 +5,23 @@ import { COURSE_PACKAGES, type CoursePackage } from '@/data/mock-database';
 import type { CardType } from '@/types/card-type';
 import type { CardTypeStatKey, MemberCard, MemberCardDetail } from '@/types/member-card';
 
+/**
+ * 会员卡剩余次数（次卡）派生：以关联课包 remainingHours 之和为准（单一数据源），
+ * 消除「只写不读」导致的课后失同步（L-11-A）；无关联课包时回退存储值（兼容历史种子数据）。
+ */
+function deriveRemainingCount(card: MemberCardDetail): number {
+  if (card.cardTypeKind !== 'count') return card.remainingCount ?? 0;
+  const linked = COURSE_PACKAGES.filter((p) => p.memberCardId === card.id);
+  if (linked.length === 0) return card.remainingCount ?? 0;
+  return linked.reduce((sum, p) => sum + (p.remainingHours || 0), 0);
+}
+
+/** 写回会员卡剩余次数（保持存储与派生一致） */
+function syncCardRemainingCount(card: MemberCardDetail): MemberCardDetail {
+  card.remainingCount = deriveRemainingCount(card);
+  return card;
+}
+
 const MOCK_MEMBER_CARDS: MemberCardDetail[] = [
   {
     id: 'mc_001',
@@ -124,6 +141,7 @@ export const mockGetMemberCardsByCardType = async (
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   const list = MOCK_MEMBER_CARDS.filter((item) => item.cardTypeId === cardTypeId);
+  list.forEach((c) => syncCardRemainingCount(c));
 
   switch (stat) {
     case 'sold':
@@ -148,7 +166,7 @@ export const mockGetMemberCardsByStudent = async (
   studentId: string,
 ): Promise<MemberCardDetail[]> => {
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return MOCK_MEMBER_CARDS.filter((item) => item.studentId === studentId);
+  return MOCK_MEMBER_CARDS.filter((item) => item.studentId === studentId).map(syncCardRemainingCount);
 };
 
 /**
@@ -156,7 +174,8 @@ export const mockGetMemberCardsByStudent = async (
  */
 export const mockGetMemberCardById = async (id: string): Promise<MemberCardDetail | null> => {
   await new Promise((resolve) => setTimeout(resolve, 200));
-  return MOCK_MEMBER_CARDS.find((item) => item.id === id) || null;
+  const card = MOCK_MEMBER_CARDS.find((item) => item.id === id);
+  return card ? syncCardRemainingCount(card) : null;
 };
 
 /**
@@ -173,17 +192,38 @@ export const mockUpdateMemberCard = async (
   MOCK_MEMBER_CARDS[index] = { ...prev, ...data };
   const updated = MOCK_MEMBER_CARDS[index];
 
-  // 打通：次卡剩余次数调整 → 同步学员课包剩余课时（差额法，避免覆盖消课已扣减值）
-  if (updated.cardTypeKind === 'count' && data.remainingCount !== undefined && updated.studentId) {
-    const pkg = COURSE_PACKAGES.find(
-      (p) => p.studentId === updated.studentId && p.name.includes('会员卡'),
-    );
-    if (pkg) {
-      const diff = (data.remainingCount || 0) - (prev.remainingCount || 0);
-      pkg.remainingHours = Math.max((pkg.remainingHours || 0) + diff, 0);
-      pkg.usedHours = Math.max((pkg.totalHours || 0) - pkg.remainingHours, 0);
-      if (pkg.remainingHours <= 0) pkg.status = 'finished';
+  // 打通：次卡剩余次数调整 → 同步关联课包剩余课时（L-11 修复）
+  // 以 memberCardId 稳定外键关联，放弃脆弱的 name.includes('会员卡') 字符串匹配（L-11-B）；
+  // 差额法 + 不变量约束：增次视为充值（totalHours 与 remainingHours 同步增长，usedHours 单向派生不被钳零，L-11-C）。
+  if (updated.cardTypeKind === 'count' && data.remainingCount !== undefined) {
+    const target = data.remainingCount || 0;
+    const linked = COURSE_PACKAGES.filter((p) => p.memberCardId === updated.id);
+    if (linked.length > 0) {
+      const currentRemaining = linked.reduce((s, p) => s + (p.remainingHours || 0), 0);
+      const delta = target - currentRemaining;
+      if (delta > 0) {
+        // 充值：总量与剩余同步增长，usedHours 保持不变（不变量：usedHours = totalHours - remainingHours）
+        const primary = linked[0];
+        primary.totalHours = (primary.totalHours || 0) + delta;
+        primary.remainingHours = (primary.remainingHours || 0) + delta;
+      } else if (delta < 0) {
+        // 减次：按 FIFO 从各关联课包扣减剩余，clamp 到 [0, totalHours]
+        let toCut = -delta;
+        for (const p of linked) {
+          if (toCut <= 0) break;
+          const cut = Math.min(toCut, p.remainingHours || 0);
+          p.remainingHours = (p.remainingHours || 0) - cut;
+          toCut -= cut;
+        }
+      }
+      // 不变量收口：usedHours 单向派生 + 用尽即 finished
+      for (const p of linked) {
+        p.usedHours = Math.max((p.totalHours || 0) - (p.remainingHours || 0), 0);
+        if ((p.remainingHours || 0) <= 0) p.status = 'finished';
+      }
     }
+    // 回写派生后的剩余次数，保持存储与读取一致
+    updated.remainingCount = deriveRemainingCount(updated);
   }
 
   return updated;
@@ -256,6 +296,7 @@ export const mockIssueMemberCard = async (
       studentId: base.studentId,
       classId: '',
       name: `${cardType.name}（会员卡）`,
+      memberCardId: card.id,
       type: 'hour_package',
       subjectId: '',
       totalHours: count,
