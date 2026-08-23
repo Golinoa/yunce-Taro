@@ -248,31 +248,31 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                       <Text className={cn('text-[30rpx] font-bold truncate', getNameClass(status))}>
                         {displayName}
                       </Text>
-                      {/* 状态标签 - 用户口径（2026-08-23）：加宽 padding + shrink-0 + nowrap，避免文字被挤压 */}
+                      {/* 状态标签 - 用户口径（2026-08-23）：flex 居中 + 加宽 padding + shrink-0 + nowrap，解决文字不居中/挤压 */}
                       {isUnattended && (
-                        <View className="course-tag-unattended rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-unattended rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">未点名</Text>
                         </View>
                       )}
                       {isDone && (
-                        <View className="course-tag-done rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-done rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已完成</Text>
                         </View>
                       )}
                       {isEnded && (
-                        <View className="course-tag-ended rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-ended rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已下课</Text>
                         </View>
                       )}
                       {/* 非 done/ended/unattended 状态显示约课标签 */}
                       {!isDone && !isEnded && !isUnattended && item.tag && (
-                        <View className="course-tag-booking rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
                       )}
                       {/* ended 状态也显示约课标签但半透明 */}
                       {isEnded && item.tag && (
-                        <View className="course-tag-booking rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
+                        <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
                       )}

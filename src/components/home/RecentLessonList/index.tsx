@@ -151,7 +151,7 @@ const RecentLessonList: React.FC<RecentLessonListProps> = ({ groups }) => {
                             {student.tag && (
                               <View
                                 className={cn(
-                                  'shrink-0 whitespace-nowrap px-[10rpx] py-[2rpx] rounded-[8rpx]',
+                                  'flex items-center shrink-0 whitespace-nowrap px-[10rpx] py-[2rpx] rounded-[8rpx]',
                                   getTagStyle(student.tag),
                                 )}
                               >
