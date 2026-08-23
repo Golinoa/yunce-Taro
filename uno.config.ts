@@ -753,6 +753,14 @@ export default defineConfig({
     ],
     ['course-status-done-border', { border: '2rpx solid hsl(var(--border))' }],
     ['course-status-ended-border', { border: '2rpx solid hsl(var(--border))' }],
+    // 已下课未点名：醒目提醒（用户口径 2026-08-23）
+    [
+      'course-status-unattended-border',
+      {
+        border: '2rpx solid hsl(var(--destructive))',
+        'box-shadow': '0 2rpx 12rpx hsl(var(--destructive)/0.18)',
+      },
+    ],
 
     // 课程状态 — 左侧时间区背景（使用 theme token）
     [
@@ -788,6 +796,14 @@ export default defineConfig({
       },
     ],
     ['course-btn-view', { background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }],
+    [
+      'course-btn-unattended',
+      {
+        background: 'linear-gradient(135deg, hsl(var(--destructive)/0.85), hsl(var(--destructive)))',
+        'box-shadow': '0 2rpx 8rpx hsl(var(--destructive)/0.35)',
+        color: 'white',
+      },
+    ],
 
     // 课程状态 — 标签（使用 theme token）
     [
@@ -799,6 +815,13 @@ export default defineConfig({
       'course-tag-ended',
       { background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' },
     ],
+    [
+      'course-tag-unattended',
+      {
+        background: 'hsl(var(--destructive))',
+        color: 'white',
+      },
+    ],
 
     // 课程状态 — 进度条（使用 theme token）
     [
@@ -809,11 +832,15 @@ export default defineConfig({
     ],
     ['course-progress-done', { background: 'hsl(var(--success))' }],
     ['course-progress-ended', { background: 'hsl(var(--border))' }],
+    ['course-progress-unattended', { background: 'hsl(var(--destructive))' }],
 
     // 课程卡片 — 语义色（对齐项目蓝色主题）
     ['course-name-active', { color: 'hsl(var(--foreground))' }],
     ['course-name-done', { color: 'hsl(var(--muted-foreground))' }],
     ['course-name-ended', { color: 'hsl(var(--border))' }],
+    // 未点名：醒目红色（用户口径 2026-08-23）
+    ['course-name-unattended', { color: 'hsl(var(--destructive))', 'font-weight': '700' }],
+    ['course-checkin-unattended', { color: 'hsl(var(--destructive))' }],
     ['course-meta-text', { color: 'hsl(var(--muted-foreground))' }],
     ['course-meta-ended', { color: 'hsl(var(--border))' }],
     ['course-checkin-active', { color: 'hsl(var(--foreground))' }],

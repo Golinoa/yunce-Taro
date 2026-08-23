@@ -27,13 +27,15 @@ const STATUS_ORDER: Record<CourseStatus, number> = {
   urgent: 0,
   active: 1,
   upcoming: 2,
-  done: 3,
-  ended: 4,
+  unattended: 3, // 已下课未点名（提醒色，权重在 done 之前）
+  done: 4,
+  ended: 5,
 };
 
 // ===================== 状态 → 按钮文案 =====================
 function getBtnText(status: CourseStatus): string {
-  if (status === 'ended' || status === 'done') return '查看';
+  if (status === 'unattended') return '未点名';
+  if (status === 'done') return '查看';
   if (status === 'urgent') return '立即点名';
   if (status === 'active') return '继续点名';
   return '点名';
@@ -42,6 +44,7 @@ function getBtnText(status: CourseStatus): string {
 // ===================== 状态 → 按钮样式 =====================
 function getBtnClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-btn-urgent animate-pulse-ring';
+  if (status === 'unattended') return 'course-btn-unattended animate-pulse-ring';
   if (status === 'upcoming' || status === 'active') return 'course-btn-normal';
   return 'course-btn-view';
 }
@@ -49,6 +52,7 @@ function getBtnClass(status: CourseStatus): string {
 // ===================== 状态 → 进度条样式 =====================
 function getProgressClass(status: CourseStatus): string {
   if (status === 'done') return 'course-progress-done';
+  if (status === 'unattended') return 'course-progress-unattended';
   if (status === 'ended') return 'course-progress-ended';
   return 'course-progress-active';
 }
@@ -56,6 +60,7 @@ function getProgressClass(status: CourseStatus): string {
 // ===================== 状态 → 卡片边框 =====================
 function getStatusBorderClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-status-urgent-border';
+  if (status === 'unattended') return 'course-status-unattended-border';
   if (status === 'done') return 'course-status-done-border';
   if (status === 'ended') return 'course-status-ended-border';
   return '';
@@ -64,15 +69,16 @@ function getStatusBorderClass(status: CourseStatus): string {
 // ===================== 状态 → 左侧时间区背景 =====================
 function getTimeBgClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-time-urgent-v14';
-  if (status === 'ended') return 'course-time-ended-v14';
+  if (status === 'unattended') return 'course-time-unattended-v14';
   if (status === 'done') return 'course-time-done-v14';
+  if (status === 'ended') return 'course-time-ended-v14';
   return '';
 }
 
 // ===================== 状态 → 卡片整体透明度 =====================
-// 设计稿中 done/ended 的 opacity 作用在整张卡片上
+// 用户口径（2026-08-23）：done 卡片加强可见（不再 opacity-85 灰显）；
+// unattended 醒目提醒色，不透明；ended/cancelled 保持淡化
 function getCardOpacity(status: CourseStatus): string {
-  if (status === 'done') return 'opacity-85';
   if (status === 'ended') return 'opacity-75';
   return '';
 }
@@ -80,6 +86,7 @@ function getCardOpacity(status: CourseStatus): string {
 // ===================== 状态 → 课程名颜色 =====================
 function getNameClass(status: CourseStatus): string {
   if (status === 'done') return 'course-name-done';
+  if (status === 'unattended') return 'course-name-unattended';
   if (status === 'ended') return 'course-name-ended';
   return 'course-name-active';
 }
@@ -163,6 +170,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
           const progressPercent = total > 0 ? Math.round((checked / total) * 100) : 0;
           const isEnded = status === 'ended';
           const isDone = status === 'done';
+          const isUnattended = status === 'unattended';
 
           return (
             <View
@@ -241,6 +249,11 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                         {displayName}
                       </Text>
                       {/* 状态标签 - 对齐设计稿 px-1.5=6rpx py-0.5=2rpx text-[10px]=20rpx */}
+                      {isUnattended && (
+                        <View className="course-tag-unattended rounded px-[6rpx] py-[2rpx]">
+                          <Text className="text-[20rpx] font-medium">未点名</Text>
+                        </View>
+                      )}
                       {isDone && (
                         <View className="course-tag-done rounded px-[6rpx] py-[2rpx]">
                           <Text className="text-[20rpx] font-medium">已完成</Text>
@@ -251,13 +264,13 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                           <Text className="text-[20rpx] font-medium">已下课</Text>
                         </View>
                       )}
-                      {/* 非done/ended状态显示约课标签 */}
-                      {!isDone && !isEnded && item.tag && (
+                      {/* 非 done/ended/unattended 状态显示约课标签 */}
+                      {!isDone && !isEnded && !isUnattended && item.tag && (
                         <View className="course-tag-booking rounded px-[6rpx] py-[2rpx]">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
                       )}
-                      {/* ended状态也显示约课标签但半透明 */}
+                      {/* ended 状态也显示约课标签但半透明 */}
                       {isEnded && item.tag && (
                         <View className="course-tag-booking rounded px-[6rpx] py-[2rpx] opacity-70">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
@@ -279,7 +292,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                       )}
                     </View>
 
-                    {/* 点名进度 - ended状态用灰色文字 */}
+                    {/* 点名进度 - ended 状态用灰色文字 */}
                     <View className="flex items-center gap-[16rpx] mt-[16rpx]">
                       <Text
                         className={cn(
@@ -293,9 +306,11 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                             'font-semibold',
                             isDone
                               ? 'course-checkin-done'
-                              : isEnded
-                                ? 'course-checkin-ended'
-                                : 'course-checkin-active',
+                              : isUnattended
+                                ? 'course-checkin-unattended'
+                                : isEnded
+                                  ? 'course-checkin-ended'
+                                  : 'course-checkin-active',
                           )}
                         >
                           {checked}/{total}

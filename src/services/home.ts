@@ -372,7 +372,9 @@ function getScheduleStatus(
   const endMinutes = getMinutesOfDay(schedule.endTime);
 
   if (currentMinutes > endMinutes) {
-    return checkedCount > 0 || totalCount === 0 ? 'done' : 'ended';
+    // 已下课：有学生但未点名 → 未点名提醒（用户口径 2026-08-23：禁止查看，须先点名）
+    if (totalCount > 0 && checkedCount === 0) return 'unattended';
+    return checkedCount > 0 ? 'done' : 'done';
   }
   if (currentMinutes >= startMinutes) {
     return checkedCount > 0 ? 'active' : 'urgent';
@@ -426,7 +428,9 @@ function mapBackendScheduleStatus(
   const endMinutes = getMinutesOfDay(endTime);
 
   if (currentMinutes > endMinutes) {
-    return 'ended';
+    // 后端接口已结束状态由后端决定（点名信息在 record），前端无法区分 done/unattended，
+    // 默认按已结束展示 done，避免误判；具体是否点名由详情接口返回
+    return 'done';
   }
 
   if (currentMinutes >= startMinutes) {
