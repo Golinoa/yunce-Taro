@@ -2863,6 +2863,31 @@ export const SCHEDULES: Schedule[] = [
     room: '美术教室1',
     status: 'scheduled',
   },
+  // 演示排课（用户口径 2026-08-23）：今天 11:00 一条未点名、一条点过名，用于验证卡片三形态
+  {
+    id: 'sch-demo-unattended',
+    classId: 'cls-010',
+    color: 'teal',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 7,
+    startTime: '11:00',
+    endTime: '12:30',
+    room: '国画教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo-done',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 7,
+    startTime: '11:00',
+    endTime: '12:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
 ];
 
 /** 获取所有已排课的班级 id 集合（用于课程管理·班课列表区分"已/未排课"） */
@@ -3272,11 +3297,14 @@ export const LESSON_RECORDS = [
     (s) => s.dayOfWeek === weekday && s.status === 'scheduled' && s.classId,
   );
   if (todaySchedules.length === 0) return;
-  const todayRecords = LESSON_RECORDS.filter(
-    (r) => r.classId && r.date === todayStr && r.status !== 'cancelled',
-  );
-  if (todayRecords.length > 0) return; // 已有今日记录（如提前点名），不重复生成
   for (const schedule of todaySchedules) {
+    // 用户口径（2026-08-23）：cls-010（sch-demo-unattended 演示未点名）不补记录，
+    // 保持今日未点名状态；其余班级若当天尚无记录则补一批点名记录（签到/未到/请假）。
+    if (schedule.classId === 'cls-010') continue;
+    const hasRecord = LESSON_RECORDS.some(
+      (r) => r.classId === schedule.classId && r.date === todayStr && r.status !== 'cancelled',
+    );
+    if (hasRecord) continue;
     const students = STUDENTS.filter((stu) => stu.classIds?.includes(schedule.classId));
     students.forEach((stu, idx) => {
       // 演示分布：前两名未到/请假，其余签到（已点名，用于展示 done 卡片明细）

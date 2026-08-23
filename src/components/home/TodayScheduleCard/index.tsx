@@ -341,9 +341,8 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                     )}
                   </View>
 
-                  {/* 操作按钮 - 对齐设计稿 px-4=32rpx py-1.5=12rpx text-[12px]=24rpx
-                      用户口径（2026-08-23）：按钮列垂直居中，避免按钮贴顶靠上 */}
-                  <View className="shrink-0 flex flex-col items-end justify-center gap-[8rpx]">
+                  {/* 操作按钮 - 用户口径（2026-08-23）：按钮贴右下角，底部间距与右侧一致（内容区 py 24rpx） */}
+                  <View className="shrink-0 self-stretch flex flex-col items-end justify-end gap-[8rpx]">
                     {status === 'urgent' && getCountdownText(item.start_time) && (
                       <Text className="text-[20rpx] course-urgent-hint font-medium">
                         {getCountdownText(item.start_time)}
