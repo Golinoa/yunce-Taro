@@ -29,6 +29,12 @@ function delay(ms = 100): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** HH:mm → 当天分钟数（endTime 可超 1440，如 '24:30' = 1470，表示跨 0 点） */
+function getMinutesOfDay(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
 // 获取今日日期字符串（提前声明，避免使用前未定义）
 const todayStr = `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}-${String(CUR_DAY).padStart(2, '0')}`;
 
@@ -57,6 +63,10 @@ export interface TodoItemData {
   time: string;
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
+  /** checkin 待办专属：未点名排课的课节/班级/日期，用于跳转 lesson-form 补点名页 */
+  scheduleId?: string;
+  classId?: string;
+  lessonDate?: string;
 }
 
 export interface RecentGroupData {
@@ -380,14 +390,28 @@ export async function mockGetStudents(teacherId: string, limit?: number) {
   return students;
 }
 
-/** 获取今日排课 */
+/** 获取今日排课（含昨日跨 0 点未完全下课的排课，用户口径 2026-08-24） */
 export async function mockGetTodaySchedules(teacherId: string, campusId?: string) {
   await delay();
-  const todayWeekday = new Date().getDay() || 7; // 周日是0，转为7
-  let schedules = filterSchedulesByActor(teacherId).filter(
-    (schedule) => schedule.dayOfWeek === todayWeekday && schedule.status === 'scheduled',
-  );
-  if (campusId) {
+  const now = new Date();
+  const todayWeekday = now.getDay() || 7; // 周日是0，转为7
+  const yesterdayWeekday = todayWeekday === 1 ? 7 : todayWeekday - 1;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let schedules = filterSchedulesByActor(teacherId).filter((schedule) => {
+    if (schedule.status !== 'scheduled') return false;
+    if (schedule.dayOfWeek === todayWeekday) return true;
+    // 昨日跨 0 点排课（endTime 超过 24:00，如 23:30-24:30）：次日未完全下课前继续显示
+    if (schedule.dayOfWeek === yesterdayWeekday) {
+      const endMinutes = getMinutesOfDay(schedule.endTime);
+      if (endMinutes > 1440 && nowMinutes < endMinutes - 1440) {
+        return true;
+      }
+    }
+    return false;
+  });
+  // 机构创建者/跨校区管理者（accessScope=org）应看到全部校区课程（用户口径 2026-08-24），不做校区过滤
+  const scope = getActorScope(teacherId);
+  if (campusId && scope.accessScope !== 'org') {
     schedules = schedules.filter((schedule) => schedule.campusId === campusId);
   }
   return schedules;
@@ -554,6 +578,11 @@ export async function mockGetTodoItems(
         if (s.dayOfWeek !== yesterdayWeekday || s.status === 'cancelled' || !s.classId) {
           return false;
         }
+        // 跨 0 点排课（endTime > 24:00，如 23:30-24:30）：实际下课在「今天」凌晨，
+        // 昨天只是开始上课 → 不属于「昨日未点名」，由今日课表承担（今日课表按开始/结束任一天在今天展示）
+        if (getMinutesOfDay(s.endTime) > 1440) {
+          return false;
+        }
         const cls = CLASSES.find((c) => c.id === s.classId);
         if (!cls || !cls.studentCount) return false;
         const hasRecord = LESSON_RECORDS.some(
@@ -573,6 +602,9 @@ export async function mockGetTodoItems(
         time: '待补点名',
         priority: 'high' as const,
         completed: false,
+        scheduleId: unattended.id,
+        classId: unattended.classId,
+        lessonDate: yesterdayStr,
       };
     })(),
   ].filter(Boolean) as TodoItemData[];

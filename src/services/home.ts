@@ -209,7 +209,18 @@ const TODO_CONFIG_MAP: Record<
 };
 
 function getTodayDateString(): string {
-  return new Date().toISOString().split('T')[0];
+  // 必须与 mock 数据约定一致：mock 的 LESSON_RECORDS 日期用「本地日期」生成
+  // （mock-database 的 NOW/CUR_DAY 均为本地时区）。此前用 toISOString()（UTC），
+  // 在 GMT+8 环境下本地日期比 UTC 早一天，导致：
+  //   - 当天点名记录匹配不上 → attendedCount=0 → 已下课班级被错判为「未点名(unattended)」，
+  //     「已完成(done)」卡片消失；
+  //   - 本地「昨天」的记录被当成「今天」，污染当日点名统计。
+  // 改用本地日期，保证首页今日课表状态判定与 mock 数据自洽。
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function formatRecentDateLabel(date: string): string {
@@ -252,13 +263,22 @@ function mapTodoItem(item: TodoItemData): HomeTodoItem {
               ? `${item.time}，点击进入补点名`
               : `${item.time} 查看安排`;
 
+  // checkin 待办：直接跳到 lesson-form 补点名页（与课表页班课卡片一致）
+  const url =
+    item.type === 'checkin' && item.scheduleId
+      ? `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.scheduleId)}` +
+        `&classId=${encodeURIComponent(item.classId || '')}` +
+        `&lessonDate=${encodeURIComponent(item.lessonDate || '')}` +
+        `&hasTrialStudent=0`
+      : config.url;
+
   return {
     id: item.id,
     title: item.title,
     desc,
     icon: config.icon,
     iconBg: config.iconBg,
-    url: config.url,
+    url,
   };
 }
 
@@ -378,6 +398,18 @@ function getScheduleStatus(
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const startMinutes = getMinutesOfDay(schedule.startTime);
   const endMinutes = getMinutesOfDay(schedule.endTime);
+
+  // 跨 0 点排课（endTime 超过 24:00，如 23:30-24:30）：
+  // 次日凌晨（当前时间早于开始时间，说明课从昨天开始），实际下课时间 = endMinutes - 1440
+  if (endMinutes > 1440 && currentMinutes < startMinutes) {
+    const realEndMinutes = endMinutes - 1440;
+    if (currentMinutes < realEndMinutes) {
+      // 次日 00:00 ~ 实际下课：课从昨天开始，仍在进行
+      return attendedCount > 0 ? 'active' : 'urgent';
+    }
+    // 次日实际下课后（今日课表已过滤）或排课当天课前：按未上课处理
+    return startMinutes - currentMinutes <= 5 ? 'urgent' : 'upcoming';
+  }
 
   if (currentMinutes > endMinutes) {
     // 已下课：有学生但未点名 → 未点名提醒（用户口径 2026-08-23：禁止查看，须先点名）

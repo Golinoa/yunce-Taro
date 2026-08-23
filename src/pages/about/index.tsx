@@ -145,13 +145,17 @@ const About: React.FC = () => {
               <View className="w-[72rpx] h-[72rpx] rounded-full bg-white center shadow-soft">
                 <Text className="text-[34rpx] font-black text-primary">SG</Text>
               </View>
-              <Text className="text-[40rpx] font-black text-white tracking-wide">{BRAND_NAME_ZH}</Text>
+              <Text className="text-[40rpx] font-black text-white tracking-wide">
+                {BRAND_NAME_ZH}
+              </Text>
             </View>
 
             {/* 安全保障标签 */}
             <View className="flex items-center justify-center mb-[20rpx]">
               <View className="px-[16rpx] h-[40rpx] rounded-full bg-white/15 center">
-                <Text className="text-[22rpx] font-medium text-white/90">端到端加密 · 数据安全</Text>
+                <Text className="text-[22rpx] font-medium text-white/90">
+                  端到端加密 · 数据安全
+                </Text>
               </View>
             </View>
 
@@ -182,7 +186,9 @@ const About: React.FC = () => {
           <View className="bg-card rounded-[28rpx] shadow-card px-[24rpx] py-[32rpx] grid grid-cols-2 gap-y-[32rpx]">
             {STATS.map((item) => (
               <View key={item.label} className="center-col">
-                <Text className="text-[34rpx] font-black text-primary leading-none">{item.value}</Text>
+                <Text className="text-[34rpx] font-black text-primary leading-none">
+                  {item.value}
+                </Text>
                 <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] text-center leading-tight">
                   {item.label}
                 </Text>
@@ -208,7 +214,9 @@ const About: React.FC = () => {
                     <Icon name={item.icon} size={32} color="destructive" />
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-[28rpx] font-semibold text-foreground block">{item.title}</Text>
+                    <Text className="text-[28rpx] font-semibold text-foreground block">
+                      {item.title}
+                    </Text>
                     <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] leading-relaxed block">
                       {item.desc}
                     </Text>
@@ -246,10 +254,7 @@ const About: React.FC = () => {
             {/* 支撑点 2x2 */}
             <View className="grid grid-cols-2 gap-[24rpx]">
               {SECURITY_POINTS.map((item) => (
-                <View
-                  key={item.title}
-                  className="bg-card rounded-[24rpx] p-[32rpx] shadow-card"
-                >
+                <View key={item.title} className="bg-card rounded-[24rpx] p-[32rpx] shadow-card">
                   <View className="w-[68rpx] h-[68rpx] rounded-[20rpx] bg-primary-10 center mb-[20rpx]">
                     <Icon name={item.icon} size={34} color="primary" />
                   </View>
@@ -267,10 +272,7 @@ const About: React.FC = () => {
             <SectionHeader eyebrow="核心能力" title="一套系统，覆盖经营全流程" />
             <View className="grid grid-cols-2 gap-[24rpx]">
               {FEATURES.map((item) => (
-                <View
-                  key={item.title}
-                  className="bg-card rounded-[24rpx] p-[32rpx] shadow-card"
-                >
+                <View key={item.title} className="bg-card rounded-[24rpx] p-[32rpx] shadow-card">
                   <View className="w-[68rpx] h-[68rpx] rounded-[20rpx] bg-primary-10 center mb-[20rpx]">
                     <Icon name={item.icon} size={34} color="primary" />
                   </View>
@@ -288,10 +290,7 @@ const About: React.FC = () => {
             <SectionHeader eyebrow="为什么选择我们" title="为什么机构选择松果排课" />
             <View className="grid grid-cols-2 gap-[24rpx]">
               {WHY_CHOOSE.map((item) => (
-                <View
-                  key={item.title}
-                  className="bg-card rounded-[24rpx] p-[32rpx] shadow-card"
-                >
+                <View key={item.title} className="bg-card rounded-[24rpx] p-[32rpx] shadow-card">
                   <View className="w-[68rpx] h-[68rpx] rounded-[20rpx] bg-primary-10 center mb-[20rpx]">
                     <Icon name={item.icon} size={34} color="primary" />
                   </View>
@@ -320,7 +319,9 @@ const About: React.FC = () => {
                     {item.step}
                   </Text>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-[28rpx] font-semibold text-foreground block">{item.title}</Text>
+                    <Text className="text-[28rpx] font-semibold text-foreground block">
+                      {item.title}
+                    </Text>
                     <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] leading-relaxed block">
                       {item.desc}
                     </Text>

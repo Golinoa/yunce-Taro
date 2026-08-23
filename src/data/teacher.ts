@@ -750,7 +750,7 @@ interface MonthStore {
  * - 当前月 → 唯一可写源 `_teachers`
  * - 其它月 → 持久化的 `monthlyTeachers[month]`（首次访问由 genMonthSnapshot 种子，之后读写同一份，跨月不再静态重置）
  */
-function useMonthStore(month?: string): MonthStore {
+function getMonthStore(month?: string): MonthStore {
   const key = month && month !== currentMonthKey() ? month : currentMonthKey();
   if (key === currentMonthKey()) {
     return {
@@ -878,7 +878,7 @@ export async function mockGetTeachers(
     return [];
   }
 
-  let teachers = month && month !== currentMonthKey ? useMonthStore(month).get() : [..._teachers];
+  let teachers = month && month !== currentMonthKey ? getMonthStore(month).get() : [..._teachers];
   if (campusId) {
     teachers = teachers.filter((t) => t.campusIds?.includes(campusId));
   }
@@ -942,7 +942,7 @@ export async function mockAddTeacher(
     salaryRule,
     salaryTemplateId,
   };
-  const store = useMonthStore(month);
+  const store = getMonthStore(month);
   store.set([...store.get(), newTeacher]);
   if (store.isCurrent) syncUnifiedTeachers(); // 新增教师同步到统一教师视图（班级/排课/统计立即可见）
   return newTeacher;
@@ -955,7 +955,7 @@ export async function mockUpdateTeacher(
   month?: string,
 ): Promise<TeacherUIModel | null> {
   await delay(200);
-  const store = useMonthStore(month);
+  const store = getMonthStore(month);
   let arr = store.get();
   const idx = arr.findIndex((t) => t.id === id);
   if (idx === -1) return null;
@@ -975,7 +975,7 @@ export async function mockUpdateTeacher(
 /** 确认薪资 */
 export async function mockConfirmSalary(id: string, month?: string): Promise<boolean> {
   await delay(150);
-  const store = useMonthStore(month);
+  const store = getMonthStore(month);
   const arr = store.get();
   const idx = arr.findIndex((t) => t.id === id);
   if (idx === -1) return false;
@@ -989,7 +989,7 @@ export async function mockConfirmSalary(id: string, month?: string): Promise<boo
 /** 批量确认薪资 */
 export async function mockBatchConfirm(ids: string[], month?: string): Promise<boolean> {
   await delay(200);
-  const store = useMonthStore(month);
+  const store = getMonthStore(month);
   store.set(
     store.get().map((t) => {
       const status = normalizeSalaryStatus(t.salaryStatus);
@@ -1040,7 +1040,7 @@ export async function mockExecutePay(
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const monthKey = month ?? `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}`;
   const finalPayMethod = (payMethod || 'other') as PayMethod;
-  const store = useMonthStore(month);
+  const store = getMonthStore(month);
   store.set(
     store.get().map((t) => {
       const status = normalizeSalaryStatus(t.salaryStatus);
@@ -1082,7 +1082,7 @@ export async function mockSendSalarySlip(
 ): Promise<SendResult> {
   await delay(300);
   const result: SendResult = { success: [], failed: [] };
-  const store = useMonthStore(month);
+  const store = getMonthStore(month);
   store.set(
     store.get().map((t) => {
       const status = normalizeSalaryStatus(t.salaryStatus);

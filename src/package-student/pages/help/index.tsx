@@ -95,7 +95,9 @@ const Help: React.FC = () => {
             <View className="w-[96rpx] h-[96rpx] rounded-[28rpx] bg-primary/10 center">
               <Icon name="mdi-help-circle-outline" size={48} color="primary" />
             </View>
-            <Text className="mt-[24rpx] text-[30rpx] font-bold text-foreground">帮助内容整理中</Text>
+            <Text className="mt-[24rpx] text-[30rpx] font-bold text-foreground">
+              帮助内容整理中
+            </Text>
             <Text className="mt-[12rpx] text-[26rpx] text-muted-foreground leading-relaxed text-center">
               家长端使用帮助正在努力编写，{'\n'}敬请期待更详细的图文指引。
             </Text>
@@ -150,7 +152,9 @@ const Help: React.FC = () => {
             </Text>
             <Icon name="mdi-content-copy" size={32} color="primary" />
           </View>
-          <Text className="mt-[20rpx] text-[22rpx] text-muted-foreground">点击上方微信号即可复制</Text>
+          <Text className="mt-[20rpx] text-[22rpx] text-muted-foreground">
+            点击上方微信号即可复制
+          </Text>
         </View>
       </Dialog>
     </View>

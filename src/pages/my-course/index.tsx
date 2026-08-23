@@ -67,9 +67,7 @@ function formatCourseTime(date: string, startTime: string, endTime: string): str
 const MyCourse: React.FC = () => {
   usePrimaryNavigationBar();
 
-  const [activeTab, setActiveTab] = useState<MyCourseStatus>(
-    () => readTabFromRouter() ?? 'booked'
-  );
+  const [activeTab, setActiveTab] = useState<MyCourseStatus>(() => readTabFromRouter() ?? 'booked');
   const [list, setList] = useState<MyCourseItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -232,7 +230,12 @@ const MyCourse: React.FC = () => {
   );
 
   return (
-    <View className={cn('min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]', themeClass)}>
+    <View
+      className={cn(
+        'min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]',
+        themeClass,
+      )}
+    >
       {/* ====== 顶部 Tab ====== */}
       <View className="sticky top-0 z-50 bg-card border-b border-border px-[32rpx] pt-[12rpx] pb-[16rpx]">
         <SegmentedControl

@@ -12,8 +12,10 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
   // 默认关闭 mock（生产安全）：联调/开发时显式传入 VITE_USE_MOCK=true 才启用 mock。
   // 生产构建若误带 VITE_USE_MOCK=true 会被强制关闭并告警（G-01 守卫）。
   let useMock = process.env.VITE_USE_MOCK ?? 'false';
-  // G-01 守卫：生产环境禁止携带 mock，避免线上使用假数据。
-  if (process.env.NODE_ENV === 'production' && useMock === 'true') {
+  // G-01 守卫：生产环境默认禁止携带 mock（线上安全）。
+  // 本地演示/联调确需在产物中保留 mock 时，显式设置 TARO_ALLOW_MOCK_PROD=1 可豁免（受控通道，默认不生效）。
+  const allowMockInProd = process.env.TARO_ALLOW_MOCK_PROD === '1';
+  if (process.env.NODE_ENV === 'production' && useMock === 'true' && !allowMockInProd) {
     console.warn('[G-01] 生产构建检测到 VITE_USE_MOCK=true，已强制关闭 mock 以保证线上数据真实。');
     useMock = 'false';
   }

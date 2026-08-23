@@ -1052,7 +1052,7 @@ export const CLASSES: Class[] = [
     categoryId: 'cat-class',
     type: 'limited',
     schedule: '周日 18:00-19:30',
-    weekdays: [7],
+    weekdays: [1, 7],
     startTime: '18:00',
     endTime: '19:30',
     totalLessons: 24,
@@ -2717,6 +2717,175 @@ export interface Schedule {
 }
 
 export const SCHEDULES: Schedule[] = [
+  // 每日已下课排课（与 LESSON_RECORDS 静态补记录保持数据一致：cls-009 00:00-00:30 全员已点名 → done，cls-demo2 00:30-01:00 无记录 → unattended）
+  {
+    id: 'sch-009-done-1',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 1,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-1',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 1,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-009-done-2',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 2,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-2',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 2,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-009-done-3',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 3,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-3',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 3,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-009-done-4',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 4,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-4',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 4,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-009-done-5',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 5,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-5',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 5,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-009-done-6',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 6,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-6',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 6,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-009-done-7',
+    classId: 'cls-009',
+    color: 'info',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 7,
+    startTime: '00:00',
+    endTime: '00:30',
+    room: '书法教室1',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-demo2-unattended-7',
+    classId: 'cls-demo2',
+    color: 'purple',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    dayOfWeek: 7,
+    startTime: '00:30',
+    endTime: '01:00',
+    room: '水彩教室1',
+    status: 'scheduled',
+  },
   {
     id: 'sch-001',
     classId: 'cls-001',
@@ -2909,92 +3078,6 @@ export const SCHEDULES: Schedule[] = [
     room: '美术教室1',
     status: 'scheduled',
   },
-  // 演示排课（用户口径 2026-08-23）：三形态并存 + 多卡片验证——
-  // done（已下课+补记录）/ unattended（已下课+无记录，cls-demo/cls-demo2 跳过）/ upcoming（未到）
-  {
-    id: 'sch-demo-done2',
-    classId: 'cls-009',
-    color: 'info',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '12:00',
-    endTime: '13:00',
-    room: '书法教室1',
-    status: 'scheduled',
-  },
-  {
-    id: 'sch-demo-unattended2',
-    classId: 'cls-demo',
-    color: 'primary',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '14:00',
-    endTime: '15:00',
-    room: '素描教室1',
-    status: 'scheduled',
-  },
-  {
-    id: 'sch-demo-done3',
-    classId: 'cls-010',
-    color: 'teal',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '15:00',
-    endTime: '16:00',
-    room: '国画教室1',
-    status: 'scheduled',
-  },
-  {
-    id: 'sch-demo-done',
-    classId: 'cls-009',
-    color: 'info',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '16:00',
-    endTime: '17:30',
-    room: '书法教室1',
-    status: 'scheduled',
-  },
-  {
-    id: 'sch-demo-unattended',
-    classId: 'cls-demo2',
-    color: 'purple',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '18:00',
-    endTime: '19:30',
-    room: '水彩教室1',
-    status: 'scheduled',
-  },
-  {
-    id: 'sch-demo-unattended3',
-    classId: 'cls-demo',
-    color: 'primary',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '20:00',
-    endTime: '21:00',
-    room: '素描教室1',
-    status: 'scheduled',
-  },
-  {
-    id: 'sch-demo-upcoming',
-    classId: 'cls-demo',
-    color: 'primary',
-    teacherId: 'teacher-004',
-    campusId: 'campus-west',
-    dayOfWeek: 7,
-    startTime: '23:00',
-    endTime: '24:00',
-    room: '素描教室1',
-    status: 'scheduled',
-  },
 ];
 
 /** 获取所有已排课的班级 id 集合（用于课程管理·班课列表区分"已/未排课"） */
@@ -3076,15 +3159,19 @@ function generateLessonRecords(): LessonRecord[] {
         60
       : 1.5;
 
-  for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
+  // 近 6 个月为主生成区间（从近到远）；更早月份仅在仍有课包预算待扣时补充（对账自洽 + 减少 mock 数据量）
+  for (let monthOffset = 0; monthOffset <= 11; monthOffset++) {
+    if (monthOffset > 5 && !Array.from(budgetByStudent.values()).some((budget) => budget > 0)) {
+      break;
+    }
     const year = CUR_MONTH - monthOffset <= 0 ? CUR_YEAR - 1 : CUR_YEAR;
     const month =
       CUR_MONTH - monthOffset <= 0 ? CUR_MONTH - monthOffset + 12 : CUR_MONTH - monthOffset;
     const daysInMonth = new Date(year, month, 0).getDate();
 
     for (let day = 1; day <= daysInMonth; day++) {
-      // 跳过2026-06-22之后的日期
-      if (year === CUR_YEAR && month === CUR_MONTH && day > CUR_DAY) continue;
+      // 只生成到昨天：今天/未来由演示补点名逻辑（generateTodayDemoRecords）控制，避免随机历史记录污染今日课表形态
+      if (year === CUR_YEAR && month === CUR_MONTH && day >= CUR_DAY) continue;
 
       const weekday = new Date(year, month - 1, day).getDay() || 7;
       if (weekday === 7) continue; // 周日休息
@@ -3138,7 +3225,10 @@ function generateLessonRecords(): LessonRecord[] {
 }
 
 function createSamplePersonalLessonRecord(): LessonRecord {
-  const sampleDate = `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}-${String(CUR_DAY).padStart(2, '0')}`;
+  // 示例日期用「昨天」（避免固定预览记录落在今天，干扰今日课表点名状态）
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const sampleDate = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
   return {
     id: 'lr-personal-sample-001',
@@ -3159,7 +3249,10 @@ function createSamplePersonalLessonRecord(): LessonRecord {
 }
 
 function createLessonCardPreviewRecords(): LessonRecord[] {
-  const sampleDate = `${CUR_YEAR}-${String(CUR_MONTH).padStart(2, '0')}-${String(CUR_DAY).padStart(2, '0')}`;
+  // 示例日期用「昨天」（避免固定预览记录落在今天，干扰今日课表点名状态）
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const sampleDate = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
   return [
     {
@@ -3279,10 +3372,11 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
 }
 
 function createLessonSupplementPreviewRecords(): LessonRecord[] {
-  // P5（2026-08-22）：示例日期动态靠拢最近的非周日，避免固定 6/28 逐渐过时
+  // 示例日期用「昨天（非周日）」，避免落在今天干扰今日课表点名状态
   const supplementDate = (() => {
     const d = new Date();
-    while (d.getDay() === 0) d.setDate(d.getDate() - 1); // 周日往前推
+    d.setDate(d.getDate() - 1);
+    while (d.getDay() === 0) d.setDate(d.getDate() - 1); // 昨天是周日则再往前推
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
       d.getDate(),
     ).padStart(2, '0')}`;
@@ -3392,43 +3486,34 @@ export const LESSON_RECORDS = [
   createSamplePersonalLessonRecord(),
 ];
 
-// ===== 今日演示点名记录（用户口径 2026-08-23）=====
-// mock 历史记录只生成到昨天，今天没有点名记录会导致今日课表全部显示"未点名"。
-// 此处为今天有排课的班级动态补一批点名记录（签到/未到/请假），便于验证卡片三形态。
-(function generateTodayDemoRecords() {
+// ===== 每日 cls-009 已下课排课的全员点名记录 =====
+// 与 SCHEDULES 中 sch-009-done-{1..7}（每天 00:00-00:30）一一对应：本周 7 天为 cls-009 全员补已点名记录，
+// 保证数据自洽（点过名 → done 卡片成立）；cls-demo2 不补（unattended 卡片成立）。
+(function appendCls009DailyAttendanceRecords() {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
-  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const weekday = now.getDay() || 7;
-  const todaySchedules = SCHEDULES.filter(
-    (s) => s.dayOfWeek === weekday && s.status === 'scheduled' && s.classId,
-  );
-  if (todaySchedules.length === 0) return;
-  for (const schedule of todaySchedules) {
-    // 用户口径（2026-08-23）：cls-demo / cls-demo2（演示未上课与下课未点名）不补记录，
-    // 保持当天无点名记录；其余班级若当天尚无记录则补一批点名记录（签到/未到/请假）。
-    if (schedule.classId === 'cls-demo' || schedule.classId === 'cls-demo2') continue;
-    const hasRecord = LESSON_RECORDS.some(
-      (r) => r.classId === schedule.classId && r.date === todayStr && r.status !== 'cancelled',
-    );
-    if (hasRecord) continue;
-    const students = STUDENTS.filter((stu) => stu.classIds?.includes(schedule.classId));
-    students.forEach((stu, idx) => {
-      // 演示分布：前两名未到/请假，其余签到（已点名，用于展示 done 卡片明细）
-      const status: 'checked' | 'absent' | 'leave' =
-        idx === 0 ? 'absent' : idx === 1 ? 'leave' : 'checked';
+  // 本周一
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() || 7) - 1));
+  const students = STUDENTS.filter((s) => s.classIds?.includes('cls-009'));
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    students.forEach((stu) => {
       LESSON_RECORDS.push({
-        id: `today-demo-${schedule.id}-${stu.id}`,
+        id: `lr-cls009-${dateStr}-${stu.id}`,
         studentId: stu.id,
-        teacherId: schedule.teacherId,
-        classId: schedule.classId,
-        campusId: schedule.campusId,
-        date: todayStr,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        hours: 1,
-        status,
-        createdAt: now.toISOString(),
+        teacherId: 'teacher-004',
+        classId: 'cls-009',
+        campusId: 'campus-west',
+        date: dateStr,
+        startTime: '00:00',
+        endTime: '00:30',
+        hours: 0.5,
+        status: 'checked',
+        checkinTime: '00:00:00',
+        createdAt: `${dateStr}T00:00:00Z`,
       });
     });
   }

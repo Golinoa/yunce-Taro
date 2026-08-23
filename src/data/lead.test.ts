@@ -15,9 +15,9 @@ describe('线索归属锁定守卫（L-14）', () => {
     );
     lead.owner_lock_status = 'locked';
 
-    await expect(
-      mockUpdateLead(lead.id, { owner_teacher_id: 'teacher_other_9' }),
-    ).rejects.toThrow(/锁定/);
+    await expect(mockUpdateLead(lead.id, { owner_teacher_id: 'teacher_other_9' })).rejects.toThrow(
+      /锁定/,
+    );
   });
 
   it('锁定态下带 forceReassign 仍可改派', async () => {
@@ -42,9 +42,7 @@ describe('线索归属锁定守卫（L-14）', () => {
     );
     lead.owner_lock_status = 'locked';
 
-    await expect(
-      mockReassignLead(lead.id, 'teacher_other_9', '家长指定'),
-    ).rejects.toThrow(/锁定/);
+    await expect(mockReassignLead(lead.id, 'teacher_other_9', '家长指定')).rejects.toThrow(/锁定/);
 
     const ok = await mockReassignLead(lead.id, 'teacher_other_9', '家长指定', {
       forceReassign: true,

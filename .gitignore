@@ -38,6 +38,7 @@ _ow.txt
 _rt2.txt
 _*.log
 build-*.log
+build_log*.txt
 
 # Cleanup archive (history moved out of project, kept locally for recovery)
 _archive/

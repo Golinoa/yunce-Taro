@@ -78,6 +78,8 @@ function getWeekday(dateStr: string): string {
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 const LESSON_EDIT_RESULT_KEY = 'yunce:lesson-form:edit-result';
 const FORM_CARD_CLASS_NAME = 'mx-[24rpx] mb-3 overflow-hidden rounded-[20rpx] bg-white shadow-soft';
+/** 已点名班级可修改的时间窗口（小时）：下课 24 小时内可修改，超时只能查看 */
+const LESSON_MODIFY_WINDOW_HOURS = 24;
 
 /** 签到状态：签到/请假/未到 */
 type CheckinStatus = 'checked' | 'leave' | 'absent';
@@ -121,6 +123,7 @@ const CheckinCard: React.FC<{
   remaining?: string;
   deduct?: string;
   isTrial?: boolean;
+  disabled?: boolean;
   onToggleStatus: (next: CheckinStatus) => void;
   onOpenDetailSheet: () => void;
 }> = ({
@@ -129,6 +132,7 @@ const CheckinCard: React.FC<{
   remaining = '',
   deduct = '',
   isTrial = false,
+  disabled = false,
   onToggleStatus,
   onOpenDetailSheet,
 }) => {
@@ -146,7 +150,9 @@ const CheckinCard: React.FC<{
   const rightActiveBg = status === 'leave' ? 'bg-destructive' : 'bg-warning';
 
   return (
-    <View className="relative flex flex-col items-center rounded-[20rpx] bg-white px-[16rpx] py-[20rpx] shadow-card">
+    <View
+      className={`relative flex flex-col items-center rounded-[20rpx] bg-white px-[16rpx] py-[20rpx] shadow-card ${disabled ? 'opacity-60' : ''}`}
+    >
       {isTrial ? (
         <View className="absolute left-0 top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-error/10 px-[12rpx] py-[4rpx]">
           <Text className="text-[18rpx] font-medium text-error">试听</Text>
@@ -154,7 +160,7 @@ const CheckinCard: React.FC<{
       ) : null}
       <View
         className="absolute right-[6rpx] top-[6rpx] flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-muted/40 active:opacity-70"
-        onClick={onOpenDetailSheet}
+        onClick={disabled ? undefined : onOpenDetailSheet}
       >
         <Icon name="mdi-square-edit-outline" size="md" color="primary" />
       </View>
@@ -178,11 +184,13 @@ const CheckinCard: React.FC<{
         <CheckinOptionButton
           status="checked"
           current={status}
-          onClick={() => onToggleStatus('checked')}
+          onClick={() => {
+            if (!disabled) onToggleStatus('checked');
+          }}
         />
         <View
           className={`flex h-[52rpx] flex-1 items-center justify-center rounded-full border ${rightActive ? `${rightActiveBg} border-transparent` : 'border-border bg-muted/30'}`}
-          onClick={handleRightButtonClick}
+          onClick={disabled ? undefined : handleRightButtonClick}
         >
           <Text
             className={`text-center text-[22rpx] font-medium ${rightActive ? 'text-white' : 'text-muted-foreground'}`}
@@ -421,6 +429,14 @@ const LessonForm: React.FC = () => {
   const [pendingAddStudentIds, setPendingAddStudentIds] = useState<Set<string>>(new Set());
   const [addStudentKeyword, setAddStudentKeyword] = useState('');
 
+  // ===== 已点名 / 查看 / 修改模式（班级模式） =====
+  /** 该班级该日期已存在的点名/消课记录 */
+  const [existingClassRecords, setExistingClassRecords] = useState<LessonRecord[]>([]);
+  /** 是否已点名（存在落库记录） */
+  const [isAlreadyChecked, setIsAlreadyChecked] = useState(false);
+  /** 查看模式：已点名且未点击「修改」（学员卡片不可编辑） */
+  const [viewMode, setViewMode] = useState(false);
+
   // ===== 试听学员状态（团课约试听） =====
   const [trialBookings, setTrialBookings] = useState<LeadBooking[]>([]);
   /** 试听学员签到状态映射：bookingId → CheckinStatus */
@@ -624,10 +640,37 @@ const LessonForm: React.FC = () => {
         }
       });
       setTrialLeadMap(nextLeadMap);
-      // 试听学员默认全部"未到"
+      // 回填试听学员已有点名记录；无记录默认"未到"
+      const trialStudentIds = new Set(classBookings.map((b) => b.trial_student_id));
+      let trialExisting: LessonRecord[] = [];
+      try {
+        trialExisting = await lessonRecordService.getByTeacherAndRange(
+          attendanceRecordActorId,
+          lessonDate,
+          lessonDate,
+        );
+      } catch (err) {
+        logError('loadTrialBookings records', err);
+      }
+      const trialRecords = trialExisting.filter(
+        (record) =>
+          record.class_id === selectedClassId &&
+          record.lesson_date === lessonDate &&
+          trialStudentIds.has(record.student_id),
+      );
       const initMap: Record<string, CheckinStatus> = {};
       classBookings.forEach((b) => {
-        initMap[b.id] = 'absent';
+        const matched = trialRecords.find((r) => r.student_id === b.trial_student_id);
+        if (matched) {
+          initMap[b.id] =
+            matched.status === 'leave'
+              ? 'leave'
+              : matched.status && !['absent', 'cancelled'].includes(matched.status)
+                ? 'checked'
+                : 'absent';
+        } else {
+          initMap[b.id] = 'absent';
+        }
       });
       setTrialCheckinMap(initMap);
     } catch (err) {
@@ -636,7 +679,7 @@ const LessonForm: React.FC = () => {
       setTrialLeadMap({});
       setTrialCheckinMap({});
     }
-  }, [currentUserId, lessonDate, selectedClassId]);
+  }, [attendanceRecordActorId, currentUserId, lessonDate, selectedClassId]);
 
   // ===== 初始化加载 =====
   useEffect(() => {
@@ -691,7 +734,31 @@ const LessonForm: React.FC = () => {
         applyClassTeacherDefaults(classInfo, teacherList);
         setClassStudents(students);
         await loadApprovedLeaveStudentIds(students);
-        setCheckedStudentIds(new Set());
+
+        // 加载该班级/日期已有点名记录 → 判定是否已点名并回填学员状态（查看模式）
+        const existingRecords = await loadLessonRecordsByDate();
+        const classRecords = existingRecords.filter(
+          (record) =>
+            record.class_id === classIdParam &&
+            record.lesson_date === lessonDate &&
+            students.some((student) => student.id === record.student_id),
+        );
+        setExistingClassRecords(classRecords);
+        const nextChecked = new Set<string>();
+        const nextLeave = new Set<string>();
+        classRecords.forEach((record) => {
+          if (record.status === 'leave') {
+            nextLeave.add(record.student_id);
+          } else if (record.status && !['absent', 'cancelled'].includes(record.status)) {
+            nextChecked.add(record.student_id);
+          }
+        });
+        const hasRecords = classRecords.length > 0;
+        setIsAlreadyChecked(hasRecords);
+        setCheckedStudentIds(nextChecked);
+        setLeaveStudentIds(nextLeave);
+        setViewMode(hasRecords);
+
         // 为每个学员匹配课包
         const pkgMap = new Map<string, CoursePackage>();
         const subMap = new Map<string, Subject | null>();
@@ -829,11 +896,35 @@ const LessonForm: React.FC = () => {
     return '';
   }, [lessonTime, selectedClass?.end_time, selectedClass?.start_time]);
 
+  /** 已点名班级是否仍在 24 小时修改窗口内（按下课时间起算） */
+  const canModifyLesson = useMemo(() => {
+    if (!isAlreadyChecked) {
+      return true;
+    }
+    const endTime = lessonTimeRange.split('-')[1]?.trim();
+    if (!endTime) {
+      return true;
+    }
+    const endDateTime = new Date(`${lessonDate}T${endTime}:00`);
+    return Date.now() - endDateTime.getTime() <= LESSON_MODIFY_WINDOW_HOURS * 60 * 60 * 1000;
+  }, [isAlreadyChecked, lessonDate, lessonTimeRange]);
+
   const pageTitle = useMemo(() => {
     return mode === 'class' ? '班级消课' : '课时消课';
   }, [mode]);
 
   // ===== 班级模式：加载班级学员 =====
+  const loadLessonRecordsByDate = useCallback(async () => {
+    if (!attendanceRecordActorId || !lessonDate) {
+      return [] as LessonRecord[];
+    }
+    return lessonRecordService.getByTeacherAndRange(
+      attendanceRecordActorId,
+      lessonDate,
+      lessonDate,
+    );
+  }, [attendanceRecordActorId, lessonDate]);
+
   const loadClassStudents = useCallback(
     async (classId: string) => {
       setSelectedClassId(classId);
@@ -850,7 +941,31 @@ const LessonForm: React.FC = () => {
       applyClassTeacherDefaults(classInfo, teacherOptions);
       setClassStudents(students);
       await loadApprovedLeaveStudentIds(students);
-      setCheckedStudentIds(new Set());
+
+      // 加载该班级/日期已有点名记录 → 判定是否已点名并回填学员状态（查看模式）
+      const existing = await loadLessonRecordsByDate();
+      const classRecords = existing.filter(
+        (record) =>
+          record.class_id === classId &&
+          record.lesson_date === lessonDate &&
+          students.some((student) => student.id === record.student_id),
+      );
+      setExistingClassRecords(classRecords);
+      const nextChecked = new Set<string>();
+      const nextLeave = new Set<string>();
+      classRecords.forEach((record) => {
+        if (record.status === 'leave') {
+          nextLeave.add(record.student_id);
+        } else if (record.status && !['absent', 'cancelled'].includes(record.status)) {
+          nextChecked.add(record.student_id);
+        }
+      });
+      const hasRecords = classRecords.length > 0;
+      setIsAlreadyChecked(hasRecords);
+      setCheckedStudentIds(nextChecked);
+      setLeaveStudentIds(nextLeave);
+      // 已点名 → 默认进入查看模式（学员卡片只读，24h 内可点「修改」进入编辑）
+      setViewMode(hasRecords);
 
       // 为每个学员匹配课包
       const pkgMap = new Map<string, CoursePackage>();
@@ -871,7 +986,14 @@ const LessonForm: React.FC = () => {
       setStudentPackages(pkgMap);
       setStudentSubjects(subMap);
     },
-    [applyClassTeacherDefaults, hoursUsed, loadApprovedLeaveStudentIds, teacherOptions],
+    [
+      applyClassTeacherDefaults,
+      hoursUsed,
+      loadApprovedLeaveStudentIds,
+      loadLessonRecordsByDate,
+      lessonDate,
+      teacherOptions,
+    ],
   );
 
   // ===== 班级模式：切换班级 =====
@@ -889,10 +1011,18 @@ const LessonForm: React.FC = () => {
 
     const syncLeaveStudents = async () => {
       const approvedLeaveIds = await loadApprovedLeaveStudentIds(classStudents);
+      // 合并：审批请假 + 已落库记录中的请假，保证请假状态完整展示
+      const recordLeaveIds = new Set(
+        existingClassRecords
+          .filter((record) => record.status === 'leave')
+          .map((record) => record.student_id),
+      );
+      const mergedLeaveIds = new Set<string>([...approvedLeaveIds, ...recordLeaveIds]);
+      setLeaveStudentIds(mergedLeaveIds);
       setCheckedStudentIds((prev) => {
         const next = new Set<string>();
         classStudents.forEach((student) => {
-          if (approvedLeaveIds.has(student.id)) {
+          if (mergedLeaveIds.has(student.id)) {
             return;
           }
           if (prev.has(student.id)) {
@@ -904,7 +1034,7 @@ const LessonForm: React.FC = () => {
     };
 
     void syncLeaveStudents();
-  }, [classStudents, loadApprovedLeaveStudentIds, mode]);
+  }, [classStudents, existingClassRecords, loadApprovedLeaveStudentIds, mode]);
 
   const handleBack = useCallback(() => {
     Taro.navigateBack({
@@ -936,17 +1066,6 @@ const LessonForm: React.FC = () => {
     },
     [emitScheduleRefreshSignal],
   );
-
-  const loadLessonRecordsByDate = useCallback(async () => {
-    if (!attendanceRecordActorId || !lessonDate) {
-      return [] as LessonRecord[];
-    }
-    return lessonRecordService.getByTeacherAndRange(
-      attendanceRecordActorId,
-      lessonDate,
-      lessonDate,
-    );
-  }, [attendanceRecordActorId, lessonDate]);
 
   // ===== 班级模式：切换签到状态 =====
   /** 切换到指定状态：签到/请假/未到 */
@@ -1404,7 +1523,7 @@ const LessonForm: React.FC = () => {
       const lessonDateValue = lessonDate;
       const existingRecords = await loadLessonRecordsByDate();
       const trialStudentIds = new Set(trialBookings.map((b) => b.trial_student_id));
-      const existingClassRecords = existingRecords.filter(
+      const existingSubmitRecords = existingRecords.filter(
         (record) =>
           record.class_id === selectedClassId &&
           record.lesson_date === lessonDateValue &&
@@ -1414,7 +1533,7 @@ const LessonForm: React.FC = () => {
 
       // 点名页按当前表单结果重算整节课出勤，先清理本节课已存在的占位或签到记录，避免重复提交冲突。
       await Promise.all(
-        existingClassRecords
+        existingSubmitRecords
           .filter((record) =>
             ['normal', 'makeup', 'leave', 'absent'].includes(record.status || 'normal'),
           )
@@ -2193,8 +2312,8 @@ const LessonForm: React.FC = () => {
                     <View className="mb-[16rpx] flex items-center justify-between">
                       <Text className="text-[26rpx] font-medium text-foreground">学员列表</Text>
                       <View
-                        className="flex items-center justify-center rounded-[12rpx] bg-muted px-[16rpx] py-[8rpx]"
-                        onClick={handleOpenAddStudentSheet}
+                        className={`flex items-center justify-center rounded-[12rpx] bg-muted px-[16rpx] py-[8rpx] ${viewMode ? 'opacity-60' : ''}`}
+                        onClick={viewMode ? undefined : handleOpenAddStudentSheet}
                       >
                         <Text className="text-[22rpx] font-medium leading-none text-muted-foreground">
                           添加学员
@@ -2215,6 +2334,7 @@ const LessonForm: React.FC = () => {
                               remaining={info.remaining}
                               deduct={info.deduct}
                               isTrial
+                              disabled={viewMode}
                               onToggleStatus={(next) => handleSetTrialCheckin(booking.id, next)}
                               onOpenDetailSheet={() =>
                                 handleOpenStudentDetailSheet({
@@ -2239,6 +2359,7 @@ const LessonForm: React.FC = () => {
                             status={status}
                             remaining={info.remaining}
                             deduct={info.deduct}
+                            disabled={viewMode}
                             onToggleStatus={(next) => handleSetStudentCheckin(stu.id, next)}
                             onOpenDetailSheet={() =>
                               handleOpenStudentDetailSheet({
@@ -2432,8 +2553,8 @@ const LessonForm: React.FC = () => {
           <View className="fixed bottom-0 left-0 right-0 z-100 border-t border-border bg-white px-[32rpx] pt-[20rpx] pb-safe-bar">
             <View className="flex items-center justify-between gap-[24rpx]">
               <View
-                className="flex items-center gap-[12rpx]"
-                onClick={handleToggleSelectAllStudents}
+                className={`flex items-center gap-[12rpx] ${viewMode ? 'opacity-50' : ''}`}
+                onClick={viewMode ? undefined : handleToggleSelectAllStudents}
               >
                 <View
                   className={`flex h-[36rpx] w-[36rpx] items-center justify-center rounded-full border-2 ${allSelectableChecked ? 'border-primary bg-primary' : 'border-muted-foreground bg-white'}`}
@@ -2442,14 +2563,31 @@ const LessonForm: React.FC = () => {
                 </View>
                 <Text className="text-[26rpx] text-foreground">全选签到</Text>
               </View>
-              <View
-                className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting || !selectedClassId ? 'bg-muted' : 'bg-[#FF7E67]'}`}
-                onClick={submitting || !selectedClassId ? undefined : handleSubmit}
-              >
-                <Text className="text-center text-[28rpx] font-medium text-white">
-                  {submitting ? '提交中...' : '提交点名'}
-                </Text>
-              </View>
+              {isAlreadyChecked && viewMode ? (
+                canModifyLesson ? (
+                  // 已点名 + 24h 内 → 「修改」：进入可编辑状态
+                  <View
+                    className="rounded-[48rpx] bg-[#FF7E67] px-[48rpx] py-[22rpx]"
+                    onClick={() => setViewMode(false)}
+                  >
+                    <Text className="text-center text-[28rpx] font-medium text-white">修改</Text>
+                  </View>
+                ) : (
+                  // 已点名 + 超 24h → 只读，不可修改
+                  <View className="rounded-[48rpx] bg-muted px-[48rpx] py-[22rpx]">
+                    <Text className="text-center text-[28rpx] font-medium text-white">已提交</Text>
+                  </View>
+                )
+              ) : (
+                <View
+                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting || !selectedClassId ? 'bg-muted' : 'bg-[#FF7E67]'}`}
+                  onClick={submitting || !selectedClassId ? undefined : handleSubmit}
+                >
+                  <Text className="text-center text-[28rpx] font-medium text-white">
+                    {submitting ? '提交中...' : '提交点名'}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         ) : (
