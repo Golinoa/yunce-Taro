@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Image, Swiper, SwiperItem } from '@tarojs/components';
+import { View, Text, ScrollView, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -28,17 +28,15 @@ import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import type { ITouchEvent } from '@tarojs/components';
 
 /** Tab 类型 */
 type HomeTab = 'schedule' | 'todo' | 'recent';
 
-const HOME_TAB_SWIPER_DURATION = 260;
 const HOME_TAB_ORDER: HomeTab[] = ['schedule', 'todo', 'recent'];
 const ORG_COVER_IMAGE = '/assets/images/2.jpg';
 
 const getHomeTabIndex = (tab: HomeTab): number => HOME_TAB_ORDER.indexOf(tab);
-
-const getHomeTabByIndex = (index: number): HomeTab => HOME_TAB_ORDER[index] || 'schedule';
 
 /**
  * Home - 机构端首页
@@ -81,8 +79,6 @@ const Home: React.FC = () => {
 
   // ---- Tab 状态 ----
   const [activeTab, setActiveTab] = useState<HomeTab>('schedule');
-  const [homeSwiperCurrent, setHomeSwiperCurrent] = useState(0);
-  const [homeSwiperHeight, setHomeSwiperHeight] = useState(420);
 
   // ---- 待办事项 ----
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
@@ -94,7 +90,6 @@ const Home: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   // ---- 公共状态 ----
   const isFirstMount = useRef(true);
-  const homeTabMeasureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ============================================
   // 校区切换
@@ -220,58 +215,10 @@ const Home: React.FC = () => {
     [recentRecords],
   );
 
-  const measureHomeSwiperHeight = useCallback(
-    (targetTab?: HomeTab) => {
-      if (!isStaffRole(currentRole)) {
-        return;
-      }
-
-      const nextTab = targetTab || getHomeTabByIndex(homeSwiperCurrent);
-      const targetId = `#home-tab-panel-${nextTab}`;
-
-      // 用户口径（2026-08-23）：延时 200ms 等 React/DOM 完成渲染后再量，避免锁旧高度
-      // （如 schedules 从 4 张扩到 8 张时，第一次 measure 仍拿到旧 4 张高度导致下方大片空白）
-      const runMeasure = (attempt: number) => {
-        Taro.nextTick(() => {
-          const query = Taro.createSelectorQuery();
-          query.select(targetId).boundingClientRect();
-          query.exec((result) => {
-            const rect = result?.[0];
-            if (rect?.height) {
-              setHomeSwiperHeight(Math.max(320, Math.ceil(rect.height)));
-            }
-            // 最多重试 3 次，确保内容动态增长后高度被刷新
-            if (attempt < 2) {
-              setTimeout(() => runMeasure(attempt + 1), 250);
-            }
-          });
-        });
-      };
-      runMeasure(0);
-    },
-    [currentRole, homeSwiperCurrent],
-  );
-
-  const scheduleHomeSwiperMeasure = useCallback(
-    (targetTab?: HomeTab) => {
-      if (homeTabMeasureTimerRef.current) {
-        clearTimeout(homeTabMeasureTimerRef.current);
-      }
-
-      homeTabMeasureTimerRef.current = setTimeout(() => {
-        measureHomeSwiperHeight(targetTab);
-      }, HOME_TAB_SWIPER_DURATION + 40);
-    },
-    [measureHomeSwiperHeight],
-  );
-
-  const handleHomeTabChange = useCallback(
-    (tab: HomeTab) => {
-      setHomeSwiperCurrent(getHomeTabIndex(tab));
-      scheduleHomeSwiperMeasure(tab);
-    },
-    [scheduleHomeSwiperMeasure],
-  );
+  // ---- Tab 切换（用户口径 2026-08-23：条件渲染替代 Swiper 固定高度，高度自然撑开）----
+  const handleHomeTabChange = useCallback((tab: HomeTab) => {
+    setActiveTab(tab);
+  }, []);
 
   /** 手动点「已读」：记录后从待办列表移除（用户口径 2026-08-23） */
   const handleMarkTodoRead = useCallback((todoId: string) => {
@@ -285,41 +232,31 @@ const Home: React.FC = () => {
       });
   }, []);
 
-  const handleHomeSwiperChange = useCallback(
-    (event: { detail?: { current?: number } }) => {
-      const current = event.detail?.current ?? 0;
-      const nextTab = getHomeTabByIndex(current);
-      setHomeSwiperCurrent(current);
-      scheduleHomeSwiperMeasure(nextTab);
-    },
-    [scheduleHomeSwiperMeasure],
-  );
-
-  const handleHomeSwiperFinish = useCallback(
-    (event: { detail?: { current?: number } }) => {
-      const current = event.detail?.current ?? homeSwiperCurrent;
-      const nextTab = getHomeTabByIndex(current);
-      setActiveTab(nextTab);
-      measureHomeSwiperHeight(nextTab);
-    },
-    [homeSwiperCurrent, measureHomeSwiperHeight],
-  );
-
-  useEffect(() => {
-    setHomeSwiperCurrent(getHomeTabIndex(activeTab));
-  }, [activeTab]);
-
-  useEffect(() => {
-    measureHomeSwiperHeight(activeTab);
-  }, [activeTab, schedules, todoItems, recentRecords, measureHomeSwiperHeight]);
-
-  useEffect(() => {
-    return () => {
-      if (homeTabMeasureTimerRef.current) {
-        clearTimeout(homeTabMeasureTimerRef.current);
-      }
-    };
+  // ---- 横滑切换 Tab（替代 Swiper 的滑动手势）----
+  const tabTouchStartRef = useRef({ x: 0, y: 0 });
+  const handleTabTouchStart = useCallback((e: ITouchEvent) => {
+    const touch = e.touches?.[0];
+    if (touch) {
+      tabTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    }
   }, []);
+  const handleTabTouchEnd = useCallback(
+    (e: ITouchEvent) => {
+      const touch = e.changedTouches?.[0];
+      if (!touch) return;
+      const deltaX = touch.clientX - tabTouchStartRef.current.x;
+      const deltaY = touch.clientY - tabTouchStartRef.current.y;
+      // 横向位移 > 60px 且明显大于纵向（避免与页面纵向滚动冲突）
+      if (Math.abs(deltaX) > 60 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        const idx = getHomeTabIndex(activeTab);
+        const nextIdx = deltaX < 0 ? idx + 1 : idx - 1;
+        if (nextIdx >= 0 && nextIdx < HOME_TAB_ORDER.length) {
+          setActiveTab(HOME_TAB_ORDER[nextIdx]);
+        }
+      }
+    },
+    [activeTab],
+  );
 
   const renderHeader = () => {
     if (!isStaffRole(currentRole)) {
@@ -409,11 +346,7 @@ const Home: React.FC = () => {
                       {TAB_OPTIONS.map((tab) => (
                         <View
                           key={tab.key}
-                          className={
-                            homeSwiperCurrent === getHomeTabIndex(tab.key)
-                              ? 'tab-item-v14 active'
-                              : 'tab-item-v14'
-                          }
+                          className={activeTab === tab.key ? 'tab-item-v14 active' : 'tab-item-v14'}
                           onClick={() => handleHomeTabChange(tab.key)}
                         >
                           <Text>{tab.label}</Text>
@@ -426,42 +359,33 @@ const Home: React.FC = () => {
                       ))}
                     </View>
 
-                    <View
-                      onClick={() =>
-                        scheduleHomeSwiperMeasure(getHomeTabByIndex(homeSwiperCurrent))
-                      }
-                    >
-                      <Swiper
-                        current={homeSwiperCurrent}
-                        duration={HOME_TAB_SWIPER_DURATION}
-                        easingFunction="easeOutCubic"
-                        style={{ height: `${homeSwiperHeight}px` }}
-                        onChange={handleHomeSwiperChange}
-                        onAnimationFinish={handleHomeSwiperFinish}
-                      >
-                        <SwiperItem itemId="schedule">
-                          <View id="home-tab-panel-schedule">
-                            <TodayScheduleCard schedules={schedules} title="" />
-                          </View>
-                        </SwiperItem>
-                        <SwiperItem itemId="todo">
-                          <View id="home-tab-panel-todo" className="pt-[24rpx]">
-                            <TodoList items={todoItems} onMarkRead={handleMarkTodoRead} />
-                          </View>
-                        </SwiperItem>
-                        <SwiperItem itemId="recent">
-                          <View id="home-tab-panel-recent" className="pt-[24rpx]">
-                            <LessonConsumptionList
-                              sections={recentSections}
-                              emptyText="暂无消课记录"
-                              footerText="查看更多"
-                              onFooterClick={() =>
-                                Taro.navigateTo({ url: '/package-teacher/pages/attendance/index' })
-                              }
-                            />
-                          </View>
-                        </SwiperItem>
-                      </Swiper>
+                    {/* 用户口径（2026-08-23）：Tab 内容改条件渲染，高度自然撑开（不裁切/不空白/无跳动）；
+                        支持横滑切换（替代 Swiper）；空数据保持最低高度 */}
+                    <View onTouchStart={handleTabTouchStart} onTouchEnd={handleTabTouchEnd}>
+                      {activeTab === 'schedule' && (
+                        <View id="home-tab-panel-schedule" className="min-h-[400rpx]">
+                          <TodayScheduleCard schedules={schedules} title="" />
+                        </View>
+                      )}
+                      {activeTab === 'todo' && (
+                        <View id="home-tab-panel-todo" className="pt-[24rpx] min-h-[400rpx]">
+                          <TodoList items={todoItems} onMarkRead={handleMarkTodoRead} />
+                        </View>
+                      )}
+                      {activeTab === 'recent' && (
+                        <View id="home-tab-panel-recent" className="pt-[24rpx] min-h-[400rpx]">
+                          <LessonConsumptionList
+                            sections={recentSections}
+                            emptyText="暂无消课记录"
+                            footerText="查看更多"
+                            onFooterClick={() =>
+                              Taro.navigateTo({
+                                url: '/package-teacher/pages/attendance/index',
+                              })
+                            }
+                          />
+                        </View>
+                      )}
                     </View>
                   </>
                 )}
