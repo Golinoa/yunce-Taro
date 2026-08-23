@@ -229,16 +229,25 @@ const Home: React.FC = () => {
       const nextTab = targetTab || getHomeTabByIndex(homeSwiperCurrent);
       const targetId = `#home-tab-panel-${nextTab}`;
 
-      Taro.nextTick(() => {
-        const query = Taro.createSelectorQuery();
-        query.select(targetId).boundingClientRect();
-        query.exec((result) => {
-          const rect = result?.[0];
-          if (rect?.height) {
-            setHomeSwiperHeight(Math.max(320, Math.ceil(rect.height)));
-          }
+      // 用户口径（2026-08-23）：延时 200ms 等 React/DOM 完成渲染后再量，避免锁旧高度
+      // （如 schedules 从 4 张扩到 8 张时，第一次 measure 仍拿到旧 4 张高度导致下方大片空白）
+      const runMeasure = (attempt: number) => {
+        Taro.nextTick(() => {
+          const query = Taro.createSelectorQuery();
+          query.select(targetId).boundingClientRect();
+          query.exec((result) => {
+            const rect = result?.[0];
+            if (rect?.height) {
+              setHomeSwiperHeight(Math.max(320, Math.ceil(rect.height)));
+            }
+            // 最多重试 3 次，确保内容动态增长后高度被刷新
+            if (attempt < 2) {
+              setTimeout(() => runMeasure(attempt + 1), 250);
+            }
+          });
         });
-      });
+      };
+      runMeasure(0);
     },
     [currentRole, homeSwiperCurrent],
   );
@@ -388,7 +397,7 @@ const Home: React.FC = () => {
             {renderHeader()}
 
             {/* 内容区：校区卡片压住上半部分 */}
-            <View className="relative z-10 bg-transparent mx-[28rpx] pt-[0] pb-[200rpx]">
+            <View className="relative z-10 bg-transparent mx-[28rpx] pt-[0] pb-[100rpx]">
               {/* 金刚区 */}
               {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
 
