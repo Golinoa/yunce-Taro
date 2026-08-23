@@ -72,7 +72,6 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   // —— 课程 / 班级（教学角色可进；配置类仅管理角色） ——
   'package-course/pages/classes/index': STAFF_ROLES,
   'package-course/pages/class-detail/index': STAFF_ROLES,
-  'package-course/pages/class-checkin/index': STAFF_ROLES,
   'package-course/pages/class-form/index': MANAGER_ROLES,
   'package-course/pages/course-management/index': MANAGER_ROLES,
   'package-course/pages/subject-management/index': MANAGER_ROLES,
@@ -117,7 +116,6 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-student/pages/follow-record-form/index': 'students',
   'package-course/pages/classes/index': 'classes',
   'package-course/pages/class-detail/index': 'classes',
-  'package-course/pages/class-checkin/index': 'classes',
   'package-course/pages/class-form/index': 'classes',
   'package-course/pages/course-management/index': 'classes',
   'package-course/pages/subject-management/index': 'classes',

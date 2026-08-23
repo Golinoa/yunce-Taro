@@ -32,3 +32,8 @@
 - 后台编译任务被中断后 `node`/`taro` 进程可能僵死（实测挂 9~11 小时），锁住 `dist` 与日志，导致后续编译卡死/残缺/ENOENT。
 - 跑编译前先 `ps aux | grep node` 确认无残留进程；有就用 `TaskStop` 停掉对应后台任务再编。
 - 验证产物：Taro 3 组件不会生成独立 `dist/components/<Name>/` 目录（正常，走 base.wxml 的 taro_tmpl）；中文被压缩为 `\uXXXX` 转义，字面量 grep 搜不到是正常的，搜 `StudentMultiSelectSheet`/`resolveEffectiveSubjectId` 或转义 `u672a`(未)`u6392`(排)`u73ed`(班) 确认。
+
+## 页面语义约定（签到相关，2026-08-23）
+- **`lesson-form`（package-course/pages/lesson-form）** = 老师**手动点名/消课页**。入口：班级详情"点名"按钮、班级列表"点名"按钮、课时详情"去点名"、首页今日课表卡片、金刚区"快速消课"。**它不是自动签到页**。
+- **`class-checkin`（package-course/pages/class-checkin）** = 给用户/学员提供的**自动签到页**（班级签到、自动消课），仅接收 `classId` 参数。课程管理页（pages/schedule）的**班课排课卡片**点击进入此页。
+- 易混点：班课排课卡片不应指向 lesson-form（那会让老师手动点名），应指向 class-checkin（用户自助签到）。

@@ -69,7 +69,6 @@ export default defineAppConfig({
         'pages/classes/index',
         'pages/class-detail/index',
         'pages/class-form/index',
-        'pages/class-checkin/index',
         'pages/course-management/index',
         'pages/subject-management/index',
         'pages/subject-form/index',

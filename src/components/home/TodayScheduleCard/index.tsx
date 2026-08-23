@@ -187,8 +187,13 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                   return;
                 }
 
+                // 普通排课卡片 → 进入排课签到消课页（lesson-form，与 schedule 班课分类课程卡片点击进入的页面一致）
                 Taro.navigateTo({
-                  url: `/package-course/pages/lesson-form/index?scheduleId=${item.id}`,
+                  url:
+                    `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
+                    `&classId=${encodeURIComponent(item.class_id || '')}` +
+                    `&lessonDate=${encodeURIComponent(dayjs().format('YYYY-MM-DD'))}` +
+                    `&hasTrialStudent=${(item as { hasTrialStudent?: boolean }).hasTrialStudent ? '1' : '0'}`,
                 });
               }}
             >
