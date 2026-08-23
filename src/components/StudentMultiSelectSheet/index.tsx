@@ -5,7 +5,7 @@
  * - 按姓名/手机号搜索
  * - 按科目筛选（基于学员课包的 subject_id），未关联科目时托底「全部科目」
  * - 功能性快捷查看标签：「未排班」(class_ids 为空) 与「已勾选」(当前选中)
- * - 弹窗拉满屏幕（fillHeight），列表内部滚动，确认按钮固定底部始终可点击
+ * - 弹窗高度约为当前窗口可用高度的 2/3（windowHeight 比例，非 vh），列表内部滚动，确认按钮固定底部
  * - 勾选框在右侧；超出容纳上限时直接禁止勾选并 toast 提醒，不再允许超额
  * - 学员行展示对应科目的会员卡（多卡折叠，点击展开查看，仅显示卡名），课时信息精简
  * - 确认后回调选中 ID 列表
@@ -38,6 +38,8 @@ export interface StudentMultiSelectSheetProps {
   subjects?: Subject[];
   /** 最大可选人数（留空/0 表示不限制） */
   maxSelectable?: number;
+  /** 是否展示「未排班」快捷筛选（仅新增/编辑课程页开启） */
+  showUnscheduledFilter?: boolean;
   /** 关闭 */
   onClose: () => void;
   /** 确认选择 */
@@ -180,6 +182,7 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
   subjectId,
   subjects = [],
   maxSelectable,
+  showUnscheduledFilter = false,
   onClose,
   onConfirm,
 }) => {
@@ -280,7 +283,7 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
       visible={visible}
       title={title}
       onClose={onClose}
-      height="90vh"
+      heightRatio={2 / 3}
       fillHeight
       // 关键：禁用外层 BottomSheet 的 ScrollView 包裹，由本组件内部 flex-1 ScrollView 管理学员列表
       // 否则嵌套 ScrollView 会导致内层点击失效、滚动卡顿
@@ -342,29 +345,31 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
           </ScrollView>
         </View>
 
-        {/* 功能性快捷查看标签：未排班 / 已勾选（独立成行，语义区别于科目筛选） */}
+        {/* 功能性快捷查看标签：未排班（仅课程表单）/ 已勾选 */}
         <View className="shrink-0 flex flex-row items-center gap-[16rpx] mb-[20rpx]">
-          <View
-            className={cn(
-              'px-[24rpx] py-[10rpx] rounded-full border-[2rpx] press-scale inline-flex',
-              unscheduledOnly
-                ? 'bg-warning border-warning'
-                : 'bg-card border-border text-foreground',
-            )}
-            onClick={() => {
-              setUnscheduledOnly((prev) => !prev);
-              setSelectedOnly(false);
-            }}
-          >
-            <Text
+          {showUnscheduledFilter ? (
+            <View
               className={cn(
-                'text-[26rpx] font-medium',
-                unscheduledOnly ? 'text-white' : 'text-foreground',
+                'px-[24rpx] py-[10rpx] rounded-full border-[2rpx] press-scale inline-flex',
+                unscheduledOnly
+                  ? 'bg-warning border-warning'
+                  : 'bg-card border-border text-foreground',
               )}
+              onClick={() => {
+                setUnscheduledOnly((prev) => !prev);
+                setSelectedOnly(false);
+              }}
             >
-              未排班
-            </Text>
-          </View>
+              <Text
+                className={cn(
+                  'text-[26rpx] font-medium',
+                  unscheduledOnly ? 'text-white' : 'text-foreground',
+                )}
+              >
+                未排班
+              </Text>
+            </View>
+          ) : null}
           <View
             className={cn(
               'px-[24rpx] py-[10rpx] rounded-full border-[2rpx] press-scale inline-flex',

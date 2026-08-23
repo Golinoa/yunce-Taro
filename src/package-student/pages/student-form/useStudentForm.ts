@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
+import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/data/course-category';
 import { studentService, packageService, campusService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { CampusUIModel } from '@/types/campus';
@@ -588,7 +589,7 @@ export function useStudentForm(): UseStudentFormReturn {
           });
           if (confirm) {
             Taro.navigateTo({
-              url: `/package-course/pages/classes/index?studentId=${newStudent.id}`,
+              url: COURSE_MANAGEMENT_CLASS_TAB_URL,
             });
           } else {
             Taro.navigateBack();

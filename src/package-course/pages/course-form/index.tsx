@@ -35,7 +35,7 @@ import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
 import type { Subject } from '@/types/campus';
 import { CLASS_LEVEL_LABELS } from '@/types/class';
-import type { Class } from '@/types/class';
+import type { Class, ClassLevel } from '@/types/class';
 import type { CourseCategoryConfig } from '@/types/course-category';
 import type {
   CheckinRole,
@@ -71,10 +71,20 @@ const FORM_HEX_TO_CLASS_COLOR: Record<string, string> = {
 interface FormErrors {
   name?: string;
   categoryId?: string;
+  subjectId?: string;
   duration?: string;
   capacity?: string;
   experiencePrice?: string;
   price?: string;
+}
+
+/** 从 HH:mm 起止时间推算课程时长（分钟） */
+function parseDurationMinutes(start?: string, end?: string): string {
+  if (!start || !end) return '';
+  const [sh, sm] = start.split(':').map((v) => Number(v) || 0);
+  const [eh, em] = end.split(':').map((v) => Number(v) || 0);
+  const minutes = eh * 60 + em - (sh * 60 + sm);
+  return minutes > 0 ? String(minutes) : '';
 }
 
 type PickerType =
@@ -153,6 +163,7 @@ const CourseFormPage: React.FC = () => {
   // 班级模式（用户口径 2026-08-23）：课程管理页「未排课班级」与班级详情页「编辑」
   // 统一走本页编辑班级数据（type=class），编辑入口不再散落于 class-form / 弹窗
   const editType = decodeURIComponent(instance?.router?.params?.type || '');
+  const routeCategoryId = decodeURIComponent(instance?.router?.params?.categoryId || '');
   const isClassEdit = isEdit && editType === 'class';
 
   // 基础字段
@@ -268,8 +279,7 @@ const CourseFormPage: React.FC = () => {
   const scrollTopRef = useRef(0);
 
   /**
-   * 班级模式回填（用户口径 2026-08-23：班级编辑统一走本页）：
-   * 名称/分类/颜色/老师/助教/学员来自班级数据，模板专属字段用默认值（班级模式不展示）。
+   * 班级模式回填：与新建班课共用同一套表单，能回填的字段从班级数据加载，其余留空由用户补全。
    */
   const fillClassForm = useCallback((cls: Class, students: Student[]) => {
     setName(cls.name);
@@ -279,23 +289,22 @@ const CourseFormPage: React.FC = () => {
     setTeacherId(cls.teachers?.[0] || cls.teacher_id || '');
     setAssistantId(cls.teachers?.[1] || '');
     setStudentIds(students.map((s) => s.id));
-    // 模板专属字段默认值（班级模式不渲染对应 UI，仅保证表单数据完整）
-    setDuration('60');
+    setDuration(parseDurationMinutes(cls.start_time, cls.end_time));
     setCapacity('');
     setAgeGroup('mix');
     setCustomAgeGroups([]);
-    setLevel('all');
+    setLevel(cls.level || 'all');
     setCustomLevels([]);
     setExperiencePrice('');
     setPrice('');
-    setMinOpenCount('');
+    setMinOpenCount(cls.min_open_count ? String(cls.min_open_count) : '');
     setBookingDeadline('60');
     setCancelQueueTime('60');
     setNonCancelTime('120');
     setAutoCheckin('follow_category');
     setStudentSelfCheckin('follow_category');
     setAllowCheckinRoles(['teacher', 'receptionist']);
-    setDescription('');
+    setDescription(cls.note || '');
     setBackgroundImage('');
     setHomeImage('');
     captureBaselineRef.current = true;
@@ -324,10 +333,11 @@ const CourseFormPage: React.FC = () => {
 
     void fetchList().then(() => {
       if (!isEdit && !defaultCategorySetRef.current) {
-        // 新增时默认选中当前激活分类，没有则选第一个；
+        // 新增时默认选中路由/当前激活分类，没有则选第一个；
         // 直接从 store 取最新列表，避免闭包拿到旧 categories
         const state = useCourseCategoryStore.getState();
-        const defaultId = state.activeCategoryId || state.categories[0]?.id || '';
+        const defaultId =
+          routeCategoryId || state.activeCategoryId || state.categories[0]?.id || '';
         if (defaultId) {
           setCategoryId(defaultId);
           defaultCategorySetRef.current = true;
@@ -338,8 +348,10 @@ const CourseFormPage: React.FC = () => {
       }
     });
 
-    if (!isEdit) return;
-    Taro.setNavigationBarTitle({ title: '编辑课程' });
+    if (!isEdit) {
+      return;
+    }
+    Taro.setNavigationBarTitle({ title: isClassEdit ? '编辑班级' : '编辑课程' });
     // setLoading(true) 由 useDelayedLoading 延迟处理：请求在阈值内完成则
     // 完全不显示骨架屏，仅网络差/加载过慢时才让用户看到加载占位。
     setLoading(true);
@@ -371,7 +383,22 @@ const CourseFormPage: React.FC = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, [courseId, isEdit, isClassEdit, fetchList, formStorageScope, fillClassForm, setLoading]);
+  }, [courseId, isEdit, isClassEdit, fetchList, formStorageScope, fillClassForm, routeCategoryId, setLoading]);
+
+  // 班课模式：高级设置默认展开（新建与编辑保持一致；团课/私教保持收起）
+  useEffect(() => {
+    if (isClassMode) {
+      setAdvancedOpen(true);
+    }
+  }, [isClassMode]);
+
+  // 新增页导航标题随模式切换
+  useEffect(() => {
+    if (isEdit) {
+      return;
+    }
+    Taro.setNavigationBarTitle({ title: isClassMode ? '新增班级' : '新增课程' });
+  }, [isClassMode, isEdit]);
 
   // 加载科目列表和教师列表
   useEffect(() => {
@@ -765,6 +792,9 @@ const CourseFormPage: React.FC = () => {
     if (!categoryId) {
       nextErrors.categoryId = '请选择所属分类';
     }
+    if (isClassMode && !subjectId) {
+      nextErrors.subjectId = '请选择所属科目';
+    }
     const durationNum = Number(duration);
     if (!duration || Number.isNaN(durationNum) || durationNum <= 0) {
       nextErrors.duration = '请输入正确的课程时长';
@@ -789,7 +819,7 @@ const CourseFormPage: React.FC = () => {
     }
     setErrors(nextErrors);
     return nextErrors;
-  }, [name, categoryId, duration, capacity, isClassMode, experiencePrice, price]);
+  }, [name, categoryId, subjectId, duration, capacity, isClassMode, experiencePrice, price]);
 
   const handleSubmit = useCallback(async () => {
     const errorsResult = validate();
@@ -888,6 +918,10 @@ const CourseFormPage: React.FC = () => {
           teacher_id: teacherId,
           teachers: [teacherId, assistantId].filter(Boolean),
           category_id: categoryId || undefined,
+          subject_id: subjectId || undefined,
+          level: level.startsWith('custom:') ? 'all' : (level as ClassLevel),
+          note: description.trim() || undefined,
+          min_open_count: minOpenCount ? Number(minOpenCount) : undefined,
         });
         for (const sid of toAdd) await classService.addStudents(courseId, [sid]);
         for (const sid of toRemove) await classService.removeStudent(courseId, sid);
@@ -1032,9 +1066,14 @@ const CourseFormPage: React.FC = () => {
               </Text>
             </FormRow>
 
-            {/* 班课模式：所属科目（班级模式隐藏模板专属字段） */}
-            {isClassMode && !isClassEdit && (
-              <FormRow label="所属科目" required onClick={() => openPicker('subject')}>
+            {/* 班课模式：所属科目 */}
+            {isClassMode && (
+              <FormRow
+                label="所属科目"
+                required
+                onClick={() => openPicker('subject')}
+                error={errors.subjectId}
+              >
                 <Text
                   className={cn(
                     'text-[30rpx]',
@@ -1046,32 +1085,27 @@ const CourseFormPage: React.FC = () => {
               </FormRow>
             )}
 
-            {/* 课程时长（班级模式隐藏：班级时长由排课/课程包承载） */}
-            {!isClassEdit && (
-              <FormRow
-                label="课程时长（分）"
-                required
-                editable
-                placeholder="请输入课程时长"
-                value={duration}
-                onInput={(e) => setDuration(e.detail.value)}
-                inputType="number"
-                error={errors.duration}
-              />
-            )}
+            <FormRow
+              label="课程时长（分）"
+              required
+              editable
+              placeholder="请输入课程时长"
+              value={duration}
+              onInput={(e) => setDuration(e.detail.value)}
+              inputType="number"
+              error={errors.duration}
+            />
 
             {/* 容纳人数：非必填，留空表示不限制人数（placeholder 已提示，不再重复 helperText） */}
-            {!isClassEdit && (
-              <FormRow
-                label="容纳人数（人）"
-                editable
-                placeholder="留空不限制人数"
-                value={capacity}
-                onInput={handleCapacityInput}
-                inputType="number"
-                error={errors.capacity}
-              />
-            )}
+            <FormRow
+              label="容纳人数（人）"
+              editable
+              placeholder="留空不限制人数"
+              value={capacity}
+              onInput={handleCapacityInput}
+              inputType="number"
+              error={errors.capacity}
+            />
           </Card>
 
           {/* 高级设置展开按钮 - 保留现状 */}
@@ -1295,24 +1329,21 @@ const CourseFormPage: React.FC = () => {
                 </>
               )}
 
-              {/* 5. 课程介绍（班级模式隐藏模板专属字段） */}
-              {!isClassEdit && (
-                <Card className="p-[32rpx]">
-                  <SectionTitle title="课程介绍" />
-                  <FormInput
-                    label="课程简介"
-                    placeholder="暂无"
-                    value={description}
-                    onInput={(e) => setDescription(e.detail.value)}
-                    multiline
-                    minHeight="200rpx"
-                  />
-                </Card>
-              )}
+              {/* 5. 课程介绍 */}
+              <Card className="p-[32rpx]">
+                <SectionTitle title="课程介绍" />
+                <FormInput
+                  label="课程简介"
+                  placeholder="暂无"
+                  value={description}
+                  onInput={(e) => setDescription(e.detail.value)}
+                  multiline
+                  minHeight="200rpx"
+                />
+              </Card>
 
-              {/* 6. 课程图片：背景图整宽上传框 + 封面左文字右方框（班级模式隐藏） */}
-              {!isClassEdit && (
-                <Card className="p-[32rpx]">
+              {/* 6. 课程图片：背景图整宽上传框 + 封面左文字右方框 */}
+              <Card className="p-[32rpx]">
                   <SectionTitle title="课程图片" />
                   <View className="flex flex-col gap-[40rpx]">
                     {/* 课程背景图：整宽上传框 */}
@@ -1366,7 +1397,6 @@ const CourseFormPage: React.FC = () => {
                     </View>
                   </View>
                 </Card>
-              )}
             </View>
           )}
         </View>

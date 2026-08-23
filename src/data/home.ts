@@ -17,6 +17,7 @@ import {
   CUR_DAY,
   type LessonRecord,
 } from './mock-database';
+import { COURSE_MANAGEMENT_CLASS_TAB_URL } from './course-category';
 import {
   filterClassesByActor,
   filterLessonRecordsByActor,
@@ -158,7 +159,7 @@ export const HOME_QUICK_ENTRIES: QuickEntry[] = [
     label: '班级管理',
     icon: 'mdi-school',
     color: 'icon-glass-blue',
-    url: '/package-course/pages/classes/index',
+    url: COURSE_MANAGEMENT_CLASS_TAB_URL,
   },
   {
     label: '教师管理',

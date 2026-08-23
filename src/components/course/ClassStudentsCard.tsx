@@ -169,6 +169,7 @@ const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({
         subjectId={subjectId}
         subjects={subjects}
         maxSelectable={maxSelectable}
+        showUnscheduledFilter
         onClose={closePicker}
         onConfirm={handleConfirm}
       />

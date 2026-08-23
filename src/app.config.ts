@@ -66,9 +66,6 @@ export default defineAppConfig({
     {
       root: 'package-course',
       pages: [
-        'pages/classes/index',
-        'pages/class-detail/index',
-        'pages/class-form/index',
         'pages/course-management/index',
         'pages/subject-management/index',
         'pages/subject-form/index',
@@ -80,7 +77,6 @@ export default defineAppConfig({
         'pages/course-packages/index',
         'pages/package-form/index',
         'pages/lesson-form/index',
-        'pages/lesson-edit/index',
         'pages/lesson-supplement/index',
         'pages/lesson-detail/index',
         'pages/schedule-form/index',

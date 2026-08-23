@@ -1,6 +1,7 @@
 import { View, Text, ScrollView } from '@tarojs/components';
+import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 
 /**
  * BottomSheet - 统一底部弹窗组件
@@ -44,6 +45,12 @@ export interface BottomSheetProps {
    * 固定高度模式下不生效
    */
   maxHeightLimit?: string;
+  /**
+   * 内容面板高度占当前窗口可用高度的比例（0~1）。
+   * 基于 Taro.getWindowInfo().windowHeight 换算为 px，避免 vh 在有/无导航栏页面表现不一致。
+   * 与 height 同时传入时优先使用 heightRatio。
+   */
+  heightRatio?: number;
   /** 额外内容区类名 */
   className?: string;
   /** 内容区是否可滚动（默认 true） */
@@ -68,6 +75,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   className,
   scrollable = true,
   fillHeight = false,
+  heightRatio,
 }) => {
   // 向后兼容：如果传了 show，则用 show 控制渲染、visible 控制动画
   // 否则用 visible 同时控制渲染和动画
@@ -109,13 +117,27 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     }
   };
 
-  if (!mounted) return null;
+  const ratioHeightPx = useMemo(() => {
+    if (!heightRatio || heightRatio <= 0 || !shouldRender) {
+      return undefined;
+    }
+    const { windowHeight } = Taro.getWindowInfo();
+    return `${Math.round(windowHeight * Math.min(heightRatio, 1))}px`;
+  }, [heightRatio, shouldRender]);
 
-  // 高度兼容：优先使用 height，其次 maxHeight（兼容旧调用），默认 70vh
-  // height="auto" 时内容自适应，可配合 maxHeightLimit 限制上限
   const isAutoHeight = height === 'auto';
-  const fixedHeight = !isAutoHeight ? height || maxHeight || '70vh' : undefined;
+  const fixedHeight = useMemo(() => {
+    if (isAutoHeight) {
+      return undefined;
+    }
+    if (ratioHeightPx) {
+      return ratioHeightPx;
+    }
+    return height || maxHeight || '70vh';
+  }, [height, isAutoHeight, maxHeight, ratioHeightPx]);
   const scrollAreaHeight = isAutoHeight ? undefined : `calc(${fixedHeight} - 120rpx)`;
+
+  if (!mounted) return null;
 
   // auto 模式下：内容自然撑开，用 maxHeightLimit 限制上限
   // 固定高度模式下：高度固定为 fixedHeight

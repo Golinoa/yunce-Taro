@@ -1,9 +1,10 @@
-import { View, Text, Input, Picker, Textarea, Image, ScrollView } from '@tarojs/components';
+import { View, Text, Input, Picker, Textarea, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import ActionButton from '@/components/ActionButton';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
+import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import ClassSelector from '@/components/lesson/ClassSelector';
 import StudentCard from '@/components/lesson/StudentCard';
 import PageContainer from '@/components/PageContainer';
@@ -28,17 +29,16 @@ import { auditLogService } from '@/services/audit-log';
 import { campusService, roomService } from '@/services/campus';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
-import type { CampusUIModel, Room } from '@/types/campus';
+import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
-import type { Subject } from '@/types/subject';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
-import { hasTrialPackage, pickBestPackage } from '@/utils/package-helper';
+import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
@@ -76,13 +76,51 @@ function getWeekday(dateStr: string): string {
 }
 
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
-const LESSON_EDIT_RESULT_KEY = 'yunce:lesson-form:edit-result';
 const FORM_CARD_CLASS_NAME = 'mx-[24rpx] mb-3 overflow-hidden rounded-[20rpx] bg-white shadow-soft';
 /** 已点名班级可修改的时间窗口（小时）：下课 24 小时内可修改，超时只能查看 */
 const LESSON_MODIFY_WINDOW_HOURS = 24;
 
 /** 签到状态：签到/请假/未到 */
 type CheckinStatus = 'checked' | 'leave' | 'absent';
+
+/** 已点名班级的交互模式 */
+type ClassAttendanceMode = 'normal' | 'view' | 'edit' | 'supplement';
+
+function getLessonRecordPriority(record?: LessonRecord): number {
+  if (!record) {
+    return 0;
+  }
+  switch (record.status) {
+    case 'normal':
+    case 'makeup':
+      return 4;
+    case 'leave':
+    case 'absent':
+      return 3;
+    case 'cancelled':
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+function buildCheckinBaseline(
+  students: Student[],
+  checkedIds: Set<string>,
+  leaveIds: Set<string>,
+): Map<string, CheckinStatus> {
+  const baseline = new Map<string, CheckinStatus>();
+  students.forEach((student) => {
+    if (leaveIds.has(student.id)) {
+      baseline.set(student.id, 'leave');
+    } else if (checkedIds.has(student.id)) {
+      baseline.set(student.id, 'checked');
+    } else {
+      baseline.set(student.id, 'absent');
+    }
+  });
+  return baseline;
+}
 
 /** 状态对应样式 */
 const CHECKIN_OPTION_STYLES: Record<
@@ -124,6 +162,7 @@ const CheckinCard: React.FC<{
   deduct?: string;
   isTrial?: boolean;
   disabled?: boolean;
+  highlight?: boolean;
   onToggleStatus: (next: CheckinStatus) => void;
   onOpenDetailSheet: () => void;
 }> = ({
@@ -133,6 +172,7 @@ const CheckinCard: React.FC<{
   deduct = '',
   isTrial = false,
   disabled = false,
+  highlight = false,
   onToggleStatus,
   onOpenDetailSheet,
 }) => {
@@ -151,10 +191,17 @@ const CheckinCard: React.FC<{
 
   return (
     <View
-      className={`relative flex flex-col items-center rounded-[20rpx] bg-white px-[16rpx] py-[20rpx] shadow-card ${disabled ? 'opacity-60' : ''}`}
+      className={`relative flex flex-col items-center rounded-[20rpx] bg-white px-[16rpx] py-[20rpx] shadow-card ${highlight ? 'border-2 border-primary bg-primary/5' : ''} ${disabled ? 'opacity-60' : ''}`}
     >
+      {highlight ? (
+        <View className="absolute left-0 top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-primary/10 px-[12rpx] py-[4rpx]">
+          <Text className="text-[18rpx] font-medium text-primary">补录</Text>
+        </View>
+      ) : null}
       {isTrial ? (
-        <View className="absolute left-0 top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-error/10 px-[12rpx] py-[4rpx]">
+        <View
+          className={`absolute ${highlight ? 'left-[72rpx]' : 'left-0'} top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-error/10 px-[12rpx] py-[4rpx]`}
+        >
           <Text className="text-[18rpx] font-medium text-error">试听</Text>
         </View>
       ) : null}
@@ -396,11 +443,6 @@ const LessonForm: React.FC = () => {
     return v ? decodeURIComponent(v) : '';
   }, [routeParams]);
 
-  const scheduleIdParam = useMemo(() => {
-    const v = routeParams.scheduleId || '';
-    return v ? decodeURIComponent(v) : '';
-  }, [routeParams]);
-
   const isEditEntryAttempt = Boolean(recordIdParam) || modeParam === 'edit';
 
   // ===== 模式切换 =====
@@ -426,16 +468,26 @@ const LessonForm: React.FC = () => {
   const [studentPackages, setStudentPackages] = useState<Map<string, CoursePackage>>(new Map());
   const [studentSubjects, setStudentSubjects] = useState<Map<string, Subject | null>>(new Map());
   const [showAddStudentSheet, setShowAddStudentSheet] = useState(false);
-  const [pendingAddStudentIds, setPendingAddStudentIds] = useState<Set<string>>(new Set());
-  const [addStudentKeyword, setAddStudentKeyword] = useState('');
+  const [addStudentSheetPurpose, setAddStudentSheetPurpose] = useState<'attendance' | 'supplement'>(
+    'attendance',
+  );
+  const [subjectOptions, setSubjectOptions] = useState<Subject[]>([]);
 
   // ===== 已点名 / 查看 / 修改模式（班级模式） =====
   /** 该班级该日期已存在的点名/消课记录 */
   const [existingClassRecords, setExistingClassRecords] = useState<LessonRecord[]>([]);
   /** 是否已点名（存在落库记录） */
   const [isAlreadyChecked, setIsAlreadyChecked] = useState(false);
-  /** 查看模式：已点名且未点击「修改」（学员卡片不可编辑） */
-  const [viewMode, setViewMode] = useState(false);
+  /** 已点名后的交互模式：查看 / 修改 / 补录 */
+  const [attendanceMode, setAttendanceMode] = useState<ClassAttendanceMode>('normal');
+  /** 本次补录新增的学员 ID（仅这些卡片在补录态可编辑） */
+  const [supplementStudentIds, setSupplementStudentIds] = useState<Set<string>>(new Set());
+  /** 学员 → 当次课节落库记录（用于增量修改） */
+  const [recordByStudentId, setRecordByStudentId] = useState<Map<string, LessonRecord>>(new Map());
+  /** 进入修改态时的出勤快照（用于增量提交） */
+  const [attendanceBaseline, setAttendanceBaseline] = useState<Map<string, CheckinStatus>>(
+    new Map(),
+  );
 
   // ===== 试听学员状态（团课约试听） =====
   const [trialBookings, setTrialBookings] = useState<LeadBooking[]>([]);
@@ -537,25 +589,6 @@ const LessonForm: React.FC = () => {
       setLessonTime(lessonTimeParam);
     }
   }, [classIdParam, lessonDateParam, lessonTimeParam]);
-
-  // 从编辑页返回后回写更新字段
-  useDidShow(() => {
-    try {
-      const result = Taro.getStorageSync(LESSON_EDIT_RESULT_KEY);
-      if (!result) return;
-      const data = JSON.parse(result);
-      if (data.lessonDate) setLessonDate(data.lessonDate);
-      if (data.startTime && data.endTime) setLessonTime(`${data.startTime}-${data.endTime}`);
-      if (data.leadTeacherId) setSelectedTeachingTeacherId(data.leadTeacherId);
-      if (data.assistantTeacherId !== undefined)
-        setSelectedAssistantTeacherId(data.assistantTeacherId);
-      if (data.content !== undefined) setContent(data.content);
-      if (data.remark !== undefined) setHomework(data.remark);
-      Taro.removeStorageSync(LESSON_EDIT_RESULT_KEY);
-    } catch (err) {
-      logError('lesson-form apply edit result', err);
-    }
-  });
 
   useEffect(() => {
     if (!isEditEntryAttempt) {
@@ -757,7 +790,16 @@ const LessonForm: React.FC = () => {
         setIsAlreadyChecked(hasRecords);
         setCheckedStudentIds(nextChecked);
         setLeaveStudentIds(nextLeave);
-        setViewMode(hasRecords);
+        const nextRecordMap = new Map<string, LessonRecord>();
+        classRecords.forEach((record) => {
+          const current = nextRecordMap.get(record.student_id);
+          if (getLessonRecordPriority(record) >= getLessonRecordPriority(current)) {
+            nextRecordMap.set(record.student_id, record);
+          }
+        });
+        setRecordByStudentId(nextRecordMap);
+        setSupplementStudentIds(new Set());
+        setAttendanceMode(hasRecords ? 'view' : 'normal');
 
         // 为每个学员匹配课包
         const pkgMap = new Map<string, CoursePackage>();
@@ -855,8 +897,54 @@ const LessonForm: React.FC = () => {
 
   const handleOpenAddStudentSheet = useCallback(async () => {
     await loadAllStudentsIfNeeded();
+    setAddStudentSheetPurpose('attendance');
     setShowAddStudentSheet(true);
   }, [loadAllStudentsIfNeeded]);
+
+  const handleOpenSupplementSheet = useCallback(async () => {
+    await loadAllStudentsIfNeeded();
+    setAddStudentSheetPurpose('supplement');
+    setShowAddStudentSheet(true);
+  }, [loadAllStudentsIfNeeded]);
+
+  const handleEnterEditMode = useCallback(() => {
+    setAttendanceBaseline(
+      buildCheckinBaseline(classStudents, checkedStudentIds, leaveStudentIds),
+    );
+    setAttendanceMode('edit');
+  }, [checkedStudentIds, classStudents, leaveStudentIds]);
+
+  const handleCancelSupplement = useCallback(() => {
+    setClassStudents((prev) => prev.filter((student) => !supplementStudentIds.has(student.id)));
+    setCheckedStudentIds((prev) => {
+      const next = new Set(prev);
+      supplementStudentIds.forEach((studentId) => next.delete(studentId));
+      return next;
+    });
+    setLeaveStudentIds((prev) => {
+      const next = new Set(prev);
+      supplementStudentIds.forEach((studentId) => next.delete(studentId));
+      return next;
+    });
+    setSupplementStudentIds(new Set());
+    setAttendanceMode('view');
+  }, [supplementStudentIds]);
+
+  const isStudentCardDisabled = useCallback(
+    (studentId: string) => {
+      if (!isAlreadyChecked) {
+        return false;
+      }
+      if (attendanceMode === 'view') {
+        return true;
+      }
+      if (attendanceMode === 'supplement') {
+        return !supplementStudentIds.has(studentId);
+      }
+      return false;
+    },
+    [attendanceMode, isAlreadyChecked, supplementStudentIds],
+  );
 
   const handleSelectStudent = useCallback(
     async (stu: Student) => {
@@ -964,8 +1052,17 @@ const LessonForm: React.FC = () => {
       setIsAlreadyChecked(hasRecords);
       setCheckedStudentIds(nextChecked);
       setLeaveStudentIds(nextLeave);
+      const nextRecordMap = new Map<string, LessonRecord>();
+      classRecords.forEach((record) => {
+        const current = nextRecordMap.get(record.student_id);
+        if (getLessonRecordPriority(record) >= getLessonRecordPriority(current)) {
+          nextRecordMap.set(record.student_id, record);
+        }
+      });
+      setRecordByStudentId(nextRecordMap);
+      setSupplementStudentIds(new Set());
       // 已点名 → 默认进入查看模式（学员卡片只读，24h 内可点「修改」进入编辑）
-      setViewMode(hasRecords);
+      setAttendanceMode(hasRecords ? 'view' : 'normal');
 
       // 为每个学员匹配课包
       const pkgMap = new Map<string, CoursePackage>();
@@ -1003,6 +1100,18 @@ const LessonForm: React.FC = () => {
     },
     [loadClassStudents],
   );
+
+  // 从课程编辑页返回后刷新班级学员与点名状态（跳过首次进入，避免与初始化重复请求）
+  const skipDidShowReloadRef = React.useRef(true);
+  useDidShow(() => {
+    if (skipDidShowReloadRef.current) {
+      skipDidShowReloadRef.current = false;
+      return;
+    }
+    if (mode === 'class' && selectedClassId) {
+      void loadClassStudents(selectedClassId);
+    }
+  });
 
   useEffect(() => {
     if (mode !== 'class' || classStudents.length === 0) {
@@ -1155,18 +1264,15 @@ const LessonForm: React.FC = () => {
     [allStudents, classStudents],
   );
 
-  const filteredAddableStudents = useMemo(() => {
-    const keyword = addStudentKeyword.trim().toLowerCase();
-    if (!keyword) {
-      return addableStudents;
+  useEffect(() => {
+    if (mode !== 'class') {
+      return;
     }
-
-    return addableStudents.filter((student) => {
-      const searchText =
-        `${student.name}${student.nickname || ''}${student.phone || ''}`.toLowerCase();
-      return searchText.includes(keyword);
-    });
-  }, [addStudentKeyword, addableStudents]);
+    void subjectService
+      .getList()
+      .then(setSubjectOptions)
+      .catch((err) => logError('lesson-form load subjects', err));
+  }, [mode]);
 
   // ===== 图片上传 =====
   const handleUploadImage = useCallback(async () => {
@@ -1276,17 +1382,69 @@ const LessonForm: React.FC = () => {
     [selectedClassId],
   );
 
-  const handleTogglePendingStudent = useCallback((studentId: string) => {
-    setPendingAddStudentIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(studentId)) {
-        next.delete(studentId);
-      } else {
-        next.add(studentId);
+  const handleConfirmAddStudents = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        Taro.showToast({ title: '请选择学员', icon: 'none' });
+        return;
       }
-      return next;
-    });
-  }, []);
+
+      const appendedStudents = addableStudents.filter((student) => ids.includes(student.id));
+      if (appendedStudents.length === 0) {
+        Taro.showToast({ title: '暂无可添加学员', icon: 'none' });
+        return;
+      }
+
+      const packageEntries = await Promise.all(
+        appendedStudents.map(async (student) => {
+          const pkgs = await packageService.getActiveByStudent(student.id);
+          const best = pickBestPackage(pkgs, hoursUsed);
+          if (!best) {
+            return { studentId: student.id, pkg: null, subject: null };
+          }
+
+          const subject = best.subject_id ? await subjectService.getById(best.subject_id) : null;
+          return { studentId: student.id, pkg: best, subject };
+        }),
+      );
+
+      setClassStudents((prev) => [...prev, ...appendedStudents]);
+      setCheckedStudentIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((studentId) => {
+          if (!leaveStudentIds.has(studentId)) {
+            next.add(studentId);
+          }
+        });
+        return next;
+      });
+      setStudentPackages((prev) => {
+        const next = new Map(prev);
+        packageEntries.forEach(({ studentId, pkg }) => {
+          if (pkg) {
+            next.set(studentId, pkg);
+          }
+        });
+        return next;
+      });
+      setStudentSubjects((prev) => {
+        const next = new Map(prev);
+        packageEntries.forEach(({ studentId, pkg, subject }) => {
+          if (pkg) {
+            next.set(studentId, subject);
+          }
+        });
+        return next;
+      });
+      setShowAddStudentSheet(false);
+
+      if (addStudentSheetPurpose === 'supplement') {
+        setSupplementStudentIds(new Set(ids));
+        setAttendanceMode('supplement');
+      }
+    },
+    [addStudentSheetPurpose, addableStudents, hoursUsed, leaveStudentIds],
+  );
 
   const handleToggleSelectAllStudents = useCallback(() => {
     if (allSelectableChecked) {
@@ -1302,67 +1460,321 @@ const LessonForm: React.FC = () => {
     );
   }, [allSelectableChecked, classStudents, leaveStudentIds]);
 
-  const handleConfirmAddStudents = useCallback(async () => {
-    if (pendingAddStudentIds.size === 0) {
-      Taro.showToast({ title: '请选择学员', icon: 'none' });
+  const getStudentCheckinStatus = useCallback(
+    (studentId: string): CheckinStatus => {
+      if (leaveStudentIds.has(studentId)) {
+        return 'leave';
+      }
+      if (checkedStudentIds.has(studentId)) {
+        return 'checked';
+      }
+      return 'absent';
+    },
+    [checkedStudentIds, leaveStudentIds],
+  );
+
+  const handleAttendanceSaveSuccess = useCallback(
+    async (title: string) => {
+      emitScheduleRefreshSignal();
+      Taro.showToast({ title, icon: 'success' });
+      if (selectedClassId) {
+        await loadClassStudents(selectedClassId);
+      }
+    },
+    [emitScheduleRefreshSignal, loadClassStudents, selectedClassId],
+  );
+
+  const persistStudentAttendanceRecord = useCallback(
+    async (
+      student: Student,
+      status: CheckinStatus,
+      options: { isSupplement?: boolean } = {},
+    ): Promise<void> => {
+      const existingRecord = recordByStudentId.get(student.id);
+      if (existingRecord) {
+        await lessonRecordService.remove(existingRecord.id);
+      }
+
+      const lessonDateValue = lessonDate;
+      const basePayload = {
+        teacher_id: selectedTeachingTeacherId || currentTeacherId,
+        operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
+        assistant_teacher_id: selectedAssistantTeacherId || undefined,
+        student_id: student.id,
+        class_id: selectedClassId,
+        lesson_date: lessonDateValue,
+        campus_id: campusId || undefined,
+        room: room || undefined,
+      };
+
+      if (status === 'checked') {
+        const pkg = studentPackages.get(student.id);
+        if (!pkg) {
+          throw new Error(`${student.name}：无可用课包`);
+        }
+
+        const studentSubject = studentSubjects.get(student.id);
+        const isCrossSubject =
+          !!pkg.subject_id && !!studentSubject && pkg.subject_id !== studentSubject.id;
+
+        const createdRecord = await lessonRecordService.create({
+          ...basePayload,
+          package_id: pkg.id,
+          hours_used: hoursUsed,
+          status: options.isSupplement ? 'makeup' : 'normal',
+          is_cross_subject: isCrossSubject || undefined,
+          package_subject: isCrossSubject ? pkg.name : undefined,
+          class_subject: isCrossSubject ? studentSubject?.name : undefined,
+          content: options.isSupplement
+            ? '补录签到'
+            : content.trim() || undefined,
+          performance: performance > 0 ? `${performance}星` : undefined,
+          homework: homework.trim() || undefined,
+          homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
+        });
+
+        const parents = await studentService.getParents(student.id);
+        for (const binding of parents) {
+          await notificationService.send({
+            sender_id: profile?.id || '',
+            receiver_id: binding.parent_id,
+            title: options.isSupplement ? `${student.name} 已补录签到` : `${student.name} 课时已核销`,
+            content: options.isSupplement
+              ? `${lessonDateValue} 已补录 ${hoursUsed} 课时，剩余 ${
+                  createdRecord.remaining_hours ??
+                  Math.max(pkg.remaining_hours - hoursUsed, 0)
+                } 课时`
+              : `本次核销 ${hoursUsed} 课时，剩余 ${
+                  createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
+                } 课时`,
+            related_id: student.id,
+          });
+        }
+        return;
+      }
+
+      if (status === 'leave') {
+        await lessonRecordService.create({
+          ...basePayload,
+          package_id: '',
+          hours_used: 0,
+          status: 'leave',
+          content: options.isSupplement ? '补录请假' : '家长已请假，本节课自动记为请假',
+        });
+        return;
+      }
+
+      await lessonRecordService.create({
+        ...basePayload,
+        package_id: '',
+        hours_used: 0,
+        status: 'absent',
+        content: options.isSupplement ? '补录未到' : '点名未到，待老师后续补录签到',
+      });
+    },
+    [
+      campusId,
+      content,
+      currentTeacherId,
+      homework,
+      homeworkImages,
+      hoursUsed,
+      lessonDate,
+      performance,
+      profile?.id,
+      recordByStudentId,
+      room,
+      selectedAssistantTeacherId,
+      selectedClassId,
+      selectedTeachingTeacherId,
+      studentPackages,
+      studentSubjects,
+    ],
+  );
+
+  const handleSupplementSave = useCallback(async () => {
+    if (!selectedClassId) {
+      Taro.showToast({ title: '请选择班级', icon: 'none' });
+      return;
+    }
+    if (supplementStudentIds.size === 0) {
+      Taro.showToast({ title: '请先补录学员', icon: 'none' });
+      return;
+    }
+    if (hoursUsed <= 0) {
+      Taro.showToast({ title: '消课课时必须大于0', icon: 'none' });
       return;
     }
 
-    const appendedStudents = addableStudents.filter((student) =>
-      pendingAddStudentIds.has(student.id),
+    const supplementStudents = classStudents.filter((student) =>
+      supplementStudentIds.has(student.id),
     );
-    if (appendedStudents.length === 0) {
-      Taro.showToast({ title: '暂无可添加学员', icon: 'none' });
+    const checkedCount = supplementStudents.filter((student) =>
+      checkedStudentIds.has(student.id),
+    ).length;
+
+    const confirmResult = await Taro.showModal({
+      title: '确认补录',
+      content: `将为 ${supplementStudents.length} 名学员追加本节课记录（签到 ${checkedCount} 人），不影响原有已点名学员。`,
+      confirmText: '保存补录',
+      confirmColor: '#3B6EF5',
+    });
+    if (!confirmResult.confirm) {
       return;
     }
 
-    const packageEntries = await Promise.all(
-      appendedStudents.map(async (student) => {
-        const pkgs = await packageService.getActiveByStudent(student.id);
-        const best = pickBestPackage(pkgs, hoursUsed);
-        if (!best) {
-          return { studentId: student.id, pkg: null, subject: null };
-        }
+    setSubmitting(true);
+    const successNames: string[] = [];
+    const failList: { name: string; reason: string }[] = [];
 
-        const subject = best.subject_id ? await subjectService.getById(best.subject_id) : null;
-        return { studentId: student.id, pkg: best, subject };
-      }),
-    );
+    try {
+      for (const student of supplementStudents) {
+        const status = getStudentCheckinStatus(student.id);
+        try {
+          await persistStudentAttendanceRecord(student, status, { isSupplement: true });
+          successNames.push(student.name);
+        } catch (error) {
+          logError('supplement single student', error);
+          failList.push({
+            name: student.name,
+            reason: error instanceof Error ? error.message : '补录失败',
+          });
+        }
+      }
 
-    setClassStudents((prev) => [...prev, ...appendedStudents]);
-    setCheckedStudentIds((prev) => {
-      const next = new Set(prev);
-      pendingAddStudentIds.forEach((studentId) => {
-        if (!leaveStudentIds.has(studentId)) {
-          next.add(studentId);
+      if (successNames.length > 0) {
+        try {
+          await auditLogService.record({
+            action: 'lesson.record',
+            operatorId: currentUserId || profile?.id || '',
+            operatorName: profile?.name || '未知',
+            operatorRole: profile?.currentContext?.role || 'unknown',
+            targetType: 'lesson_record',
+            detail: `补录签到：${successNames.join('、')}`,
+            meta: { count: successNames.length, names: successNames, hours: hoursUsed },
+          });
+        } catch (error) {
+          logError('audit supplement lesson.record', error);
         }
-      });
-      return next;
-    });
-    setStudentPackages((prev) => {
-      const next = new Map(prev);
-      packageEntries.forEach(({ studentId, pkg }) => {
-        if (pkg) {
-          next.set(studentId, pkg);
-        }
-      });
-      return next;
-    });
-    setStudentSubjects((prev) => {
-      const next = new Map(prev);
-      packageEntries.forEach(({ studentId, pkg, subject }) => {
-        if (pkg) {
-          next.set(studentId, subject);
-        }
-      });
-      return next;
-    });
-    setShowAddStudentSheet(false);
-    setPendingAddStudentIds(new Set());
-    setAddStudentKeyword('');
-  }, [addableStudents, hoursUsed, leaveStudentIds, pendingAddStudentIds]);
+        invalidateStudents(currentUserId);
+      }
 
-  // ===== 单人模式提交 =====
+      if (failList.length === 0) {
+        await handleAttendanceSaveSuccess(`已补录 ${successNames.length} 人`);
+      } else if (successNames.length === 0) {
+        Taro.showToast({ title: failList[0]?.reason || '补录失败', icon: 'none' });
+      } else {
+        Taro.showToast({
+          title: `${successNames.length}人成功，${failList.length}人失败`,
+          icon: 'none',
+          duration: 3000,
+        });
+        await handleAttendanceSaveSuccess(`已补录 ${successNames.length} 人`);
+      }
+    } catch (error) {
+      logError('handleSupplementSave', error);
+      Taro.showToast({ title: '补录失败，请重试', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    checkedStudentIds,
+    classStudents,
+    currentUserId,
+    getStudentCheckinStatus,
+    handleAttendanceSaveSuccess,
+    hoursUsed,
+    invalidateStudents,
+    persistStudentAttendanceRecord,
+    profile,
+    selectedClassId,
+    supplementStudentIds,
+  ]);
+
+  const handleIncrementalEditSave = useCallback(async () => {
+    if (!selectedClassId) {
+      Taro.showToast({ title: '请选择班级', icon: 'none' });
+      return;
+    }
+    if (hoursUsed <= 0) {
+      Taro.showToast({ title: '消课课时必须大于0', icon: 'none' });
+      return;
+    }
+
+    const changedStudents = classStudents.filter((student) => {
+      const currentStatus = getStudentCheckinStatus(student.id);
+      const baselineStatus = attendanceBaseline.get(student.id) || 'absent';
+      return currentStatus !== baselineStatus;
+    });
+
+    if (changedStudents.length === 0) {
+      Taro.showToast({ title: '暂无变更', icon: 'none' });
+      setAttendanceMode('view');
+      return;
+    }
+
+    const confirmResult = await Taro.showModal({
+      title: '确认保存修改',
+      content: `将更新 ${changedStudents.length} 名学员的本节课出勤记录，不影响未变更学员。`,
+      confirmText: '保存修改',
+      confirmColor: '#2563eb',
+    });
+    if (!confirmResult.confirm) {
+      return;
+    }
+
+    setSubmitting(true);
+    const successNames: string[] = [];
+    const failList: { name: string; reason: string }[] = [];
+
+    try {
+      for (const student of changedStudents) {
+        const status = getStudentCheckinStatus(student.id);
+        try {
+          await persistStudentAttendanceRecord(student, status);
+          successNames.push(student.name);
+        } catch (error) {
+          logError('incremental edit single student', error);
+          failList.push({
+            name: student.name,
+            reason: error instanceof Error ? error.message : '保存失败',
+          });
+        }
+      }
+
+      if (successNames.length > 0) {
+        invalidateStudents(currentUserId);
+      }
+
+      if (failList.length === 0) {
+        await handleAttendanceSaveSuccess(`已更新 ${successNames.length} 人`);
+      } else if (successNames.length === 0) {
+        Taro.showToast({ title: failList[0]?.reason || '保存失败', icon: 'none' });
+      } else {
+        Taro.showToast({
+          title: `${successNames.length}人成功，${failList.length}人失败`,
+          icon: 'none',
+          duration: 3000,
+        });
+        await handleAttendanceSaveSuccess(`已更新 ${successNames.length} 人`);
+      }
+    } catch (error) {
+      logError('handleIncrementalEditSave', error);
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    attendanceBaseline,
+    classStudents,
+    currentUserId,
+    getStudentCheckinStatus,
+    handleAttendanceSaveSuccess,
+    hoursUsed,
+    invalidateStudents,
+    persistStudentAttendanceRecord,
+    selectedClassId,
+  ]);
   const handleSingleSubmit = useCallback(async () => {
     if (!selectedStudent) {
       Taro.showToast({ title: '请选择学生', icon: 'none' });
@@ -1783,10 +2195,30 @@ const LessonForm: React.FC = () => {
 
     if (mode === 'single') {
       handleSingleSubmit();
-    } else {
-      handleClassSubmit();
+      return;
     }
-  }, [handleClassSubmit, handleSingleSubmit, isEditEntryAttempt, mode]);
+
+    if (isAlreadyChecked && attendanceMode === 'supplement') {
+      void handleSupplementSave();
+      return;
+    }
+
+    if (isAlreadyChecked && attendanceMode === 'edit') {
+      void handleIncrementalEditSave();
+      return;
+    }
+
+    handleClassSubmit();
+  }, [
+    attendanceMode,
+    handleClassSubmit,
+    handleIncrementalEditSave,
+    handleSingleSubmit,
+    handleSupplementSave,
+    isAlreadyChecked,
+    isEditEntryAttempt,
+    mode,
+  ]);
 
   // ===== 提交按钮文案 =====
   const submitText = useMemo(() => {
@@ -2170,32 +2602,22 @@ const LessonForm: React.FC = () => {
                       备注：{homework || '-'}
                     </Text>
                   </View>
-                  <View
-                    className="flex items-center justify-center rounded-[12rpx] bg-[#FF7E67] px-[28rpx] py-[12rpx]"
-                    onClick={() => {
-                      if (!scheduleIdParam) {
-                        Taro.showToast({ title: '缺少课节信息', icon: 'none' });
-                        return;
-                      }
-                      const [startTime = '', endTime = ''] = lessonTimeRange.split('-');
-                      Taro.navigateTo({
-                        url:
-                          `/package-course/pages/lesson-edit/index?scheduleId=${encodeURIComponent(scheduleIdParam)}` +
-                          `&classId=${encodeURIComponent(selectedClassId)}` +
-                          `&className=${encodeURIComponent(selectedClass?.name || '')}` +
-                          `&lessonDate=${encodeURIComponent(lessonDate)}` +
-                          `&startTime=${encodeURIComponent(startTime)}` +
-                          `&endTime=${encodeURIComponent(endTime)}` +
-                          `&leadTeacherId=${encodeURIComponent(selectedTeachingTeacherId)}` +
-                          `&assistantTeacherId=${encodeURIComponent(selectedAssistantTeacherId || '')}` +
-                          `&room=${encodeURIComponent('')}` +
-                          `&content=${encodeURIComponent(content)}` +
-                          `&homework=${encodeURIComponent(homework)}`,
-                      });
-                    }}
-                  >
-                    <Text className="text-[24rpx] font-medium leading-none text-white">编辑</Text>
-                  </View>
+                  {!isAlreadyChecked ? (
+                    <View
+                      className="flex items-center justify-center rounded-[12rpx] bg-[#FF7E67] px-[28rpx] py-[12rpx]"
+                      onClick={() => {
+                        if (!selectedClassId) {
+                          Taro.showToast({ title: '缺少班级信息', icon: 'none' });
+                          return;
+                        }
+                        Taro.navigateTo({
+                          url: `/package-course/pages/course-form/index?id=${encodeURIComponent(selectedClassId)}&type=class`,
+                        });
+                      }}
+                    >
+                      <Text className="text-[24rpx] font-medium leading-none text-white">编辑</Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             ) : null}
@@ -2311,14 +2733,16 @@ const LessonForm: React.FC = () => {
                   <View className="mx-[24rpx] mb-3">
                     <View className="mb-[16rpx] flex items-center justify-between">
                       <Text className="text-[26rpx] font-medium text-foreground">学员列表</Text>
-                      <View
-                        className={`flex items-center justify-center rounded-[12rpx] bg-muted px-[16rpx] py-[8rpx] ${viewMode ? 'opacity-60' : ''}`}
-                        onClick={viewMode ? undefined : handleOpenAddStudentSheet}
-                      >
-                        <Text className="text-[22rpx] font-medium leading-none text-muted-foreground">
-                          添加学员
-                        </Text>
-                      </View>
+                      {!isAlreadyChecked ? (
+                        <View
+                          className="flex items-center justify-center rounded-[12rpx] bg-muted px-[16rpx] py-[8rpx]"
+                          onClick={handleOpenAddStudentSheet}
+                        >
+                          <Text className="text-[22rpx] font-medium leading-none text-muted-foreground">
+                            添加学员
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                     <View className="grid grid-cols-2 gap-[16rpx]">
                       {mergedStudentList.map((item) => {
@@ -2334,7 +2758,7 @@ const LessonForm: React.FC = () => {
                               remaining={info.remaining}
                               deduct={info.deduct}
                               isTrial
-                              disabled={viewMode}
+                              disabled={isStudentCardDisabled(booking.id)}
                               onToggleStatus={(next) => handleSetTrialCheckin(booking.id, next)}
                               onOpenDetailSheet={() =>
                                 handleOpenStudentDetailSheet({
@@ -2359,7 +2783,8 @@ const LessonForm: React.FC = () => {
                             status={status}
                             remaining={info.remaining}
                             deduct={info.deduct}
-                            disabled={viewMode}
+                            disabled={isStudentCardDisabled(stu.id)}
+                            highlight={supplementStudentIds.has(stu.id)}
                             onToggleStatus={(next) => handleSetStudentCheckin(stu.id, next)}
                             onOpenDetailSheet={() =>
                               handleOpenStudentDetailSheet({
@@ -2431,103 +2856,18 @@ const LessonForm: React.FC = () => {
           </View>
         </BottomSheet>
 
-        <BottomSheet
+        <StudentMultiSelectSheet
           visible={showAddStudentSheet}
-          title="添加学员到点名名单"
-          maxHeight="78vh"
-          scrollable={false}
-          onClose={() => {
-            setShowAddStudentSheet(false);
-            setAddStudentKeyword('');
-            setPendingAddStudentIds(new Set());
-          }}
-        >
-          <View className="flex flex-col bg-white" style={{ height: 'calc(78vh - 120rpx)' }}>
-            <View className="border-b border-border/70 px-[32rpx] pb-[20rpx] pt-[8rpx]">
-              <View className="flex items-center gap-[16rpx] rounded-[22rpx] bg-muted px-[24rpx] py-[18rpx]">
-                <Icon name="mdi-magnify" size="sm" color="#94a3b8" />
-                <Input
-                  className="flex-1 text-[26rpx] text-foreground"
-                  value={addStudentKeyword}
-                  onInput={(event) => setAddStudentKeyword(event.detail.value)}
-                  placeholder="搜索学员姓名 / 昵称 / 手机号"
-                  placeholderClass="input-placeholder"
-                  confirmType="search"
-                />
-              </View>
-            </View>
-
-            <ScrollView scrollY className="min-h-0 flex-1 bg-white px-[32rpx] py-[24rpx]">
-              <View className="flex flex-col gap-[16rpx] pb-[12rpx]">
-                {filteredAddableStudents.map((student) => {
-                  const checked = pendingAddStudentIds.has(student.id);
-                  const pkg = studentPackages.get(student.id) || null;
-                  const subject = studentSubjects.get(student.id);
-                  const isOwe = pkg && pkg.remaining_hours < hoursUsed;
-                  const noPackage = !pkg;
-                  const isTrialStudent =
-                    hasTrialPackage(student.course_packages) || hasTrialPackage(pkg ? [pkg] : []);
-                  const subtitle = noPackage
-                    ? '无可用课包'
-                    : isOwe
-                      ? `欠课 · ${subject ? subject.name : pkg.name}仅剩${pkg.remaining_hours}课时`
-                      : `${subject ? subject.name : pkg.name} · ${pkg.remaining_hours}课时`;
-
-                  return (
-                    <PickerItem
-                      key={student.id}
-                      iconType="avatar"
-                      avatarBgColor={noPackage ? '#D9404020' : isOwe ? '#E8C46820' : '#5EC8A820'}
-                      avatarUrl={student.avatar_url}
-                      avatarChar={student.name[0]}
-                      title={student.name}
-                      titleExtra={
-                        isTrialStudent ? (
-                          <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
-                            <Text className="text-center text-[20rpx] font-medium text-error">
-                              试听
-                            </Text>
-                          </View>
-                        ) : undefined
-                      }
-                      subtitle={subtitle}
-                      selected={checked}
-                      right={{
-                        type: 'checkbox',
-                        checked,
-                        onCheckChange: () => handleTogglePendingStudent(student.id),
-                      }}
-                      onClick={() => handleTogglePendingStudent(student.id)}
-                    />
-                  );
-                })}
-
-                {filteredAddableStudents.length === 0 ? (
-                  <View className="rounded-[20rpx] bg-muted px-[24rpx] py-[24rpx]">
-                    <Text className="text-[24rpx] text-muted-foreground">
-                      {addStudentKeyword.trim() ? '没有找到匹配的学员。' : '当前没有可添加的学员。'}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </ScrollView>
-
-            <View className="border-t border-border bg-white px-[32rpx] pb-[32rpx] pt-[20rpx]">
-              <View
-                className={`rounded-[48rpx] py-[24rpx] text-center ${
-                  pendingAddStudentIds.size > 0 ? 'bg-primary' : 'bg-border'
-                }`}
-                onClick={
-                  pendingAddStudentIds.size > 0 ? () => void handleConfirmAddStudents() : undefined
-                }
-              >
-                <Text className="text-[28rpx] font-semibold text-white">
-                  确认添加 {pendingAddStudentIds.size} 人
-                </Text>
-              </View>
-            </View>
-          </View>
-        </BottomSheet>
+          students={addableStudents}
+          selectedIds={[]}
+          subjects={subjectOptions}
+          subjectId={selectedClass?.subject_id}
+          title={
+            addStudentSheetPurpose === 'supplement' ? '选择补录学员' : '添加学员到点名名单'
+          }
+          onClose={() => setShowAddStudentSheet(false)}
+          onConfirm={(ids) => void handleConfirmAddStudents(ids)}
+        />
 
         {/* ====== 学员编辑弹窗 ====== */}
         <StudentEditSheet
@@ -2553,8 +2893,12 @@ const LessonForm: React.FC = () => {
           <View className="fixed bottom-0 left-0 right-0 z-100 border-t border-border bg-white px-[32rpx] pt-[20rpx] pb-safe-bar">
             <View className="flex items-center justify-between gap-[24rpx]">
               <View
-                className={`flex items-center gap-[12rpx] ${viewMode ? 'opacity-50' : ''}`}
-                onClick={viewMode ? undefined : handleToggleSelectAllStudents}
+                className={`flex items-center gap-[12rpx] ${attendanceMode === 'view' || attendanceMode === 'supplement' ? 'opacity-50' : ''}`}
+                onClick={
+                  attendanceMode === 'view' || attendanceMode === 'supplement'
+                    ? undefined
+                    : handleToggleSelectAllStudents
+                }
               >
                 <View
                   className={`flex h-[36rpx] w-[36rpx] items-center justify-center rounded-full border-2 ${allSelectableChecked ? 'border-primary bg-primary' : 'border-muted-foreground bg-white'}`}
@@ -2563,21 +2907,59 @@ const LessonForm: React.FC = () => {
                 </View>
                 <Text className="text-[26rpx] text-foreground">全选签到</Text>
               </View>
-              {isAlreadyChecked && viewMode ? (
+              {isAlreadyChecked && attendanceMode === 'view' ? (
                 canModifyLesson ? (
-                  // 已点名 + 24h 内 → 「修改」：进入可编辑状态
-                  <View
-                    className="rounded-[48rpx] bg-[#FF7E67] px-[48rpx] py-[22rpx]"
-                    onClick={() => setViewMode(false)}
-                  >
-                    <Text className="text-center text-[28rpx] font-medium text-white">修改</Text>
+                  <View className="flex items-center gap-[16rpx]">
+                    <View
+                      className="rounded-[48rpx] border border-primary bg-white px-[36rpx] py-[22rpx]"
+                      onClick={handleOpenSupplementSheet}
+                    >
+                      <Text className="text-center text-[28rpx] font-medium text-primary">
+                        补录
+                      </Text>
+                    </View>
+                    <View
+                      className="rounded-[48rpx] bg-[#FF7E67] px-[36rpx] py-[22rpx]"
+                      onClick={handleEnterEditMode}
+                    >
+                      <Text className="text-center text-[28rpx] font-medium text-white">修改</Text>
+                    </View>
                   </View>
                 ) : (
-                  // 已点名 + 超 24h → 只读，不可修改
                   <View className="rounded-[48rpx] bg-muted px-[48rpx] py-[22rpx]">
                     <Text className="text-center text-[28rpx] font-medium text-white">已提交</Text>
                   </View>
                 )
+              ) : isAlreadyChecked && attendanceMode === 'supplement' ? (
+                <View className="flex items-center gap-[16rpx]">
+                  <View
+                    className="rounded-[48rpx] border border-border bg-white px-[32rpx] py-[22rpx]"
+                    onClick={handleCancelSupplement}
+                  >
+                    <Text className="text-center text-[28rpx] font-medium text-foreground">
+                      取消
+                    </Text>
+                  </View>
+                  <View
+                    className={`rounded-[48rpx] px-[32rpx] py-[22rpx] ${submitting || supplementStudentIds.size === 0 ? 'bg-muted' : 'bg-primary'}`}
+                    onClick={
+                      submitting || supplementStudentIds.size === 0 ? undefined : handleSubmit
+                    }
+                  >
+                    <Text className="text-center text-[28rpx] font-medium text-white">
+                      {submitting ? '保存中...' : '保存补录'}
+                    </Text>
+                  </View>
+                </View>
+              ) : isAlreadyChecked && attendanceMode === 'edit' ? (
+                <View
+                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting ? 'bg-muted' : 'bg-[#FF7E67]'}`}
+                  onClick={submitting ? undefined : handleSubmit}
+                >
+                  <Text className="text-center text-[28rpx] font-medium text-white">
+                    {submitting ? '保存中...' : '保存修改'}
+                  </Text>
+                </View>
               ) : (
                 <View
                   className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting || !selectedClassId ? 'bg-muted' : 'bg-[#FF7E67]'}`}

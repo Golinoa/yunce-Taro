@@ -22,6 +22,10 @@ export const DEFAULT_CATEGORY_IDS = {
   private: 'cat-private',
 } as const;
 
+/** 课程管理 · 班课 Tab 直达链接（首页「班级管理」等入口复用） */
+export const COURSE_MANAGEMENT_CLASS_TAB_URL =
+  `/package-course/pages/course-management/index?categoryId=${DEFAULT_CATEGORY_IDS.class}`;
+
 /** 课程模式选项（不含线上课） */
 export const CATEGORY_MODE_OPTIONS: {
   label: string;

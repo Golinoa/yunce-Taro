@@ -22,6 +22,7 @@ import {
   mockGetOperationContent,
   HOME_QUICK_ENTRIES,
 } from '@/data/home';
+import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/data/course-category';
 import type {
   StatsPeriod,
   StatsData,
@@ -184,7 +185,7 @@ const TODO_CONFIG_MAP: Record<
   lesson: {
     icon: 'mdi-book-open-variant',
     iconBg: 'checkin',
-    url: '/package-course/pages/classes/index',
+    url: COURSE_MANAGEMENT_CLASS_TAB_URL,
   },
   recharge: {
     icon: 'mdi-cash-plus',
@@ -204,7 +205,7 @@ const TODO_CONFIG_MAP: Record<
   checkin: {
     icon: 'mdi-account-check-outline',
     iconBg: 'alert',
-    url: '/package-course/pages/classes/index',
+    url: COURSE_MANAGEMENT_CLASS_TAB_URL,
   },
 };
 
@@ -375,7 +376,7 @@ function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] 
       desc: '请尽快安排续费或提醒',
       icon: 'mdi-book-open-variant',
       iconBg: 'checkin',
-      url: '/package-course/pages/classes/index',
+      url: COURSE_MANAGEMENT_CLASS_TAB_URL,
     });
   }
 

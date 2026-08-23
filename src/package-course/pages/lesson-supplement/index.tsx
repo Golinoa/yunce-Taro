@@ -1,12 +1,12 @@
-import { View, Text, Textarea, Input, ScrollView } from '@tarojs/components';
+import { View, Text, Textarea } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
@@ -17,7 +17,9 @@ import {
   studentService,
 } from '@/services';
 import { auditLogService } from '@/services/audit-log';
+import { subjectService } from '@/services/campus';
 import { useStudentStore } from '@/stores';
+import type { Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -85,8 +87,7 @@ const LessonSupplementPage: React.FC = () => {
   const [recordByStudentId, setRecordByStudentId] = useState<Map<string, LessonRecord>>(new Map());
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [showAddStudentSheet, setShowAddStudentSheet] = useState(false);
-  const [pendingAddStudentIds, setPendingAddStudentIds] = useState<Set<string>>(new Set());
-  const [addStudentKeyword, setAddStudentKeyword] = useState('');
+  const [subjectOptions, setSubjectOptions] = useState<Subject[]>([]);
   const [hoursUsed, setHoursUsed] = useState(1);
   const [note, setNote] = useState('');
   const { loading, setLoading } = useDelayedLoading();
@@ -215,18 +216,12 @@ const LessonSupplementPage: React.FC = () => {
     [selectedStudentIds, students, teacherStudents],
   );
 
-  const filteredAddableStudents = useMemo(() => {
-    const keyword = addStudentKeyword.trim().toLowerCase();
-    if (!keyword) {
-      return addableStudents;
-    }
-
-    return addableStudents.filter((student) => {
-      const searchText =
-        `${student.name}${student.nickname || ''}${student.phone || ''}`.toLowerCase();
-      return searchText.includes(keyword);
-    });
-  }, [addStudentKeyword, addableStudents]);
+  useEffect(() => {
+    void subjectService
+      .getList()
+      .then(setSubjectOptions)
+      .catch((err) => logError('lesson-supplement load subjects', err));
+  }, []);
 
   useEffect(() => {
     setSelectedStudentIds((prev) => {
@@ -273,41 +268,27 @@ const LessonSupplementPage: React.FC = () => {
       return;
     }
 
-    setAddStudentKeyword('');
-    setPendingAddStudentIds(new Set());
     setShowAddStudentSheet(true);
   }, [addableStudents.length]);
 
-  const handleTogglePendingStudent = useCallback((studentId: string) => {
-    setPendingAddStudentIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(studentId)) {
-        next.delete(studentId);
-      } else {
-        next.add(studentId);
+  const handleConfirmAddStudents = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) {
+        Taro.showToast({ title: '请选择学员', icon: 'none' });
+        return;
       }
-      return next;
-    });
-  }, []);
 
-  const handleConfirmAddStudents = useCallback(() => {
-    if (pendingAddStudentIds.size === 0) {
-      Taro.showToast({ title: '请选择学员', icon: 'none' });
-      return;
-    }
-
-    const appendedStudents = addableStudents.filter((student) =>
-      pendingAddStudentIds.has(student.id),
-    );
-    setStudents((prev) => [...prev, ...appendedStudents]);
-    setSelectedStudentIds((prev) => {
-      const next = new Set(prev);
-      pendingAddStudentIds.forEach((studentId) => next.add(studentId));
-      return next;
-    });
-    setShowAddStudentSheet(false);
-    setPendingAddStudentIds(new Set());
-  }, [addableStudents, pendingAddStudentIds]);
+      const appendedStudents = addableStudents.filter((student) => ids.includes(student.id));
+      setStudents((prev) => [...prev, ...appendedStudents]);
+      setSelectedStudentIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((studentId) => next.add(studentId));
+        return next;
+      });
+      setShowAddStudentSheet(false);
+    },
+    [addableStudents],
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!classId) {
@@ -732,142 +713,16 @@ const LessonSupplementPage: React.FC = () => {
           </View>
         </View>
 
-        <BottomSheet
+        <StudentMultiSelectSheet
           visible={showAddStudentSheet}
+          students={addableStudents}
+          selectedIds={[]}
+          subjects={subjectOptions}
+          subjectId={classInfo?.subject_id}
           title="添加学员到补录名单"
-          maxHeight="78vh"
-          scrollable={false}
-          onClose={() => {
-            setShowAddStudentSheet(false);
-            setAddStudentKeyword('');
-            setPendingAddStudentIds(new Set());
-          }}
-        >
-          <View className="flex flex-col bg-white" style={{ height: 'calc(78vh - 120rpx)' }}>
-            <View className="border-b border-border/70 px-[32rpx] pb-[20rpx] pt-[8rpx]">
-              <View className="flex items-center gap-[16rpx] rounded-[22rpx] bg-muted px-[24rpx] py-[18rpx]">
-                <Icon name="mdi-magnify" size="sm" color="#94a3b8" />
-                <Input
-                  className="flex-1 text-[26rpx] text-foreground"
-                  value={addStudentKeyword}
-                  onInput={(event) => setAddStudentKeyword(event.detail.value)}
-                  placeholder="搜索学员姓名 / 昵称 / 手机号"
-                  placeholderClass="input-placeholder"
-                  confirmType="search"
-                />
-              </View>
-            </View>
-
-            <ScrollView scrollY className="min-h-0 flex-1 bg-white px-[32rpx] py-[24rpx]">
-              <View className="flex flex-col gap-[16rpx] pb-[12rpx]">
-                {filteredAddableStudents.map((student) => {
-                  const checked = pendingAddStudentIds.has(student.id);
-                  const matchedPackage = matchedPackageByStudent.get(student.id);
-                  const isTrialStudent = hasTrialPackage(studentPackages.get(student.id));
-                  const record = recordByStudentId.get(student.id);
-                  const isDebtByInsufficient = Boolean(
-                    matchedPackage && matchedPackage.remaining_hours < hoursUsed,
-                  );
-
-                  let secondaryText = '';
-                  let secondaryClassName = 'text-muted-foreground';
-                  let statusTagText = '可补录';
-                  let statusTagClassName = 'bg-primary/10 text-primary';
-
-                  if (record?.status === 'cancelled') {
-                    secondaryText = '原记录已取消，可重新补录';
-                    statusTagText = '已取消';
-                    statusTagClassName = 'bg-amber-50 text-amber-600';
-                  } else if (record?.status === 'leave') {
-                    secondaryText = '原记录为请假，本次可补录';
-                    statusTagText = '请假';
-                    statusTagClassName = 'bg-info/10 text-info';
-                  } else if (record?.status === 'absent') {
-                    secondaryText = '原记录为缺勤，本次可补录';
-                    statusTagText = '缺勤';
-                    statusTagClassName = 'bg-warning/10 text-warning';
-                  } else if (matchedPackage && !isDebtByInsufficient) {
-                    secondaryText = `使用课包 ${matchedPackage.name}，剩余 ${matchedPackage.remaining_hours} 课时`;
-                  } else if (matchedPackage) {
-                    secondaryText = `课包 ${matchedPackage.name} 仅剩 ${matchedPackage.remaining_hours} 课时，补录后记为欠课时`;
-                    secondaryClassName = 'text-warning';
-                    statusTagText = '欠课时';
-                    statusTagClassName = 'bg-warning/10 text-warning';
-                  } else {
-                    secondaryText = '当前无可用课时包，补录后记为欠课时';
-                    secondaryClassName = 'text-warning';
-                    statusTagText = '欠课时';
-                    statusTagClassName = 'bg-warning/10 text-warning';
-                  }
-
-                  return (
-                    <View
-                      key={student.id}
-                      className={`rounded-[24rpx] border px-[24rpx] py-[22rpx] ${
-                        checked ? 'border-primary bg-primary/5' : 'border-border bg-white'
-                      }`}
-                      onClick={() => handleTogglePendingStudent(student.id)}
-                    >
-                      <View className="flex items-center gap-[20rpx]">
-                        <StudentAvatar name={student.name} size="sm" />
-                        <View className="min-w-0 flex-1">
-                          <View className="flex items-center gap-[12rpx]">
-                            <Text className="shrink-0 text-[28rpx] font-medium text-foreground">
-                              {student.name}
-                            </Text>
-                            {isTrialStudent ? (
-                              <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
-                                <Text className="text-center text-[20rpx] font-medium text-error">
-                                  试听
-                                </Text>
-                              </View>
-                            ) : null}
-                            <View
-                              className={`rounded-[8rpx] px-[12rpx] py-[4rpx] ${statusTagClassName}`}
-                            >
-                              <Text className="text-center text-[20rpx] font-medium">
-                                {statusTagText}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text className={`mt-[6rpx] block text-[24rpx] ${secondaryClassName}`}>
-                            {secondaryText}
-                          </Text>
-                        </View>
-                        <Icon
-                          name={checked ? 'mdi-check-circle' : 'mdi-checkbox-blank-circle-outline'}
-                          size="sm"
-                          color={checked ? '#3B6EF5' : '#c7ced9'}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-
-                {filteredAddableStudents.length === 0 && (
-                  <View className="rounded-[20rpx] bg-muted px-[24rpx] py-[24rpx]">
-                    <Text className="text-[24rpx] text-muted-foreground">
-                      {addStudentKeyword.trim() ? '没有找到匹配的学员。' : '当前没有可添加的学员。'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-
-            <View className="border-t border-border bg-white px-[32rpx] pb-[32rpx] pt-[20rpx]">
-              <View
-                className={`rounded-[48rpx] py-[24rpx] text-center ${
-                  pendingAddStudentIds.size > 0 ? 'bg-primary' : 'bg-border'
-                }`}
-                onClick={pendingAddStudentIds.size > 0 ? handleConfirmAddStudents : undefined}
-              >
-                <Text className="text-[28rpx] font-semibold text-white">
-                  确认添加 {pendingAddStudentIds.size} 人
-                </Text>
-              </View>
-            </View>
-          </View>
-        </BottomSheet>
+          onClose={() => setShowAddStudentSheet(false)}
+          onConfirm={handleConfirmAddStudents}
+        />
       </View>
     </PageContainer>
   );

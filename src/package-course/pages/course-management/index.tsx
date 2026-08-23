@@ -77,6 +77,10 @@ const CourseManagementPage: React.FC = () => {
   }, [categories]);
 
   useDidShow(() => {
+    const routeCategoryId = decodeURIComponent(
+      Taro.getCurrentInstance()?.router?.params?.categoryId || '',
+    );
+
     // 已排课班级 id 集合（用于未排课标签判断）
     void classService
       .getScheduledClassIds()
@@ -90,18 +94,22 @@ const CourseManagementPage: React.FC = () => {
         .catch(() => setActiveClasses([]));
     }
     void fetchList().then(() => {
-      // 确保激活分类有效：如果当前 activeCategoryId 不在列表中，自动选第一个
       const { categories: latestCategories, activeCategoryId: currentId } =
         useCourseCategoryStore.getState();
-      const isValid = latestCategories.some((c) => c.id === currentId);
+      const preferredCategoryId =
+        routeCategoryId && latestCategories.some((c) => c.id === routeCategoryId)
+          ? routeCategoryId
+          : currentId;
+      const isValid = latestCategories.some((c) => c.id === preferredCategoryId);
       if (!isValid && latestCategories.length > 0) {
         const firstId = latestCategories[0].id;
         setActiveCategoryId(firstId);
         setActiveTemplateCategoryId(firstId);
         void fetchByCategoryId(firstId);
       } else if (isValid) {
-        setActiveTemplateCategoryId(currentId);
-        void fetchByCategoryId(currentId);
+        setActiveCategoryId(preferredCategoryId);
+        setActiveTemplateCategoryId(preferredCategoryId);
+        void fetchByCategoryId(preferredCategoryId);
       }
     });
     try {
@@ -128,9 +136,13 @@ const CourseManagementPage: React.FC = () => {
     [fetchByCategoryId, setActiveCategoryId, setActiveTemplateCategoryId],
   );
 
+  const isClassTab = activeCategoryItem?.mode === 'class';
+
   const handleAdd = useCallback(() => {
-    Taro.navigateTo({ url: '/package-course/pages/course-form/index' });
-  }, []);
+    const categoryId = activeCategoryId || activeCategoryItem?.id || '';
+    const query = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : '';
+    Taro.navigateTo({ url: `/package-course/pages/course-form/index${query}` });
+  }, [activeCategoryId, activeCategoryItem?.id]);
 
   const handleCategoryLongPress = useCallback((id: string) => {
     Taro.navigateTo({ url: `/package-course/pages/category-form/index?id=${id}` });
@@ -294,10 +306,7 @@ const CourseManagementPage: React.FC = () => {
                       className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
                       onClick={() =>
                         Taro.navigateTo({
-                          // 用户口径（2026-08-23）：已排课 → 班级详情；未排课 → 统一进编辑课程页面（班级模式，无弹窗）
-                          url: hasSchedule
-                            ? `/package-course/pages/class-detail/index?id=${encodeURIComponent(cls.id)}`
-                            : `/package-course/pages/course-form/index?id=${encodeURIComponent(cls.id)}&type=class`,
+                          url: `/package-course/pages/course-form/index?id=${encodeURIComponent(cls.id)}&type=class`,
                         })
                       }
                     >
@@ -367,14 +376,16 @@ const CourseManagementPage: React.FC = () => {
         })()}
       </View>
 
-      {/* 底部新增课程按钮 */}
+      {/* 底部新增按钮：班课 Tab 文案为「新增班级」 */}
       <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))]">
         <View
           className="w-full py-[26rpx] rounded-full bg-card border-[2rpx] border-primary flex items-center justify-center gap-[12rpx] press-scale shadow-soft"
           onClick={handleAdd}
         >
           <Icon name="mdi-plus" size={28} color="primary" />
-          <Text className="text-[30rpx] font-semibold text-primary">新增课程</Text>
+          <Text className="text-[30rpx] font-semibold text-primary">
+            {isClassTab ? '新增班级' : '新增课程'}
+          </Text>
         </View>
       </View>
 
