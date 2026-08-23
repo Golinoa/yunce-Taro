@@ -137,7 +137,7 @@ const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
                         </Text>
                         <View
                           className={cn(
-                            'center rounded-[8rpx] px-[10rpx] py-[2rpx]',
+                            'center shrink-0 whitespace-nowrap rounded-[8rpx] px-[10rpx] py-[2rpx]',
                             open ? 'bg-success/10' : 'bg-muted',
                           )}
                         >

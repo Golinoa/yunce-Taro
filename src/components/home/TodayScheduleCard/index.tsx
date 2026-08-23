@@ -211,7 +211,8 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                   return (
                     <View
                       className={cn(
-                        'w-[152rpx] shrink-0 flex flex-col items-center justify-center py-[24rpx] border-r',
+                        // 用户口径（2026-08-23）：左侧时间区收窄到 100rpx（原 152rpx 的 2/3，取双数整数）
+                        'w-[100rpx] shrink-0 flex flex-col items-center justify-center py-[24rpx] border-r',
                         !colorKey && TIME_AREA_STYLE.bg,
                         !colorKey && TIME_AREA_STYLE.border,
                         timeStatusClass,
@@ -247,32 +248,31 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                       <Text className={cn('text-[30rpx] font-bold truncate', getNameClass(status))}>
                         {displayName}
                       </Text>
-                      {/* 状态标签 - 对齐设计稿 px-1.5=6rpx py-0.5=2rpx text-[10px]=20rpx
-                          修复标签圆角 bug（2026-08-23）：unocss-applet 不生成裸 rounded 类，改 rounded-full 胶囊 */}
+                      {/* 状态标签 - 用户口径（2026-08-23）：加宽 padding + shrink-0 + nowrap，避免文字被挤压 */}
                       {isUnattended && (
-                        <View className="course-tag-unattended rounded-full px-[6rpx] py-[2rpx]">
+                        <View className="course-tag-unattended rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">未点名</Text>
                         </View>
                       )}
                       {isDone && (
-                        <View className="course-tag-done rounded-full px-[6rpx] py-[2rpx]">
+                        <View className="course-tag-done rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已完成</Text>
                         </View>
                       )}
                       {isEnded && (
-                        <View className="course-tag-ended rounded-full px-[6rpx] py-[2rpx]">
+                        <View className="course-tag-ended rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已下课</Text>
                         </View>
                       )}
                       {/* 非 done/ended/unattended 状态显示约课标签 */}
                       {!isDone && !isEnded && !isUnattended && item.tag && (
-                        <View className="course-tag-booking rounded-full px-[6rpx] py-[2rpx]">
+                        <View className="course-tag-booking rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
                       )}
                       {/* ended 状态也显示约课标签但半透明 */}
                       {isEnded && item.tag && (
-                        <View className="course-tag-booking rounded-full px-[6rpx] py-[2rpx] opacity-70">
+                        <View className="course-tag-booking rounded-full shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
                       )}
@@ -341,8 +341,9 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                     )}
                   </View>
 
-                  {/* 操作按钮 - 对齐设计稿 px-4=32rpx py-1.5=12rpx text-[12px]=24rpx */}
-                  <View className="shrink-0 flex flex-col items-end gap-[8rpx]">
+                  {/* 操作按钮 - 对齐设计稿 px-4=32rpx py-1.5=12rpx text-[12px]=24rpx
+                      用户口径（2026-08-23）：按钮列垂直居中，避免按钮贴顶靠上 */}
+                  <View className="shrink-0 flex flex-col items-end justify-center gap-[8rpx]">
                     {status === 'urgent' && getCountdownText(item.start_time) && (
                       <Text className="text-[20rpx] course-urgent-hint font-medium">
                         {getCountdownText(item.start_time)}

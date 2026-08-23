@@ -340,7 +340,7 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                         <Text className="text-[28rpx] font-bold text-foreground block truncate">
                           {card.title}
                         </Text>
-                        <View className="px-[10rpx] py-[2rpx] rounded-[8rpx] bg-[hsl(var(--primary)/0.08)]">
+                        <View className="shrink-0 whitespace-nowrap px-[10rpx] py-[2rpx] rounded-[8rpx] bg-[hsl(var(--primary)/0.08)]">
                           <Text className="text-[18rpx] font-bold text-[hsl(var(--primary))]">
                             {card.studentCountText}
                           </Text>
@@ -393,7 +393,7 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                                 {detail.packageTagText ? (
                                   <View
                                     className={cn(
-                                      'px-[10rpx] py-[2rpx] rounded-[8rpx]',
+                                      'shrink-0 whitespace-nowrap px-[10rpx] py-[2rpx] rounded-[8rpx]',
                                       detail.packageTagClassName,
                                     )}
                                   >
@@ -405,7 +405,7 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                                 {detail.attendanceStatusText ? (
                                   <View
                                     className={cn(
-                                      'px-[10rpx] py-[2rpx] rounded-[8rpx]',
+                                      'shrink-0 whitespace-nowrap px-[10rpx] py-[2rpx] rounded-[8rpx]',
                                       detail.attendanceStatusClassName,
                                     )}
                                   >

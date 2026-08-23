@@ -873,8 +873,8 @@ export default defineConfig({
     'btn-secondary': 'h-[88rpx] rounded-2xl flex items-center justify-center press-scale',
 
     // ===== 全局标签规范 =====
-    // 状态标签：已统一 padding + font-size，防止文字溢出
-    tag: 'rounded px-2 py-0_d5 text-xs font-medium inline-flex items-center whitespace-nowrap',
+    // 状态标签：统一 padding + 圆角 + 不换行防挤压（2026-08-23：rounded 在 applet 不生成，改 rounded-full）
+    tag: 'rounded-full px-2 py-0_d5 text-xs font-medium inline-flex items-center shrink-0 whitespace-nowrap',
     'tag-primary': 'tag bg-primary/10 text-primary',
     'tag-purple': 'tag bg-purple-10 text-purple',
     'tag-amber': 'tag bg-amber-10 text-amber',

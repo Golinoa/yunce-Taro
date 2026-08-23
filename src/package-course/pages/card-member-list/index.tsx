@@ -216,7 +216,7 @@ const CardMemberListPage: React.FC = () => {
               </Text>
               <View
                 className={cn(
-                  'inline-flex items-center rounded-[16rpx] px-[10rpx] py-[2rpx]',
+                  'inline-flex items-center shrink-0 whitespace-nowrap rounded-[16rpx] px-[10rpx] py-[2rpx]',
                   STATUS_TAG_STYLES[member.status],
                 )}
               >
