@@ -1,7 +1,9 @@
 /**
  * 排课颜色主题
+ * 用户口径（2026-08-23）：排课颜色 = 班级颜色（ClassColor），
+ * 保证今日课表与课程管理/班级详情颜色一致。
  */
-export type ScheduleColor = 'primary' | 'info' | 'accent' | 'lavender';
+export type ScheduleColor = 'primary' | 'red' | 'amber' | 'purple' | 'info' | 'teal';
 
 /**
  * 课程类型（左侧时间区配色）

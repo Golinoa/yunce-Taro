@@ -47,24 +47,24 @@ import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { uploadImage } from '@/utils/image-upload';
 
-/** 班级色 key → 课程模板色值（COURSE_COLOR_OPTIONS 内就近取值，班级模式回填用） */
+/** 班级色 key → 课程模板色值（统一色板 classColorHex，班级模式回填用） */
 const CLASS_COLOR_TO_FORM_HEX: Record<string, string> = {
-  primary: '#10B981',
-  red: '#EF4444',
-  amber: '#F59E0B',
-  purple: '#8B5CF6',
-  info: '#0EA5E9',
-  teal: '#14B8A6',
+  primary: '#5EC8A8',
+  red: '#E57373',
+  amber: '#D4A24E',
+  purple: '#9B7ED8',
+  info: '#6BA3D6',
+  teal: '#4FC3B7',
 };
 
 /** 课程模板色值 → 班级色 key（班级模式保存回班级用） */
 const FORM_HEX_TO_CLASS_COLOR: Record<string, string> = {
-  '#10B981': 'primary',
-  '#EF4444': 'red',
-  '#F59E0B': 'amber',
-  '#8B5CF6': 'purple',
-  '#0EA5E9': 'info',
-  '#14B8A6': 'teal',
+  '#5EC8A8': 'primary',
+  '#E57373': 'red',
+  '#D4A24E': 'amber',
+  '#9B7ED8': 'purple',
+  '#6BA3D6': 'info',
+  '#4FC3B7': 'teal',
 };
 
 /** 表单字段错误 */

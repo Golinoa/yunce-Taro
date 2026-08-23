@@ -8,12 +8,14 @@ interface ScheduleTimelineProps {
   schedules: Schedule[];
 }
 
-// 排课颜色主题（对齐 theme.ts scheduleColors，使用 hsla 引用 CSS 变量）
+// 排课颜色主题（统一色板 classColorHex，用户口径 2026-08-23：与今日课表/课程管理一致）
 const colorMap: Record<ScheduleColor, { bg: string; text: string }> = {
-  primary: { bg: 'hsl(var(--primary) / 0.25)', text: 'hsl(var(--primary) / 0.85)' },
-  info: { bg: 'hsl(var(--info) / 0.25)', text: 'hsl(var(--info) / 0.85)' },
-  accent: { bg: 'hsl(var(--accent) / 0.25)', text: 'hsl(var(--accent) / 0.85)' },
-  lavender: { bg: 'hsl(var(--petal-purple) / 0.25)', text: 'hsl(var(--petal-purple) / 0.85)' },
+  primary: { bg: '#5EC8A840', text: '#5EC8A8' },
+  red: { bg: '#E5737340', text: '#E57373' },
+  amber: { bg: '#D4A24E40', text: '#D4A24E' },
+  purple: { bg: '#9B7ED840', text: '#9B7ED8' },
+  info: { bg: '#6BA3D640', text: '#6BA3D6' },
+  teal: { bg: '#4FC3B740', text: '#4FC3B7' },
 };
 
 const ScheduleTimeline: React.FC<ScheduleTimelineProps> = ({ schedules }) => {

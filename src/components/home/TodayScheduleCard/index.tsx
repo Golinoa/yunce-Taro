@@ -4,7 +4,7 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
-import { scheduleColors } from '@/theme';
+import { classColorHex } from '@/theme';
 import type { Schedule, CourseStatus } from '@/types/schedule';
 
 export interface TodayScheduleCardProps {
@@ -191,19 +191,16 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                   const timeStatusClass = getTimeBgClass(status);
                   // 状态（urgent/done/ended）有专属背景时优先状态色；否则用班级颜色；再回退橙色
                   const colorKey =
-                    !timeStatusClass && item.color && scheduleColors[item.color]
-                      ? item.color
-                      : null;
+                    !timeStatusClass && item.color && classColorHex[item.color] ? item.color : null;
+                  const colorHex = colorKey ? classColorHex[colorKey] : '';
                   const colorStyle = colorKey
                     ? {
-                        backgroundColor: scheduleColors[colorKey].bg,
-                        borderColor: scheduleColors[colorKey].text,
+                        backgroundColor: `${colorHex}40`,
+                        borderColor: colorHex,
                       }
                     : undefined;
                   const timeTextClass = colorKey ? '' : TIME_AREA_STYLE.text;
-                  const timeTextStyle = colorKey
-                    ? { color: scheduleColors[colorKey].text }
-                    : undefined;
+                  const timeTextStyle = colorKey ? { color: colorHex } : undefined;
                   return (
                     <View
                       className={cn(
@@ -223,9 +220,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                       {/* 分割线：无班级颜色时用统一橙色，有班级颜色时用班级色覆盖 */}
                       <View
                         className="w-[16rpx] h-[2rpx] my-[4rpx] bg-[hsl(var(--warning)/0.3)]"
-                        style={
-                          colorKey ? { backgroundColor: scheduleColors[colorKey].text } : undefined
-                        }
+                        style={colorKey ? { backgroundColor: colorHex } : undefined}
                       />
                       <Text
                         className={cn('text-[24rpx] font-bold opacity-60', timeTextClass)}

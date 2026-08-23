@@ -2662,8 +2662,8 @@ export interface Schedule {
   startTime: string;
   endTime: string;
   room?: string;
-  /** 排课/班级颜色（primary/info/accent/lavender），首页课表卡片左侧时间区使用 */
-  color?: 'primary' | 'info' | 'accent' | 'lavender';
+  /** 排课/班级颜色（与班级 ClassColor 一致，用户口径 2026-08-23） */
+  color?: 'primary' | 'red' | 'amber' | 'purple' | 'info' | 'teal';
   status: 'scheduled' | 'done' | 'cancelled';
   semesterId?: string;
   semesterName?: string;
@@ -2722,7 +2722,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-005',
     classId: 'cls-003',
-    color: 'lavender',
+    color: 'purple',
     teacherId: 'teacher-001',
     campusId: 'campus-center',
     dayOfWeek: 6,
@@ -2734,7 +2734,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-006',
     classId: 'cls-004',
-    color: 'accent',
+    color: 'amber',
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 1,
@@ -2746,7 +2746,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-007',
     classId: 'cls-004',
-    color: 'accent',
+    color: 'amber',
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 5,
@@ -2758,7 +2758,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-008',
     classId: 'cls-005',
-    color: 'primary',
+    color: 'teal',
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 3,
@@ -2770,7 +2770,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-009',
     classId: 'cls-005',
-    color: 'primary',
+    color: 'teal',
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 6,
@@ -2782,7 +2782,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-010',
     classId: 'cls-006',
-    color: 'accent',
+    color: 'red',
     teacherId: 'teacher-003',
     campusId: 'campus-east',
     dayOfWeek: 2,
@@ -2794,7 +2794,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-011',
     classId: 'cls-006',
-    color: 'accent',
+    color: 'red',
     teacherId: 'teacher-003',
     campusId: 'campus-east',
     dayOfWeek: 4,
@@ -2806,7 +2806,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-012',
     classId: 'cls-007',
-    color: 'lavender',
+    color: 'amber',
     teacherId: 'teacher-003',
     campusId: 'campus-east',
     dayOfWeek: 6,
@@ -2818,7 +2818,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-013',
     classId: 'cls-008',
-    color: 'info',
+    color: 'purple',
     teacherId: 'teacher-002',
     campusId: 'campus-east',
     dayOfWeek: 5,
@@ -2830,7 +2830,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-014',
     classId: 'cls-009',
-    color: 'primary',
+    color: 'info',
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 3,
@@ -2842,7 +2842,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-015',
     classId: 'cls-009',
-    color: 'primary',
+    color: 'info',
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 5,
@@ -2854,7 +2854,7 @@ export const SCHEDULES: Schedule[] = [
   {
     id: 'sch-016',
     classId: 'cls-010',
-    color: 'lavender',
+    color: 'teal',
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 7,

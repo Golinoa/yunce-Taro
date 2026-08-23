@@ -615,7 +615,22 @@ export const classColors = {
   amber: { gradient: 'linear-gradient(135deg, #d4a24e, #e8c47a)', label: '琥珀' },
   info: { gradient: 'linear-gradient(135deg, #6ba3d6, #93c5e8)', label: '天蓝' },
   purple: { gradient: 'linear-gradient(135deg, #9b7ed8, #bda4e8)', label: '紫罗兰' },
+  red: { gradient: 'linear-gradient(135deg, #E57373, #f2a0a0)', label: '绯红' },
+  teal: { gradient: 'linear-gradient(135deg, #4FC3B7, #8adfd6)', label: '青碧' },
 } as const;
+
+/**
+ * 班级颜色统一色板（ClassColor key → hex）：
+ * 课程管理 / 班级详情头部 / 今日课表 / 新增课程预设色 共用此表，保证颜色一致（用户口径 2026-08-23）
+ */
+export const classColorHex: Record<string, string> = {
+  primary: '#5EC8A8',
+  red: '#E57373',
+  amber: '#D4A24E',
+  purple: '#9B7ED8',
+  info: '#6BA3D6',
+  teal: '#4FC3B7',
+};
 
 // ============================================
 // 动画 Token

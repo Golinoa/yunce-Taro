@@ -31,20 +31,14 @@ export const COURSE_CATEGORY_LABEL: Record<CourseCategory, string> = {
   private: '私教',
 };
 
-/** 课程颜色选项 */
+/** 课程颜色选项（统一色板，与班级颜色 classColorHex 一致，用户口径 2026-08-23） */
 export const COURSE_COLOR_OPTIONS = [
-  '#3B6EF5',
-  '#EF4444',
-  '#F59E0B',
-  '#10B981',
-  '#8B5CF6',
-  '#0EA5E9',
-  '#EC4899',
-  '#6366F1',
-  '#14B8A6',
-  '#F97316',
-  '#84CC16',
-  '#06B6D4',
+  '#5EC8A8', // primary 薄荷绿
+  '#6BA3D6', // info 天蓝
+  '#9B7ED8', // purple 紫罗兰
+  '#D4A24E', // amber 琥珀
+  '#E57373', // red 绯红
+  '#4FC3B7', // teal 青碧
 ];
 
 /** 年龄组选项 */
@@ -127,8 +121,16 @@ let MOCK_TEMPLATES: CourseTemplate[] = [
     isOnline: false,
     // 已排入 10 名学员，编辑时若将容量改到 10 以下应触发「人数超限」拦截
     studentIds: [
-      'stu-001', 'stu-002', 'stu-003', 'stu-004', 'stu-005',
-      'stu-006', 'stu-007', 'stu-008', 'stu-009', 'stu-010',
+      'stu-001',
+      'stu-002',
+      'stu-003',
+      'stu-004',
+      'stu-005',
+      'stu-006',
+      'stu-007',
+      'stu-008',
+      'stu-009',
+      'stu-010',
     ],
     createdAt: '2026-07-01T10:00:00Z',
     updatedAt: '2026-07-15T10:00:00Z',

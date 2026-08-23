@@ -20,24 +20,13 @@ import { classService } from '@/services';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useCourseTemplateStore } from '@/stores/course-template';
+import { classColorHex } from '@/theme';
 import type { Class } from '@/types/class';
 import type { CourseTemplate } from '@/types/course-template';
 import { useAuth } from '@/utils/auth';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.course;
 const CATEGORY_TIP_KEY = 'course_management_category_tip_hidden';
-
-/** 班级颜色 → 色条 hex（与班级管理/课表一致） */
-const CLASS_BAR_COLORS: Record<string, string> = {
-  primary: '#5EC8A8',
-  accent: '#e88aaa',
-  amber: '#d4a24e',
-  info: '#6ba3d6',
-  purple: '#9b7ed8',
-  teal: '#4FC3B7',
-  red: '#E57373',
-  lavender: '#A08CD2',
-};
 
 /** 课程管理列表页 */
 const CourseManagementPage: React.FC = () => {
@@ -316,7 +305,7 @@ const CourseManagementPage: React.FC = () => {
                         <View
                           className="w-[16rpx] h-[88rpx] rounded-full shrink-0"
                           style={{
-                            backgroundColor: CLASS_BAR_COLORS[cls.color] || 'hsl(var(--primary))',
+                            backgroundColor: classColorHex[cls.color] || 'hsl(var(--primary))',
                           }}
                         />
                         <View className="min-w-0 flex-1">

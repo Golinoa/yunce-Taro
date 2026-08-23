@@ -104,51 +104,6 @@ const ClassDetail: React.FC = () => {
 
         {/* ====== 2. 内容区域 ====== */}
         <View className="px-5 -mt-4 relative z-10 pb-32">
-          {/* 统计卡片 - 3列 */}
-          {isEnded ? (
-            <View className="bg-white rounded-2xl p-5 shadow-soft mb-3">
-              <View className="grid grid-cols-3 gap-2">
-                <View className="stat-card bg-purple-bg">
-                  <Text className="stat-value text-purple">{classInfo.used_lessons}</Text>
-                  <Text className="stat-label">已上课时</Text>
-                </View>
-                <View className="stat-card bg-purple-bg">
-                  <Text className="stat-value text-purple">{classInfo.total_lessons}</Text>
-                  <Text className="stat-label">总课时</Text>
-                </View>
-                <View className="stat-card bg-purple-bg">
-                  <Text className="stat-value text-purple">{students.length}</Text>
-                  <Text className="stat-label">学生数</Text>
-                </View>
-              </View>
-            </View>
-          ) : (
-            <View className="bg-white rounded-2xl p-5 shadow-soft mb-3">
-              <View className="grid grid-cols-3 gap-2">
-                <View className="stat-card bg-primary-bg">
-                  {isUnlimited ? (
-                    <Text className="stat-value text-primary">∞</Text>
-                  ) : (
-                    <Text className="stat-value text-primary">{classInfo.used_lessons}</Text>
-                  )}
-                  <Text className="stat-label">已上课时</Text>
-                </View>
-                <View className="stat-card bg-primary-bg">
-                  {isUnlimited ? (
-                    <Text className="stat-value text-primary">∞</Text>
-                  ) : (
-                    <Text className="stat-value text-primary">{classInfo.total_lessons}</Text>
-                  )}
-                  <Text className="stat-label">总课时</Text>
-                </View>
-                <View className="stat-card bg-primary-bg">
-                  <Text className="stat-value text-primary">{students.length}</Text>
-                  <Text className="stat-label">学生数</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
           {/* 上课安排 */}
           <View className="bg-white rounded-2xl p-5 shadow-soft mb-3">
             <Text className="text-base font-semibold text-foreground block mb-2">上课安排</Text>
@@ -170,48 +125,7 @@ const ClassDetail: React.FC = () => {
             )}
           </View>
 
-          {/* 课时进度 */}
-          <View className="bg-white rounded-2xl p-5 shadow-soft mb-3">
-            <Text className="text-base font-semibold text-foreground block mb-3">课时进度</Text>
-            {isEnded ? (
-              <View>
-                <View className="flex justify-between mb-2">
-                  <Text className="text-sm text-muted-foreground">课时进度</Text>
-                  <Text className="text-sm font-semibold text-purple">
-                    {classInfo.used_lessons} / {classInfo.total_lessons} 已完成
-                  </Text>
-                </View>
-                <View className="h-2 rounded-sm overflow-hidden bg-progress-purple-track">
-                  <View className="h-full rounded-sm bg-progress-purple w-full" />
-                </View>
-              </View>
-            ) : isUnlimited ? (
-              <View>
-                <View className="flex justify-between mb-2">
-                  <Text className="text-sm text-muted-foreground">上课进度</Text>
-                  <Text className="text-sm font-semibold text-primary">循环上课</Text>
-                </View>
-                <View className="h-2 rounded-sm overflow-hidden bg-progress-primary" />
-              </View>
-            ) : (
-              <View>
-                <View className="flex justify-between mb-2">
-                  <Text className="text-sm text-muted-foreground">课时进度</Text>
-                  <Text className="text-sm font-semibold text-primary">
-                    {classInfo.used_lessons} / {classInfo.total_lessons}
-                  </Text>
-                </View>
-                <View className="h-2 rounded-sm overflow-hidden bg-progress-primary-track">
-                  <View
-                    className="h-full rounded-sm bg-progress-primary"
-                    style={{
-                      width: `${classInfo.total_lessons ? Math.round((classInfo.used_lessons / classInfo.total_lessons) * 100) : 0}%`,
-                    }}
-                  />
-                </View>
-              </View>
-            )}
-          </View>
+          {/* 用户口径（2026-08-23）：课时进度 / 已上课时 / 总课时 / 学生数 均已移除 */}
 
           {/* ====== 已结课：收费与流水 ====== */}
           {isEnded && (

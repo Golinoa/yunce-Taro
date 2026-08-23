@@ -464,37 +464,37 @@ export default defineConfig({
     ['bg-amber-500/15', { background: 'hsl(var(--warning) / 0.15)' }],
     ['text-amber-500', { color: 'hsl(var(--warning))' }],
 
-    // ===== 班级颜色主题（使用 CSS 变量） =====
+    // ===== 班级颜色主题（统一色板，用户口径 2026-08-23：与课程管理/今日课表 classColorHex 一致） =====
     [
       'bg-class-primary',
-      { background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))' },
+      { background: 'linear-gradient(135deg, #5EC8A8, #7dd8bc)' },
     ],
     [
       'bg-class-red',
-      { background: 'linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive)/0.7))' },
+      { background: 'linear-gradient(135deg, #E57373, #f2a0a0)' },
     ],
     [
       'bg-class-amber',
-      { background: 'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning)/0.7))' },
+      { background: 'linear-gradient(135deg, #D4A24E, #e8c47a)' },
     ],
     [
       'bg-gradient-amber',
       {
-        background: 'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning)/0.7))',
-        'box-shadow': '0 3px 10px hsl(var(--warning)/0.35)',
+        background: 'linear-gradient(135deg, #D4A24E, #e8c47a)',
+        'box-shadow': '0 3px 10px rgba(212,162,78,0.35)',
       },
     ],
     [
       'bg-class-purple',
-      { background: 'linear-gradient(135deg, hsl(var(--petal-purple)), hsl(var(--petal-purple)/0.7))' },
+      { background: 'linear-gradient(135deg, #9B7ED8, #bda4e8)' },
     ],
     [
       'bg-class-info',
-      { background: 'linear-gradient(135deg, hsl(var(--info)), hsl(var(--info)/0.7))' },
+      { background: 'linear-gradient(135deg, #6BA3D6, #93c5e8)' },
     ],
     [
       'bg-class-teal',
-      { background: 'linear-gradient(135deg, hsl(var(--petal-cyan)), hsl(var(--petal-cyan)/0.7))' },
+      { background: 'linear-gradient(135deg, #4FC3B7, #8adfd6)' },
     ],
     ['text-purple', { color: 'hsl(var(--accent))' }],
     ['bg-purple-10', { background: 'hsl(var(--accent) / 0.1)' }],
