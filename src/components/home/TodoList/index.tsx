@@ -35,6 +35,12 @@ const ICON_BG_MAP: Record<string, string> = {
  * - 图标配色：alert(红橙预警)、leave(橙/warning)、hours(红/destructive)、checkin(绿/success)
  */
 const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
+  // 用户口径（2026-08-23）：待办超过 3 个时收起，标题 + 手风琴展开/收起
+  const [expanded, setExpanded] = React.useState(false);
+  const MAX_COLLAPSED = 3;
+  const collapsed = items.length > MAX_COLLAPSED;
+  const visibleItems = collapsed && !expanded ? items.slice(0, MAX_COLLAPSED) : items;
+
   if (items.length === 0) {
     return (
       <View className="bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[60rpx] text-center">
@@ -45,7 +51,7 @@ const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
 
   return (
     <View className="flex flex-col gap-[20rpx]">
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <View
           key={item.id}
           className="flex items-center gap-[20rpx] px-[28rpx] py-[24rpx] bg-card rounded-[28rpx] shadow-card border-[2rpx] border-[hsl(var(--border))] active:shadow-float transition-shadow duration-200"
@@ -77,6 +83,18 @@ const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
           <Text className="text-[hsl(var(--border))] text-[32rpx]">›</Text>
         </View>
       ))}
+      {/* 手风琴：超过 3 个时显示展开/收起（用户口径 2026-08-23） */}
+      {collapsed && (
+        <View
+          className="flex items-center justify-center gap-[8rpx] py-[16rpx] press-scale"
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          <Text className="text-[26rpx] font-medium text-primary">
+            {expanded ? '收起' : `展开全部（${items.length}）`}
+          </Text>
+          <Icon name={expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'} size={24} color="primary" />
+        </View>
+      )}
     </View>
   );
 };

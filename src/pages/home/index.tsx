@@ -26,6 +26,7 @@ import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 /** Tab 类型 */
@@ -163,6 +164,23 @@ const Home: React.FC = () => {
         setUnreadCount(unread);
         setTodoItems(todoList);
         setRecentRecords(lessonRecords);
+
+        // 未点名提醒（用户口径 2026-08-23）：当天 20:00 后，今日课表存在下课未点名 → 微信订阅消息提醒补点名
+        const now = new Date();
+        if (now.getHours() >= 20) {
+          const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          const unattended = scheduleList.find((s) => s.status === 'unattended');
+          if (unattended && !hasPushedUnattended(todayStr)) {
+            void pushUnattendedReminder(
+              {
+                className: unattended.class_info?.name || '未点名课程',
+                startTime: unattended.start_time,
+                scheduleId: unattended.id,
+              },
+              todayStr,
+            );
+          }
+        }
       } catch (err) {
         logError('Home loadData', err);
       }

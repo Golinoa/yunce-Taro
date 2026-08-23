@@ -54,8 +54,12 @@ export interface Schedule {
   // 课程卡片扩展字段
   /** 课程状态 */
   status?: CourseStatus;
-  /** 已点名人数 */
+  /** 已点名（签到）人数 */
   checked_count?: number;
+  /** 未到人数 */
+  absent_count?: number;
+  /** 请假人数 */
+  leave_count?: number;
   /** 总学员数 */
   total_count?: number;
   /** 教室 */

@@ -53,7 +53,7 @@ export interface QuickEntry {
 export interface TodoItemData {
   id: string;
   title: string;
-  type: 'alert' | 'lesson' | 'recharge' | 'meeting' | 'salary';
+  type: 'alert' | 'lesson' | 'recharge' | 'meeting' | 'salary' | 'checkin';
   time: string;
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
@@ -542,6 +542,39 @@ export async function mockGetTodoItems(
       priority: 'low',
       completed: scope.role !== 'principal',
     },
+    // 未点名降级待办（用户口径 2026-08-23）：昨日下课未点名的课 → 次日进待办提醒补点名
+    (() => {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      const yesterdayStr = `${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}`;
+      const yesterdayWeekday = yesterday.getDay() || 7;
+      const unattended = SCHEDULES.find((s) => {
+        if (s.dayOfWeek !== yesterdayWeekday || s.status === 'cancelled' || !s.classId) {
+          return false;
+        }
+        const cls = CLASSES.find((c) => c.id === s.classId);
+        if (!cls || !cls.studentCount) return false;
+        const hasRecord = LESSON_RECORDS.some(
+          (r) =>
+            r.classId === s.classId &&
+            r.date === yesterdayStr &&
+            (r.status === 'checked' || r.status === 'absent' || r.status === 'leave'),
+        );
+        return !hasRecord;
+      });
+      if (!unattended) return null;
+      const cls = CLASSES.find((c) => c.id === unattended.classId);
+      return {
+        id: `todo-unattended-${unattended.id}-${yesterdayStr}`,
+        title: `「${cls?.name || '班级'}」昨日未点名`,
+        type: 'checkin' as const,
+        time: '待补点名',
+        priority: 'high' as const,
+        completed: false,
+      };
+    })(),
   ].filter(Boolean) as TodoItemData[];
 }
 

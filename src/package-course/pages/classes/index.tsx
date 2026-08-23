@@ -179,8 +179,8 @@ const ClassesPage: React.FC = () => {
                 <View className="flex items-center gap-3">
                   <View className="w-10 h-10 rounded-xl bg-gray-100" />
                   <View className="flex-1">
-                    <View className="h-4 w-24 bg-gray-100 rounded mb-2" />
-                    <View className="h-3 w-32 bg-gray-100 rounded" />
+                    <View className="h-4 w-24 bg-gray-100 rounded-full mb-2" />
+                    <View className="h-3 w-32 bg-gray-100 rounded-full" />
                   </View>
                 </View>
               </View>

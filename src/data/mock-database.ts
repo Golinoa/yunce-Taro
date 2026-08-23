@@ -3260,6 +3260,45 @@ export const LESSON_RECORDS = [
   createSamplePersonalLessonRecord(),
 ];
 
+// ===== 今日演示点名记录（用户口径 2026-08-23）=====
+// mock 历史记录只生成到昨天，今天没有点名记录会导致今日课表全部显示"未点名"。
+// 此处为今天有排课的班级动态补一批点名记录（签到/未到/请假），便于验证卡片三形态。
+(function generateTodayDemoRecords() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const weekday = now.getDay() || 7;
+  const todaySchedules = SCHEDULES.filter(
+    (s) => s.dayOfWeek === weekday && s.status === 'scheduled' && s.classId,
+  );
+  if (todaySchedules.length === 0) return;
+  const todayRecords = LESSON_RECORDS.filter(
+    (r) => r.classId && r.date === todayStr && r.status !== 'cancelled',
+  );
+  if (todayRecords.length > 0) return; // 已有今日记录（如提前点名），不重复生成
+  for (const schedule of todaySchedules) {
+    const students = STUDENTS.filter((stu) => stu.classIds?.includes(schedule.classId));
+    students.forEach((stu, idx) => {
+      // 演示分布：前两名未到/请假，其余签到（已点名，用于展示 done 卡片明细）
+      const status: 'checked' | 'absent' | 'leave' =
+        idx === 0 ? 'absent' : idx === 1 ? 'leave' : 'checked';
+      LESSON_RECORDS.push({
+        id: `today-demo-${schedule.id}-${stu.id}`,
+        studentId: stu.id,
+        teacherId: schedule.teacherId,
+        classId: schedule.classId,
+        campusId: schedule.campusId,
+        date: todayStr,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        hours: 1,
+        status,
+        createdAt: now.toISOString(),
+      });
+    });
+  }
+})();
+
 // ============================================
 // 10. 请假记录
 // ============================================

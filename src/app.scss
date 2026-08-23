@@ -686,11 +686,6 @@ button.privacy-agree-btn:active {
   background: hsl(var(--muted)) !important;
   border-right-color: hsl(var(--border)) !important;
 }
-/* 已下课未点名：醒目提醒色（用户口径 2026-08-23） */
-.course-time-unattended-v14 {
-  background: linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive)/0.7)) !important;
-  border-right-color: hsl(var(--destructive)) !important;
-}
 
 /* 进度条 - 对齐项目蓝色主题 */
 .progress-fill-active {

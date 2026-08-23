@@ -200,6 +200,12 @@ const TODO_CONFIG_MAP: Record<
     iconBg: 'alert',
     url: '/package-teacher/pages/salary-payment/index',
   },
+  // 未点名降级待办（用户口径 2026-08-23）：点击去补点名
+  checkin: {
+    icon: 'mdi-account-check-outline',
+    iconBg: 'alert',
+    url: '/package-course/pages/classes/index',
+  },
 };
 
 function getTodayDateString(): string {
@@ -242,7 +248,9 @@ function mapTodoItem(item: TodoItemData): HomeTodoItem {
           ? `${item.time} 跟进续费提醒`
           : item.type === 'salary'
             ? `${item.time} 前往薪资管理`
-            : `${item.time} 查看安排`;
+            : item.type === 'checkin'
+              ? `${item.time}，点击进入补点名`
+              : `${item.time} 查看安排`;
 
   return {
     id: item.id,
@@ -356,7 +364,7 @@ function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] 
 
 function getScheduleStatus(
   schedule: RawHomeSchedule,
-  checkedCount: number,
+  attendedCount: number,
   totalCount: number,
 ): NonNullable<Schedule['status']> {
   if (schedule.status === 'done') {
@@ -373,11 +381,11 @@ function getScheduleStatus(
 
   if (currentMinutes > endMinutes) {
     // 已下课：有学生但未点名 → 未点名提醒（用户口径 2026-08-23：禁止查看，须先点名）
-    if (totalCount > 0 && checkedCount === 0) return 'unattended';
-    return checkedCount > 0 ? 'done' : 'done';
+    if (totalCount > 0 && attendedCount === 0) return 'unattended';
+    return 'done';
   }
   if (currentMinutes >= startMinutes) {
-    return checkedCount > 0 ? 'active' : 'urgent';
+    return attendedCount > 0 ? 'active' : 'urgent';
   }
 
   const diffMinutes = startMinutes - currentMinutes;
@@ -395,8 +403,26 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
       record.date === today &&
       record.status === 'checked',
   );
+  const absentRecords = LESSON_RECORDS.filter(
+    (record) =>
+      record.classId === schedule.classId &&
+      record.teacherId === schedule.teacherId &&
+      record.date === today &&
+      record.status === 'absent',
+  );
+  const leaveRecords = LESSON_RECORDS.filter(
+    (record) =>
+      record.classId === schedule.classId &&
+      record.teacherId === schedule.teacherId &&
+      record.date === today &&
+      record.status === 'leave',
+  );
   const checkedCount = checkedRecords.length;
-  const totalCount = classInfo?.studentCount ?? checkedCount;
+  const absentCount = absentRecords.length;
+  const leaveCount = leaveRecords.length;
+  // 已点名 = 签到 + 未到 + 请假（老师点过名即可算已点名）
+  const attendedCount = checkedCount + absentCount + leaveCount;
+  const totalCount = classInfo?.studentCount ?? attendedCount;
 
   return {
     id: schedule.id,
@@ -407,12 +433,14 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     end_time: schedule.endTime,
     room: schedule.room,
     color: schedule.color,
-    status: getScheduleStatus(schedule, checkedCount, totalCount),
+    status: getScheduleStatus(schedule, attendedCount, totalCount),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     note: classInfo?.name || '未命名课程',
     class_info: classInfo ? { name: classInfo.name } : undefined,
     checked_count: checkedCount,
+    absent_count: absentCount,
+    leave_count: leaveCount,
     total_count: totalCount,
     teacher_name: teacherInfo?.name || '授课老师',
   };
