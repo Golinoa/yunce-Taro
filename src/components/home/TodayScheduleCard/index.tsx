@@ -193,19 +193,44 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
               }}
             >
               <View className="flex">
-                {/* 左侧时间区 - 优先班级颜色（排课 color），无 color 时回退统一橙色；状态覆盖仍生效 */}
+                {/* 左侧时间区 - done/urgent/ended 强制 inline 状态色（2026-08-23：兜底避免 CSS 加载顺序导致色错），其余用班级色 / 默认橙 */}
                 {(() => {
                   const timeStatusClass = getTimeBgClass(status);
-                  // 状态（urgent/done/ended）有专属背景时优先状态色；否则用班级颜色；再回退橙色
+                  // 兜底 inline 状态色（解决 course-time-done-v14 等类名在某些情况下未生效的问题）
+                  const forcedStatusStyle: React.CSSProperties | null =
+                    status === 'done'
+                      ? {
+                          backgroundColor: 'hsl(var(--success) / 0.08)',
+                          borderRightColor: 'hsl(var(--success) / 0.2)',
+                        }
+                      : status === 'urgent'
+                        ? {
+                            background:
+                              'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7))',
+                            borderRightColor: 'hsl(var(--warning))',
+                          }
+                        : status === 'ended'
+                          ? {
+                              background: 'hsl(var(--muted))',
+                              borderRightColor: 'hsl(var(--border))',
+                            }
+                          : null;
                   const colorKey =
-                    !timeStatusClass && item.color && classColorHex[item.color] ? item.color : null;
+                    !forcedStatusStyle &&
+                    !timeStatusClass &&
+                    item.color &&
+                    classColorHex[item.color]
+                      ? item.color
+                      : null;
                   const colorHex = colorKey ? classColorHex[colorKey] : '';
-                  const colorStyle = colorKey
-                    ? {
-                        backgroundColor: `${colorHex}40`,
-                        borderColor: colorHex,
-                      }
-                    : undefined;
+                  const colorStyle: React.CSSProperties | undefined = forcedStatusStyle
+                    ? forcedStatusStyle
+                    : colorKey
+                      ? {
+                          backgroundColor: `${colorHex}40`,
+                          borderColor: colorHex,
+                        }
+                      : undefined;
                   const timeTextClass = colorKey ? '' : TIME_AREA_STYLE.text;
                   const timeTextStyle = colorKey ? { color: colorHex } : undefined;
                   return (
