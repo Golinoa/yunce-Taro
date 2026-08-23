@@ -1019,6 +1019,29 @@ export const CLASSES: Class[] = [
     pricePerLesson: 150,
     createdAt: '2025-09-20T00:00:00Z',
   },
+  // 演示班级（用户口径 2026-08-23）：今日课表 23:00 未点名演示，保持当天无点名记录
+  {
+    id: 'cls-demo',
+    name: '少儿素描基础班',
+    teacherId: 'teacher-004',
+    campusId: 'campus-west',
+    subjectId: 'sub-art',
+    categoryId: 'cat-class',
+    type: 'limited',
+    schedule: '周日 23:00-24:00',
+    weekdays: [7],
+    startTime: '23:00',
+    endTime: '24:00',
+    totalLessons: 30,
+    usedLessons: 8,
+    status: 'active',
+    startDate: '2026-06-01',
+    color: 'primary',
+    icon: 'art',
+    studentCount: 5,
+    pricePerLesson: 130,
+    createdAt: '2026-05-28T00:00:00Z',
+  },
   // 曦绘艺术 - 张老师（开放预约）
   {
     id: 'cls-011',
@@ -2036,7 +2059,7 @@ export const STUDENTS: Student[] = [
     address: '杭州市余杭区EFC欧美金融城',
     campusId: 'campus-west',
     teacherId: 'teacher-004',
-    classIds: ['cls-009'],
+    classIds: ['cls-009', 'cls-demo'],
     totalHours: 38,
     remainingHours: 22,
     status: 'active',
@@ -2053,7 +2076,7 @@ export const STUDENTS: Student[] = [
     address: '杭州市余杭区梦想小镇',
     campusId: 'campus-west',
     teacherId: 'teacher-004',
-    classIds: ['cls-009'],
+    classIds: ['cls-009', 'cls-demo'],
     totalHours: 32,
     remainingHours: 18,
     status: 'active',
@@ -2069,7 +2092,7 @@ export const STUDENTS: Student[] = [
     address: '杭州市余杭区海创园',
     campusId: 'campus-west',
     teacherId: 'teacher-004',
-    classIds: ['cls-009'],
+    classIds: ['cls-009', 'cls-demo'],
     totalHours: 36,
     remainingHours: 24,
     status: 'active',
@@ -2085,7 +2108,7 @@ export const STUDENTS: Student[] = [
     address: '杭州市余杭区阿里巴城园区',
     campusId: 'campus-west',
     teacherId: 'teacher-004',
-    classIds: ['cls-009'],
+    classIds: ['cls-009', 'cls-demo'],
     totalHours: 28,
     remainingHours: 16,
     status: 'active',
@@ -2101,7 +2124,7 @@ export const STUDENTS: Student[] = [
     address: '杭州市余杭区未来科技城',
     campusId: 'campus-west',
     teacherId: 'teacher-004',
-    classIds: ['cls-009'],
+    classIds: ['cls-009', 'cls-demo'],
     totalHours: 40,
     remainingHours: 20,
     status: 'active',
@@ -2863,17 +2886,17 @@ export const SCHEDULES: Schedule[] = [
     room: '美术教室1',
     status: 'scheduled',
   },
-  // 演示排课（用户口径 2026-08-23）：今天 11:00 一条未点名、一条点过名，用于验证卡片三形态
+  // 演示排课（用户口径 2026-08-23）：今晚 23:00 一条未点名、一条点过名，用于验证卡片三形态
   {
     id: 'sch-demo-unattended',
-    classId: 'cls-010',
-    color: 'teal',
+    classId: 'cls-demo',
+    color: 'primary',
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 7,
-    startTime: '11:00',
-    endTime: '12:30',
-    room: '国画教室1',
+    startTime: '23:00',
+    endTime: '24:00',
+    room: '素描教室1',
     status: 'scheduled',
   },
   {
@@ -2883,8 +2906,8 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 7,
-    startTime: '11:00',
-    endTime: '12:30',
+    startTime: '23:00',
+    endTime: '24:00',
     room: '书法教室1',
     status: 'scheduled',
   },
@@ -3298,9 +3321,9 @@ export const LESSON_RECORDS = [
   );
   if (todaySchedules.length === 0) return;
   for (const schedule of todaySchedules) {
-    // 用户口径（2026-08-23）：cls-010（sch-demo-unattended 演示未点名）不补记录，
+    // 用户口径（2026-08-23）：cls-demo（sch-demo-unattended 演示未点名）不补记录，
     // 保持今日未点名状态；其余班级若当天尚无记录则补一批点名记录（签到/未到/请假）。
-    if (schedule.classId === 'cls-010') continue;
+    if (schedule.classId === 'cls-demo') continue;
     const hasRecord = LESSON_RECORDS.some(
       (r) => r.classId === schedule.classId && r.date === todayStr && r.status !== 'cancelled',
     );
