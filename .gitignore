@@ -33,6 +33,10 @@ npm-debug.log*
 
 # Local backups & temp files
 dist_bak_*/
+dist_dev_*/
+dist_prev_*/
+dist_prod_*/
+dist_incomplete_*/
 _dtest_bak/
 _ow.txt
 _rt2.txt

@@ -1,1 +1,0 @@
-"use strict";(wx["webpackJsonp"]=wx["webpackJsonp"]||[]).push([[2699],{465:function(t,n,e){function c(t){if(!t)return"";var n=new Date(t);return"".concat(n.getFullYear(),"\u5e74").concat(n.getMonth()+1,"\u6708").concat(n.getDate(),"\u65e5")}e.d(n,{G:function(){return c}})}}]);
