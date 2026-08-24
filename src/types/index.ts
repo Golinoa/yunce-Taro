@@ -4,6 +4,8 @@
 
 // 用户与认证
 export type { UserRole, Profile, AuthSession } from './profile';
+export type { TodoItem } from './home-todo';
+export type { TodoQuadrant } from './todo-quadrant';
 
 // 教师
 export type {

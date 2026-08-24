@@ -28,7 +28,7 @@ export interface TestAccount {
   label: string;
 }
 export const TEST_ACCOUNTS: TestAccount[] = [
-  { username: 'principal1', label: '校长' },
+  { username: 'principal1', label: '万老师（校长·机构创建者）' },
   { username: 'teacher1', label: '教师' },
   { username: 'parent1', label: '家长' },
 ];
@@ -488,7 +488,7 @@ export const STUDENT_PARENTS: StudentParentBinding[] = [
 ];
 
 export const IDENTITIES: Identity[] = [
-  // 管理员 - 可访问全部校区，拥有系统设置等管理权限
+  // 机构创建者（万老师）- admin 身份，可访问全部校区与系统设置
   {
     id: 'identity-principal-001',
     userId: 'user-principal-001',

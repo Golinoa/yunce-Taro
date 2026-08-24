@@ -19,7 +19,7 @@ const HOME_GRID_GRADIENTS = [
   { from: '#FF922B', to: '#FCC419', deg: 135 }, // 添加学员 - 橙黄
   { from: '#4DABF7', to: '#22B8CF', deg: 135 }, // 考勤管理 - 蓝青
   { from: '#845EF7', to: '#E64980', deg: 135 }, // 试听记录 - 紫粉
-  { from: '#FA5252', to: '#F06595', deg: 135 }, // 课时套餐 - 红粉
+  { from: '#FA5252', to: '#F06595', deg: 135 }, // 充值记录 - 红粉
   { from: '#4DABF7', to: '#845EF7', deg: 135 }, // 班级管理 - 蓝紫
   { from: '#9775FA', to: '#4DABF7', deg: 135 }, // 教师管理 - 紫蓝
   { from: '#22B8CF', to: '#51CF66', deg: 135 }, // 校区设置 - 青绿

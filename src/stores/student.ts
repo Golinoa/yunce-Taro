@@ -3,7 +3,7 @@
  * 缓存学员列表，避免重复请求；增删改后自动 invalidate
  */
 import { create } from 'zustand';
-import { studentService } from '@/services';
+import { studentService } from '@/services/student';
 import type { Student } from '@/types/student';
 import { logError } from '@/utils/logger';
 

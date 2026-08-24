@@ -313,7 +313,7 @@ const rawMockTeachers: Omit<TeacherUIModel, 'accessScope' | 'accessScopeText'>[]
     avatar: '',
     identity: 'principal',
     role: 'lead',
-    roleText: '主讲',
+    roleText: '校长',
     subject: '',
     phone: '13800000001',
     hours: 42,

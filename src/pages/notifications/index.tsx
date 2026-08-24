@@ -101,6 +101,9 @@ const NotificationsPage: React.FC = () => {
       <View className="min-h-screen bg-background">
         {/* 分组列表 */}
         <View className="px-[32rpx] pt-[24rpx] pb-[60rpx] flex flex-col gap-[24rpx]">
+          <Text className="text-[24rpx] text-muted-foreground leading-relaxed px-[8rpx]">
+            以下开关控制微信订阅消息等站外推送；关闭后不影响首页「待办事项」Tab 内的页面内提醒。
+          </Text>
           {groups.map((group, groupIndex) => (
             <View key={group.title} className="bg-card rounded-[28rpx] overflow-hidden">
               {/* 分组标题 */}

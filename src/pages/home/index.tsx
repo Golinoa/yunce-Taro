@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Image } from '@tarojs/components';
+import { View, Text, ScrollView, Image, PageMeta } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -7,7 +7,10 @@ import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import KingKongSection from '@/components/home/KingKongSection';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import TodoList from '@/components/home/TodoList';
-import type { TodoItem } from '@/components/home/TodoList';
+import type { TodoItem } from '@/types/home-todo';
+import AddCustomTodoSheet from '@/components/home/AddCustomTodoSheet';
+import AddNoteSheet from '@/components/home/AddNoteSheet';
+import ExpandableFabMenu from '@/components/home/ExpandableFabMenu';
 import Icon from '@/components/Icon';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
@@ -23,6 +26,7 @@ import type { CampusUIModel } from '@/types/campus';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
+import { getTodoShowTabBadge } from '@/utils/todo-settings';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -35,6 +39,8 @@ type HomeTab = 'schedule' | 'todo' | 'recent';
 
 const HOME_TAB_ORDER: HomeTab[] = ['schedule', 'todo', 'recent'];
 const ORG_COVER_IMAGE = '/assets/images/2.jpg';
+/** 待办列表进入视口后，距底部约 2 张卡片高度时显示 FAB（rpx @375） */
+const FAB_REVEAL_BOTTOM_OFFSET_RPX = 320;
 
 const getHomeTabIndex = (tab: HomeTab): number => HOME_TAB_ORDER.indexOf(tab);
 
@@ -82,6 +88,8 @@ const Home: React.FC = () => {
 
   // ---- 待办事项 ----
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
+  const [addTodoSheetVisible, setAddTodoSheetVisible] = useState(false);
+  const [addNoteSheetVisible, setAddNoteSheetVisible] = useState(false);
 
   // ---- 最近消课 ----
   const [recentRecords, setRecentRecords] = useState<LessonRecord[]>([]);
@@ -90,6 +98,116 @@ const Home: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   // ---- 公共状态 ----
   const isFirstMount = useRef(true);
+  const [fabMenuExpanded, setFabMenuExpanded] = useState(false);
+  const [fabVisible, setFabVisible] = useState(false);
+  const savedScrollTopRef = useRef(0);
+  /** 仅 FAB 展开等场景短暂受控 scrollTop；为 null 时不传 prop，避免误重置滚动 */
+  const [scrollTopPin, setScrollTopPin] = useState<number | null>(null);
+  const fabQueryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 待办 FAB 锚点在滚动内容中的 top（px），切换 Tab 后测量一次 */
+  const todoFabAnchorTopRef = useRef(0);
+  /** Tab 内容区历史最大高度（px），切换时占位防止滚动跳动 */
+  const tabAreaMinHeightRef = useRef(0);
+  const [tabAreaMinHeight, setTabAreaMinHeight] = useState(0);
+
+  const measureTabAreaHeight = useCallback(() => {
+    Taro.createSelectorQuery()
+      .select(`#home-tab-panel-${activeTab}`)
+      .boundingClientRect()
+      .exec((res) => {
+        const rect = res[0];
+        if (!rect || Array.isArray(rect) || rect.height <= 0) return;
+
+        const nextMin = Math.max(tabAreaMinHeightRef.current, rect.height);
+        if (nextMin === tabAreaMinHeightRef.current) return;
+
+        tabAreaMinHeightRef.current = nextMin;
+        setTabAreaMinHeight(nextMin);
+      });
+  }, [activeTab]);
+
+  const updateFabVisibilityFromScroll = useCallback(
+    (scrollTop: number) => {
+      if (activeTab !== 'todo' || !isStaffRole(currentRole)) {
+        setFabVisible(false);
+        return;
+      }
+      const { windowHeight, windowWidth } = Taro.getWindowInfo();
+      const bottomOffsetPx = (FAB_REVEAL_BOTTOM_OFFSET_RPX * windowWidth) / 750;
+      const revealLine = scrollTop + windowHeight - bottomOffsetPx;
+      setFabVisible(revealLine > todoFabAnchorTopRef.current);
+    },
+    [activeTab, currentRole],
+  );
+
+  const measureTodoFabAnchor = useCallback(() => {
+    if (activeTab !== 'todo' || !isStaffRole(currentRole)) return;
+
+    Taro.createSelectorQuery()
+      .select('#home-todo-fab-anchor')
+      .boundingClientRect()
+      .select('#home-scroll-inner')
+      .boundingClientRect()
+      .exec((res) => {
+        const anchorRect = res[0];
+        const innerRect = res[1];
+        if (!anchorRect || !innerRect || Array.isArray(anchorRect) || Array.isArray(innerRect)) {
+          return;
+        }
+        todoFabAnchorTopRef.current =
+          savedScrollTopRef.current + anchorRect.top - innerRect.top;
+        updateFabVisibilityFromScroll(savedScrollTopRef.current);
+      });
+  }, [activeTab, currentRole, updateFabVisibilityFromScroll]);
+
+  const handleScroll = useCallback(
+    (event: { detail: { scrollTop: number } }) => {
+      const scrollTop = event.detail.scrollTop;
+      savedScrollTopRef.current = scrollTop;
+      if (activeTab !== 'todo') return;
+      if (fabQueryTimerRef.current) return;
+      fabQueryTimerRef.current = setTimeout(() => {
+        fabQueryTimerRef.current = null;
+        updateFabVisibilityFromScroll(scrollTop);
+      }, 50);
+    },
+    [activeTab, updateFabVisibilityFromScroll],
+  );
+
+  const handleFabToggle = useCallback((expanded: boolean) => {
+    setFabMenuExpanded(expanded);
+    if (expanded) {
+      setScrollTopPin(savedScrollTopRef.current);
+      return;
+    }
+    // 释放受控：不传 scrollTop prop，保持当前物理滚动位置
+    setScrollTopPin(null);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'todo') {
+      setFabVisible(false);
+      return;
+    }
+    Taro.nextTick(() => {
+      measureTodoFabAnchor();
+    });
+  }, [activeTab, todoItems.length, measureTodoFabAnchor]);
+
+  useEffect(() => {
+    Taro.nextTick(() => {
+      measureTabAreaHeight();
+    });
+    const timer = setTimeout(measureTabAreaHeight, 100);
+    return () => clearTimeout(timer);
+  }, [activeTab, schedules.length, todoItems.length, recentRecords.length, measureTabAreaHeight]);
+
+  useEffect(
+    () => () => {
+      if (fabQueryTimerRef.current) clearTimeout(fabQueryTimerRef.current);
+    },
+    [],
+  );
 
   // ============================================
   // 校区切换
@@ -152,7 +270,7 @@ const Home: React.FC = () => {
         const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
           homeService.getTodaySchedules(teacherData.id, currentRole, campusId),
           homeService.getUnreadCount(profile.id, currentRole),
-          homeService.getTodoItems(teacherData.id, currentRole, campusId),
+          homeService.getTodoItems(teacherData.id, currentRole, campusId, profile.id),
           recentLessonRequest,
         ]);
         setSchedules(scheduleList);
@@ -203,10 +321,15 @@ const Home: React.FC = () => {
     loadData(currentCampusId);
   });
 
-  // Tab 配置
+  // Tab 配置（待办 badge：仅数量 > 0 且设置开启时显示）
+  const showTodoBadge = getTodoShowTabBadge();
   const TAB_OPTIONS: { key: HomeTab; label: string; badge?: number }[] = [
     { key: 'schedule', label: '今日课表' },
-    { key: 'todo', label: '待办事项', badge: todoItems.length },
+    {
+      key: 'todo',
+      label: '待办事项',
+      ...(showTodoBadge && todoItems.length > 0 ? { badge: todoItems.length } : {}),
+    },
     { key: 'recent', label: '最近消课' },
   ];
 
@@ -216,21 +339,105 @@ const Home: React.FC = () => {
   );
 
   // ---- Tab 切换（用户口径 2026-08-23：条件渲染替代 Swiper 固定高度，高度自然撑开）----
-  const handleHomeTabChange = useCallback((tab: HomeTab) => {
-    setActiveTab(tab);
+  const handleHomeTabChange = useCallback(
+    (tab: HomeTab) => {
+      if (tab === activeTab) return;
+
+      if (activeTab === 'todo') {
+        setFabMenuExpanded(false);
+        setFabVisible(false);
+        // 禁止 setScrollTopPin(undefined)：受控 ScrollView 会把 undefined 当成滚回顶部
+        setScrollTopPin(null);
+      }
+
+      setActiveTab(tab);
+    },
+    [activeTab],
+  );
+
+  /** 手动点「已读」/「完成」：记录后从待办列表移除 */
+  const handleMarkTodoRead = useCallback(
+    (todoId: string) => {
+      if (!profile?.id) return;
+      void homeService
+        .markTodoRead(todoId, profile.id)
+        .then(() => {
+          setTodoItems((prev) => prev.filter((item) => item.id !== todoId));
+        })
+        .catch((err) => {
+          logError('Home markTodoRead', err);
+        });
+    },
+    [profile?.id],
+  );
+
+  const handleCloseAddTodoSheet = useCallback(() => {
+    setAddTodoSheetVisible(false);
   }, []);
 
-  /** 手动点「已读」：记录后从待办列表移除（用户口径 2026-08-23） */
-  const handleMarkTodoRead = useCallback((todoId: string) => {
-    void homeService
-      .markTodoRead(todoId)
-      .then(() => {
-        setTodoItems((prev) => prev.filter((item) => item.id !== todoId));
-      })
-      .catch((err) => {
-        logError('Home markTodoRead', err);
-      });
-  }, []);
+  const handleSubmitCustomTodo = useCallback(
+    async (payload: {
+      title: string;
+      note?: string;
+      remindEnabled: boolean;
+      remindDate?: string;
+      remindTime?: string;
+      quadrant?: import('@/types/todo-quadrant').TodoQuadrant;
+    }) => {
+      if (!profile?.id) return;
+      const item = await homeService.addCustomTodo(profile.id, payload);
+      setTodoItems((prev) => [item, ...prev]);
+      Taro.showToast({ title: '已保存', icon: 'success' });
+    },
+    [profile?.id],
+  );
+
+  const handleSubmitNote = useCallback(
+    async (payload: { content: string; folder?: string; tagColor?: import('@/utils/user-notes').NoteTagColor }) => {
+      if (!profile?.id) return;
+      await homeService.addUserNote(profile.id, payload);
+      Taro.showToast({ title: '笔记已保存', icon: 'success' });
+    },
+    [profile?.id],
+  );
+
+  const fabActions = useMemo(
+    () => [
+      {
+        key: 'calendar',
+        label: '日历视图',
+        icon: 'mdi-calendar-outline',
+        onClick: () => {
+          Taro.switchTab({ url: '/pages/schedule/index' });
+        },
+      },
+      {
+        key: 'my-notes',
+        label: '我的笔记',
+        icon: 'mdi-notebook-edit-outline',
+        onClick: () => {
+          Taro.navigateTo({ url: '/pages/my-notes/index' });
+        },
+      },
+      {
+        key: 'add-note',
+        label: '记笔记',
+        icon: 'mdi-pencil',
+        onClick: () => {
+          setAddNoteSheetVisible(true);
+        },
+      },
+      {
+        key: 'add-todo',
+        label: '记待办',
+        icon: 'mdi-clipboard-text-outline',
+        onClick: () => {
+          setAddTodoSheetVisible(true);
+        },
+      },
+    ],
+    [],
+  );
 
   // ---- 横滑切换 Tab（替代 Swiper 的滑动手势）----
   const tabTouchStartRef = useRef({ x: 0, y: 0 });
@@ -251,11 +458,11 @@ const Home: React.FC = () => {
         const idx = getHomeTabIndex(activeTab);
         const nextIdx = deltaX < 0 ? idx + 1 : idx - 1;
         if (nextIdx >= 0 && nextIdx < HOME_TAB_ORDER.length) {
-          setActiveTab(HOME_TAB_ORDER[nextIdx]);
+          handleHomeTabChange(HOME_TAB_ORDER[nextIdx]);
         }
       }
     },
-    [activeTab],
+    [activeTab, handleHomeTabChange],
   );
 
   const renderHeader = () => {
@@ -328,9 +535,16 @@ const Home: React.FC = () => {
 
   return (
     <>
+      <PageMeta pageStyle={fabMenuExpanded ? 'overflow: hidden;' : ''} />
       <View className={cn(`theme-${activeTheme}`, 'h-screen overflow-x-hidden bg-background')}>
-        <ScrollView scrollY showScrollbar={false} className="h-full overflow-x-hidden no-scrollbar">
-          <View className="min-h-full">
+        <ScrollView
+          scrollY={!fabMenuExpanded}
+          showScrollbar={false}
+          className="h-full overflow-x-hidden no-scrollbar"
+          {...(scrollTopPin !== null ? { scrollTop: scrollTopPin } : {})}
+          onScroll={handleScroll}
+        >
+          <View id="home-scroll-inner" className="min-h-full">
             {renderHeader()}
 
             {/* 内容区：校区卡片压住上半部分 */}
@@ -342,38 +556,58 @@ const Home: React.FC = () => {
               <View className="px-[24rpx]">
                 {isStaffRole(currentRole) && (
                   <>
-                    <View className="flex items-baseline gap-[24rpx] overflow-x-hidden py-[24rpx]">
-                      {TAB_OPTIONS.map((tab) => (
-                        <View
-                          key={tab.key}
-                          className={activeTab === tab.key ? 'tab-item-v14 active' : 'tab-item-v14'}
-                          onClick={() => handleHomeTabChange(tab.key)}
-                        >
-                          <Text>{tab.label}</Text>
-                          {tab.badge && tab.badge > 0 && (
-                            <View className="inline-block bg-destructive text-white text-[18rpx] font-bold px-[8rpx] rounded-[16rpx] min-w-[28rpx] h-[28rpx] leading-[28rpx] text-center ml-[4rpx]">
-                              <Text className="text-white text-[18rpx]">{tab.badge}</Text>
-                            </View>
-                          )}
-                        </View>
-                      ))}
+                    <View className="flex flex-row items-center gap-[24rpx] overflow-x-hidden py-[24rpx]">
+                      {TAB_OPTIONS.map((tab) => {
+                        const badgeCount =
+                          typeof tab.badge === 'number' && tab.badge > 0 ? tab.badge : 0;
+                        return (
+                          <View
+                            key={tab.key}
+                            className={
+                              activeTab === tab.key ? 'tab-item-v14 active' : 'tab-item-v14'
+                            }
+                            onClick={() => handleHomeTabChange(tab.key)}
+                          >
+                            <Text className="tab-item-v14__label">{tab.label}</Text>
+                            {/* 空待办不显示 0：仅 badge>0 时渲染圆形数字 */}
+                            {badgeCount > 0 && (
+                              <View className="tab-badge-v14">
+                                <Text className="tab-badge-v14__text">
+                                  {badgeCount > 99 ? '99+' : badgeCount}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
                     </View>
 
                     {/* 用户口径（2026-08-23）：Tab 内容改条件渲染，高度自然撑开（不裁切/不空白/无跳动）；
                         支持横滑切换（替代 Swiper）；空数据保持最低高度 */}
-                    <View onTouchStart={handleTabTouchStart} onTouchEnd={handleTabTouchEnd}>
+                    <View
+                      className="home-tab-panels relative min-h-[400rpx]"
+                      style={tabAreaMinHeight > 0 ? { minHeight: `${tabAreaMinHeight}px` } : undefined}
+                      onTouchStart={handleTabTouchStart}
+                      onTouchEnd={handleTabTouchEnd}
+                    >
                       {activeTab === 'schedule' && (
-                        <View id="home-tab-panel-schedule" className="min-h-[400rpx]">
+                        <View id="home-tab-panel-schedule">
                           <TodayScheduleCard schedules={schedules} title="" />
                         </View>
                       )}
+
                       {activeTab === 'todo' && (
-                        <View id="home-tab-panel-todo" className="pt-[24rpx] min-h-[400rpx]">
+                        <View
+                          id="home-tab-panel-todo"
+                          className="relative pt-[24rpx] pb-[48rpx]"
+                        >
+                          <View id="home-todo-fab-anchor" className="h-[2rpx] w-full" />
                           <TodoList items={todoItems} onMarkRead={handleMarkTodoRead} />
                         </View>
                       )}
+
                       {activeTab === 'recent' && (
-                        <View id="home-tab-panel-recent" className="pt-[24rpx] min-h-[400rpx]">
+                        <View id="home-tab-panel-recent" className="pt-[24rpx]">
                           <LessonConsumptionList
                             sections={recentSections}
                             emptyText="暂无消课记录"
@@ -411,6 +645,26 @@ const Home: React.FC = () => {
 
       {/* 身份切换 Sheet */}
       <RoleSwitchSheet visible={roleSheetVisible} onClose={() => setRoleSheetVisible(false)} />
+
+      <AddCustomTodoSheet
+        visible={addTodoSheetVisible}
+        onClose={handleCloseAddTodoSheet}
+        onSubmit={handleSubmitCustomTodo}
+      />
+
+      <AddNoteSheet
+        visible={addNoteSheetVisible}
+        onClose={() => setAddNoteSheetVisible(false)}
+        onSubmit={handleSubmitNote}
+      />
+
+      {isStaffRole(currentRole) && (
+        <ExpandableFabMenu
+          visible={activeTab === 'todo' && fabVisible}
+          actions={fabActions}
+          onToggle={handleFabToggle}
+        />
+      )}
     </>
   );
 };

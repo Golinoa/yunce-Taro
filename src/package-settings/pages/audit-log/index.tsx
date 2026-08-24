@@ -36,7 +36,7 @@ const TIME_TABS: { key: TimeRange; label: string }[] = [
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: '管理员',
+  admin: '校长·机构创建者',
   principal: '校长',
   teacher: '老师',
   assistant: '前台',

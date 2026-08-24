@@ -191,8 +191,8 @@ const ProfileEdit: React.FC = () => {
 
   // 保存
   const handleSave = useCallback(async () => {
-    if (!draft.name.trim()) {
-      Taro.showToast({ title: '请填写姓名', icon: 'none' });
+    if (!draft.nickname.trim()) {
+      Taro.showToast({ title: '请填写昵称', icon: 'none' });
       return;
     }
     if (draft.phone && !/^1\d{10}$/.test(draft.phone)) {
@@ -202,15 +202,13 @@ const ProfileEdit: React.FC = () => {
     setSaving(true);
     try {
       const { error } = await submitUpdate({
-        name: draft.name.trim(),
+        name: draft.nickname.trim(),
         nickname: draft.nickname.trim(),
         avatar_url: draft.avatar_url.trim(),
         phone: draft.phone.trim(),
         gender: (draft.gender || undefined) as Gender | undefined,
         birthday: draft.birthday.trim(),
-        id_card: draft.id_card.trim(),
         region: draft.region.trim(),
-        address: draft.address.trim(),
       });
       if (error) {
         Taro.showToast({ title: error.message || '保存失败', icon: 'none' });
@@ -378,7 +376,7 @@ const ProfileEdit: React.FC = () => {
     setAdding(true);
     try {
       const created = await studentService.create({
-        name: childForm.name.trim() || childForm.nickname.trim(),
+        name: childForm.nickname.trim(),
         nickname: childForm.nickname.trim(),
         relation: childForm.relation,
         gender: childForm.gender as Gender,
@@ -462,17 +460,6 @@ const ProfileEdit: React.FC = () => {
                 }
               />
               <FieldRow
-                label="姓名"
-                right={
-                  <FormInput
-                    variant="ghost"
-                    placeholder="请输入真实姓名"
-                    value={draft.name}
-                    onInput={(e) => updateField('name', e.detail.value || '')}
-                  />
-                }
-              />
-              <FieldRow
                 label="昵称"
                 right={
                   <FormInput
@@ -529,17 +516,6 @@ const ProfileEdit: React.FC = () => {
                 }
               />
               <FieldRow
-                label="证件号码"
-                right={
-                  <FormInput
-                    variant="ghost"
-                    placeholder="请输入证件号码"
-                    value={draft.id_card}
-                    onInput={(e) => updateField('id_card', e.detail.value || '')}
-                  />
-                }
-              />
-              <FieldRow
                 label="地区"
                 right={
                   <Picker
@@ -553,17 +529,6 @@ const ProfileEdit: React.FC = () => {
                       <RowArrow />
                     </View>
                   </Picker>
-                }
-              />
-              <FieldRow
-                label="地址"
-                right={
-                  <FormInput
-                    variant="ghost"
-                    placeholder="请输入详细地址"
-                    value={draft.address}
-                    onInput={(e) => updateField('address', e.detail.value || '')}
-                  />
                 }
               />
             </View>
@@ -714,7 +679,7 @@ const ProfileEdit: React.FC = () => {
               <View className="flex items-center gap-[8rpx]">
                 {childForm.avatar_url ? (
                   <Avatar
-                    name={childForm.name || '子'}
+                    name={childForm.nickname || '子'}
                     avatarUrl={childForm.avatar_url}
                     size="md"
                   />
@@ -725,18 +690,6 @@ const ProfileEdit: React.FC = () => {
                 )}
                 <RowArrow />
               </View>
-            }
-          />
-          {/* 真实姓名 */}
-          <FieldRow
-            label="真实姓名"
-            right={
-              <FormInput
-                variant="ghost"
-                placeholder="请输入"
-                value={childForm.name}
-                onInput={(e) => setChildForm((prev) => ({ ...prev, name: e.detail.value || '' }))}
-              />
             }
           />
           {/* 昵称 */}

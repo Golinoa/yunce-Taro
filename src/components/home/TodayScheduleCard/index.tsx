@@ -60,6 +60,7 @@ function getProgressClass(status: CourseStatus): string {
 // ===================== 状态 → 卡片边框 =====================
 function getStatusBorderClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-status-urgent-border';
+  if (status === 'active') return 'course-status-active-border';
   // 未点名：仅加细红边框提醒（用户口径 2026-08-23，样式收敛为形态1）
   if (status === 'unattended') return 'course-status-unattended-border';
   if (status === 'done') return 'course-status-done-border';
@@ -70,6 +71,7 @@ function getStatusBorderClass(status: CourseStatus): string {
 // ===================== 状态 → 左侧时间区背景 =====================
 function getTimeBgClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-time-urgent-v14';
+  if (status === 'active') return 'course-time-active-v14';
   if (status === 'done') return 'course-time-done-v14';
   if (status === 'ended') return 'course-time-ended-v14';
   return '';
@@ -170,6 +172,9 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
           const isEnded = status === 'ended';
           const isDone = status === 'done';
           const isUnattended = status === 'unattended';
+          const isActive = status === 'active';
+          const isUrgent = status === 'urgent';
+          const countdownText = isUrgent ? getCountdownText(item.start_time) : null;
 
           return (
             <View
@@ -208,18 +213,23 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                           backgroundColor: 'hsl(var(--success) / 0.08)',
                           borderRightColor: 'hsl(var(--success) / 0.2)',
                         }
-                      : status === 'urgent'
+                      : status === 'active'
                         ? {
-                            background:
-                              'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7))',
-                            borderRightColor: 'hsl(var(--warning))',
+                            backgroundColor: 'hsl(var(--success) / 0.12)',
+                            borderRightColor: 'hsl(var(--success) / 0.35)',
                           }
-                        : status === 'ended'
+                        : status === 'urgent'
                           ? {
-                              background: 'hsl(var(--muted))',
-                              borderRightColor: 'hsl(var(--border))',
+                              background:
+                                'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7))',
+                              borderRightColor: 'hsl(var(--warning))',
                             }
-                          : null;
+                          : status === 'ended'
+                            ? {
+                                background: 'hsl(var(--muted))',
+                                borderRightColor: 'hsl(var(--border))',
+                              }
+                            : null;
                   const colorKey =
                     !forcedStatusStyle &&
                     !timeStatusClass &&
@@ -236,8 +246,20 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                           borderColor: colorHex,
                         }
                       : undefined;
-                  const timeTextClass = colorKey ? '' : TIME_AREA_STYLE.text;
-                  const timeTextStyle = colorKey ? { color: colorHex } : undefined;
+                  const timeTextClass =
+                    status === 'urgent'
+                      ? 'text-white'
+                      : status === 'active'
+                        ? 'text-success'
+                        : colorKey
+                          ? ''
+                          : TIME_AREA_STYLE.text;
+                  const timeTextStyle =
+                    status === 'urgent'
+                      ? undefined
+                      : colorKey
+                        ? { color: colorHex }
+                        : undefined;
                   return (
                     <View
                       className={cn(
@@ -284,6 +306,11 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                           <Text className="text-[20rpx] font-medium">未点名</Text>
                         </View>
                       )}
+                      {isActive && (
+                        <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                          <Text className="text-[20rpx] font-medium">上课中</Text>
+                        </View>
+                      )}
                       {isDone && (
                         <View className="course-tag-done rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已完成</Text>
@@ -294,8 +321,8 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                           <Text className="text-[20rpx] font-medium">已下课</Text>
                         </View>
                       )}
-                      {/* 非 done/ended/unattended 状态显示约课标签 */}
-                      {!isDone && !isEnded && !isUnattended && item.tag && (
+                      {/* 非 done/ended/unattended/active 状态显示约课标签 */}
+                      {!isDone && !isEnded && !isUnattended && !isActive && item.tag && (
                         <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
@@ -373,9 +400,9 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
 
                   {/* 操作按钮 - 用户口径（2026-08-23）：按钮贴右下角，底部间距与右侧一致（内容区 py 24rpx） */}
                   <View className="shrink-0 self-stretch flex flex-col items-end justify-end gap-[8rpx]">
-                    {status === 'urgent' && getCountdownText(item.start_time) && (
-                      <Text className="text-[20rpx] course-urgent-hint font-medium">
-                        {getCountdownText(item.start_time)}
+                    {countdownText && (
+                      <Text className="text-[20rpx] course-urgent-hint font-medium whitespace-nowrap">
+                        {countdownText}
                       </Text>
                     )}
                     <View

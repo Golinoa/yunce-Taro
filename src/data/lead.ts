@@ -5,7 +5,8 @@
  * 联调时 Service 层只需改一行切换为 API 调用。
  */
 import dayjs from 'dayjs';
-import { CLASSES, COURSE_PACKAGES, STUDENTS, type Student } from '@/data/mock-database';
+import { CLASSES, COURSE_PACKAGES, STUDENTS, TEACHERS, type Student } from '@/data/mock-database';
+import { getActorScope } from '@/data/students';
 import type {
   Lead,
   LeadBooking,
@@ -999,6 +1000,38 @@ export async function mockGetLeadCardsByTeacher(
       created_at: l.created_at,
     } as LeadCardModel;
   });
+}
+
+const LEAD_FOLLOWING_STATUSES: LeadStatus[] = ['new', 'pending', 'following', 'not_arrived'];
+
+function resolveLeadActorUserId(actorId: string): string {
+  const teacher = TEACHERS.find((teacher) => teacher.id === actorId || teacher.userId === actorId);
+  return teacher?.userId || actorId;
+}
+
+/**
+ * 获取待跟进线索数量（首页待办 Mock）
+ * - 校长/管理员：按校区统计全部待跟进线索
+ * - 教师：仅统计自己负责或创建的线索
+ */
+export async function mockGetLeadFollowingCount(
+  actorId: string,
+  campusId?: string,
+): Promise<number> {
+  await delay(0);
+  const scope = getActorScope(actorId);
+  const followingSet = new Set(LEAD_FOLLOWING_STATUSES);
+  let leads = LEADS.filter((lead) => followingSet.has(lead.status));
+  if (campusId) {
+    leads = leads.filter((lead) => lead.campus_id === campusId);
+  }
+  if (scope.role === 'principal' || scope.role === 'admin') {
+    return leads.length;
+  }
+  const userId = resolveLeadActorUserId(actorId);
+  return leads.filter(
+    (lead) => lead.owner_teacher_id === userId || lead.creator_teacher_id === userId,
+  ).length;
 }
 
 /** 获取线索统计摘要 */

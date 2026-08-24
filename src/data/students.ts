@@ -37,6 +37,7 @@ interface StoredProfileIdentity {
   id: string;
   role: UserRole;
   campusIds?: string[];
+  isDefault?: boolean;
 }
 
 interface StoredProfile {
@@ -109,19 +110,31 @@ export function getActorScope(actorId: string) {
   let role: UserRole | undefined;
   let campusIds: string[] = [];
 
-  if (storedProfile?.id === actorId) {
-    const activeIdentity = storedProfile.identities?.find(
-      (identity) => identity.id === storedProfile.currentContext?.identityId,
-    );
+  const applyProfileScope = (profileUserId: string): boolean => {
+    if (storedProfile?.id !== profileUserId) {
+      return false;
+    }
+    const activeIdentity =
+      storedProfile.identities?.find(
+        (identity) => identity.id === storedProfile.currentContext?.identityId,
+      ) ||
+      storedProfile.identities?.find((identity) => identity.isDefault) ||
+      storedProfile.identities?.[0];
     role = activeIdentity?.role || storedProfile.currentContext?.role;
     campusIds = activeIdentity?.campusIds || [];
     if (!campusIds.length && storedProfile.currentContext?.campusId) {
       campusIds = [storedProfile.currentContext.campusId];
     }
+    return true;
+  };
+
+  if (!applyProfileScope(actorId) && directTeacher?.userId) {
+    applyProfileScope(directTeacher.userId);
   }
 
   if (!role) {
-    const identity = IDENTITIES.find((item) => item.userId === actorId);
+    const identityUserId = directTeacher?.userId || actorId;
+    const identity = IDENTITIES.find((item) => item.userId === identityUserId);
     if (identity) {
       role = identity.role;
       campusIds = identity.campusIds;
@@ -129,8 +142,12 @@ export function getActorScope(actorId: string) {
   }
 
   if (directTeacher) {
-    role = role || 'teacher';
-    campusIds = directTeacher.campusIds;
+    if (!role) {
+      role = 'teacher';
+    }
+    if (!campusIds.length) {
+      campusIds = directTeacher.campusIds;
+    }
   }
 
   const managedSubjectIds = directTeacher?.managedSubjectIds || [];
@@ -146,7 +163,7 @@ export function getActorScope(actorId: string) {
             : [directTeacher.id]
         : role === 'teacher'
           ? DB_TEACHERS.filter((teacher) => teacher.userId === actorId).map((teacher) => teacher.id)
-          : role === 'principal'
+          : role === 'principal' || role === 'admin'
             ? DB_TEACHERS.filter((teacher) =>
                 teacher.campusIds.some((campusId) => campusIds.includes(campusId)),
               ).map((teacher) => teacher.id)

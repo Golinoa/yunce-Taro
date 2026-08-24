@@ -38,7 +38,7 @@ import { withRouteGuard } from '@/utils/route-guard';
 // 角色标签映射
 // ============================================
 const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员',
+  admin: '校长·机构创建者',
   principal: '校长',
   teacher: '教师',
   assistant: '助教',
@@ -433,7 +433,7 @@ const Profile: React.FC = () => {
       {
         label: '我的卡包',
         icon: 'mdi-package' as const,
-        onClick: () => handleNavigate('/package-course/pages/course-packages/index'),
+        onClick: () => handleNavigate('/pages/my-course/index'),
       },
       {
         label: '我的合同',

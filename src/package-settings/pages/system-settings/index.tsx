@@ -44,6 +44,10 @@ const ALL_SETTING_ITEMS: SettingItem[] = [
     route: '/package-settings/pages/theme-settings/index',
   },
   {
+    title: '待办提醒',
+    route: '/package-settings/pages/todo-settings/index',
+  },
+  {
     title: '角色权限',
     route: '/package-settings/pages/permission-settings/index',
     adminOnly: true,

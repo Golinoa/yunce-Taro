@@ -9,7 +9,7 @@ import LeadCard from '@/components/lead/LeadCard';
 import MemberActionSheet from '@/components/student/MemberActionSheet';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
-import { studentService } from '@/services';
+import { studentService } from '@/services/student';
 import { useStudentStore } from '@/stores';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFilterTab } from '@/types/lead';

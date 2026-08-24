@@ -761,6 +761,13 @@ export default defineConfig({
         'box-shadow': '0 2rpx 10rpx hsl(var(--destructive)/0.12)',
       },
     ],
+    [
+      'course-status-active-border',
+      {
+        border: '2rpx solid hsl(var(--success))',
+        'box-shadow': '0 2rpx 12rpx hsl(var(--success)/0.12)',
+      },
+    ],
 
     // 课程状态 — 左侧时间区背景（使用 theme token）
     [
@@ -812,6 +819,13 @@ export default defineConfig({
       {
         background: 'hsl(var(--destructive))',
         color: 'white',
+      },
+    ],
+    [
+      'course-tag-active',
+      {
+        background: 'hsl(var(--success)/0.12)',
+        color: 'hsl(var(--success))',
       },
     ],
 

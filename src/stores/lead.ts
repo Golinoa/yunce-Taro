@@ -3,7 +3,7 @@
  * 缓存线索列表与统计摘要，增删改后自动 invalidate
  */
 import { create } from 'zustand';
-import { leadService } from '@/services';
+import { leadService } from '@/services/lead';
 import type { LeadCardModel, LeadFilterTab, LeadSummary } from '@/types/lead';
 import { logError } from '@/utils/logger';
 

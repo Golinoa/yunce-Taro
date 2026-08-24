@@ -16,6 +16,7 @@ import {
   CUR_MONTH,
   CUR_DAY,
   type LessonRecord,
+  type Schedule,
 } from './mock-database';
 import { COURSE_MANAGEMENT_CLASS_TAB_URL } from './course-category';
 import {
@@ -25,6 +26,10 @@ import {
   filterStudentsByActor,
   getActorScope,
 } from './students';
+import { mockGetLeadFollowingCount } from './lead';
+import { mockGetTeachers } from './teacher';
+import { normalizeSalaryStatus } from '@/types/teacher';
+import { buildStudentRechargeTodoTitle } from '@/utils/student-recharge-todo';
 
 function delay(ms = 100): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -60,7 +65,7 @@ export interface QuickEntry {
 export interface TodoItemData {
   id: string;
   title: string;
-  type: 'alert' | 'lesson' | 'recharge' | 'meeting' | 'salary' | 'checkin';
+  type: 'alert' | 'recharge' | 'meeting' | 'salary' | 'checkin' | 'lead';
   time: string;
   priority: 'high' | 'medium' | 'low';
   completed: boolean;
@@ -68,6 +73,8 @@ export interface TodoItemData {
   scheduleId?: string;
   classId?: string;
   lessonDate?: string;
+  /** recharge 待办：学员剩余课时（用于统一描述文案） */
+  remainingHours?: number;
 }
 
 export interface RecentGroupData {
@@ -150,10 +157,10 @@ export const HOME_QUICK_ENTRIES: QuickEntry[] = [
     url: '/package-student/pages/student-form/index',
   },
   {
-    label: '课时套餐',
-    icon: 'mdi-package-variant',
+    label: '充值记录',
+    icon: 'mdi-cash-multiple',
     color: 'icon-glass-red',
-    url: '/package-course/pages/course-packages/index',
+    url: '/package-course/pages/recharge-records/index',
   },
   {
     label: '班级管理',
@@ -391,6 +398,50 @@ export async function mockGetStudents(teacherId: string, limit?: number) {
   return students;
 }
 
+/** 分钟数 → HH:mm（支持跨 0 点，仅用于 Mock 演示排课） */
+function formatMinutesToTime(totalMinutes: number): string {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * 首页今日课表状态演示排课（动态时间）
+ * - sch-home-demo-urgent：4 分钟后开课 → 黄色 urgent + 倒计时
+ * - sch-home-demo-active：已开课 25 分钟、距下课 35 分钟 → 绿色 active +「上课中」
+ */
+function buildHomeScheduleStatusDemos(todayWeekday: Schedule['dayOfWeek']): Schedule[] {
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+
+  return [
+    {
+      id: 'sch-home-demo-urgent',
+      classId: 'cls-demo',
+      color: 'amber',
+      teacherId: 'teacher-004',
+      campusId: 'campus-west',
+      dayOfWeek: todayWeekday,
+      startTime: formatMinutesToTime(nowMinutes + 4),
+      endTime: formatMinutesToTime(nowMinutes + 64),
+      room: '素描教室1',
+      status: 'scheduled',
+    },
+    {
+      id: 'sch-home-demo-active',
+      classId: 'cls-009',
+      color: 'info',
+      teacherId: 'teacher-004',
+      campusId: 'campus-west',
+      dayOfWeek: todayWeekday,
+      startTime: formatMinutesToTime(nowMinutes - 25),
+      endTime: formatMinutesToTime(nowMinutes + 35),
+      room: '书法教室1',
+      status: 'scheduled',
+    },
+  ];
+}
+
 /** 获取今日排课（含昨日跨 0 点未完全下课的排课，用户口径 2026-08-24） */
 export async function mockGetTodaySchedules(teacherId: string, campusId?: string) {
   await delay();
@@ -415,6 +466,7 @@ export async function mockGetTodaySchedules(teacherId: string, campusId?: string
   if (campusId && scope.accessScope !== 'org') {
     schedules = schedules.filter((schedule) => schedule.campusId === campusId);
   }
+  schedules = [...schedules, ...buildHomeScheduleStatusDemos(todayWeekday as Schedule['dayOfWeek'])];
   return schedules;
 }
 
@@ -495,18 +547,15 @@ export async function mockGetTodoItems(
 ): Promise<TodoItemData[]> {
   await delay();
   let students = filterStudentsByActor(teacherId);
-  let classes = filterClassesByActor(teacherId);
   if (campusId) {
     students = students.filter((student) => student.campusId === campusId);
-    classes = classes.filter((cls) => cls.campusId === campusId);
   }
   const scope = getActorScope(teacherId);
   const lowHoursStudent = [...students]
     .sort((a, b) => a.remainingHours - b.remainingHours)
     .find((student) => student.remainingHours <= 12);
-  const nextClass = [...classes].sort((a, b) => a.startTime.localeCompare(b.startTime))[0];
 
-  return [
+  const baseItems = [
     // 发薪日提醒：提前 pushDaysBefore 天提醒（使用真实日期，与 mock 时间基准无关）
     (() => {
       const payDay = 15; // mock 默认发薪日
@@ -539,24 +588,15 @@ export async function mockGetTodoItems(
       }
       return null;
     })(),
-    nextClass
-      ? {
-          id: `todo-lesson-${nextClass.id}`,
-          title: `${nextClass.name}备课确认`,
-          type: 'lesson',
-          time: nextClass.startTime,
-          priority: 'high',
-          completed: false,
-        }
-      : null,
     lowHoursStudent
       ? {
           id: `todo-recharge-${lowHoursStudent.id}`,
-          title: `${lowHoursStudent.name}课时续费提醒`,
+          title: buildStudentRechargeTodoTitle(lowHoursStudent.name),
           type: 'recharge',
           time: '15:00',
           priority: 'medium',
           completed: false,
+          remainingHours: lowHoursStudent.remainingHours,
         }
       : null,
     {
@@ -609,6 +649,80 @@ export async function mockGetTodoItems(
       };
     })(),
   ].filter(Boolean) as TodoItemData[];
+
+  const extraItems: TodoItemData[] = [];
+
+  const followingCount = await mockGetLeadFollowingCount(teacherId, campusId);
+  if (followingCount > 0) {
+    extraItems.push({
+      id: 'todo-leads-following',
+      title: `${followingCount}条线索待跟进`,
+      type: 'lead',
+      time: '尽快',
+      priority: 'high',
+      completed: false,
+    });
+  }
+
+  if (scope.role === 'principal' || scope.role === 'admin') {
+    const teachers = await mockGetTeachers(campusId);
+    const pendingCount = teachers.filter(
+      (teacher) => normalizeSalaryStatus(teacher.salaryStatus) === 'pending',
+    ).length;
+    const confirmedCount = teachers.filter(
+      (teacher) => normalizeSalaryStatus(teacher.salaryStatus) === 'confirmed',
+    ).length;
+    if (pendingCount > 0) {
+      extraItems.push({
+        id: 'todo-salary-pending-batch',
+        title: `${pendingCount}位教师薪资待确认`,
+        type: 'salary',
+        time: '本月',
+        priority: 'high',
+        completed: false,
+      });
+    }
+    if (confirmedCount > 0) {
+      extraItems.push({
+        id: 'todo-salary-confirmed-batch',
+        title: `${confirmedCount}位教师薪资待发放`,
+        type: 'salary',
+        time: '本月',
+        priority: 'high',
+        completed: false,
+      });
+    }
+  }
+
+  const demoNowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  extraItems.push(
+    {
+      id: 'todo-demo-timeline-1',
+      title: '联系张家长续费',
+      type: 'recharge',
+      time: formatMinutesToTime(demoNowMinutes + 12),
+      priority: 'high',
+      completed: false,
+    },
+    {
+      id: 'todo-demo-timeline-2',
+      title: '准备周六公开课物料',
+      type: 'meeting',
+      time: formatMinutesToTime(demoNowMinutes + 45),
+      priority: 'medium',
+      completed: false,
+    },
+    {
+      id: 'todo-demo-timeline-done',
+      title: '核对昨日试听反馈',
+      type: 'lead',
+      time: formatMinutesToTime(Math.max(0, demoNowMinutes - 30)),
+      priority: 'low',
+      completed: true,
+    },
+  );
+
+  return [...baseItems, ...extraItems];
 }
 
 /** 获取最近消课记录 */

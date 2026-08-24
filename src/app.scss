@@ -597,8 +597,12 @@ button.privacy-agree-btn:active {
   margin-top: 16rpx;
 }
 
-/* v14 Tab 切换栏 */
+/* v14 Tab 切换栏：文字与圆形提醒数字同一行垂直居中 */
 .tab-item-v14 {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8rpx;
   font-size: 28rpx;
   font-weight: 500;
   color: hsl(var(--muted-foreground));
@@ -611,7 +615,14 @@ button.privacy-agree-btn:active {
     transform 0.2s ease;
   white-space: nowrap;
   z-index: 0;
-  overflow: hidden;
+  /* 勿用 overflow:hidden，会裁切 badge 并导致文字与数字挤叠错位 */
+  overflow: visible;
+}
+.tab-item-v14__label {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  line-height: 1.2;
 }
 .tab-item-v14:active {
   opacity: 0.8;
@@ -641,6 +652,26 @@ button.privacy-agree-btn:active {
   opacity: 0.65;
   z-index: -1;
   animation: tab-indicator-pulse 2s ease-in-out infinite;
+}
+
+/* 待办 Tab 圆形提醒数字：与文字同行，空为 0 时不渲染 */
+.tab-badge-v14 {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 8rpx;
+  border-radius: 28rpx;
+  background: hsl(var(--destructive));
+  box-sizing: border-box;
+}
+.tab-badge-v14__text {
+  color: #fff;
+  font-size: 18rpx;
+  font-weight: 700;
+  line-height: 1;
 }
 
 @keyframes tab-indicator-pulse {
@@ -681,6 +712,132 @@ button.privacy-agree-btn:active {
 .course-time-done-v14 {
   background: hsl(var(--success) / 0.08) !important;
   border-right-color: hsl(var(--success) / 0.2) !important;
+}
+.course-time-active-v14 {
+  background: hsl(var(--success) / 0.12) !important;
+  border-right-color: hsl(var(--success) / 0.35) !important;
+}
+
+/* 待办 Tab 可展开 FAB */
+.fab-menu-root {
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+.fab-menu-root--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.fab-menu-root--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(24rpx);
+}
+.fab-main-trigger {
+  transition:
+    transform 180ms linear,
+    width 180ms linear,
+    height 180ms linear;
+}
+.fab-main-trigger--normal {
+  width: 96rpx;
+  height: 96rpx;
+}
+.fab-main-trigger--expanded {
+  width: 76rpx;
+  height: 76rpx;
+}
+.fab-main-icon {
+  transition: transform 180ms linear;
+}
+.fab-main-icon--rotated {
+  transform: rotate(90deg);
+}
+.todo-remind-chip {
+  border: 3rpx solid hsl(var(--primary) / 0.55);
+  border-radius: 20rpx;
+  background: hsl(var(--card));
+}
+.fab-menu-action-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  white-space: nowrap;
+}
+.fab-menu-item {
+  pointer-events: none;
+}
+.todo-quadrant-icon-active {
+  box-shadow: 0 0 0 3rpx hsl(var(--primary) / 0.35);
+}
+
+.fab-menu-item--hidden-instant {
+  opacity: 0;
+  transform: translateX(72rpx);
+  pointer-events: none;
+}
+.fab-menu-item--visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  transition:
+    opacity 180ms linear,
+    transform 180ms linear;
+}
+
+/* 待办时间轴 */
+.todo-timeline-line {
+  background: hsl(var(--border));
+}
+.todo-timeline-now {
+  background: hsl(var(--primary));
+}
+.todo-timeline-now-dash {
+  border-top: 2rpx dashed hsl(var(--primary) / 0.45);
+}
+.todo-card-tag-default {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+.todo-quadrant-cell-muted {
+  background: hsl(var(--muted));
+}
+.todo-quadrant-cell-q1 {
+  background: linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive) / 0.75));
+}
+.todo-quadrant-cell-q2 {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow) / 0.85));
+}
+.todo-quadrant-cell-q3 {
+  background: linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7));
+}
+.todo-quadrant-cell-q4 {
+  background: linear-gradient(135deg, hsl(var(--muted-foreground) / 0.45), hsl(var(--muted-foreground) / 0.25));
+}
+
+.todo-card-tag-primary {
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+.todo-card-tag-accent {
+  background: hsl(var(--accent) / 0.12);
+  color: hsl(var(--accent));
+}
+.todo-card-tag-warning {
+  background: hsl(var(--warning) / 0.12);
+  color: hsl(var(--warning));
+}
+.todo-card-tag-success {
+  background: hsl(var(--success) / 0.12);
+  color: hsl(var(--success));
+}
+.todo-check-pending {
+  border: 3rpx solid hsl(var(--border));
+}
+.todo-check-done {
+  background: hsl(var(--success));
+  border: 3rpx solid hsl(var(--success));
 }
 .course-time-ended-v14 {
   background: hsl(var(--muted)) !important;

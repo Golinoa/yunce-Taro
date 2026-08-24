@@ -35,6 +35,15 @@ import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const PAGE_INTRO_KEY = 'salary_payment_intro_hidden';
 
+/** 薪资状态排序：待核对优先展示 */
+const SALARY_STATUS_SORT: Record<SalaryStatus, number> = {
+  pending: 0,
+  confirmed: 1,
+  sending: 2,
+  teacher_confirmed: 3,
+  archived: 4,
+};
+
 /** 根据状态返回卡片底部提示文案 */
 function getStatusHintText(status: SalaryStatus): string {
   switch (status) {
@@ -172,6 +181,17 @@ const SalaryPaymentPage: React.FC = () => {
       (t) => t.status === 'active' || normalizeSalaryStatus(t.salaryStatus) !== 'archived',
     );
   }, [teachers]);
+
+  const sortedVisibleTeachers = useMemo(() => {
+    return [...visibleTeachers].sort((left, right) => {
+      const leftOrder = SALARY_STATUS_SORT[normalizeSalaryStatus(left.salaryStatus)];
+      const rightOrder = SALARY_STATUS_SORT[normalizeSalaryStatus(right.salaryStatus)];
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      return left.name.localeCompare(right.name, 'zh-CN');
+    });
+  }, [visibleTeachers]);
 
   /** 汇总统计 */
   const stats = useMemo(() => {
@@ -435,7 +455,7 @@ const SalaryPaymentPage: React.FC = () => {
         </View>
       ) : (
         <View className="mt-[32rpx] px-[32rpx] flex flex-col gap-[20rpx]">
-          {visibleTeachers.map((t) => {
+          {sortedVisibleTeachers.map((t) => {
             const lessonFee = t.hours * t.rate;
             const social = 0;
             const status = normalizeSalaryStatus(t.salaryStatus);

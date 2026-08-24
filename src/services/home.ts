@@ -1,8 +1,11 @@
 /**
  * Service 层 — 首页相关 API
  */
+import dayjs from 'dayjs';
 import type { RecentGroup, RecentStudent } from '@/components/home/RecentLessonList';
-import type { TodoItem } from '@/components/home/TodoList';
+import type { TodoItem, TodoLevel } from '@/types/home-todo';
+import type { TodoQuadrant } from '@/types/todo-quadrant';
+import type { AlertItem } from '@/components/statistics/AlertSheet';
 import {
   mockGetTeacher,
   mockGetStudents,
@@ -40,6 +43,25 @@ import type { Schedule } from '@/types/schedule';
 import { notWired } from '@/utils/not-wired';
 import { get } from '@/utils/request';
 import { isTodoRead, markTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
+import {
+  addCustomTodo,
+  completeCustomTodo,
+  getCustomTodos,
+  isCustomTodoId,
+  mapCustomTodoToHomeItem,
+  sortCustomTodos,
+  type AddCustomTodoInput,
+} from '@/utils/custom-todos';
+import { filterTodosBySettings, type TodoItemCategory } from '@/utils/todo-settings';
+import {
+  addUserNote,
+  type AddUserNoteInput,
+} from '@/utils/user-notes';
+import {
+  buildStudentRechargeTodoDesc,
+  buildStudentRechargeTodoTitle,
+  normalizeStudentRechargeTodoDesc,
+} from '@/utils/student-recharge-todo';
 import { statisticsService } from './statistics';
 
 const USE_MOCK =
@@ -174,40 +196,68 @@ export type OperationBannerItem = OperationBannerItemData;
 
 export type { StatsPeriod, StatsData, QuickEntry };
 
-const TODO_CONFIG_MAP: Record<
-  TodoItemData['type'],
-  { icon: string; iconBg: TodoItem['iconBg']; url?: string }
-> = {
-  alert: {
-    icon: 'mdi-alert-circle-outline',
-    iconBg: 'alert',
-  },
-  lesson: {
-    icon: 'mdi-book-open-variant',
-    iconBg: 'checkin',
-    url: COURSE_MANAGEMENT_CLASS_TAB_URL,
-  },
-  recharge: {
-    icon: 'mdi-cash-plus',
-    iconBg: 'hours',
-    url: '/package-course/pages/recharge-records/index',
-  },
-  meeting: {
-    icon: 'mdi-calendar-check-outline',
-    iconBg: 'leave',
-  },
-  salary: {
-    icon: 'mdi-cash-multiple',
-    iconBg: 'alert',
-    url: '/package-teacher/pages/salary-payment/index',
-  },
-  // 未点名降级待办（用户口径 2026-08-23）：点击去补点名
-  checkin: {
-    icon: 'mdi-account-check-outline',
-    iconBg: 'alert',
-    url: COURSE_MANAGEMENT_CLASS_TAB_URL,
-  },
+/** Mock/后端待办 type → 跳转 URL */
+const TODO_TYPE_URL: Partial<Record<TodoItemData['type'], string>> = {
+  recharge: '/package-course/pages/recharge-records/index',
+  salary: '/package-teacher/pages/salary-payment/index',
+  checkin: COURSE_MANAGEMENT_CLASS_TAB_URL,
+  lead: '/package-lead/pages/my-invite/index',
 };
+
+/** Mock/后端待办 type → 待办提醒设置分类 */
+const TODO_TYPE_CATEGORY: Record<TodoItemData['type'], TodoItemCategory> = {
+  checkin: 'attendanceCheckin',
+  recharge: 'studentRecharge',
+  salary: 'salaryRemind',
+  meeting: 'meetingRemind',
+  alert: 'studentRecharge',
+  lead: 'leadFollowUp',
+};
+
+/** Mock/后端待办 type → 事态等级（左侧色条） */
+const TODO_TYPE_LEVEL: Record<TodoItemData['type'], TodoLevel> = {
+  checkin: 'urgent',
+  recharge: 'normal',
+  salary: 'high',
+  meeting: 'low',
+  alert: 'normal',
+  lead: 'normal',
+};
+
+const TODO_PRIORITY_LEVEL: Record<TodoItemData['priority'], TodoLevel> = {
+  high: 'high',
+  medium: 'normal',
+  low: 'low',
+};
+
+const TODO_TYPE_QUADRANT: Record<TodoItemData['type'], TodoQuadrant> = {
+  alert: 'q1',
+  checkin: 'q1',
+  salary: 'q2',
+  recharge: 'q2',
+  lead: 'q3',
+  meeting: 'q4',
+};
+
+function buildRemindAtFromTodoTime(time: string): string {
+  const today = dayjs().format('YYYY-MM-DD');
+  if (/^\d{1,2}:\d{2}$/.test(time)) {
+    const [hourText, minuteText] = time.split(':');
+    const hour = hourText.padStart(2, '0');
+    const minute = minuteText.padStart(2, '0');
+    return dayjs(`${today} ${hour}:${minute}:00`).toISOString();
+  }
+  if (time === '今天') {
+    return dayjs().hour(12).minute(0).second(0).millisecond(0).toISOString();
+  }
+  return dayjs().add(2, 'hour').startOf('minute').toISOString();
+}
+
+function mapAlertLevelToTodoLevel(level: 'danger' | 'warning' | 'primary'): TodoLevel {
+  if (level === 'danger') return 'urgent';
+  if (level === 'warning') return 'high';
+  return 'normal';
+}
 
 function getTodayDateString(): string {
   // 必须与 mock 数据约定一致：mock 的 LESSON_RECORDS 日期用「本地日期」生成
@@ -250,36 +300,38 @@ function mapTeacher(data: RawHomeTeacher): HomeTeacherSummary {
 }
 
 function mapTodoItem(item: TodoItemData): HomeTodoItem {
-  const config = TODO_CONFIG_MAP[item.type];
   const desc =
     item.type === 'alert'
       ? `${item.time} 查看预警详情`
-      : item.type === 'lesson'
-        ? `${item.time} 前完成备课确认`
-        : item.type === 'recharge'
-          ? `${item.time} 跟进续费提醒`
-          : item.type === 'salary'
-            ? `${item.time} 前往薪资管理`
-            : item.type === 'checkin'
-              ? `${item.time}，点击进入补点名`
+      : item.type === 'recharge'
+        ? buildStudentRechargeTodoDesc(item.remainingHours)
+        : item.type === 'salary'
+          ? `${item.time} 前往薪资管理`
+          : item.type === 'checkin'
+            ? `${item.time}，点击进入补点名`
+            : item.type === 'lead'
+              ? `${item.time} 查看线索跟进`
               : `${item.time} 查看安排`;
 
-  // checkin 待办：直接跳到 lesson-form 补点名页（与课表页班课卡片一致）
   const url =
     item.type === 'checkin' && item.scheduleId
       ? `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.scheduleId)}` +
         `&classId=${encodeURIComponent(item.classId || '')}` +
         `&lessonDate=${encodeURIComponent(item.lessonDate || '')}` +
         `&hasTrialStudent=0`
-      : config.url;
+      : TODO_TYPE_URL[item.type];
 
   return {
     id: item.id,
     title: item.title,
     desc,
-    icon: config.icon,
-    iconBg: config.iconBg,
     url,
+    level: TODO_PRIORITY_LEVEL[item.priority] ?? TODO_TYPE_LEVEL[item.type],
+    category: TODO_TYPE_CATEGORY[item.type],
+    remindAt: buildRemindAtFromTodoTime(item.time),
+    quadrant: TODO_TYPE_QUADRANT[item.type],
+    remindEnabled: true,
+    completed: item.completed,
   };
 }
 
@@ -304,14 +356,9 @@ function mapAlertToHomeTodoItem(alert: {
     id: `todo-alert-${alert.id}`,
     title: alert.count > 1 ? `${alert.title} (${alert.count})` : alert.title,
     desc: alert.desc,
-    icon:
-      alert.level === 'primary'
-        ? 'mdi-information-outline'
-        : alert.level === 'danger'
-          ? 'mdi-alert-circle'
-          : 'mdi-alert-circle-outline',
-    iconBg: 'alert',
     url: `/package-statistics/pages/alert-detail/index?alertId=${encodeURIComponent(alert.id)}`,
+    level: mapAlertLevelToTodoLevel(alert.level),
+    category: 'financePackage',
   };
 }
 
@@ -336,10 +383,10 @@ function mapOperationAlertToStudentTodos(alert: {
     if (isTodoRead(todoId)) continue;
     todos.push({
       id: todoId,
-      title: `「${detail.name}」课时续费提醒`,
-      desc: detail.info,
-      icon: 'mdi-alert-circle-outline',
-      iconBg: 'alert',
+      title: buildStudentRechargeTodoTitle(detail.name),
+      desc: normalizeStudentRechargeTodoDesc(detail.info),
+      level: detail.info.includes('已用尽') ? 'urgent' : mapAlertLevelToTodoLevel(alert.level),
+      category: 'studentRecharge',
     });
   }
   return todos;
@@ -353,8 +400,8 @@ function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] 
       id: 'todo-pending-leaves',
       title: `${data.pendingLeaves}条请假待处理`,
       desc: '请及时处理待审批请假',
-      icon: 'mdi-calendar-check-outline',
-      iconBg: 'leave',
+      level: 'high',
+      category: 'leavePending',
     });
   }
 
@@ -363,9 +410,9 @@ function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] 
       id: 'todo-expiring-packages',
       title: `${data.expiringPackages}个课包即将到期`,
       desc: '请及时跟进续费提醒',
-      icon: 'mdi-cash-plus',
-      iconBg: 'hours',
       url: '/package-course/pages/recharge-records/index',
+      level: 'high',
+      category: 'financePackage',
     });
   }
 
@@ -374,9 +421,9 @@ function mapBackendTodoItems(data: BackendTeacherTodosResponse): HomeTodoItem[] 
       id: 'todo-low-hour-students',
       title: `${data.lowHourStudents}位学员剩余课时不足`,
       desc: '请尽快安排续费或提醒',
-      icon: 'mdi-book-open-variant',
-      iconBg: 'checkin',
       url: COURSE_MANAGEMENT_CLASS_TAB_URL,
+      level: 'normal',
+      category: 'studentRecharge',
     });
   }
 
@@ -406,7 +453,7 @@ function getScheduleStatus(
     const realEndMinutes = endMinutes - 1440;
     if (currentMinutes < realEndMinutes) {
       // 次日 00:00 ~ 实际下课：课从昨天开始，仍在进行
-      return attendedCount > 0 ? 'active' : 'urgent';
+      return 'active';
     }
     // 次日实际下课后（今日课表已过滤）或排课当天课前：按未上课处理
     return startMinutes - currentMinutes <= 5 ? 'urgent' : 'upcoming';
@@ -418,7 +465,7 @@ function getScheduleStatus(
     return 'done';
   }
   if (currentMinutes >= startMinutes) {
-    return attendedCount > 0 ? 'active' : 'urgent';
+    return 'active';
   }
 
   const diffMinutes = startMinutes - currentMinutes;
@@ -844,14 +891,20 @@ export const homeService = {
     teacherId: string,
     role?: UserRole | null,
     campusId?: string,
+    userId?: string,
   ): Promise<HomeTodoItem[]> => {
+    const customTodoItems = userId
+      ? sortCustomTodos(getCustomTodos(userId)).map(mapCustomTodoToHomeItem)
+      : [];
+
     const [operationAlertList, financeAlertList] = await Promise.all([
-      statisticsService.getAlerts(getCurrentAlertQueryParams('operation')).catch(() => []),
-      statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch(() => []),
+      statisticsService.getAlerts(getCurrentAlertQueryParams('operation')).catch((): AlertItem[] => []),
+      statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch((): AlertItem[] => []),
     ]);
     // 运营预警（课时不足）→ 学员级待办（过滤已读）；财务预警 → 预警级待办（过滤已读）
     const operationTodos = operationAlertList.flatMap(mapOperationAlertToStudentTodos);
     const financeTodos = financeAlertList
+      .filter((alert) => alert.id !== 'fin-stable')
       .map(mapAlertToHomeTodoItem)
       .filter((todo) => !isTodoRead(todo.id));
     const alertTodoItems = [...operationTodos, ...financeTodos];
@@ -864,20 +917,37 @@ export const homeService = {
         const data = await get<BackendTeacherTodosResponse>(
           `/home/teacher/todos${query ? `?${query}` : ''}`,
         );
-        return [...alertTodoItems, ...mapBackendTodoItems(data)];
+        return filterTodosBySettings([...customTodoItems, ...alertTodoItems, ...mapBackendTodoItems(data)]);
       } catch {
-        return alertTodoItems;
+        return filterTodosBySettings([...customTodoItems, ...alertTodoItems]);
       }
     }
 
     const fixedTodos = (await mockGetTodoItems(teacherId, campusId))
       .map(mapTodoItem)
       .filter((todo) => !isTodoRead(todo.id));
-    return [...alertTodoItems, ...fixedTodos];
+    return filterTodosBySettings([...customTodoItems, ...alertTodoItems, ...fixedTodos]);
+  },
+
+  /** 添加用户自定义待办 */
+  addCustomTodo: async (userId: string, input: AddCustomTodoInput): Promise<HomeTodoItem> => {
+    if (!USE_MOCK) notWired('home.addCustomTodo');
+    const record = addCustomTodo(userId, input);
+    return mapCustomTodoToHomeItem(record);
+  },
+
+  /** 添加用户笔记 */
+  addUserNote: async (userId: string, input: AddUserNoteInput) => {
+    if (!USE_MOCK) notWired('home.addUserNote');
+    return addUserNote(userId, input);
   },
 
   /** 标记待办为已读（用户手动点已读 → 不再出现） */
-  markTodoRead: async (todoId: string): Promise<void> => {
+  markTodoRead: async (todoId: string, userId?: string): Promise<void> => {
+    if (isCustomTodoId(todoId) && userId) {
+      completeCustomTodo(userId, todoId);
+      return;
+    }
     if (!USE_MOCK) notWired('home.markTodoRead');
     markTodoRead(todoId);
   },
