@@ -3,7 +3,7 @@
  */
 import dayjs from 'dayjs';
 import type { RecentGroup, RecentStudent } from '@/components/home/RecentLessonList';
-import type { TodoItem, TodoLevel } from '@/types/home-todo';
+import type { TodoCompletion, TodoItem, TodoLevel } from '@/types/home-todo';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import type { AlertItem } from '@/components/statistics/AlertSheet';
 import {
@@ -42,7 +42,15 @@ import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import { notWired } from '@/utils/not-wired';
 import { get } from '@/utils/request';
-import { isTodoRead, markTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
+import { getTodoReadAt, isTodoRead, markTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
+import { getTodoCompletion, saveTodoCompletion } from '@/utils/todo-completion';
+import {
+  extractNoteIdFromTodoId,
+  isNoteTodoId,
+  mapNoteToHomeItem,
+} from '@/utils/note-todos';
+import { completeNoteReminder, getUserNotes } from '@/utils/user-notes';
+import { resolveSystemTodoDisplayDay } from '@/utils/todo-timeline';
 import {
   addCustomTodo,
   completeCustomTodo,
@@ -299,6 +307,38 @@ function mapTeacher(data: RawHomeTeacher): HomeTeacherSummary {
   };
 }
 
+function enrichTodoItem(todo: HomeTodoItem): HomeTodoItem {
+  const stored = getTodoCompletion(todo.id);
+  const legacyReadAt = isTodoRead(todo.id) ? getTodoReadAt(todo.id) : undefined;
+  const completion: TodoCompletion | undefined =
+    stored ||
+    (legacyReadAt
+      ? {
+          completedAt: legacyReadAt,
+          completedBy: 'legacy',
+          completedByName: '已处理',
+        }
+      : todo.completion);
+
+  const pushedAt = todo.pushedAt || todo.remindAt || new Date().toISOString();
+  const displayDay =
+    todo.displayDay ||
+    (todo.sourceType === 'system' || (!todo.sourceType && !todo.remindAt && todo.pushedAt)
+      ? resolveSystemTodoDisplayDay(pushedAt, completion?.completedAt)
+      : todo.remindAt
+        ? dayjs(todo.remindAt).format('YYYY-MM-DD')
+        : dayjs().format('YYYY-MM-DD'));
+
+  return {
+    ...todo,
+    sourceType: todo.sourceType || (todo.pushedAt ? 'system' : undefined),
+    pushedAt: todo.sourceType === 'system' || todo.pushedAt ? pushedAt : todo.pushedAt,
+    displayDay,
+    completion,
+    completed: Boolean(completion || todo.completed),
+  };
+}
+
 function mapTodoItem(item: TodoItemData): HomeTodoItem {
   const desc =
     item.type === 'alert'
@@ -332,6 +372,9 @@ function mapTodoItem(item: TodoItemData): HomeTodoItem {
     quadrant: TODO_TYPE_QUADRANT[item.type],
     remindEnabled: true,
     completed: item.completed,
+    sourceType: 'system',
+    sharedScope: item.type === 'recharge' ? 'campus_ops' : 'private',
+    pushedAt: buildRemindAtFromTodoTime(item.time),
   };
 }
 
@@ -379,14 +422,18 @@ function mapOperationAlertToStudentTodos(alert: {
   for (const detail of alert.details) {
     if (!detail.refId) continue;
     const todoId = rechargeAlertTodoId(detail.refId);
-    // 手动已读后不再出现（同一轮不重复推送）
-    if (isTodoRead(todoId)) continue;
+    const pushedAt = new Date().toISOString();
     todos.push({
       id: todoId,
       title: buildStudentRechargeTodoTitle(detail.name),
       desc: normalizeStudentRechargeTodoDesc(detail.info),
       level: detail.info.includes('已用尽') ? 'urgent' : mapAlertLevelToTodoLevel(alert.level),
       category: 'studentRecharge',
+      sourceType: 'system',
+      sharedScope: 'campus_ops',
+      pushedAt,
+      remindAt: pushedAt,
+      remindEnabled: true,
     });
   }
   return todos;
@@ -753,6 +800,30 @@ function mapBackendOperationContent(data: BackendHomeOperationResponse): HomeOpe
   };
 }
 
+async function completeHomeTodo(
+  todoId: string,
+  payload: { userId: string; userName: string; note?: string },
+): Promise<void> {
+  const completion: TodoCompletion = {
+    completedAt: new Date().toISOString(),
+    completedBy: payload.userId,
+    completedByName: payload.userName,
+    note: payload.note?.trim() || undefined,
+  };
+
+  if (isCustomTodoId(todoId)) {
+    completeCustomTodo(payload.userId, todoId, payload.note);
+    return;
+  }
+  if (isNoteTodoId(todoId)) {
+    completeNoteReminder(payload.userId, extractNoteIdFromTodoId(todoId), payload.note);
+    return;
+  }
+  if (!USE_MOCK) notWired('home.completeTodo');
+  saveTodoCompletion(todoId, completion);
+  markTodoRead(todoId);
+}
+
 export const homeService = {
   /** 获取教师信息 */
   getTeacher: async (
@@ -892,22 +963,35 @@ export const homeService = {
     role?: UserRole | null,
     campusId?: string,
     userId?: string,
+    userName?: string,
   ): Promise<HomeTodoItem[]> => {
     const customTodoItems = userId
-      ? sortCustomTodos(getCustomTodos(userId)).map(mapCustomTodoToHomeItem)
+      ? sortCustomTodos(getCustomTodos(userId)).map((record) =>
+          enrichTodoItem(mapCustomTodoToHomeItem(record, userName)),
+        )
       : [];
+
+    const noteTodoItems = userId
+      ? getUserNotes(userId)
+          .map((note) => mapNoteToHomeItem(note, userName))
+          .filter((item): item is HomeTodoItem => Boolean(item))
+          .map(enrichTodoItem)
+      : [];
+
+    const canShared = role === 'admin' || role === 'principal' || role === 'teacher';
 
     const [operationAlertList, financeAlertList] = await Promise.all([
       statisticsService.getAlerts(getCurrentAlertQueryParams('operation')).catch((): AlertItem[] => []),
       statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch((): AlertItem[] => []),
     ]);
-    // 运营预警（课时不足）→ 学员级待办（过滤已读）；财务预警 → 预警级待办（过滤已读）
-    const operationTodos = operationAlertList.flatMap(mapOperationAlertToStudentTodos);
+    const operationTodos = operationAlertList
+      .flatMap(mapOperationAlertToStudentTodos)
+      .filter((todo) => canShared || todo.sharedScope !== 'campus_ops');
     const financeTodos = financeAlertList
       .filter((alert) => alert.id !== 'fin-stable')
       .map(mapAlertToHomeTodoItem)
-      .filter((todo) => !isTodoRead(todo.id));
-    const alertTodoItems = [...operationTodos, ...financeTodos];
+      .map((todo) => enrichTodoItem({ ...todo, sourceType: 'system', pushedAt: new Date().toISOString() }));
+    const alertTodoItems = [...operationTodos, ...financeTodos].map(enrichTodoItem);
 
     if (!USE_MOCK && role === 'teacher') {
       try {
@@ -917,16 +1001,23 @@ export const homeService = {
         const data = await get<BackendTeacherTodosResponse>(
           `/home/teacher/todos${query ? `?${query}` : ''}`,
         );
-        return filterTodosBySettings([...customTodoItems, ...alertTodoItems, ...mapBackendTodoItems(data)]);
+        return filterTodosBySettings([
+          ...customTodoItems,
+          ...noteTodoItems,
+          ...alertTodoItems,
+          ...mapBackendTodoItems(data).map((todo) =>
+            enrichTodoItem({ ...todo, sourceType: 'system', pushedAt: new Date().toISOString() }),
+          ),
+        ]);
       } catch {
-        return filterTodosBySettings([...customTodoItems, ...alertTodoItems]);
+        return filterTodosBySettings([...customTodoItems, ...noteTodoItems, ...alertTodoItems]);
       }
     }
 
     const fixedTodos = (await mockGetTodoItems(teacherId, campusId))
       .map(mapTodoItem)
-      .filter((todo) => !isTodoRead(todo.id));
-    return filterTodosBySettings([...customTodoItems, ...alertTodoItems, ...fixedTodos]);
+      .map(enrichTodoItem);
+    return filterTodosBySettings([...customTodoItems, ...noteTodoItems, ...alertTodoItems, ...fixedTodos]);
   },
 
   /** 添加用户自定义待办 */
@@ -942,8 +1033,19 @@ export const homeService = {
     return addUserNote(userId, input);
   },
 
-  /** 标记待办为已读（用户手动点已读 → 不再出现） */
-  markTodoRead: async (todoId: string, userId?: string): Promise<void> => {
+  completeTodo: completeHomeTodo,
+
+  /** @deprecated 使用 completeTodo */
+  markTodoRead: async (
+    todoId: string,
+    userId?: string,
+    userName?: string,
+    note?: string,
+  ): Promise<void> => {
+    if (userId && userName) {
+      await completeHomeTodo(todoId, { userId, userName, note });
+      return;
+    }
     if (isCustomTodoId(todoId) && userId) {
       completeCustomTodo(userId, todoId);
       return;

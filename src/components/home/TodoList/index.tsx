@@ -2,76 +2,54 @@ import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import Icon from '@/components/Icon';
 import TodoQuadrantIcon from '@/components/TodoQuadrantIcon';
 import type { TodoItem } from '@/types/home-todo';
-import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { resolveTodoQuadrant } from '@/types/todo-quadrant';
+import {
+  buildTimelineEntries,
+  formatTimelineClock,
+  resolveTimelineAt,
+  shouldShowNowMarker,
+} from '@/utils/todo-timeline';
 
 export type { TodoItem };
 
 export interface TodoListProps {
   items: TodoItem[];
-  /** 手动点「已读」/「完成」回调 */
-  onMarkRead?: (todoId: string) => void;
+  /** 指定日期 YYYY-MM-DD（日历页）；默认今天 */
+  targetDate?: string;
+  /** 点勾选完成 */
+  onComplete?: (item: TodoItem) => void;
 }
 
-const TAG_CLASS: Record<TodoQuadrant, string> = {
-  q1: 'todo-card-tag-warning',
-  q2: 'todo-card-tag-primary',
-  q3: 'todo-card-tag-accent',
-  q4: 'todo-card-tag-default',
-};
-
-function hasRemind(item: TodoItem): boolean {
-  return item.remindEnabled !== false && Boolean(item.remindAt);
-}
-
-function resolveRemindAt(item: TodoItem): dayjs.Dayjs {
-  if (item.remindAt && dayjs(item.remindAt).isValid()) {
-    return dayjs(item.remindAt);
-  }
-  return dayjs().endOf('day');
-}
-
-function formatTimelineTime(value: dayjs.Dayjs): string {
-  return value.format('HH:mm');
+function hasDisplayTime(item: TodoItem): boolean {
+  return Boolean(item.remindAt || item.pushedAt);
 }
 
 function formatRemindLabel(value: dayjs.Dayjs): string {
   return value.format('MM/DD HH:mm');
 }
 
-function formatRelativeMinutes(value: dayjs.Dayjs): string | null {
-  const diffMin = value.diff(dayjs(), 'minute');
-  if (diffMin <= 0) return null;
-  if (diffMin <= 60) return `${diffMin}分钟后`;
-  return null;
-}
-
 /**
- * TodoList - 首页待办时间轴列表
+ * TodoList - 首页待办时间轴（自下而上，实时蓝线分割）
  *
- * 参考检查单时间轴布局：左侧时刻 + 竖线，当前时间虚线，卡片含勾选圈、标题、提醒时间与分类角标。
+ * 仅展示今日待办：下方为较早时刻，向上靠近 Tab；已完成项沉至实时线下方。
  */
-const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
-  const [expanded, setExpanded] = useState(false);
-  const MAX_COLLAPSED = 6;
-
-  const sortedItems = useMemo(() => {
-    return [...items].sort((left, right) => {
-      const leftDone = left.completed ? 1 : 0;
-      const rightDone = right.completed ? 1 : 0;
-      if (leftDone !== rightDone) return leftDone - rightDone;
-      return resolveRemindAt(left).valueOf() - resolveRemindAt(right).valueOf();
-    });
-  }, [items]);
-
-  const collapsed = sortedItems.length > MAX_COLLAPSED;
-  const visibleItems = collapsed && !expanded ? sortedItems.slice(0, MAX_COLLAPSED) : sortedItems;
+const TodoList: React.FC<TodoListProps> = ({ items, targetDate, onComplete }) => {
   const now = dayjs();
   const nowLabel = now.format('HH:mm');
+  const isTodayView = !targetDate || targetDate === now.format('YYYY-MM-DD');
+
+  const entries = useMemo(
+    () => buildTimelineEntries(items, now, targetDate),
+    [items, now, targetDate],
+  );
+  const showNowMarker = useMemo(
+    () => isTodayView && shouldShowNowMarker(entries),
+    [entries, now, isTodayView],
+  );
 
   const handleCardClick = (item: TodoItem) => {
     if (item.url) {
@@ -81,14 +59,14 @@ const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
 
   const handleToggleComplete = (item: TodoItem, event: { stopPropagation?: () => void }) => {
     event.stopPropagation?.();
-    if (item.completed || !onMarkRead) return;
-    onMarkRead(item.id);
+    if (item.completed || item.completion || !onComplete) return;
+    onComplete(item);
   };
 
   if (items.length === 0) {
     return (
       <View className="bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[60rpx] text-center">
-        <Text className="text-muted-foreground text-[28rpx]">暂无待办事项</Text>
+        <Text className="text-muted-foreground text-[28rpx]">今日暂无待办</Text>
         <Text className="text-muted-foreground text-[24rpx] mt-[12rpx] block">
           点击右下角加号，记待办或查看日历
         </Text>
@@ -96,116 +74,116 @@ const TodoList: React.FC<TodoListProps> = ({ items, onMarkRead }) => {
     );
   }
 
-  return (
-    <View className="px-[8rpx]">
-      <View className="relative pl-[88rpx]">
-        <View className="absolute left-[36rpx] top-[8rpx] bottom-[8rpx] w-[2rpx] todo-timeline-line" />
+  const renderNowLine = (key: string) => (
+    <View key={key} className="relative -ml-[52rpx] my-[20rpx] flex items-center">
+      <View className="absolute left-[28rpx] z-10 rounded-full bg-primary px-[12rpx] py-[4rpx]">
+        <Text className="text-[20rpx] font-medium text-white">{nowLabel}</Text>
+      </View>
+      <View className="ml-[12rpx] h-[2rpx] flex-1 todo-timeline-now-dash" />
+    </View>
+  );
 
-        {visibleItems.map((item, index) => {
-          const remindAt = resolveRemindAt(item);
-          const timeLabel = hasRemind(item) ? formatTimelineTime(remindAt) : '--:--';
-          const relativeLabel = hasRemind(item) ? formatRelativeMinutes(remindAt) : null;
-          const quadrant = resolveTodoQuadrant({ quadrant: item.quadrant, level: item.level });
-          const showNowLine = index > 0 && remindAt.isAfter(now) && resolveRemindAt(visibleItems[index - 1]).isBefore(now);
+  const rows: React.ReactNode[] = [];
+  let nowInserted = false;
 
-          return (
-            <React.Fragment key={item.id}>
-              {showNowLine && (
-                <View className="relative -ml-[52rpx] mb-[24rpx] flex items-center">
-                  <View className="absolute left-[28rpx] z-10 rounded-full bg-primary px-[12rpx] py-[4rpx]">
-                    <Text className="text-[20rpx] font-medium text-white">{nowLabel}</Text>
-                  </View>
-                  <View className="ml-[12rpx] h-[2rpx] flex-1 todo-timeline-now-dash" />
+  entries.forEach((entry, index) => {
+    const prev = entries[index - 1];
+    if (
+      !nowInserted &&
+      showNowMarker &&
+      entry.segment === 'future' &&
+      prev &&
+      (prev.segment === 'past' || prev.segment === 'completed')
+    ) {
+      rows.push(renderNowLine('now-between'));
+      nowInserted = true;
+    }
+
+    const { item } = entry;
+    const timelineAt = resolveTimelineAt(item, now);
+    const timeLabel = hasDisplayTime(item) ? formatTimelineClock(timelineAt) : '--:--';
+    const isDone = Boolean(item.completed || item.completion);
+    const quadrant = resolveTodoQuadrant({ quadrant: item.quadrant, level: item.level });
+
+    rows.push(
+      <View key={item.id} className="relative mb-[20rpx]">
+        <Text className="absolute -left-[88rpx] top-[28rpx] w-[64rpx] text-right text-[22rpx] text-muted-foreground">
+          {timeLabel}
+        </Text>
+
+        <View
+          className={cn(
+            'relative rounded-[24rpx] bg-card border border-border shadow-card px-[24rpx] py-[22rpx] press-scale',
+            isDone && 'todo-card-done',
+          )}
+          onClick={() => handleCardClick(item)}
+        >
+          <View className="absolute right-[16rpx] top-[16rpx]">
+            <TodoQuadrantIcon quadrant={quadrant} size="sm" />
+          </View>
+
+          <View className="flex items-start gap-[16rpx] pr-[56rpx]">
+            <View
+              className={cn(
+                'mt-[6rpx] h-[36rpx] w-[36rpx] shrink-0 rounded-full center',
+                isDone ? 'todo-check-done-soft' : 'todo-check-pending',
+              )}
+              onClick={(event) => handleToggleComplete(item, event)}
+            >
+              {isDone && <Icon name="mdi-check" size="xs" color="success" />}
+            </View>
+
+            <View className="min-w-0 flex-1">
+              <Text
+                className={cn(
+                  'text-[30rpx] leading-snug block',
+                  isDone ? 'todo-title-done' : 'text-foreground font-semibold',
+                )}
+              >
+                {item.title}
+              </Text>
+
+              {hasDisplayTime(item) && (
+                <View className="mt-[10rpx] flex flex-row items-center gap-[8rpx] flex-wrap">
+                  <Icon name="mdi-calendar-clock" size="xs" color="mutedForeground" />
+                  <Text className="text-[22rpx] text-muted-foreground">
+                    {formatRemindLabel(timelineAt)}
+                  </Text>
+                  {item.sourceType === 'note' && (
+                    <Text className="text-[20rpx] text-muted-foreground">笔记</Text>
+                  )}
                 </View>
               )}
 
-              <View className="relative mb-[24rpx]">
-                <Text className="absolute -left-[88rpx] top-[28rpx] w-[64rpx] text-right text-[22rpx] text-muted-foreground">
-                  {timeLabel}
+              {(item.note || item.desc) && (
+                <Text className="mt-[10rpx] text-[24rpx] text-muted-foreground line-clamp-2 block">
+                  {item.note || item.desc}
                 </Text>
+              )}
 
-                <View
-                  className={cn(
-                    'relative rounded-[24rpx] bg-card border border-border shadow-card px-[24rpx] py-[22rpx] press-scale',
-                    item.completed && 'opacity-80',
-                  )}
-                  onClick={() => handleCardClick(item)}
-                >
-                  <View
-                    className={cn(
-                      'absolute right-[16rpx] top-[16rpx] rounded-[10rpx] px-[8rpx] py-[6rpx]',
-                      TAG_CLASS[quadrant],
-                    )}
-                  >
-                    <TodoQuadrantIcon quadrant={quadrant} size="sm" />
-                  </View>
-
-                  <View className="flex items-start gap-[16rpx] pr-[56rpx]">
-                    <View
-                      className={cn(
-                        'mt-[6rpx] h-[36rpx] w-[36rpx] shrink-0 rounded-full center',
-                        item.completed ? 'todo-check-done' : 'todo-check-pending',
-                      )}
-                      onClick={(event) => handleToggleComplete(item, event)}
-                    >
-                      {item.completed && <Icon name="mdi-check" size="xs" color="white" />}
-                    </View>
-
-                    <View className="min-w-0 flex-1">
-                      <Text
-                        className={cn(
-                          'text-[30rpx] font-semibold leading-snug block',
-                          item.completed ? 'text-success line-through' : 'text-foreground',
-                        )}
-                      >
-                        {item.title}
-                      </Text>
-
-                      {hasRemind(item) && (
-                        <View className="mt-[10rpx] flex flex-row items-center gap-[8rpx] flex-wrap">
-                          <Icon name="mdi-calendar-clock" size="xs" color="destructive" />
-                          <Text className="text-[22rpx] text-muted-foreground">
-                            {formatRemindLabel(remindAt)}
-                          </Text>
-                          {relativeLabel && !item.completed && (
-                            <Text className="text-[22rpx] text-warning">{relativeLabel}</Text>
-                          )}
-                        </View>
-                      )}
-
-                      {(item.note || item.desc) && (
-                        <Text className="mt-[10rpx] text-[24rpx] text-muted-foreground line-clamp-2 block">
-                          {item.note || item.desc}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </React.Fragment>
-          );
-        })}
-
-        {!visibleItems.some((item) => resolveRemindAt(item).isAfter(now)) && (
-          <View className="relative -ml-[52rpx] mb-[8rpx] flex items-center">
-            <View className="absolute left-[28rpx] z-10 rounded-full bg-primary px-[12rpx] py-[4rpx]">
-              <Text className="text-[20rpx] font-medium text-white">{nowLabel}</Text>
+              {item.completion && (
+                <Text className="mt-[10rpx] text-[22rpx] text-muted-foreground block">
+                  {item.completion.completedByName} 已完成
+                  {item.completion.note ? ` · ${item.completion.note}` : ''}
+                </Text>
+              )}
             </View>
-            <View className="ml-[12rpx] h-[2rpx] flex-1 todo-timeline-now-dash" />
           </View>
-        )}
-      </View>
-
-      {collapsed && (
-        <View
-          className="flex items-center justify-center py-[16rpx] press-scale"
-          onClick={() => setExpanded((prev) => !prev)}
-        >
-          <Text className="text-[26rpx] font-medium text-primary">
-            {expanded ? '收起' : `展开全部（${sortedItems.length}）`}
-          </Text>
         </View>
-      )}
+      </View>,
+    );
+  });
+
+  if (showNowMarker && !nowInserted) {
+    rows.push(renderNowLine('now-tail'));
+  }
+
+  return (
+    <View className="px-[8rpx]">
+      <View className="relative flex flex-col-reverse pl-[88rpx]">
+        <View className="absolute left-[36rpx] top-[8rpx] bottom-[8rpx] w-[2rpx] todo-timeline-line" />
+        {rows}
+      </View>
     </View>
   );
 };

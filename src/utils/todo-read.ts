@@ -47,6 +47,11 @@ export function isTodoRead(todoId: string): boolean {
   return !!load()[todoId];
 }
 
+/** 某待办已读时间 */
+export function getTodoReadAt(todoId: string): string | undefined {
+  return load()[todoId];
+}
+
 /** 清除某待办已读记录（剩余回升后可重新提醒） */
 export function clearTodoRead(todoId: string): void {
   const read = load();

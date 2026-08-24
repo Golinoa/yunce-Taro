@@ -28,6 +28,7 @@ export default defineAppConfig({
     'pages/notifications/index',
     'pages/my-notes/index',
     'pages/note-detail/index',
+    'pages/todo-calendar/index',
     'pages/agreement/index',
     'pages/about/index',
     'pages/store-entry/index',

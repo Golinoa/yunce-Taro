@@ -7,6 +7,9 @@ import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import KingKongSection from '@/components/home/KingKongSection';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import TodoList from '@/components/home/TodoList';
+import TodoToolbar, { type TodoViewMode } from '@/components/home/TodoToolbar';
+import TodoQuadrantBoard from '@/components/home/TodoQuadrantBoard';
+import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
 import type { TodoItem } from '@/types/home-todo';
 import AddCustomTodoSheet from '@/components/home/AddCustomTodoSheet';
 import AddNoteSheet from '@/components/home/AddNoteSheet';
@@ -30,6 +33,7 @@ import { getTodoShowTabBadge } from '@/utils/todo-settings';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import type { ITouchEvent } from '@tarojs/components';
@@ -39,8 +43,12 @@ type HomeTab = 'schedule' | 'todo' | 'recent';
 
 const HOME_TAB_ORDER: HomeTab[] = ['schedule', 'todo', 'recent'];
 const ORG_COVER_IMAGE = '/assets/images/2.jpg';
-/** 待办列表进入视口后，距底部约 2 张卡片高度时显示 FAB（rpx @375） */
-const FAB_REVEAL_BOTTOM_OFFSET_RPX = 320;
+/** FAB 距屏幕底的安全边距（rpx），与 ExpandableFabMenu 对齐 */
+const FAB_REVEAL_BOTTOM_OFFSET_RPX = 48;
+/** Tab 标签行下方禁区（rpx）：视口底到 Tab 底不足该高度时不显示 FAB */
+const FAB_REVEAL_TAB_GAP_RPX = 300;
+/** 待办空状态 Tab 面板兜底高度（rpx @375） */
+const TODO_EMPTY_PANEL_MIN_HEIGHT_RPX = 520;
 
 const getHomeTabIndex = (tab: HomeTab): number => HOME_TAB_ORDER.indexOf(tab);
 
@@ -90,6 +98,9 @@ const Home: React.FC = () => {
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
   const [addTodoSheetVisible, setAddTodoSheetVisible] = useState(false);
   const [addNoteSheetVisible, setAddNoteSheetVisible] = useState(false);
+  const [todoViewMode, setTodoViewMode] = useState<TodoViewMode>('timeline');
+  const [completeSheetItem, setCompleteSheetItem] = useState<TodoItem | null>(null);
+  const [completeSheetVisible, setCompleteSheetVisible] = useState(false);
 
   // ---- 最近消课 ----
   const [recentRecords, setRecentRecords] = useState<LessonRecord[]>([]);
@@ -103,9 +114,9 @@ const Home: React.FC = () => {
   const savedScrollTopRef = useRef(0);
   /** 仅 FAB 展开等场景短暂受控 scrollTop；为 null 时不传 prop，避免误重置滚动 */
   const [scrollTopPin, setScrollTopPin] = useState<number | null>(null);
-  const fabQueryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** 待办 FAB 锚点在滚动内容中的 top（px），切换 Tab 后测量一次 */
-  const todoFabAnchorTopRef = useRef(0);
+  /** 待办 Tab 内是否发生过滚动（防止仅点 Tab 未滑就误显） */
+  const todoTabScrollEngagedRef = useRef(false);
+  const fabVisibilityRafRef = useRef(0);
   /** Tab 内容区历史最大高度（px），切换时占位防止滚动跳动 */
   const tabAreaMinHeightRef = useRef(0);
   const [tabAreaMinHeight, setTabAreaMinHeight] = useState(0);
@@ -126,52 +137,57 @@ const Home: React.FC = () => {
       });
   }, [activeTab]);
 
-  const updateFabVisibilityFromScroll = useCallback(
-    (scrollTop: number) => {
-      if (activeTab !== 'todo' || !isStaffRole(currentRole)) {
-        setFabVisible(false);
-        return;
-      }
-      const { windowHeight, windowWidth } = Taro.getWindowInfo();
-      const bottomOffsetPx = (FAB_REVEAL_BOTTOM_OFFSET_RPX * windowWidth) / 750;
-      const revealLine = scrollTop + windowHeight - bottomOffsetPx;
-      setFabVisible(revealLine > todoFabAnchorTopRef.current);
-    },
-    [activeTab, currentRole],
-  );
-
-  const measureTodoFabAnchor = useCallback(() => {
-    if (activeTab !== 'todo' || !isStaffRole(currentRole)) return;
+  const updateFabVisibility = useCallback(() => {
+    if (activeTab !== 'todo' || !isStaffRole(currentRole) || !todoTabScrollEngagedRef.current) {
+      setFabVisible(false);
+      return;
+    }
 
     Taro.createSelectorQuery()
+      .select('#home-scroll-view')
+      .boundingClientRect()
       .select('#home-todo-fab-anchor')
       .boundingClientRect()
-      .select('#home-scroll-inner')
-      .boundingClientRect()
       .exec((res) => {
-        const anchorRect = res[0];
-        const innerRect = res[1];
-        if (!anchorRect || !innerRect || Array.isArray(anchorRect) || Array.isArray(innerRect)) {
+        const scrollViewRect = res[0];
+        const anchorRect = res[1];
+        if (
+          !scrollViewRect ||
+          !anchorRect ||
+          Array.isArray(scrollViewRect) ||
+          Array.isArray(anchorRect)
+        ) {
+          setFabVisible(false);
           return;
         }
-        todoFabAnchorTopRef.current =
-          savedScrollTopRef.current + anchorRect.top - innerRect.top;
-        updateFabVisibilityFromScroll(savedScrollTopRef.current);
+
+        const { windowWidth } = Taro.getWindowInfo();
+        const bottomOffsetPx = (FAB_REVEAL_BOTTOM_OFFSET_RPX * windowWidth) / 750;
+        const tabGapPx = (FAB_REVEAL_TAB_GAP_RPX * windowWidth) / 750;
+        const scrollViewportBottom = scrollViewRect.top + scrollViewRect.height - bottomOffsetPx;
+        const gapBelowTab = scrollViewportBottom - anchorRect.bottom;
+
+        setFabVisible(gapBelowTab > tabGapPx);
       });
-  }, [activeTab, currentRole, updateFabVisibilityFromScroll]);
+  }, [activeTab, currentRole]);
+
+  const scheduleFabVisibilityUpdate = useCallback(() => {
+    if (fabVisibilityRafRef.current) return;
+    fabVisibilityRafRef.current = requestAnimationFrame(() => {
+      fabVisibilityRafRef.current = 0;
+      updateFabVisibility();
+    });
+  }, [updateFabVisibility]);
 
   const handleScroll = useCallback(
     (event: { detail: { scrollTop: number } }) => {
       const scrollTop = event.detail.scrollTop;
       savedScrollTopRef.current = scrollTop;
       if (activeTab !== 'todo') return;
-      if (fabQueryTimerRef.current) return;
-      fabQueryTimerRef.current = setTimeout(() => {
-        fabQueryTimerRef.current = null;
-        updateFabVisibilityFromScroll(scrollTop);
-      }, 50);
+      todoTabScrollEngagedRef.current = true;
+      scheduleFabVisibilityUpdate();
     },
-    [activeTab, updateFabVisibilityFromScroll],
+    [activeTab, scheduleFabVisibilityUpdate],
   );
 
   const handleFabToggle = useCallback((expanded: boolean) => {
@@ -186,13 +202,22 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     if (activeTab !== 'todo') {
+      todoTabScrollEngagedRef.current = false;
       setFabVisible(false);
       return;
     }
-    Taro.nextTick(() => {
-      measureTodoFabAnchor();
-    });
-  }, [activeTab, todoItems.length, measureTodoFabAnchor]);
+    todoTabScrollEngagedRef.current = false;
+    setFabVisible(false);
+  }, [activeTab, todoItems.length]);
+
+  useEffect(
+    () => () => {
+      if (fabVisibilityRafRef.current) {
+        cancelAnimationFrame(fabVisibilityRafRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     Taro.nextTick(() => {
@@ -201,13 +226,6 @@ const Home: React.FC = () => {
     const timer = setTimeout(measureTabAreaHeight, 100);
     return () => clearTimeout(timer);
   }, [activeTab, schedules.length, todoItems.length, recentRecords.length, measureTabAreaHeight]);
-
-  useEffect(
-    () => () => {
-      if (fabQueryTimerRef.current) clearTimeout(fabQueryTimerRef.current);
-    },
-    [],
-  );
 
   // ============================================
   // 校区切换
@@ -267,10 +285,11 @@ const Home: React.FC = () => {
             ? lessonRecordService.getByTeacher(teacherData.id, campusId)
             : lessonRecordService.getAll();
 
+        const userName = profile.nickname || profile.name || '我';
         const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
           homeService.getTodaySchedules(teacherData.id, currentRole, campusId),
           homeService.getUnreadCount(profile.id, currentRole),
-          homeService.getTodoItems(teacherData.id, currentRole, campusId, profile.id),
+          homeService.getTodoItems(teacherData.id, currentRole, campusId, profile.id, userName),
           recentLessonRequest,
         ]);
         setSchedules(scheduleList);
@@ -321,6 +340,11 @@ const Home: React.FC = () => {
     loadData(currentCampusId);
   });
 
+  const activeTodoCount = useMemo(
+    () => todoItems.filter((item) => isTodoVisibleOnTimelineToday(item) && !item.completed && !item.completion).length,
+    [todoItems],
+  );
+
   // Tab 配置（待办 badge：仅数量 > 0 且设置开启时显示）
   const showTodoBadge = getTodoShowTabBadge();
   const TAB_OPTIONS: { key: HomeTab; label: string; badge?: number }[] = [
@@ -328,7 +352,7 @@ const Home: React.FC = () => {
     {
       key: 'todo',
       label: '待办事项',
-      ...(showTodoBadge && todoItems.length > 0 ? { badge: todoItems.length } : {}),
+      ...(showTodoBadge && activeTodoCount > 0 ? { badge: activeTodoCount } : {}),
     },
     { key: 'recent', label: '最近消课' },
   ];
@@ -346,8 +370,13 @@ const Home: React.FC = () => {
       if (activeTab === 'todo') {
         setFabMenuExpanded(false);
         setFabVisible(false);
-        // 禁止 setScrollTopPin(undefined)：受控 ScrollView 会把 undefined 当成滚回顶部
+        todoTabScrollEngagedRef.current = false;
         setScrollTopPin(null);
+      }
+
+      if (tab === 'todo') {
+        todoTabScrollEngagedRef.current = false;
+        setFabVisible(false);
       }
 
       setActiveTab(tab);
@@ -355,20 +384,37 @@ const Home: React.FC = () => {
     [activeTab],
   );
 
-  /** 手动点「已读」/「完成」：记录后从待办列表移除 */
-  const handleMarkTodoRead = useCallback(
-    (todoId: string) => {
+  const handleCompleteTodo = useCallback(
+    (item: TodoItem) => {
+      if (item.sharedScope === 'campus_ops') {
+        setCompleteSheetItem(item);
+        setCompleteSheetVisible(true);
+        return;
+      }
       if (!profile?.id) return;
+      const userName = profile.nickname || profile.name || '我';
       void homeService
-        .markTodoRead(todoId, profile.id)
-        .then(() => {
-          setTodoItems((prev) => prev.filter((item) => item.id !== todoId));
-        })
-        .catch((err) => {
-          logError('Home markTodoRead', err);
-        });
+        .completeTodo(item.id, { userId: profile.id, userName })
+        .then(() => loadData(currentCampusId))
+        .catch((err) => logError('Home completeTodo', err));
     },
-    [profile?.id],
+    [profile, currentCampusId, loadData],
+  );
+
+  const handleSubmitCompleteTodo = useCallback(
+    async (note: string) => {
+      if (!profile?.id || !completeSheetItem) return;
+      const userName = profile.nickname || profile.name || '我';
+      await homeService.completeTodo(completeSheetItem.id, {
+        userId: profile.id,
+        userName,
+        note,
+      });
+      setCompleteSheetVisible(false);
+      setCompleteSheetItem(null);
+      await loadData(currentCampusId);
+    },
+    [profile, completeSheetItem, currentCampusId, loadData],
   );
 
   const handleCloseAddTodoSheet = useCallback(() => {
@@ -393,12 +439,20 @@ const Home: React.FC = () => {
   );
 
   const handleSubmitNote = useCallback(
-    async (payload: { content: string; folder?: string; tagColor?: import('@/utils/user-notes').NoteTagColor }) => {
+    async (payload: {
+      content: string;
+      folder?: string;
+      tagColor?: import('@/utils/user-notes').NoteTagColor;
+      remindEnabled?: boolean;
+      remindDate?: string;
+      remindTime?: string;
+    }) => {
       if (!profile?.id) return;
       await homeService.addUserNote(profile.id, payload);
+      await loadData(currentCampusId);
       Taro.showToast({ title: '笔记已保存', icon: 'success' });
     },
-    [profile?.id],
+    [profile?.id, currentCampusId, loadData],
   );
 
   const fabActions = useMemo(
@@ -408,7 +462,7 @@ const Home: React.FC = () => {
         label: '日历视图',
         icon: 'mdi-calendar-outline',
         onClick: () => {
-          Taro.switchTab({ url: '/pages/schedule/index' });
+          Taro.navigateTo({ url: '/pages/todo-calendar/index' });
         },
       },
       {
@@ -538,6 +592,7 @@ const Home: React.FC = () => {
       <PageMeta pageStyle={fabMenuExpanded ? 'overflow: hidden;' : ''} />
       <View className={cn(`theme-${activeTheme}`, 'h-screen overflow-x-hidden bg-background')}>
         <ScrollView
+          id="home-scroll-view"
           scrollY={!fabMenuExpanded}
           showScrollbar={false}
           className="h-full overflow-x-hidden no-scrollbar"
@@ -556,7 +611,7 @@ const Home: React.FC = () => {
               <View className="px-[24rpx]">
                 {isStaffRole(currentRole) && (
                   <>
-                    <View className="flex flex-row items-center gap-[24rpx] overflow-x-hidden py-[24rpx]">
+                    <View className="relative flex flex-row items-center gap-[24rpx] overflow-x-hidden py-[24rpx]">
                       {TAB_OPTIONS.map((tab) => {
                         const badgeCount =
                           typeof tab.badge === 'number' && tab.badge > 0 ? tab.badge : 0;
@@ -580,6 +635,10 @@ const Home: React.FC = () => {
                           </View>
                         );
                       })}
+                      <View
+                        id="home-todo-fab-anchor"
+                        className="pointer-events-none absolute bottom-0 left-0 h-[1rpx] w-full"
+                      />
                     </View>
 
                     {/* 用户口径（2026-08-23）：Tab 内容改条件渲染，高度自然撑开（不裁切/不空白/无跳动）；
@@ -600,9 +659,22 @@ const Home: React.FC = () => {
                         <View
                           id="home-tab-panel-todo"
                           className="relative pt-[24rpx] pb-[48rpx]"
+                          style={
+                            todoItems.length === 0
+                              ? { minHeight: `${TODO_EMPTY_PANEL_MIN_HEIGHT_RPX}rpx` }
+                              : undefined
+                          }
                         >
-                          <View id="home-todo-fab-anchor" className="h-[2rpx] w-full" />
-                          <TodoList items={todoItems} onMarkRead={handleMarkTodoRead} />
+                          <TodoToolbar
+                            viewMode={todoViewMode}
+                            onCalendarClick={() => Taro.navigateTo({ url: '/pages/todo-calendar/index' })}
+                            onViewModeChange={setTodoViewMode}
+                          />
+                          {todoViewMode === 'timeline' ? (
+                            <TodoList items={todoItems} onComplete={handleCompleteTodo} />
+                          ) : (
+                            <TodoQuadrantBoard items={todoItems} />
+                          )}
                         </View>
                       )}
 
@@ -656,6 +728,16 @@ const Home: React.FC = () => {
         visible={addNoteSheetVisible}
         onClose={() => setAddNoteSheetVisible(false)}
         onSubmit={handleSubmitNote}
+      />
+
+      <CompleteTodoSheet
+        visible={completeSheetVisible}
+        item={completeSheetItem}
+        onClose={() => {
+          setCompleteSheetVisible(false);
+          setCompleteSheetItem(null);
+        }}
+        onSubmit={handleSubmitCompleteTodo}
       />
 
       {isStaffRole(currentRole) && (

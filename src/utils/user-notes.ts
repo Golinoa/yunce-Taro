@@ -16,12 +16,20 @@ export interface UserNoteRecord {
   tagColor: NoteTagColor;
   createdAt: string;
   updatedAt: string;
+  remindEnabled?: boolean;
+  remindDate?: string;
+  remindTime?: string;
+  completedAt?: string;
+  completionNote?: string;
 }
 
 export interface AddUserNoteInput {
   content: string;
   folder?: string;
   tagColor?: NoteTagColor;
+  remindEnabled?: boolean;
+  remindDate?: string;
+  remindTime?: string;
 }
 
 type UserNoteStore = Record<string, UserNoteRecord[]>;
@@ -60,6 +68,7 @@ export function getUserNotes(userId: string): UserNoteRecord[] {
 export function addUserNote(userId: string, input: AddUserNoteInput): UserNoteRecord {
   const store = loadStore();
   const now = new Date().toISOString();
+  const remindEnabled = input.remindEnabled === true;
   const record: UserNoteRecord = {
     id: createNoteId(),
     userId,
@@ -68,6 +77,9 @@ export function addUserNote(userId: string, input: AddUserNoteInput): UserNoteRe
     tagColor: input.tagColor || 'default',
     createdAt: now,
     updatedAt: now,
+    remindEnabled,
+    remindDate: remindEnabled ? input.remindDate || dayjs().format('YYYY-MM-DD') : undefined,
+    remindTime: remindEnabled ? input.remindTime || '09:00' : undefined,
   };
   const list = store[userId] || [];
   store[userId] = [record, ...list];
@@ -103,6 +115,27 @@ export function updateUserNote(
   store[userId] = list;
   persistStore();
   return next;
+}
+
+export function completeNoteReminder(
+  userId: string,
+  noteId: string,
+  completionNote?: string,
+): boolean {
+  if (!userId || !noteId) return false;
+  const store = loadStore();
+  const list = store[userId] || [];
+  const index = list.findIndex((item) => item.id === noteId);
+  if (index < 0) return false;
+  list[index] = {
+    ...list[index],
+    completedAt: new Date().toISOString(),
+    completionNote: completionNote?.trim() || undefined,
+    updatedAt: new Date().toISOString(),
+  };
+  store[userId] = list;
+  persistStore();
+  return true;
 }
 
 export function removeUserNote(userId: string, noteId: string): boolean {

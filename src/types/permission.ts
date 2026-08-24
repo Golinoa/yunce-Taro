@@ -131,6 +131,8 @@ export interface CustomRole {
 export interface RoleGrant {
   scope: DataScope;
   modules: DataModule[];
+  /** 可见校区运营协同待办（续费提醒等） */
+  sharedTodos?: boolean;
 }
 
 /** 权限配置（持久化结构：系统角色覆盖 + 自定义角色） */
@@ -147,8 +149,18 @@ export const PERMISSION_CONFIG_KEY = 'yunce-permission-config';
 /** 取角色默认授权（未覆盖时回退） */
 export function defaultRoleGrant(role: UserRole): RoleGrant {
   const cfg = ROLE_PERMISSION_MAP[role];
+  const sharedTodos = role === 'admin' || role === 'principal' || role === 'teacher';
   return {
     scope: cfg?.defaultScope ?? 'own',
     modules: cfg ? [...cfg.defaultModules] : [],
+    sharedTodos,
   };
+}
+
+/** 是否可查看校区运营协同待办 */
+export function canViewSharedOpsTodos(profile?: Profile | null): boolean {
+  if (!profile) return false;
+  const role = profile.currentContext?.role;
+  if (role === 'admin' || role === 'principal' || role === 'teacher') return true;
+  return false;
 }

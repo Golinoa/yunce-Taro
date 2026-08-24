@@ -186,7 +186,7 @@ const AddCustomTodoSheet: React.FC<AddCustomTodoSheetProps> = ({
                 )}
                 onClick={() => setQuadrant(option)}
               >
-                <TodoQuadrantIcon quadrant={option} size="md" active={quadrant === option} />
+                <TodoQuadrantIcon quadrant={option} size="md" />
               </View>
             ))}
           </View>

@@ -13,6 +13,8 @@ export interface CalendarWeekSelectorProps {
   onChange: (date: dayjs.Dayjs) => void;
   /** 日期下方红点/灰点状态 */
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
+  /** 无数据日期禁用（灰色不可点） */
+  isDateDisabled?: (date: dayjs.Dayjs) => boolean;
   /** 是否展示“返回今日” */
   showTodayButton?: boolean;
   /** 是否展示展开/收起月历入口 */
@@ -81,6 +83,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
   selectedDate,
   onChange,
   getDateDotType,
+  isDateDisabled,
   showTodayButton = true,
   showExpandToggle = true,
   className,
@@ -243,12 +246,16 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
     const selected = date.isSame(displaySelectedDate, 'day');
     const today = date.isSame(dayjs(), 'day');
     const dotType = getDateDotType?.(date) || 'none';
+    const disabled = isDateDisabled?.(date) ?? false;
 
     return (
       <View
         key={date.format('YYYY-MM-DD')}
-        className="flex w-[90rpx] flex-col items-center"
-        onClick={() => commitDateChange(date)}
+        className={cn('flex w-[90rpx] flex-col items-center', disabled && 'opacity-40')}
+        onClick={() => {
+          if (disabled) return;
+          commitDateChange(date);
+        }}
       >
         <Text
           className={cn(
@@ -298,12 +305,19 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
     const isSelected = date.isSame(displaySelectedDate, 'day');
     const isToday = date.isSame(dayjs(), 'day');
     const dotType = getDateDotType?.(date) || 'none';
+    const disabled = isDateDisabled?.(date) ?? false;
 
     return (
       <View
         key={date.format('YYYY-MM-DD')}
-        className="flex w-[14.285%] items-center justify-center py-[10rpx]"
-        onClick={() => commitDateChange(date)}
+        className={cn(
+          'flex w-[14.285%] items-center justify-center py-[10rpx]',
+          disabled && 'opacity-40',
+        )}
+        onClick={() => {
+          if (disabled) return;
+          commitDateChange(date);
+        }}
       >
         <View className="flex items-center">
           <View

@@ -25,6 +25,8 @@ export interface CustomTodoRecord {
   remindEnabled?: boolean;
   quadrant?: TodoQuadrant;
   createdAt: string;
+  completedAt?: string;
+  completionNote?: string;
 }
 
 export interface AddCustomTodoInput {
@@ -67,7 +69,7 @@ export function isCustomTodoId(todoId: string): boolean {
   return todoId.startsWith(CUSTOM_TODO_ID_PREFIX);
 }
 
-/** 获取用户未完成的自定义待办 */
+/** 获取用户自定义待办（含已完成，供时间轴展示） */
 export function getCustomTodos(userId: string): CustomTodoRecord[] {
   if (!userId) return [];
   const list = loadStore()[userId] || [];
@@ -95,14 +97,23 @@ export function addCustomTodo(userId: string, input: AddCustomTodoInput): Custom
   return record;
 }
 
-/** 完成（删除）自定义待办 */
-export function completeCustomTodo(userId: string, todoId: string): boolean {
+/** 完成自定义待办（保留记录，标记完成） */
+export function completeCustomTodo(
+  userId: string,
+  todoId: string,
+  completionNote?: string,
+): boolean {
   if (!userId || !isCustomTodoId(todoId)) return false;
   const store = loadStore();
   const list = store[userId] || [];
-  const next = list.filter((item) => item.id !== todoId);
-  if (next.length === list.length) return false;
-  store[userId] = next;
+  const index = list.findIndex((item) => item.id === todoId);
+  if (index < 0) return false;
+  list[index] = {
+    ...list[index],
+    completedAt: new Date().toISOString(),
+    completionNote: completionNote?.trim() || undefined,
+  };
+  store[userId] = list;
   persistStore();
   return true;
 }
@@ -160,12 +171,13 @@ export function sortCustomTodos(records: CustomTodoRecord[]): CustomTodoRecord[]
 }
 
 /** 转为首页待办卡片 */
-export function mapCustomTodoToHomeItem(record: CustomTodoRecord): TodoItem {
+export function mapCustomTodoToHomeItem(record: CustomTodoRecord, userName?: string): TodoItem {
   const remindEnabled = record.remindEnabled !== false && Boolean(record.remindDate);
   const timePart = record.remindTime || '09:00';
   const remindAt = remindEnabled
     ? dayjs(`${record.remindDate} ${timePart}`).toISOString()
     : undefined;
+  const isCompleted = Boolean(record.completedAt);
 
   return {
     id: record.id,
@@ -178,6 +190,20 @@ export function mapCustomTodoToHomeItem(record: CustomTodoRecord): TodoItem {
     quadrant: record.quadrant || 'q2',
     category: 'custom',
     actionLabel: '完成',
+    sourceType: 'custom',
+    sharedScope: 'private',
+    displayDay: isCompleted
+      ? dayjs(record.completedAt).format('YYYY-MM-DD')
+      : record.remindDate || record.createdAt.slice(0, 10),
+    completed: isCompleted,
+    completion: isCompleted
+      ? {
+          completedAt: record.completedAt!,
+          completedBy: record.userId,
+          completedByName: userName || '我',
+          note: record.completionNote,
+        }
+      : undefined,
   };
 }
 

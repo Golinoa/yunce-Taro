@@ -5,6 +5,20 @@ import type { TodoQuadrant } from '@/types/todo-quadrant';
 export type { TodoLevel };
 export type { TodoQuadrant };
 
+/** 待办来源 */
+export type TodoSourceType = 'system' | 'custom' | 'note';
+
+/** 共享范围：private=仅本人；campus_ops=校区运营协同（续费等） */
+export type TodoSharedScope = 'private' | 'campus_ops';
+
+/** 完成记录 */
+export interface TodoCompletion {
+  completedAt: string;
+  completedBy: string;
+  completedByName: string;
+  note?: string;
+}
+
 /** 待办卡片角标色 */
 export type TodoTagColor = 'default' | 'primary' | 'accent' | 'warning' | 'success';
 
@@ -32,4 +46,16 @@ export interface TodoItem {
   remindEnabled?: boolean;
   /** 是否已完成（展示态） */
   completed?: boolean;
+  /** 来源类型 */
+  sourceType?: TodoSourceType;
+  /** 系统推送时间 ISO */
+  pushedAt?: string;
+  /** 展示/历史锚定日 YYYY-MM-DD */
+  displayDay?: string;
+  /** 共享范围 */
+  sharedScope?: TodoSharedScope;
+  /** 协同待办：关联教师 id（续费提醒任课老师） */
+  assigneeTeacherIds?: string[];
+  /** 完成记录（共享待办全员同步） */
+  completion?: TodoCompletion;
 }
