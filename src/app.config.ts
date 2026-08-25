@@ -27,6 +27,7 @@ export default defineAppConfig({
     'pages/children/index',
     'pages/notifications/index',
     'pages/my-todos/index',
+    'pages/todo-collaborator/index',
     'pages/agreement/index',
     'pages/about/index',
     'pages/store-entry/index',

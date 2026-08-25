@@ -63,7 +63,8 @@ npm run check          # typecheck + lint + format 全量
 ```
 
 - 提交触发 husky + lint-staged：仅对暂存文件执行 `eslint --fix` + `prettier --write`。
-- 编译微信小程序**禁止**直接 `npm run build:weapp`（生产模式默认禁用 Mock → 网络异常）。正确姿势：
+- **每次改完 `src/` 影响小程序的代码，AI 任务结束前必须执行 `npm run build:weapp:mock` 重编译**（用户在微信开发者工具看 `dist`，不编译看不到最新效果）。
+- 编译微信小程序**禁止**直接 `npm run build:weapp`（生产模式默认禁用 Mock → 网络异常）。也可用手动等价命令：
 
 ```bash
 Remove-Item -Recurse -Force .\dist

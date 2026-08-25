@@ -18,7 +18,7 @@ export interface TimelineEntry {
   timelineAt: Dayjs;
 }
 
-/** 解析待办在时间轴上的展示时刻 */
+/** 解析待办在时间轴上的展示时刻：有提醒用提醒时间，无提醒用创建时间 */
 export function resolveTimelineAt(item: TodoItem, now: Dayjs = dayjs()): Dayjs {
   if (item.remindAt && dayjs(item.remindAt).isValid()) {
     return dayjs(item.remindAt);
@@ -30,6 +30,9 @@ export function resolveTimelineAt(item: TodoItem, now: Dayjs = dayjs()): Dayjs {
       item.completion?.completedAt,
       now,
     );
+  }
+  if (item.createdAt && dayjs(item.createdAt).isValid()) {
+    return dayjs(item.createdAt);
   }
   return now.endOf('day');
 }
@@ -118,7 +121,7 @@ function isTodoCompleted(item: TodoItem): boolean {
 }
 
 /** 解析待办锚定日（提醒日 / 展示日 / 推送日） */
-function resolveTodoAnchorDay(item: TodoItem, now: Dayjs = dayjs()): string | null {
+export function resolveTodoAnchorDay(item: TodoItem, now: Dayjs = dayjs()): string | null {
   if (item.remindAt && dayjs(item.remindAt).isValid()) {
     return dayjs(item.remindAt).format('YYYY-MM-DD');
   }
@@ -153,14 +156,17 @@ export function buildTimelineEntries(
   items: TodoItem[],
   now: Dayjs = dayjs(),
   targetDate?: string,
+  options?: { skipDateFilter?: boolean },
 ): TimelineEntry[] {
   const today = now.format('YYYY-MM-DD');
   const dateKey = targetDate || today;
-  const dayItems = items.filter((item) =>
-    dateKey === today
-      ? isTodoVisibleOnTimelineToday(item, now)
-      : isTodoVisibleOnDate(item, dateKey, now),
-  );
+  const dayItems = options?.skipDateFilter
+    ? items
+    : items.filter((item) =>
+        dateKey === today
+          ? isTodoVisibleOnTimelineToday(item, now)
+          : isTodoVisibleOnDate(item, dateKey, now),
+      );
 
   const entries: TimelineEntry[] = dayItems.map((item) => {
     const timelineAt = resolveTimelineAt(item, now);
@@ -224,4 +230,99 @@ export function collectTodoDateKeys(items: TodoItem[]): Set<string> {
 /** 按日期过滤待办 */
 export function filterTodosByDate(items: TodoItem[], date: string, now: Dayjs = dayjs()): TodoItem[] {
   return items.filter((item) => isTodoVisibleOnDate(item, date, now));
+}
+
+/** 我的待办 embedded 时间轴几何（与首页轴线比例一致，无外层 px-[8rpx]） */
+export const TODO_TIMELINE_EMBEDDED_LAYOUT = {
+  /** 时刻列宽 */
+  timeWidth: 64,
+  /** 轴线 left（2rpx 宽，中心 = axisLeft + 1） */
+  axisLeft: 36,
+  /** 卡片区左缩进 */
+  cardInset: 88,
+  /** 时刻与卡片首行垂直对齐 */
+  timePaddingTop: 28,
+} as const;
+
+/** 我的待办列表分组键：YYYY-MM-DD；无锚定日归入 inbox */
+export function resolveTodoGroupDateKey(item: TodoItem, now: Dayjs = dayjs()): string {
+  return resolveTodoAnchorDay(item, now) ?? item.displayDay ?? 'inbox';
+}
+
+/** 分组标题排序：按日期降序，无提醒置底 */
+export function sortTodoGroupDateKeys(keys: string[]): string[] {
+  const dated = keys.filter((key) => key !== 'inbox').sort().reverse();
+  if (keys.includes('inbox')) dated.push('inbox');
+  return dated;
+}
+
+/** 待办是否落在指定月份（YYYY-MM） */
+export function isTodoInMonth(item: TodoItem, month: string, now: Dayjs = dayjs()): boolean {
+  const dateKey = resolveTodoGroupDateKey(item, now);
+  if (dateKey === 'inbox') {
+    const fallbackAt = item.createdAt || item.pushedAt || item.completion?.completedAt;
+    const anchorMonth = fallbackAt ? dayjs(fallbackAt).format('YYYY-MM') : now.format('YYYY-MM');
+    return anchorMonth === month;
+  }
+  return dateKey.startsWith(month);
+}
+
+/** 月份筛选展示文案：2026年8月 */
+export function formatTodoMonthLabel(month: string): string {
+  const [yearText, monthText] = month.split('-');
+  const year = Number(yearText);
+  const monthNum = Number(monthText);
+  if (!year || !monthNum) return month;
+  return `${year}年${monthNum}月`;
+}
+
+/** 我的待办默认展开：当月内「今天及以前」展开，今天之后收起 */
+export function buildDefaultExpandedTodoDates(month: string, now: Dayjs = dayjs()): Set<string> {
+  const today = now.format('YYYY-MM-DD');
+  const monthStart = dayjs(`${month}-01`);
+  if (!monthStart.isValid()) return new Set([today]);
+
+  const expanded = new Set<string>();
+  const monthEnd = monthStart.endOf('month');
+  let cursor = monthStart.startOf('day');
+
+  while (cursor.isBefore(monthEnd) || cursor.isSame(monthEnd, 'day')) {
+    const key = cursor.format('YYYY-MM-DD');
+    if (key <= today) {
+      expanded.add(key);
+    }
+    cursor = cursor.add(1, 'day');
+  }
+
+  return expanded;
+}
+
+/** 我的待办日期分组标题结构 */
+export interface TodoGroupDateParts {
+  /** 仅「今日」有前缀 */
+  prefix: string | null;
+  /** YYYY-MM-DD，无提醒时为 null */
+  date: string | null;
+}
+
+/** 解析日期分组标题（仅今日带前缀 + ISO 日期） */
+export function formatTodoGroupDateParts(
+  dateKey: string,
+  now: Dayjs = dayjs(),
+): TodoGroupDateParts {
+  if (dateKey === 'inbox') return { prefix: '无提醒', date: null };
+  const target = dayjs(dateKey);
+  if (!target.isValid()) return { prefix: null, date: dateKey };
+  const isoDate = target.format('YYYY-MM-DD');
+  const today = now.format('YYYY-MM-DD');
+  if (dateKey === today) return { prefix: '今日', date: isoDate };
+  return { prefix: null, date: isoDate };
+}
+
+/** 我的待办日期分组标题：今日 + YYYY-MM-DD，其余仅 YYYY-MM-DD */
+export function formatTodoGroupDateLabel(dateKey: string, now: Dayjs = dayjs()): string {
+  const parts = formatTodoGroupDateParts(dateKey, now);
+  if (parts.prefix === '无提醒') return '无提醒';
+  if (parts.prefix && parts.date) return `${parts.prefix} ${parts.date}`;
+  return parts.date ?? dateKey;
 }

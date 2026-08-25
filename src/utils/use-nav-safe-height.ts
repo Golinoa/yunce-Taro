@@ -8,6 +8,28 @@ import { useMemo } from 'react';
 /** 胶囊按钮下方的视觉间隙（px） */
 const NAV_GAP_PX = 8;
 
+export interface MiniProgramNavBarLayout {
+  statusBarHeight: number;
+  navBarHeight: number;
+  navPaddingRight: number;
+}
+
+/** 自定义导航栏与微信原生胶囊同一行的布局尺寸 */
+export function useMiniProgramNavBarLayout(): MiniProgramNavBarLayout {
+  return useMemo(() => {
+    try {
+      const windowInfo = Taro.getWindowInfo();
+      const menuButton = Taro.getMenuButtonBoundingClientRect();
+      const statusBarHeight = windowInfo.statusBarHeight ?? 44;
+      const navBarHeight = (menuButton.top - statusBarHeight) * 2 + menuButton.height;
+      const navPaddingRight = Math.max((windowInfo.windowWidth || 375) - menuButton.left + 8, 0);
+      return { statusBarHeight, navBarHeight, navPaddingRight };
+    } catch {
+      return { statusBarHeight: 44, navBarHeight: 44, navPaddingRight: 96 };
+    }
+  }, []);
+}
+
 export function useNavSafeHeight(): number {
   return useMemo(() => {
     try {

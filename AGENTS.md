@@ -84,6 +84,14 @@ git commit
 
 ## 七、编译铁律
 
+### AI 交付必做（每次改代码后）
+
+凡修改 `src/` 下影响小程序运行的代码（页面 / 组件 / 样式 / Service / Store），**任务结束前 AI 必须主动执行 Mock 重编译**。用户在微信开发者工具里看的是 `dist` 产物，**只改源码不编译等于用户看不到最新效果**。
+
+- ✅ **必须做**：改完代码 → `npm run check`（或至少 `typecheck`）→ **`npm run build:weapp:mock`**
+- ❌ **禁止**：只提交源码、在回复里写「请自行编译」而不实际执行编译
+- 交付摘要中注明「已重编译 `dist`」；若编译失败须修到通过再交付
+
 **每次代码修改完成后，必须删除 dist 目录并用 Mock 模式重新编译。若"改了代码小程序里没生效"，必须连 webpack 持久化缓存一起清掉再编：**
 
 ```bash
@@ -126,6 +134,7 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 - [ ] 是否有新增 SCSS 文件（应迁移为 UnoCSS）？
 - [ ] 是否有内联 style（应提取为 UnoCSS 规则）？
 - [ ] TypeScript 类型是否完整（无隐式 any）？
+- [ ] **是否已执行 `npm run build:weapp:mock` 重编译**（用户靠 `dist` 验收入口）？
 
 ---
 

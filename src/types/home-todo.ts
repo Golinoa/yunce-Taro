@@ -1,6 +1,6 @@
 import type { TodoLevel } from '@/components/AccentBarCard';
-import type { TodoItemCategory } from '@/utils/todo-settings';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
+import type { TodoItemCategory } from '@/utils/todo-settings';
 
 export type { TodoLevel };
 export type { TodoQuadrant };
@@ -10,6 +10,15 @@ export type TodoSourceType = 'system' | 'custom';
 
 /** 共享范围：private=仅本人；campus_ops=校区运营协同（续费等） */
 export type TodoSharedScope = 'private' | 'campus_ops';
+
+/** 协作待办完成模式 */
+export type TodoCollaborationMode = 'collaborative' | 'individual';
+
+/** 各自完成模式下成员完成记录 */
+export interface TodoMemberCompletion {
+  completedAt: string;
+  completedByName: string;
+}
 
 /** 完成记录 */
 export interface TodoCompletion {
@@ -44,6 +53,8 @@ export interface TodoItem {
   tagColor?: TodoTagColor;
   /** 是否开启提醒 */
   remindEnabled?: boolean;
+  /** 我的待办分类 id（默认收件箱 inbox） */
+  todoCategoryId?: string;
   /** 是否已完成（展示态） */
   completed?: boolean;
   /** 来源类型 */
@@ -56,6 +67,12 @@ export interface TodoItem {
   sharedScope?: TodoSharedScope;
   /** 协同待办：关联教师 id（续费提醒任课老师） */
   assigneeTeacherIds?: string[];
+  /** 协作完成模式（有参与人时生效） */
+  collaborationMode?: TodoCollaborationMode;
+  /** 各自完成：成员完成记录，key 为创建者 userId 或协作 teacherId */
+  memberCompletions?: Record<string, TodoMemberCompletion>;
   /** 完成记录（共享待办全员同步） */
   completion?: TodoCompletion;
+  /** 创建时间 ISO（无提醒随手记时间轴兜底） */
+  createdAt?: string;
 }

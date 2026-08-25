@@ -39,6 +39,8 @@ export interface AvatarProps {
   avatarUrl?: string;
   /** 尺寸 */
   size?: 'sm' | 'md' | 'mlg' | 'lg' | 'xl';
+  /** 无图片时：brand 品牌默认图 / initial 姓氏色块 */
+  fallback?: 'brand' | 'initial';
   /** 额外类名 */
   className?: string;
   /** 点击事件 */
@@ -53,15 +55,20 @@ const SIZE_MAP = {
   xl: { container: 'w-40 h-40', text: 'text-[60rpx]' }, // 160rpx
 } as const;
 
-const Avatar: React.FC<AvatarProps> = ({ name, avatarUrl, size = 'md', className, onClick }) => {
+const Avatar: React.FC<AvatarProps> = ({
+  name,
+  avatarUrl,
+  size = 'md',
+  fallback = 'brand',
+  className,
+  onClick,
+}) => {
   const { container, text } = SIZE_MAP[size];
-  const src = avatarUrl || BRAND_LOGO;
 
-  // 图片头像（无自定义头像时使用品牌默认头像）
-  if (src) {
+  if (avatarUrl) {
     return (
       <Image
-        src={src}
+        src={avatarUrl}
         mode="aspectFill"
         className={cn('rounded-full flex-shrink-0', container, className)}
         onClick={onClick}
@@ -69,7 +76,18 @@ const Avatar: React.FC<AvatarProps> = ({ name, avatarUrl, size = 'md', className
     );
   }
 
-  // 文字头像兜底
+  if (fallback === 'brand') {
+    return (
+      <Image
+        src={BRAND_LOGO}
+        mode="aspectFill"
+        className={cn('rounded-full flex-shrink-0', container, className)}
+        onClick={onClick}
+      />
+    );
+  }
+
+  // 文字头像兜底（员工列表等场景）
   return (
     <View
       className={cn(

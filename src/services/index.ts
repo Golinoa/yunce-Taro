@@ -45,6 +45,8 @@ export type {
   OperationActivityItem,
   OperationBannerItem,
 } from './home';
+export { todoService } from './todo';
+export type { TodoListParams, TodoListView, TodoListItem } from './todo';
 export { feedbackService } from './feedback';
 export { uploadService } from './upload';
 export type { UploadResult } from './upload';

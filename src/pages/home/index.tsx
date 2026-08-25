@@ -2,39 +2,39 @@ import { View, Text, ScrollView, Image, PageMeta } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import AddCustomTodoSheet from '@/components/home/AddCustomTodoSheet';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
+import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
+import ExpandableFabMenu from '@/components/home/ExpandableFabMenu';
 import KingKongSection from '@/components/home/KingKongSection';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import TodoList from '@/components/home/TodoList';
-import TodoToolbar, { type TodoViewMode } from '@/components/home/TodoToolbar';
 import TodoQuadrantBoard from '@/components/home/TodoQuadrantBoard';
-import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
-import type { TodoItem } from '@/types/home-todo';
-import type { TodoQuadrant } from '@/types/todo-quadrant';
-import AddCustomTodoSheet from '@/components/home/AddCustomTodoSheet';
-import ExpandableFabMenu from '@/components/home/ExpandableFabMenu';
+import TodoToolbar, { type TodoViewMode } from '@/components/home/TodoToolbar';
 import Icon from '@/components/Icon';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
-import { lessonRecordService } from '@/services';
+import { lessonRecordService, todoService } from '@/services';
 import { homeService } from '@/services/home';
 import type { QuickEntry } from '@/services/home';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CampusUIModel } from '@/types/campus';
+import type { TodoItem } from '@/types/home-todo';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
+import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
-import { getTodoShowTabBadge } from '@/utils/todo-settings';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
-import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
+import { getTodoShowTabBadge } from '@/utils/todo-settings';
+import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 /** Tab 类型 */
@@ -281,7 +281,14 @@ const Home: React.FC = () => {
         const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
           homeService.getTodaySchedules(teacherData.id, currentRole, campusId),
           homeService.getUnreadCount(profile.id, currentRole),
-          homeService.getTodoItems(teacherData.id, currentRole, campusId, profile.id, userName),
+          todoService.getList({
+            view: 'home',
+            teacherId: teacherData.id,
+            role: currentRole,
+            campusId,
+            userId: profile.id,
+            userName,
+          }),
           recentLessonRequest,
         ]);
         setSchedules(scheduleList);
@@ -400,8 +407,8 @@ const Home: React.FC = () => {
       }
       if (!profile?.id) return;
       const userName = profile.nickname || profile.name || '我';
-      void homeService
-        .completeTodo(item.id, { userId: profile.id, userName })
+      void todoService
+        .complete(item.id, { userId: profile.id, userName })
         .then(() => loadData(currentCampusId))
         .catch((err) => logError('Home completeTodo', err));
     },
@@ -412,7 +419,7 @@ const Home: React.FC = () => {
     async (note: string) => {
       if (!profile?.id || !completeSheetItem) return;
       const userName = profile.nickname || profile.name || '我';
-      await homeService.completeTodo(completeSheetItem.id, {
+      await todoService.complete(completeSheetItem.id, {
         userId: profile.id,
         userName,
         note,
@@ -437,7 +444,7 @@ const Home: React.FC = () => {
   const handleQuadrantChange = useCallback(
     async (item: TodoItem, quadrant: TodoQuadrant) => {
       if (!profile?.id) return;
-      const ok = await homeService.updateTodoQuadrant(profile.id, item.id, quadrant);
+      const ok = await todoService.updateQuadrant(profile.id, item.id, quadrant);
       if (!ok) {
         Taro.showToast({ title: '调整失败', icon: 'none' });
         return;
@@ -463,7 +470,7 @@ const Home: React.FC = () => {
       quadrant?: import('@/types/todo-quadrant').TodoQuadrant;
     }) => {
       if (!profile?.id) return;
-      const item = await homeService.addCustomTodo(profile.id, payload);
+      const item = await todoService.add(profile.id, payload);
       setTodoItems((prev) => [item, ...prev]);
       Taro.showToast({ title: '已保存', icon: 'success' });
     },

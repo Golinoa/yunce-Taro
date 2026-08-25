@@ -11,6 +11,7 @@ import {
   mergeCustomTodoSeeds,
   refreshMockCustomTodoSeedFields,
 } from '@/utils/custom-todos';
+import { TODO_CATEGORY_INBOX_ID } from '@/utils/todo-categories';
 
 /** Mock 登录页三个测试账号均注入演示数据 */
 export const MOCK_CUSTOM_TODO_SEED_USER_IDS = [
@@ -40,6 +41,7 @@ export function buildMockCustomTodoSeeds(userId: string): CustomTodoRecord[] {
       remindTime: '23:59',
       remindEnabled: true,
       quadrant: 'q1',
+      categoryId: TODO_CATEGORY_INBOX_ID,
       createdAt: today.subtract(6, 'day').toISOString(),
     },
     {
@@ -50,6 +52,7 @@ export function buildMockCustomTodoSeeds(userId: string): CustomTodoRecord[] {
       remindTime: '18:00',
       remindEnabled: true,
       quadrant: 'q2',
+      categoryId: TODO_CATEGORY_INBOX_ID,
       createdAt: today.subtract(8, 'day').toISOString(),
     },
     {
@@ -60,6 +63,7 @@ export function buildMockCustomTodoSeeds(userId: string): CustomTodoRecord[] {
       remindTime: '15:00',
       remindEnabled: true,
       quadrant: 'q3',
+      categoryId: TODO_CATEGORY_INBOX_ID,
       createdAt: today.subtract(1, 'day').toISOString(),
     },
     {
@@ -70,6 +74,7 @@ export function buildMockCustomTodoSeeds(userId: string): CustomTodoRecord[] {
       remindTime: '09:00',
       remindEnabled: true,
       quadrant: 'q4',
+      categoryId: TODO_CATEGORY_INBOX_ID,
       createdAt: today.toISOString(),
     },
     {
@@ -78,6 +83,7 @@ export function buildMockCustomTodoSeeds(userId: string): CustomTodoRecord[] {
       title: '无提醒的随手记',
       remindEnabled: false,
       quadrant: 'q4',
+      categoryId: TODO_CATEGORY_INBOX_ID,
       createdAt: today.toISOString(),
     },
   ];

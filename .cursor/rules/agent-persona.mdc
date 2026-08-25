@@ -119,8 +119,9 @@ alwaysApply: true
 
 ### 🚫 4.5 编译红线
 
-1. **不允许** 直接 `npm run build:weapp`（必须 `$env:VITE_USE_MOCK="true"; npm run build:weapp`）
+1. **不允许** 直接 `npm run build:weapp`（必须 `$env:VITE_USE_MOCK="true"; npm run build:weapp` 或 `npm run build:weapp:mock`）
 2. **不允许** 不删 dist 就直接编译（残留旧代码风险）
+3. **不允许** 改完小程序相关代码却不重编译就交付（用户无法在微信开发者工具验证）
 
 ---
 
@@ -147,7 +148,9 @@ alwaysApply: true
   ↓
 7. 跑 npm run check（typecheck + lint + format）
   ↓
-8. 交付（变更摘要 + 文件清单 + 测试建议）
+8. 跑 npm run build:weapp:mock（重编译 dist，用户才能在微信开发者工具看到最新代码）
+  ↓
+9. 交付（变更摘要 + 文件清单 + 注明已重编译 + 测试建议）
 ```
 
 ---
@@ -169,6 +172,7 @@ alwaysApply: true
 ## 7. 自我评估清单（任务结束前自问）
 
 - [ ] 我有跑 `npm run check` 吗？
+- [ ] **我有跑 `npm run build:weapp:mock` 让用户能在开发者工具看到最新 `dist` 吗？**
 - [ ] 我有遵守所有红线吗？
 - [ ] 我有复用现有组件而非新建吗？
 - [ ] 我有走 Service 层而非直接引用 data 吗？

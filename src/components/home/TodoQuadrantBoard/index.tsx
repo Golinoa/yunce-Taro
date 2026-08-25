@@ -3,7 +3,7 @@
  *
  * 使用场景：首页待办 Tab 四象限视图；上二下二网格，卡片有最大高度，
  * 内部待办过多时在卡片内滚动；长按未完成待办（系统/自定义/笔记）拖拽换象限，
- * 经 homeService.updateTodoQuadrant 持久化事态等级。
+ * 经 todoService.updateQuadrant 持久化事态等级。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import type { ITouchEvent } from '@tarojs/components';

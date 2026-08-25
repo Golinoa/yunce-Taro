@@ -44,7 +44,7 @@ const AddCustomTodoSheet: React.FC<AddCustomTodoSheetProps> = ({
   const [remindEnabled, setRemindEnabled] = useState(true);
   const [remindDate, setRemindDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [remindTime, setRemindTime] = useState(dayjs().add(30, 'minute').format('HH:mm'));
-  const [quadrant, setQuadrant] = useState<TodoQuadrant>('q2');
+  const [quadrant, setQuadrant] = useState<TodoQuadrant>('q4');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +56,7 @@ const AddCustomTodoSheet: React.FC<AddCustomTodoSheetProps> = ({
     setRemindEnabled(true);
     setRemindDate(dayjs().format('YYYY-MM-DD'));
     setRemindTime(dayjs().add(30, 'minute').format('HH:mm'));
-    setQuadrant(defaultQuadrant ?? 'q2');
+    setQuadrant(defaultQuadrant ?? 'q4');
     setSubmitting(false);
   }, [visible, defaultQuadrant]);
 
