@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build:weapp": "taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
+    "build:weapp:mock": "node scripts/build-weapp-mock.mjs",
     "build:weapp:clean": "node scripts/clean-weapp-cache.mjs && taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
     "build:swan": "taro build --type swan",
     "build:alipay": "taro build --type alipay",
@@ -21,7 +22,7 @@
     "build:jd": "taro build --type jd",
     "build:quickapp": "taro build --type quickapp",
     "optimize:images": "node scripts/optimize-images.mjs",
-    "dev:weapp": "npm run build:weapp -- --watch",
+    "dev:weapp": "node scripts/dev-weapp.mjs",
     "dev:swan": "npm run build:swan -- --watch",
     "dev:alipay": "npm run build:alipay -- --watch",
     "dev:tt": "npm run build:tt -- --watch",

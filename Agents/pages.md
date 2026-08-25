@@ -268,3 +268,15 @@ useDidShow(() => {
   {/* 内容 */}
 </View>
 ```
+
+## 九、首页 ScrollView + FAB 交互
+
+首页 `src/pages/home/index.tsx` 待办 Tab 使用整页 `ScrollView` + 固定 `ExpandableFabMenu`：
+
+| 场景 | 做法 |
+|------|------|
+| FAB 展开 | `fabMenuExpanded` + `scrollTopPin` + `scrollY={!fabMenuExpanded}` |
+| 菜单内「切换视图」 | 禁止展开态直接切视图；菜单关闭后延迟调用与 `TodoToolbar` 相同的 `handleTodoViewModeChange` |
+| 多入口同一能力 | 只维护一条 handler，其它入口串联复用 |
+
+`ExpandableFabMenu`：`handleActionClick` 先 `setExpandedState(false)`，再 `action.onClick()`。详见 `AGENTS.md` 第十节。

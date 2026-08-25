@@ -78,6 +78,14 @@ useEffect(() => {
 **原因**：未通过 Token 体系管理
 **方案**：在 `theme.ts` 新增 Token → 同步 `app.scss` → 在 `uno.config.ts` 新增规则
 
+### Q: 首页 FAB 切换视图导致 ScrollView 跳顶
+
+**原因**：FAB 菜单内直接 `setTodoViewMode`，与工具栏 icon 不同路径；或展开态叠多层 scroll hack / 无关 setState 触发重渲染。
+
+**方案**：工具栏 icon 保留唯一切视图实现；FAB 菜单项先收起（`ExpandableFabMenu` 内 `setExpandedState(false)` 再 `onClick`），延迟约 220ms 后调用同一 `handleTodoViewModeChange`。FAB 展开继续用 `fabMenuExpanded` + `scrollTopPin`。
+
+详见 `AGENTS.md` 第十节。
+
 ### Q: TypeScript 编译报 CommonEventFunction 未定义
 
 **原因**：`@tarojs/components` 类型定义问题

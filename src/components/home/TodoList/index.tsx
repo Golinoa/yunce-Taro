@@ -13,6 +13,7 @@ import {
   resolveTimelineAt,
   shouldShowNowMarker,
 } from '@/utils/todo-timeline';
+import { buildRemindMetaFromAt } from '@/utils/custom-todos';
 
 export type { TodoItem };
 
@@ -63,12 +64,12 @@ const TodoList: React.FC<TodoListProps> = ({ items, targetDate, onComplete }) =>
     onComplete(item);
   };
 
-  if (items.length === 0) {
+  if (entries.length === 0) {
     return (
       <View className="bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[60rpx] text-center">
         <Text className="text-muted-foreground text-[28rpx]">今日暂无待办</Text>
         <Text className="text-muted-foreground text-[24rpx] mt-[12rpx] block">
-          点击右下角加号，记待办或查看日历
+          点击下方查看更多，或点右下角加号记待办
         </Text>
       </View>
     );
@@ -104,6 +105,8 @@ const TodoList: React.FC<TodoListProps> = ({ items, targetDate, onComplete }) =>
     const timeLabel = hasDisplayTime(item) ? formatTimelineClock(timelineAt) : '--:--';
     const isDone = Boolean(item.completed || item.completion);
     const quadrant = resolveTodoQuadrant({ quadrant: item.quadrant, level: item.level });
+    const remindMeta =
+      !isDone && item.remindAt ? buildRemindMetaFromAt(item.remindAt) : null;
 
     rows.push(
       <View key={item.id} className="relative mb-[20rpx]">
@@ -125,7 +128,7 @@ const TodoList: React.FC<TodoListProps> = ({ items, targetDate, onComplete }) =>
           <View className="flex items-start gap-[16rpx] pr-[56rpx]">
             <View
               className={cn(
-                'mt-[6rpx] h-[36rpx] w-[36rpx] shrink-0 rounded-full center',
+                'mt-[4rpx] h-[40rpx] w-[40rpx] shrink-0 rounded-full center',
                 isDone ? 'todo-check-done-soft' : 'todo-check-pending',
               )}
               onClick={(event) => handleToggleComplete(item, event)}
@@ -145,13 +148,23 @@ const TodoList: React.FC<TodoListProps> = ({ items, targetDate, onComplete }) =>
 
               {hasDisplayTime(item) && (
                 <View className="mt-[10rpx] flex flex-row items-center gap-[8rpx] flex-wrap">
-                  <Icon name="mdi-calendar-clock" size="xs" color="mutedForeground" />
-                  <Text className="text-[22rpx] text-muted-foreground">
-                    {formatRemindLabel(timelineAt)}
+                  <Icon
+                    name="mdi-calendar-clock"
+                    size="xs"
+                    color={remindMeta?.isOverdue ? 'destructive' : 'mutedForeground'}
+                  />
+                  <Text
+                    className={cn(
+                      'text-[22rpx]',
+                      remindMeta?.tone === 'overdue'
+                        ? 'text-destructive'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {remindMeta?.isOverdue
+                      ? remindMeta.line
+                      : formatRemindLabel(timelineAt)}
                   </Text>
-                  {item.sourceType === 'note' && (
-                    <Text className="text-[20rpx] text-muted-foreground">笔记</Text>
-                  )}
                 </View>
               )}
 
@@ -181,7 +194,8 @@ const TodoList: React.FC<TodoListProps> = ({ items, targetDate, onComplete }) =>
   return (
     <View className="px-[8rpx]">
       <View className="relative flex flex-col-reverse pl-[88rpx]">
-        <View className="absolute left-[36rpx] top-[8rpx] bottom-[8rpx] w-[2rpx] todo-timeline-line" />
+        {/* top-0：与工具栏向下延伸的轴线无缝衔接 */}
+        <View className="absolute left-[36rpx] top-0 bottom-[8rpx] w-[2rpx] todo-timeline-line" />
         {rows}
       </View>
     </View>

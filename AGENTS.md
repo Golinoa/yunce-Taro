@@ -144,6 +144,34 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 
 > 排查方式：`grep -rn 'indicatorStyle' src/` 确认所有命中都是 `px`，无一例 `rpx`。
 
+---
+
+## 十、交互复用铁律（ScrollView + 多入口同一能力）
+
+**教训来源**：首页待办 FAB「切换视图」与工具栏 icon——工具栏正常，FAB 路径反复改 scroll 锁定仍跳顶。
+
+### 原则
+
+1. **同一业务能力只保留一条已验证实现**（如 `handleTodoViewModeChange`），多入口复用，禁止 FAB 再写一套旁路。
+2. **先确认哪条路径可用**，让其它入口串联到该路径，而非为坏路径叠 scroll hack。
+3. **FAB + ScrollView**：沿用 `fabMenuExpanded` + `scrollTopPin` + `scrollY={!fabMenuExpanded}`；勿随意改成 ref-only 等半套方案。
+4. **菜单内操作等价于页面按钮**：菜单先收起，短延迟后调用同一 handler（首页 `FAB_VIEW_TOGGLE_DELAY_MS` ≈ 220ms）。
+5. **禁止**长期保留专用排查 `console.log` / 临时代码文件；问题解决后删除。正式本地调试走 `utils/local-debug.ts`。
+6. **能复用就不扩代码**：每多一层无关 setState 都可能让微信 `ScrollView` 丢滚动位置。
+
+### 首页待办 FAB 切换视图（标准写法）
+
+```tsx
+const handleTodoViewModeChange = useCallback((mode: TodoViewMode) => {
+  setTodoViewMode(mode);
+}, []);
+
+const handleFabViewModeToggle = useCallback(() => {
+  const next = todoViewModeRef.current === 'timeline' ? 'quadrant' : 'timeline';
+  setTimeout(() => handleTodoViewModeChange(next), FAB_VIEW_TOGGLE_DELAY_MS);
+}, [handleTodoViewModeChange]);
+```
+
 ## 详细规则索引
 
 | 文件 | 内容 |

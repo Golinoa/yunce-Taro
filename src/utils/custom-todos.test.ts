@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   CUSTOM_TODOS_STORAGE_KEY,
   addCustomTodo,
+  buildCustomTodoRemindMeta,
   completeCustomTodo,
   formatCustomTodoRemindDesc,
   getCustomTodoLevel,
@@ -52,7 +53,21 @@ describe('custom-todos', () => {
 
   it('逾期待办等级为 urgent', () => {
     expect(getCustomTodoLevel('2020-01-01')).toBe('urgent');
-    expect(formatCustomTodoRemindDesc('2020-01-01')).toContain('已逾期');
+    expect(formatCustomTodoRemindDesc('2020-01-01')).toContain('逾期');
+  });
+
+  it('逾期提醒文案：逾期N天 · 截止日期时间', () => {
+    const meta = buildCustomTodoRemindMeta({
+      id: 'x',
+      userId: 'u',
+      title: '测试',
+      remindDate: '2026-08-25',
+      remindTime: '23:59',
+      remindEnabled: true,
+      createdAt: '2026-08-20T00:00:00.000Z',
+    });
+    expect(meta?.isOverdue).toBe(true);
+    expect(meta?.line).toMatch(/^逾期\d+天 · 2026-08-25 23:59$/);
   });
 
   it('排序：逾期优先于今天，今天优先于未来', () => {

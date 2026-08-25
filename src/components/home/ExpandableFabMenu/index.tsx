@@ -2,12 +2,12 @@
  * ExpandableFabMenu - 待办 Tab 右下角可展开 FAB 菜单
  *
  * 使用场景：首页待办事项 Tab；主按钮旋转缩小，子项自右向左依次滑入；
- * 每个子项为 icon + 文案横向排列的一体胶囊按钮。
+ * actions 数组自上而下对应展开菜单（首项在最上）。
  */
 import { View, Text } from '@tarojs/components';
 import type { ITouchEvent } from '@tarojs/components';
 import cn from 'classnames';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 
 export interface ExpandableFabMenuAction {
@@ -36,7 +36,7 @@ const ExpandableFabMenu: React.FC<ExpandableFabMenuProps> = ({
   visible = true,
   onToggle,
 }) => {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
   const expandedRef = useRef(false);
 
   const setExpandedState = useCallback(
@@ -48,7 +48,7 @@ const ExpandableFabMenu: React.FC<ExpandableFabMenuProps> = ({
     [onToggle],
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!visible && expandedRef.current) {
       setExpandedState(false);
     }

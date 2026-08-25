@@ -1,4 +1,4 @@
 export default definePageConfig({
-  navigationBarTitleText: '我的笔记',
+  navigationBarTitleText: '我的待办',
   enablePullDownRefresh: true,
 });

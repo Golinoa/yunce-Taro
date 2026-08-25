@@ -20,6 +20,8 @@ import { TODO_QUADRANT_ORDER } from '@/types/todo-quadrant';
 
 export interface AddCustomTodoSheetProps {
   visible: boolean;
+  /** 打开时默认选中的象限（四象限卡片 + 入口） */
+  defaultQuadrant?: TodoQuadrant;
   onClose: () => void;
   onSubmit: (payload: {
     title: string;
@@ -33,6 +35,7 @@ export interface AddCustomTodoSheetProps {
 
 const AddCustomTodoSheet: React.FC<AddCustomTodoSheetProps> = ({
   visible,
+  defaultQuadrant,
   onClose,
   onSubmit,
 }) => {
@@ -53,9 +56,9 @@ const AddCustomTodoSheet: React.FC<AddCustomTodoSheetProps> = ({
     setRemindEnabled(true);
     setRemindDate(dayjs().format('YYYY-MM-DD'));
     setRemindTime(dayjs().add(30, 'minute').format('HH:mm'));
-    setQuadrant('q2');
+    setQuadrant(defaultQuadrant ?? 'q2');
     setSubmitting(false);
-  }, [visible]);
+  }, [visible, defaultQuadrant]);
 
   const remindDateTime = useMemo(
     () => dayjs(`${remindDate} ${remindTime}`),

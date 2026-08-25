@@ -41,15 +41,13 @@ import { CLASSES, COURSE_PACKAGES, LESSON_RECORDS, STUDENTS, TEACHERS } from '@/
 import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import { notWired } from '@/utils/not-wired';
-import { get } from '@/utils/request';
+import { get, put } from '@/utils/request';
 import { getTodoReadAt, isTodoRead, markTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
 import { getTodoCompletion, saveTodoCompletion } from '@/utils/todo-completion';
 import {
-  extractNoteIdFromTodoId,
-  isNoteTodoId,
-  mapNoteToHomeItem,
-} from '@/utils/note-todos';
-import { completeNoteReminder, getUserNotes } from '@/utils/user-notes';
+  getTodoQuadrantOverride,
+  saveTodoQuadrantOverride,
+} from '@/utils/todo-quadrant-override';
 import { resolveSystemTodoDisplayDay } from '@/utils/todo-timeline';
 import {
   addCustomTodo,
@@ -57,25 +55,32 @@ import {
   getCustomTodos,
   isCustomTodoId,
   mapCustomTodoToHomeItem,
+  removeCustomTodo,
+  reopenCustomTodo,
   sortCustomTodos,
+  sortCustomTodosByMode,
+  updateCustomTodoQuadrant,
   type AddCustomTodoInput,
+  type CustomTodoRecord,
 } from '@/utils/custom-todos';
 import { filterTodosBySettings, type TodoItemCategory } from '@/utils/todo-settings';
-import {
-  addUserNote,
-  type AddUserNoteInput,
-} from '@/utils/user-notes';
 import {
   buildStudentRechargeTodoDesc,
   buildStudentRechargeTodoTitle,
   normalizeStudentRechargeTodoDesc,
 } from '@/utils/student-recharge-todo';
+import { ensureMockCustomTodoSeedsForUser } from '@/data/custom-todos';
 import { statisticsService } from './statistics';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
     ? process.env.VITE_USE_MOCK !== 'false'
     : true;
+
+function ensureMockCustomTodoSeeds(userId: string): void {
+  if (!USE_MOCK || !userId) return;
+  ensureMockCustomTodoSeedsForUser(userId);
+}
 
 type RawHomeTeacher = NonNullable<Awaited<ReturnType<typeof mockGetTeacher>>>;
 type RawHomeSchedule = Awaited<ReturnType<typeof mockGetTodaySchedules>>[number];
@@ -143,6 +148,22 @@ interface BackendTeacherTodosResponse {
   expiringPackages: number;
   lowHourStudents: number;
   pendingLeaves: number;
+  /**
+   * 用户重分配的事态等级（象限）覆盖表。
+   * 后端实现 PUT 象限后，应在本接口一并返回，便于多端同步。
+   */
+  quadrantOverrides?: Record<string, TodoQuadrant> | null;
+}
+
+/** PUT /home/teacher/todos/:todoId/quadrant 请求体 */
+export interface UpdateTodoQuadrantRequest {
+  quadrant: TodoQuadrant;
+}
+
+/** PUT /home/teacher/todos/:todoId/quadrant 响应 data */
+export interface UpdateTodoQuadrantResponse {
+  todoId: string;
+  quadrant: TodoQuadrant;
 }
 
 interface BackendUnreadCountResponse {
@@ -307,7 +328,7 @@ function mapTeacher(data: RawHomeTeacher): HomeTeacherSummary {
   };
 }
 
-function enrichTodoItem(todo: HomeTodoItem): HomeTodoItem {
+function enrichTodoItem(todo: HomeTodoItem, userId?: string): HomeTodoItem {
   const stored = getTodoCompletion(todo.id);
   const legacyReadAt = isTodoRead(todo.id) ? getTodoReadAt(todo.id) : undefined;
   const completion: TodoCompletion | undefined =
@@ -329,6 +350,8 @@ function enrichTodoItem(todo: HomeTodoItem): HomeTodoItem {
         ? dayjs(todo.remindAt).format('YYYY-MM-DD')
         : dayjs().format('YYYY-MM-DD'));
 
+  const quadrantOverride = userId ? getTodoQuadrantOverride(userId, todo.id) : null;
+
   return {
     ...todo,
     sourceType: todo.sourceType || (todo.pushedAt ? 'system' : undefined),
@@ -336,6 +359,7 @@ function enrichTodoItem(todo: HomeTodoItem): HomeTodoItem {
     displayDay,
     completion,
     completed: Boolean(completion || todo.completed),
+    ...(quadrantOverride ? { quadrant: quadrantOverride } : {}),
   };
 }
 
@@ -815,10 +839,6 @@ async function completeHomeTodo(
     completeCustomTodo(payload.userId, todoId, payload.note);
     return;
   }
-  if (isNoteTodoId(todoId)) {
-    completeNoteReminder(payload.userId, extractNoteIdFromTodoId(todoId), payload.note);
-    return;
-  }
   if (!USE_MOCK) notWired('home.completeTodo');
   saveTodoCompletion(todoId, completion);
   markTodoRead(todoId);
@@ -965,17 +985,11 @@ export const homeService = {
     userId?: string,
     userName?: string,
   ): Promise<HomeTodoItem[]> => {
+    if (userId) ensureMockCustomTodoSeeds(userId);
     const customTodoItems = userId
       ? sortCustomTodos(getCustomTodos(userId)).map((record) =>
-          enrichTodoItem(mapCustomTodoToHomeItem(record, userName)),
+          enrichTodoItem(mapCustomTodoToHomeItem(record, userName), userId),
         )
-      : [];
-
-    const noteTodoItems = userId
-      ? getUserNotes(userId)
-          .map((note) => mapNoteToHomeItem(note, userName))
-          .filter((item): item is HomeTodoItem => Boolean(item))
-          .map(enrichTodoItem)
       : [];
 
     const canShared = role === 'admin' || role === 'principal' || role === 'teacher';
@@ -990,8 +1004,12 @@ export const homeService = {
     const financeTodos = financeAlertList
       .filter((alert) => alert.id !== 'fin-stable')
       .map(mapAlertToHomeTodoItem)
-      .map((todo) => enrichTodoItem({ ...todo, sourceType: 'system', pushedAt: new Date().toISOString() }));
-    const alertTodoItems = [...operationTodos, ...financeTodos].map(enrichTodoItem);
+      .map((todo) =>
+        enrichTodoItem({ ...todo, sourceType: 'system', pushedAt: new Date().toISOString() }, userId),
+      );
+    const alertTodoItems = [...operationTodos, ...financeTodos].map((todo) =>
+      enrichTodoItem(todo, userId),
+    );
 
     if (!USE_MOCK && role === 'teacher') {
       try {
@@ -1001,23 +1019,33 @@ export const homeService = {
         const data = await get<BackendTeacherTodosResponse>(
           `/home/teacher/todos${query ? `?${query}` : ''}`,
         );
+        // 服务端象限覆盖写入本地缓存，enrich 时与 Mock 路径一致
+        if (userId && data.quadrantOverrides) {
+          Object.entries(data.quadrantOverrides).forEach(([id, q]) => {
+            if (q === 'q1' || q === 'q2' || q === 'q3' || q === 'q4') {
+              saveTodoQuadrantOverride(userId, id, q);
+            }
+          });
+        }
         return filterTodosBySettings([
           ...customTodoItems,
-          ...noteTodoItems,
           ...alertTodoItems,
           ...mapBackendTodoItems(data).map((todo) =>
-            enrichTodoItem({ ...todo, sourceType: 'system', pushedAt: new Date().toISOString() }),
+            enrichTodoItem(
+              { ...todo, sourceType: 'system', pushedAt: new Date().toISOString() },
+              userId,
+            ),
           ),
         ]);
       } catch {
-        return filterTodosBySettings([...customTodoItems, ...noteTodoItems, ...alertTodoItems]);
+        return filterTodosBySettings([...customTodoItems, ...alertTodoItems]);
       }
     }
 
     const fixedTodos = (await mockGetTodoItems(teacherId, campusId))
       .map(mapTodoItem)
-      .map(enrichTodoItem);
-    return filterTodosBySettings([...customTodoItems, ...noteTodoItems, ...alertTodoItems, ...fixedTodos]);
+      .map((todo) => enrichTodoItem(todo, userId));
+    return filterTodosBySettings([...customTodoItems, ...alertTodoItems, ...fixedTodos]);
   },
 
   /** 添加用户自定义待办 */
@@ -1027,10 +1055,73 @@ export const homeService = {
     return mapCustomTodoToHomeItem(record);
   },
 
-  /** 添加用户笔记 */
-  addUserNote: async (userId: string, input: AddUserNoteInput) => {
-    if (!USE_MOCK) notWired('home.addUserNote');
-    return addUserNote(userId, input);
+  /** 「我的待办」列表：当前用户全部自定义待办（含已完成） */
+  listCustomTodos: async (userId: string): Promise<CustomTodoRecord[]> => {
+    if (!USE_MOCK) notWired('home.listCustomTodos');
+    if (!userId) return [];
+    ensureMockCustomTodoSeeds(userId);
+    // 「我的待办」默认按截止日期；页面侧还可再按用户选择重排
+    return sortCustomTodosByMode(getCustomTodos(userId), 'deadline');
+  },
+
+  /** 删除自定义待办 */
+  removeCustomTodo: async (userId: string, todoId: string): Promise<boolean> => {
+    if (!USE_MOCK) notWired('home.removeCustomTodo');
+    return removeCustomTodo(userId, todoId);
+  },
+
+  /** 将已完成的自定义待办重新打开为未完成 */
+  reopenCustomTodo: async (userId: string, todoId: string): Promise<boolean> => {
+    if (!USE_MOCK) notWired('home.reopenCustomTodo');
+    return reopenCustomTodo(userId, todoId);
+  },
+
+  /**
+   * 更新待办四象限（事态等级）
+   *
+   * 链路：四象限看板拖拽 → 本方法 → Mock 本地 / 真实 PUT → enrich 读覆盖表。
+   * 后端契约见 `docs/todo/07-todo-quadrant-api-contract.md`。
+   */
+  updateTodoQuadrant: async (
+    userId: string,
+    todoId: string,
+    quadrant: TodoQuadrant,
+  ): Promise<boolean> => {
+    if (!userId || !todoId) return false;
+
+    if (USE_MOCK) {
+      if (isCustomTodoId(todoId)) {
+        if (!updateCustomTodoQuadrant(userId, todoId, quadrant)) return false;
+      }
+      saveTodoQuadrantOverride(userId, todoId, quadrant);
+      return true;
+    }
+
+    try {
+      await put<UpdateTodoQuadrantResponse>(
+        `/home/teacher/todos/${encodeURIComponent(todoId)}/quadrant`,
+        { quadrant } satisfies UpdateTodoQuadrantRequest,
+      );
+    } catch {
+      return false;
+    }
+
+    if (isCustomTodoId(todoId)) {
+      updateCustomTodoQuadrant(userId, todoId, quadrant);
+    }
+    saveTodoQuadrantOverride(userId, todoId, quadrant);
+    return true;
+  },
+
+  /**
+   * @deprecated 使用 updateTodoQuadrant（行为相同）
+   */
+  updateCustomTodoQuadrant: async (
+    userId: string,
+    todoId: string,
+    quadrant: TodoQuadrant,
+  ): Promise<boolean> => {
+    return homeService.updateTodoQuadrant(userId, todoId, quadrant);
   },
 
   completeTodo: completeHomeTodo,

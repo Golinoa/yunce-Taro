@@ -63,6 +63,21 @@ export const colors = {
   error: '0 84% 60%', // #ef4444
   info: '199 89% 48%', // #0EA5E9
 
+  /**
+   * 待办四象限专用色（参考 Eisenhower 看板）
+   * - q1 重要且紧急 · 红
+   * - q2 重要不紧急 · 金 #DAA520 / 浅底 #FFF9E6
+   * - q3 紧急不重要 · 蓝（info）
+   * - q4 不紧急不重要 · 绿 #00B36B / 浅底 #E6F9F0
+   */
+  todoQ1Bg: '0 86% 97%', // #FEF2F2
+  todoQ2: '43 74% 49%', // #DAA520
+  todoQ2Bg: '48 100% 95%', // #FFF9E6
+  todoQ3: '199 89% 48%', // #0EA5E9 与 info 一致
+  todoQ3Bg: '199 95% 96%', // #E8F6FC
+  todoQ4: '156 100% 35%', // #00B36B
+  todoQ4Bg: '152 56% 94%', // #E6F9F0
+
   // 薄荷绿（用于课程/消课详情头部卡片等轻量成功场景）
   mint: '160 100% 97%', // #f4fffa
   mintForeground: '160 84% 39%', // #10b981
@@ -118,6 +133,14 @@ export const hexColors = {
   warning: '#f59e0b',
   error: '#ef4444',
   info: '#0EA5E9',
+  /** 待办四象限：q1 红 / q2 金 / q3 蓝 / q4 绿 */
+  todoQ1Bg: '#FEF2F2',
+  todoQ2: '#DAA520',
+  todoQ2Bg: '#FFF9E6',
+  todoQ3: '#0EA5E9',
+  todoQ3Bg: '#E8F6FC',
+  todoQ4: '#00B36B',
+  todoQ4Bg: '#E6F9F0',
   mint: '#f4fffa',
   mintForeground: '#10b981',
   mintBorder: '#dff3e8',

@@ -46,6 +46,14 @@ export default defineConfig({
       'warning-foreground': 'hsl(var(--warning-foreground))',
       error: 'hsl(var(--error))',
       info: 'hsl(var(--info))',
+      // 待办四象限专用色（q1 红 / q2 金 / q3 蓝 / q4 绿）
+      'todo-q1-bg': 'hsl(var(--todo-q1-bg))',
+      'todo-q2': 'hsl(var(--todo-q2))',
+      'todo-q2-bg': 'hsl(var(--todo-q2-bg))',
+      'todo-q3': 'hsl(var(--todo-q3))',
+      'todo-q3-bg': 'hsl(var(--todo-q3-bg))',
+      'todo-q4': 'hsl(var(--todo-q4))',
+      'todo-q4-bg': 'hsl(var(--todo-q4-bg))',
       // 薄荷绿（课程/消课详情头部卡片）
       mint: 'hsl(var(--mint))',
       'mint-foreground': 'hsl(var(--mint-foreground))',

@@ -6,7 +6,7 @@ export type { TodoLevel };
 export type { TodoQuadrant };
 
 /** 待办来源 */
-export type TodoSourceType = 'system' | 'custom' | 'note';
+export type TodoSourceType = 'system' | 'custom';
 
 /** 共享范围：private=仅本人；campus_ops=校区运营协同（续费等） */
 export type TodoSharedScope = 'private' | 'campus_ops';

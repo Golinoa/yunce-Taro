@@ -96,6 +96,15 @@ page {
   --error: 0 84% 60%;
   --info: 199 89% 48%;
 
+  // --- 待办四象限专用色（参考 Eisenhower 看板） ---
+  --todo-q1-bg: 0 86% 97%; // #FEF2F2
+  --todo-q2: 43 74% 49%; // #DAA520 重要不紧急
+  --todo-q2-bg: 48 100% 95%; // #FFF9E6
+  --todo-q3: 199 89% 48%; // #0EA5E9 紧急不重要
+  --todo-q3-bg: 199 95% 96%; // #E8F6FC
+  --todo-q4: 156 100% 35%; // #00B36B 不紧急不重要
+  --todo-q4-bg: 152 56% 94%; // #E6F9F0
+
   // --- 薄荷绿（课程/消课详情头部卡片） ---
   --mint: 160 100% 97%;
   --mint-foreground: 160 84% 39%;
@@ -270,6 +279,15 @@ page {
   --error: 0 84% 60%;
   --info: 189 80% 48%;
 
+  // 待办四象限专用色（跨主题保持看板参考色）
+  --todo-q1-bg: 0 86% 97%;
+  --todo-q2: 43 74% 49%;
+  --todo-q2-bg: 48 100% 95%;
+  --todo-q3: 199 89% 48%;
+  --todo-q3-bg: 199 95% 96%;
+  --todo-q4: 156 100% 35%;
+  --todo-q4-bg: 152 56% 94%;
+
   // 薄荷绿（在珊瑚主题下保持原有色，不变）
   --mint: 160 100% 97%;
   --mint-foreground: 160 84% 39%;
@@ -373,6 +391,15 @@ page {
   --warning-foreground: 0 0% 100%;
   --error: 0 84% 60%;
   --info: 189 94% 43%;
+
+  // 待办四象限专用色（跨主题保持看板参考色）
+  --todo-q1-bg: 0 86% 97%;
+  --todo-q2: 43 74% 49%;
+  --todo-q2-bg: 48 100% 95%;
+  --todo-q3: 199 89% 48%;
+  --todo-q3-bg: 199 95% 96%;
+  --todo-q4: 156 100% 35%;
+  --todo-q4-bg: 152 56% 94%;
 
   // 薄荷绿
   --mint: 160 100% 97%;
@@ -827,19 +854,65 @@ button.privacy-agree-btn:active {
 .todo-quadrant-icon--q2 .todo-quadrant-icon__cell {
   background-image: linear-gradient(
     225deg,
-    hsl(var(--primary) / 0.5),
-    hsl(var(--primary-glow) / 0.16)
+    hsl(var(--todo-q2) / 0.55),
+    hsl(var(--todo-q2) / 0.16)
   );
 }
 .todo-quadrant-icon--q3 .todo-quadrant-icon__cell {
-  background-image: linear-gradient(45deg, hsl(var(--warning) / 0.48), hsl(var(--warning) / 0.14));
+  background-image: linear-gradient(45deg, hsl(var(--todo-q3) / 0.48), hsl(var(--todo-q3) / 0.14));
 }
 .todo-quadrant-icon--q4 .todo-quadrant-icon__cell {
   background-image: linear-gradient(
     315deg,
-    hsl(var(--muted-foreground) / 0.42),
-    hsl(var(--muted-foreground) / 0.12)
+    hsl(var(--todo-q4) / 0.5),
+    hsl(var(--todo-q4) / 0.14)
   );
+}
+
+/* 四象限看板：标题色与图标一致 */
+.todo-quadrant-title--q1 {
+  color: hsl(var(--destructive));
+}
+.todo-quadrant-title--q2 {
+  color: hsl(var(--todo-q2));
+}
+.todo-quadrant-title--q3 {
+  color: hsl(var(--todo-q3));
+}
+.todo-quadrant-title--q4 {
+  color: hsl(var(--todo-q4));
+}
+/* 四象限看板：磨砂玻璃色顶栏 */
+.todo-quadrant-header {
+  flex-shrink: 0;
+  padding: 16rpx 14rpx 14rpx;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border-bottom: 1rpx solid transparent;
+}
+.todo-quadrant-header--q1 {
+  background: hsl(var(--todo-q1-bg) / 0.88);
+  border-bottom-color: hsl(var(--destructive) / 0.1);
+}
+.todo-quadrant-header--q2 {
+  background: hsl(var(--todo-q2-bg) / 0.88);
+  border-bottom-color: hsl(var(--todo-q2) / 0.14);
+}
+.todo-quadrant-header--q3 {
+  background: hsl(var(--todo-q3-bg) / 0.88);
+  border-bottom-color: hsl(var(--todo-q3) / 0.12);
+}
+.todo-quadrant-header--q4 {
+  background: hsl(var(--todo-q4-bg) / 0.88);
+  border-bottom-color: hsl(var(--todo-q4) / 0.14);
+}
+.todo-quadrant-card {
+  max-height: 520rpx;
+  height: 520rpx;
+}
+.todo-quadrant-card--drop-target {
+  border-color: hsl(var(--primary) / 0.55);
+  box-shadow: 0 0 0 3rpx hsl(var(--primary) / 0.2);
 }
 
 .fab-menu-item--hidden-instant {
@@ -888,15 +961,19 @@ button.privacy-agree-btn:active {
   color: hsl(var(--success));
 }
 .todo-check-pending {
-  border: 3rpx solid hsl(var(--border));
+  border: 2rpx solid hsl(var(--muted-foreground) / 0.45);
+  background: transparent;
+  box-sizing: border-box;
 }
 .todo-check-done {
   background: hsl(var(--success));
-  border: 3rpx solid hsl(var(--success));
+  border: 2rpx solid hsl(var(--success));
+  box-sizing: border-box;
 }
 .todo-check-done-soft {
-  background: hsl(var(--success) / 0.12);
-  border: 3rpx solid hsl(var(--success) / 0.35);
+  background: hsl(var(--success) / 0.18);
+  border: 2rpx solid hsl(var(--success) / 0.7);
+  box-sizing: border-box;
 }
 .todo-card-done {
   opacity: 0.92;

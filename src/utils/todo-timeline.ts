@@ -112,9 +112,40 @@ export function isTodoVisibleOnDate(
   return false;
 }
 
-/** 首页时间轴：仅展示「今天」的待办 */
+/** 待办是否已完成 */
+function isTodoCompleted(item: TodoItem): boolean {
+  return Boolean(item.completed || item.completion);
+}
+
+/** 解析待办锚定日（提醒日 / 展示日 / 推送日） */
+function resolveTodoAnchorDay(item: TodoItem, now: Dayjs = dayjs()): string | null {
+  if (item.remindAt && dayjs(item.remindAt).isValid()) {
+    return dayjs(item.remindAt).format('YYYY-MM-DD');
+  }
+  if (item.displayDay && dayjs(item.displayDay).isValid()) {
+    return dayjs(item.displayDay).format('YYYY-MM-DD');
+  }
+  if (item.pushedAt && dayjs(item.pushedAt).isValid()) {
+    return resolveSystemTodoDisplayDay(item.pushedAt, item.completion?.completedAt, now);
+  }
+  return null;
+}
+
+/**
+ * 首页时间轴：今日待办
+ *
+ * - 锚定日为今天的待办
+ * - 未完成且已逾期的待办滚入今日（取消「按日历看其它日期」后，避免逾期项在首页消失）
+ */
 export function isTodoVisibleOnTimelineToday(item: TodoItem, now: Dayjs = dayjs()): boolean {
-  return isTodoVisibleOnDate(item, now.format('YYYY-MM-DD'), now);
+  const today = now.format('YYYY-MM-DD');
+  if (isTodoVisibleOnDate(item, today, now)) return true;
+
+  if (isTodoCompleted(item)) return false;
+
+  const anchorDay = resolveTodoAnchorDay(item, now);
+  if (!anchorDay) return false;
+  return dayjs(anchorDay).isBefore(dayjs(today), 'day');
 }
 
 /** 构建时间轴条目并分段（自下而上：完成 → 过去 → 现在线 → 未来） */
@@ -123,8 +154,13 @@ export function buildTimelineEntries(
   now: Dayjs = dayjs(),
   targetDate?: string,
 ): TimelineEntry[] {
-  const dateKey = targetDate || now.format('YYYY-MM-DD');
-  const dayItems = items.filter((item) => isTodoVisibleOnDate(item, dateKey, now));
+  const today = now.format('YYYY-MM-DD');
+  const dateKey = targetDate || today;
+  const dayItems = items.filter((item) =>
+    dateKey === today
+      ? isTodoVisibleOnTimelineToday(item, now)
+      : isTodoVisibleOnDate(item, dateKey, now),
+  );
 
   const entries: TimelineEntry[] = dayItems.map((item) => {
     const timelineAt = resolveTimelineAt(item, now);
