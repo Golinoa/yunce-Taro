@@ -514,7 +514,7 @@ const StudentDetail: React.FC = () => {
     const token = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const path = `/package-student/pages/parent-bind/index?studentId=${encodeURIComponent(student.id)}&token=${encodeURIComponent(token)}`;
     // 实际环境可替换为短链接或 H5 中转页；开发/测试阶段复制小程序路径
-    const link = `pages/index/index?redirect=${encodeURIComponent(path)}`;
+    const link = `package-auth/pages/index/index?redirect=${encodeURIComponent(path)}`;
     void Taro.setClipboardData({
       data: link,
       success: () => {

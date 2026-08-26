@@ -15,18 +15,18 @@ import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 
 // 无需登录即可访问的页面
 const PUBLIC_PAGES = [
-  '/pages/login/index',
-  '/pages/login/forgot-account/index',
-  '/pages/login/forgot-password/index',
-  '/pages/login/contact-support/index',
-  '/pages/register/index',
-  '/pages/register/role-select',
-  '/pages/register/role-info',
-  '/pages/agreement/index',
+  '/package-auth/pages/login/index',
+  '/package-auth/pages/login/forgot-account/index',
+  '/package-auth/pages/login/forgot-password/index',
+  '/package-auth/pages/login/contact-support/index',
+  '/package-auth/pages/register/index',
+  '/package-auth/pages/register/role-select',
+  '/package-auth/pages/register/role-info',
+  '/package-settings/pages/agreement/index',
   '/package-settings/pages/feedback/index',
   '/package-student/pages/parent-bind/index',
 ];
-const LOGIN_PAGE = '/pages/login/index';
+const LOGIN_PAGE = '/package-auth/pages/login/index';
 const REDIRECT_KEY = 'loginRedirectPath';
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 
@@ -80,13 +80,13 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-course/pages/course-form/index': MANAGER_ROLES,
   // —— 经营数据看板（仅 admin/principal；家长与教学角色不可见） ——
   'pages/statistics/index': MANAGER_ROLES,
-  'pages/finance-data/index': MANAGER_ROLES,
-  'pages/member-data/index': MANAGER_ROLES,
-  'pages/card-data/index': MANAGER_ROLES,
-  'pages/salary-data/index': MANAGER_ROLES,
-  'pages/record-transaction/index': MANAGER_ROLES,
+  'package-statistics/pages/finance-data/index': MANAGER_ROLES,
+  'package-statistics/pages/member-data/index': MANAGER_ROLES,
+  'package-statistics/pages/card-data/index': MANAGER_ROLES,
+  'package-statistics/pages/salary-data/index': MANAGER_ROLES,
+  'package-statistics/pages/record-transaction/index': MANAGER_ROLES,
   // —— 门店入驻（仅 admin/principal） ——
-  'pages/store-entry/index': MANAGER_ROLES,
+  'package-settings/pages/store-entry/index': MANAGER_ROLES,
 };
 
 /**
@@ -120,12 +120,12 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-course/pages/category-form/index': 'classes',
   'package-course/pages/course-form/index': 'classes',
   'pages/statistics/index': 'finance',
-  'pages/finance-data/index': 'finance',
-  'pages/member-data/index': 'finance',
-  'pages/card-data/index': 'finance',
-  'pages/salary-data/index': 'finance',
-  'pages/record-transaction/index': 'finance',
-  'pages/store-entry/index': 'settings',
+  'package-statistics/pages/finance-data/index': 'finance',
+  'package-statistics/pages/member-data/index': 'finance',
+  'package-statistics/pages/card-data/index': 'finance',
+  'package-statistics/pages/salary-data/index': 'finance',
+  'package-statistics/pages/record-transaction/index': 'finance',
+  'package-settings/pages/store-entry/index': 'settings',
 };
 
 /** 模块授权校验：读持久化的 grants（系统角色覆盖），未覆盖回退角色默认 */
@@ -223,14 +223,14 @@ export function navigateAfterLogin(profile?: Profile | null) {
 
   const identities = profile?.identities || [];
   if (identities.length === 0) {
-    Taro.redirectTo({ url: '/pages/register/index' });
+    Taro.redirectTo({ url: '/package-auth/pages/register/index' });
     return;
   }
   if (identities.length === 1) {
     Taro.switchTab({ url: '/pages/home/index' });
     return;
   }
-  Taro.redirectTo({ url: '/pages/role-switch/index' });
+  Taro.redirectTo({ url: '/package-auth/pages/role-switch/index' });
 }
 
 // ============================================

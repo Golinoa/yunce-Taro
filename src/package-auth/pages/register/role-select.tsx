@@ -30,7 +30,7 @@ const RegisterRoleSelect: React.FC = () => {
   // 必须先完成 Step1
   useEffect(() => {
     if (!registerDraft?.tempToken) {
-      Taro.redirectTo({ url: '/pages/register/index' });
+      Taro.redirectTo({ url: '/package-auth/pages/register/index' });
     }
   }, [registerDraft]);
 
@@ -50,7 +50,7 @@ const RegisterRoleSelect: React.FC = () => {
       return;
     }
 
-    Taro.navigateTo({ url: '/pages/register/role-info' });
+    Taro.navigateTo({ url: '/package-auth/pages/register/role-info' });
   }, [submitting, selectedRole, signUpStep2]);
 
   return (

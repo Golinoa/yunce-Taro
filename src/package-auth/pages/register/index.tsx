@@ -73,7 +73,7 @@ const RegisterStep1: React.FC = () => {
       return;
     }
 
-    Taro.navigateTo({ url: '/pages/register/role-select' });
+    Taro.navigateTo({ url: '/package-auth/pages/register/role-select' });
   }, [submitting, username, password, signUpStep1]);
 
   const handleRegisterClick = useCallback(() => {

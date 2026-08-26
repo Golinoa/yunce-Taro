@@ -52,9 +52,9 @@ interface LoginInputRect {
   height: number;
 }
 
-const FORGOT_ACCOUNT_PAGE = '/pages/login/forgot-account/index';
-const FORGOT_PASSWORD_PAGE = '/pages/login/forgot-password/index';
-const CONTACT_SUPPORT_PAGE = '/pages/login/contact-support/index';
+const FORGOT_ACCOUNT_PAGE = '/package-auth/pages/login/forgot-account/index';
+const FORGOT_PASSWORD_PAGE = '/package-auth/pages/login/forgot-password/index';
+const CONTACT_SUPPORT_PAGE = '/package-auth/pages/login/contact-support/index';
 
 const LOGIN_OPTIONS: Array<{
   key: LoginMethod;
@@ -436,7 +436,7 @@ const Login: React.FC = () => {
   }, [executeAccountLogin, executeEmailLogin, executeWechatLogin, pendingAction, setAgreed]);
 
   const handleRegister = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/register/index' });
+    Taro.navigateTo({ url: '/package-auth/pages/register/index' });
   }, []);
 
   const handleFeedback = useCallback(() => {

@@ -63,7 +63,7 @@ const ParentBind: React.FC = () => {
     if (!isLoggedIn) {
       Taro.showToast({ title: '请先登录', icon: 'none' });
       setTimeout(() => {
-        Taro.navigateTo({ url: '/pages/login/index' });
+        Taro.navigateTo({ url: '/package-auth/pages/login/index' });
       }, 1500);
       return;
     }

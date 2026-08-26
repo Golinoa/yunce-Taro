@@ -6,7 +6,7 @@ const INPUT_STORAGE_KEY = 'yunce:todo-collaborator:input';
 const RESULT_STORAGE_KEY = 'yunce:todo-collaborator:result';
 const META_STORAGE_KEY = 'yunce:todo-collaborator:meta';
 
-const PAGE_PATH = '/pages/todo-collaborator/index';
+const PAGE_PATH = '/package-settings/pages/todo-collaborator/index';
 
 export interface CollaboratorSummary {
   id: string;

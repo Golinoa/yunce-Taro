@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
+import { ORG_COVER_IMAGE } from '@/constants/brand';
 import { homeService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import type { CampusUIModel } from '@/types/campus';
@@ -10,9 +11,6 @@ import type { Schedule } from '@/types/schedule';
 import { useAuth } from '@/utils/auth';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { withRouteGuard } from '@/utils/route-guard';
-
-/** 机构背景图（瑜伽馆） */
-const ORG_COVER_IMAGE = '/assets/images/2.jpg';
 
 /**
  * Index - 教师端首页

@@ -242,7 +242,7 @@ const Profile: React.FC = () => {
 
   // 跳转到个人资料编辑页
   const handleProfile = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/profile-edit/index' });
+    Taro.navigateTo({ url: '/package-student/pages/profile-edit/index' });
   }, []);
 
   // 跳转到子女档案页
@@ -251,7 +251,7 @@ const Profile: React.FC = () => {
       // 0 个孩子时引导去绑定
       setShowBindSheet(true);
     } else {
-      Taro.navigateTo({ url: '/pages/children/index' });
+      Taro.navigateTo({ url: '/package-student/pages/children/index' });
     }
   }, [students.length]);
 
@@ -262,7 +262,7 @@ const Profile: React.FC = () => {
 
   // 关于品牌
   const handleAbout = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/about/index' });
+    Taro.navigateTo({ url: '/package-settings/pages/about/index' });
   }, []);
 
   // ============================================
@@ -375,7 +375,7 @@ const Profile: React.FC = () => {
       {
         label: '消息通知',
         icon: 'mdi-message-text-outline',
-        onClick: () => handleNavigate('/pages/notifications/index'),
+        onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
       },
     ];
     // 系统设置：所有角色可见，内部设置项按权限过滤
@@ -406,22 +406,22 @@ const Profile: React.FC = () => {
       {
         label: '已预约',
         icon: 'mdi-calendar-check-outline' as const,
-        onClick: () => handleNavigate('/pages/my-course/index?tab=booked'),
+        onClick: () => handleNavigate('/package-course/pages/my-course/index?tab=booked'),
       },
       {
         label: '排队中',
         icon: 'mdi-account-group-outline' as const,
-        onClick: () => handleNavigate('/pages/my-course/index?tab=waiting'),
+        onClick: () => handleNavigate('/package-course/pages/my-course/index?tab=waiting'),
       },
       {
         label: '待评价',
         icon: 'mdi-star-outline' as const,
-        onClick: () => handleNavigate('/pages/my-course/index?tab=pending_evaluate'),
+        onClick: () => handleNavigate('/package-course/pages/my-course/index?tab=pending_evaluate'),
       },
       {
         label: '已取消',
         icon: 'mdi-calendar-blank-outline' as const,
-        onClick: () => handleNavigate('/pages/my-course/index?tab=cancelled'),
+        onClick: () => handleNavigate('/package-course/pages/my-course/index?tab=cancelled'),
       },
     ],
     [handleNavigate],
@@ -433,7 +433,7 @@ const Profile: React.FC = () => {
       {
         label: '我的卡包',
         icon: 'mdi-package' as const,
-        onClick: () => handleNavigate('/pages/my-course/index'),
+        onClick: () => handleNavigate('/package-course/pages/my-course/index'),
       },
       {
         label: '我的合同',
@@ -475,7 +475,7 @@ const Profile: React.FC = () => {
       {
         label: '消息通知',
         icon: 'mdi-message-text-outline' as const,
-        onClick: () => handleNavigate('/pages/notifications/index'),
+        onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
       },
       {
         label: '系统设置',

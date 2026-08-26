@@ -232,7 +232,7 @@ const ProfileEdit: React.FC = () => {
         if (confirm) {
           await signOut();
           Taro.clearStorageSync();
-          Taro.reLaunch({ url: '/pages/login/index' });
+          Taro.reLaunch({ url: '/package-auth/pages/login/index' });
         }
       },
     });
@@ -284,7 +284,7 @@ const ProfileEdit: React.FC = () => {
   // 点击子女卡片 → 独立子女详情页
   const goChildDetail = useCallback((student: Student) => {
     Taro.navigateTo({
-      url: `/pages/child-detail/index?id=${encodeURIComponent(student.id)}`,
+      url: `/package-student/pages/child-detail/index?id=${encodeURIComponent(student.id)}`,
     });
   }, []);
 

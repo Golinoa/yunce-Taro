@@ -22,11 +22,11 @@ const AgreementSheet: React.FC<AgreementSheetProps> = ({
   confirmText = '同意协议并继续',
 }) => {
   const handleAgreement = () => {
-    Taro.navigateTo({ url: '/pages/agreement/index?type=user' });
+    Taro.navigateTo({ url: '/package-settings/pages/agreement/index?type=user' });
   };
 
   const handlePrivacy = () => {
-    Taro.navigateTo({ url: '/pages/agreement/index?type=privacy' });
+    Taro.navigateTo({ url: '/package-settings/pages/agreement/index?type=privacy' });
   };
 
   return (

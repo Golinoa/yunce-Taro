@@ -1,7 +1,7 @@
 /**
  * AddCustomTodoPopover - 创建待办就近弹框
  *
- * 使用场景：我的待办页 FAB 入口；在按钮附近弹出带主题色边框的轻量表单，
+ * 使用场景：首页待办 FAB / 我的待办页 FAB；在按钮附近弹出带主题色边框的轻量表单，
  * 支持分类、优先级、提醒、协作人（@员工）等字段。
  */
 import { View, Text, Textarea } from '@tarojs/components';
@@ -12,8 +12,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from '@/components/Avatar';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import FormInput from '@/components/FormInput';
-import HintPopover from '@/components/HintPopover';
 import Icon from '@/components/Icon';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import AddTodoCategorySheet from '@/components/my-todos/AddTodoCategorySheet';
 import Switch from '@/components/Switch';
 import TimePickerSheet from '@/components/TimePickerSheet';
@@ -109,11 +109,13 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [titleFocus, setTitleFocus] = useState(false);
   const teachers = useTeacherStore((state) => state.teachers);
   const fetchTeachers = useTeacherStore((state) => state.fetchTeachers);
   const wasVisibleRef = useRef(false);
 
   const subSheetOpen = datePickerVisible || timePickerVisible || addCategoryVisible;
+  const keyboardHeight = useKeyboardHeight(visible && !subSheetOpen);
 
   const categoryOptions = useMemo(
     () => categoryTabs.filter((tab) => tab.id !== TODO_CATEGORY_ALL_ID),
@@ -149,6 +151,8 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
     setCollaborationMode('collaborative');
     setAddCategoryVisible(false);
     setSubmitting(false);
+    setTitleFocus(false);
+    window.setTimeout(() => setTitleFocus(true), 320);
   }, [visible, defaultCategoryId, defaultQuadrant]);
 
   useEffect(() => {
@@ -260,10 +264,13 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
           <View
             className={cn(
               'fixed left-[24rpx] right-[24rpx] z-[310]',
-              'bottom-[calc(148rpx+env(safe-area-inset-bottom))]',
+              keyboardHeight === 0 && 'bottom-[calc(148rpx+env(safe-area-inset-bottom))]',
               'rounded-[24rpx] bg-card shadow-popup animate-popover-in',
             )}
-            style={POPOVER_PANEL_STYLE}
+            style={{
+              ...POPOVER_PANEL_STYLE,
+              ...(keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : {}),
+            }}
           >
             <View className="px-[40rpx] pt-[28rpx] pb-[calc(28rpx+env(safe-area-inset-bottom))]">
               <View className="relative mb-[20rpx] flex flex-row items-center justify-between">
@@ -342,6 +349,8 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
               placeholder="待办标题"
               value={title}
               maxlength={50}
+              focus={titleFocus}
+              adjustPosition={false}
               onInput={(event) => setTitle(event.detail.value || '')}
               inputClassName="text-[30rpx] font-semibold w-full"
               inputStyle={{ textAlign: 'left', height: '40rpx', minHeight: '40rpx' }}
@@ -354,6 +363,7 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
               placeholderClass="text-muted-foreground"
               maxlength={200}
               autoHeight={false}
+              adjustPosition={false}
               value={note}
               onInput={(event) => setNote(event.detail.value || '')}
             />
@@ -400,7 +410,9 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
                     key={option}
                     className={cn(
                       'relative flex flex-1 flex-row items-center justify-center gap-[4rpx] rounded-full border px-[8rpx] py-[10rpx] press-scale',
-                      active ? 'border-primary bg-primary-10' : 'border-border bg-card',
+                      active
+                        ? 'border-primary bg-primary-10 shadow-soft'
+                        : 'border-borderLight bg-muted shadow-soft',
                     )}
                     onClick={() => setQuadrant(option)}
                   >
@@ -412,7 +424,7 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
                     <Text
                       className={cn(
                         'shrink-0 text-[20rpx] leading-none',
-                        active ? 'font-semibold text-primary' : 'text-muted-foreground',
+                        active ? 'font-semibold text-primary' : 'font-medium text-foregroundSecondary',
                       )}
                     >
                       {TODO_QUADRANT_META[option].shortLabel}
@@ -428,90 +440,102 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
 
               <View className="mt-[20rpx]">
                 <View
-                  className="mb-[12rpx] flex flex-row items-center justify-between press-bg"
-                  onClick={collaboratorIds.length === 0 ? handleOpenAddCollaborators : undefined}
+                  className="rounded-[12rpx] py-[12rpx] press-bg"
+                  onClick={
+                    collaboratorIds.length === 0
+                      ? handleOpenAddCollaborators
+                      : handleOpenViewCollaborators
+                  }
                 >
-                  <Text className="text-[26rpx] text-foreground">参与人</Text>
-                  {collaboratorIds.length === 0 ? (
+                  <View className="mb-[10rpx] flex flex-row items-center justify-between">
+                    <View className="flex min-w-0 flex-row items-center gap-[8rpx]">
+                      <Text className="text-[26rpx] text-foreground">参与人</Text>
+                      {collaboratorIds.length > 0 ? (
+                        <Text className="text-[24rpx] text-muted-foreground">
+                          {collaboratorIds.length}人
+                        </Text>
+                      ) : null}
+                    </View>
                     <Icon name="mdi-chevron-right" size="sm" color="muted" />
-                  ) : null}
-                </View>
-                <View className="flex flex-row items-center py-[6rpx]">
-              <View className="flex min-w-0 flex-row items-center">
-                {selectedCollaborators.slice(0, 4).map((teacher, index) => (
-                  <View
-                    key={teacher.id}
-                    className={cn('relative shrink-0', index > 0 && '-ml-[12rpx]')}
-                  >
-                    <Avatar
-                      name={teacher.name}
-                      avatarUrl={teacher.avatar}
-                      size="sm"
-                      fallback="initial"
-                      className="border-2 border-card"
-                    />
                   </View>
-                ))}
-                <View
-                  className={cn(
-                    'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-muted press-scale',
-                    selectedCollaborators.length > 0 && '-ml-[12rpx]',
-                  )}
-                  onClick={handleOpenAddCollaborators}
-                >
-                  <Icon name="mdi-plus" size={22} color="muted" />
-                </View>
-              </View>
-              <View className="flex-1" />
-              {collaboratorIds.length > 0 ? (
-                <View
-                  className="flex shrink-0 flex-row items-center gap-[4rpx] rounded-[8rpx] px-[8rpx] py-[6rpx] press-bg"
-                  onClick={handleOpenViewCollaborators}
-                >
-                  <Text className="text-[24rpx] text-muted-foreground">
-                    {collaboratorIds.length}人
-                  </Text>
-                  <Icon name="mdi-chevron-right" size="sm" color="muted" />
-                </View>
-              ) : null}
+                  <View className="flex flex-row items-center">
+                    <View className="flex shrink-0 flex-row items-center">
+                      {selectedCollaborators.slice(0, 4).map((teacher, index) => (
+                        <View
+                          key={teacher.id}
+                          className={cn('relative shrink-0', index > 0 && '-ml-[12rpx]')}
+                        >
+                          <Avatar
+                            name={teacher.name}
+                            avatarUrl={teacher.avatar}
+                            size="sm"
+                            className="border-2 border-card"
+                          />
+                        </View>
+                      ))}
+                      <View
+                        className={cn(
+                          'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-muted press-scale',
+                          selectedCollaborators.length > 0 && '-ml-[12rpx]',
+                        )}
+                        onClick={
+                          collaboratorIds.length > 0
+                            ? (event) => {
+                                event.stopPropagation?.();
+                                handleOpenAddCollaborators();
+                              }
+                            : undefined
+                        }
+                      >
+                        <Icon name="mdi-plus" size={22} color="muted" />
+                      </View>
+                    </View>
+                  </View>
                 </View>
               </View>
 
               {collaboratorIds.length > 0 ? (
-                <View className="mt-[16rpx] flex flex-row gap-[20rpx]">
-                  {COLLABORATION_MODE_OPTIONS.map((option) => {
-                    const active = collaborationMode === option.value;
-                    return (
-                      <View
-                        key={option.value}
-                        className="flex flex-1 flex-row items-center justify-between py-[10rpx] press-bg"
-                        onClick={() => setCollaborationMode(option.value)}
-                      >
-                        <View className="flex min-w-0 flex-row items-center">
-                          <Text
+                <View className="mt-[16rpx]">
+                  <Text className="mb-[12rpx] text-[22rpx] text-muted-foreground">完成方式</Text>
+                  <View className="overflow-hidden rounded-[16rpx] border border-border bg-card">
+                    {COLLABORATION_MODE_OPTIONS.map((option, index) => {
+                      const active = collaborationMode === option.value;
+                      return (
+                        <View
+                          key={option.value}
+                          className={cn(
+                            'flex flex-row items-start gap-[16rpx] px-[20rpx] py-[18rpx] press-bg',
+                            index > 0 && 'border-t border-border',
+                          )}
+                          onClick={() => setCollaborationMode(option.value)}
+                        >
+                          <View
                             className={cn(
-                              'shrink-0 text-[24rpx] font-medium',
-                              active ? 'text-foreground' : 'text-foregroundSecondary',
+                              'mt-[4rpx] flex h-[36rpx] w-[36rpx] shrink-0 items-center justify-center rounded-full border-[3rpx] border-solid',
+                              active
+                                ? 'border-primary bg-primary'
+                                : 'border-mutedForeground bg-card shadow-soft',
                             )}
                           >
-                            {option.label}
-                          </Text>
-                          <HintPopover
-                            content={option.desc}
-                            iconClassName="ml-[2rpx] w-[28rpx] h-[28rpx]"
-                          />
+                            {active ? <Icon name="mdi-check" size={18} color="white" /> : null}
+                          </View>
+                          <View className="min-w-0 flex-1">
+                            <Text
+                              className={cn(
+                                'block text-[26rpx] font-medium leading-snug',
+                                active ? 'text-foreground' : 'text-foregroundSecondary',
+                              )}
+                            >
+                              {option.label}
+                            </Text>
+                            <Text className="mt-[6rpx] block text-[22rpx] leading-snug text-muted-foreground">
+                              {option.desc}
+                            </Text>
+                          </View>
                         </View>
-                        <View
-                          className={cn(
-                            'ml-[12rpx] flex h-[40rpx] w-[40rpx] shrink-0 items-center justify-center rounded-full border-[3rpx] border-solid',
-                            active ? 'border-primary bg-primary' : 'border-border bg-card',
-                          )}
-                        >
-                          {active ? <Icon name="mdi-check" size={20} color="#fff" /> : null}
-                        </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
+                  </View>
                 </View>
               ) : null}
 

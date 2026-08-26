@@ -64,11 +64,12 @@ const Avatar: React.FC<AvatarProps> = ({
   onClick,
 }) => {
   const { container, text } = SIZE_MAP[size];
+  const resolvedAvatarUrl = avatarUrl?.trim() || undefined;
 
-  if (avatarUrl) {
+  if (resolvedAvatarUrl) {
     return (
       <Image
-        src={avatarUrl}
+        src={resolvedAvatarUrl}
         mode="aspectFill"
         className={cn('rounded-full flex-shrink-0', container, className)}
         onClick={onClick}

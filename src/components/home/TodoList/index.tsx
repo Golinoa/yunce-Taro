@@ -11,7 +11,7 @@ import {
   shouldShowNowMarker,
   TODO_TIMELINE_EMBEDDED_LAYOUT,
 } from '@/utils/todo-timeline';
-import { hasTodoDisplayTime } from '@/utils/todo-card-meta';
+import { hasTodoDisplayTime, shouldShowTodoCardScheduleRow, buildTodoCardDomId } from '@/utils/todo-card-meta';
 
 export type { TodoItem };
 
@@ -129,7 +129,7 @@ const TodoList: React.FC<TodoListProps> = ({
   };
 
   const renderEmbeddedRow = (item: TodoItem, timeLabel: string) => (
-    <View key={item.id} className="mb-[16rpx] flex flex-row">
+    <View key={item.id} id={buildTodoCardDomId(item.id)} className="mb-[16rpx] flex flex-row">
       <Text
         className="shrink-0 text-left text-[22rpx] leading-none tabular-nums text-muted-foreground"
         style={{
@@ -141,17 +141,25 @@ const TodoList: React.FC<TodoListProps> = ({
       </Text>
       <View className="shrink-0" style={{ width: `${EMBED_GAP_TO_CARD}rpx` }} />
       <View className="min-w-0 flex-1">
-        <TodoCard item={item} hideScheduleRow onToggleComplete={toggleHandler} />
+        <TodoCard
+          item={item}
+          hideScheduleRow={!shouldShowTodoCardScheduleRow(item)}
+          onToggleComplete={toggleHandler}
+        />
       </View>
     </View>
   );
 
   const renderDefaultRow = (item: TodoItem, timeLabel: string) => (
-    <View key={item.id} className="relative mb-[20rpx]">
+    <View key={item.id} id={buildTodoCardDomId(item.id)} className="relative mb-[16rpx]">
       <Text className="absolute top-[28rpx] -left-[88rpx] w-[64rpx] text-right text-[22rpx] tabular-nums text-muted-foreground">
         {timeLabel}
       </Text>
-      <TodoCard item={item} onToggleComplete={toggleHandler} />
+      <TodoCard
+        item={item}
+        hideScheduleRow={!shouldShowTodoCardScheduleRow(item)}
+        onToggleComplete={toggleHandler}
+      />
     </View>
   );
 

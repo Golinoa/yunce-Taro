@@ -390,7 +390,7 @@ const SchedulePage: React.FC = () => {
   // 家长角色进入课表页时重定向到约课页
   React.useEffect(() => {
     if (isParentRole(currentRole)) {
-      Taro.redirectTo({ url: '/pages/booking/index' });
+      Taro.redirectTo({ url: '/package-course/pages/booking/index' });
     }
   }, [currentRole]);
   const currentUserId = profile?.id || '';
@@ -1267,7 +1267,7 @@ const SchedulePage: React.FC = () => {
   const handlePrimaryAction = useCallback((item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
     if (item.bookingTag) {
       Taro.navigateTo({
-        url: `/pages/booking/index?date=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}`,
+        url: `/package-course/pages/booking/index?date=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}`,
       });
       return;
     }
@@ -2127,12 +2127,12 @@ const SchedulePage: React.FC = () => {
               venue={venue}
               onClick={() => {
                 Taro.navigateTo({
-                  url: `/pages/venue-booking/index?roomId=${encodeURIComponent(venue.id)}`,
+                  url: `/package-course/pages/venue-booking/index?roomId=${encodeURIComponent(venue.id)}`,
                 });
               }}
               onBook={() => {
                 Taro.navigateTo({
-                  url: `/pages/venue-booking/index?roomId=${encodeURIComponent(venue.id)}`,
+                  url: `/package-course/pages/venue-booking/index?roomId=${encodeURIComponent(venue.id)}`,
                 });
               }}
             />

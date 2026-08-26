@@ -2,7 +2,7 @@ import { View, Text, ScrollView, Image, PageMeta } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import AddCustomTodoSheet from '@/components/home/AddCustomTodoSheet';
+import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
@@ -18,6 +18,7 @@ import LessonConsumptionList, {
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
+import { ORG_COVER_IMAGE } from '@/constants/brand';
 import { lessonRecordService, todoService } from '@/services';
 import { homeService } from '@/services/home';
 import type { QuickEntry } from '@/services/home';
@@ -25,6 +26,7 @@ import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CampusUIModel } from '@/types/campus';
 import type { TodoItem } from '@/types/home-todo';
+import type { TodoCollaborationMode } from '@/types/home-todo';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
@@ -33,14 +35,21 @@ import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
+import { buildTodoCardDomId } from '@/utils/todo-card-meta';
 import { getTodoShowTabBadge } from '@/utils/todo-settings';
+import {
+  TODO_CATEGORY_INBOX_ID,
+  addTodoCategory,
+  listTodoCategoryTabs,
+  type TodoCategoryTab,
+} from '@/utils/todo-categories';
+import { consumeTodoCollaboratorResult, type CollaboratorSummary } from '@/utils/todo-collaborator-select';
 import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 /** Tab 类型 */
 type HomeTab = 'schedule' | 'todo' | 'recent';
 
-const ORG_COVER_IMAGE = '/assets/images/2.jpg';
 /** FAB 距屏幕底的安全边距（rpx），与 ExpandableFabMenu 对齐 */
 const FAB_REVEAL_BOTTOM_OFFSET_RPX = 48;
 /** Tab 标签行下方禁区（rpx）：视口底到 Tab 底不足该高度时不显示 FAB */
@@ -94,8 +103,11 @@ const Home: React.FC = () => {
 
   // ---- 待办事项 ----
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
-  const [addTodoSheetVisible, setAddTodoSheetVisible] = useState(false);
+  const [addPopoverVisible, setAddPopoverVisible] = useState(false);
   const [addTodoDefaultQuadrant, setAddTodoDefaultQuadrant] = useState<TodoQuadrant | undefined>();
+  const [addCollaboratorIds, setAddCollaboratorIds] = useState<string[]>([]);
+  const [addCollaboratorSummaries, setAddCollaboratorSummaries] = useState<CollaboratorSummary[]>([]);
+  const [categoryTabs, setCategoryTabs] = useState<TodoCategoryTab[]>(() => listTodoCategoryTabs(''));
   const [todoViewMode, setTodoViewMode] = useState<TodoViewMode>('timeline');
   const [completeSheetItem, setCompleteSheetItem] = useState<TodoItem | null>(null);
   const [completeSheetVisible, setCompleteSheetVisible] = useState(false);
@@ -118,6 +130,7 @@ const Home: React.FC = () => {
   /** 待办 Tab 内是否发生过滚动（防止仅点 Tab 未滑就误显） */
   const todoTabScrollEngagedRef = useRef(false);
   const fabVisibilityRafRef = useRef(0);
+  const [homeScrollIntoView, setHomeScrollIntoView] = useState('');
 
   useEffect(() => {
     todoViewModeRef.current = todoViewMode;
@@ -249,6 +262,14 @@ const Home: React.FC = () => {
     [setCurrentCampusId],
   );
 
+  const loadCategories = useCallback(() => {
+    if (!profile?.id) {
+      setCategoryTabs(listTodoCategoryTabs(''));
+      return;
+    }
+    setCategoryTabs(listTodoCategoryTabs(profile.id));
+  }, [profile?.id]);
+
   // ============================================
   // 教师端数据加载
   // ============================================
@@ -331,7 +352,16 @@ const Home: React.FC = () => {
     loadData(currentCampusId);
   }, [profile, currentRole, currentCampusId, loadData]);
 
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
   useDidShow(() => {
+    const collaboratorResult = consumeTodoCollaboratorResult();
+    if (collaboratorResult !== null) {
+      setAddCollaboratorIds(collaboratorResult.ids);
+      setAddCollaboratorSummaries(collaboratorResult.summaries);
+    }
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
@@ -356,7 +386,7 @@ const Home: React.FC = () => {
   );
 
   const handleOpenMyTodos = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/my-todos/index' });
+    Taro.navigateTo({ url: '/package-settings/pages/my-todos/index' });
   }, []);
 
   // Tab 配置（待办 badge：仅数量 > 0 且设置开启时显示）
@@ -432,14 +462,31 @@ const Home: React.FC = () => {
   );
 
   const handleOpenAddTodoSheet = useCallback((quadrant?: TodoQuadrant) => {
+    setAddCollaboratorIds([]);
+    setAddCollaboratorSummaries([]);
     setAddTodoDefaultQuadrant(quadrant);
-    setAddTodoSheetVisible(true);
+    setAddPopoverVisible(true);
   }, []);
 
   const handleCloseAddTodoSheet = useCallback(() => {
-    setAddTodoSheetVisible(false);
+    setAddPopoverVisible(false);
     setAddTodoDefaultQuadrant(undefined);
   }, []);
+
+  const handleCreateCategoryFromPopover = useCallback(
+    async (name: string) => {
+      if (!profile?.id) return null;
+      const created = addTodoCategory(profile.id, name);
+      if (!created) {
+        Taro.showToast({ title: '分类已存在或无效', icon: 'none' });
+        return null;
+      }
+      loadCategories();
+      Taro.showToast({ title: '已添加', icon: 'success' });
+      return created.id;
+    },
+    [loadCategories, profile?.id],
+  );
 
   const handleQuadrantChange = useCallback(
     async (item: TodoItem, quadrant: TodoQuadrant) => {
@@ -467,14 +514,31 @@ const Home: React.FC = () => {
       remindEnabled: boolean;
       remindDate?: string;
       remindTime?: string;
-      quadrant?: import('@/types/todo-quadrant').TodoQuadrant;
+      quadrant?: TodoQuadrant;
+      categoryId?: string;
+      collaboratorIds?: string[];
+      collaborationMode?: TodoCollaborationMode;
     }) => {
       if (!profile?.id) return;
-      const item = await todoService.add(profile.id, payload);
-      setTodoItems((prev) => [item, ...prev]);
-      Taro.showToast({ title: '已保存', icon: 'success' });
+      const created = await todoService.add(profile.id, payload);
+      setAddPopoverVisible(false);
+      setAddTodoDefaultQuadrant(undefined);
+      setActiveTab('todo');
+      setTodoViewMode('timeline');
+      await loadData(currentCampusId);
+
+      // 首页仅展示今日时间轴：在首页则滚动定位；否则 Toast 兜底引导去「我的待办」
+      if (isTodoVisibleOnTimelineToday(created)) {
+        setTimeout(() => {
+          setHomeScrollIntoView(buildTodoCardDomId(created.id));
+          setTimeout(() => setHomeScrollIntoView(''), 500);
+        }, 150);
+        Taro.showToast({ title: '已保存', icon: 'success' });
+      } else {
+        Taro.showToast({ title: '已保存，请到「我的待办」查看', icon: 'none' });
+      }
     },
-    [profile?.id],
+    [profile?.id, loadData, currentCampusId],
   );
 
   const fabActions = useMemo(
@@ -498,7 +562,7 @@ const Home: React.FC = () => {
         label: '我的待办',
         icon: 'mdi-clipboard-text-outline',
         onClick: () => {
-          Taro.navigateTo({ url: '/pages/my-todos/index' });
+          Taro.navigateTo({ url: '/package-settings/pages/my-todos/index' });
         },
       },
     ],
@@ -518,7 +582,7 @@ const Home: React.FC = () => {
           <View className="mt-[24rpx] flex gap-[16rpx] w-full">
             <View
               className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
-              onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+              onClick={() => Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })}
             >
               <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
             </View>
@@ -548,7 +612,7 @@ const Home: React.FC = () => {
           <View
             className="absolute right-[24rpx] z-10"
             style={{ top: `${navSafeHeight - 4}px` }}
-            onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}
+            onClick={() => Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })}
           >
             <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
               <Icon name="mdi-bell-outline" size={44} color="white" />
@@ -580,7 +644,8 @@ const Home: React.FC = () => {
         <ScrollView
           id="home-scroll-view"
           scrollY={!fabMenuExpanded && !quadrantDragging}
-          scrollWithAnimation={false}
+          scrollWithAnimation={homeScrollIntoView.length > 0}
+          scrollIntoView={homeScrollIntoView}
           showScrollbar={false}
           className="h-full overflow-x-hidden no-scrollbar"
           {...(scrollTopPin !== null ? { scrollTop: scrollTopPin } : {})}
@@ -716,10 +781,15 @@ const Home: React.FC = () => {
       {/* 身份切换 Sheet */}
       <RoleSwitchSheet visible={roleSheetVisible} onClose={() => setRoleSheetVisible(false)} />
 
-      <AddCustomTodoSheet
-        visible={addTodoSheetVisible}
+      <AddCustomTodoPopover
+        visible={addPopoverVisible}
+        categoryTabs={categoryTabs}
+        defaultCategoryId={TODO_CATEGORY_INBOX_ID}
         defaultQuadrant={addTodoDefaultQuadrant}
+        collaboratorIds={addCollaboratorIds}
+        collaboratorSummaries={addCollaboratorSummaries}
         onClose={handleCloseAddTodoSheet}
+        onCreateCategory={handleCreateCategoryFromPopover}
         onSubmit={handleSubmitCustomTodo}
       />
 

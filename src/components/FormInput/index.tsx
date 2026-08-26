@@ -43,6 +43,10 @@ export interface FormInputProps {
   prefixNode?: React.ReactNode;
   /** 输入框 inline style，用于覆盖 disabled 等原生样式 */
   inputStyle?: React.CSSProperties;
+  /** 是否聚焦（打开弹窗后默认聚焦标题等场景） */
+  focus?: boolean;
+  /** 键盘弹起时是否自动上推页面，弹窗内输入建议 false */
+  adjustPosition?: boolean;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -67,6 +71,8 @@ const FormInput: React.FC<FormInputProps> = ({
   variant = 'default',
   prefixNode,
   inputStyle,
+  focus = false,
+  adjustPosition = true,
 }) => {
   const isCapsule = variant === 'capsule';
   const isGhost = variant === 'ghost';
@@ -136,6 +142,8 @@ const FormInput: React.FC<FormInputProps> = ({
             maxlength={maxlength}
             disabled={disabled}
             password={password}
+            focus={focus}
+            adjustPosition={adjustPosition}
           />
         )}
         {suffix}

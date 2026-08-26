@@ -27,11 +27,11 @@ function clearAuthSession(): void {
 function redirectToLogin(): void {
   const currentPages = Taro.getCurrentPages();
   const currentRoute = currentPages[currentPages.length - 1]?.route;
-  if (currentRoute === 'pages/login/index') {
+  if (currentRoute === 'package-auth/pages/login/index') {
     return;
   }
 
-  Taro.redirectTo({ url: '/pages/login/index' });
+  Taro.redirectTo({ url: '/package-auth/pages/login/index' });
 }
 
 /** API 统一响应格式 */

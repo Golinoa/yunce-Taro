@@ -51,7 +51,7 @@ const RoleSwitchSheet: React.FC<RoleSwitchSheetProps> = ({ visible, onClose }) =
 
   const handleAddIdentity = useCallback(() => {
     onClose();
-    Taro.navigateTo({ url: '/pages/role-switch/index' });
+    Taro.navigateTo({ url: '/package-auth/pages/role-switch/index' });
   }, [onClose]);
 
   return (

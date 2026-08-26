@@ -187,7 +187,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
               onClick={() => {
                 if (item.tag) {
                   Taro.navigateTo({
-                    url: `/pages/booking/index?date=${encodeURIComponent(dayjs().format('YYYY-MM-DD'))}`,
+                    url: `/package-course/pages/booking/index?date=${encodeURIComponent(dayjs().format('YYYY-MM-DD'))}`,
                   });
                   return;
                 }

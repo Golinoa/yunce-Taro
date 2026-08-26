@@ -28,6 +28,7 @@ import {
 } from '@/types/todo-quadrant';
 import { useAuth } from '@/utils/auth';
 import { sortHomeTodosByMode, type CustomTodoSortMode } from '@/utils/custom-todos';
+import { buildTodoCardDomId } from '@/utils/todo-card-meta';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import {
@@ -42,6 +43,7 @@ import {
   buildDefaultExpandedTodoDates,
   formatTodoMonthLabel,
   isTodoVisibleOnTimelineToday,
+  resolveTodoGroupDateKey,
 } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import dayjs from 'dayjs';
@@ -100,6 +102,7 @@ const MyTodos: React.FC = () => {
   );
   const [monthFilter, setMonthFilter] = useState(() => dayjs().format('YYYY-MM'));
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+  const [listScrollIntoView, setListScrollIntoView] = useState('');
   const teacherIdRef = useRef<string | null>(null);
   const isFirstMount = useRef(true);
   const loadSeqRef = useRef(0);
@@ -399,9 +402,20 @@ const MyTodos: React.FC = () => {
       collaborationMode?: TodoCollaborationMode;
     }) => {
       if (!profile?.id) return;
-      await todoService.add(profile.id, payload);
+      const created = await todoService.add(profile.id, payload);
       setAddPopoverVisible(false);
+      const now = dayjs();
+      const dateKey = resolveTodoGroupDateKey(created, now);
+      setExpandedDates((prev) => new Set([...prev, dateKey]));
+      if (payload.remindDate) {
+        setMonthFilter(dayjs(payload.remindDate).format('YYYY-MM'));
+      }
       await loadTodos();
+      const domId = buildTodoCardDomId(created.id);
+      setTimeout(() => {
+        setListScrollIntoView(domId);
+        setTimeout(() => setListScrollIntoView(''), 500);
+      }, 150);
       Taro.showToast({ title: '已保存', icon: 'success' });
     },
     [loadTodos, profile?.id],
@@ -648,7 +662,12 @@ const MyTodos: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView scrollY className="box-border min-h-0 flex-1 bg-muted">
+      <ScrollView
+        scrollY
+        scrollWithAnimation
+        scrollIntoView={listScrollIntoView}
+        className="box-border min-h-0 flex-1 bg-muted"
+      >
         {listLoading && todos.length === 0 ? (
           <View className="flex items-center justify-center pt-[120rpx]">
             <Loading size="small" delayMs={0} title="加载待办" text="正在同步待办列表" />

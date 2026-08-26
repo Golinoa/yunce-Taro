@@ -1,7 +1,7 @@
 /**
  * TodoCard - 待办卡片（首页时间轴 / 我的待办列表共用）
  *
- * 使用场景：与首页 TodoList 单卡完全一致；默认带左侧象限色条（逾期为红色）。
+ * 使用场景：与首页 TodoList 单卡完全一致；内容区统一为「标题 → 内容 → 提醒时间 @人员」。
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -57,6 +57,9 @@ const TodoCard: React.FC<TodoCardProps> = ({
     [isDone, item.remindAt],
   );
   const collaboratorNames = useTeacherNames(item.assigneeTeacherIds);
+  const contentText = item.note || item.desc;
+  const showScheduleRow = hasTodoDisplayTime(item) && !hideScheduleRow;
+  const showMetaRow = showScheduleRow || collaboratorNames.length > 0;
 
   const handlePress = () => {
     if (onPress) {
@@ -113,41 +116,40 @@ const TodoCard: React.FC<TodoCardProps> = ({
             {item.title}
           </Text>
 
-          {collaboratorNames.length > 0 ? (
-            <View className="mt-[8rpx] flex flex-row flex-wrap items-center gap-x-[12rpx] gap-y-[4rpx]">
+          {contentText ? (
+            <Text className="mt-[8rpx] block text-[24rpx] leading-snug text-muted-foreground line-clamp-2">
+              {contentText}
+            </Text>
+          ) : null}
+
+          {showMetaRow ? (
+            <View className="mt-[10rpx] flex flex-row flex-wrap items-center gap-x-[12rpx] gap-y-[4rpx]">
+              {showScheduleRow ? (
+                <View className="flex shrink-0 flex-row items-center gap-[6rpx]">
+                  <Icon
+                    name="mdi-calendar-clock"
+                    size="xs"
+                    color={remindMeta?.isOverdue ? 'destructive' : 'mutedForeground'}
+                  />
+                  <Text
+                    className={cn(
+                      'text-[22rpx]',
+                      remindMeta?.tone === 'overdue' ? 'text-destructive' : 'text-muted-foreground',
+                    )}
+                  >
+                    {remindMeta?.isOverdue ? remindMeta.line : formatRemindLabel(timelineAt)}
+                  </Text>
+                </View>
+              ) : null}
               {collaboratorNames.map((name, index) => (
                 <Text
                   key={`${item.id}-collab-${item.assigneeTeacherIds?.[index] ?? index}`}
-                  className="text-[24rpx] font-medium text-primary"
+                  className="text-[22rpx] font-medium text-primary"
                 >
                   @{name}
                 </Text>
               ))}
             </View>
-          ) : null}
-
-          {hasTodoDisplayTime(item) && !hideScheduleRow ? (
-            <View className="mt-[10rpx] flex flex-row flex-wrap items-center gap-[8rpx]">
-              <Icon
-                name="mdi-calendar-clock"
-                size="xs"
-                color={remindMeta?.isOverdue ? 'destructive' : 'mutedForeground'}
-              />
-              <Text
-                className={cn(
-                  'text-[22rpx]',
-                  remindMeta?.tone === 'overdue' ? 'text-destructive' : 'text-muted-foreground',
-                )}
-              >
-                {remindMeta?.isOverdue ? remindMeta.line : formatRemindLabel(timelineAt)}
-              </Text>
-            </View>
-          ) : null}
-
-          {item.note || item.desc ? (
-            <Text className="mt-[10rpx] block text-[24rpx] text-muted-foreground line-clamp-2">
-              {item.note || item.desc}
-            </Text>
           ) : null}
 
           {item.completion ? (

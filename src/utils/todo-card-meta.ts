@@ -29,6 +29,16 @@ export function hasTodoDisplayTime(item: TodoItem): boolean {
   return Boolean(item.remindAt || item.pushedAt || item.createdAt);
 }
 
+/** 卡片内展示提醒时间行（时间轴左侧已有时刻时，仅有提醒的待办在卡片内重复展示） */
+export function shouldShowTodoCardScheduleRow(item: TodoItem): boolean {
+  return Boolean(item.remindAt);
+}
+
+/** ScrollView scroll-into-view 锚点 id */
+export function buildTodoCardDomId(todoId: string): string {
+  return `todo-card-${todoId}`;
+}
+
 /** 构建卡片副文案（提醒/逾期/完成/无提醒） */
 export function buildTodoCardMeta(item: TodoItem, now = dayjs()): TodoCardMeta {
   const isDone = Boolean(item.completed || item.completion);

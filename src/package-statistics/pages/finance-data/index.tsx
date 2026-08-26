@@ -76,7 +76,7 @@ const FinanceData: React.FC = () => {
 
   /** 跳转记一笔 */
   const goRecordTransaction = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/record-transaction/index' });
+    Taro.navigateTo({ url: '/package-statistics/pages/record-transaction/index' });
   }, []);
 
   /** 格式化金额 */

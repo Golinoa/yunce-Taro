@@ -2,6 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 
 /**
  * BottomSheet - 统一底部弹窗组件
@@ -61,6 +62,8 @@ export interface BottomSheetProps {
    * - false（默认）：保留 block 布局
    */
   fillHeight?: boolean;
+  /** 键盘弹起时整体上移，避免遮挡输入区（弹窗内表单场景） */
+  keyboardAware?: boolean;
 }
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -76,6 +79,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   scrollable = true,
   fillHeight = false,
   heightRatio,
+  keyboardAware = false,
 }) => {
   // 向后兼容：如果传了 show，则用 show 控制渲染、visible 控制动画
   // 否则用 visible 同时控制渲染和动画
@@ -86,6 +90,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   const [mounted, setMounted] = useState(false);
   const [animating, setAnimating] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const keyboardHeight = useKeyboardHeight(mounted && keyboardAware);
 
   useEffect(() => {
     if (shouldRender) {
@@ -147,6 +152,9 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       : undefined
     : { height: fixedHeight, maxHeight: fixedHeight };
 
+  const panelPositionStyle =
+    keyboardAware && keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined;
+
   const content = fillHeight ? (
     <View className="bg-white h-full flex flex-col">{children}</View>
   ) : (
@@ -176,7 +184,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           animating ? 'translate-y-0' : 'translate-y-full',
           className,
         )}
-        style={panelStyle}
+        style={{ ...panelStyle, ...panelPositionStyle }}
         onClick={(e) => e.stopPropagation()}
         onTransitionEnd={handleTransitionEnd}
       >

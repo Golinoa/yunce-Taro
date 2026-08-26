@@ -41,7 +41,7 @@ const RoleSwitch: React.FC = () => {
   );
 
   const handleAddIdentity = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/role-switch/add-role' });
+    Taro.navigateTo({ url: '/package-auth/pages/role-switch/add-role' });
   }, []);
 
   const handleBack = useCallback(() => {

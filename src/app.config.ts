@@ -1,38 +1,28 @@
 export default defineAppConfig({
+  /** 按需注入：仅加载当前页面声明的自定义组件，降低启动耗时与内存占用 */
+  lazyCodeLoading: 'requiredComponents',
   pages: [
     'pages/home/index',
     'pages/schedule/index',
-    'pages/booking/index',
-    'pages/my-course/index',
-    'pages/venue-booking/index',
-    'pages/index/index',
-    'pages/login/index',
-    'pages/login/forgot-account/index',
-    'pages/login/forgot-password/index',
-    'pages/login/contact-support/index',
-    'pages/register/index',
-    'pages/register/role-select',
-    'pages/register/role-info',
-    'pages/role-switch/index',
-    'pages/role-switch/add-role',
     'pages/statistics/index',
-    'pages/finance-data/index',
-    'pages/member-data/index',
-    'pages/card-data/index',
-    'pages/salary-data/index',
-    'pages/record-transaction/index',
     'pages/profile/index',
-    'pages/profile-edit/index',
-    'pages/child-detail/index',
-    'pages/children/index',
-    'pages/notifications/index',
-    'pages/my-todos/index',
-    'pages/todo-collaborator/index',
-    'pages/agreement/index',
-    'pages/about/index',
-    'pages/store-entry/index',
   ],
   subPackages: [
+    {
+      root: 'package-auth',
+      pages: [
+        'pages/index/index',
+        'pages/login/index',
+        'pages/login/forgot-account/index',
+        'pages/login/forgot-password/index',
+        'pages/login/contact-support/index',
+        'pages/register/index',
+        'pages/register/role-select',
+        'pages/register/role-info',
+        'pages/role-switch/index',
+        'pages/role-switch/add-role',
+      ],
+    },
     {
       root: 'package-student',
       pages: [
@@ -46,6 +36,9 @@ export default defineAppConfig({
         'pages/member-card-edit/index',
         'pages/follow-record-form/index',
         'pages/help/index',
+        'pages/child-detail/index',
+        'pages/children/index',
+        'pages/profile-edit/index',
       ],
     },
     {
@@ -68,6 +61,9 @@ export default defineAppConfig({
     {
       root: 'package-course',
       pages: [
+        'pages/booking/index',
+        'pages/my-course/index',
+        'pages/venue-booking/index',
         'pages/course-management/index',
         'pages/subject-management/index',
         'pages/subject-form/index',
@@ -110,16 +106,29 @@ export default defineAppConfig({
         'pages/permission-form/index',
         'pages/threshold-config/index',
         'pages/todo-settings/index',
+        'pages/my-todos/index',
+        'pages/todo-collaborator/index',
         'pages/audit-log/index',
         'pages/theme-settings/index',
         'pages/feedback/index',
         'pages/help/index',
         'pages/notification-send/index',
+        'pages/agreement/index',
+        'pages/about/index',
+        'pages/store-entry/index',
+        'pages/notifications/index',
       ],
     },
     {
       root: 'package-statistics',
-      pages: ['pages/alert-detail/index'],
+      pages: [
+        'pages/alert-detail/index',
+        'pages/finance-data/index',
+        'pages/member-data/index',
+        'pages/card-data/index',
+        'pages/salary-data/index',
+        'pages/record-transaction/index',
+      ],
     },
     {
       root: 'package-lead',
@@ -150,10 +159,10 @@ export default defineAppConfig({
    *   开启会导致真机选图/定位等接口被拦截且弹窗不弹出。待隐私指引审核发布生效后改回 true。
    */
   __usePrivacyCheck__: false,
-  /** 进入课表页后预下载 package-lead 分包，加速「排课/预约」Tab 切换 */
+  /** 进入课表页后预下载 package-lead、package-course 分包，加速预约相关跳转 */
   preloadRule: {
     'pages/schedule/index': {
-      packages: ['package-lead'],
+      packages: ['package-lead', 'package-course'],
       network: 'all',
     },
   },

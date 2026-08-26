@@ -91,11 +91,11 @@ const RegisterRoleInfo: React.FC = () => {
   // 必须先完成 Step2
   useEffect(() => {
     if (!registerDraft?.tempToken) {
-      Taro.redirectTo({ url: '/pages/register/index' });
+      Taro.redirectTo({ url: '/package-auth/pages/register/index' });
       return;
     }
     if (!role) {
-      Taro.redirectTo({ url: '/pages/register/role-select' });
+      Taro.redirectTo({ url: '/package-auth/pages/register/role-select' });
     }
   }, [registerDraft, role]);
 

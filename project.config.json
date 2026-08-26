@@ -19,7 +19,7 @@
     "useCompilerModule": false,
     "compileWorklet": false,
     "uglifyFileName": true,
-    "uploadWithSourceMap": true,
+    "uploadWithSourceMap": false,
     "packNpmManually": false,
     "packNpmRelationList": [],
     "minifyWXSS": true,
@@ -37,11 +37,29 @@
     }
   },
   "compileType": "miniprogram",
+  "libVersion": "3.17.1",
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},
   "condition": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "suffix",
+        "value": ".LICENSE.txt"
+      },
+      {
+        "type": "suffix",
+        "value": ".map"
+      },
+      {
+        "type": "file",
+        "value": "project.config.json"
+      },
+      {
+        "type": "file",
+        "value": "project.private.config.json"
+      }
+    ],
     "include": []
   },
   "editorSetting": {}

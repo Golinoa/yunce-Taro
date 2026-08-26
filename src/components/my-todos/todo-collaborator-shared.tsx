@@ -46,7 +46,7 @@ export function resolveTeacherIdentityMeta(teacher: CollaboratorDisplayInfo) {
   return { label, tag };
 }
 
-/** 参与人列表统一头像（添加/查看页一致：图片优先，无图用姓氏色块） */
+/** 参与人列表统一头像（添加/查看页一致：有上传用上传，无上传用品牌默认图 sgpk.png） */
 export const TodoCollaboratorListAvatar: React.FC<{
   teacher: CollaboratorDisplayInfo;
   className?: string;
@@ -55,7 +55,6 @@ export const TodoCollaboratorListAvatar: React.FC<{
     name={teacher.name}
     avatarUrl={teacher.avatar}
     size="sm"
-    fallback="initial"
     className={cn('shrink-0', className)}
   />
 );
@@ -158,7 +157,7 @@ export const TodoCollaboratorSelectRow: React.FC<TodoCollaboratorSelectRowProps>
           checked ? 'border-primary bg-primary' : 'border-border bg-card',
         )}
       >
-        {checked ? <Icon name="mdi-check" size={22} color="#fff" /> : null}
+        {checked ? <Icon name="mdi-check" size={22} color="white" /> : null}
       </View>
       <TodoCollaboratorListAvatar teacher={teacher} />
       <View className="ml-[16rpx] min-w-0 flex-1 flex-row items-center overflow-hidden">
@@ -183,21 +182,44 @@ export interface TodoCollaboratorViewRowProps {
   onRemove: () => void;
 }
 
-/** 查看页 — 头像 + 姓名 + 右侧移除（与添加页列表行头像/字号对齐） */
+/** 查看页 — 头像 + 姓名/科目 + 身份标签 + 圆形移除按钮 */
 export const TodoCollaboratorViewRow: React.FC<TodoCollaboratorViewRowProps> = ({
   teacher,
   onRemove,
-}) => (
-  <View className="flex flex-row items-center py-[22rpx]">
-    <TodoCollaboratorListAvatar teacher={teacher} />
-    <Text className="ml-[16rpx] min-w-0 flex-1 truncate text-[30rpx] font-medium text-foreground">
-      {teacher.name}
-    </Text>
-    <View
-      className="ml-[16rpx] flex h-[48rpx] w-[48rpx] shrink-0 items-center justify-center press-bg"
-      onClick={onRemove}
-    >
-      <Icon name="mdi-close" size={20} color="muted" />
+}) => {
+  const identityMeta = resolveTeacherIdentityMeta(teacher);
+
+  const handleRemove = (event: { stopPropagation?: () => void }) => {
+    event.stopPropagation?.();
+    onRemove();
+  };
+
+  return (
+    <View className="flex flex-row items-center px-[24rpx] py-[20rpx]">
+      <TodoCollaboratorListAvatar teacher={teacher} />
+      <View className="ml-[16rpx] min-w-0 flex-1">
+        <View className="flex flex-row items-center overflow-hidden">
+          <Text className="shrink-0 text-[30rpx] font-medium text-foreground">{teacher.name}</Text>
+          {teacher.subject ? (
+            <Text className="ml-[8rpx] truncate text-[24rpx] text-muted-foreground">
+              ({teacher.subject})
+            </Text>
+          ) : null}
+        </View>
+        <View className="mt-[8rpx] flex flex-row items-center">
+          <View className={cn('rounded-tag px-[10rpx] py-[2rpx]', identityMeta.tag.bg)}>
+            <Text className={cn('text-[20rpx] font-medium', identityMeta.tag.text)}>
+              {identityMeta.label}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View
+        className="ml-[16rpx] flex h-[52rpx] w-[52rpx] shrink-0 items-center justify-center rounded-full border border-border-light bg-destructive-5 press-scale"
+        onClick={handleRemove}
+      >
+        <Icon name="mdi-close" size={20} color="destructive" />
+      </View>
     </View>
-  </View>
-);
+  );
+};

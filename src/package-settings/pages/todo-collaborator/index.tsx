@@ -138,10 +138,21 @@ const TodoCollaboratorPage: React.FC = () => {
 
   const handleRemoveOne = useCallback(
     (id: string) => {
-      applySelection(
-        selectedIdsRef.current.filter((item) => item !== id),
-        summaryMetaRef.current,
-      );
+      const teacher = summaryMetaRef.current.find((item) => item.id === id);
+      const teacherName = teacher?.name || '该员工';
+      Taro.showModal({
+        title: '移除参与人',
+        content: `确定将「${teacherName}」从参与人中移除？`,
+        confirmText: '移除',
+        cancelText: '取消',
+        success: (result) => {
+          if (!result.confirm) return;
+          applySelection(
+            selectedIdsRef.current.filter((item) => item !== id),
+            summaryMetaRef.current,
+          );
+        },
+      });
     },
     [applySelection],
   );
@@ -222,32 +233,29 @@ const TodoCollaboratorPage: React.FC = () => {
 
     return (
       <ScrollView scrollY className="min-h-0 flex-1">
-        <View className="border-b border-border px-[32rpx] pb-[20rpx] pt-[8rpx]">
-          <Text className="text-[36rpx] font-semibold text-foreground">
-            参与者 ({selectedIds.length})
+        <View className="px-[32rpx] pt-[16rpx]">
+          <View className="overflow-hidden rounded-[20rpx] border border-border bg-card shadow-card">
+            {displayItems.map((teacher, index) => (
+              <View key={teacher.id}>
+                <TodoCollaboratorViewRow
+                  teacher={teacher}
+                  onRemove={() => handleRemoveOne(teacher.id)}
+                />
+                {index < displayItems.length - 1 ? (
+                  <View className="mx-[24rpx] h-[2rpx] bg-border" />
+                ) : null}
+              </View>
+            ))}
+          </View>
+          <Text className="mt-[20rpx] block text-center text-[22rpx] text-muted-foreground">
+            点击右侧 × 可移除参与人
           </Text>
-        </View>
-        <View className="flex flex-col px-[32rpx]">
-          {displayItems.map((teacher, index) => (
-            <View key={teacher.id}>
-              <TodoCollaboratorViewRow
-                teacher={teacher}
-                onRemove={() => handleRemoveOne(teacher.id)}
-              />
-              {index < displayItems.length - 1 ? (
-                <View className="h-[2rpx] bg-border" />
-              ) : null}
-            </View>
-          ))}
-        </View>
-        <View className="flex items-center justify-center py-[48rpx]">
-          <Text className="text-[24rpx] text-muted-foreground">已展示所有参与者</Text>
         </View>
       </ScrollView>
     );
   };
 
-  const navTitle = mode === 'view' ? '' : '添加参与人';
+  const navTitle = mode === 'view' ? '查看参与人' : '添加参与人';
 
   const primaryLabel =
     mode === 'view'

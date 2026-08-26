@@ -59,7 +59,7 @@ const ALL_SETTING_ITEMS: SettingItem[] = [
   },
   {
     title: '用户协议',
-    route: '/pages/agreement/index',
+    route: '/package-settings/pages/agreement/index',
   },
   {
     title: '重置新手引导',
@@ -140,7 +140,7 @@ const SystemSettings: React.FC = () => {
     });
     if (!res.confirm) return;
     await signOut();
-    Taro.reLaunch({ url: '/pages/login/index' });
+    Taro.reLaunch({ url: '/package-auth/pages/login/index' });
   }, [activeTheme, signOut]);
 
   return (

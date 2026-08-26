@@ -127,7 +127,7 @@ const About: React.FC = () => {
   const { activeTheme } = useThemeStore();
 
   const handleEntry = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/store-entry/index' });
+    Taro.navigateTo({ url: '/package-settings/pages/store-entry/index' });
   }, []);
 
   return (

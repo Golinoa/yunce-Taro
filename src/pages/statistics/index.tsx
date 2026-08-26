@@ -78,27 +78,27 @@ const DataCenter: React.FC = () => {
 
   /** 跳转到财务详情 */
   const goFinanceDetail = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/finance-data/index' });
+    Taro.navigateTo({ url: '/package-statistics/pages/finance-data/index' });
   }, []);
 
   /** 跳转会员详情 */
   const goMemberDetail = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/member-data/index' });
+    Taro.navigateTo({ url: '/package-statistics/pages/member-data/index' });
   }, []);
 
   /** 跳转卡项详情 */
   const goCardDetail = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/card-data/index' });
+    Taro.navigateTo({ url: '/package-statistics/pages/card-data/index' });
   }, []);
 
   /** 跳转薪资详情 */
   const goSalaryDetail = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/salary-data/index' });
+    Taro.navigateTo({ url: '/package-statistics/pages/salary-data/index' });
   }, []);
 
   /** 跳转记一笔 */
   const goRecordTransaction = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/record-transaction/index' });
+    Taro.navigateTo({ url: '/package-statistics/pages/record-transaction/index' });
   }, []);
 
   /** 返回首页 */

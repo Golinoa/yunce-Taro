@@ -11,8 +11,7 @@ import React from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 
-// 默认头像：项目内置 sgpk.png（家长 / 教师未上传头像时统一使用）
-const DEFAULT_AVATAR_URL = '/assets/images/sgpk.png';
+import { BRAND_LOGO } from '@/constants/brand';
 
 export type ProfileHeaderVariant = 'default' | 'gradient';
 
@@ -61,7 +60,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           {/* 头像：白色圆形底 + 灰色外边框，头像缩小后自然留出白色内边 */}
           <View className="relative flex-shrink-0 w-[96rpx] h-[96rpx] rounded-full border-[4rpx] border-solid border-border bg-card flex items-center justify-center overflow-hidden">
             <Image
-              src={avatarUrl || DEFAULT_AVATAR_URL}
+              src={avatarUrl || BRAND_LOGO}
               mode="aspectFill"
               className="w-[80rpx] h-[80rpx] rounded-full flex-shrink-0"
             />

@@ -38,7 +38,7 @@ const TRIPLE_CARD_CONFIG = [
     label: '预约课程',
     subLabel: '管理 预约制课程',
     icon: 'mdi-account-plus',
-    url: '/pages/booking/index',
+    url: '/package-course/pages/booking/index',
   },
   {
     label: '学员管理',

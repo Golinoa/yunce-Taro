@@ -4,6 +4,7 @@
  * 所有 Mock 数据的单一数据源，保证数据一致性和关联性
  * 数据时间跨度：2025年7月 - 2026年6月（共12个月）
  */
+import { BRAND_LOGO, MEDIA_IMAGE_BASE } from '@/constants/brand';
 import { getManagedTeachers } from '@/data/teacher';
 import type { Venue, Room } from '@/types/campus';
 import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
@@ -101,7 +102,7 @@ export const CAMPUSES: Campus[] = [
     name: '曦绘艺术',
     code: 'XC0001',
     type: 'main',
-    logo: '/assets/images/sgpk.png',
+    logo: BRAND_LOGO,
     licenseName: '杭州云策教育科技有限公司',
     contactName: '万老师',
     region: '浙江省-杭州市-西湖区',
@@ -122,7 +123,7 @@ export const CAMPUSES: Campus[] = [
     name: '城东校区',
     code: 'XC0002',
     type: 'self',
-    logo: '/assets/images/sgpk.png',
+    logo: BRAND_LOGO,
     licenseName: '杭州云策教育科技有限公司城东分公司',
     contactName: '李老师',
     region: '浙江省-杭州市-上城区',
@@ -142,7 +143,7 @@ export const CAMPUSES: Campus[] = [
     name: '城西校区',
     code: 'XC0003',
     type: 'self',
-    logo: '/assets/images/sgpk.png',
+    logo: BRAND_LOGO,
     licenseName: '杭州云策教育科技有限公司城西分公司',
     contactName: '王老师',
     region: '浙江省-杭州市-余杭区',
@@ -202,7 +203,7 @@ export const ROOMS: Room[] = [
     capacity: 8,
     status: 'active',
     bookingEnabled: true,
-    photos: ['/assets/images/2.jpg'],
+    photos: [`${MEDIA_IMAGE_BASE}/2.jpg`],
     openTimeStart: '09:00',
     openTimeEnd: '22:00',
     pricePerSession: 120,
@@ -280,7 +281,7 @@ export const ROOMS: Room[] = [
     capacity: 18,
     status: 'active',
     bookingEnabled: true,
-    photos: ['/assets/images/2.jpg', '/assets/images/3.jpg'],
+    photos: [`${MEDIA_IMAGE_BASE}/2.jpg`, `${MEDIA_IMAGE_BASE}/3.jpg`],
     openTimeStart: '10:00',
     openTimeEnd: '21:00',
     pricePerSession: 100,
@@ -327,7 +328,7 @@ export const ROOMS: Room[] = [
     capacity: 14,
     status: 'active',
     bookingEnabled: true,
-    photos: ['/assets/images/3.jpg'],
+    photos: [`${MEDIA_IMAGE_BASE}/3.jpg`],
     openTimeStart: '09:00',
     openTimeEnd: '22:00',
     pricePerSession: 20,
