@@ -29,6 +29,7 @@ import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { markStepVisited } from '@/data/onboarding';
 import { onboardingService, studentService } from '@/services';
+import { organizationService, type OrganizationQuotaUsage } from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
@@ -51,6 +52,33 @@ const ROLE_LABEL: Record<string, string> = {
 // 占位提示：未实现入口统一提示
 // ============================================
 const PLACEHOLDER_TIP = '功能开发中，敬请期待';
+
+/** 配额使用率进度条（达到上限变红） */
+const QuotaBar: React.FC<{ label: string; current: number; max: number }> = ({
+  label,
+  current,
+  max,
+}) => {
+  const ratio = max > 0 ? Math.min(current / max, 1) : 0;
+  const full = current >= max;
+  return (
+    <View className="mt-[20rpx]">
+      <View className="flex flex-row items-center justify-between">
+        <Text className="text-[26rpx] text-foreground">{label}</Text>
+        <Text className={cn('text-[24rpx]', full ? 'text-destructive' : 'text-muted-foreground')}>
+          {current}/{max}
+          {full ? ' 已满' : ''}
+        </Text>
+      </View>
+      <View className="mt-[10rpx] h-[12rpx] rounded-full bg-bg-card overflow-hidden">
+        <View
+          className={cn('h-full rounded-full', full ? 'bg-destructive' : 'bg-primary')}
+          style={{ width: `${Math.max(ratio * 100, 4)}%` }}
+        />
+      </View>
+    </View>
+  );
+};
 
 const Profile: React.FC = () => {
   const { profile, currentRole, currentIdentity } = useAuth();
@@ -76,6 +104,21 @@ const Profile: React.FC = () => {
 
   // 会员开通状态（TODO: 后续接入接口）
   const [isMembershipActive] = useState(true);
+
+  // 机构配额使用率（校长/管理员，P1）
+  const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
+  const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
+
+  // 加载机构配额使用率
+  const loadQuotaUsage = useCallback(async () => {
+    if (!isManagerRole) return;
+    try {
+      const data = await organizationService.getQuotaUsage();
+      setQuotaUsage(data);
+    } catch {
+      /* 非阻塞：配额卡加载失败不影响页面 */
+    }
+  }, [isManagerRole]);
 
   // 加载家长绑定的学生
   const loadStudents = useCallback(async () => {
@@ -129,12 +172,14 @@ const Profile: React.FC = () => {
     loadStudents();
     loadStoreOnboardingHidden();
     loadStoreProgress();
-  }, [loadStudents, loadStoreOnboardingHidden, loadStoreProgress]);
+    loadQuotaUsage();
+  }, [loadStudents, loadStoreOnboardingHidden, loadStoreProgress, loadQuotaUsage]);
 
   useDidShow(() => {
     loadStudents();
     loadStoreOnboardingHidden();
     loadStoreProgress();
+    loadQuotaUsage();
   });
 
   const activeStudent = useMemo(
@@ -559,6 +604,50 @@ const Profile: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        {/* ====== 机构配额使用率卡片（校长/管理员，P1） ====== */}
+        {isManagerRole && quotaUsage && (
+          <View className="mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] p-[28rpx] shadow-soft">
+            <View className="flex flex-row items-center justify-between">
+              <View className="flex flex-row items-center gap-[12rpx]">
+                <Text className="text-[30rpx] font-semibold text-foreground">机构配额</Text>
+                <View className="px-[12rpx] py-[4rpx] rounded-full bg-primary-10">
+                  <Text className="text-[22rpx] text-primary">{quotaUsage.versionName}</Text>
+                </View>
+              </View>
+              <Text
+                className={cn(
+                  'text-[22rpx]',
+                  quotaUsage.members.current >= quotaUsage.members.max ||
+                    quotaUsage.employees.current >= quotaUsage.employees.max
+                    ? 'text-destructive'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {quotaUsage.members.current >= quotaUsage.members.max ||
+                quotaUsage.employees.current >= quotaUsage.employees.max
+                  ? '配额已满，联系运营升级'
+                  : '免费版配额'}
+              </Text>
+            </View>
+
+            <QuotaBar
+              label="会员"
+              current={quotaUsage.members.current}
+              max={quotaUsage.members.max}
+            />
+            <QuotaBar
+              label="员工"
+              current={quotaUsage.employees.current}
+              max={quotaUsage.employees.max}
+            />
+            <QuotaBar
+              label="校区"
+              current={quotaUsage.campuses.current}
+              max={quotaUsage.campuses.max}
+            />
+          </View>
+        )}
 
         {/* ====== 公众号关注卡片（暂时隐藏） ====== */}
         {false && <ProfileFollowCard className="mt-[24rpx]" onClick={handleFollow} />}

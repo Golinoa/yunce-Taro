@@ -118,12 +118,41 @@ export const organizationService = {
     }
     return put<OrganizationSettings>('/organization/settings', input);
   },
+
+  /** 机构配额使用率（校长/管理员，P1） */
+  getQuotaUsage: async (): Promise<OrganizationQuotaUsage> => {
+    if (USE_MOCK) {
+      return {
+        organizationId: 'org-mock',
+        organizationName: '松果排课',
+        versionCode: 'FREE',
+        versionName: '免费版',
+        members: { current: 5, max: 40 },
+        employees: { current: 1, max: 2 },
+        campuses: { current: 1, max: 1 },
+        features: { leadTrace: false, batchImportExport: false },
+      };
+    }
+    return get<OrganizationQuotaUsage>('/organization/quota-usage');
+  },
 };
 
 /** 机构设置（与后端 OrgSettings 对齐） */
 export interface OrganizationSettings {
   /** 家长请假自动审批，默认 true */
   leaveAutoApprove: boolean;
+}
+
+/** 机构配额使用率（P1） */
+export interface OrganizationQuotaUsage {
+  organizationId: string;
+  organizationName: string;
+  versionCode: 'FREE' | 'STANDARD' | 'FLAGSHIP';
+  versionName: string;
+  members: { current: number; max: number };
+  employees: { current: number; max: number };
+  campuses: { current: number; max: number };
+  features: { leadTrace: boolean; batchImportExport: boolean };
 }
 
 // ==================== 待确认关系本地存储（首页关系弹窗触发源） ====================

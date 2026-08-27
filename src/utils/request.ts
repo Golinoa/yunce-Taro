@@ -109,7 +109,12 @@ async function refreshAccessToken(): Promise<string | null> {
         timeout: TIMEOUT,
       });
 
-      if (res.statusCode >= 200 && res.statusCode < 300 && res.data && typeof res.data === 'object') {
+      if (
+        res.statusCode >= 200 &&
+        res.statusCode < 300 &&
+        res.data &&
+        typeof res.data === 'object'
+      ) {
         const body = res.data as ApiResponse<{
           token: string;
           refreshToken: string;
@@ -206,6 +211,9 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
           clearAuthSession();
           redirectToLogin();
         }
+        if (isQuotaExceededMessage(body.message)) {
+          handleQuotaExceeded(body.message);
+        }
         throw new ApiError(body.code, body.message);
       }
       // 直接返回数据
@@ -219,7 +227,12 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
       throw new ApiError(401, '登录已过期，请重新登录');
     }
 
-    throw new ApiError(res.statusCode, `请求失败 (${res.statusCode})`);
+    // 统一解析后端错误消息（修复 422 等丢失 message 的问题）
+    const errorMessage = extractErrorMessage(res);
+    if (isQuotaExceededMessage(errorMessage)) {
+      handleQuotaExceeded(errorMessage);
+    }
+    throw new ApiError(res.statusCode, errorMessage);
   } catch (err) {
     // #region debug-point H1:request-fail
     reportLocalDebug({
@@ -248,6 +261,43 @@ export class ApiError extends Error {
     this.code = code;
     this.name = 'ApiError';
   }
+}
+
+/** ===== QUOTA_EXCEEDED 升级引导（P0）=====
+ * 后端配额拦截统一返回 422，message 以 QUOTA_EXCEEDED: 开头。
+ * 识别后弹一次升级引导弹窗（防抖 3s），提示用户联系运营升级版本。
+ */
+let quotaModalShownAt = 0;
+
+function handleQuotaExceeded(rawMessage: string): void {
+  const now = Date.now();
+  if (now - quotaModalShownAt < 3000) {
+    return;
+  }
+  quotaModalShownAt = now;
+  const friendly = rawMessage.replace(/^QUOTA_EXCEEDED:\s*/, '');
+  Taro.showModal({
+    title: '版本配额已达上限',
+    content: `${friendly}。请升级版本或联系运营开通更高配额。`,
+    showCancel: false,
+    confirmText: '我知道了',
+  });
+}
+
+/** 是否 QUOTA_EXCEEDED 类错误消息 */
+function isQuotaExceededMessage(message: unknown): boolean {
+  return typeof message === 'string' && message.startsWith('QUOTA_EXCEEDED:');
+}
+
+/** 从响应体中提取可读 message（兼容 {code,data,message} 与纯文本） */
+function extractErrorMessage(res: { statusCode: number; data: unknown }): string {
+  if (res.data && typeof res.data === 'object' && 'message' in res.data) {
+    const msg = (res.data as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg.trim()) {
+      return msg;
+    }
+  }
+  return `请求失败 (${res.statusCode})`;
 }
 
 /** POST 请求 */
