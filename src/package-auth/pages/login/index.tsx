@@ -2,7 +2,7 @@
  * 登录首页 - 登录布局与交互优化版
  * 保持原有配色，只调整登录方式切换、分阶段输入和错误兜底交互
  */
-import { View, Text } from '@tarojs/components';
+import { View, Text, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,13 +15,12 @@ import {
   authCapabilities,
   checkLoginAccount,
   prepareEmailLogin,
-  testAccounts,
-  testPassword,
 } from '@/services/auth';
+import { BRAND_LOGO } from '@/constants/brand';
 import { useAgreementStore } from '@/stores/agreement';
 import { ACCOUNT_RULE_TEXT, isAccountFormatValid, sanitizeAccountInput } from '@/utils/account';
+import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useAuth } from '@/utils/auth';
-import { navigateAfterLogin } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 type LoginMethod = 'wechat' | 'account' | 'email';
@@ -101,11 +100,11 @@ const Login: React.FC = () => {
   const [maskedEmail, setMaskedEmail] = useState('');
   const [inputRect, setInputRect] = useState<LoginInputRect | null>(null);
   const [buttonRect, setButtonRect] = useState<LoginInputRect | null>(null);
-  const isMockMode = testAccounts.length > 0;
 
   useEffect(() => {
     if (profile) {
-      navigateAfterLogin(profile);
+      const isNewUser = consumeLastLoginIsNewUser();
+      navigateAfterAuth(profile, isNewUser ? { isNewUser: true } : undefined);
     }
   }, [profile]);
 
@@ -123,15 +122,19 @@ const Login: React.FC = () => {
     setWechatSubmitting(true);
     try {
       const { code: wxCode } = await Taro.login();
+      if (!wxCode) {
+        Taro.showToast({ title: '微信授权失败，请重试', icon: 'none' });
+        return;
+      }
       const { error } = await signInWithWechat(wxCode);
       if (error) {
         Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
-        setWechatSubmitting(false);
         return;
       }
       Taro.setStorageSync('justLoggedIn', 'true');
     } catch {
       Taro.showToast({ title: '微信登录失败', icon: 'none' });
+    } finally {
       setWechatSubmitting(false);
     }
   }, [wechatSubmitting, signInWithWechat]);
@@ -626,7 +629,16 @@ const Login: React.FC = () => {
     }
   }, [accountValue, currentPopoverKey, emailCodeValue, emailValue, maskedEmail, passwordValue]);
 
-  const otherLoginOptions = LOGIN_OPTIONS.filter((item) => item.key !== currentMethod);
+  const otherLoginOptions = useMemo(
+    () =>
+      LOGIN_OPTIONS.filter((item) => {
+        if (item.key === 'wechat') return false;
+        if (item.key === 'account') return authCapabilities.supportsAccountPasswordLogin;
+        if (item.key === 'email') return authCapabilities.supportsEmailCodeLogin;
+        return false;
+      }),
+    [],
+  );
   const isLoginLayoutReady =
     currentMethod === 'wechat' || (Boolean(inputRect) && Boolean(buttonRect));
 
@@ -638,8 +650,12 @@ const Login: React.FC = () => {
 
       <View className="relative z-10 flex-1 flex flex-col items-center justify-start pt-[88rpx]">
         <View className="absolute w-[420rpx] h-[420rpx] rounded-full bg-login-glow" />
-        <View className="relative w-[220rpx] h-[220rpx] rounded-full bg-login-orb flex items-center justify-center mt-[14rpx]">
-          <Icon name="school" size={120} className="text-primary" />
+        <View className="relative w-[220rpx] h-[220rpx] rounded-full bg-login-orb flex items-center justify-center mt-[14rpx] overflow-hidden">
+          <Image
+            src={BRAND_LOGO}
+            mode="aspectFill"
+            className="w-[160rpx] h-[160rpx] rounded-full"
+          />
         </View>
       </View>
 
@@ -675,21 +691,25 @@ const Login: React.FC = () => {
         </View>
 
         <View className="flex flex-col items-center mt-[24rpx] mb-[48rpx]">
-          <Text className="text-[24rpx] text-muted-foreground mb-[24rpx]">其他登录方式</Text>
-          <View className="flex flex-row items-center justify-center gap-[44rpx]">
-            {otherLoginOptions.map((item) => (
-              <View
-                key={item.key}
-                className="flex flex-col items-center gap-[12px] active:opacity-70"
-                onClick={() => handleSelectMethod(item.key)}
-              >
-                <View className="w-[96rpx] h-[96rpx] rounded-full bg-muted flex items-center justify-center">
-                  <Icon name={item.icon} size={44} className="text-primary" />
-                </View>
-                <Text className="text-[22rpx] text-muted-foreground">{item.label}</Text>
+          {otherLoginOptions.length > 0 ? (
+            <>
+              <Text className="text-[24rpx] text-muted-foreground mb-[24rpx]">其他登录方式</Text>
+              <View className="flex flex-row items-center justify-center gap-[44rpx]">
+                {otherLoginOptions.map((item) => (
+                  <View
+                    key={item.key}
+                    className="flex flex-col items-center gap-[12px] active:opacity-70"
+                    onClick={() => handleSelectMethod(item.key)}
+                  >
+                    <View className="w-[96rpx] h-[96rpx] rounded-full bg-muted flex items-center justify-center">
+                      <Icon name={item.icon} size={44} className="text-primary" />
+                    </View>
+                    <Text className="text-[22rpx] text-muted-foreground">{item.label}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          ) : null}
         </View>
       </View>
 
@@ -703,23 +723,6 @@ const Login: React.FC = () => {
           </Text>
         </View>
       </View>
-
-      {isMockMode ? (
-        <View className="relative z-10 px-[48rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))]">
-          <View className="bg-card/80 rounded-[20rpx] px-[24rpx] py-[20rpx]">
-            <Text className="text-[24rpx] text-muted-foreground font-medium mb-[12rpx] block">
-              {`测试账号（密码均为 ${testPassword || '123456'}）：`}
-            </Text>
-            <View className="space-y-[8rpx]">
-              {testAccounts.map((account) => (
-                <Text key={account.username} className="text-[22rpx] text-muted-foreground block">
-                  {`• ${account.label}：${account.username}`}
-                </Text>
-              ))}
-            </View>
-          </View>
-        </View>
-      ) : null}
 
       {currentMethod !== 'wechat' && currentPopoverProps && isLoginLayoutReady ? (
         <LoginFlowPopover

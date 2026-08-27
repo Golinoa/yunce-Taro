@@ -28,6 +28,7 @@ import {
   teacherService,
   temporaryRescheduleService,
   venueBookingService,
+  calendarSyncService,
 } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { useCampusStore } from '@/stores/campus';
@@ -817,13 +818,20 @@ const SchedulePage: React.FC = () => {
       setTeachers(teacherList);
       setTrialClassIds(nextTrialClassIds);
       setTrialBookingKeys(nextTrialBookingKeys);
+      void calendarSyncService.maybePromptOnSchedulePage({
+        userId: currentUserId,
+        teacherId: currentUserId,
+        role: currentRole ?? undefined,
+        campusId: currentCampusId,
+        scheduleCount: scheduleList.length,
+      });
     } catch (err) {
       logError('SchedulePage loadBaseData', err);
       Taro.showToast({ title: '课表加载失败', icon: 'none' });
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, currentCampusId, fetchCategories]);
+  }, [currentUserId, currentCampusId, currentRole, fetchCategories]);
 
   const loadMonthRecords = useCallback(async () => {
     if (!currentUserId) {
@@ -1528,6 +1536,12 @@ const SchedulePage: React.FC = () => {
       setSchedules((prev) => prev.filter((schedule) => schedule.id !== item.id));
       closeDangerActionDialog();
       Taro.showToast({ title: '排课规则已删除', icon: 'success' });
+      void calendarSyncService.syncAfterScheduleChange({
+        userId: currentUserId,
+        teacherId: currentUserId,
+        campusId: currentCampusId,
+        role: profile?.currentContext?.role,
+      });
     } catch (err) {
       logError('SchedulePage remove schedule', err);
       Taro.showToast({ title: '删除失败，请重试', icon: 'none' });
@@ -1537,6 +1551,7 @@ const SchedulePage: React.FC = () => {
   }, [
     filteredClasses,
     closeDangerActionDialog,
+    currentCampusId,
     currentTeacherId,
     currentUserId,
     dangerActionState.item,

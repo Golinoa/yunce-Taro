@@ -90,7 +90,6 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Notification, NotificationType } from '@/types/notification';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
-import { notWired } from '@/utils/not-wired';
 import { del, get, post, put } from '@/utils/request';
 
 const USE_MOCK =
@@ -325,6 +324,8 @@ interface BackendLessonRecordListItem {
   hoursUsed?: null | number;
   id: string;
   lessonDate: string;
+  note?: null | string;
+  remark?: null | string;
   packageId?: null | string;
   packageName?: null | string;
   performance?: null | string;
@@ -365,6 +366,8 @@ interface BackendLessonRecordDetailResponse {
   hoursUsed?: null | number;
   id: string;
   lessonDate: string;
+  note?: null | string;
+  remark?: null | string;
   package?: {
     id?: string;
     name: string;
@@ -402,6 +405,8 @@ interface BackendLessonRecordCreateResponse {
   homework?: null | string;
   id: string;
   lessonDate: string;
+  note?: null | string;
+  remark?: null | string;
   operatorTeacherId?: null | string;
   operatorTeacherName?: null | string;
   assistantTeacherId?: null | string;
@@ -833,6 +838,13 @@ function mapBackendLessonRecord(
     hours_used: Number(('hoursUsed' in item ? item.hoursUsed : null) ?? item.duration / 60),
     status,
     content: item.content || undefined,
+    // 单学员备注：后端契约字段为 remark，兼容 note 命名
+    note:
+      'remark' in item && item.remark != null
+        ? item.remark || undefined
+        : 'note' in item && item.note != null
+          ? item.note || undefined
+          : undefined,
     performance: 'performance' in item ? item.performance || undefined : undefined,
     homework: item.homework || undefined,
     homework_images: 'homeworkImages' in item ? item.homeworkImages || undefined : undefined,
@@ -885,6 +897,8 @@ function buildLessonRecordPayload(
     duration: Math.max(Math.round(Number(data.hours_used || 0) * 60), 1),
     content: data.content,
     homework: data.homework,
+    // 单学员备注 → 后端 remark 字段
+    remark: data.note,
   };
 }
 
@@ -1036,6 +1050,7 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     id: cls.id,
     name: cls.name,
     teacher_id: cls.teacherId,
+    note: cls.note,
     created_at: cls.createdAt,
     updated_at: cls.createdAt,
     type: cls.status === 'ended' ? 'ended' : cls.type,
@@ -1059,6 +1074,8 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     min_open_count: cls.minOpenCount,
     subject_id: cls.subjectId,
     category_id: cls.categoryId,
+    hours_per_lesson: cls.hoursPerLesson ?? 1,
+    pricePerLesson: cls.pricePerLesson,
   };
 }
 
@@ -1349,6 +1366,8 @@ function mapMockLessonRecord(record: NonNullable<MockLessonRecord>): LessonRecor
     hours_used: record.hours,
     status: mappedStatus,
     content: record.note,
+    // mock 记录：note=课程内容(content)，remark=单学员备注(note)
+    note: record.remark,
     fee_amount: (classInfo?.pricePerLesson || 0) * record.hours,
     remaining_hours: pkg?.remainingHours,
     purchased_deduct: record.hours,
@@ -1398,6 +1417,8 @@ function mapLessonRecordInput(
     hours: data.hours_used || 0,
     status,
     note: data.content,
+    // 单学员备注 → mock 记录 remark 字段（与 note=课程内容区分开）
+    remark: data.note,
     packageId: data.package_id || '', // 保留课包关联，供 mock 扣减课时（模拟后端自动扣减）
     createdAt: new Date().toISOString(),
   };
@@ -2121,7 +2142,18 @@ export const classService = {
    * 真实后端：联调时按 teacher/admin 权限返回
    */
   getScheduledClassIds: async (): Promise<string[]> => {
-    if (!USE_MOCK) notWired('classService.getScheduledClassIds');
+    if (!USE_MOCK) {
+      const data = await get<{ list: Array<{ classId?: string; class_id?: string }> }>(
+        '/schedules',
+        { page: 1, pageSize: 500 },
+      );
+      const ids = new Set<string>();
+      for (const item of data.list ?? []) {
+        const classId = item.classId ?? item.class_id;
+        if (classId) ids.add(classId);
+      }
+      return Array.from(ids);
+    }
     return Array.from(getScheduledClassIdSet());
   },
   create: async (data: Omit<Class, 'id' | 'created_at' | 'updated_at'>) => {
@@ -2144,7 +2176,26 @@ export const classService = {
       return mapBackendClassListItem(updated);
     }
 
-    return mockUpdateClass(classId, data);
+    // 前端 Class（snake_case）→ mock DB（camelCase），保证 mock 读写一致
+    const mockPatch: Record<string, unknown> = {};
+    if (data.name !== undefined) mockPatch.name = data.name;
+    if (data.teacher_id !== undefined) mockPatch.teacherId = data.teacher_id;
+    if (data.teachers !== undefined) mockPatch.teachers = data.teachers;
+    if (data.color !== undefined) mockPatch.color = data.color;
+    if (data.category_id !== undefined) mockPatch.categoryId = data.category_id;
+    if (data.subject_id !== undefined) mockPatch.subjectId = data.subject_id;
+    if (data.level !== undefined) mockPatch.level = data.level;
+    if (data.note !== undefined) mockPatch.note = data.note;
+    if (data.min_open_count !== undefined) mockPatch.minOpenCount = data.min_open_count;
+    if (data.hours_per_lesson !== undefined) mockPatch.hoursPerLesson = data.hours_per_lesson;
+    if (data.pricePerLesson !== undefined) mockPatch.pricePerLesson = data.pricePerLesson;
+    if (data.schedule !== undefined) mockPatch.schedule = data.schedule;
+    if (data.status !== undefined) mockPatch.status = data.status;
+    if (data.campus_id !== undefined) mockPatch.campusId = data.campus_id;
+    if (data.room !== undefined) mockPatch.room = data.room;
+
+    const updated = await mockUpdateClass(classId, mockPatch);
+    return updated ? mapMockClass(updated) : undefined;
   },
   remove: async (classId: string) => {
     if (!USE_MOCK) {

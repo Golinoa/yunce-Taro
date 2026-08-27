@@ -20,6 +20,7 @@ import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_SOURCE_META, FOLLOW_UP_ACTION_META, TRIAL_MODE_META } from '@/constants/lead';
 import { leadService } from '@/services';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { auditLogService } from '@/services/audit-log';
 import { useLeadStore } from '@/stores/lead';
 import type { Lead, LeadFollowUp, LeadBooking } from '@/types/lead';
@@ -139,6 +140,15 @@ const LeadDetailPage: React.FC = () => {
         invalidate(userId || '');
         loadData(lead.id);
         Taro.showToast({ title: '跟进已添加', icon: 'success' });
+        try {
+          Taro.hideToast();
+          await subscribeMessageService.runRenewFlow('lead_follow_renew', 'lead_follow_submit', {
+            role: profile?.currentContext?.role,
+            campusId: profile?.currentContext?.campusId,
+          });
+        } catch (error) {
+          logError('subscribe E10 follow renew', error);
+        }
       } catch {
         Taro.showToast({ title: '添加失败', icon: 'none' });
       }

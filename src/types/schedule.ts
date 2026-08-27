@@ -66,6 +66,20 @@ export interface Schedule {
   room?: string;
   /** 约课标记 */
   tag?: string;
+  /** 关联试听/私教预约 ID（首页今日课表合并预约时使用） */
+  booking_id?: string;
+  /** 试听模式：团课 / 私教 */
+  trial_mode?: 'group' | 'private';
+  /** 是否含试听学员（团课试听预约） */
+  has_trial_student?: boolean;
+  /** 课程分类展示名（用户自定义分类，非写死班课/团课/私教） */
+  category_label?: string;
+  /** 课表项来源：固定排课 / 试听预约 / 场地预约 */
+  schedule_kind?: 'schedule' | 'booking' | 'venue';
+  /** 场地预约 ID */
+  venue_booking_id?: string;
+  /** 场地/教室 ID（场地预约跳转用） */
+  room_id?: string;
   /** 课程类型（控制左侧时间区配色） */
   course_type?: CourseType;
   /** 授课老师名称 */

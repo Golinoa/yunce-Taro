@@ -29,9 +29,11 @@ import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { markStepVisited } from '@/data/onboarding';
 import { onboardingService, studentService } from '@/services';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
 import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
 // ============================================
@@ -162,6 +164,17 @@ const Profile: React.FC = () => {
       await loadStudents();
       setActiveStudentId(student.id);
       Taro.setStorageSync('activeStudentId', student.id);
+      try {
+        Taro.hideToast();
+        await subscribeMessageService.runFlow('E03', {
+          childName: student.name,
+          studentName: student.name,
+          role: profile.currentContext?.role,
+          campusId: profile.currentContext?.campusId,
+        });
+      } catch (error) {
+        logError('subscribe E03 after bind child', error);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('已绑定') || msg.includes('重复')) {

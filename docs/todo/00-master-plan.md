@@ -15,6 +15,11 @@
 | [03-homepage-redesign.md](./03-homepage-redesign.md)         | 第三阶段 | 首页重构 + TabBar 改造（TASK-26 已完成；TASK-27/29/30 按用户决策调整） |
 | [04-p2-details.md](./04-p2-details.md)                       | 第四阶段 | P2 细节优化                                                            |
 | [05-api-migration.md](./05-api-migration.md)                 | 第五阶段 | 后端 API 对接                                                          |
+| [06-home-ux-backlog.md](./06-home-ux-backlog.md)             | 持续     | 首页 & 周边体验待办（#1–#12）                                          |
+| [07-todo-quadrant-api-contract.md](./07-todo-quadrant-api-contract.md) | 契约 | 待办四象限 API                                                         |
+| [08-todo-module-api-contract.md](./08-todo-module-api-contract.md)   | 契约 | 待办模块 API                                                           |
+| [09-platform-capabilities-backlog.md](./09-platform-capabilities-backlog.md) | 持续 | 小程序平台能力待办（转发分享、添加桌面等）                             |
+| [subscribe-message/](./subscribe-message/README.md)          | 持续     | 微信订阅消息方案与接口契约                                             |
 
 ---
 

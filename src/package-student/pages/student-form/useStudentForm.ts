@@ -3,7 +3,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
 import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/data/course-category';
-import { studentService, packageService, campusService } from '@/services';
+import { studentService, packageService, campusService, subscribeMessageService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { CampusUIModel } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
@@ -577,24 +577,32 @@ export function useStudentForm(): UseStudentFormReturn {
         }
       }
 
-      // 新建学员成功后引导分班
+      // 新建学员成功后：先订阅消息引导（E01），再询问是否分班
       if (!isEdit && newStudent) {
-        setTimeout(async () => {
-          Taro.hideToast();
-          const { confirm } = await Taro.showModal({
-            title: '学员已创建',
-            content: '是否立即分班？',
-            confirmText: '立即分班',
-            cancelText: '稍后再说',
+        Taro.hideToast();
+        try {
+          await subscribeMessageService.runFlow('E01', {
+            studentId: newStudent.id,
+            studentName: newStudent.name,
+            campusId: campusId || undefined,
+            role: profile?.currentContext?.role,
           });
-          if (confirm) {
-            Taro.navigateTo({
-              url: COURSE_MANAGEMENT_CLASS_TAB_URL,
-            });
-          } else {
-            Taro.navigateBack();
-          }
-        }, 1000);
+        } catch (error) {
+          logError('subscribe E01 after student create', error);
+        }
+        const { confirm } = await Taro.showModal({
+          title: '学员已创建',
+          content: '是否立即分班？',
+          confirmText: '立即分班',
+          cancelText: '稍后再说',
+        });
+        if (confirm) {
+          Taro.navigateTo({
+            url: COURSE_MANAGEMENT_CLASS_TAB_URL,
+          });
+        } else {
+          Taro.navigateBack();
+        }
       } else {
         setTimeout(() => Taro.navigateBack(), 1500);
       }
@@ -629,6 +637,7 @@ export function useStudentForm(): UseStudentFormReturn {
     hoursComposition,
     campusId,
     campusOptions,
+    profile?.currentContext?.role,
   ]);
 
   // 重置表单

@@ -10,7 +10,7 @@ import ActionButton from '@/components/ActionButton';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import RegisterStepper from '@/components/RegisterStepper';
-import type { ParentRoleInfo, PrincipalRoleInfo, TeacherRoleInfo, UserRole } from '@/types/profile';
+import { authCapabilities } from '@/services/auth';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterLogin } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -140,13 +140,15 @@ const RegisterRoleInfo: React.FC = () => {
         Taro.showToast({ title: '请输入机构名称', icon: 'none' });
         return false;
       }
-      if (!contactPhone.trim()) {
-        Taro.showToast({ title: '请输入负责人手机号', icon: 'none' });
-        return false;
-      }
-      if (!/^1\d{10}$/.test(contactPhone.trim())) {
-        Taro.showToast({ title: '请输入正确的手机号', icon: 'none' });
-        return false;
+      if (authCapabilities.usesMockRegister) {
+        if (!contactPhone.trim()) {
+          Taro.showToast({ title: '请输入负责人手机号', icon: 'none' });
+          return false;
+        }
+        if (!/^1\d{10}$/.test(contactPhone.trim())) {
+          Taro.showToast({ title: '请输入正确的手机号', icon: 'none' });
+          return false;
+        }
       }
     }
     return true;
@@ -162,7 +164,9 @@ const RegisterRoleInfo: React.FC = () => {
       roleInfo = {
         organizationName: orgName.trim(),
         organizationAddress: orgAddress.trim() || undefined,
-        contactPhone: contactPhone.trim(),
+        contactPhone: authCapabilities.usesMockRegister
+          ? contactPhone.trim()
+          : registerDraft?.phone || contactPhone.trim(),
       };
     } else if (role === 'teacher') {
       roleInfo = { campusCode: campusCode.trim().toUpperCase() || undefined };
@@ -266,14 +270,16 @@ const RegisterRoleInfo: React.FC = () => {
                 hint="该地址将在活动页面展示给家长，请如实填写"
               />
 
-              <FormInput
-                label="负责人手机号"
-                required
-                placeholder="请输入11位手机号"
-                value={contactPhone}
-                onInput={(e) => setContactPhone(e.detail.value)}
-                maxlength={11}
-              />
+              {authCapabilities.usesMockRegister && (
+                <FormInput
+                  label="负责人手机号"
+                  required
+                  placeholder="请输入11位手机号"
+                  value={contactPhone}
+                  onInput={(e) => setContactPhone(e.detail.value)}
+                  maxlength={11}
+                />
+              )}
             </>
           )}
 

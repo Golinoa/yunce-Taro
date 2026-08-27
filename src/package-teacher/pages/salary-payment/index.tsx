@@ -19,6 +19,7 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import MonthPickerSheet from '@/components/teacher/MonthPickerSheet';
 import SendSalarySheet from '@/components/teacher/SendSalarySheet';
 import { auditLogService } from '@/services/audit-log';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useTeacherStore, calcTotal } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
@@ -288,6 +289,15 @@ const SalaryPaymentPage: React.FC = () => {
         logError('audit salary.confirm', e);
       }
       Taro.showToast({ title: '已核对', icon: 'success' });
+      try {
+        Taro.hideToast();
+        await subscribeMessageService.runRenewFlow('salary_confirm_renew', 'salary_confirm', {
+          role: profile?.currentContext?.role,
+          campusId: profile?.currentContext?.campusId,
+        });
+      } catch (error) {
+        logError('subscribe E11 salary confirm renew', error);
+      }
     } catch {
       Taro.showToast({ title: '核对失败，请重试', icon: 'none' });
     } finally {
@@ -311,10 +321,9 @@ const SalaryPaymentPage: React.FC = () => {
     try {
       const result = await executeSend();
       setSendResult(result);
-      // 审计日志（用户口径 2026-08-22）：发送工资单属关键财务操作
+      const okCount = result?.success?.length ?? 0;
+      const failCount = result?.failed?.length ?? 0;
       try {
-        const okCount = result?.success?.length ?? 0;
-        const failCount = result?.failed?.length ?? 0;
         await auditLogService.record({
           action: 'salary.send_slip',
           operatorId: profile?.id || '',
@@ -326,6 +335,16 @@ const SalaryPaymentPage: React.FC = () => {
         });
       } catch (e) {
         logError('audit salary.send_slip', e);
+      }
+      if (okCount > 0) {
+        try {
+          await subscribeMessageService.runSalarySlipSendPrompt(okCount, {
+            role: profile?.currentContext?.role,
+            campusId: profile?.currentContext?.campusId,
+          });
+        } catch (error) {
+          logError('subscribe E11 salary slip send', error);
+        }
       }
     } catch {
       Taro.showToast({ title: '发送失败，请重试', icon: 'none' });

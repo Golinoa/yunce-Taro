@@ -17,11 +17,11 @@ export const BRAND_NAME_EN = 'SONGGUO';
  */
 export const MEDIA_IMAGE_BASE = '/assets/images';
 
-/** 品牌 Logo 资源路径 */
+/** 机构 Logo 资源路径 */
 export const BRAND_LOGO = `${MEDIA_IMAGE_BASE}/sgpk.png`;
 
-/** 机构封面默认图 */
-export const ORG_COVER_IMAGE = `${MEDIA_IMAGE_BASE}/2.jpg`;
+/** 机构封面默认图（压缩 WebP，控制主包体积 ≤1.5MB） */
+export const ORG_COVER_IMAGE = `${MEDIA_IMAGE_BASE}/cover-home.webp`;
 
 /** 品牌名称本地回退值（orgName 为空时使用） */
 export const BRAND_FALLBACK_ORG_NAME = BRAND_NAME_ZH;

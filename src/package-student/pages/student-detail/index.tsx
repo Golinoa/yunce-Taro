@@ -9,6 +9,10 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import LessonConsumptionList, {
+  buildLessonConsumptionSections,
+  navigateToLessonDetail,
+} from '@/components/lesson/LessonConsumptionList';
 import { studentService, packageService, lessonRecordService, leaveService } from '@/services';
 import { followRecordService } from '@/services/follow-record';
 import { memberCardService } from '@/services/member-card';
@@ -334,6 +338,11 @@ const StudentDetail: React.FC = () => {
       .slice(0, 8);
   }, [records]);
 
+  const recentConsumptionSections = useMemo(
+    () => buildLessonConsumptionSections(recentConsumptions),
+    [recentConsumptions],
+  );
+
   /** 会员卡课时/金额汇总 */
   const memberCardStats = useMemo(() => {
     let totalCount = 0;
@@ -532,9 +541,7 @@ const StudentDetail: React.FC = () => {
 
   // 跳转上课记录详情
   const goToRecordDetail = useCallback((recordId: string) => {
-    Taro.navigateTo({
-      url: `/package-course/pages/lesson-detail/index?id=${encodeURIComponent(recordId)}`,
-    });
+    navigateToLessonDetail(recordId);
   }, []);
 
   // 发会员卡
@@ -1105,29 +1112,12 @@ const StudentDetail: React.FC = () => {
                 {recentConsumptions.length === 0 ? (
                   <Empty icon="mdi-history" description="暂无消课记录" />
                 ) : (
-                  <View className="flex flex-col">
-                    {recentConsumptions.map((record, index) => (
-                      <View
-                        key={record.id}
-                        className={cn(
-                          'flex items-center gap-[16rpx] py-[20rpx]',
-                          index !== recentConsumptions.length - 1 && 'border-b border-border/60',
-                        )}
-                      >
-                        <View className="flex-1 min-w-0">
-                          <Text className="text-[26rpx] font-medium text-foreground block truncate">
-                            {record.course_package?.name || record.class_name || '课程消课'}
-                          </Text>
-                          <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block">
-                            {formatDateCN(record.lesson_date)}
-                          </Text>
-                        </View>
-                        <Text className="text-[28rpx] font-semibold text-primary flex-shrink-0">
-                          -{record.hours_used}课时
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  <LessonConsumptionList
+                    sections={recentConsumptionSections}
+                    embedded
+                    showDateHeaders={false}
+                    onRecordClick={navigateToLessonDetail}
+                  />
                 )}
               </View>
             </View>

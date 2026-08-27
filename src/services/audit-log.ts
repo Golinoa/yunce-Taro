@@ -1,18 +1,22 @@
 /**
  * 操作日志 Service 层（审计日志）
- * - 双分支：USE_MOCK ? mock（本地持久化） : notWired（真实后端接口待联调）
- * - 只提供 record / query，无 update / delete，保证日志不可修改
+ * - 查询走 GET /audit-logs
+ * - 写入仍由前端 mock 层 append（后端暂未提供写入接口）
  */
 import { addAuditLog, queryAuditLogs } from '@/data/audit-log';
 import type { AuditLogEntry, AuditLogPage, AuditLogQuery } from '@/types/audit-log';
-import { notWired } from '@/utils/not-wired';
+import { get } from '@/utils/request';
+import {
+  type PaginatedResponse,
+  formatApiDateTime,
+  unwrapPaginatedList,
+} from '@/utils/pagination';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
     ? process.env.VITE_USE_MOCK !== 'false'
     : true;
 
-/** 记录入参（id/createdAt 由数据层生成） */
 export interface AuditLogInput {
   action: AuditLogEntry['action'];
   operatorId: string;
@@ -24,37 +28,62 @@ export interface AuditLogInput {
   meta?: Record<string, unknown>;
 }
 
-/** 查询者身份（用于可见范围控制，模拟后端数据权限） */
 export interface AuditLogViewer {
   id: string;
-  /** 管理角色（admin/principal）可查看全部；其余只能看自己的 */
   isManager: boolean;
 }
 
-/** 是否管理角色（admin / principal 可看下属全部日志） */
 export function isAuditLogManager(role: string | null | undefined): boolean {
   return role === 'admin' || role === 'principal';
 }
 
+function mapBackendAuditLog(raw: Record<string, unknown>): AuditLogEntry {
+  return {
+    id: String(raw.id ?? ''),
+    action: String(raw.action ?? 'lesson.record') as AuditLogEntry['action'],
+    actionLabel: String(raw.actionLabel ?? raw.action ?? '操作记录'),
+    operatorId: String(raw.userId ?? raw.operatorId ?? ''),
+    operatorName: String(raw.userName ?? raw.operatorName ?? '未知用户'),
+    operatorRole: String(raw.userRole ?? raw.operatorRole ?? ''),
+    targetType: String(raw.module ?? raw.targetType ?? ''),
+    targetId: raw.targetId ? String(raw.targetId) : undefined,
+    detail: String(raw.detail ?? raw.message ?? ''),
+    meta: (raw.meta as Record<string, unknown>) ?? undefined,
+    createdAt: formatApiDateTime(raw.createdAt),
+  };
+}
+
 export const auditLogService = {
-  /** 记录一条操作日志（append-only） */
   record: async (input: AuditLogInput): Promise<AuditLogEntry> => {
-    if (!USE_MOCK) notWired('auditLog.record');
     return addAuditLog(input);
   },
 
-  /**
-   * 查询操作日志（只读、分页）
-   * 可见范围：管理角色可查全部（也可传 operatorId 定向查某员工）；
-   * 非管理角色强制只能查自己的日志（operatorId 被覆盖，防越权）。
-   */
   query: async (viewer: AuditLogViewer, query?: AuditLogQuery): Promise<AuditLogPage> => {
-    if (!USE_MOCK) notWired('auditLog.query');
     const safeQuery: AuditLogQuery = {
       ...query,
-      // 非管理角色：无论传什么，只能看自己的操作日志
       operatorId: viewer.isManager ? query?.operatorId : viewer.id,
     };
-    return queryAuditLogs(safeQuery);
+
+    if (USE_MOCK) {
+      return queryAuditLogs(safeQuery);
+    }
+
+    const data = await get<PaginatedResponse<Record<string, unknown>>>('/audit-logs', {
+      page: safeQuery.page ?? 1,
+      pageSize: safeQuery.pageSize ?? 20,
+      userId: safeQuery.operatorId,
+      action: safeQuery.action,
+      startDate: safeQuery.startDate,
+      endDate: safeQuery.endDate,
+    });
+
+    const list = unwrapPaginatedList(data).map(mapBackendAuditLog);
+    const pagination = Array.isArray(data) ? null : data.pagination;
+    return {
+      list,
+      total: pagination?.total ?? list.length,
+      page: pagination?.page ?? safeQuery.page ?? 1,
+      pageSize: pagination?.pageSize ?? safeQuery.pageSize ?? 20,
+    };
   },
 };

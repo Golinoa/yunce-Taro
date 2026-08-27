@@ -7,13 +7,13 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import { todoService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { memberCardService } from '@/services/member-card';
 import type { MemberCardDetail } from '@/types/member-card';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
-import { clearTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
 
 function formatCurrencyYuan(fen?: number): string {
   if (fen === undefined || fen === null) return '0.00';
@@ -212,7 +212,7 @@ const MemberCardEditPage: React.FC = () => {
         // 预警联动：充值/加课时后剩余回升 → 清除该学员「课时续费提醒」待办已读记录，之后再次下降可重新在首页待办提醒
         if (card.studentId) {
           try {
-            clearTodoRead(rechargeAlertTodoId(card.studentId));
+            todoService.clearStudentRechargeState(card.studentId);
           } catch (e) {
             logError('operation alert clear', e);
           }

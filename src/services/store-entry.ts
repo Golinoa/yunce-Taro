@@ -1,10 +1,9 @@
 /**
  * Service 层 — 门店入驻申请 API
- * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用
  */
 import { mockSubmitStoreEntry } from '@/data/store-entry';
 import type { StoreEntryFormData, StoreEntryResult } from '@/types/store-entry';
-import { notWired } from '@/utils/not-wired';
+import { post } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -12,7 +11,29 @@ const USE_MOCK =
     : true;
 
 export const storeEntryService = {
-  /** 提交门店入驻申请 */
-  submit: (data: StoreEntryFormData): Promise<StoreEntryResult> =>
-    USE_MOCK ? mockSubmitStoreEntry(data) : notWired('storeEntry.submit'),
+  submit: async (data: StoreEntryFormData): Promise<StoreEntryResult> => {
+    if (USE_MOCK) return mockSubmitStoreEntry(data);
+
+    await post('/feedback', {
+      type: 'OTHER',
+      content: [
+        `门店入驻申请：${data.name}`,
+        `类型：${data.type}`,
+        `地区：${data.region.join(' ')}`,
+        data.locationName ? `定位：${data.locationName}` : '',
+        `地址：${data.address}`,
+        `联系人：${data.contactName}`,
+        `电话：${data.contactPhone}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      images: [],
+      contact: data.contactPhone,
+    });
+
+    return {
+      id: `store-entry-${Date.now()}`,
+      status: 'pending',
+    };
+  },
 };

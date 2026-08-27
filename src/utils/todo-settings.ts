@@ -5,19 +5,12 @@
  * 入口：我的 → 系统设置 → 待办提醒
  */
 import Taro from '@tarojs/taro';
+import type { TodoItemCategory } from '@/types/home-todo';
+
+export type { TodoItemCategory };
 
 /** 待办提醒开关项（不含 showTabBadge，其为展示层开关） */
-export type TodoReminderKey =
-  | 'attendanceCheckin'
-  | 'studentRecharge'
-  | 'financePackage'
-  | 'leavePending'
-  | 'leadFollowUp'
-  | 'salaryRemind'
-  | 'meetingRemind';
-
-/** 待办项分类，与开关项一一对应（showTabBadge 仅控制 Tab 角标）；custom 为用户自建待办 */
-export type TodoItemCategory = TodoReminderKey | 'custom';
+export type TodoReminderKey = Exclude<TodoItemCategory, 'custom'>;
 
 export interface TodoSettings {
   /** 昨日/历史未点名补录提醒 */
@@ -28,7 +21,7 @@ export interface TodoSettings {
   financePackage: boolean;
   /** 请假待审批 */
   leavePending: boolean;
-  /** 线索待跟进（预留，Mock 暂未接入） */
+  /** 线索待跟进 */
   leadFollowUp: boolean;
   /** 发薪日 / 工资待确认提醒 */
   salaryRemind: boolean;

@@ -13,10 +13,10 @@
  *   路径可加载性，不可用时先经离屏 canvas 转存（保住裁剪效果），仍不行则回退原图，
  *   保证预览永远不为空白（详见 chooseImageTemp 内注释）。
  * - 保存时由业务层（course-form / teacher / campus 等）调用 uploadImage，
- *   内部委托 uploadService.upload 上传到七牛（后端代理）并返回可访问 URL。
+ *   内部委托 uploadService：mock 返回本地路径，真实模式 token 直传七牛。
  */
 import Taro from '@tarojs/taro';
-import { uploadService } from '@/services/upload';
+import { uploadService, type UploadType } from '@/services/upload';
 
 export interface ChooseImageOptions {
   /** 最大文件大小（MB），默认 5 */
@@ -415,11 +415,11 @@ export function deleteTempImage(path?: string): void {
  * 上传本地图片文件，返回可访问 URL。
  *
  * - 传入远程 URL（http/https）或 base64（data:）时直接原样返回（已是线上地址，无需上传）。
- * - 传入本地文件路径（wxfile:// / http://tmp/）时委托 uploadService.upload 上传七牛，返回 URL。
+ * - 传入本地文件路径（wxfile:// / http://tmp/）时委托 uploadService 直传七牛，返回 URL。
  *
  * 保存图片的业务层（course-form / teacher / campus 等）统一在此处完成“本地路径 → 线上 URL”的转换。
  */
-export async function uploadImage(filePath: string): Promise<string> {
+export async function uploadImage(filePath: string, type: UploadType = 'common'): Promise<string> {
   if (!filePath) return filePath;
   if (
     filePath.startsWith('http://') ||
@@ -428,6 +428,6 @@ export async function uploadImage(filePath: string): Promise<string> {
   ) {
     return filePath;
   }
-  const res = await uploadService.upload(filePath);
+  const res = await uploadService.upload(filePath, { type });
   return res.url;
 }

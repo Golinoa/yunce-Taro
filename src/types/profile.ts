@@ -93,9 +93,10 @@ export interface AuthSession {
 export interface RegisterDraft {
   /** 后端临时注册令牌 */
   tempToken: string;
-  /** Step1: 用户名 */
+  phone?: string;
+  /** Step1: 用户名（Mock） */
   username: string;
-  /** Step1: 密码 */
+  /** Step1: 密码（Mock） */
   password: string;
   /** Step1: 拉新邀请码 */
   inviteCode?: string;

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { type ScheduleItem } from '@/components/InstallmentPanel';
-import { studentService, packageService, subjectService } from '@/services';
+import { studentService, packageService, subjectService, subscribeMessageService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { Subject } from '@/types/campus';
 import type { CoursePackageTemplate, FeeMethod, PackageType } from '@/types/course-package';
@@ -480,8 +480,18 @@ export function usePackageForm() {
             : null;
         const expiryTip = expiryDate ? `，到期日 ${expiryDate}` : '';
         Taro.showToast({ title: `充值成功${expiryTip}`, icon: 'success', duration: 2000 });
+        try {
+          Taro.hideToast();
+          await subscribeMessageService.runFlow('E08', {
+            studentId: selectedStudent.id,
+            studentName: selectedStudent.name,
+            role: profile?.currentContext?.role,
+          });
+        } catch (error) {
+          logError('subscribe E08 after recharge', error);
+        }
       }
-      setTimeout(() => Taro.navigateBack(), 1200);
+      setTimeout(() => Taro.navigateBack(), isEdit ? 1200 : 300);
     } catch (err) {
       logError('save package', err);
       Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
@@ -512,6 +522,7 @@ export function usePackageForm() {
     installmentSchedule,
     currentUserId,
     invalidateStudents,
+    profile?.currentContext?.role,
   ]);
 
   return {

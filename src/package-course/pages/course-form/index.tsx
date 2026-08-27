@@ -5,7 +5,7 @@
  * 所有字段采用左标签右输入/值的行内布局。
  */
 import { ScrollView, View, Text } from '@tarojs/components';
-import Taro, { useUnload } from '@tarojs/taro';
+import Taro, { useUnload, useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
@@ -26,7 +26,7 @@ import {
   STUDENT_SELF_CHECKIN_OPTIONS,
 } from '@/data/course-template';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import { classService } from '@/services';
+import { classService, subscribeMessageService } from '@/services';
 import { subjectService } from '@/services/campus';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';
@@ -46,6 +46,7 @@ import type {
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { uploadImage } from '@/utils/image-upload';
+import { logError } from '@/utils/logger';
 
 /** 班级色 key → 课程模板色值（统一色板 classColorHex，班级模式回填用） */
 const CLASS_COLOR_TO_FORM_HEX: Record<string, string> = {
@@ -221,6 +222,10 @@ const CourseFormPage: React.FC = () => {
   const [teacherId, setTeacherId] = useState('');
   const [assistantId, setAssistantId] = useState('');
   const [studentIds, setStudentIds] = useState<string[]>([]);
+  /** 班课：单次默认消耗课时 */
+  const [hoursPerLesson, setHoursPerLesson] = useState('1');
+  /** 班课：单次授课扣费（元） */
+  const [feePerLesson, setFeePerLesson] = useState('');
   // 班课学员列表
   const [studentList, setStudentList] = useState<Student[]>([]);
 
@@ -252,6 +257,15 @@ const CourseFormPage: React.FC = () => {
 
   /** 班课模式：隐藏开课与价格/预约规则/签到规则，改为班课信息区块 */
   const isClassMode = category === 'class';
+
+  // E02-D：入班后 5 分钟内进入班级页，补充上课提醒次数
+  useDidShow(() => {
+    if (!isClassEdit || !courseId) return;
+    void subscribeMessageService.maybeRunClassViewRenew(courseId, {
+      role: profile?.currentContext?.role,
+      campusId: profile?.currentContext?.campusId,
+    });
+  });
 
   // 加载状态：使用延迟显示 Hook，仅当请求超过阈值未完成时才显示骨架屏，
   // 避免每次进页面都闪一下加载占位（mock/缓存数据通常很快返回）。
@@ -289,6 +303,12 @@ const CourseFormPage: React.FC = () => {
     setTeacherId(cls.teachers?.[0] || cls.teacher_id || '');
     setAssistantId(cls.teachers?.[1] || '');
     setStudentIds(students.map((s) => s.id));
+    setHoursPerLesson(String(cls.hours_per_lesson ?? 1));
+    setFeePerLesson(
+      cls.pricePerLesson !== undefined && cls.pricePerLesson !== null
+        ? String(cls.pricePerLesson)
+        : '',
+    );
     setDuration(parseDurationMinutes(cls.start_time, cls.end_time));
     setCapacity('');
     setAgeGroup('mix');
@@ -485,6 +505,8 @@ const CourseFormPage: React.FC = () => {
       teacherId,
       assistantId,
       studentIds,
+      hoursPerLesson,
+      feePerLesson,
     });
     if (captureBaselineRef.current) {
       // fillForm 刚把回填值刷入 state，用当前值重抓基线，避免把「回填」误判为改动
@@ -525,6 +547,8 @@ const CourseFormPage: React.FC = () => {
     teacherId,
     assistantId,
     studentIds,
+    hoursPerLesson,
+    feePerLesson,
     applyLeaveGuard,
   ]);
 
@@ -852,8 +876,8 @@ const CourseFormPage: React.FC = () => {
     let homeImageUrl: string | undefined;
     try {
       [backgroundImageUrl, homeImageUrl] = await Promise.all([
-        backgroundImage ? uploadImage(backgroundImage) : Promise.resolve(undefined),
-        homeImage ? uploadImage(homeImage) : Promise.resolve(undefined),
+        backgroundImage ? uploadImage(backgroundImage, 'course') : Promise.resolve(undefined),
+        homeImage ? uploadImage(homeImage, 'course') : Promise.resolve(undefined),
       ]);
     } catch {
       Taro.showToast({ title: '图片上传失败，请重试', icon: 'none' });
@@ -922,16 +946,44 @@ const CourseFormPage: React.FC = () => {
           level: level.startsWith('custom:') ? 'all' : (level as ClassLevel),
           note: description.trim() || undefined,
           min_open_count: minOpenCount ? Number(minOpenCount) : undefined,
+          hours_per_lesson: hoursPerLesson ? Number(hoursPerLesson) : 1,
+          pricePerLesson: feePerLesson ? Number(feePerLesson) : 0,
         });
         for (const sid of toAdd) await classService.addStudents(courseId, [sid]);
         for (const sid of toRemove) await classService.removeStudent(courseId, sid);
         Taro.showToast({ title: '保存成功', icon: 'success' });
+        // E02A：操作人入班成功后弹框订阅班级变动
+        if (toAdd.length > 0) {
+          try {
+            Taro.hideToast();
+            await subscribeMessageService.runFlow('E02A', {
+              classId: courseId,
+              className: name.trim(),
+              role: profile?.currentContext?.role,
+              navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&type=class`,
+            });
+          } catch (error) {
+            logError('subscribe E02A after class assign', error);
+          }
+        }
       } else if (isEdit) {
         await update(courseId, formData);
         Taro.showToast({ title: '保存成功', icon: 'success' });
       } else {
         await create(formData);
         Taro.showToast({ title: '新增成功', icon: 'success' });
+        // E06：新建班级成功后弹框
+        if (isClassMode) {
+          try {
+            Taro.hideToast();
+            await subscribeMessageService.runFlow('E06', {
+              className: name.trim(),
+              role: profile?.currentContext?.role,
+            });
+          } catch (error) {
+            logError('subscribe E06 after class create', error);
+          }
+        }
       }
       // 保存成功后关闭离开确认，避免返回时再弹「未保存」误扰
       setLeaveGuard(false);
@@ -986,9 +1038,12 @@ const CourseFormPage: React.FC = () => {
     teacherId,
     assistantId,
     studentIds,
+    hoursPerLesson,
+    feePerLesson,
     isClassMode,
     isClassEdit,
     formStorageScope,
+    profile?.currentContext?.role,
   ]);
 
   const handleDelete = useCallback(async () => {
@@ -1183,7 +1238,7 @@ const CourseFormPage: React.FC = () => {
                       </Text>
                     </FormRow>
                     {/* 助教 */}
-                    <FormRow label="助教" onClick={() => openPicker('assistant')} border={false}>
+                    <FormRow label="助教" onClick={() => openPicker('assistant')} border>
                       <Text
                         className={cn(
                           'text-[30rpx]',
@@ -1193,6 +1248,26 @@ const CourseFormPage: React.FC = () => {
                         {assistantId ? teachers.find((t) => t.id === assistantId)?.name : '请选择'}
                       </Text>
                     </FormRow>
+                    <FormRow
+                      label="消耗课时"
+                      editable
+                      placeholder="请输入"
+                      value={hoursPerLesson}
+                      onInput={(e) => setHoursPerLesson(e.detail.value)}
+                      inputType="digit"
+                      suffix="课时"
+                      border
+                    />
+                    <FormRow
+                      label="授课扣费"
+                      editable
+                      placeholder="请输入"
+                      value={feePerLesson}
+                      onInput={(e) => setFeePerLesson(e.detail.value)}
+                      inputType="digit"
+                      suffix="元"
+                      border={false}
+                    />
                   </View>
                 </Card>
               )}

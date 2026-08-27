@@ -1,8 +1,21 @@
 /**
  * Service 层 — 文件上传 API
- * 定义接口契约，当前由 mock 实现，联调时替换为 Taro.uploadFile 调用
+ *
+ * Mock：返回本地路径，不走七牛。
+ * 真实：POST /upload/token 拿凭证 → 直传七牛 → 返回 CDN url。
  */
 import Taro from '@tarojs/taro';
+import { post } from '@/utils/request';
+
+/** 与后端 upload-token 一致的类型 */
+export type UploadType = 'avatar' | 'venue' | 'course' | 'courseware' | 'common';
+
+export interface UploadOptions {
+  /** 上传类型，决定七牛 key 前缀与大小限制 */
+  type?: UploadType;
+  /** 原始文件名，用于生成可读 key */
+  filename?: string;
+}
 
 /** 上传结果 */
 export interface UploadResult {
@@ -12,103 +25,107 @@ export interface UploadResult {
   filename: string;
 }
 
-// 与 src/utils/request.ts 保持一致的 mock 开关口径
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
+interface UploadTokenPayload {
+  token: string;
+  uploadUrl: string;
+  domain: string;
+  bucket: string;
+  prefix: string;
+  key: string;
+  url: string;
+}
+
+function isMockMode(): boolean {
+  return typeof process !== 'undefined' && typeof process.env !== 'undefined'
     ? process.env.VITE_USE_MOCK !== 'false'
     : true;
+}
 
-const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
-const RAW_BASE_URL =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.TARO_API_BASE_URL || '/api/app/v1'
-    : '/api/app/v1';
-const BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
-
-/** 获取存储的 token（与 request.ts 保持一致） */
-function getToken(): string | null {
-  try {
-    const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    const expiresAt = Number(session.expires_at ?? 0);
-    if (!Number.isFinite(expiresAt) || expiresAt * 1000 < Date.now()) {
-      return null;
-    }
-    return session.access_token || null;
-  } catch {
-    return null;
-  }
+function resolveFilename(filePath: string, filename?: string): string {
+  return filename || filePath.split('/').pop() || 'unknown.jpg';
 }
 
 /**
  * mock 上传：直接把本地文件路径作为占位 URL 返回
- * 开发模式下不真正上传，但本地稳定路径（wxfile://usr/uploads/...）可被 <Image> 正常渲染，
- * 保证「选图预览」与「再次进入回填显示」在开发者工具 / 真机 mock 下都能看到图片。
- * 联调 / 生产环境走下方真实 Taro.uploadFile，返回七牛可访问 URL；
- * 此时需在小程序后台将 CDN 域名加入「downloadFile 合法域名」白名单，否则真机加载不出。
+ * 保证「选图预览」与「再次进入回填显示」在 mock 下都能看到图片。
  */
 async function mockUploadFile(filePath: string, filename: string): Promise<UploadResult> {
-  // 模拟网络延迟
   await new Promise((r) => setTimeout(r, 500));
-  return {
-    url: filePath,
-    filename,
-  };
+  return { url: filePath, filename };
+}
+
+async function fetchUploadToken(type: UploadType, filename: string): Promise<UploadTokenPayload> {
+  return post<UploadTokenPayload>('/upload/token', { type, filename });
+}
+
+/** 直传七牛；成功后的访问地址以 token 响应中的 url 为准 */
+function uploadToQiniu(
+  filePath: string,
+  payload: UploadTokenPayload,
+  filename: string,
+): Promise<UploadResult> {
+  return new Promise((resolve, reject) => {
+    Taro.uploadFile({
+      url: payload.uploadUrl,
+      filePath,
+      name: 'file',
+      formData: {
+        token: payload.token,
+        key: payload.key,
+      },
+      success: (res) => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          let message = `七牛上传失败（${res.statusCode}）`;
+          try {
+            const body = JSON.parse(res.data) as { error?: string };
+            if (body.error) {
+              message = body.error;
+            }
+          } catch {
+            /* 忽略解析失败 */
+          }
+          reject(new Error(message));
+          return;
+        }
+        resolve({ url: payload.url, filename });
+      },
+      fail: (err) => {
+        reject(new Error(err.errMsg || '七牛上传请求失败'));
+      },
+    });
+  });
+}
+
+async function realUploadFile(
+  filePath: string,
+  type: UploadType,
+  filename: string,
+): Promise<UploadResult> {
+  const tokenPayload = await fetchUploadToken(type, filename);
+  return uploadToQiniu(filePath, tokenPayload, filename);
 }
 
 export const uploadService = {
   /**
    * 上传单个文件
-   * mock 模式返回占位 URL；真实模式调用 /upload 接口
-   * 失败时抛出错误，由调用方处理提示
+   * mock 模式返回本地路径；真实模式走 token + 七牛直传
    */
-  upload: (filePath: string, filename?: string): Promise<UploadResult> => {
-    const name = filename || filePath.split('/').pop() || 'unknown.jpg';
+  upload: (filePath: string, options: UploadOptions = {}): Promise<UploadResult> => {
+    const type = options.type ?? 'common';
+    const filename = resolveFilename(filePath, options.filename);
 
-    if (USE_MOCK) {
-      return mockUploadFile(filePath, name);
+    if (isMockMode()) {
+      return mockUploadFile(filePath, filename);
     }
 
-    // 真实接口：联调时启用
-    return new Promise<UploadResult>((resolve, reject) => {
-      const token = getToken();
-      Taro.uploadFile({
-        url: `${BASE_URL}/upload`,
-        filePath,
-        name: 'file',
-        header: token ? { Authorization: `Bearer ${token}` } : {},
-        success: (res) => {
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(new Error(`上传失败（${res.statusCode}）`));
-            return;
-          }
-          try {
-            const data = JSON.parse(res.data) as { url?: string; data?: { url?: string } };
-            // 兼容两种返回结构：直接返回 { url } 或 { data: { url } }
-            const url = data.url || data.data?.url;
-            if (!url) {
-              reject(new Error('上传响应缺少 url 字段'));
-              return;
-            }
-            resolve({ url, filename: name });
-          } catch {
-            reject(new Error('上传响应解析失败'));
-          }
-        },
-        fail: (err) => {
-          reject(new Error(err.errMsg || '上传请求失败'));
-        },
-      });
-    });
+    return realUploadFile(filePath, type, filename);
   },
 
   /**
    * 批量上传多个文件
    * 任一文件失败则整体抛错，由调用方决定是否部分保留
    */
-  uploadBatch: async (filePaths: string[]): Promise<UploadResult[]> => {
-    const results = await Promise.all(filePaths.map((fp) => uploadService.upload(fp)));
-    return results;
+  uploadBatch: (filePaths: string[], options: UploadOptions = {}): Promise<UploadResult[]> => {
+    return Promise.all(filePaths.map((fp) => uploadService.upload(fp, options)));
   },
 };

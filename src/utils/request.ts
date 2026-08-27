@@ -42,15 +42,15 @@ export interface ApiResponse<T = unknown> {
 }
 
 /** 获取存储的 token */
-function getToken(): string | null {
+function readAccessToken(): string | null {
   try {
     const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw);
     const expiresAt = Number(session.expires_at ?? 0);
-    // 检查过期
-    if (!Number.isFinite(expiresAt) || expiresAt * 1000 < Date.now()) {
-      clearAuthSession();
+    if (!session.access_token) return null;
+    // 提前 60 秒视为过期，便于静默刷新
+    if (!Number.isFinite(expiresAt) || expiresAt * 1000 < Date.now() + 60_000) {
       return null;
     }
     return session.access_token || null;
@@ -59,10 +59,96 @@ function getToken(): string | null {
   }
 }
 
+function readRefreshToken(): string | null {
+  try {
+    const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    return session.refresh_token || null;
+  } catch {
+    return null;
+  }
+}
+
+function persistRefreshedSession(token: string, refreshToken: string, expiresIn: number): void {
+  try {
+    const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
+    const session = raw ? JSON.parse(raw) : {};
+    const next = {
+      ...session,
+      access_token: token,
+      refresh_token: refreshToken,
+      expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+    };
+    Taro.setStorageSync(AUTH_TOKEN_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    const refreshToken = readRefreshToken();
+    if (!refreshToken) {
+      clearAuthSession();
+      return null;
+    }
+
+    try {
+      const res = await Taro.request({
+        url: buildRequestUrl('/auth/refresh'),
+        method: 'POST',
+        data: { refreshToken },
+        header: { 'Content-Type': 'application/json' },
+        timeout: TIMEOUT,
+      });
+
+      if (res.statusCode >= 200 && res.statusCode < 300 && res.data && typeof res.data === 'object') {
+        const body = res.data as ApiResponse<{
+          token: string;
+          refreshToken: string;
+          expiresIn: number;
+        }>;
+        if (body.code === 0 || body.code === 200) {
+          persistRefreshedSession(body.data.token, body.data.refreshToken, body.data.expiresIn);
+          return body.data.token;
+        }
+      }
+
+      clearAuthSession();
+      return null;
+    } catch {
+      clearAuthSession();
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+async function resolveAccessToken(skipAuth: boolean): Promise<string | null> {
+  if (skipAuth) {
+    return null;
+  }
+  const current = readAccessToken();
+  if (current) {
+    return current;
+  }
+  return refreshAccessToken();
+}
+
 /** 请求配置 */
 interface RequestOptions {
   url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   data?: Record<string, unknown>;
   header?: Record<string, string>;
   /** 是否跳过自动 token 注入 */
@@ -74,9 +160,9 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
   const { url, method = 'GET', data, header = {}, skipAuth = false } = options;
   const startAt = Date.now();
 
-  // 注入 token
+  // 注入 token（过期时尝试 refresh）
   if (!skipAuth) {
-    const token = getToken();
+    const token = await resolveAccessToken(skipAuth);
     if (token) {
       header['Authorization'] = `Bearer ${token}`;
     }
@@ -164,19 +250,32 @@ export class ApiError extends Error {
   }
 }
 
-/** GET 请求 */
-export function get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> {
-  return request<T>({ url, method: 'GET', data: params });
+/** POST 请求 */
+export function post<T = unknown>(
+  url: string,
+  data?: Record<string, unknown>,
+  options?: { skipAuth?: boolean },
+): Promise<T> {
+  return request<T>({ url, method: 'POST', data, skipAuth: options?.skipAuth });
 }
 
-/** POST 请求 */
-export function post<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
-  return request<T>({ url, method: 'POST', data });
+/** GET 请求 */
+export function get<T = unknown>(
+  url: string,
+  params?: Record<string, unknown>,
+  options?: { skipAuth?: boolean },
+): Promise<T> {
+  return request<T>({ url, method: 'GET', data: params, skipAuth: options?.skipAuth });
 }
 
 /** PUT 请求 */
 export function put<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
   return request<T>({ url, method: 'PUT', data });
+}
+
+/** PATCH 请求 */
+export function patch<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
+  return request<T>({ url, method: 'PATCH', data });
 }
 
 /** DELETE 请求 */

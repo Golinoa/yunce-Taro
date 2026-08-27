@@ -1,9 +1,25 @@
-import type { TodoLevel } from '@/components/AccentBarCard';
+/**
+ * 待办领域类型（前后端契约对齐，见 docs/todo/08-todo-module-api-contract.md）
+ *
+ * 类型层不依赖 components / utils。
+ */
 import type { TodoQuadrant } from '@/types/todo-quadrant';
-import type { TodoItemCategory } from '@/utils/todo-settings';
 
-export type { TodoLevel };
 export type { TodoQuadrant };
+
+/** 待办事态等级（左侧色条） */
+export type TodoLevel = 'urgent' | 'high' | 'normal' | 'low';
+
+/** 待办提醒分类（对应设置页开关；custom = 用户自建） */
+export type TodoItemCategory =
+  | 'attendanceCheckin'
+  | 'studentRecharge'
+  | 'financePackage'
+  | 'leavePending'
+  | 'leadFollowUp'
+  | 'salaryRemind'
+  | 'meetingRemind'
+  | 'custom';
 
 /** 待办来源 */
 export type TodoSourceType = 'system' | 'custom';
@@ -28,51 +44,39 @@ export interface TodoCompletion {
   note?: string;
 }
 
-/** 待办卡片角标色 */
+/** @deprecated 使用 quadrant */
 export type TodoTagColor = 'default' | 'primary' | 'accent' | 'warning' | 'success';
 
-/** 首页待办事项数据 */
+/**
+ * 待办卡片 / API TodoDto（首页与「我的待办」统一）
+ */
 export interface TodoItem {
   id: string;
   title: string;
   desc: string;
   url?: string;
-  /** 事态等级（兼容旧逻辑） */
   level?: TodoLevel;
-  /** 对应待办提醒设置开关，用于过滤展示 */
   category?: TodoItemCategory;
-  /** 右侧操作文案，默认「已读」 */
   actionLabel?: string;
-  /** 提醒时间 ISO，用于时间轴排序与展示 */
   remindAt?: string;
-  /** 备注/描述 */
   note?: string;
-  /** 四象限分类 */
   quadrant?: TodoQuadrant;
   /** @deprecated 使用 quadrant */
   tagColor?: TodoTagColor;
-  /** 是否开启提醒 */
   remindEnabled?: boolean;
-  /** 我的待办分类 id（默认收件箱 inbox） */
   todoCategoryId?: string;
-  /** 是否已完成（展示态） */
   completed?: boolean;
-  /** 来源类型 */
   sourceType?: TodoSourceType;
-  /** 系统推送时间 ISO */
   pushedAt?: string;
-  /** 展示/历史锚定日 YYYY-MM-DD */
   displayDay?: string;
-  /** 共享范围 */
   sharedScope?: TodoSharedScope;
-  /** 协同待办：关联教师 id（续费提醒任课老师） */
   assigneeTeacherIds?: string[];
-  /** 协作完成模式（有参与人时生效） */
   collaborationMode?: TodoCollaborationMode;
-  /** 各自完成：成员完成记录，key 为创建者 userId 或协作 teacherId */
   memberCompletions?: Record<string, TodoMemberCompletion>;
-  /** 完成记录（共享待办全员同步） */
   completion?: TodoCompletion;
-  /** 创建时间 ISO（无提醒随手记时间轴兜底） */
   createdAt?: string;
+  /** 关联实体类型（续费 student / 未点名 schedule / 预警 alert） */
+  refType?: string;
+  /** 关联实体 id */
+  refId?: string;
 }

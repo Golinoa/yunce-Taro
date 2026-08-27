@@ -45,11 +45,11 @@ export type {
   OperationActivityItem,
   OperationBannerItem,
 } from './home';
-export { todoService } from './todo';
+export { todoService, clearStudentRechargeTodoState } from './todo';
 export type { TodoListParams, TodoListView, TodoListItem } from './todo';
 export { feedbackService } from './feedback';
 export { uploadService } from './upload';
-export type { UploadResult } from './upload';
+export type { UploadResult, UploadType, UploadOptions } from './upload';
 export {
   teacherService,
   salaryModelService,
@@ -79,3 +79,5 @@ export { myCourseService } from './my-course';
 export type { MyCourseItem, MyCourseStatus } from './my-course';
 export { onboardingService } from './onboarding';
 export type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
+export { subscribeMessageService } from './subscribe-message';
+export { calendarSyncService } from './calendar-sync';

@@ -3,6 +3,8 @@
  */
 import dayjs from 'dayjs';
 import type { BookableVenue, VenueBookingRecord, VenueBookingSlot } from '@/types/venue-booking';
+import { DEFAULT_VENUE_MANAGER_USER_ID, ROOMS, VENUES } from '@/data/mock-database';
+import { resolveMyTeachingActorIds, getActorScope } from '@/data/students';
 import { mockGetRoomById, mockGetRooms, mockGetVenueById } from './campus';
 
 function delay(ms = 80): Promise<void> {
@@ -15,39 +17,46 @@ let mockBookingRecords: VenueBookingRecord[] = [];
 /** 单个时段时长（分钟） */
 const SLOT_DURATION = 30;
 
-/** 初始化一些 mock 预约记录，让部分时段显示已满/已约 */
+function resolveRoomManagerUserId(roomId: string): string {
+  const room = ROOMS.find((item) => item.id === roomId);
+  if (room?.managerUserId) return room.managerUserId;
+  const venue = VENUES.find((item) => item.id === room?.venueId);
+  return venue?.managerUserId || DEFAULT_VENUE_MANAGER_USER_ID;
+}
+
+/**
+ * 初始化 mock 预约：
+ * - 今日仅 1 条（首页今日课表「场地」形态各 1 张）
+ * - 明日保留少量，供场地预约页展示已约态
+ */
 function seedMockBookings(): void {
   if (mockBookingRecords.length > 0) return;
 
   const today = dayjs().format('YYYY-MM-DD');
   const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
-  const rooms = ['room-east-001', 'room-east-002', 'room-center-001'];
-  const seedUsers = ['user-parent-001', 'user-parent-002', 'user-parent-003'];
+  const homeRoomId = 'room-center-101';
 
-  const records: VenueBookingRecord[] = [];
-  rooms.forEach((roomId, roomIndex) => {
-    const baseHour = 9 + roomIndex;
-    seedUsers.forEach((userId, userIndex) => {
-      records.push({
-        id: `vb-seed-${roomId}-${today}-${userIndex}`,
-        userId,
-        userName: `会员${userIndex + 1}`,
-        roomId,
-        date: today,
-        startTime: `${baseHour.toString().padStart(2, '0')}:00`,
-        endTime: `${(baseHour + 1).toString().padStart(2, '0')}:00`,
-        peopleCount: 1,
-        unitPrice: 50,
-        totalPrice: 50,
-        status: 'confirmed',
-        createdAt: dayjs().subtract(1, 'day').toISOString(),
-      });
-    });
-    records.push({
-      id: `vb-seed-${roomId}-${tomorrow}-multi`,
-      userId: seedUsers[0],
+  mockBookingRecords = [
+    {
+      id: `vb-seed-${homeRoomId}-${today}-home`,
+      userId: 'user-parent-001',
       userName: '会员1',
-      roomId,
+      roomId: homeRoomId,
+      date: today,
+      startTime: '15:00',
+      endTime: '16:00',
+      peopleCount: 1,
+      unitPrice: 50,
+      totalPrice: 50,
+      status: 'confirmed',
+      managerUserId: resolveRoomManagerUserId(homeRoomId),
+      createdAt: dayjs().subtract(1, 'day').toISOString(),
+    },
+    {
+      id: `vb-seed-${homeRoomId}-${tomorrow}-sample`,
+      userId: 'user-parent-001',
+      userName: '会员1',
+      roomId: homeRoomId,
       date: tomorrow,
       startTime: '14:00',
       endTime: '14:30',
@@ -55,11 +64,10 @@ function seedMockBookings(): void {
       unitPrice: 50,
       totalPrice: 100,
       status: 'confirmed',
+      managerUserId: resolveRoomManagerUserId(homeRoomId),
       createdAt: dayjs().subtract(1, 'day').toISOString(),
-    });
-  });
-
-  mockBookingRecords = records;
+    },
+  ];
 }
 
 seedMockBookings();
@@ -195,9 +203,12 @@ export async function mockCreateVenueBooking(
   const created: VenueBookingRecord = {
     ...record,
     id: `vb-${Date.now()}`,
+    managerUserId: resolveRoomManagerUserId(record.roomId),
     createdAt: new Date().toISOString(),
   };
   mockBookingRecords = [...mockBookingRecords, created];
+  const room = await mockGetRoomById(record.roomId);
+  notifyVenueBookingStakeholders(created, room?.name || '场地');
   return created;
 }
 
@@ -209,6 +220,56 @@ export async function mockCancelVenueBooking(bookingId: string): Promise<VenueBo
     throw new Error('预约记录不存在');
   }
   const updated: VenueBookingRecord = { ...record, status: 'cancelled' };
+  mockBookingRecords = mockBookingRecords.map((item) => (item.id === bookingId ? updated : item));
+  return updated;
+}
+
+/** 新建预约时通知场地负责人与机构管理员（站内；联调后走订阅消息） */
+function notifyVenueBookingStakeholders(record: VenueBookingRecord, roomName: string): void {
+  const managerUserId = record.managerUserId || resolveRoomManagerUserId(record.roomId);
+  const adminUserId = DEFAULT_VENUE_MANAGER_USER_ID;
+  void managerUserId;
+  void adminUserId;
+  void roomName;
+  // Mock：联调阶段由后端 notification + subscribe-message 推送给 managerUserId 与 admin 角色
+}
+
+/** 获取当天本人负责场馆下的场地预约（负责人或管理员可见） */
+export function filterMyTodayVenueBookings(
+  actorOrUserId: string,
+  campusId?: string,
+): VenueBookingRecord[] {
+  const actorIds = new Set(resolveMyTeachingActorIds(actorOrUserId));
+  const scope = getActorScope(actorOrUserId);
+  const isAdmin = scope.role === 'admin' || scope.role === 'principal';
+  const today = dayjs().format('YYYY-MM-DD');
+
+  const managedRoomIds = new Set<string>();
+  ROOMS.forEach((room) => {
+    const managerId = room.managerUserId || resolveRoomManagerUserId(room.id);
+    if (isAdmin || actorIds.has(managerId)) {
+      if (!campusId || room.campusId === campusId) {
+        managedRoomIds.add(room.id);
+      }
+    }
+  });
+
+  return mockBookingRecords.filter((record) => {
+    if (record.date !== today) return false;
+    if (record.status === 'cancelled') return false;
+    if (!managedRoomIds.has(record.roomId)) return false;
+    return true;
+  });
+}
+
+/** 场地预约签到（负责人确认到场） */
+export async function mockCheckInVenueBooking(
+  bookingId: string,
+): Promise<VenueBookingRecord | null> {
+  await delay();
+  const record = mockBookingRecords.find((item) => item.id === bookingId);
+  if (!record || record.status === 'cancelled') return null;
+  const updated: VenueBookingRecord = { ...record, status: 'checked_in' };
   mockBookingRecords = mockBookingRecords.map((item) => (item.id === bookingId ? updated : item));
   return updated;
 }

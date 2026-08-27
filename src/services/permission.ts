@@ -14,12 +14,6 @@ import {
   type PermissionConfig,
   type RoleGrant,
 } from '@/types/permission';
-import { notWired } from '@/utils/not-wired';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 /** 默认配置：系统角色按 ROLE_PERMISSION_MAP 默认值，无自定义角色 */
 function createDefaultConfig(): PermissionConfig {
@@ -37,7 +31,6 @@ function createDefaultConfig(): PermissionConfig {
 
 /** 读取权限配置（同步，供路由守卫/数据层直接消费） */
 export function getPermissionConfig(): PermissionConfig {
-  if (!USE_MOCK) notWired('permission.getConfig');
   try {
     const raw = Taro.getStorageSync(PERMISSION_CONFIG_KEY);
     if (raw && typeof raw === 'object') {
@@ -51,7 +44,6 @@ export function getPermissionConfig(): PermissionConfig {
 
 /** 保存权限配置 */
 export function savePermissionConfig(config: PermissionConfig): void {
-  if (!USE_MOCK) notWired('permission.saveConfig');
   Taro.setStorageSync(PERMISSION_CONFIG_KEY, {
     ...config,
     version: (config.version || 1) + 1,

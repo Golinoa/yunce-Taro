@@ -6,7 +6,7 @@ import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import PackageSelectSheet from '@/components/proxy-booking/PackageSelectSheet';
 import type { PackageOption } from '@/components/proxy-booking/PackageSelectSheet';
-import { homeService, leadService, teacherService } from '@/services';
+import { homeService, leadService, subscribeMessageService, teacherService } from '@/services';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 
@@ -315,6 +315,11 @@ const AddProxyBookingPage: React.FC = () => {
         note,
       });
       Taro.showToast({ title: '代约成功', icon: 'success' });
+      const flowId = params.mode === 'group' ? 'E21' : 'E22';
+      void subscribeMessageService.runFlow(flowId, {
+        bookingLabel: `${params.mode === 'group' ? '团课' : '私教'}·${teacher?.name ?? ''}`,
+        campusId,
+      });
       setTimeout(() => Taro.navigateBack(), 800);
     } catch {
       Taro.showToast({ title: '代约失败，请重试', icon: 'none' });

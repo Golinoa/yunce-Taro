@@ -4,6 +4,7 @@
  */
 import {
   mockCancelVenueBooking,
+  mockCheckInVenueBooking,
   mockCreateVenueBooking,
   mockGetBookableVenueById,
   mockGetBookableVenues,
@@ -71,6 +72,14 @@ export const venueBookingService = {
       );
     }
     return mockGetMyVenueBookings(userId);
+  },
+
+  /** 场地预约确认到场（负责人操作） */
+  checkInBooking: async (bookingId: string): Promise<VenueBookingRecord | null> => {
+    if (!USE_MOCK) {
+      return put<VenueBookingRecord>(`/venue-booking/bookings/${bookingId}/check-in`);
+    }
+    return mockCheckInVenueBooking(bookingId);
   },
 
   /** 删除场地预约记录 */

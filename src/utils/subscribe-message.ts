@@ -1,3 +1,5 @@
+import Taro from '@tarojs/taro';
+
 /**
  * 未点名提醒订阅消息（用户口径 2026-08-23）
  *
@@ -10,7 +12,7 @@
  * - mock 阶段：前端模拟推送（本地记录已推送，避免重复），不真实发送；
  *   联调时由后端消费推送任务（每日 20:00 定时任务扫未点名课程 → send）。
  */
-import Taro from '@tarojs/taro';
+import type { SubscribeAuthStatus, SubscribeTemplateGroup } from '@/types/subscribe-message';
 
 /** 未点名提醒订阅模板 ID（小程序后台「订阅消息」申请后替换） */
 export const UNATTENDED_REMIND_TEMPLATE_ID = '';
@@ -81,5 +83,76 @@ export async function pushUnattendedReminder(
     return true;
   } catch {
     return false;
+  }
+}
+
+export interface SubscribeAuthRequestItem {
+  tmplId: string;
+  group: SubscribeTemplateGroup;
+  status: SubscribeAuthStatus;
+}
+
+export function createClientRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export interface SubscribeAuthEntry {
+  group: SubscribeTemplateGroup;
+  tmplId: string;
+}
+
+/** 调起微信订阅面板并解析各模板授权结果 */
+export async function requestSubscribeMessageAuth(
+  entries: SubscribeAuthEntry[],
+): Promise<SubscribeAuthRequestItem[]> {
+  const seen = new Set<SubscribeTemplateGroup>();
+  const uniqueEntries = entries
+    .filter((entry) => {
+      if (!entry.tmplId || seen.has(entry.group)) return false;
+      seen.add(entry.group);
+      return true;
+    })
+    .slice(0, 5);
+
+  const tmplIds = uniqueEntries.map((entry) => entry.tmplId);
+
+  if (tmplIds.length === 0) {
+    return [];
+  }
+
+  // Mock 模板 ID：开发态直接记 accept，避免非真机环境 requestSubscribeMessage 报错
+  if (tmplIds.every((id) => id.startsWith('mock-'))) {
+    return uniqueEntries.map((entry) => ({
+      tmplId: entry.tmplId,
+      group: entry.group,
+      status: 'accept' as const,
+    }));
+  }
+
+  try {
+    const option = { tmplIds } as Taro.requestSubscribeMessage.Option;
+    const res = await Taro.requestSubscribeMessage(option);
+
+    return uniqueEntries.map((entry) => {
+      const raw = res?.[entry.tmplId];
+      const status: SubscribeAuthStatus =
+        raw === 'accept' || raw === 'reject' || raw === 'ban' || raw === 'filter'
+          ? raw
+          : 'reject';
+      return { tmplId: entry.tmplId, group: entry.group, status };
+    });
+  } catch {
+    return uniqueEntries.map((entry) => ({
+      tmplId: entry.tmplId,
+      group: entry.group,
+      status: 'reject' as const,
+    }));
   }
 }

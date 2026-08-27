@@ -4,7 +4,7 @@
  * 所有 Mock 数据的单一数据源，保证数据一致性和关联性
  * 数据时间跨度：2025年7月 - 2026年6月（共12个月）
  */
-import { BRAND_LOGO, MEDIA_IMAGE_BASE } from '@/constants/brand';
+import { BRAND_LOGO } from '@/constants/brand';
 import { getManagedTeachers } from '@/data/teacher';
 import type { Venue, Room } from '@/types/campus';
 import type { ClassColor, ClassIcon, ClassLevel } from '@/types/class';
@@ -163,6 +163,8 @@ export const CAMPUSES: Campus[] = [
 // 1.1 场地 / 教室
 // ============================================
 
+export const DEFAULT_VENUE_MANAGER_USER_ID = 'user-principal-001';
+
 export const VENUES: Venue[] = [
   {
     id: 'venue-center-001',
@@ -170,6 +172,7 @@ export const VENUES: Venue[] = [
     name: '云策大厦主馆',
     address: '杭州市西湖区文三路168号云策大厦1-3层',
     status: 'active',
+    managerUserId: DEFAULT_VENUE_MANAGER_USER_ID,
     createdAt: '2024-01-15T08:00:00Z',
     updatedAt: '2024-01-15T08:00:00Z',
   },
@@ -179,6 +182,7 @@ export const VENUES: Venue[] = [
     name: '城东艺术馆',
     address: '杭州市上城区钱江新城丹桂街88号',
     status: 'active',
+    managerUserId: DEFAULT_VENUE_MANAGER_USER_ID,
     createdAt: '2024-06-01T08:00:00Z',
     updatedAt: '2024-06-01T08:00:00Z',
   },
@@ -188,6 +192,7 @@ export const VENUES: Venue[] = [
     name: '城西文创中心',
     address: '杭州市余杭区未来科技城EFC欧美金融城',
     status: 'active',
+    managerUserId: DEFAULT_VENUE_MANAGER_USER_ID,
     createdAt: '2024-09-01T08:00:00Z',
     updatedAt: '2024-09-01T08:00:00Z',
   },
@@ -203,11 +208,12 @@ export const ROOMS: Room[] = [
     capacity: 8,
     status: 'active',
     bookingEnabled: true,
-    photos: [`${MEDIA_IMAGE_BASE}/2.jpg`],
+    photos: [],
     openTimeStart: '09:00',
     openTimeEnd: '22:00',
     pricePerSession: 120,
     timeBasedPricing: false,
+    managerUserId: 'teacher-001',
     createdAt: '2024-01-15T08:00:00Z',
     updatedAt: '2024-01-15T08:00:00Z',
   },
@@ -281,7 +287,7 @@ export const ROOMS: Room[] = [
     capacity: 18,
     status: 'active',
     bookingEnabled: true,
-    photos: [`${MEDIA_IMAGE_BASE}/2.jpg`, `${MEDIA_IMAGE_BASE}/3.jpg`],
+    photos: [],
     openTimeStart: '10:00',
     openTimeEnd: '21:00',
     pricePerSession: 100,
@@ -328,7 +334,7 @@ export const ROOMS: Room[] = [
     capacity: 14,
     status: 'active',
     bookingEnabled: true,
-    photos: [`${MEDIA_IMAGE_BASE}/3.jpg`],
+    photos: [],
     openTimeStart: '09:00',
     openTimeEnd: '22:00',
     pricePerSession: 20,
@@ -772,7 +778,11 @@ export interface Class {
   /** 课程难度等级 */
   level?: ClassLevel;
   studentCount: number;
+  /** 单次默认消耗课时（手动消课预填） */
+  hoursPerLesson?: number;
   pricePerLesson: number;
+  /** 课程介绍 / 备注说明 */
+  note?: string;
   /** 课程分类 ID（决定约课首页 Tab 归属） */
   categoryId?: string;
   createdAt: string;
@@ -801,7 +811,9 @@ export const CLASSES: Class[] = [
     color: 'primary',
     icon: 'piano',
     studentCount: 6,
+    hoursPerLesson: 1.5,
     pricePerLesson: 150,
+    note: '适合零基础学员，以识谱与基础指法为主。',
     createdAt: '2025-08-15T00:00:00Z',
   },
   {
@@ -825,6 +837,7 @@ export const CLASSES: Class[] = [
     color: 'info',
     icon: 'piano',
     studentCount: 5,
+    hoursPerLesson: 1,
     pricePerLesson: 180,
     createdAt: '2025-08-15T00:00:00Z',
   },
@@ -847,6 +860,7 @@ export const CLASSES: Class[] = [
     color: 'purple',
     icon: 'book',
     studentCount: 8,
+    hoursPerLesson: 1,
     pricePerLesson: 120,
     createdAt: '2025-02-20T00:00:00Z',
   },
@@ -876,6 +890,7 @@ export const CLASSES: Class[] = [
     color: 'amber',
     icon: 'music',
     studentCount: 7,
+    hoursPerLesson: 1,
     pricePerLesson: 140,
     createdAt: '2025-08-20T00:00:00Z',
   },
@@ -901,6 +916,7 @@ export const CLASSES: Class[] = [
     color: 'teal',
     icon: 'music',
     studentCount: 12,
+    hoursPerLesson: 1,
     pricePerLesson: 100,
     createdAt: '2024-08-01T00:00:00Z',
   },
@@ -925,6 +941,7 @@ export const CLASSES: Class[] = [
     color: 'red',
     icon: 'dance',
     studentCount: 10,
+    hoursPerLesson: 1,
     pricePerLesson: 130,
     createdAt: '2025-08-25T00:00:00Z',
   },
@@ -948,6 +965,7 @@ export const CLASSES: Class[] = [
     color: 'amber',
     icon: 'dance',
     studentCount: 8,
+    hoursPerLesson: 1,
     pricePerLesson: 160,
     createdAt: '2025-12-20T00:00:00Z',
   },
@@ -972,6 +990,7 @@ export const CLASSES: Class[] = [
     color: 'purple',
     icon: 'music',
     studentCount: 5,
+    hoursPerLesson: 1,
     pricePerLesson: 200,
     createdAt: '2026-02-15T00:00:00Z',
   },
@@ -996,6 +1015,7 @@ export const CLASSES: Class[] = [
     color: 'info',
     icon: 'calligraphy',
     studentCount: 8,
+    hoursPerLesson: 1,
     pricePerLesson: 120,
     createdAt: '2025-08-28T00:00:00Z',
   },
@@ -1017,6 +1037,7 @@ export const CLASSES: Class[] = [
     color: 'teal',
     icon: 'art',
     studentCount: 6,
+    hoursPerLesson: 1,
     pricePerLesson: 150,
     createdAt: '2025-09-20T00:00:00Z',
   },
@@ -1040,6 +1061,7 @@ export const CLASSES: Class[] = [
     color: 'primary',
     icon: 'art',
     studentCount: 5,
+    hoursPerLesson: 1,
     pricePerLesson: 130,
     createdAt: '2026-05-28T00:00:00Z',
   },
@@ -1063,6 +1085,7 @@ export const CLASSES: Class[] = [
     color: 'purple',
     icon: 'art',
     studentCount: 5,
+    hoursPerLesson: 1,
     pricePerLesson: 120,
     createdAt: '2026-06-20T00:00:00Z',
   },
@@ -1092,6 +1115,7 @@ export const CLASSES: Class[] = [
     color: 'info',
     icon: 'piano',
     studentCount: 0,
+    hoursPerLesson: 1,
     pricePerLesson: 150,
     createdAt: '2026-06-01T00:00:00Z',
   },
@@ -1121,6 +1145,7 @@ export const CLASSES: Class[] = [
     color: 'amber',
     icon: 'music',
     studentCount: 6,
+    hoursPerLesson: 1,
     pricePerLesson: 130,
     createdAt: '2026-07-01T00:00:00Z',
   },
@@ -2704,6 +2729,8 @@ export interface Schedule {
   id: string;
   classId: string;
   teacherId: string;
+  /** 助教教师 ID（首页今日课表按主讲/助教过滤） */
+  assistantTeacherId?: string;
   campusId: string;
   dayOfWeek: DayOfWeek;
   startTime: string;
@@ -2904,6 +2931,7 @@ export const SCHEDULES: Schedule[] = [
     classId: 'cls-001',
     color: 'primary',
     teacherId: 'teacher-001',
+    assistantTeacherId: 'teacher-003',
     campusId: 'campus-center',
     dayOfWeek: 3,
     startTime: '14:00',
@@ -3110,7 +3138,10 @@ export interface LessonRecord {
   hours: number;
   status: 'checked' | 'leave' | 'absent' | 'cancelled' | 'makeup';
   checkinTime?: string;
+  /** 课程内容（与前端 content 对应） */
   note?: string;
+  /** 单学员备注（与前端 note 对应，2026-08-26 新增，与 note=课程内容区分开） */
+  remark?: string;
   /** 上课教室 */
   room?: string;
   /** 消耗的课包 ID（2026-08-22 新增：撤销/删除消课记录时据此回补课时） */

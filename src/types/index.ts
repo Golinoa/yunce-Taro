@@ -4,7 +4,14 @@
 
 // 用户与认证
 export type { UserRole, Profile, AuthSession } from './profile';
-export type { TodoItem } from './home-todo';
+export type {
+  TodoItem,
+  TodoItemCategory,
+  TodoLevel,
+  TodoCompletion,
+  TodoSourceType,
+  TodoSharedScope,
+} from './home-todo';
 export type { TodoQuadrant } from './todo-quadrant';
 
 // 教师
@@ -66,6 +73,17 @@ export type { LeaveType, LeaveStatus, LeaveRequest } from './leave-request';
 
 // 通知
 export type { NotificationType, Notification } from './notification';
+
+// 订阅消息
+export type {
+  SubscribeTemplateGroup,
+  SubscribeFlowId,
+  SubscribePromptPresetId,
+  SubscribeRenewPresetId,
+  SubscribeQuotaDto,
+  SubscribeBootstrapDto,
+  SubscribeFlowContext,
+} from './subscribe-message';
 
 // 反馈
 export type { Feedback } from './feedback';

@@ -48,7 +48,9 @@ export interface VenueBookingRecord {
   /** 总价（元） */
   totalPrice: number;
   /** 预约状态 */
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'checked_in';
+  /** 所属场馆负责人（推送用） */
+  managerUserId?: string;
   /** 创建时间 */
   createdAt: string;
 }

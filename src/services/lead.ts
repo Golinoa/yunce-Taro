@@ -1,8 +1,5 @@
 /**
  * Service 层 — 试听线索相关 API
- *
- * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用。
- * 规范：mock 函数用 mock 前缀，联调时只改 Service 一行切换。
  */
 import {
   mockGetLeadsByTeacher,
@@ -21,6 +18,7 @@ import {
   mockGetLeadBookings,
   mockGetLeadBookingsByTeacher,
   mockCancelLeadBooking,
+  mockCheckInPrivateLeadBooking,
   mockRestoreLeadBooking,
   mockUpdateLeadBooking,
   mockGetLeadFollowUps,
@@ -35,68 +33,124 @@ import {
   mockDeleteTrialSlotConfig,
   type TrialCourseSlot,
 } from '@/data/lead';
+import {
+  filterLeadCardsByTab,
+  mapBackendLead,
+  mapBackendLeadBooking,
+  mapBackendLeadConversion,
+  mapBackendLeadFollowUp,
+  mapBackendLeadSummary,
+  mapBackendTrialSlotConfig,
+  mapTrialSlotToCourseSlot,
+} from '@/services/mappers/lead-api.mapper';
 import type {
   Lead,
   LeadBooking,
   LeadBookingDifficulty,
-  LeadFollowUp,
-  LeadConversion,
   LeadCardModel,
-  LeadSummary,
+  LeadConversion,
+  LeadFollowUp,
   LeadFormData,
-  LeadStatus,
   LeadFilterTab,
+  LeadStatus,
+  LeadSummary,
   TrialSlotConfig,
 } from '@/types/lead';
-import { notWired } from '@/utils/not-wired';
+import { del, get, patch, post, put } from '@/utils/request';
+import {
+  type PaginatedResponse,
+  unwrapPaginatedList,
+} from '@/utils/pagination';
 
-// ============================================
-// Mock 开关：联调时改为 false 即可切换到 API
-// ============================================
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
     ? process.env.VITE_USE_MOCK !== 'false'
     : true;
 
-// ============================================
-// 线索 CRUD
-// ============================================
+async function fetchLeadList(params: Record<string, unknown>) {
+  const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads', params);
+  return unwrapPaginatedList(data).map(mapBackendLead);
+}
 
-/** 获取老师的线索列表 */
+async function fetchLeadBookings(params: Record<string, unknown>) {
+  const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads/bookings', params);
+  return unwrapPaginatedList(data).map(mapBackendLeadBooking);
+}
+
+async function fetchLeadFollowUps(params: Record<string, unknown>) {
+  const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads/follow-ups', params);
+  return unwrapPaginatedList(data).map(mapBackendLeadFollowUp);
+}
+
+async function fetchTrialSlotList(params: Record<string, unknown>) {
+  const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads/trial-slots', params);
+  return unwrapPaginatedList(data).map(mapBackendTrialSlotConfig);
+}
+
 export async function getLeadsByTeacher(teacherId: string): Promise<Lead[]> {
   if (USE_MOCK) return mockGetLeadsByTeacher(teacherId);
-  // TODO: 联调时替换为 API
-  return notWired('lead.getLeadsByTeacher');
+  return fetchLeadList({ teacherId, page: 1, pageSize: 100 });
 }
 
-/** 获取线索详情 */
 export async function getLeadById(leadId: string): Promise<Lead | null> {
   if (USE_MOCK) return mockGetLeadById(leadId);
-  return notWired('lead.getLeadById');
+  const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
+  if (!detail) return null;
+  return mapBackendLead(detail);
 }
 
-/** 获取线索卡片列表（带筛选） */
 export async function getLeadCards(
   teacherId: string,
   filterTab?: LeadFilterTab,
 ): Promise<LeadCardModel[]> {
   if (USE_MOCK) return mockGetLeadCardsByTeacher(teacherId, filterTab);
-  return notWired('lead.getLeadCards');
+  const leads = await fetchLeadList({ teacherId, page: 1, pageSize: 100, filterTab });
+  const cards = leads.map((lead) => ({
+    id: lead.id,
+    trial_student_id: lead.trial_student_id,
+    child_name: lead.child_name,
+    child_nickname: lead.child_nickname,
+    parent_phone: lead.parent_phone,
+    parent_name: lead.parent_name,
+    status: lead.status,
+    source_type: lead.source_type,
+    booking_course_name: undefined,
+    owner_teacher_name:
+      lead.owner_teacher_id === teacherId || lead.creator_teacher_id === teacherId
+        ? '我'
+        : undefined,
+    owner_lock_status: lead.owner_lock_status,
+    latest_follow_up_at: undefined,
+    next_follow_up_at: undefined,
+    created_at: lead.created_at,
+  }));
+  return filterLeadCardsByTab(cards, filterTab);
 }
 
-/** 获取线索统计摘要 */
 export async function getLeadSummary(teacherId: string): Promise<LeadSummary> {
   if (USE_MOCK) return mockGetLeadSummary(teacherId);
-  return notWired('lead.getLeadSummary');
+  const summary = await get<Record<string, unknown>>('/leads/summary', { teacherId });
+  return mapBackendLeadSummary(summary);
 }
 
-/** 创建线索（手动录入） */
 export async function createLead(data: LeadFormData, teacherId: string): Promise<Lead> {
   if (USE_MOCK) return mockCreateLead(data, teacherId);
-  return notWired('lead.createLead');
+  const created = await post<Record<string, unknown>>('/leads', {
+    childName: data.child_name,
+    childNickname: data.child_nickname,
+    childGender: data.child_gender,
+    childAge: data.child_age,
+    parentName: data.parent_name,
+    parentPhone: data.parent_phone,
+    campusId: data.campus_id,
+    subjectId: data.subject_id,
+    sourceCourseId: data.source_course_id,
+    sourceType: data.source_type || 'manual',
+    notes: data.notes,
+  });
+  return mapBackendLead(created);
 }
 
-/** 通过邀约链接创建线索（家长注册后自动触发） */
 export async function createLeadFromInvite(params: {
   parentUserId: string;
   parentName?: string;
@@ -109,30 +163,51 @@ export async function createLeadFromInvite(params: {
   sourceCourseId?: string;
 }): Promise<Lead> {
   if (USE_MOCK) return mockCreateLeadFromInvite(params);
-  return notWired('lead.createLeadFromInvite');
+  const created = await post<Record<string, unknown>>('/leads', {
+    childName: params.childName,
+    childNickname: params.childNickname,
+    parentName: params.parentName,
+    parentPhone: params.parentPhone,
+    campusId: params.campusId,
+    sourceCourseId: params.sourceCourseId,
+    sourceType: params.sourceType,
+  });
+  return mapBackendLead(created);
 }
 
-/** 更新线索状态 */
 export async function updateLeadStatus(
   leadId: string,
   status: LeadStatus,
   extra?: { closed_reason?: string },
 ): Promise<Lead | null> {
   if (USE_MOCK) return mockUpdateLeadStatus(leadId, status, extra);
-  return notWired('lead.updateLeadStatus');
+  await patch<Record<string, unknown>>(`/leads/${leadId}/status`, {
+    status,
+    closedReason: extra?.closed_reason,
+  });
+  return getLeadById(leadId);
 }
 
-/** 更新线索信息 */
 export async function updateLead(
   leadId: string,
   data: Partial<Lead>,
   options?: { forceReassign?: boolean },
 ): Promise<Lead | null> {
   if (USE_MOCK) return mockUpdateLead(leadId, data, options);
-  return notWired('lead.updateLead');
+  await put<Record<string, unknown>>(`/leads/${leadId}`, {
+    childName: data.child_name,
+    childNickname: data.child_nickname,
+    childGender: data.child_gender,
+    childAge: data.child_age,
+    parentName: data.parent_name,
+    parentPhone: data.parent_phone,
+    status: data.status,
+    notes: data.notes,
+    closedReason: data.closed_reason,
+  });
+  return getLeadById(leadId);
 }
 
-/** 线索改派（专用入口，锁定态需显式 forceReassign，记录改派原因与审计） */
 export async function reassignLead(
   leadId: string,
   newOwnerId: string,
@@ -140,20 +215,22 @@ export async function reassignLead(
   opts?: { forceReassign?: boolean; operatorId?: string },
 ): Promise<Lead | null> {
   if (USE_MOCK) return mockReassignLead(leadId, newOwnerId, reason, opts);
-  return notWired('lead.reassignLead');
+  return updateLead(
+    leadId,
+    {
+      owner_teacher_id: newOwnerId,
+      reassign_reason: reason,
+    },
+    opts,
+  );
 }
 
-/** 删除线索 */
 export async function deleteLead(leadId: string): Promise<boolean> {
   if (USE_MOCK) return mockDeleteLead(leadId);
-  return notWired('lead.deleteLead');
+  await del(`/leads/${leadId}`);
+  return true;
 }
 
-// ============================================
-// 试听预约
-// ============================================
-
-/** 创建试听预约 */
 export async function createLeadBooking(params: {
   leadId: string;
   trialMode?: 'group' | 'private';
@@ -178,10 +255,32 @@ export async function createLeadBooking(params: {
   note?: string;
 }): Promise<LeadBooking> {
   if (USE_MOCK) return mockCreateLeadBooking(params);
-  return notWired('lead.createLeadBooking');
+  const created = await post<Record<string, unknown>>('/leads/bookings', {
+    leadId: params.leadId,
+    trialMode: params.trialMode ?? 'group',
+    referenceScheduleId: params.referenceScheduleId,
+    timeOffsetMinutes: params.timeOffsetMinutes,
+    classId: params.classId,
+    className: params.className,
+    courseId: params.courseId,
+    courseName: params.courseName,
+    subjectId: params.subjectId,
+    subjectName: params.subjectName,
+    campusId: params.campusId,
+    campusName: params.campusName,
+    teacherId: params.teacherId,
+    teacherName: params.teacherName,
+    lessonDate: params.lessonDate,
+    startTime: params.startTime,
+    endTime: params.endTime,
+    room: params.room,
+    bookingType: params.bookingType,
+    operatorId: params.operatorId,
+    note: params.note,
+  });
+  return mapBackendLeadBooking(created);
 }
 
-/** 根据班级快速预约试听（课表卡片入口） */
 export async function bookTrialByClass(params: {
   leadId: string;
   classId: string;
@@ -195,37 +294,66 @@ export async function bookTrialByClass(params: {
   note?: string;
 }): Promise<LeadBooking> {
   if (USE_MOCK) return mockBookTrialByClass(params);
-  return notWired('lead.bookTrialByClass');
+  return createLeadBooking({
+    leadId: params.leadId,
+    classId: params.classId,
+    className: params.className,
+    courseId: params.classId,
+    courseName: params.className || '试听课',
+    campusId: '',
+    teacherId: params.teacherId || '',
+    teacherName: params.teacherName,
+    lessonDate: params.lessonDate,
+    startTime: params.startTime,
+    endTime: params.endTime,
+    bookingType: 'proxy',
+    operatorId: params.operatorId,
+    note: params.note,
+  });
 }
 
-/** 获取线索的预约列表 */
 export async function getLeadBookings(leadId: string): Promise<LeadBooking[]> {
   if (USE_MOCK) return mockGetLeadBookings(leadId);
-  return notWired('lead.getLeadBookings');
+  return fetchLeadBookings({ leadId, page: 1, pageSize: 100 });
 }
 
-/** 获取老师的所有试听预约（用于课表标记试听班级） */
 export async function getLeadBookingsByTeacher(
   teacherId: string,
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
   if (USE_MOCK) return mockGetLeadBookingsByTeacher(teacherId, params);
-  return notWired('lead.getLeadBookingsByTeacher');
+  return fetchLeadBookings({
+    teacherId,
+    startDate: params?.startDate,
+    endDate: params?.endDate,
+    status: params?.status,
+    page: 1,
+    pageSize: 100,
+  });
 }
 
-/** 取消试听预约 */
+export async function checkInPrivateLeadBooking(
+  bookingId: string,
+): Promise<LeadBooking | null> {
+  if (USE_MOCK) return mockCheckInPrivateLeadBooking(bookingId);
+  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+    status: 'completed',
+  });
+  return mapBackendLeadBooking(updated);
+}
+
 export async function cancelLeadBooking(bookingId: string): Promise<LeadBooking | null> {
   if (USE_MOCK) return mockCancelLeadBooking(bookingId);
-  return notWired('lead.cancelLeadBooking');
+  const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/cancel`);
+  return mapBackendLeadBooking(updated);
 }
 
-/** 恢复已取消的试听预约 */
 export async function restoreLeadBooking(bookingId: string): Promise<LeadBooking | null> {
   if (USE_MOCK) return mockRestoreLeadBooking(bookingId);
-  return notWired('lead.restoreLeadBooking');
+  const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/restore`);
+  return mapBackendLeadBooking(updated);
 }
 
-/** 更新试听预约 */
 export async function updateLeadBooking(
   bookingId: string,
   data: {
@@ -242,20 +370,26 @@ export async function updateLeadBooking(
   },
 ): Promise<LeadBooking | null> {
   if (USE_MOCK) return mockUpdateLeadBooking(bookingId, data);
-  return notWired('lead.updateLeadBooking');
+  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+    lessonDate: data.lessonDate,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    courseName: data.courseName,
+    childName: data.childName,
+    note: data.note,
+    teacherId: data.teacherId,
+    difficulty: data.difficulty,
+    room: data.room,
+    trialMode: data.trialMode,
+  });
+  return mapBackendLeadBooking(updated);
 }
 
-// ============================================
-// 跟进记录
-// ============================================
-
-/** 获取线索的跟进记录 */
 export async function getLeadFollowUps(leadId: string): Promise<LeadFollowUp[]> {
   if (USE_MOCK) return mockGetLeadFollowUps(leadId);
-  return notWired('lead.getLeadFollowUps');
+  return fetchLeadFollowUps({ leadId, page: 1, pageSize: 100 });
 }
 
-/** 创建跟进记录 */
 export async function createFollowUp(params: {
   leadId: string;
   action: LeadFollowUp['action'];
@@ -266,20 +400,23 @@ export async function createFollowUp(params: {
   operatorName?: string;
 }): Promise<LeadFollowUp> {
   if (USE_MOCK) return mockCreateFollowUp(params);
-  return notWired('lead.createFollowUp');
+  const created = await post<Record<string, unknown>>('/leads/follow-ups', {
+    leadId: params.leadId,
+    action: params.action,
+    intentLevel: params.intentLevel,
+    content: params.content,
+    nextFollowUpAt: params.nextFollowUpAt,
+  });
+  return mapBackendLeadFollowUp(created);
 }
 
-// ============================================
-// 转化记录
-// ============================================
-
-/** 获取线索的转化记录 */
 export async function getLeadConversions(leadId: string): Promise<LeadConversion[]> {
   if (USE_MOCK) return mockGetLeadConversions(leadId);
-  return notWired('lead.getLeadConversions');
+  const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
+  const conversions = Array.isArray(detail.conversions) ? detail.conversions : [];
+  return conversions.map((item) => mapBackendLeadConversion(item as Record<string, unknown>));
 }
 
-/** 创建转化记录（转正式学员） */
 export async function createConversion(params: {
   leadId: string;
   conversionType: LeadConversion['conversion_type'];
@@ -289,66 +426,97 @@ export async function createConversion(params: {
   note?: string;
 }): Promise<LeadConversion> {
   if (USE_MOCK) return mockCreateConversion(params);
-  return notWired('lead.createConversion');
+  const created = await post<Record<string, unknown>>('/leads/conversions', {
+    leadId: params.leadId,
+    conversionType: params.conversionType,
+    studentId: params.studentId,
+    mergeToStudentId: params.mergeToStudentId,
+    note: params.note,
+  });
+  return mapBackendLeadConversion(created);
 }
 
-// ============================================
-// 可预约课程（试听专用）
-// ============================================
-
-/** 获取试听可预约课程列表 */
 export async function getTrialCourseSlots(campusId?: string): Promise<TrialCourseSlot[]> {
   if (USE_MOCK) return mockGetTrialCourseSlots(campusId);
-  return notWired('lead.getTrialCourseSlots');
+  const slots = await fetchTrialSlotList({
+    campusId,
+    status: 'active',
+    page: 1,
+    pageSize: 100,
+  });
+  return slots.map(mapTrialSlotToCourseSlot);
 }
 
-// ============================================
-// 独立试听时段配置
-// ============================================
-
-/** 获取独立试听时段列表 */
 export async function getTrialSlotConfigs(
   teacherId?: string,
   campusId?: string,
 ): Promise<TrialSlotConfig[]> {
   if (USE_MOCK) return mockGetTrialSlotConfigs(teacherId, campusId);
-  return notWired('lead.getTrialSlotConfigs');
+  return fetchTrialSlotList({
+    teacherId,
+    campusId,
+    page: 1,
+    pageSize: 100,
+  });
 }
 
-/** 获取独立试听时段详情 */
 export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfig | null> {
   if (USE_MOCK) return mockGetTrialSlotConfigById(id);
-  return notWired('lead.getTrialSlotConfigById');
+  const list = await fetchTrialSlotList({ page: 1, pageSize: 100 });
+  return list.find((item) => item.id === id) ?? null;
 }
 
-/** 创建独立试听时段 */
 export async function createTrialSlotConfig(
   data: Omit<TrialSlotConfig, 'id' | 'current_count' | 'created_at' | 'updated_at'>,
 ): Promise<TrialSlotConfig> {
   if (USE_MOCK) return mockCreateTrialSlotConfig(data);
-  return notWired('lead.createTrialSlotConfig');
+  const created = await post<Record<string, unknown>>('/leads/trial-slots', {
+    courseId: data.course_id,
+    courseName: data.course_name,
+    subjectId: data.subject_id,
+    subjectName: data.subject_name,
+    campusId: data.campus_id,
+    campusName: data.campus_name,
+    teacherId: data.teacher_id,
+    teacherName: data.teacher_name,
+    lessonDate: data.lesson_date,
+    startTime: data.start_time,
+    endTime: data.end_time,
+    room: data.room,
+    maxCount: data.max_count,
+    note: data.note,
+  });
+  return mapBackendTrialSlotConfig(created);
 }
 
-/** 更新独立试听时段 */
 export async function updateTrialSlotConfig(
   id: string,
   data: Partial<TrialSlotConfig>,
 ): Promise<TrialSlotConfig | null> {
   if (USE_MOCK) return mockUpdateTrialSlotConfig(id, data);
-  return notWired('lead.updateTrialSlotConfig');
+  const updated = await put<Record<string, unknown>>(`/leads/trial-slots/${id}`, {
+    courseName: data.course_name,
+    subjectName: data.subject_name,
+    lessonDate: data.lesson_date,
+    startTime: data.start_time,
+    endTime: data.end_time,
+    room: data.room,
+    maxCount: data.max_count,
+    status: data.status,
+    note: data.note,
+  });
+  return mapBackendTrialSlotConfig(updated);
 }
 
-/** 删除独立试听时段 */
 export async function deleteTrialSlotConfig(id: string): Promise<boolean> {
   if (USE_MOCK) return mockDeleteTrialSlotConfig(id);
-  return notWired('lead.deleteTrialSlotConfig');
+  await del(`/leads/trial-slots/${id}`);
+  return true;
 }
 
-/** 批量创建代约预约（支持会员+线索混合） */
 export async function batchCreateProxyBookings(params: {
   memberIds: string[];
   leadIds: string[];
-  /** 会员消耗的课包映射：memberId -> packageId */
   memberPackages?: Record<string, string>;
   teacherId: string;
   teacherName?: string;
@@ -363,12 +531,28 @@ export async function batchCreateProxyBookings(params: {
   note?: string;
 }): Promise<LeadBooking[]> {
   if (USE_MOCK) return mockBatchCreateProxyBookings(params);
-  return notWired('lead.batchCreateProxyBookings');
+  const results: LeadBooking[] = [];
+  for (const leadId of params.leadIds) {
+    results.push(
+      await createLeadBooking({
+        leadId,
+        trialMode: params.trialMode,
+        courseId: params.courseId,
+        courseName: params.courseName,
+        campusId: params.campusId,
+        teacherId: params.teacherId,
+        teacherName: params.teacherName,
+        lessonDate: params.lessonDate,
+        startTime: params.startTime,
+        endTime: params.endTime,
+        bookingType: 'proxy',
+        operatorId: params.operatorId,
+        note: params.note,
+      }),
+    );
+  }
+  return results;
 }
-
-// ============================================
-// Service 对象导出（统一出口）
-// ============================================
 
 export const leadService = {
   getLeadsByTeacher,
@@ -387,6 +571,7 @@ export const leadService = {
   getLeadBookings,
   getLeadBookingsByTeacher,
   cancelLeadBooking,
+  checkInPrivateLeadBooking,
   restoreLeadBooking,
   updateLeadBooking,
   getLeadFollowUps,

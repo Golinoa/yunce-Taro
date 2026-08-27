@@ -51,6 +51,22 @@ export interface LessonConsumptionListProps {
   emptyText?: string;
   footerText?: string;
   onFooterClick?: () => void;
+  /** 点击单条消课记录（优先于跳转学员详情） */
+  onRecordClick?: (recordId: string) => void;
+  /** 嵌入卡片内时收紧间距、空态不套大卡片 */
+  embedded?: boolean;
+  /** 是否展示日期分组标题 */
+  showDateHeaders?: boolean;
+}
+
+/** 跳转消课详情页（多入口复用） */
+export function navigateToLessonDetail(recordId: string): void {
+  if (!recordId) {
+    return;
+  }
+  Taro.navigateTo({
+    url: `/package-course/pages/lesson-detail/index?id=${encodeURIComponent(recordId)}`,
+  });
 }
 
 interface BuildSectionsOptions {
@@ -291,6 +307,7 @@ export function buildLessonConsumptionSections(
 interface StudentConsumptionRowProps {
   detail: LessonConsumptionDetailItem;
   onStudentClick: (studentId: string) => void;
+  onRecordClick?: (recordId: string) => void;
   showDivider?: boolean;
 }
 
@@ -298,6 +315,7 @@ interface StudentConsumptionRowProps {
 const StudentConsumptionRow: React.FC<StudentConsumptionRowProps> = ({
   detail,
   onStudentClick,
+  onRecordClick,
   showDivider = false,
 }) => (
   <View
@@ -305,7 +323,13 @@ const StudentConsumptionRow: React.FC<StudentConsumptionRowProps> = ({
       'flex items-center gap-[20rpx] py-[20rpx] press-bg',
       showDivider ? 'border-b border-border' : '',
     )}
-    onClick={() => onStudentClick(detail.studentId)}
+    onClick={() => {
+      if (onRecordClick) {
+        onRecordClick(detail.id);
+        return;
+      }
+      onStudentClick(detail.studentId);
+    }}
   >
     <View className="shrink-0 rounded-full border-[2rpx] border-card shadow-soft">
       <Avatar name={detail.name || '学'} avatarUrl={detail.avatarUrl} size="md" />
@@ -389,6 +413,9 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
   emptyText = '暂无消课记录',
   footerText,
   onFooterClick,
+  onRecordClick,
+  embedded = false,
+  showDateHeaders = true,
 }) => {
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
@@ -416,6 +443,9 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
   }, []);
 
   if (cardCount === 0) {
+    if (embedded) {
+      return <Text className="text-[24rpx] text-muted-foreground text-center py-[24rpx]">{emptyText}</Text>;
+    }
     return (
       <View className="bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[60rpx] text-center">
         <Text className="text-muted-foreground text-[28rpx]">{emptyText}</Text>
@@ -424,20 +454,22 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
   }
 
   return (
-    <View className="flex flex-col gap-[24rpx]">
+    <View className={cn('flex flex-col', embedded ? 'gap-[12rpx]' : 'gap-[24rpx]')}>
       {sections.map((section) => (
         <View key={section.id} className="flex flex-col gap-[16rpx]">
-          <View className="flex items-center justify-between px-[4rpx]">
-            <View className="flex items-center gap-[16rpx]">
-              <Text className="text-[32rpx] font-semibold text-foreground">
-                {formatDateLabel(section.date)}
+          {showDateHeaders ? (
+            <View className="flex items-center justify-between px-[4rpx]">
+              <View className="flex items-center gap-[16rpx]">
+                <Text className="text-[32rpx] font-semibold text-foreground">
+                  {formatDateLabel(section.date)}
+                </Text>
+                <Text className="text-[22rpx] text-muted-foreground">{getWeekDay(section.date)}</Text>
+              </View>
+              <Text className="text-[22rpx] text-muted-foreground">
+                {section.totalHours}课时 / {section.studentCount}人
               </Text>
-              <Text className="text-[22rpx] text-muted-foreground">{getWeekDay(section.date)}</Text>
             </View>
-            <Text className="text-[22rpx] text-muted-foreground">
-              {section.totalHours}课时 / {section.studentCount}人
-            </Text>
-          </View>
+          ) : null}
 
           <View className="flex flex-col gap-[16rpx]">
             {section.cards.map((card) => {
@@ -489,6 +521,7 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                           key={detail.id}
                           detail={detail}
                           onStudentClick={handleStudentClick}
+                          onRecordClick={onRecordClick}
                           showDivider={index < card.details.length - 1}
                         />
                       ))}
@@ -509,7 +542,11 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                     style={{ backgroundColor: TODO_LEVEL_BAR_COLOR.low }}
                   />
                   <View className="flex-1 min-w-0">
-                    <StudentConsumptionRow detail={detail} onStudentClick={handleStudentClick} />
+                    <StudentConsumptionRow
+                      detail={detail}
+                      onStudentClick={handleStudentClick}
+                      onRecordClick={onRecordClick}
+                    />
                   </View>
                 </View>
               </View>

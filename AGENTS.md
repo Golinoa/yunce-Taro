@@ -158,6 +158,7 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 ## 十、交互复用铁律（ScrollView + 多入口同一能力）
 
 **教训来源**：首页待办 FAB「切换视图」与工具栏 icon——工具栏正常，FAB 路径反复改 scroll 锁定仍跳顶。
+**二次教训**：待办详情/添加弹窗「关层触发滚动条」——根因是误用 `scrollTop` 受控。
 
 ### 原则
 
@@ -167,6 +168,20 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 4. **菜单内操作等价于页面按钮**：菜单先收起，短延迟后调用同一 handler（首页 `FAB_VIEW_TOGGLE_DELAY_MS` ≈ 220ms）。
 5. **禁止**长期保留专用排查 `console.log` / 临时代码文件；问题解决后删除。正式本地调试走 `utils/local-debug.ts`。
 6. **能复用就不扩代码**：每多一层无关 setState 都可能让微信 `ScrollView` 丢滚动位置。
+
+### 固定蒙层弹窗 × ScrollView（硬性，三根因必须同时规避）
+
+| # | 根因 | 正确做法 | 禁止 |
+|---|------|----------|------|
+| 1 | `scroll-into-view` **只要还绑着**（含 `""`），任意 setData 都可能回顶 | idle 用 `scrollIntoViewProps(id)` **完全解绑**；仅定位瞬间传入 | 长期绑 `scrollIntoView={x \|\| undefined}` / 空串 |
+| 2 | 开蒙层 setState 可能让未受控列表丢位置；onScroll 缓存可能过期（ref=0→一点击回顶） | `freeze(() => open())`：先 `scrollOffset` 实测再开层；关层后 `unfreeze()` **延迟解绑** | 先 `setVisible` 再 freeze；关层 `top → top+0.01 → null` |
+| 3 | 页面级滚动 / 弹层内 Input 插入推页 | 页配置 `disableScroll: true`；Input `adjustPosition={false}`；详情可推迟挂载 Input | 为弹层改 `scrollY`；用 `+0.01` 当「保位置」 |
+
+**标准钩子**：`useOverlayScrollFreeze('#scroll-id')`（开层 `freeze(() => setVisible(true))`；关层 `unfreeze`；FAB 收起用 `unfreezeNow`）。
+
+**FAB 菜单**（已验证）：`fabMenuExpanded` + freeze + `scrollY={!fabMenuExpanded}`，勿与蒙层方案拆成两套互相打架的 pin。
+
+**根因总结**：点卡片跳顶 = idle 仍绑着 `scroll-into-view` + 开层 setData 丢位置；关层抖滚动条 = `+0.01` 解绑舞——两套「修复」互相制造问题。
 
 ### 首页待办 FAB 切换视图（标准写法）
 

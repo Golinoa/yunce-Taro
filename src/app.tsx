@@ -1,11 +1,13 @@
-import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
-import React from 'react';
+import Taro, { useDidShow, useDidHide, useLaunch } from '@tarojs/taro';
+import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import PrivacyPopup from '@/components/PrivacyPopup';
-import { useThemeStore } from '@/stores/theme';
+import { SubscribeAuthHost } from '@/components/subscribe';
+import { scheduleDeferredAppStartup } from '@/utils/app-startup';
 import { AuthProvider } from '@/utils/auth';
 import { logError } from '@/utils/logger';
-import { initPrivacy } from '@/utils/privacy';
+import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
+import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import 'uno.css';
 
 /**
@@ -37,6 +39,8 @@ import '@/components/lead/BookTrialByClassSheet';
 import '@/components/campus/CampusSwitcher';
 import '@/components/campus/CampusTrigger';
 import '@/stores/campus';
+import '@/stores/subscribe-auth';
+import '@/components/subscribe';
 import '@/services/member-card';
 import '@/services/card-type';
 import '@/services/student';
@@ -46,11 +50,9 @@ import '@/components/teacher/SalaryEditSheet';
 import '@/components/PageContainer';
 import './app.scss';
 
-// 应用启动时立即从本地存储初始化主题，避免首屏闪烁
-useThemeStore.getState().initTheme();
-
-// 启动时注册微信隐私授权监听并按需主动弹窗（满足《个人信息保护指引》合规）
-initPrivacy();
+// 模块注入最早痕迹：若桌面启动连这行都没有，说明 JS 尚未执行就退出（非业务代码闪退）
+// eslint-disable-next-line no-console
+console.warn('[App] module loaded');
 
 // H-02：全局未捕获错误兜底上报（经 utils/logger 门控，生产可剥离）
 if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {
@@ -60,8 +62,28 @@ if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {
 }
 
 const App: React.FC<{ children?: React.ReactNode }> = (props) => {
-  useDidShow(() => {
-    // App 可见
+  useLaunch((options) => {
+    try {
+      markAppColdStart(options);
+      logLaunchOptions(options);
+    } catch (err) {
+      logError('app.useLaunch', err);
+      markAppColdStart();
+    }
+  });
+
+  useEffect(() => {
+    scheduleDeferredAppStartup();
+  }, []);
+
+  useDidShow((options) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.warn('[App Show]', options?.scene, options?.path);
+      void consumeSubscribeOnShow();
+    } catch {
+      // 忽略
+    }
   });
 
   useDidHide(() => {
@@ -74,6 +96,7 @@ const App: React.FC<{ children?: React.ReactNode }> = (props) => {
       <AuthProvider>
         {props.children}
         <PrivacyPopup />
+        <SubscribeAuthHost />
       </AuthProvider>
     </ErrorBoundary>
   );

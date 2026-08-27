@@ -23,6 +23,7 @@ import PickerSheet from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
 import { auditLogService } from '@/services/audit-log';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
@@ -219,6 +220,16 @@ const TeacherFormPage: React.FC = () => {
           logError('audit staff.add', e);
         }
         Taro.showToast({ title: '添加成功', icon: 'success' });
+        try {
+          Taro.hideToast();
+          await subscribeMessageService.runFlow('E11', {
+            teacherName: base.name?.trim() || form.name.trim(),
+            role: profile?.currentContext?.role,
+            campusId: profile?.currentContext?.campusId,
+          });
+        } catch (error) {
+          logError('subscribe E11 after teacher create', error);
+        }
       }
       setTimeout(() => Taro.navigateBack(), 800);
     } catch {

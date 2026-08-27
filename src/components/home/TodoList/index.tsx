@@ -23,6 +23,8 @@ export interface TodoListProps {
   onComplete?: (item: TodoItem) => void;
   /** 点勾选（完成/重开，我的待办用） */
   onToggleComplete?: (item: TodoItem) => void;
+  /** 点击卡片（打开详情等） */
+  onPress?: (item: TodoItem) => void;
   /** 我的待办嵌入日期分组：左对齐时刻 + 轴线与首页同比例 */
   embedded?: boolean;
   /** embedded 时由父级绘制竖线，组内不再重复 */
@@ -49,6 +51,7 @@ const TodoList: React.FC<TodoListProps> = ({
   targetDate,
   onComplete,
   onToggleComplete,
+  onPress,
   embedded = false,
   hideAxis = false,
   chronological = false,
@@ -145,6 +148,7 @@ const TodoList: React.FC<TodoListProps> = ({
           item={item}
           hideScheduleRow={!shouldShowTodoCardScheduleRow(item)}
           onToggleComplete={toggleHandler}
+          onPress={onPress}
         />
       </View>
     </View>
@@ -159,6 +163,7 @@ const TodoList: React.FC<TodoListProps> = ({
         item={item}
         hideScheduleRow={!shouldShowTodoCardScheduleRow(item)}
         onToggleComplete={toggleHandler}
+        onPress={onPress}
       />
     </View>
   );

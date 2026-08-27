@@ -1,9 +1,9 @@
 import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
+import type { TodoLevel } from '@/types/home-todo';
 
-/** 待办事态等级（左侧色条颜色） */
-export type TodoLevel = 'urgent' | 'high' | 'normal' | 'low';
+export type { TodoLevel };
 
 /** 等级 → 色条颜色（对齐课程管理左侧色条，使用 Token） */
 export const TODO_LEVEL_BAR_COLOR: Record<TodoLevel, string> = {

@@ -1,10 +1,7 @@
 /**
  * Service 层 — 教师管理 API
- * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用
- *
- * A11 口径：真实接口路径待后端 OpenAPI 契约后接入，当前 VITE_USE_MOCK=false
- * 一律抛 notWired 显式报错，禁止猜测 URL。
  */
+import dayjs from 'dayjs';
 import {
   mockGetTeachers,
   mockGetActiveTeachers,
@@ -36,93 +33,150 @@ import {
   mockCopySalaryRuleToTeachers,
   createDefaultSalaryRule,
 } from '@/data/teacher';
+import {
+  mapBackendDeduction,
+  mapBackendSalaryModel,
+  mapBackendSalarySettings,
+  mapBackendSalaryTemplate,
+  mapBackendTeacherToUI,
+  mapUiTeacherToCreatePayload,
+  mapUiTeacherToUpdatePayload,
+} from '@/services/mappers/teacher-api.mapper';
 import type {
-  TeacherUIModel,
-  SalaryModel,
-  SalarySettings,
   Deduction,
-  SalaryTemplate,
+  SalaryModel,
   SalaryRuleConfig,
+  SalarySettings,
+  SalaryTemplate,
+  TeacherUIModel,
 } from '@/types/teacher';
 import { notWired } from '@/utils/not-wired';
+import { del, get, post, put } from '@/utils/request';
+import {
+  type PaginatedResponse,
+  unwrapPaginatedList,
+} from '@/utils/pagination';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
     ? process.env.VITE_USE_MOCK !== 'false'
     : true;
 
-// ============================================
-// 教师 Service
-// ============================================
+type RawRecord = Record<string, unknown>;
+
+async function fetchTeacherList(params: Record<string, unknown>) {
+  const data = await get<PaginatedResponse<RawRecord>>('/teachers', params);
+  return unwrapPaginatedList(data);
+}
+
+function currentSalaryMonth(month?: string): string {
+  return month || dayjs().format('YYYY-MM');
+}
+
+async function resolveSalaryRecordId(teacherId: string, month?: string): Promise<string | null> {
+  const detail = await get<RawRecord>(`/teachers/${teacherId}`);
+  const monthKey = currentSalaryMonth(month);
+  const history = Array.isArray(detail.payHistory) ? detail.payHistory : [];
+  const matched = history.find(
+    (item) => String((item as RawRecord).month ?? '') === monthKey,
+  ) as RawRecord | undefined;
+  return matched?.id ? String(matched.id) : null;
+}
+
+async function fetchSalaryTemplates(params: Record<string, unknown>) {
+  const data = await get<PaginatedResponse<RawRecord>>('/attendance/salary-templates', params);
+  return unwrapPaginatedList(data).map(mapBackendSalaryTemplate);
+}
+
 export const teacherService = {
-  /** 获取教师列表 */
-  getList: (campusId?: string, month?: string) => {
+  getList: async (campusId?: string, month?: string) => {
     if (USE_MOCK) return mockGetTeachers(campusId, month);
-    return notWired('teacher.getList');
+    const list = await fetchTeacherList({
+      page: 1,
+      pageSize: 100,
+      status: undefined,
+    });
+    return list.map((item, index) => mapBackendTeacherToUI(item, index));
   },
 
-  /** 获取在职教师列表（用于班级表单选择器） */
-  getActiveList: (campusId?: string) => {
+  getActiveList: async (campusId?: string) => {
     if (USE_MOCK) return mockGetActiveTeachers(campusId);
-    return notWired('teacher.getActiveList');
+    const list = await fetchTeacherList({
+      page: 1,
+      pageSize: 100,
+      status: 'active',
+    });
+    return list.map((item, index) => mapBackendTeacherToUI(item, index));
   },
 
-  /** 获取教师详情 */
-  getById: (id: string) => {
+  getById: async (id: string) => {
     if (USE_MOCK) return mockGetTeacherById(id);
-    return notWired('teacher.getById');
+    const detail = await get<RawRecord>(`/teachers/${id}`);
+    return detail ? mapBackendTeacherToUI(detail) : null;
   },
 
-  /** 添加教师 */
-  add: (teacher: TeacherUIModel) => {
+  add: async (teacher: TeacherUIModel) => {
     if (USE_MOCK) return mockAddTeacher(teacher);
-    return notWired('teacher.add');
+    const created = await post<RawRecord>('/teachers', mapUiTeacherToCreatePayload(teacher));
+    return mapBackendTeacherToUI(created);
   },
 
-  /** 更新教师信息 */
-  update: (id: string, updates: Partial<TeacherUIModel>) => {
+  update: async (id: string, updates: Partial<TeacherUIModel>) => {
     if (USE_MOCK) return mockUpdateTeacher(id, updates);
-    return notWired('teacher.update');
+    const updated = await put<RawRecord>(`/teachers/${id}`, mapUiTeacherToUpdatePayload(updates));
+    return mapBackendTeacherToUI(updated);
   },
 
-  /** 确认薪资 */
-  confirmSalary: (id: string) => {
-    if (USE_MOCK) return mockConfirmSalary(id);
-    return notWired('teacher.confirmSalary');
+  confirmSalary: async (id: string, month?: string) => {
+    if (USE_MOCK) return mockConfirmSalary(id, month);
+    const recordId = await resolveSalaryRecordId(id, month);
+    if (!recordId) return false;
+    await post(`/teachers/salary/${recordId}/confirm`);
+    return true;
   },
 
-  /** 批量确认薪资 */
-  batchConfirm: (ids: string[]) => {
-    if (USE_MOCK) return mockBatchConfirm(ids);
-    return notWired('teacher.batchConfirm');
+  batchConfirm: async (ids: string[], month?: string) => {
+    if (USE_MOCK) return mockBatchConfirm(ids, month);
+    const recordIds = (
+      await Promise.all(ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)))
+    ).filter((item): item is string => Boolean(item));
+    if (recordIds.length === 0) return false;
+    await post('/teachers/salary/batch-confirm', { ids: recordIds });
+    return true;
   },
 
-  /** 发放薪资 */
-  executePay: (ids: string[], remark?: string, payMethod?: string) => {
-    if (USE_MOCK) return mockExecutePay(ids, remark, payMethod);
-    return notWired('teacher.executePay');
+  executePay: async (ids: string[], remark?: string, payMethod?: string, month?: string) => {
+    if (USE_MOCK) return mockExecutePay(ids, remark, payMethod, month);
+    const recordIds = (
+      await Promise.all(ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)))
+    ).filter((item): item is string => Boolean(item));
+    if (recordIds.length === 0) return false;
+    await post('/teachers/salary/execute-pay', { ids: recordIds, remark });
+    return true;
   },
 
-  /** 发送工资单（供老师核对） */
-  sendSalarySlip: (ids: string[], remark?: string) => {
-    if (USE_MOCK) return mockSendSalarySlip(ids, remark);
+  sendSalarySlip: async (ids: string[], remark?: string, month?: string) => {
+    if (USE_MOCK) return mockSendSalarySlip(ids, remark, month);
     return notWired('teacher.sendSalarySlip');
   },
 
-  /** 教师离职 */
-  resign: (id: string, resignType: string, reason?: string) => {
+  resign: async (id: string, resignType: string, reason?: string) => {
     if (USE_MOCK) return mockResignTeacher(id, resignType, reason);
-    return notWired('teacher.resign');
+    await post(`/teachers/${id}/resign`, { resignType, reason });
+    return true;
   },
 
-  /** 添加扣款/补发 */
-  addDeduction: (teacherId: string, deduction: Deduction) => {
+  addDeduction: async (teacherId: string, deduction: Deduction) => {
     if (USE_MOCK) return mockAddDeduction(teacherId, deduction);
-    return notWired('teacher.addDeduction');
+    const created = await post<RawRecord>(`/teachers/${teacherId}/deductions`, {
+      reason: deduction.reason,
+      amount: deduction.amount,
+      type: deduction.type,
+    });
+    return mapBackendDeduction(created);
   },
 
-  /** 更新扣款/补发 */
-  updateDeduction: (
+  updateDeduction: async (
     teacherId: string,
     deductionId: string,
     updates: Partial<Pick<Deduction, 'reason' | 'amount' | 'type'>>,
@@ -131,128 +185,137 @@ export const teacherService = {
     return notWired('teacher.updateDeduction');
   },
 
-  /** 删除扣款/补发 */
-  deleteDeduction: (teacherId: string, deductionId: string) => {
+  deleteDeduction: async (teacherId: string, deductionId: string) => {
     if (USE_MOCK) return mockDeleteDeduction(teacherId, deductionId);
     return notWired('teacher.deleteDeduction');
   },
 };
 
-// ============================================
-// 工资模型 Service
-// ============================================
 export const salaryModelService = {
-  /** 获取工资模型列表 */
-  getList: () => {
+  getList: async () => {
     if (USE_MOCK) return mockGetSalaryModels();
-    return notWired('salaryModel.getList');
+    const list = await get<RawRecord[]>('/teachers/salary-models');
+    return list.map((item, index) => mapBackendSalaryModel(item));
   },
 
-  /** 创建工资模型 */
-  create: (model: SalaryModel) => {
+  create: async (model: SalaryModel) => {
     if (USE_MOCK) return mockCreateSalaryModel(model);
-    return notWired('salaryModel.create');
+    const created = await post<RawRecord>('/teachers/salary-models', {
+      name: model.name,
+      type: model.type,
+      base: model.base,
+      rate: model.rate,
+      attend: model.attend,
+      perf: model.perf,
+      isDefault: model.isDefault,
+    });
+    return mapBackendSalaryModel(created);
   },
 
-  /** 更新工资模型（含历史一致性处理） */
-  update: (id: string, updates: Partial<SalaryModel>) => {
+  update: async (id: string, updates: Partial<SalaryModel>) => {
     if (USE_MOCK) return mockUpdateSalaryModel(id, updates);
-    return notWired('salaryModel.update');
+    const updated = await put<RawRecord>(`/teachers/salary-models/${id}`, {
+      name: updates.name,
+      type: updates.type,
+      base: updates.base,
+      rate: updates.rate,
+      attend: updates.attend,
+      perf: updates.perf,
+      isDefault: updates.isDefault,
+    });
+    return mapBackendSalaryModel(updated);
   },
 
-  /** 切换工资模型 — 按薪资状态处理历史数据一致性
-   * 已发放 → 冻结不变
-   * 已确认未发放 → 可重算（标记需重算）
-   * 待确认 → 按新模型计算
-   */
   switchModel: async (modelId: string, updates: Partial<SalaryModel>) => {
     if (USE_MOCK) return mockUpdateSalaryModel(modelId, updates);
-    return notWired('salaryModel.switchModel');
+    return salaryModelService.update(modelId, updates);
   },
 };
 
-// ============================================
-// 发薪设置 Service
-// ============================================
 export const salarySettingsService = {
-  /** 获取发薪设置 */
-  get: () => {
+  get: async () => {
     if (USE_MOCK) return mockGetSettings();
-    return notWired('salarySettings.get');
+    const settings = await get<RawRecord>('/teachers/salary-settings');
+    return mapBackendSalarySettings(settings);
   },
 
-  /** 更新发薪设置 */
-  update: (updates: Partial<SalarySettings>) => {
+  update: async (updates: Partial<SalarySettings>) => {
     if (USE_MOCK) return mockUpdateSettings(updates);
-    return notWired('salarySettings.update');
+    const updated = await put<RawRecord>('/teachers/salary-settings', {
+      payDay: updates.payDay,
+      pushDaysBefore: updates.pushDaysBefore,
+      autoConfirm: updates.autoConfirm,
+      pushEnabled: updates.pushEnabled,
+    });
+    return mapBackendSalarySettings(updated);
   },
 };
 
-// ============================================
-// 排课 Service
-// ============================================
 export const teacherScheduleService = {
-  /** 获取排课数据 */
-  getList: () => {
+  getList: async () => {
     if (USE_MOCK) return mockGetScheduleData();
     return notWired('teacherSchedule.getList');
   },
 };
 
-// ============================================
-// 薪资模板 Service
-// ============================================
 export const salaryTemplateService = {
-  /** 获取薪资模板列表 */
-  getList: () => {
+  getList: async () => {
     if (USE_MOCK) return mockGetSalaryTemplates();
-    return notWired('salaryTemplate.getList');
+    return fetchSalaryTemplates({ page: 1, pageSize: 100 });
   },
-  /** 获取单个薪资模板 */
-  getById: (id: string) => {
+
+  getById: async (id: string) => {
     if (USE_MOCK) return mockGetSalaryTemplateById(id);
-    return notWired('salaryTemplate.getById');
+    const list = await fetchSalaryTemplates({ page: 1, pageSize: 100 });
+    return list.find((item) => item.id === id) ?? null;
   },
-  /** 创建薪资模板 */
-  create: (data: Omit<SalaryTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
+
+  create: async (data: Omit<SalaryTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (USE_MOCK) return mockCreateSalaryTemplate(data);
-    return notWired('salaryTemplate.create');
+    const created = await post<RawRecord>('/attendance/salary-templates', {
+      campusId: data.config ? undefined : undefined,
+      name: data.name,
+      baseSalary: 0,
+      rules: data.config,
+    });
+    return mapBackendSalaryTemplate(created);
   },
-  /** 更新薪资模板 */
-  update: (id: string, updates: Partial<Omit<SalaryTemplate, 'id'>>) => {
+
+  update: async (id: string, updates: Partial<Omit<SalaryTemplate, 'id'>>) => {
     if (USE_MOCK) return mockUpdateSalaryTemplate(id, updates);
-    return notWired('salaryTemplate.update');
+    const updated = await put<RawRecord>(`/attendance/salary-templates/${id}`, {
+      name: updates.name,
+      rules: updates.config,
+    });
+    return mapBackendSalaryTemplate(updated);
   },
-  /** 删除薪资模板 */
-  remove: (id: string) => {
+
+  remove: async (id: string) => {
     if (USE_MOCK) return mockDeleteSalaryTemplate(id);
-    return notWired('salaryTemplate.remove');
+    await del(`/attendance/salary-templates/${id}`);
+    return true;
   },
-  /** 套用薪资模板到多个教师 */
-  apply: (templateId: string, teacherIds: string[]) => {
+
+  apply: async (templateId: string, teacherIds: string[]) => {
     if (USE_MOCK) return mockApplySalaryTemplate(templateId, teacherIds);
     return notWired('salaryTemplate.apply');
   },
-  /** 创建默认空薪资规则配置 */
+
   createDefaultRule: () => createDefaultSalaryRule(),
 };
 
-// ============================================
-// 教师薪资规则 Service
-// ============================================
 export const teacherSalaryRuleService = {
-  /** 获取教师薪资规则配置 */
-  get: (teacherId: string) => {
+  get: async (teacherId: string) => {
     if (USE_MOCK) return mockGetTeacherSalaryRule(teacherId);
     return notWired('teacherSalaryRule.get');
   },
-  /** 更新教师薪资规则配置 */
-  update: (teacherId: string, config: SalaryRuleConfig, templateId?: string) => {
+
+  update: async (teacherId: string, config: SalaryRuleConfig, templateId?: string) => {
     if (USE_MOCK) return mockUpdateTeacherSalaryRule(teacherId, config, templateId);
     return notWired('teacherSalaryRule.update');
   },
-  /** 把当前教师薪资规则配置复制给其他教师 */
-  copyToTeachers: (sourceTeacherId: string, targetTeacherIds: string[]) => {
+
+  copyToTeachers: async (sourceTeacherId: string, targetTeacherIds: string[]) => {
     if (USE_MOCK) return mockCopySalaryRuleToTeachers(sourceTeacherId, targetTeacherIds);
     return notWired('teacherSalaryRule.copyToTeachers');
   },

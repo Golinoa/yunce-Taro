@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { defineConfig, type UserConfigExport } from '@tarojs/cli';
 import UnoCSS from '@unocss/webpack';
@@ -20,6 +21,12 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
     useMock = 'false';
   }
   const apiBaseUrl = process.env.TARO_API_BASE_URL ?? '/api/app/v1';
+  /** mock / API 地址切换时必须隔离 webpack 缓存，否则会复用错误产物 */
+  const weappCacheKey = crypto
+    .createHash('md5')
+    .update(`${useMock}|${apiBaseUrl}`)
+    .digest('hex')
+    .slice(0, 10);
   // 构建目标平台（taro build --type xxx）。weapp 为纯小程序，组件编译为原生组件，
   // 不需要 @tarojs/plugin-html（该插件仅用于 H5/HTML 渲染）。
   // 排除它可避免其在初始化阶段覆盖写 node_modules 内 runtime.js —— 该写操作在当前
@@ -53,9 +60,18 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
           from: 'src/assets/icons',
           to: 'dist/assets/icons',
         },
+        // 主包图片白名单：禁止整目录拷贝大图，硬顶微信 1.5MB 主包上限
         {
-          from: 'src/assets/images',
-          to: 'dist/assets/images',
+          from: 'src/assets/images/sgpk.png',
+          to: 'dist/assets/images/sgpk.png',
+        },
+        {
+          from: 'src/assets/images/cover-home.webp',
+          to: 'dist/assets/images/cover-home.webp',
+        },
+        {
+          from: 'src/package-settings/assets/wx.jpg',
+          to: 'dist/package-settings/assets/wx.jpg',
         },
       ],
       options: {},
@@ -94,7 +110,7 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
         chain.merge({
           cache: {
             type: 'filesystem',
-            name: 'yunce-weapp-cache',
+            name: `yunce-weapp-${weappCacheKey}`,
             cacheDirectory: path.resolve(__dirname, '../node_modules/.cache/webpack/weapp'),
             buildDependencies: {
               config: [

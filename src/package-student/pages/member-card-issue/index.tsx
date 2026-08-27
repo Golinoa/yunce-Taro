@@ -13,7 +13,7 @@ import { auditLogService } from '@/services/audit-log';
 import { cardTypeService } from '@/services/card-type';
 import { lessonDebtService } from '@/services/lesson-debt';
 import { memberCardService } from '@/services/member-card';
-import { studentService } from '@/services/student';
+import { studentService, subscribeMessageService } from '@/services';
 import type { CardType, CardTypeKind } from '@/types/card-type';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -216,7 +216,17 @@ const MemberCardIssuePage: React.FC = () => {
         logError('audit card.issue', e);
       }
       Taro.showToast({ title: '开卡成功', icon: 'success' });
-      setTimeout(() => Taro.navigateBack(), 1200);
+      try {
+        Taro.hideToast();
+        await subscribeMessageService.runFlow('E09', {
+          studentId: student.id,
+          studentName: student.name,
+          role: profile?.currentContext?.role,
+        });
+      } catch (error) {
+        logError('subscribe E09 after card issue', error);
+      }
+      setTimeout(() => Taro.navigateBack(), 300);
     } catch (error) {
       logError('MemberCardIssuePage submit', error);
       Taro.showToast({ title: '开卡失败，请重试', icon: 'none' });

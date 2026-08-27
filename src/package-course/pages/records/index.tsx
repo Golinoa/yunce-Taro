@@ -5,6 +5,10 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import LessonConsumptionList, {
+  buildLessonConsumptionSections,
+  navigateToLessonDetail,
+} from '@/components/lesson/LessonConsumptionList';
 import { studentService, lessonRecordService } from '@/services';
 import { useStudentStore } from '@/stores';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -42,20 +46,6 @@ function getMonthRange(): DateRange {
     start: start.toISOString().split('T')[0],
     end: end.toISOString().split('T')[0],
   };
-}
-
-function formatDateLabel(dateStr: string): string {
-  const d = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  const ds = d.toISOString().split('T')[0];
-  if (ds === today.toISOString().split('T')[0]) return '今天';
-  if (ds === yesterday.toISOString().split('T')[0]) return '昨天';
-
-  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${weekDays[d.getDay()]}`;
 }
 
 const RecordsPage: React.FC = () => {
@@ -164,15 +154,10 @@ const RecordsPage: React.FC = () => {
     return result;
   }, [records, dateRange, isTeacher, filterStudentId]);
 
-  const grouped = useMemo(() => {
-    const map: Record<string, LessonRecord[]> = {};
-    for (const r of filteredRecords) {
-      const key = r.lesson_date;
-      if (!map[key]) map[key] = [];
-      map[key].push(r);
-    }
-    return map;
-  }, [filteredRecords]);
+  const consumptionSections = useMemo(
+    () => buildLessonConsumptionSections(filteredRecords),
+    [filteredRecords],
+  );
 
   const stats = useMemo(() => {
     const totalCount = filteredRecords.length;
@@ -183,12 +168,6 @@ const RecordsPage: React.FC = () => {
 
   const handleQuickChange = useCallback((range: QuickRange) => {
     setQuickRange(range);
-  }, []);
-
-  const goDetail = useCallback((id: string) => {
-    Taro.navigateTo({
-      url: `/package-course/pages/lesson-detail/index?id=${encodeURIComponent(id)}`,
-    });
   }, []);
 
   if (loading) {
@@ -339,73 +318,10 @@ const RecordsPage: React.FC = () => {
           <Empty icon="mdi-history" description="暂无上课记录" />
         ) : (
           <View className="px-4">
-            {Object.entries(grouped).map(([date, items]) => (
-              <View key={date} className="mb-3">
-                <View className="flex items-baseline gap-[12rpx] mb-2 px-1">
-                  <Text className="text-lg font-semibold text-foreground">
-                    {formatDateLabel(date)}
-                  </Text>
-                  <Text className="text-sm text-muted-foreground">{date}</Text>
-                </View>
-
-                <View className="flex flex-col">
-                  {items.map((record, idx) => (
-                    <View
-                      key={record.id}
-                      className="flex gap-[20rpx]"
-                      onClick={() => goDetail(record.id)}
-                    >
-                      {/* 时间轴节点 */}
-                      <View className="flex flex-col items-center w-[32rpx] flex-shrink-0 pt-3">
-                        <View className="w-[16rpx] h-[16rpx] rounded-full bg-gradient-primary border-[4rpx] border-white shadow-[0_0_0_2rpx_hsl(var(--primary))]" />
-                        {idx < items.length - 1 && (
-                          <View className="flex-1 w-[2rpx] bg-input mt-[4rpx]" />
-                        )}
-                      </View>
-
-                      {/* 记录卡片 */}
-                      <View className="flex-1 bg-white rounded-[24rpx] p-3 shadow-soft mb-2 press-scale">
-                        <View className="flex items-center justify-between">
-                          <View className="flex items-center gap-2">
-                            <View className="w-[72rpx] h-[72rpx] rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
-                              <Text className="text-white text-[32rpx] font-bold">
-                                {(record.student?.name || '学')[0]}
-                              </Text>
-                            </View>
-                            <View className="flex flex-col gap-[4rpx]">
-                              <Text className="text-lg font-semibold text-foreground">
-                                {record.student?.name || '学生'}
-                              </Text>
-                              <Text className="text-sm text-muted-foreground">
-                                {record.course_package?.name || '课程'}
-                              </Text>
-                            </View>
-                          </View>
-                          <View className="flex flex-col items-end gap-[4rpx]">
-                            <Text className="text-lg font-semibold text-primary">
-                              -{record.hours_used} 课时
-                            </Text>
-                            {record.performance && (
-                              <Text className="text-sm text-muted-foreground bg-muted py-[2rpx] px-2 rounded-round">
-                                {record.performance}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-
-                        {record.content && (
-                          <View className="mt-2 py-2 px-[20rpx] bg-muted rounded-2">
-                            <Text className="text-md text-muted-foreground leading-normal line-clamp-2">
-                              {record.content}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))}
+            <LessonConsumptionList
+              sections={consumptionSections}
+              onRecordClick={navigateToLessonDetail}
+            />
           </View>
         )}
       </View>

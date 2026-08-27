@@ -13,6 +13,11 @@
   - 之前「20:41 提升权限后可删」「rename 到 `_archive` 兜底」均**已失效**。
 - `dist_bak_*`：当前**删不掉**（钩子拦死），但 `.gitignore` 已忽略 `dist_bak_*/`，不会进 git、对仓库无害；待钩子修复后一次性 `rm -rf dist_bak_*` 即可。
 - `config/index.ts` 已对 weapp 构建**排除 `@tarojs/plugin-html`**（该插件每次构建覆盖写 `node_modules/.../runtime.js` 也会踩删除拦截；项目纯 weapp 不需要它）。
+- **2026-08-26 补充**：safe-delete 钩子现已**同时包裹 `fs.unlinkSync`**（实测删 webpack 缓存 pack 文件被拦；同日上午用 unlink 清缓存尚可，钩子状态会变化）。若清缓存被拦，改用 webpack `cache.name` 换新缓存目录即可绕过。
+
+## 构建期命名坑（2026-08-26 实测，必读）
+- **`_a_visible is not defined`**：TodoDetailPopover 模块内把解构绑定命名为 `visible` 时，weapp 生产构建会把它改写成未声明的 `_a_visible`（`!visible` 的 `!` 丢失）→ 运行时崩溃。**修复：内部绑定改名为 `isOpen`（解构 `{ visible: isOpen }`，对外 prop 名不变）**。该组件头部 JSDoc 已注明，勿改回。已验证与 webpack 缓存无关（清缓存全量重编仍复现）、单独跑 babel/babel-loader 均干净，属构建管线模块级处理问题。
+- **ScrollView `scrollTop` 回顶**：Taro base.wxml 恒渲染 `scroll-top="{{p32}}"`，把 `scrollTop` prop 从数值移除（→`''`）会被微信当 0 → 回顶。`useOverlayScrollFreeze` 已改为**粘性保持**（`lastPinRef` 常驻，freezeProps 永不移除 scrollTop）。scroll-top 是一次性命令，保留旧值不卡滚动。
 
 ## 编译流程（用户 2026-08-24：以后打包不需要备份）
 - **不再做"重命名移走旧 dist"的备份步骤**（用户明确要求）。直接带 Mock 变量编译即可：

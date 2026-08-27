@@ -4,7 +4,6 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import ActionButton from '@/components/ActionButton';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
-import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import ClassSelector from '@/components/lesson/ClassSelector';
 import StudentCard from '@/components/lesson/StudentCard';
 import PageContainer from '@/components/PageContainer';
@@ -13,6 +12,7 @@ import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import StarRating from '@/components/StarRating';
 import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import {
   studentService,
   packageService,
@@ -24,6 +24,7 @@ import {
   uploadService,
   teacherService,
   leadService,
+  subscribeMessageService,
 } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { campusService, roomService } from '@/services/campus';
@@ -40,7 +41,6 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
-import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
@@ -163,6 +163,8 @@ const CheckinCard: React.FC<{
   isTrial?: boolean;
   disabled?: boolean;
   highlight?: boolean;
+  /** 本节课该学员的备注（有值才显示备注行） */
+  note?: string;
   onToggleStatus: (next: CheckinStatus) => void;
   onOpenDetailSheet: () => void;
 }> = ({
@@ -173,6 +175,7 @@ const CheckinCard: React.FC<{
   isTrial = false,
   disabled = false,
   highlight = false,
+  note,
   onToggleStatus,
   onOpenDetailSheet,
 }) => {
@@ -215,6 +218,13 @@ const CheckinCard: React.FC<{
       <Text className="mt-[12rpx] text-center text-[28rpx] font-medium text-foreground line-clamp-1">
         {name}
       </Text>
+      {/* 本节课备注：有备注时展示（点击右上角编辑图标可查看/修改） */}
+      {note ? (
+        <View className="mt-[6rpx] flex w-full items-center justify-center gap-[4rpx]">
+          <Icon name="mdi-note-text" size={22} color="warning" />
+          <Text className="max-w-[200rpx] truncate text-[20rpx] text-warning">{note}</Text>
+        </View>
+      ) : null}
       <View className="relative mt-[12rpx] grid w-full grid-cols-2 gap-x-[16rpx] gap-y-[4rpx]">
         <Text className="text-center text-[22rpx] text-muted-foreground">剩余</Text>
         <Text className="text-center text-[22rpx] text-muted-foreground">扣课</Text>
@@ -269,7 +279,7 @@ const StudentEditSheet: React.FC<{
   onClose: () => void;
   onTransfer: (student: Student, targetClassId: string) => void;
   onRemove: (student: Student) => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }> = ({
   visible,
   target,
@@ -391,8 +401,8 @@ const StudentEditSheet: React.FC<{
         <View className="flex justify-center pb-[8rpx]">
           <View
             className="flex w-full items-center justify-center rounded-[48rpx] bg-[#FF7E67] py-[24rpx]"
-            onClick={() => {
-              onConfirm();
+            onClick={async () => {
+              await onConfirm();
               onClose();
             }}
           >
@@ -406,7 +416,6 @@ const StudentEditSheet: React.FC<{
 
 const LessonForm: React.FC = () => {
   const { profile } = useAuth();
-  const navSafeHeight = useNavSafeHeight();
 
   const routeParams = useMemo(() => {
     const instance = Taro.getCurrentInstance();
@@ -461,6 +470,7 @@ const LessonForm: React.FC = () => {
 
   // ===== 班级模式状态 =====
   const [classes, setClasses] = useState<Class[]>([]);
+  const [scheduledClassIds, setScheduledClassIds] = useState<Set<string>>(new Set());
   const [selectedClassId, setSelectedClassId] = useState(classIdParam);
   const [classStudents, setClassStudents] = useState<Student[]>([]);
   const [checkedStudentIds, setCheckedStudentIds] = useState<Set<string>>(new Set());
@@ -544,6 +554,9 @@ const LessonForm: React.FC = () => {
     student?: Student;
   } | null>(null);
   const [detailSheetRemark, setDetailSheetRemark] = useState('');
+  // 单学员备注草稿：studentId → 备注。优先落库到消课记录（record.note）；
+  // 学员尚无考勤记录时先暂存于此，随下次提交点名写入记录，保证输入不丢失。
+  const [studentRemarkDrafts, setStudentRemarkDrafts] = useState<Record<string, string>>({});
 
   const applyClassTeacherDefaults = useCallback(
     (classInfo: Class | null, options: TeacherUIModel[]) => {
@@ -562,21 +575,33 @@ const LessonForm: React.FC = () => {
         .map((id) => options.find((teacher) => teacher.id === id))
         .filter((teacher): teacher is TeacherUIModel => Boolean(teacher));
       const leadTeacher =
+        configuredTeachers.find((teacher) => teacher.id === classInfo.teacher_id) ||
         configuredTeachers.find((teacher) => teacher.role !== 'assist') ||
         configuredTeachers[0] ||
         options.find((teacher) => teacher.id === classInfo.teacher_id) ||
         options.find((teacher) => teacher.id === currentTeacherId) ||
         null;
-      const assistantTeacher =
-        configuredTeachers.find(
-          (teacher) => teacher.role === 'assist' && teacher.id !== leadTeacher?.id,
-        ) || null;
+      const assistantTeacherId = configuredTeacherIds.find((id) => id !== leadTeacher?.id);
+      const assistantTeacher = assistantTeacherId
+        ? options.find((teacher) => teacher.id === assistantTeacherId) || null
+        : configuredTeachers.find(
+            (teacher) => teacher.role === 'assist' && teacher.id !== leadTeacher?.id,
+          ) || null;
 
       setSelectedTeachingTeacherId(leadTeacher?.id || currentTeacherId);
       setSelectedAssistantTeacherId(assistantTeacher?.id || '');
     },
     [currentTeacherId],
   );
+
+  /** 从班级默认配置预填本次消课课时与扣费 */
+  const applyClassLessonDefaults = useCallback((classInfo: Class | null) => {
+    if (!classInfo) {
+      return;
+    }
+    setHoursUsed(classInfo.hours_per_lesson ?? 1);
+    setFeeAmount(String(classInfo.pricePerLesson ?? 0));
+  }, []);
 
   useEffect(() => {
     if (classIdParam) {
@@ -721,12 +746,14 @@ const LessonForm: React.FC = () => {
     }
 
     const loadData = async () => {
-      const [classList, teacherList, campusList] = await Promise.all([
-        fetchClassesByTeacher(currentUserId),
+      const [classList, teacherList, campusList, scheduledIds] = await Promise.all([
+        fetchClassesByTeacher(currentTeacherId),
         teacherService.getList(),
         campusService.getList(),
+        classService.getScheduledClassIds(),
       ]);
-      setClasses(classList);
+      setClasses(classList.filter((item) => item.status === 'active'));
+      setScheduledClassIds(new Set(scheduledIds));
       setTeacherOptions(teacherList);
       setCampusOptions(campusList);
       const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
@@ -765,6 +792,7 @@ const LessonForm: React.FC = () => {
         setSelectedClassId(classIdParam);
         setCampusId(classInfo?.campus_id || mainCampusId);
         applyClassTeacherDefaults(classInfo, teacherList);
+        applyClassLessonDefaults(classInfo);
         setClassStudents(students);
         await loadApprovedLeaveStudentIds(students);
 
@@ -829,6 +857,7 @@ const LessonForm: React.FC = () => {
     currentUserId,
     fetchClassesByTeacher,
     applyClassTeacherDefaults,
+    applyClassLessonDefaults,
     isEditEntryAttempt,
     loadApprovedLeaveStudentIds,
     profile?.name,
@@ -908,9 +937,7 @@ const LessonForm: React.FC = () => {
   }, [loadAllStudentsIfNeeded]);
 
   const handleEnterEditMode = useCallback(() => {
-    setAttendanceBaseline(
-      buildCheckinBaseline(classStudents, checkedStudentIds, leaveStudentIds),
-    );
+    setAttendanceBaseline(buildCheckinBaseline(classStudents, checkedStudentIds, leaveStudentIds));
     setAttendanceMode('edit');
   }, [checkedStudentIds, classStudents, leaveStudentIds]);
 
@@ -960,6 +987,10 @@ const LessonForm: React.FC = () => {
     () => teacherOptions.find((teacher) => teacher.id === selectedTeachingTeacherId) || null,
     [teacherOptions, selectedTeachingTeacherId],
   );
+  const selectedAssistantTeacher = useMemo(
+    () => teacherOptions.find((teacher) => teacher.id === selectedAssistantTeacherId) || null,
+    [teacherOptions, selectedAssistantTeacherId],
+  );
 
   const selectedClass = useMemo(
     () => classes.find((item) => item.id === selectedClassId) || null,
@@ -968,34 +999,25 @@ const LessonForm: React.FC = () => {
   const isClassDirectEntry = Boolean(classIdParam);
   const shouldShowModeTabs = !isClassDirectEntry;
 
-  /** 上课时间范围：优先使用班级起止时间，否则按当前时间+1小时兜底 */
-  const lessonTimeRange = useMemo(() => {
-    if (selectedClass?.start_time && selectedClass?.end_time) {
-      return `${selectedClass.start_time}-${selectedClass.end_time}`;
-    }
-    if (lessonTime) {
-      const [h, m] = lessonTime.split(':').map((v) => parseInt(v, 10));
-      const start = new Date();
-      start.setHours(h || 0, m || 0);
-      const end = new Date(start.getTime() + 60 * 60 * 1000);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${pad(start.getHours())}:${pad(start.getMinutes())}-${pad(end.getHours())}:${pad(end.getMinutes())}`;
-    }
-    return '';
-  }, [lessonTime, selectedClass?.end_time, selectedClass?.start_time]);
+  /** 手动消课：展示当前操作时间（不使用班级固定上课时间） */
+  const displayLessonTime = lessonTime || formatTime(new Date());
 
-  /** 已点名班级是否仍在 24 小时修改窗口内（按下课时间起算） */
+  /** 24h 修改窗口：按当前操作时间 +1 小时作为下课时间估算 */
   const canModifyLesson = useMemo(() => {
     if (!isAlreadyChecked) {
       return true;
     }
-    const endTime = lessonTimeRange.split('-')[1]?.trim();
-    if (!endTime) {
+    const timeText = displayLessonTime;
+    if (!timeText) {
       return true;
     }
-    const endDateTime = new Date(`${lessonDate}T${endTime}:00`);
+    const [h, m] = timeText.split(':').map((v) => parseInt(v, 10));
+    const endDateTime = new Date(
+      `${lessonDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`,
+    );
+    endDateTime.setTime(endDateTime.getTime() + 60 * 60 * 1000);
     return Date.now() - endDateTime.getTime() <= LESSON_MODIFY_WINDOW_HOURS * 60 * 60 * 1000;
-  }, [isAlreadyChecked, lessonDate, lessonTimeRange]);
+  }, [displayLessonTime, isAlreadyChecked, lessonDate]);
 
   const pageTitle = useMemo(() => {
     return mode === 'class' ? '班级消课' : '课时消课';
@@ -1026,7 +1048,19 @@ const LessonForm: React.FC = () => {
       if (classInfo?.room) {
         setRoom(classInfo.room);
       }
+      if (classInfo) {
+        setClasses((prev) => {
+          const index = prev.findIndex((item) => item.id === classId);
+          if (index === -1) {
+            return prev;
+          }
+          const next = [...prev];
+          next[index] = classInfo;
+          return next;
+        });
+      }
       applyClassTeacherDefaults(classInfo, teacherOptions);
+      applyClassLessonDefaults(classInfo);
       setClassStudents(students);
       await loadApprovedLeaveStudentIds(students);
 
@@ -1085,6 +1119,7 @@ const LessonForm: React.FC = () => {
     },
     [
       applyClassTeacherDefaults,
+      applyClassLessonDefaults,
       hoursUsed,
       loadApprovedLeaveStudentIds,
       loadLessonRecordsByDate,
@@ -1162,18 +1197,33 @@ const LessonForm: React.FC = () => {
   }, []);
 
   const handleSubmitSuccessReturn = useCallback(
-    (title: string, icon: 'success' | 'none' = 'success', duration = 1800) => {
+    async (
+      title: string,
+      icon: 'success' | 'none' = 'success',
+      duration = 1800,
+      options?: { renewSubscribe?: boolean },
+    ) => {
       emitScheduleRefreshSignal();
       Taro.showToast({ title, icon, duration });
-      setTimeout(() => {
-        Taro.navigateBack({
-          fail: () => {
-            void Taro.switchTab({ url: '/pages/schedule/index' });
-          },
-        });
-      }, 240);
+      // E05：点名成功后底部弹窗补充可发送次数（不阻断返回）
+      if (options?.renewSubscribe) {
+        try {
+          Taro.hideToast();
+          await subscribeMessageService.runFlow('E05', {
+            campusId: campusId || undefined,
+            role: profile?.currentContext?.role,
+          });
+        } catch (error) {
+          logError('subscribe E05 after checkin', error);
+        }
+      }
+      Taro.navigateBack({
+        fail: () => {
+          void Taro.switchTab({ url: '/pages/schedule/index' });
+        },
+      });
     },
-    [emitScheduleRefreshSignal],
+    [campusId, emitScheduleRefreshSignal, profile?.currentContext?.role],
   );
 
   // ===== 班级模式：切换签到状态 =====
@@ -1289,7 +1339,7 @@ const LessonForm: React.FC = () => {
       setUploading(true);
       const tempPaths = res.tempFilePaths || [];
       // 通过 uploadService 上传，mock 阶段返回固定 URL
-      const results = await uploadService.uploadBatch(tempPaths);
+      const results = await uploadService.uploadBatch(tempPaths, { type: 'courseware' });
       const urls = results.map((r) => r.url);
       setHomeworkImages((prev) => [...prev, ...urls]);
       if (urls.length > 0) {
@@ -1317,10 +1367,12 @@ const LessonForm: React.FC = () => {
       student?: Student;
     }) => {
       setDetailSheetTarget(target);
-      setDetailSheetRemark('');
+      // 预填备注：草稿优先（最新输入），否则取已落库的消课记录备注
+      const saved = recordByStudentId.get(target.id)?.note || '';
+      setDetailSheetRemark(studentRemarkDrafts[target.id] || saved);
       setShowStudentDetailSheet(true);
     },
-    [],
+    [recordByStudentId, studentRemarkDrafts],
   );
 
   const handleCloseStudentDetailSheet = useCallback(() => {
@@ -1525,9 +1577,9 @@ const LessonForm: React.FC = () => {
           is_cross_subject: isCrossSubject || undefined,
           package_subject: isCrossSubject ? pkg.name : undefined,
           class_subject: isCrossSubject ? studentSubject?.name : undefined,
-          content: options.isSupplement
-            ? '补录签到'
-            : content.trim() || undefined,
+          content: options.isSupplement ? '补录签到' : content.trim() || undefined,
+          // 单学员备注：草稿优先，其次保留原记录的备注（增量编辑时记录被 remove 重建，不能丢）
+          note: studentRemarkDrafts[student.id] || existingRecord?.note || undefined,
           performance: performance > 0 ? `${performance}星` : undefined,
           homework: homework.trim() || undefined,
           homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
@@ -1538,11 +1590,12 @@ const LessonForm: React.FC = () => {
           await notificationService.send({
             sender_id: profile?.id || '',
             receiver_id: binding.parent_id,
-            title: options.isSupplement ? `${student.name} 已补录签到` : `${student.name} 课时已核销`,
+            title: options.isSupplement
+              ? `${student.name} 已补录签到`
+              : `${student.name} 课时已核销`,
             content: options.isSupplement
               ? `${lessonDateValue} 已补录 ${hoursUsed} 课时，剩余 ${
-                  createdRecord.remaining_hours ??
-                  Math.max(pkg.remaining_hours - hoursUsed, 0)
+                  createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
                 } 课时`
               : `本次核销 ${hoursUsed} 课时，剩余 ${
                   createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
@@ -1560,6 +1613,7 @@ const LessonForm: React.FC = () => {
           hours_used: 0,
           status: 'leave',
           content: options.isSupplement ? '补录请假' : '家长已请假，本节课自动记为请假',
+          note: studentRemarkDrafts[student.id] || existingRecord?.note || undefined,
         });
         return;
       }
@@ -1570,6 +1624,7 @@ const LessonForm: React.FC = () => {
         hours_used: 0,
         status: 'absent',
         content: options.isSupplement ? '补录未到' : '点名未到，待老师后续补录签到',
+        note: studentRemarkDrafts[student.id] || existingRecord?.note || undefined,
       });
     },
     [
@@ -1588,6 +1643,7 @@ const LessonForm: React.FC = () => {
       selectedClassId,
       selectedTeachingTeacherId,
       studentPackages,
+      studentRemarkDrafts,
       studentSubjects,
     ],
   );
@@ -1864,7 +1920,7 @@ const LessonForm: React.FC = () => {
         logError('audit lesson.record', e);
       }
       // （预警提醒走首页待办事项：扣课时后剩余降到阈值 → 首页「课时续费提醒」待办，手动点已读）
-      handleSubmitSuccessReturn('消课成功');
+      handleSubmitSuccessReturn('消课成功', 'success', 1800, { renewSubscribe: true });
     } catch (err) {
       logError('submit lesson', err);
       Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
@@ -1978,6 +2034,8 @@ const LessonForm: React.FC = () => {
             package_subject: isCrossSubject ? pkg.name : undefined,
             class_subject: isCrossSubject ? studentSubject?.name : undefined,
             content: content.trim() || undefined,
+            // 单学员备注：随提交写入（编辑弹窗输入的草稿）
+            note: studentRemarkDrafts[student.id] || undefined,
             performance: performance > 0 ? `${performance}星` : undefined,
             homework: homework.trim() || undefined,
             homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
@@ -2026,6 +2084,7 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'leave',
             content: '家长已请假，本节课自动记为请假',
+            note: studentRemarkDrafts[student.id] || undefined,
             campus_id: campusId || undefined,
             room: room || undefined,
           });
@@ -2049,6 +2108,7 @@ const LessonForm: React.FC = () => {
             hours_used: 0,
             status: 'absent',
             content: '点名未到，待老师后续补录签到',
+            note: studentRemarkDrafts[student.id] || undefined,
             campus_id: campusId || undefined,
             room: room || undefined,
           });
@@ -2136,6 +2196,9 @@ const LessonForm: React.FC = () => {
         invalidateStudents(currentUserId);
         handleSubmitSuccessReturn(
           `签到${presentStudents.length + presentTrialBookings.length}人（含试听${presentTrialBookings.length}人），请假${leaveStudents.length}人，未到${classAbsentCount + absentTrialBookings.length}人`,
+          'success',
+          1800,
+          { renewSubscribe: true },
         );
       } else if (successCount === 0) {
         Taro.showToast({ title: '全部消课失败', icon: 'none' });
@@ -2145,6 +2208,7 @@ const LessonForm: React.FC = () => {
           `${successCount}条记录成功，${failList.length}条失败`,
           'none',
           3000,
+          { renewSubscribe: true },
         );
       }
     } catch (err) {
@@ -2176,6 +2240,7 @@ const LessonForm: React.FC = () => {
     selectedTeachingTeacherId,
     classAbsentCount,
     studentPackages,
+    studentRemarkDrafts,
     studentSubjects,
     trialBookings,
     presentTrialBookings,
@@ -2338,17 +2403,17 @@ const LessonForm: React.FC = () => {
   return (
     <PageContainer safeBottom>
       <View className="min-h-screen bg-background pb-28">
-        {/* 白色导航栏 */}
-        <View className="border-b border-black/5 bg-white px-4">
-          <View className="flex items-end pb-[6rpx]" style={{ height: `${navSafeHeight}px` }}>
-            <View className="flex min-w-0 flex-1 items-center gap-[8rpx]">
+        {/* 自定义导航栏：标题居中，返回按钮与原生胶囊对齐 */}
+        <View className="sticky top-0 z-50 border-b border-black/5 bg-white">
+          <View className="pt-nav-safe">
+            <View className="relative flex h-[88rpx] items-center justify-center">
               <View
-                className="flex h-[56rpx] w-[56rpx] items-center justify-center"
+                className="absolute left-[32rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full active:bg-muted/60"
                 onClick={handleBack}
               >
-                <Icon name="mdi-chevron-left" size="md" color="foreground" />
+                <Icon name="mdi-chevron-left" size={40} color="foreground" />
               </View>
-              <Text className="flex-1 truncate text-[30rpx] font-semibold text-foreground">
+              <Text className="max-w-[60%] truncate text-[34rpx] font-bold text-foreground">
                 {mode === 'class' ? selectedClass?.name || pageTitle : pageTitle}
               </Text>
             </View>
@@ -2581,13 +2646,13 @@ const LessonForm: React.FC = () => {
         {/* ====== 班级模式 ====== */}
         {mode === 'class' && (
           <>
-            {/* 头部信息卡片：时间段/日期/老师/编辑 */}
+            {/* 头部信息卡片：当前时间 / 老师 / 助教 / 课程介绍 / 备注 */}
             {selectedClassId ? (
               <View className="mx-[24rpx] mt-3 rounded-[20rpx] bg-white px-[28rpx] py-[24rpx] shadow-soft">
                 <View className="flex items-start justify-between gap-[20rpx]">
                   <View className="flex-1">
                     <Text className="block text-[44rpx] font-bold leading-[56rpx] text-foreground">
-                      {lessonTimeRange}
+                      {displayLessonTime}
                     </Text>
                     <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
                       {lessonDate}（{getWeekday(lessonDate)}）
@@ -2596,11 +2661,23 @@ const LessonForm: React.FC = () => {
                       老师：{selectedTeachingTeacher?.name || profile?.name || '-'}
                     </Text>
                     <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
-                      上课内容：{content || '-'}
+                      助教：{selectedAssistantTeacher?.name || '-'}
                     </Text>
-                    <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
-                      备注：{homework || '-'}
+                    <Text className="mt-[12rpx] block text-[24rpx] leading-[36rpx] text-muted-foreground">
+                      课程介绍：{selectedClass?.note || '-'}
                     </Text>
+                    <View className="mt-[12rpx] flex items-start gap-[8rpx]">
+                      <Text className="shrink-0 text-[24rpx] leading-[44rpx] text-muted-foreground">
+                        备注：
+                      </Text>
+                      <Input
+                        className="min-h-[44rpx] flex-1 text-[24rpx] leading-[44rpx] text-foreground"
+                        value={homework}
+                        onInput={(e) => setHomework(e.detail.value || '')}
+                        placeholder="可随时填写备注"
+                        placeholderClass="text-muted-foreground"
+                      />
+                    </View>
                   </View>
                   {!isAlreadyChecked ? (
                     <View
@@ -2634,6 +2711,7 @@ const LessonForm: React.FC = () => {
                     <ClassSelector
                       classes={classes}
                       selectedClassId={selectedClassId}
+                      scheduledClassIds={scheduledClassIds}
                       onSelect={handleSelectClass}
                     />
                   </View>
@@ -2670,7 +2748,7 @@ const LessonForm: React.FC = () => {
                       <Text className="text-[28rpx] text-foreground">授课扣费</Text>
                       <View className="flex items-center gap-[8rpx]">
                         <Input
-                          className="w-[160rpx] rounded-xl bg-background px-4 py-2 text-right text-[28rpx] text-foreground"
+                          className="h-[72rpx] w-[160rpx] rounded-xl bg-background px-4 text-right text-[28rpx] leading-[72rpx] text-foreground"
                           type="digit"
                           value={feeAmount}
                           onInput={(e) => setFeeAmount(e.detail.value || '0')}
@@ -2785,6 +2863,9 @@ const LessonForm: React.FC = () => {
                             deduct={info.deduct}
                             disabled={isStudentCardDisabled(stu.id)}
                             highlight={supplementStudentIds.has(stu.id)}
+                            note={
+                              studentRemarkDrafts[stu.id] || recordByStudentId.get(stu.id)?.note
+                            }
                             onToggleStatus={(next) => handleSetStudentCheckin(stu.id, next)}
                             onOpenDetailSheet={() =>
                               handleOpenStudentDetailSheet({
@@ -2862,9 +2943,7 @@ const LessonForm: React.FC = () => {
           selectedIds={[]}
           subjects={subjectOptions}
           subjectId={selectedClass?.subject_id}
-          title={
-            addStudentSheetPurpose === 'supplement' ? '选择补录学员' : '添加学员到点名名单'
-          }
+          title={addStudentSheetPurpose === 'supplement' ? '选择补录学员' : '添加学员到点名名单'}
           onClose={() => setShowAddStudentSheet(false)}
           onConfirm={(ids) => void handleConfirmAddStudents(ids)}
         />
@@ -2880,11 +2959,48 @@ const LessonForm: React.FC = () => {
           onClose={handleCloseStudentDetailSheet}
           onTransfer={handleTransferStudent}
           onRemove={handleRemoveStudent}
-          onConfirm={() => {
-            if (detailSheetTarget) {
-              // 备注可保存到对应学员的考勤记录中（后续对接 API）
-              Taro.showToast({ title: '备注已保存', icon: 'success' });
+          onConfirm={async () => {
+            if (!detailSheetTarget) {
+              return;
             }
+            const remark = detailSheetRemark.trim();
+            const studentId = detailSheetTarget.id;
+
+            // 统一先落草稿（作为 UI 呈现与提交携带的唯一事实源）
+            setStudentRemarkDrafts((prev) => ({ ...prev, [studentId]: remark }));
+
+            // 试听学员：仅暂存草稿，随下次提交点名写入记录
+            if (detailSheetTarget.type === 'trial') {
+              Taro.showToast({ title: remark ? '备注已保存' : '备注已清除', icon: 'success' });
+              return;
+            }
+
+            // 正式学员：已有点名记录 → 立即写入消课记录
+            const record = recordByStudentId.get(studentId);
+            if (record) {
+              try {
+                await lessonRecordService.update(record.id, {
+                  note: remark || undefined,
+                });
+                // 同步本地记录，保证卡片备注即时呈现
+                setRecordByStudentId((prev) => {
+                  const next = new Map(prev);
+                  const current = next.get(studentId);
+                  if (current) {
+                    next.set(studentId, { ...current, note: remark || undefined });
+                  }
+                  return next;
+                });
+                Taro.showToast({ title: '备注已保存', icon: 'success' });
+              } catch (err) {
+                logError('save student remark', err);
+                Taro.showToast({ title: '备注保存失败，请重试', icon: 'none' });
+              }
+              return;
+            }
+
+            // 尚无考勤记录：草稿已在提交点名时随 create 写入
+            Taro.showToast({ title: '已保存，提交点名后生效', icon: 'none' });
           }}
         />
 

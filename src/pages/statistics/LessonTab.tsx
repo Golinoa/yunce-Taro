@@ -3,6 +3,10 @@ import Taro from '@tarojs/taro';
 import React from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
+import LessonConsumptionList, {
+  buildLessonConsumptionSections,
+  navigateToLessonDetail,
+} from '@/components/lesson/LessonConsumptionList';
 import BarChart from '@/components/statistics/BarChart';
 import ChartContainer from '@/components/statistics/ChartContainer';
 import type { ChartDataItem } from '@/components/statistics/ChartContainer';
@@ -43,6 +47,11 @@ const LessonTab: React.FC<LessonTabProps> = ({
   packages,
   parentStudents,
 }) => {
+  const parentRecordSections = React.useMemo(
+    () => buildLessonConsumptionSections(records),
+    [records],
+  );
+
   return (
     <>
       <KpiCard
@@ -114,54 +123,12 @@ const LessonTab: React.FC<LessonTabProps> = ({
       {!isTeacher && parentStudents.length > 0 && (
         <>
           <Text className="text-xl font-semibold text-foreground mb-3 mt-6">上课记录</Text>
-          <View className="flex flex-col gap-3">
-            {records.length > 0 ? (
-              records.map((r) => (
-                <View
-                  key={r.id}
-                  className="bg-card rounded-2xl p-4 shadow-soft press-scale"
-                  onClick={() =>
-                    Taro.navigateTo({
-                      url: `/package-course/pages/lesson-detail/index?id=${encodeURIComponent(r.id)}`,
-                    })
-                  }
-                >
-                  <View className="flex items-center justify-between">
-                    <View className="flex items-center gap-3">
-                      <View className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                        <Icon
-                          name="mdi-book-open-variant"
-                          size="sm"
-                          color="hsl(var(--primary-foreground))"
-                        />
-                      </View>
-                      <View className="flex flex-col gap-1">
-                        <Text className="text-lg font-medium text-foreground">
-                          {r.course_package?.name || '课程'}
-                        </Text>
-                        <Text className="text-sm text-muted-foreground">
-                          {formatDateCN(r.lesson_date)}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text className="text-lg font-semibold text-primary">-{r.hours_used}课时</Text>
-                  </View>
-                  {r.content && (
-                    <View className="mt-2 text-base text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">
-                      内容：{r.content}
-                    </View>
-                  )}
-                  {r.performance && (
-                    <View className="mt-1 text-base text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">
-                      表现：{r.performance}
-                    </View>
-                  )}
-                </View>
-              ))
-            ) : (
-              <Empty icon="mdi-inbox" description="暂无上课记录" />
-            )}
-          </View>
+          <LessonConsumptionList
+            sections={parentRecordSections}
+            emptyText="暂无上课记录"
+            onRecordClick={navigateToLessonDetail}
+            showDateHeaders={false}
+          />
 
           <Text className="text-xl font-semibold text-foreground mb-3 mt-6">课时充值</Text>
           <View className="space-y-3">

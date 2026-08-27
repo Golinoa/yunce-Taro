@@ -16,7 +16,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Modal from '@/components/Modal';
 import PickerItem from '@/components/PickerItem';
-import { leadService } from '@/services';
+import { leadService, subscribeMessageService } from '@/services';
 import type { Lead } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
 
@@ -147,6 +147,9 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
       });
 
       Taro.showToast({ title: '预约成功', icon: 'success' });
+      void subscribeMessageService.runFlow('E24', {
+        bookingLabel: `试听·${className}`,
+      });
       onSuccess?.({ classId, lessonDate });
       onClose();
     } catch {

@@ -174,6 +174,11 @@ export async function mockGetCourseCategories(): Promise<CourseCategoryConfig[]>
   return [...MOCK_CATEGORIES].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+/** 同步读取当前分类列表（首页今日课表标签等纯映射场景） */
+export function listCourseCategoriesSync(): CourseCategoryConfig[] {
+  return [...MOCK_CATEGORIES];
+}
+
 export async function mockGetCourseCategoryById(id: string): Promise<CourseCategoryConfig | null> {
   await delay();
   return MOCK_CATEGORIES.find((item) => item.id === id) || null;

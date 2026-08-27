@@ -1,8 +1,8 @@
 /**
  * Service 层 — 待办唯一出口
  *
- * 首页时间轴 / 四象限、「我的待办」必须都走本 Service，禁止各写一套聚合。
- * view=home：排除无提醒随手记；view=all：全量（含收件箱）。
+ * 契约：docs/todo/08-todo-module-api-contract.md
+ * 首页 view=home /「我的待办」view=all 必须都走本 Service。
  */
 import dayjs from 'dayjs';
 import type { AlertItem } from '@/components/statistics/AlertSheet';
@@ -10,7 +10,12 @@ import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/data/course-category';
 import { ensureMockCustomTodoSeedsForUser } from '@/data/custom-todos';
 import { mockGetTodoItems } from '@/data/home';
 import type { TodoItemData } from '@/data/home';
-import type { TodoCompletion, TodoItem, TodoLevel } from '@/types/home-todo';
+import type {
+  TodoCompletion,
+  TodoItem,
+  TodoItemCategory,
+  TodoLevel,
+} from '@/types/home-todo';
 import type { UserRole } from '@/types/profile';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import {
@@ -23,12 +28,13 @@ import {
   reopenCustomTodo,
   sortCustomTodos,
   sortCustomTodosByMode,
+  updateCustomTodo,
   updateCustomTodoQuadrant,
   type AddCustomTodoInput,
   type CustomTodoRecord,
+  type UpdateCustomTodoInput,
 } from '@/utils/custom-todos';
-import { notWired } from '@/utils/not-wired';
-import { get, put } from '@/utils/request';
+import { del, get, post, put } from '@/utils/request';
 import {
   buildStudentRechargeTodoDesc,
   buildStudentRechargeTodoTitle,
@@ -40,8 +46,14 @@ import {
   saveTodoCompletion,
 } from '@/utils/todo-completion';
 import { getTodoQuadrantOverride, saveTodoQuadrantOverride } from '@/utils/todo-quadrant-override';
-import { getTodoReadAt, isTodoRead, markTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
-import { filterTodosBySettings, type TodoItemCategory } from '@/utils/todo-settings';
+import {
+  clearTodoRead,
+  getTodoReadAt,
+  isTodoRead,
+  markTodoRead,
+  rechargeAlertTodoId,
+} from '@/utils/todo-read';
+import { filterTodosBySettings } from '@/utils/todo-settings';
 import { TODO_CATEGORY_INBOX_ID } from '@/utils/todo-categories';
 import { isTodoInMonth, resolveSystemTodoDisplayDay } from '@/utils/todo-timeline';
 import { statisticsService } from './statistics';
@@ -69,20 +81,17 @@ export interface TodoListParams {
 export type { AddCustomTodoInput, CustomTodoRecord };
 export type TodoListItem = TodoItem;
 
-interface BackendTeacherTodosResponse {
-  expiringPackages: number;
-  lowHourStudents: number;
-  pendingLeaves: number;
+/** 后端列表响应（契约 08） */
+interface BackendTodoListResponse {
+  items: TodoItem[];
   quadrantOverrides?: Record<string, TodoQuadrant> | null;
 }
 
-interface UpdateTodoQuadrantRequest {
-  quadrant: TodoQuadrant;
-}
-
-interface UpdateTodoQuadrantResponse {
-  todoId: string;
-  quadrant: TodoQuadrant;
+interface BackendTodoMutationResponse {
+  ok?: boolean;
+  todoId?: string;
+  completion?: TodoCompletion;
+  quadrant?: TodoQuadrant;
 }
 
 const TODO_TYPE_URL: Partial<Record<TodoItemData['type'], string>> = {
@@ -150,6 +159,18 @@ function mapAlertLevelToTodoLevel(level: 'danger' | 'warning' | 'primary'): Todo
   return 'normal';
 }
 
+function applyQuadrantOverrides(
+  userId: string,
+  overrides: Record<string, TodoQuadrant> | null | undefined,
+): void {
+  if (!overrides) return;
+  Object.entries(overrides).forEach(([id, q]) => {
+    if (q === 'q1' || q === 'q2' || q === 'q3' || q === 'q4') {
+      saveTodoQuadrantOverride(userId, id, q);
+    }
+  });
+}
+
 function enrichTodoItem(todo: TodoItem, userId?: string): TodoItem {
   const stored = getTodoCompletion(todo.id);
   const legacyReadAt = isTodoRead(todo.id) ? getTodoReadAt(todo.id) : undefined;
@@ -173,7 +194,6 @@ function enrichTodoItem(todo: TodoItem, userId?: string): TodoItem {
         : dayjs().format('YYYY-MM-DD'));
 
   const quadrantOverride = userId ? getTodoQuadrantOverride(userId, todo.id) : null;
-
   const sourceType = todo.sourceType || (todo.pushedAt ? 'system' : undefined);
 
   return {
@@ -210,6 +230,9 @@ function mapTodoItem(item: TodoItemData): TodoItem {
         `&hasTrialStudent=0`
       : TODO_TYPE_URL[item.type];
 
+  const isRecharge = item.type === 'recharge';
+  const studentId = isRecharge ? item.id.replace(/^alert-recharge-/, '') : undefined;
+
   return {
     id: item.id,
     title: item.title,
@@ -222,8 +245,13 @@ function mapTodoItem(item: TodoItemData): TodoItem {
     remindEnabled: true,
     completed: item.completed,
     sourceType: 'system',
-    sharedScope: item.type === 'recharge' ? 'campus_ops' : 'private',
+    sharedScope: isRecharge ? 'campus_ops' : 'private',
     pushedAt: buildRemindAtFromTodoTime(item.time),
+    ...(isRecharge && studentId
+      ? { refType: 'student', refId: studentId }
+      : item.scheduleId
+        ? { refType: 'schedule', refId: item.scheduleId }
+        : {}),
   };
 }
 
@@ -251,6 +279,10 @@ function mapAlertToTodoItem(alert: {
     url: `/package-statistics/pages/alert-detail/index?alertId=${encodeURIComponent(alert.id)}`,
     level: mapAlertLevelToTodoLevel(alert.level),
     category: 'financePackage',
+    sourceType: 'system',
+    sharedScope: 'private',
+    refType: 'alert',
+    refId: alert.id,
   };
 }
 
@@ -271,6 +303,7 @@ function mapOperationAlertToStudentTodos(alert: {
       id: todoId,
       title: buildStudentRechargeTodoTitle(detail.name),
       desc: normalizeStudentRechargeTodoDesc(detail.info),
+      url: '/package-course/pages/recharge-records/index',
       level: detail.info.includes('已用尽') ? 'urgent' : mapAlertLevelToTodoLevel(alert.level),
       category: 'studentRecharge',
       sourceType: 'system',
@@ -278,81 +311,43 @@ function mapOperationAlertToStudentTodos(alert: {
       pushedAt,
       remindAt: pushedAt,
       remindEnabled: true,
+      refType: 'student',
+      refId: detail.refId,
     });
   }
   return todos;
 }
 
-function mapBackendTodoItems(data: BackendTeacherTodosResponse): TodoItem[] {
-  const items: TodoItem[] = [];
-
-  if (data.pendingLeaves > 0) {
-    items.push({
-      id: 'todo-pending-leaves',
-      title: `${data.pendingLeaves}条请假待处理`,
-      desc: '请及时处理待审批请假',
-      level: 'high',
-      category: 'leavePending',
-    });
+function dedupeTodosById(items: TodoItem[]): TodoItem[] {
+  const seen = new Set<string>();
+  const result: TodoItem[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    result.push(item);
   }
-
-  if (data.expiringPackages > 0) {
-    items.push({
-      id: 'todo-expiring-packages',
-      title: `${data.expiringPackages}个课包即将到期`,
-      desc: '请及时跟进续费提醒',
-      url: '/package-course/pages/recharge-records/index',
-      level: 'high',
-      category: 'financePackage',
-    });
-  }
-
-  if (data.lowHourStudents > 0) {
-    items.push({
-      id: 'todo-low-hour-students',
-      title: `${data.lowHourStudents}位学员剩余课时不足`,
-      desc: '请尽快安排续费或提醒',
-      url: COURSE_MANAGEMENT_CLASS_TAB_URL,
-      level: 'normal',
-      category: 'studentRecharge',
-    });
-  }
-
-  return items;
+  return result;
 }
 
-async function completeTodoItem(
-  todoId: string,
-  payload: { userId: string; userName: string; note?: string; memberId?: string },
-): Promise<void> {
-  const completion: TodoCompletion = {
-    completedAt: new Date().toISOString(),
-    completedBy: payload.userId,
-    completedByName: payload.userName,
-    note: payload.note?.trim() || undefined,
-  };
-
-  if (isCustomTodoId(todoId)) {
-    completeCustomTodo(payload.userId, todoId, {
-      note: payload.note,
-      memberId: payload.memberId || payload.userId,
-      memberName: payload.userName,
-    });
-    return;
+function buildListQuery(params: TodoListParams, monthKey: string): string {
+  const queryParams = new URLSearchParams();
+  queryParams.set('view', params.view);
+  if (params.campusId) queryParams.set('campusId', params.campusId);
+  if (params.view === 'all') {
+    const [yearText, monthText] = monthKey.split('-');
+    if (yearText) queryParams.set('year', yearText);
+    if (monthText) queryParams.set('month', monthText);
+    queryParams.set('monthKey', monthKey);
   }
-  if (!USE_MOCK) notWired('todo.complete');
-  saveTodoCompletion(todoId, completion);
-  markTodoRead(todoId);
+  return queryParams.toString();
 }
 
 /**
- * 聚合待办唯一实现：自定义 + 预警 + 系统/Mock 固定项。
- * 首页与「我的待办」仅通过 view 区分是否纳入无提醒随手记。
+ * Mock 聚合：自定义 + 预警 + 系统固定项。
+ * 续费只走 alert-recharge-*（预警优先，mockGetTodoItems 同 id 去重）。
  */
-async function getList(params: TodoListParams): Promise<TodoItem[]> {
+async function getListFromMock(params: TodoListParams): Promise<TodoItem[]> {
   const { teacherId, userId, role, campusId, userName, view, month } = params;
-  if (!userId) return [];
-
   const monthKey = month || dayjs().format('YYYY-MM');
 
   ensureMockCustomTodoSeeds(userId);
@@ -387,59 +382,95 @@ async function getList(params: TodoListParams): Promise<TodoItem[]> {
     enrichTodoItem(todo, userId),
   );
 
-  if (!USE_MOCK && role === 'teacher') {
-    try {
-      const queryParams = new URLSearchParams();
-      if (campusId) queryParams.set('campusId', campusId);
-      if (view === 'all') {
-        const [yearText, monthText] = monthKey.split('-');
-        if (yearText) queryParams.set('year', yearText);
-        if (monthText) queryParams.set('month', monthText);
-      }
-      const query = queryParams.toString();
-      const data = await get<BackendTeacherTodosResponse>(
-        `/home/teacher/todos${query ? `?${query}` : ''}`,
-      );
-      if (data.quadrantOverrides) {
-        Object.entries(data.quadrantOverrides).forEach(([id, q]) => {
-          if (q === 'q1' || q === 'q2' || q === 'q3' || q === 'q4') {
-            saveTodoQuadrantOverride(userId, id, q);
-          }
-        });
-      }
-      const backendTodos = mapBackendTodoItems(data).map((todo) =>
-        enrichTodoItem(
-          { ...todo, sourceType: 'system', pushedAt: new Date().toISOString() },
-          userId,
-        ),
-      );
-      const apiResult = filterTodosBySettings([
-        ...customTodoItems,
-        ...alertTodoItems,
-        ...backendTodos,
-      ]);
-      if (view === 'all') {
-        return apiResult.filter((item) => isTodoInMonth(item, monthKey));
-      }
-      return apiResult;
-    } catch {
-      const fallback = filterTodosBySettings([...customTodoItems, ...alertTodoItems]);
-      if (view === 'all') {
-        return fallback.filter((item) => isTodoInMonth(item, monthKey));
-      }
-      return fallback;
-    }
-  }
-
   const fixedTodos = (await mockGetTodoItems(teacherId || '', campusId))
     .map(mapTodoItem)
     .map((todo) => enrichTodoItem(todo, userId));
 
-  const result = filterTodosBySettings([...customTodoItems, ...alertTodoItems, ...fixedTodos]);
+  // 预警续费优先：同 id 时保留先出现的 alert 项
+  const result = filterTodosBySettings(
+    dedupeTodosById([...customTodoItems, ...alertTodoItems, ...fixedTodos]),
+  );
   if (view === 'all') {
     return result.filter((item) => isTodoInMonth(item, monthKey));
   }
   return result;
+}
+
+async function getListFromApi(params: TodoListParams): Promise<TodoItem[]> {
+  const monthKey = params.month || dayjs().format('YYYY-MM');
+  const query = buildListQuery(params, monthKey);
+  const data = await get<BackendTodoListResponse>(`/todos?${query}`);
+  applyQuadrantOverrides(params.userId, data.quadrantOverrides);
+  const items = (data.items || []).map((todo) => enrichTodoItem(todo, params.userId));
+  const filtered = filterTodosBySettings(items);
+  if (params.view === 'all') {
+    return filtered.filter((item) => isTodoInMonth(item, monthKey));
+  }
+  return filtered;
+}
+
+async function getList(params: TodoListParams): Promise<TodoItem[]> {
+  if (!params.userId) return [];
+  if (USE_MOCK) return getListFromMock(params);
+  return getListFromApi(params);
+}
+
+async function completeTodoItem(
+  todoId: string,
+  payload: { userId: string; userName: string; note?: string; memberId?: string },
+): Promise<void> {
+  const completion: TodoCompletion = {
+    completedAt: new Date().toISOString(),
+    completedBy: payload.userId,
+    completedByName: payload.userName,
+    note: payload.note?.trim() || undefined,
+  };
+
+  if (USE_MOCK) {
+    if (isCustomTodoId(todoId)) {
+      completeCustomTodo(payload.userId, todoId, {
+        note: payload.note,
+        memberId: payload.memberId || payload.userId,
+        memberName: payload.userName,
+      });
+      return;
+    }
+    saveTodoCompletion(todoId, completion);
+    markTodoRead(todoId);
+    return;
+  }
+
+  const data = await post<BackendTodoMutationResponse>(
+    `/todos/${encodeURIComponent(todoId)}/complete`,
+    {
+      note: payload.note?.trim() || undefined,
+      memberId: payload.memberId || payload.userId,
+    },
+  );
+  if (data.completion) {
+    saveTodoCompletion(todoId, data.completion);
+  } else {
+    saveTodoCompletion(todoId, completion);
+  }
+  markTodoRead(todoId);
+  if (isCustomTodoId(todoId)) {
+    completeCustomTodo(payload.userId, todoId, {
+      note: payload.note,
+      memberId: payload.memberId || payload.userId,
+      memberName: payload.userName,
+    });
+  }
+}
+
+/**
+ * 课时回升后清除续费待办完成态（read + completion），使下次列表可再提醒。
+ * 页面在充值 / 撤销消课后调用。
+ */
+export function clearStudentRechargeTodoState(studentId: string): void {
+  if (!studentId) return;
+  const todoId = rechargeAlertTodoId(studentId);
+  clearTodoRead(todoId);
+  clearTodoCompletion(todoId);
 }
 
 export const todoService = {
@@ -452,34 +483,88 @@ export const todoService = {
 
   /** 添加自定义待办 */
   add: async (userId: string, input: AddCustomTodoInput): Promise<TodoItem> => {
-    if (!USE_MOCK) notWired('todo.add');
-    const record = addCustomTodo(userId, input);
-    return mapCustomTodoToHomeItem(record);
+    if (USE_MOCK) {
+      const record = addCustomTodo(userId, input);
+      return mapCustomTodoToHomeItem(record);
+    }
+    const created = await post<TodoItem>('/todos', {
+      title: input.title,
+      note: input.note,
+      remindEnabled: input.remindEnabled,
+      remindDate: input.remindDate,
+      remindTime: input.remindTime,
+      quadrant: input.quadrant,
+      todoCategoryId: input.categoryId,
+      collaboratorIds: input.collaboratorIds,
+      collaborationMode: input.collaborationMode,
+    });
+    return enrichTodoItem(created, userId);
   },
 
   /** 仅自定义原始记录（调试/兼容，业务列表请用 getList） */
   listCustomRecords: async (userId: string): Promise<CustomTodoRecord[]> => {
     if (!userId) return [];
     ensureMockCustomTodoSeeds(userId);
-    if (!USE_MOCK) notWired('todo.listCustomRecords');
+    if (USE_MOCK) {
+      return sortCustomTodosByMode(getCustomTodos(userId), 'deadline');
+    }
+    // 真模式：自定义记录已含在 GET /todos；本方法仅 Mock/调试保留本地副本
     return sortCustomTodosByMode(getCustomTodos(userId), 'deadline');
   },
 
   /** 删除自定义待办 */
   remove: async (userId: string, todoId: string): Promise<boolean> => {
-    if (!USE_MOCK) notWired('todo.remove');
-    return removeCustomTodo(userId, todoId);
+    if (USE_MOCK) {
+      return removeCustomTodo(userId, todoId);
+    }
+    await del<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}`);
+    removeCustomTodo(userId, todoId);
+    return true;
+  },
+
+  /** 更新自定义待办（仅 custom） */
+  update: async (
+    userId: string,
+    todoId: string,
+    input: UpdateCustomTodoInput,
+  ): Promise<TodoItem | null> => {
+    if (!userId || !todoId || !isCustomTodoId(todoId)) return null;
+    if (USE_MOCK) {
+      const record = updateCustomTodo(userId, todoId, input);
+      return record ? mapCustomTodoToHomeItem(record) : null;
+    }
+    const updated = await put<TodoItem>(`/todos/${encodeURIComponent(todoId)}`, {
+      title: input.title,
+      note: input.note,
+      remindEnabled: input.remindEnabled,
+      remindDate: input.remindDate,
+      remindTime: input.remindTime,
+      quadrant: input.quadrant,
+      todoCategoryId: input.categoryId,
+      collaboratorIds: input.collaboratorIds,
+      collaborationMode: input.collaborationMode,
+    });
+    updateCustomTodo(userId, todoId, input);
+    return enrichTodoItem(updated, userId);
   },
 
   /** 重新打开待办 */
   reopen: async (userId: string, todoId: string): Promise<boolean> => {
     if (!userId || !todoId) return false;
-    if (isCustomTodoId(todoId)) {
-      if (!USE_MOCK) notWired('todo.reopen');
-      return reopenCustomTodo(userId, todoId);
+    if (USE_MOCK) {
+      if (isCustomTodoId(todoId)) {
+        return reopenCustomTodo(userId, todoId);
+      }
+      clearTodoCompletion(todoId);
+      clearTodoRead(todoId);
+      return true;
     }
-    if (!USE_MOCK) notWired('todo.reopen');
+    await post<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}/reopen`);
+    if (isCustomTodoId(todoId)) {
+      reopenCustomTodo(userId, todoId);
+    }
     clearTodoCompletion(todoId);
+    clearTodoRead(todoId);
     return true;
   },
 
@@ -500,10 +585,9 @@ export const todoService = {
     }
 
     try {
-      await put<UpdateTodoQuadrantResponse>(
-        `/home/teacher/todos/${encodeURIComponent(todoId)}/quadrant`,
-        { quadrant } satisfies UpdateTodoQuadrantRequest,
-      );
+      await put<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}/quadrant`, {
+        quadrant,
+      });
     } catch {
       return false;
     }
@@ -517,4 +601,7 @@ export const todoService = {
 
   /** 完成待办 */
   complete: completeTodoItem,
+
+  /** 课时回升：清除学员续费待办完成态 */
+  clearStudentRechargeState: clearStudentRechargeTodoState,
 };

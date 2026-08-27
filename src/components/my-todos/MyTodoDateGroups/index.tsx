@@ -25,6 +25,8 @@ export interface MyTodoDateGroupsProps {
   expandedDates: Set<string>;
   onToggleDate: (dateKey: string) => void;
   onToggleComplete: (item: TodoItem) => void;
+  /** 点击卡片打开详情 */
+  onPress?: (item: TodoItem) => void;
 }
 
 const EMBED = TODO_TIMELINE_EMBEDDED_LAYOUT;
@@ -35,6 +37,7 @@ const MyTodoDateGroups: React.FC<MyTodoDateGroupsProps> = ({
   expandedDates,
   onToggleDate,
   onToggleComplete,
+  onPress,
 }) => {
   const now = dayjs();
   const todayKey = now.format('YYYY-MM-DD');
@@ -61,6 +64,7 @@ const MyTodoDateGroups: React.FC<MyTodoDateGroupsProps> = ({
         items={items}
         targetDate={todayKey}
         onToggleComplete={onToggleComplete}
+        onPress={onPress}
         embedded
       />
     );
@@ -125,6 +129,7 @@ const MyTodoDateGroups: React.FC<MyTodoDateGroupsProps> = ({
                     targetDate={isInbox ? undefined : group.dateKey}
                     plainList={isInbox}
                     onToggleComplete={onToggleComplete}
+                    onPress={onPress}
                     embedded
                     hideAxis
                     chronological={!isTodayGroup}

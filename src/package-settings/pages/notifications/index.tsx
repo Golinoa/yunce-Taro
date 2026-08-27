@@ -1,7 +1,10 @@
 import { View, Text } from '@tarojs/components';
+import Taro from '@tarojs/taro';
 import React, { useCallback, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
+import Icon from '@/components/Icon';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -101,6 +104,18 @@ const NotificationsPage: React.FC = () => {
       <View className="min-h-screen bg-background">
         {/* 分组列表 */}
         <View className="px-[32rpx] pt-[24rpx] pb-[60rpx] flex flex-col gap-[24rpx]">
+          <View
+            className="flex flex-row items-center justify-between rounded-[28rpx] bg-card px-[32rpx] py-[28rpx] active:opacity-90"
+            onClick={() => Taro.navigateTo({ url: subscribeMessageService.messageAuthPageUrl })}
+          >
+            <View className="flex-1">
+              <Text className="text-[30rpx] font-medium text-foreground">微信订阅消息授权</Text>
+              <Text className="mt-[8rpx] text-[24rpx] text-muted-foreground">
+                查看剩余可发送次数，点击补充授权
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={20} className="text-muted-foreground" />
+          </View>
           <Text className="text-[24rpx] text-muted-foreground leading-relaxed px-[8rpx]">
             以下开关控制微信订阅消息等站外推送；关闭后不影响首页「待办事项」Tab 内的页面内提醒。
           </Text>

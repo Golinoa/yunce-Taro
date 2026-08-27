@@ -56,10 +56,15 @@ const AUTH_ENDPOINTS = {
   me: '/auth/me',
   logout: '/auth/logout',
   phoneLogin: '/auth/phone-login',
+  smsCode: '/auth/sms-code',
+  register: '/auth/register',
+  refresh: '/auth/refresh',
   profile: '/profile',
   switchRole: '/auth/switch-role',
   wechatLogin: '/auth/wechat-login',
 } as const;
+
+const REGISTER_DRAFT_STORAGE_KEY = 'yunce-edu-register-draft-local';
 
 interface BackendUserInfo {
   id: string;
@@ -90,6 +95,7 @@ interface BackendUserInfo {
 
 interface BackendAuthPayload {
   expiresIn: number;
+  isNewUser?: boolean;
   refreshToken: string;
   token: string;
   user: BackendUserInfo;
@@ -130,6 +136,7 @@ export const authCapabilities = {
   supportsEmailCodeLogin: USE_MOCK,
   supportsPhoneLogin: USE_MOCK,
   supportsWechatLogin: true,
+  usesMockRegister: USE_MOCK,
 } as const;
 
 const clearStoredAuth = (): void => {
@@ -157,6 +164,31 @@ const mapBackendRole = (role: BackendRole): UserRole => {
       return 'principal';
   }
 };
+
+const mapUserRoleToBackend = (role: UserRole): BackendRole => {
+  switch (role) {
+    case 'teacher':
+      return 'TEACHER';
+    case 'parent':
+      return 'PARENT';
+    case 'principal':
+      return 'PRINCIPAL';
+    default:
+      throw new Error('当前仅支持注册为教师、校长或家长');
+  }
+};
+
+function readClientRegisterDraft(): RegisterDraft | null {
+  try {
+    const raw = Taro.getStorageSync(REGISTER_DRAFT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as RegisterDraft;
+  } catch {
+    return null;
+  }
+}
 
 const buildOrganizationName = (user: BackendUserInfo, role: UserRole): string => {
   if (role === 'teacher') {
@@ -294,7 +326,16 @@ const readStoredSession = (): AuthSession | null => {
     }
 
     const session = JSON.parse(raw) as AuthSession;
-    if (!session?.access_token || !session?.expires_at || session.expires_at * 1000 <= Date.now()) {
+    if (!session?.refresh_token && !session?.access_token) {
+      clearStoredAuth();
+      return null;
+    }
+
+    // access 过期但 refresh 仍可用时保留 session，由 request 层静默刷新
+    if (session.expires_at * 1000 <= Date.now()) {
+      if (session.refresh_token) {
+        return session;
+      }
       clearStoredAuth();
       return null;
     }
@@ -356,6 +397,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export interface LoginResult {
   session: AuthSession | null;
   profile: Profile | null;
+  isNewUser?: boolean;
   error: { message: string } | null;
 }
 
@@ -371,9 +413,18 @@ export async function login(username: string, password: string): Promise<LoginRe
 export async function wechatLogin(code: string): Promise<LoginResult> {
   if (USE_MOCK) return mockWechatLogin(code);
   try {
-    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatLogin, { code });
+    const data = await post<BackendAuthPayload>(
+      AUTH_ENDPOINTS.wechatLogin,
+      { code },
+      { skipAuth: true },
+    );
     const mapped = mapBackendAuthPayload(data);
-    return { session: mapped.session, profile: mapped.profile, error: null };
+    return {
+      session: mapped.session,
+      profile: mapped.profile,
+      isNewUser: data.isNewUser,
+      error: null,
+    };
   } catch (error) {
     return {
       session: null,
@@ -383,10 +434,26 @@ export async function wechatLogin(code: string): Promise<LoginResult> {
   }
 }
 
+export async function sendSmsCode(phone: string): Promise<{ error: { message: string } | null }> {
+  if (USE_MOCK) {
+    return { error: null };
+  }
+  try {
+    await post(AUTH_ENDPOINTS.smsCode, { phone }, { skipAuth: true });
+    return { error: null };
+  } catch (error) {
+    return { error: { message: getErrorMessage(error, '验证码发送失败') } };
+  }
+}
+
 export async function phoneLogin(phone: string, code: string): Promise<LoginResult> {
   if (USE_MOCK) return mockPhoneLogin(phone, code);
   try {
-    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.phoneLogin, { phone, code });
+    const data = await post<BackendAuthPayload>(
+      AUTH_ENDPOINTS.phoneLogin,
+      { phone, code },
+      { skipAuth: true },
+    );
     const mapped = mapBackendAuthPayload(data);
     return { session: mapped.session, profile: mapped.profile, error: null };
   } catch (error) {
@@ -481,7 +548,23 @@ export async function registerStep1(
   inviteCode?: string,
 ): Promise<RegisterStep1Result> {
   if (USE_MOCK) return mockRegisterStep1(username, password, inviteCode);
-  return { tempToken: null, error: { message: '注册服务暂未接通，请稍后再试' } };
+  return { tempToken: null, error: { message: '请使用手机号注册' } };
+}
+
+export async function registerStep1ByPhone(phone: string): Promise<RegisterStep1Result> {
+  const normalized = phone.trim();
+  if (!/^1[3-9]\d{9}$/.test(normalized)) {
+    return { tempToken: null, error: { message: '请输入正确的手机号' } };
+  }
+
+  if (USE_MOCK) {
+    return mockRegisterStep1(normalized, 'phone-register', undefined);
+  }
+
+  return {
+    tempToken: `phone-register:${normalized}`,
+    error: null,
+  };
 }
 
 export async function registerStep2(
@@ -489,7 +572,13 @@ export async function registerStep2(
   role: UserRole,
 ): Promise<RegisterStep1Result> {
   if (USE_MOCK) return mockRegisterStep2(tempToken, role);
-  return { tempToken: null, error: { message: '注册服务暂未接通，请稍后再试' } };
+  if (!tempToken) {
+    return { tempToken: null, error: { message: '注册已过期，请重新填写' } };
+  }
+  if (!['teacher', 'principal', 'parent'].includes(role)) {
+    return { tempToken: null, error: { message: '当前仅支持注册为教师、校长或家长' } };
+  }
+  return { tempToken, error: null };
 }
 
 export async function registerStep3(
@@ -497,7 +586,36 @@ export async function registerStep3(
   roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo,
 ): Promise<LoginResult> {
   if (USE_MOCK) return mockRegisterStep3(tempToken, roleInfo);
-  return { session: null, profile: null, error: { message: '注册服务暂未接通，请稍后再试' } };
+
+  const draft = readClientRegisterDraft();
+  if (!draft?.phone || !draft.role || draft.tempToken !== tempToken) {
+    return { session: null, profile: null, error: { message: '注册信息不完整，请重新填写' } };
+  }
+
+  try {
+    const backendRole = mapUserRoleToBackend(draft.role);
+    const principalInfo =
+      draft.role === 'principal' ? (roleInfo as PrincipalRoleInfo) : undefined;
+    const body: Record<string, unknown> = {
+      phone: draft.phone,
+      role: backendRole,
+    };
+
+    if (principalInfo?.organizationName) {
+      body.nickname = principalInfo.organizationName;
+      body.institution = principalInfo.organizationName;
+    }
+
+    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.register, body, { skipAuth: true });
+    const mapped = mapBackendAuthPayload(data);
+    return { session: mapped.session, profile: mapped.profile, error: null };
+  } catch (error) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: getErrorMessage(error, '注册失败') },
+    };
+  }
 }
 
 // ============================================
@@ -519,6 +637,8 @@ export async function validateInviteCode(code: string) {
   try {
     const data = await get<{ valid: boolean; student?: { id: string; name: string } }>(
       `/auth/invite-code/${encodeURIComponent(code)}/validate`,
+      undefined,
+      { skipAuth: true },
     );
     return {
       valid: data.valid,
@@ -664,6 +784,7 @@ export async function logout(): Promise<void> {
     await post(
       AUTH_ENDPOINTS.logout,
       storedSession?.refresh_token ? { refreshToken: storedSession.refresh_token } : {},
+      { skipAuth: !storedSession?.access_token },
     );
   } finally {
     clearStoredAuth();

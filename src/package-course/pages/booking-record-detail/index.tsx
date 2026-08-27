@@ -10,6 +10,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { notificationService } from '@/services';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useAuth } from '@/utils/auth';
 import { getBookingRuleSummaryList, readBookingRules } from '@/utils/booking-rules';
 import { logError } from '@/utils/logger';
@@ -239,6 +240,10 @@ const BookingRecordDetailPage: React.FC = () => {
           content: `您预约的「${className}」已取消，原上课时间为 ${lessonDate} ${timeRange}。`,
         });
         Taro.showToast({ title: '已取消预约', icon: 'success' });
+        void subscribeMessageService.runFlow('E25', {
+          bookingLabel: className,
+          className,
+        });
         Taro.navigateBack();
         return;
       }

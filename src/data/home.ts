@@ -22,14 +22,23 @@ import { COURSE_MANAGEMENT_CLASS_TAB_URL } from './course-category';
 import {
   filterClassesByActor,
   filterLessonRecordsByActor,
-  filterSchedulesByActor,
+  filterSchedulesForMyToday,
   filterStudentsByActor,
   getActorScope,
 } from './students';
-import { mockGetLeadFollowingCount } from './lead';
+import { filterMyTodayLeadBookings, mockGetLeadFollowingCount } from './lead';
+import { filterMyTodayVenueBookings } from './venue-booking';
+import type { LeadBooking } from '@/types/lead';
+import type { VenueBookingRecord } from '@/types/venue-booking';
+import { ROOMS } from './mock-database';
+import {
+  resolveCategoryLabelByClassId,
+  resolveCategoryLabelByMode,
+} from '@/utils/schedule-category';
 import { mockGetTeachers } from './teacher';
 import { normalizeSalaryStatus } from '@/types/teacher';
 import { buildStudentRechargeTodoTitle } from '@/utils/student-recharge-todo';
+import { rechargeAlertTodoId } from '@/utils/todo-read';
 
 function delay(ms = 100): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -398,48 +407,91 @@ export async function mockGetStudents(teacherId: string, limit?: number) {
   return students;
 }
 
-/** 分钟数 → HH:mm（支持跨 0 点，仅用于 Mock 演示排课） */
-function formatMinutesToTime(totalMinutes: number): string {
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-  const h = Math.floor(normalized / 60);
-  const m = normalized % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+/** 首页今日课表行：固定排课 + 当日预约合并后的统一结构 */
+export type HomeTodayScheduleRow = Schedule & {
+  bookingId?: string;
+  trialMode?: LeadBooking['trial_mode'];
+  displayName?: string;
+  trialStudentId?: string;
+  scheduleKind?: 'schedule' | 'booking' | 'venue';
+  venueBookingId?: string;
+  sourceRoomId?: string;
+  categoryLabel?: string;
+};
+
+function normalizeBookingTeacherId(rawId: string): string {
+  const teacher = TEACHERS.find((item) => item.id === rawId || item.userId === rawId);
+  return teacher?.id ?? rawId;
 }
 
-/**
- * 首页今日课表状态演示排课（动态时间）
- * - sch-home-demo-urgent：4 分钟后开课 → 黄色 urgent + 倒计时
- * - sch-home-demo-active：已开课 25 分钟、距下课 35 分钟 → 绿色 active +「上课中」
- */
-function buildHomeScheduleStatusDemos(todayWeekday: Schedule['dayOfWeek']): Schedule[] {
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+/** 团课试听若与当日固定排课时段完全一致，则不再重复展示 */
+function isBookingCoveredByFixedSchedule(
+  booking: LeadBooking,
+  schedules: Schedule[],
+): boolean {
+  if (booking.trial_mode !== 'group' || !booking.class_id) return false;
+  return schedules.some(
+    (schedule) =>
+      schedule.classId === booking.class_id &&
+      schedule.startTime === booking.start_time &&
+      schedule.endTime === booking.end_time,
+  );
+}
 
-  return [
-    {
-      id: 'sch-home-demo-urgent',
-      classId: 'cls-demo',
-      color: 'amber',
-      teacherId: 'teacher-004',
-      campusId: 'campus-west',
-      dayOfWeek: todayWeekday,
-      startTime: formatMinutesToTime(nowMinutes + 4),
-      endTime: formatMinutesToTime(nowMinutes + 64),
-      room: '素描教室1',
-      status: 'scheduled',
-    },
-    {
-      id: 'sch-home-demo-active',
-      classId: 'cls-009',
-      color: 'info',
-      teacherId: 'teacher-004',
-      campusId: 'campus-west',
-      dayOfWeek: todayWeekday,
-      startTime: formatMinutesToTime(nowMinutes - 25),
-      endTime: formatMinutesToTime(nowMinutes + 35),
-      room: '书法教室1',
-      status: 'scheduled',
-    },
-  ];
+function mapLeadBookingToHomeScheduleRow(
+  booking: LeadBooking,
+  todayWeekday: Schedule['dayOfWeek'],
+): HomeTodayScheduleRow {
+  const teacherId = normalizeBookingTeacherId(booking.teacher_id);
+  const categoryLabel =
+    resolveCategoryLabelByClassId(booking.class_id) ||
+    resolveCategoryLabelByMode(booking.trial_mode);
+  const displayName =
+    booking.trial_mode === 'private'
+      ? `${booking.child_name || '学员'} · ${booking.course_name || categoryLabel || '课程'}`
+      : booking.class_name || booking.course_name || '试听团课';
+  return {
+    id: `booking-${booking.id}`,
+    classId: booking.class_id || '',
+    teacherId,
+    campusId: booking.campus_id,
+    dayOfWeek: todayWeekday,
+    startTime: booking.start_time,
+    endTime: booking.end_time,
+    room: booking.room,
+    color: booking.trial_mode === 'private' ? 'purple' : 'amber',
+    status: booking.status === 'completed' ? 'done' : 'scheduled',
+    bookingId: booking.id,
+    trialMode: booking.trial_mode,
+    displayName,
+    trialStudentId: booking.trial_student_id,
+    scheduleKind: 'booking',
+    categoryLabel,
+  };
+}
+
+function mapVenueBookingToHomeScheduleRow(
+  booking: VenueBookingRecord,
+  todayWeekday: Schedule['dayOfWeek'],
+): HomeTodayScheduleRow {
+  const room = ROOMS.find((item) => item.id === booking.roomId);
+  return {
+    id: `venue-${booking.id}`,
+    classId: '',
+    teacherId: '',
+    campusId: room?.campusId || 'campus-center',
+    dayOfWeek: todayWeekday,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    room: room?.name,
+    color: 'teal',
+    status: booking.status === 'checked_in' ? 'done' : 'scheduled',
+    venueBookingId: booking.id,
+    sourceRoomId: booking.roomId,
+    scheduleKind: 'venue',
+    categoryLabel: '场地',
+    displayName: `${booking.userName} · ${room?.name || '场地'}`,
+  };
 }
 
 /** 获取今日排课（含昨日跨 0 点未完全下课的排课，用户口径 2026-08-24） */
@@ -449,7 +501,13 @@ export async function mockGetTodaySchedules(teacherId: string, campusId?: string
   const todayWeekday = now.getDay() || 7; // 周日是0，转为7
   const yesterdayWeekday = todayWeekday === 1 ? 7 : todayWeekday - 1;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  let schedules = filterSchedulesByActor(teacherId).filter((schedule) => {
+  const myTeacherIds = new Set(
+    // 与首页专用 mock（teacher-001）对齐，保证演示账号始终有班课卡
+    TEACHERS.filter((t) => t.id === teacherId || t.userId === teacherId).map((t) => t.id),
+  );
+  if (myTeacherIds.size === 0) myTeacherIds.add(teacherId);
+
+  let schedules = filterSchedulesForMyToday(teacherId).filter((schedule) => {
     if (schedule.status !== 'scheduled') return false;
     if (schedule.dayOfWeek === todayWeekday) return true;
     // 昨日跨 0 点排课（endTime 超过 24:00，如 23:30-24:30）：次日未完全下课前继续显示
@@ -461,13 +519,61 @@ export async function mockGetTodaySchedules(teacherId: string, campusId?: string
     }
     return false;
   });
-  // 机构创建者/跨校区管理者（accessScope=org）应看到全部校区课程（用户口径 2026-08-24），不做校区过滤
-  const scope = getActorScope(teacherId);
-  if (campusId && scope.accessScope !== 'org') {
+  if (campusId) {
     schedules = schedules.filter((schedule) => schedule.campusId === campusId);
   }
-  schedules = [...schedules, ...buildHomeScheduleStatusDemos(todayWeekday as Schedule['dayOfWeek'])];
-  return schedules;
+
+  // 演示账号无当日固定排课时，补 1 条班课形态，保证四种卡片齐全
+  if (
+    schedules.length === 0 &&
+    (myTeacherIds.has('teacher-001') || teacherId === 'user-teacher-001')
+  ) {
+    schedules = [
+      {
+        id: 'sch-home-today-class-001',
+        classId: 'cls-001',
+        color: 'primary',
+        teacherId: 'teacher-001',
+        campusId: 'campus-center',
+        dayOfWeek: todayWeekday as Schedule['dayOfWeek'],
+        startTime: '14:00',
+        endTime: '15:30',
+        room: '101',
+        status: 'scheduled',
+      },
+    ];
+    if (campusId && campusId !== 'campus-center') {
+      schedules = [];
+    }
+  }
+
+  // 首页演示：班课 / 团课 / 私教 / 场地 各保留 1 张卡片
+  const classSchedule = schedules[0] ? [schedules[0]] : [];
+
+  const leadBookings = filterMyTodayLeadBookings(teacherId, campusId).filter(
+    (booking) => !isBookingCoveredByFixedSchedule(booking, classSchedule),
+  );
+  // 优先用首页专用 mock（lb-home-today-*），避免派生预约抢先
+  const privateBooking =
+    leadBookings.find((b) => b.trial_mode === 'private' && b.id.startsWith('lb-home-today-')) ||
+    leadBookings.find((b) => b.trial_mode === 'private');
+  const groupBooking =
+    leadBookings.find((b) => b.trial_mode === 'group' && b.id.startsWith('lb-home-today-')) ||
+    leadBookings.find((b) => b.trial_mode === 'group');
+  const bookingRows = [privateBooking, groupBooking]
+    .filter((booking): booking is NonNullable<typeof booking> => Boolean(booking))
+    .map((booking) =>
+      mapLeadBookingToHomeScheduleRow(booking, todayWeekday as Schedule['dayOfWeek']),
+    );
+
+  const venueList = filterMyTodayVenueBookings(teacherId, campusId);
+  const venueBooking =
+    venueList.find((b) => b.id.includes('-home')) || venueList[0];
+  const venueRows = venueBooking
+    ? [mapVenueBookingToHomeScheduleRow(venueBooking, todayWeekday as Schedule['dayOfWeek'])]
+    : [];
+
+  return [...classSchedule, ...bookingRows, ...venueRows];
 }
 
 /** 获取最近消课记录 */
@@ -590,7 +696,7 @@ export async function mockGetTodoItems(
     })(),
     lowHoursStudent
       ? {
-          id: `todo-recharge-${lowHoursStudent.id}`,
+          id: rechargeAlertTodoId(lowHoursStudent.id),
           title: buildStudentRechargeTodoTitle(lowHoursStudent.name),
           type: 'recharge',
           time: '15:00',
@@ -693,34 +799,6 @@ export async function mockGetTodoItems(
       });
     }
   }
-
-  const demoNowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-  extraItems.push(
-    {
-      id: 'todo-demo-timeline-1',
-      title: '联系张家长续费',
-      type: 'recharge',
-      time: formatMinutesToTime(demoNowMinutes + 12),
-      priority: 'high',
-      completed: false,
-    },
-    {
-      id: 'todo-demo-timeline-2',
-      title: '准备周六公开课物料',
-      type: 'meeting',
-      time: formatMinutesToTime(demoNowMinutes + 45),
-      priority: 'medium',
-      completed: false,
-    },
-    {
-      id: 'todo-demo-timeline-done',
-      title: '核对昨日试听反馈',
-      type: 'lead',
-      time: formatMinutesToTime(Math.max(0, demoNowMinutes - 30)),
-      priority: 'low',
-      completed: true,
-    },
-  );
 
   return [...baseItems, ...extraItems];
 }

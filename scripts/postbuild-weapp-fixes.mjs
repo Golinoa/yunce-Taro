@@ -149,9 +149,10 @@ function auditPackageSize() {
   );
 
   if (mainBytes > MAIN_PACKAGE_LIMIT_BYTES) {
-    console.warn(
-      `[postbuild-weapp-fixes] WARN: main package exceeds 1.5MB recommendation (${formatKb(mainBytes)})`,
+    console.error(
+      `[postbuild-weapp-fixes] ERROR: main package exceeds hard 1.5MB limit (${formatKb(mainBytes)} > ${formatKb(MAIN_PACKAGE_LIMIT_BYTES)})`,
     );
+    process.exitCode = 1;
   }
 
   if (oversizedMedia.length > 0) {

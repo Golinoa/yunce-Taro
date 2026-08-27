@@ -424,7 +424,8 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
           </View>
         ) : (
           <ScrollView scrollY className="flex-1 min-h-0">
-            <View className="flex flex-col">
+            {/* 顶部 pt-[16rpx]：第一排学员与上方统计栏留出间距，避免贴头（全引用处统一生效） */}
+            <View className="flex flex-col pt-[16rpx]">
               {filteredStudents.map((s) => (
                 <StudentRow
                   key={s.id}
@@ -439,8 +440,8 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
           </ScrollView>
         )}
 
-        {/* 确认按钮（固定底部，不被列表挤走，始终可点击） */}
-        <View className="shrink-0 pt-[24rpx] pb-[48rpx]">
+        {/* 确认按钮（固定底部，不被列表挤走，始终可点击）；pb 带上安全区避免被手势条遮住 */}
+        <View className="shrink-0 pt-[24rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))]">
           <View
             className={cn(
               'w-full py-[24rpx] rounded-full flex items-center justify-center press-scale',

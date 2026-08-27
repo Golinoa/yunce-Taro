@@ -20,8 +20,18 @@ import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { getAlertThreshold } from '@/utils/alert-config';
 import { isAdmin, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
+import {
+  canUseCalendarSync,
+  getCalendarSyncSettings,
+  isCalendarSyncEnabled,
+} from '@/utils/calendar-sync-settings';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
+import { calendarSyncService } from '@/services/calendar-sync';
+import {
+  handleVersionNumberTap,
+  isDeveloperModeUnlocked,
+} from '@/utils/developer-mode';
 
 /** 设置项配置 */
 interface SettingItem {
@@ -73,21 +83,57 @@ const PLACEHOLDER_TIP = '功能开发中，敬请期待';
 
 const SystemSettings: React.FC = () => {
   useCardNavigationBar();
-  const { signOut, currentRole } = useAuth();
+  const { signOut, currentRole, profile } = useAuth();
   const { activeTheme } = useThemeStore();
   const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
+  const [calendarSyncEnabled, setCalendarSyncEnabledState] = useState(false);
   const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
+  const [developerModeVisible, setDeveloperModeVisible] = useState(isDeveloperModeUnlocked());
+  const currentUserId = profile?.id || '';
+  const showCalendarSyncSwitch = canUseCalendarSync(currentRole);
 
   // 页面显示时读取最新开关状态
   useDidShow(() => {
     setVenueBookingEnabledState(getVenueBookingEnabled());
     setAlertThresholdState(getAlertThreshold());
+    setDeveloperModeVisible(isDeveloperModeUnlocked());
+    if (currentUserId) {
+      setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
+    }
   });
 
   const handleVenueBookingChange = useCallback((enabled: boolean) => {
     setVenueBookingEnabledState(enabled);
     setVenueBookingEnabled(enabled);
   }, []);
+
+  const handleCalendarSyncChange = useCallback(
+    async (enabled: boolean) => {
+      if (!currentUserId) {
+        return;
+      }
+      if (!enabled) {
+        setCalendarSyncEnabledState(false);
+        calendarSyncService.disable(currentUserId);
+        return;
+      }
+
+      setCalendarSyncEnabledState(true);
+      try {
+        await calendarSyncService.enableAndSync({
+          userId: currentUserId,
+          teacherId: currentUserId,
+          role: currentRole ?? undefined,
+          campusId: profile?.currentContext?.campusId,
+          directAuth: true,
+        });
+      } catch (err) {
+        setCalendarSyncEnabledState(getCalendarSyncSettings(currentUserId).enabled);
+        Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
+      }
+    },
+    [currentRole, currentUserId, profile?.currentContext?.campusId],
+  );
 
   /** 预警阈值配置：跳转到专用表单页（用户口径 2026-08-22：单独页面，非弹框） */
   const handleAlertThresholdChange = useCallback(() => {
@@ -113,9 +159,7 @@ const SystemSettings: React.FC = () => {
           confirmColor: getThemeHexColors(activeTheme).primary,
           success: (res) => {
             if (res.confirm) {
-              // 清除访问记录，所有步骤回到未完成
               clearVisitedMap();
-              // 重新显示引导态
               Taro.setStorageSync(STORE_ONBOARDING_HIDDEN_KEY, false);
               Taro.showToast({ title: '已重置', icon: 'success' });
             }
@@ -131,6 +175,17 @@ const SystemSettings: React.FC = () => {
     },
     [activeTheme],
   );
+
+  const handleVersionTap = useCallback(() => {
+    const result = handleVersionNumberTap();
+    if (result === 'unlocked') {
+      setDeveloperModeVisible(true);
+    }
+  }, []);
+
+  const handleOpenDeveloperMode = useCallback(() => {
+    Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     const res = await Taro.showModal({
@@ -169,6 +224,18 @@ const SystemSettings: React.FC = () => {
             <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
           </View>
 
+          {showCalendarSyncSwitch && (
+            <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] border-t border-border">
+              <View className="flex flex-col gap-[8rpx] flex-1 pr-[24rpx]">
+                <Text className="text-[30rpx] text-foreground">同步手机日历</Text>
+                <Text className="text-[24rpx] text-muted-foreground leading-snug">
+                  开启后自动同步未来一周课表到系统日历
+                </Text>
+              </View>
+              <Switch checked={calendarSyncEnabled} onChange={handleCalendarSyncChange} />
+            </View>
+          )}
+
           {/* 运营预警阈值配置（adminOnly） */}
           {isAdmin(currentRole) && (
             <View
@@ -182,8 +249,21 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {/* 当前版本 */}
-          <View className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
+          {developerModeVisible && (
+            <View
+              className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg border-t border-border"
+              onClick={handleOpenDeveloperMode}
+            >
+              <Text className="text-[30rpx] text-foreground">开发者模式</Text>
+              <Icon name="mdi-chevron-right" size={28} color="mutedForeground" />
+            </View>
+          )}
+
+          {/* 当前版本（连点解锁开发者模式） */}
+          <View
+            className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70"
+            onClick={handleVersionTap}
+          >
             <Text className="text-[30rpx] text-foreground">当前版本</Text>
             <Text className="text-[28rpx] text-muted-foreground">v{APP_VERSION}</Text>
           </View>

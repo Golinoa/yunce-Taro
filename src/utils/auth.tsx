@@ -5,6 +5,7 @@
  */
 import Taro from '@tarojs/taro';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { markLastLoginAsNewUser } from '@/utils/auth-onboarding';
 import {
   addIdentity as addIdentityService,
   getProfileExtra,
@@ -14,6 +15,7 @@ import {
   logout,
   phoneLogin,
   registerStep1,
+  registerStep1ByPhone,
   registerStep2,
   registerStep3,
   restoreRegisterDrafts,
@@ -58,7 +60,9 @@ export interface AuthState {
     password: string,
   ) => Promise<{ error: { message: string } | null }>;
   /** 微信一键登录 */
-  signInWithWechat: (code: string) => Promise<{ error: { message: string } | null }>;
+  signInWithWechat: (
+    code: string,
+  ) => Promise<{ error: { message: string } | null; isNewUser?: boolean }>;
   /** 手机号验证码登录 */
   signInWithPhone: (phone: string, code: string) => Promise<{ error: { message: string } | null }>;
   /** 邮箱验证码登录 */
@@ -67,12 +71,13 @@ export interface AuthState {
     code: string,
   ) => Promise<{ error: { message: string } | null }>;
 
-  /** 注册 Step1：创建账号 */
-  signUpStep1: (
-    username: string,
-    password: string,
-    inviteCode?: string,
-  ) => Promise<{ error: { message: string } | null }>;
+  /** 注册 Step1：创建账号（Mock：用户名密码；真实：手机号） */
+  signUpStep1: (payload: {
+    username?: string;
+    password?: string;
+    phone?: string;
+    inviteCode?: string;
+  }) => Promise<{ error: { message: string } | null }>;
   /** 注册 Step2：选择身份 */
   signUpStep2: (role: UserRole) => Promise<{ error: { message: string } | null }>;
   /** 注册 Step3：补全角色信息并完成注册 */
@@ -251,8 +256,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const draftStr = Taro.getStorageSync(REGISTER_DRAFT_STORAGE_KEY);
         if (draftStr) {
-          const draft: RegisterDraft = JSON.parse(draftStr);
-          setRegisterDraft(draft);
+          try {
+            const draft: RegisterDraft = JSON.parse(draftStr);
+            setRegisterDraft(draft);
+          } catch {
+            Taro.removeStorageSync(REGISTER_DRAFT_STORAGE_KEY);
+          }
         }
       } catch {
         setSession(null);
@@ -305,11 +314,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (code: string) => {
       const result = await wechatLogin(code);
       if (result.error) return { error: result.error };
+      if (result.isNewUser) {
+        markLastLoginAsNewUser();
+      }
       setSession(result.session);
       setProfile(result.profile);
       persistAuth(result.profile, result.session);
       syncUserRole(result.profile?.currentContext?.role || null);
-      return { error: null };
+      return { error: null, isNewUser: result.isNewUser };
     },
     [persistAuth, syncUserRole],
   );
@@ -344,16 +356,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 注册 Step1
   const signUpStep1 = useCallback(
-    async (username: string, password: string, inviteCode?: string) => {
-      const result = await registerStep1(username, password, inviteCode);
-      if (result.error || !result.tempToken)
+    async (payload: {
+      username?: string;
+      password?: string;
+      phone?: string;
+      inviteCode?: string;
+    }) => {
+      const usePhoneRegister = Boolean(payload.phone) && !payload.username;
+      const result = usePhoneRegister
+        ? await registerStep1ByPhone(payload.phone!)
+        : await registerStep1(payload.username || '', payload.password || '', payload.inviteCode);
+
+      if (result.error || !result.tempToken) {
         return { error: result.error || { message: '注册失败' } };
-      const draft: RegisterDraft = {
-        tempToken: result.tempToken,
-        username,
-        password,
-        inviteCode,
-      };
+      }
+
+      const draft: RegisterDraft = usePhoneRegister
+        ? {
+            tempToken: result.tempToken,
+            phone: payload.phone!.trim(),
+            username: '',
+            password: '',
+            inviteCode: payload.inviteCode,
+          }
+        : {
+            tempToken: result.tempToken,
+            username: payload.username!.trim(),
+            password: payload.password!,
+            inviteCode: payload.inviteCode,
+          };
       setRegisterDraft(draft);
       return { error: null };
     },

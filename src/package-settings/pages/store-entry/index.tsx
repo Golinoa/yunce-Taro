@@ -281,9 +281,8 @@ const StoreEntry: React.FC = () => {
       }
 
       // L-18-B：成功文案与数据层实际行为统一——
-      // mock 同步建校区即开通（status: 'approved'）→ 提示校区已创建可见；
-      // 真实后端仅提交申请单（status: 'pending'）→ 提示等待人工审核。
-      const isOpened = result.status === 'approved';
+      // mock 同步建校区即开通（status: 'approved'）→ pending 页展示入驻成功；
+      // 真实后端仅提交申请单（status: 'pending'）→ pending 页展示审核中。
       // 审计日志（用户口径 2026-08-22）：门店入驻申请属机构扩张运营数据
       try {
         await auditLogService.record({
@@ -304,15 +303,9 @@ const StoreEntry: React.FC = () => {
       } catch (e) {
         logError('audit store.apply', e);
       }
-      Taro.showModal({
-        title: isOpened ? '入驻成功' : '提交成功',
-        content: isOpened
-          ? `门店入驻成功，校区「${form.name}」已创建，可在校区列表中查看。`
-          : `感谢您对${BRAND_NAME_ZH}的信任，工作人员将在 1-3 个工作日内与您联系。`,
-        showCancel: false,
-        success: () => {
-          Taro.navigateBack();
-        },
+      const storeName = encodeURIComponent(form.name.trim());
+      void Taro.redirectTo({
+        url: `/package-settings/pages/store-entry/pending/index?status=${result.status}&storeName=${storeName}`,
       });
     } catch {
       Taro.showToast({ title: '提交失败，请稍后重试', icon: 'none' });

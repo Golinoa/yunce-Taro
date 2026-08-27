@@ -16,6 +16,7 @@ vi.mock('@tarojs/taro', () => {
     },
     showToast: () => {},
     showModal: () => Promise.resolve({ confirm: true, cancel: false }),
+    addPhoneCalendar: () => Promise.resolve(),
     showLoading: () => {},
     hideLoading: () => {},
     navigateBack: () => {},

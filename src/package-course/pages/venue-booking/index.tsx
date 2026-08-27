@@ -14,7 +14,7 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { BRAND_LOGO } from '@/constants/brand';
-import { venueBookingService } from '@/services';
+import { venueBookingService, subscribeMessageService } from '@/services';
 import type { BookableVenue, VenueBookingSlot } from '@/types/venue-booking';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
@@ -227,6 +227,9 @@ const VenueBookingPage: React.FC = () => {
         status: 'confirmed',
       });
       Taro.showToast({ title: '预约成功', icon: 'success' });
+      void subscribeMessageService.runFlow('E23', {
+        bookingLabel: `场地·${venue.name}`,
+      });
       setSelectedSlotId('');
       setPeopleCount(1);
       void loadVenue();

@@ -56,8 +56,11 @@ import type {
   VenueFormData,
   Room,
   RoomFormData,
+  CampusType,
+  PartnerMode,
 } from '@/types/campus';
 import { get, put } from '@/utils/request';
+import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -111,14 +114,58 @@ function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup
   return Array.from(grouped.values());
 }
 
+interface BackendCampusItem {
+  address?: null | string;
+  icon?: string;
+  iconGradient?: string;
+  id: string;
+  isMain?: boolean;
+  monthlyRent?: number;
+  name: string;
+  partnerMode?: null | string;
+  phone?: null | string;
+  rentDueDay?: number;
+  type?: string;
+}
+
+function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
+  const campusType: CampusType =
+    raw.type === 'main' || raw.type === 'self' || raw.type === 'partner' ? raw.type : 'self';
+
+  return {
+    id: raw.id,
+    name: raw.name,
+    type: campusType,
+    phone: raw.phone || '',
+    address: raw.address || '',
+    icon: raw.icon || '🏫',
+    iconGradient: raw.iconGradient || 'from-blue-400 to-blue-600',
+    isMain: Boolean(raw.isMain),
+    monthlyRent: raw.monthlyRent ?? 0,
+    rentDueDay: raw.rentDueDay ?? 1,
+    partnerMode: raw.partnerMode as PartnerMode | undefined,
+    stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
+    businessCategories: [],
+    tags: [],
+  };
+}
+
 // ============================================
 // 校区 Service
 // ============================================
 export const campusService = {
   /** 获取校区列表 */
-  getList: (): Promise<CampusUIModel[]> => mockGetCampuses(),
-  // 联调时替换为:
-  // getList: () => get<CampusUIModel[]>('/api/campuses'),
+  getList: async (): Promise<CampusUIModel[]> => {
+    if (USE_MOCK) {
+      return mockGetCampuses();
+    }
+
+    const data = await get<PaginatedResponse<BackendCampusItem>>('/campuses', {
+      page: 1,
+      pageSize: 100,
+    });
+    return unwrapPaginatedList(data).map(mapBackendCampus);
+  },
 
   /** 获取校区详情 */
   getById: async (id: string): Promise<CampusUIModel | null> =>

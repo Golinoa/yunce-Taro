@@ -2,7 +2,9 @@ import { View, Text, ScrollView, Image, PageMeta } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import AddToDesktopTip from '@/components/AddToDesktopTip';
 import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
+import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
@@ -15,11 +17,14 @@ import TodoToolbar, { type TodoViewMode } from '@/components/home/TodoToolbar';
 import Icon from '@/components/Icon';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
+  navigateToLessonDetail,
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { ORG_COVER_IMAGE } from '@/constants/brand';
 import { lessonRecordService, todoService } from '@/services';
+import { leadService } from '@/services/lead';
+import { venueBookingService } from '@/services/venue-booking';
 import { homeService } from '@/services/home';
 import type { QuickEntry } from '@/services/home';
 import { useCampusStore } from '@/stores/campus';
@@ -36,6 +41,7 @@ import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { buildTodoCardDomId } from '@/utils/todo-card-meta';
+import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { getTodoShowTabBadge } from '@/utils/todo-settings';
 import {
   TODO_CATEGORY_INBOX_ID,
@@ -46,6 +52,7 @@ import {
 import { consumeTodoCollaboratorResult, type CollaboratorSummary } from '@/utils/todo-collaborator-select';
 import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 
 /** Tab 类型 */
 type HomeTab = 'schedule' | 'todo' | 'recent';
@@ -111,6 +118,14 @@ const Home: React.FC = () => {
   const [todoViewMode, setTodoViewMode] = useState<TodoViewMode>('timeline');
   const [completeSheetItem, setCompleteSheetItem] = useState<TodoItem | null>(null);
   const [completeSheetVisible, setCompleteSheetVisible] = useState(false);
+  const [detailItem, setDetailItem] = useState<TodoItem | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailCollaboratorIds, setDetailCollaboratorIds] = useState<string[]>([]);
+  const [detailCollaboratorSummaries, setDetailCollaboratorSummaries] = useState<
+    CollaboratorSummary[]
+  >([]);
+  const detailItemRef = useRef<TodoItem | null>(null);
+  detailItemRef.current = detailItem;
 
   // ---- 最近消课 ----
   const [recentRecords, setRecentRecords] = useState<LessonRecord[]>([]);
@@ -123,9 +138,13 @@ const Home: React.FC = () => {
   const [fabVisible, setFabVisible] = useState(false);
   /** 四象限拖动中锁定首页滚动，避免抢手势 */
   const [quadrantDragging, setQuadrantDragging] = useState(false);
-  const savedScrollTopRef = useRef(0);
-  /** 仅 FAB 展开等场景短暂受控 scrollTop；为 null 时不传 prop，避免误重置滚动 */
-  const [scrollTopPin, setScrollTopPin] = useState<number | null>(null);
+  const {
+    onScroll: onOverlayScrollTrack,
+    freeze: freezeHomeScroll,
+    unfreeze: unfreezeHomeScroll,
+    unfreezeNow: unfreezeHomeScrollNow,
+    freezeProps: homeScrollFreezeProps,
+  } = useOverlayScrollFreeze('#home-scroll-view');
   const todoViewModeRef = useRef<TodoViewMode>('timeline');
   /** 待办 Tab 内是否发生过滚动（防止仅点 Tab 未滑就误显） */
   const todoTabScrollEngagedRef = useRef(false);
@@ -183,24 +202,26 @@ const Home: React.FC = () => {
 
   const handleScroll = useCallback(
     (event: { detail: { scrollTop: number } }) => {
-      savedScrollTopRef.current = event.detail.scrollTop;
+      onOverlayScrollTrack(event);
       if (activeTab !== 'todo') return;
       if (fabMenuExpanded) return;
       todoTabScrollEngagedRef.current = true;
       scheduleFabVisibilityUpdate();
     },
-    [activeTab, fabMenuExpanded, scheduleFabVisibilityUpdate],
+    [activeTab, fabMenuExpanded, onOverlayScrollTrack, scheduleFabVisibilityUpdate],
   );
 
-  const handleFabToggle = useCallback((expanded: boolean) => {
-    setFabMenuExpanded(expanded);
-    if (expanded) {
-      setScrollTopPin(savedScrollTopRef.current);
-      return;
-    }
-    setScrollTopPin(null);
-  }, []);
-
+  const handleFabToggle = useCallback(
+    (expanded: boolean) => {
+      setFabMenuExpanded(expanded);
+      if (expanded) {
+        freezeHomeScroll();
+        return;
+      }
+      unfreezeHomeScrollNow();
+    },
+    [freezeHomeScroll, unfreezeHomeScrollNow],
+  );
   const handleTodoViewModeChange = useCallback((mode: TodoViewMode) => {
     setTodoViewMode(mode);
   }, []);
@@ -340,6 +361,32 @@ const Home: React.FC = () => {
     [profile, currentRole],
   );
 
+  const handlePrivateCheckIn = useCallback(
+    async (bookingId: string) => {
+      const result = await leadService.checkInPrivateLeadBooking(bookingId);
+      if (!result) {
+        Taro.showToast({ title: '签到失败', icon: 'none' });
+        return;
+      }
+      Taro.showToast({ title: '签到成功', icon: 'success' });
+      await loadData(currentCampusId);
+    },
+    [currentCampusId, loadData],
+  );
+
+  const handleVenueCheckIn = useCallback(
+    async (venueBookingId: string) => {
+      const result = await venueBookingService.checkInBooking(venueBookingId);
+      if (!result) {
+        Taro.showToast({ title: '确认失败', icon: 'none' });
+        return;
+      }
+      Taro.showToast({ title: '已确认到场', icon: 'success' });
+      await loadData(currentCampusId);
+    },
+    [currentCampusId, loadData],
+  );
+
   // ============================================
   // 初始化
   // ============================================
@@ -359,8 +406,14 @@ const Home: React.FC = () => {
   useDidShow(() => {
     const collaboratorResult = consumeTodoCollaboratorResult();
     if (collaboratorResult !== null) {
-      setAddCollaboratorIds(collaboratorResult.ids);
-      setAddCollaboratorSummaries(collaboratorResult.summaries);
+      // 详情弹框未关时从参与人页返回 → 写回详情；否则写回新建弹框
+      if (detailItemRef.current) {
+        setDetailCollaboratorIds(collaboratorResult.ids);
+        setDetailCollaboratorSummaries(collaboratorResult.summaries);
+      } else {
+        setAddCollaboratorIds(collaboratorResult.ids);
+        setAddCollaboratorSummaries(collaboratorResult.summaries);
+      }
     }
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -414,7 +467,7 @@ const Home: React.FC = () => {
       if (activeTab === 'todo') {
         setFabMenuExpanded(false);
         setFabVisible(false);
-        setScrollTopPin(null);
+        unfreezeHomeScrollNow();
         todoTabScrollEngagedRef.current = false;
       }
 
@@ -425,7 +478,7 @@ const Home: React.FC = () => {
 
       setActiveTab(tab);
     },
-    [activeTab],
+    [activeTab, unfreezeHomeScrollNow],
   );
 
   const handleCompleteTodo = useCallback(
@@ -441,6 +494,60 @@ const Home: React.FC = () => {
         .complete(item.id, { userId: profile.id, userName })
         .then(() => loadData(currentCampusId))
         .catch((err) => logError('Home completeTodo', err));
+    },
+    [profile, currentCampusId, loadData],
+  );
+
+  const handleOpenTodoDetail = useCallback(
+    (item: TodoItem) => {
+      // scrollOffset 实测后再开层；禁止先 setVisible 再 freeze（会丢位置钉成 0）
+      freezeHomeScroll(() => {
+        setDetailItem(item);
+        setDetailCollaboratorIds(item.assigneeTeacherIds ? [...item.assigneeTeacherIds] : []);
+        setDetailCollaboratorSummaries([]);
+        setDetailVisible(true);
+      });
+    },
+    [freezeHomeScroll],
+  );
+
+  const handleCloseTodoDetail = useCallback(() => {
+    setDetailVisible(false);
+    setDetailItem(null);
+    setDetailCollaboratorIds([]);
+    setDetailCollaboratorSummaries([]);
+    // 延迟解绑 scrollTop；禁止 +0.01 微调（那会主动驱动滚动条）
+    unfreezeHomeScroll();
+  }, [unfreezeHomeScroll]);
+
+  const handleDetailDelete = useCallback(
+    async (item: TodoItem) => {
+      if (!profile?.id) return;
+      await todoService.remove(profile.id, item.id);
+      await loadData(currentCampusId);
+    },
+    [profile, currentCampusId, loadData],
+  );
+
+  const handleDetailSave = useCallback(
+    async (
+      item: TodoItem,
+      payload: {
+        title: string;
+        note?: string;
+        remindEnabled: boolean;
+        remindDate?: string;
+        remindTime?: string;
+        quadrant?: TodoQuadrant;
+        categoryId?: string;
+        collaboratorIds?: string[];
+        collaborationMode?: TodoCollaborationMode;
+      },
+    ) => {
+      if (!profile?.id) return;
+      const updated = await todoService.update(profile.id, item.id, payload);
+      await loadData(currentCampusId);
+      if (updated) setDetailItem(updated);
     },
     [profile, currentCampusId, loadData],
   );
@@ -461,17 +568,23 @@ const Home: React.FC = () => {
     [profile, completeSheetItem, currentCampusId, loadData],
   );
 
-  const handleOpenAddTodoSheet = useCallback((quadrant?: TodoQuadrant) => {
-    setAddCollaboratorIds([]);
-    setAddCollaboratorSummaries([]);
-    setAddTodoDefaultQuadrant(quadrant);
-    setAddPopoverVisible(true);
-  }, []);
+  const handleOpenAddTodoSheet = useCallback(
+    (quadrant?: TodoQuadrant) => {
+      freezeHomeScroll(() => {
+        setAddCollaboratorIds([]);
+        setAddCollaboratorSummaries([]);
+        setAddTodoDefaultQuadrant(quadrant);
+        setAddPopoverVisible(true);
+      });
+    },
+    [freezeHomeScroll],
+  );
 
   const handleCloseAddTodoSheet = useCallback(() => {
     setAddPopoverVisible(false);
     setAddTodoDefaultQuadrant(undefined);
-  }, []);
+    unfreezeHomeScroll();
+  }, [unfreezeHomeScroll]);
 
   const handleCreateCategoryFromPopover = useCallback(
     async (name: string) => {
@@ -644,11 +757,13 @@ const Home: React.FC = () => {
         <ScrollView
           id="home-scroll-view"
           scrollY={!fabMenuExpanded && !quadrantDragging}
-          scrollWithAnimation={homeScrollIntoView.length > 0}
-          scrollIntoView={homeScrollIntoView}
           showScrollbar={false}
+          scrollWithAnimation={false}
           className="h-full overflow-x-hidden no-scrollbar"
-          {...(scrollTopPin !== null ? { scrollTop: scrollTopPin } : {})}
+          // idle 时禁止绑定 scroll-into-view（空串也会导致每次 setState 回顶）
+          {...scrollIntoViewProps(homeScrollIntoView)}
+          // 弹层/FAB 期间钉住；idle 完全不传 scrollTop
+          {...homeScrollFreezeProps}
           onScroll={handleScroll}
         >
           <View id="home-scroll-inner" className="min-h-full">
@@ -693,7 +808,12 @@ const Home: React.FC = () => {
                     <View className="home-tab-panels relative min-h-[400rpx]">
                       {activeTab === 'schedule' && (
                         <View id="home-tab-panel-schedule">
-                          <TodayScheduleCard schedules={schedules} title="" />
+                          <TodayScheduleCard
+                            schedules={schedules}
+                            title=""
+                            onPrivateCheckIn={handlePrivateCheckIn}
+                            onVenueCheckIn={handleVenueCheckIn}
+                          />
                         </View>
                       )}
 
@@ -714,7 +834,11 @@ const Home: React.FC = () => {
                             onAddTodoClick={() => handleOpenAddTodoSheet()}
                           />
                           {todoViewMode === 'timeline' ? (
-                            <TodoList items={todayTodoItems} onComplete={handleCompleteTodo} />
+                            <TodoList
+                              items={todayTodoItems}
+                              onComplete={handleCompleteTodo}
+                              onPress={handleOpenTodoDetail}
+                            />
                           ) : (
                             <TodoQuadrantBoard
                               items={todayTodoItems}
@@ -746,6 +870,7 @@ const Home: React.FC = () => {
                           <LessonConsumptionList
                             sections={recentSections}
                             emptyText="暂无消课记录"
+                            onRecordClick={navigateToLessonDetail}
                             footerText="查看更多"
                             onFooterClick={() =>
                               Taro.navigateTo({
@@ -793,6 +918,18 @@ const Home: React.FC = () => {
         onSubmit={handleSubmitCustomTodo}
       />
 
+      <TodoDetailPopover
+        visible={detailVisible}
+        item={detailItem}
+        categoryTabs={categoryTabs}
+        collaboratorIds={detailCollaboratorIds}
+        collaboratorSummaries={detailCollaboratorSummaries}
+        onClose={handleCloseTodoDetail}
+        onCreateCategory={handleCreateCategoryFromPopover}
+        onDelete={handleDetailDelete}
+        onSave={handleDetailSave}
+      />
+
       <CompleteTodoSheet
         visible={completeSheetVisible}
         item={completeSheetItem}
@@ -810,6 +947,8 @@ const Home: React.FC = () => {
           onToggle={handleFabToggle}
         />
       )}
+
+      <AddToDesktopTip />
     </>
   );
 };

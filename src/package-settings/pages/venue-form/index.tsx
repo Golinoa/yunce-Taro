@@ -14,11 +14,14 @@ import ImageUploaderList from '@/components/ImageUploaderList';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
+import { DEFAULT_VENUE_MANAGER_USER_ID } from '@/data/mock-database';
 import { roomService, venueService } from '@/services/campus';
+import { teacherService } from '@/services/teacher';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { Room, RoomStatus } from '@/types/campus';
+import type { TeacherUIModel } from '@/types/teacher';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
@@ -32,6 +35,7 @@ interface FormState {
   openTimeEnd: string;
   pricePerSession: string;
   timeBasedPricing: boolean;
+  managerUserId: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -44,6 +48,7 @@ const EMPTY_FORM: FormState = {
   openTimeEnd: '22:00',
   pricePerSession: '0',
   timeBasedPricing: false,
+  managerUserId: DEFAULT_VENUE_MANAGER_USER_ID,
 };
 
 const STATUS_OPTIONS: { label: string; value: RoomStatus }[] = [
@@ -65,6 +70,8 @@ const VenueFormPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showManagerPicker, setShowManagerPicker] = useState(false);
+  const [managerOptions, setManagerOptions] = useState<{ label: string; value: string }[]>([]);
   const formInitializedRef = useRef(false);
 
   const currentCampus = useMemo(
@@ -99,6 +106,13 @@ const VenueFormPage: React.FC = () => {
 
   Taro.useDidShow(() => {
     void loadRoom();
+    void teacherService.getActiveList(currentCampus?.id).then((list: TeacherUIModel[]) => {
+      const options = [
+        { label: '机构管理员', value: DEFAULT_VENUE_MANAGER_USER_ID },
+        ...list.map((teacher) => ({ label: teacher.name, value: teacher.id })),
+      ];
+      setManagerOptions(options);
+    });
   });
 
   const updateField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -150,6 +164,7 @@ const VenueFormPage: React.FC = () => {
         openTimeEnd: form.openTimeEnd,
         pricePerSession: Number(form.pricePerSession || 0),
         timeBasedPricing: form.timeBasedPricing,
+        managerUserId: form.managerUserId || DEFAULT_VENUE_MANAGER_USER_ID,
       };
 
       if (isEdit) {
@@ -188,6 +203,12 @@ const VenueFormPage: React.FC = () => {
   const statusText = useMemo(
     () => STATUS_OPTIONS.find((opt) => opt.value === form.status)?.label || '',
     [form.status],
+  );
+
+  const managerText = useMemo(
+    () =>
+      managerOptions.find((opt) => opt.value === form.managerUserId)?.label || '机构管理员',
+    [form.managerUserId, managerOptions],
   );
 
   if (loading && isEdit) {
@@ -234,6 +255,14 @@ const VenueFormPage: React.FC = () => {
             editable={false}
             showArrow
             onClick={() => setShowStatusPicker(true)}
+            divider
+          />
+          <FormCell
+            label="场地负责人"
+            value={managerText}
+            editable={false}
+            showArrow
+            onClick={() => setShowManagerPicker(true)}
             divider={false}
           />
         </View>
@@ -246,6 +275,14 @@ const VenueFormPage: React.FC = () => {
           value={form.status}
           onClose={() => setShowStatusPicker(false)}
           onConfirm={(value) => updateField('status', value as RoomStatus)}
+        />
+        <PickerSheet
+          visible={showManagerPicker}
+          title="选择场地负责人"
+          options={managerOptions}
+          value={form.managerUserId}
+          onClose={() => setShowManagerPicker(false)}
+          onConfirm={(value) => updateField('managerUserId', value)}
         />
 
         {/* 场地预约模式 */}
@@ -409,6 +446,7 @@ function mapRoomToForm(room: Room): FormState {
     openTimeEnd: room.openTimeEnd ?? '22:00',
     pricePerSession: room.pricePerSession !== undefined ? String(room.pricePerSession) : '0',
     timeBasedPricing: room.timeBasedPricing ?? false,
+    managerUserId: room.managerUserId || DEFAULT_VENUE_MANAGER_USER_ID,
   };
 }
 

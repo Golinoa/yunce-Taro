@@ -10,6 +10,7 @@ import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
+import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -29,6 +30,7 @@ import {
 import { useAuth } from '@/utils/auth';
 import { sortHomeTodosByMode, type CustomTodoSortMode } from '@/utils/custom-todos';
 import { buildTodoCardDomId } from '@/utils/todo-card-meta';
+import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import {
@@ -46,6 +48,7 @@ import {
   resolveTodoGroupDateKey,
 } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import dayjs from 'dayjs';
 
 type ScopeFilter = 'today' | 'all';
@@ -103,6 +106,20 @@ const MyTodos: React.FC = () => {
   const [monthFilter, setMonthFilter] = useState(() => dayjs().format('YYYY-MM'));
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [listScrollIntoView, setListScrollIntoView] = useState('');
+  const [detailItem, setDetailItem] = useState<TodoItem | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailCollaboratorIds, setDetailCollaboratorIds] = useState<string[]>([]);
+  const [detailCollaboratorSummaries, setDetailCollaboratorSummaries] = useState<
+    CollaboratorSummary[]
+  >([]);
+  const detailItemRef = useRef<TodoItem | null>(null);
+  detailItemRef.current = detailItem;
+  const {
+    onScroll: onListScrollTrack,
+    freeze: freezeListScroll,
+    unfreeze: unfreezeListScroll,
+    freezeProps: listScrollFreezeProps,
+  } = useOverlayScrollFreeze('#my-todos-list-scroll');
   const teacherIdRef = useRef<string | null>(null);
   const isFirstMount = useRef(true);
   const loadSeqRef = useRef(0);
@@ -210,8 +227,13 @@ const MyTodos: React.FC = () => {
   useDidShow(() => {
     const collaboratorResult = consumeTodoCollaboratorResult();
     if (collaboratorResult !== null) {
-      setAddCollaboratorIds(collaboratorResult.ids);
-      setAddCollaboratorSummaries(collaboratorResult.summaries);
+      if (detailItemRef.current) {
+        setDetailCollaboratorIds(collaboratorResult.ids);
+        setDetailCollaboratorSummaries(collaboratorResult.summaries);
+      } else {
+        setAddCollaboratorIds(collaboratorResult.ids);
+        setAddCollaboratorSummaries(collaboratorResult.summaries);
+      }
     }
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -374,6 +396,58 @@ const MyTodos: React.FC = () => {
     [loadTodos, profile, userName],
   );
 
+  const handleOpenTodoDetail = useCallback(
+    (item: TodoItem) => {
+      freezeListScroll(() => {
+        setDetailItem(item);
+        setDetailCollaboratorIds(item.assigneeTeacherIds ? [...item.assigneeTeacherIds] : []);
+        setDetailCollaboratorSummaries([]);
+        setDetailVisible(true);
+      });
+    },
+    [freezeListScroll],
+  );
+
+  const handleCloseTodoDetail = useCallback(() => {
+    setDetailVisible(false);
+    setDetailItem(null);
+    setDetailCollaboratorIds([]);
+    setDetailCollaboratorSummaries([]);
+    unfreezeListScroll();
+  }, [unfreezeListScroll]);
+
+  const handleDetailDelete = useCallback(
+    async (item: TodoItem) => {
+      if (!profile?.id) return;
+      await todoService.remove(profile.id, item.id);
+      await loadTodos();
+    },
+    [loadTodos, profile?.id],
+  );
+
+  const handleDetailSave = useCallback(
+    async (
+      item: TodoItem,
+      payload: {
+        title: string;
+        note?: string;
+        remindEnabled: boolean;
+        remindDate?: string;
+        remindTime?: string;
+        quadrant?: TodoQuadrant;
+        categoryId?: string;
+        collaboratorIds?: string[];
+        collaborationMode?: TodoCollaborationMode;
+      },
+    ) => {
+      if (!profile?.id) return;
+      const updated = await todoService.update(profile.id, item.id, payload);
+      await loadTodos();
+      if (updated) setDetailItem(updated);
+    },
+    [loadTodos, profile?.id],
+  );
+
   const handleCreateCategoryFromPopover = useCallback(
     async (name: string) => {
       if (!profile?.id) return null;
@@ -496,9 +570,8 @@ const MyTodos: React.FC = () => {
           enhanced
           enableFlex
           showScrollbar={false}
-          scrollWithAnimation
-          scrollIntoView={categoryScrollIntoView}
           className="h-[72rpx] min-w-0 flex-1 overflow-hidden"
+          {...scrollIntoViewProps(categoryScrollIntoView)}
         >
           <View className="inline-flex h-[72rpx] flex-row items-center whitespace-nowrap">
             <View id="my-todo-cat-tabs" className="inline-flex flex-row items-center">
@@ -663,10 +736,14 @@ const MyTodos: React.FC = () => {
       </View>
 
       <ScrollView
+        id="my-todos-list-scroll"
         scrollY
-        scrollWithAnimation
-        scrollIntoView={listScrollIntoView}
+        showScrollbar={false}
+        scrollWithAnimation={false}
         className="box-border min-h-0 flex-1 bg-muted"
+        {...scrollIntoViewProps(listScrollIntoView)}
+        {...listScrollFreezeProps}
+        onScroll={onListScrollTrack}
       >
         {listLoading && todos.length === 0 ? (
           <View className="flex items-center justify-center pt-[120rpx]">
@@ -684,6 +761,7 @@ const MyTodos: React.FC = () => {
               expandedDates={expandedDates}
               onToggleDate={handleToggleDateSection}
               onToggleComplete={(item) => void handleToggleComplete(item)}
+              onPress={handleOpenTodoDetail}
             />
           </View>
         )}
@@ -693,9 +771,11 @@ const MyTodos: React.FC = () => {
       <View
         className="fixed bottom-[calc(32rpx+env(safe-area-inset-bottom))] right-[32rpx] z-[100] flex h-[96rpx] w-[96rpx] items-center justify-center rounded-full bg-primary shadow-float press-scale"
         onClick={() => {
-          setAddCollaboratorIds([]);
-          setAddCollaboratorSummaries([]);
-          setAddPopoverVisible(true);
+          freezeListScroll(() => {
+            setAddCollaboratorIds([]);
+            setAddCollaboratorSummaries([]);
+            setAddPopoverVisible(true);
+          });
         }}
       >
         <Icon name="mdi-plus" size="xl" color="white" />
@@ -713,9 +793,24 @@ const MyTodos: React.FC = () => {
         defaultCategoryId={categoryTabId}
         collaboratorIds={addCollaboratorIds}
         collaboratorSummaries={addCollaboratorSummaries}
-        onClose={() => setAddPopoverVisible(false)}
+        onClose={() => {
+          setAddPopoverVisible(false);
+          unfreezeListScroll();
+        }}
         onCreateCategory={handleCreateCategoryFromPopover}
         onSubmit={handleSubmitAdd}
+      />
+
+      <TodoDetailPopover
+        visible={detailVisible}
+        item={detailItem}
+        categoryTabs={categoryTabs}
+        collaboratorIds={detailCollaboratorIds}
+        collaboratorSummaries={detailCollaboratorSummaries}
+        onClose={handleCloseTodoDetail}
+        onCreateCategory={handleCreateCategoryFromPopover}
+        onDelete={handleDetailDelete}
+        onSave={handleDetailSave}
       />
 
       <MonthPickerSheet

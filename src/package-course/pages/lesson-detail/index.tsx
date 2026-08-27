@@ -8,7 +8,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerItem from '@/components/PickerItem';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import { classService, lessonRecordService, scheduleService } from '@/services';
+import { classService, lessonRecordService, scheduleService, todoService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { useStudentStore } from '@/stores';
 import type { Class } from '@/types/class';
@@ -18,7 +18,6 @@ import type { Student } from '@/types/student';
 import { isAdmin, isStaffRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
-import { clearTodoRead, rechargeAlertTodoId } from '@/utils/todo-read';
 
 /** 教师 24h 内可撤销，校长 7 天内可撤销 */
 const REVOKE_LIMIT_HOURS_TEACHER = 24;
@@ -314,7 +313,7 @@ const LessonDetail: React.FC = () => {
       // 之后再次降到阈值可重新在首页待办提醒
       if (record?.student_id) {
         try {
-          clearTodoRead(rechargeAlertTodoId(record.student_id));
+          todoService.clearStudentRechargeState(record.student_id);
         } catch (e) {
           logError('todo read clear', e);
         }
@@ -367,7 +366,7 @@ const LessonDetail: React.FC = () => {
         // 之后再次降到阈值可重新在首页待办提醒
         if (v < (record?.hours_used ?? 0) && updated.student_id) {
           try {
-            clearTodoRead(rechargeAlertTodoId(updated.student_id));
+            todoService.clearStudentRechargeState(updated.student_id);
           } catch (e) {
             logError('todo read clear', e);
           }

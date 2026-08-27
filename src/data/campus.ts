@@ -25,6 +25,7 @@ import {
   CAMPUSES,
   CAMPUS_STATS,
   CLASSES,
+  DEFAULT_VENUE_MANAGER_USER_ID,
   ROOMS,
   STUDENTS,
   SUBJECTS,
@@ -374,14 +375,14 @@ export async function mockUpdateCampus(
   const logo =
     data.logo !== undefined
       ? isTempImagePath(data.logo)
-        ? await uploadImage(data.logo)
+        ? await uploadImage(data.logo, 'common')
         : data.logo || undefined
       : current.logo;
 
   const venueImages =
     data.venueImages !== undefined
       ? await Promise.all(
-          data.venueImages.map((url) => (isTempImagePath(url) ? uploadImage(url) : url)),
+          data.venueImages.map((url) => (isTempImagePath(url) ? uploadImage(url, 'venue') : url)),
         )
       : current.venueImages;
 
@@ -710,6 +711,7 @@ export async function mockAddRoom(data: RoomFormData): Promise<Room> {
     openTimeEnd: data.openTimeEnd ?? '22:00',
     pricePerSession: data.pricePerSession ?? 0,
     timeBasedPricing: data.timeBasedPricing ?? false,
+    managerUserId: data.managerUserId || DEFAULT_VENUE_MANAGER_USER_ID,
     createdAt: now,
     updatedAt: now,
   };
@@ -727,7 +729,7 @@ export async function mockUpdateRoom(
 
   const photos =
     data.photos !== undefined
-      ? await Promise.all(data.photos.map((url) => (isTempImagePath(url) ? uploadImage(url) : url)))
+      ? await Promise.all(data.photos.map((url) => (isTempImagePath(url) ? uploadImage(url, 'venue') : url)))
       : current.photos;
 
   const updated: Room = {

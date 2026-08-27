@@ -39,6 +39,8 @@ import {
   studentService,
   teacherService,
   temporaryRescheduleService,
+  subscribeMessageService,
+  calendarSyncService,
 } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
@@ -513,12 +515,28 @@ const ScheduleForm: React.FC = () => {
         // 刷新 store，让其他页面（课程管理/班级详情）看到最新结果
         invalidateStudents(currentUserId);
         Taro.showToast({ title: '已同步到课程管理', icon: 'success', duration: 1200 });
+        // E02A：入班成功后操作人弹框
+        if (toAdd.length > 0) {
+          try {
+            Taro.hideToast();
+            await subscribeMessageService.runFlow('E02A', {
+              classId,
+              className: selectedClass?.name || '',
+              role: profile?.currentContext?.role,
+              navigateUrl: classId
+                ? `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&type=class`
+                : undefined,
+            });
+          } catch (error) {
+            logError('subscribe E02A after schedule student assign', error);
+          }
+        }
       } catch (err) {
         logError('同步班级学员失败', err);
         Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
       }
     },
-    [classId, classStudents, currentUserId, invalidateStudents],
+    [classId, classStudents, currentUserId, invalidateStudents, selectedClass?.name, profile?.currentContext?.role],
   );
 
   /** 调整授课老师 */
@@ -645,6 +663,22 @@ const ScheduleForm: React.FC = () => {
             );
         }
         Taro.showToast({ title: '调课成功', icon: 'success' });
+        try {
+          Taro.hideToast();
+          await subscribeMessageService.runFlow('E07', {
+            className: selectedClass?.name || '',
+            role: profile?.currentContext?.role,
+            campusId: profile?.currentContext?.campusId,
+          });
+        } catch (error) {
+          logError('subscribe E07 after reschedule', error);
+        }
+        void calendarSyncService.syncAfterScheduleChange({
+          userId: currentUserId,
+          teacherId: currentUserId,
+          campusId: profile?.currentContext?.campusId,
+          role: profile?.currentContext?.role,
+        });
         setTimeout(() => Taro.navigateBack(), 1200);
       } catch {
         Taro.showToast({ title: '调课失败', icon: 'none' });
@@ -686,6 +720,22 @@ const ScheduleForm: React.FC = () => {
           await scheduleService.create(data as Omit<Schedule, 'id' | 'created_at' | 'updated_at'>);
           Taro.showToast({ title: '添加成功', icon: 'success' });
         }
+        try {
+          Taro.hideToast();
+          await subscribeMessageService.runFlow('E07', {
+            className: selectedClass?.name || '',
+            role: profile?.currentContext?.role,
+            campusId: profile?.currentContext?.campusId,
+          });
+        } catch (error) {
+          logError('subscribe E07 after schedule save', error);
+        }
+        void calendarSyncService.syncAfterScheduleChange({
+          userId: currentUserId,
+          teacherId: currentUserId,
+          campusId: profile?.currentContext?.campusId,
+          role: profile?.currentContext?.role,
+        });
         setTimeout(() => Taro.navigateBack(), 1200);
       } catch {
         Taro.showToast({ title: '保存失败', icon: 'none' });
@@ -713,6 +763,8 @@ const ScheduleForm: React.FC = () => {
     mode,
     note,
     originalSchedule,
+    profile?.currentContext?.campusId,
+    profile?.currentContext?.role,
     reminderMinutes,
     room,
     saving,

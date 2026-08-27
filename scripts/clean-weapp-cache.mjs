@@ -22,10 +22,24 @@ const targets = [
 ];
 
 for (const t of targets) {
-  if (existsSync(t)) {
+  if (!existsSync(t)) {
+    console.log(`[clean] skip (not exist): ${t}`);
+    continue;
+  }
+  try {
     rmSync(t, { recursive: true, force: true });
     console.log(`[clean] removed: ${t}`);
-  } else {
-    console.log(`[clean] skip (not exist): ${t}`);
+  } catch (error) {
+    const isDistLocked =
+      t.endsWith('dist') &&
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'EBUSY';
+    if (isDistLocked) {
+      console.warn('[clean] dist is locked (close WeChat DevTools preview?), skip removing dist');
+      continue;
+    }
+    throw error;
   }
 }

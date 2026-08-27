@@ -11,6 +11,7 @@ import ActionButton from '@/components/ActionButton';
 import FormInput from '@/components/FormInput';
 import PageContainer from '@/components/PageContainer';
 import { leadService } from '@/services';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { auditLogService } from '@/services/audit-log';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFormData } from '@/types/lead';
@@ -99,6 +100,16 @@ const LeadFormPage: React.FC = () => {
       invalidate(teacherId);
 
       Taro.showToast({ title: '创建成功', icon: 'success' });
+      try {
+        Taro.hideToast();
+        await subscribeMessageService.runFlow('E10', {
+          studentName: form.child_name.trim(),
+          role: profile?.currentContext?.role,
+          campusId: profile?.currentContext?.campusId || form.campus_id,
+        });
+      } catch (error) {
+        logError('subscribe E10 after lead create', error);
+      }
       setTimeout(() => {
         Taro.navigateBack();
       }, 1000);

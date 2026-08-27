@@ -2,7 +2,7 @@ import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
 import { classColorHex } from '@/theme';
 import type { Schedule, CourseStatus } from '@/types/schedule';
@@ -11,38 +11,45 @@ export interface TodayScheduleCardProps {
   schedules: Schedule[];
   /** 卡片标题，默认"今日课表" */
   title?: string;
+  /** 私教预约一键签到（不跳转） */
+  onPrivateCheckIn?: (bookingId: string) => Promise<void>;
+  /** 场地预约确认到场 */
+  onVenueCheckIn?: (venueBookingId: string) => Promise<void>;
 }
 
-// ===================== 时间区统一配色 =====================
-// 设计稿中课程数据无 type 字段，所有卡片时间区统一使用橙色配色
-// 仅通过状态覆盖背景（urgent 渐变、done/ended #fafafa）
 const TIME_AREA_STYLE = {
   bg: 'course-time-normal',
   text: 'text-[hsl(var(--warning))]',
   border: 'border-[hsl(var(--warning)/0.3)]',
 };
 
-// ===================== 状态排序权重 =====================
 const STATUS_ORDER: Record<CourseStatus, number> = {
   urgent: 0,
   active: 1,
   upcoming: 2,
-  unattended: 3, // 已下课未点名（提醒色，权重在 done 之前）
+  unattended: 3,
   done: 4,
   ended: 5,
 };
 
-// ===================== 状态 → 按钮文案 =====================
-function getBtnText(status: CourseStatus): string {
-  // 用户口径（2026-08-23）：未点名沿用形态1，按钮文案统一「点名」（红框+标签已提醒）
+function getBtnText(status: CourseStatus, item: Schedule): string {
+  if (item.schedule_kind === 'venue') {
+    return status === 'done' ? '已确认' : '确认到场';
+  }
+  if (item.trial_mode === 'private') {
+    return status === 'done' ? '已签到' : '签到';
+  }
   if (status === 'done') return '查看';
   if (status === 'urgent') return '立即点名';
   if (status === 'active') return '继续点名';
   return '点名';
 }
 
-// ===================== 状态 → 按钮样式 =====================
-function getBtnClass(status: CourseStatus): string {
+function getBtnClass(status: CourseStatus, item: Schedule): string {
+  if (item.trial_mode === 'private' || item.schedule_kind === 'venue') {
+    if (status === 'done') return 'course-btn-view';
+    return 'course-btn-normal';
+  }
   if (status === 'urgent') return 'course-btn-urgent animate-pulse-ring';
   if (status === 'upcoming' || status === 'active' || status === 'unattended') {
     return 'course-btn-normal';
@@ -50,25 +57,21 @@ function getBtnClass(status: CourseStatus): string {
   return 'course-btn-view';
 }
 
-// ===================== 状态 → 进度条样式 =====================
 function getProgressClass(status: CourseStatus): string {
   if (status === 'done') return 'course-progress-done';
   if (status === 'ended') return 'course-progress-ended';
   return 'course-progress-active';
 }
 
-// ===================== 状态 → 卡片边框 =====================
 function getStatusBorderClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-status-urgent-border';
   if (status === 'active') return 'course-status-active-border';
-  // 未点名：仅加细红边框提醒（用户口径 2026-08-23，样式收敛为形态1）
   if (status === 'unattended') return 'course-status-unattended-border';
   if (status === 'done') return 'course-status-done-border';
   if (status === 'ended') return 'course-status-ended-border';
   return '';
 }
 
-// ===================== 状态 → 左侧时间区背景 =====================
 function getTimeBgClass(status: CourseStatus): string {
   if (status === 'urgent') return 'course-time-urgent-v14';
   if (status === 'active') return 'course-time-active-v14';
@@ -77,23 +80,17 @@ function getTimeBgClass(status: CourseStatus): string {
   return '';
 }
 
-// ===================== 状态 → 卡片整体透明度 =====================
-// 用户口径（2026-08-23）：done 卡片加强可见（不再 opacity-85 灰显）；
-// 未点名沿用形态1（不透明）；ended/cancelled 保持淡化
 function getCardOpacity(status: CourseStatus): string {
   if (status === 'ended') return 'opacity-75';
   return '';
 }
 
-// ===================== 状态 → 课程名颜色 =====================
 function getNameClass(status: CourseStatus): string {
   if (status === 'done') return 'course-name-done';
   if (status === 'ended') return 'course-name-ended';
   return 'course-name-active';
 }
 
-// ===================== 倒计时文本 =====================
-/** 根据排课开始时间计算倒计时文本，返回 null 表示无需显示 */
 function getCountdownText(startTime: string): string | null {
   const now = new Date();
   const [h, m] = startTime.split(':').map(Number);
@@ -103,38 +100,102 @@ function getCountdownText(startTime: string): string | null {
   const diffMs = target.getTime() - now.getTime();
   if (diffMs <= 0) return null;
   const diffMin = Math.ceil(diffMs / 60000);
-  if (diffMin > 30) return null; // 超过30分钟不显示
+  if (diffMin > 30) return null;
   if (diffMin <= 5) return `⏱ 还有${diffMin}分钟`;
   return `⏱ ${diffMin}分钟后`;
 }
 
-/**
- * TodayScheduleCard - 今日课表卡片 v3
- *
- * 对齐设计稿 course_app_home_v3.html：
- * - 左右分栏布局：左侧时间区（课程类型配色）+ 右侧内容区
- * - 5 种课程状态（urgent/upcoming/active/done/ended）视觉差异
- * - 状态标签、进度条、操作按钮随状态变化
- * - 按状态权重排序展示
- *
- * 使用场景：教师端首页今日课表区域
- */
-const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title = '今日课表' }) => {
-  // 按状态权重排序
+function navigateToSchedule(item: Schedule): void {
+  const lessonDate = dayjs().format('YYYY-MM-DD');
+
+  if (item.schedule_kind === 'venue' && item.room_id) {
+    Taro.navigateTo({
+      url: `/package-course/pages/venue-booking/index?roomId=${encodeURIComponent(item.room_id)}`,
+    });
+    return;
+  }
+
+  const bookingId = item.booking_id;
+  if (bookingId && item.trial_mode !== 'private') {
+    Taro.navigateTo({
+      url:
+        `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(item.class_id || '')}` +
+        `&lessonDate=${encodeURIComponent(lessonDate)}` +
+        `&lessonTime=${encodeURIComponent(item.start_time)}` +
+        `&hasTrialStudent=1`,
+    });
+    return;
+  }
+
+  if (item.tag) {
+    Taro.navigateTo({
+      url: `/package-course/pages/booking/index?date=${encodeURIComponent(lessonDate)}`,
+    });
+    return;
+  }
+
+  Taro.navigateTo({
+    url:
+      `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
+      `&classId=${encodeURIComponent(item.class_id || '')}` +
+      `&lessonDate=${encodeURIComponent(lessonDate)}` +
+      `&hasTrialStudent=${item.has_trial_student ? '1' : '0'}`,
+  });
+}
+
+const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
+  schedules,
+  title = '今日课表',
+  onPrivateCheckIn,
+  onVenueCheckIn,
+}) => {
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+
   const sortedSchedules = useMemo(() => {
     return [...schedules].sort((a, b) => {
       const orderA = STATUS_ORDER[a.status || 'upcoming'] ?? 2;
       const orderB = STATUS_ORDER[b.status || 'upcoming'] ?? 2;
-      return orderA - orderB;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.start_time.localeCompare(b.start_time);
     });
   }, [schedules]);
 
-  // 倒计时每分钟刷新
   const [, setTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleActionClick = useCallback(
+    async (item: Schedule, status: CourseStatus) => {
+      if (checkingId) return;
+
+      if (item.trial_mode === 'private' && item.booking_id && status !== 'done') {
+        if (!onPrivateCheckIn) return;
+        setCheckingId(item.id);
+        try {
+          await onPrivateCheckIn(item.booking_id);
+        } finally {
+          setCheckingId(null);
+        }
+        return;
+      }
+
+      if (item.schedule_kind === 'venue' && item.venue_booking_id && status !== 'done') {
+        if (!onVenueCheckIn) return;
+        setCheckingId(item.id);
+        try {
+          await onVenueCheckIn(item.venue_booking_id);
+        } finally {
+          setCheckingId(null);
+        }
+        return;
+      }
+
+      navigateToSchedule(item);
+    },
+    [checkingId, onPrivateCheckIn, onVenueCheckIn],
+  );
 
   if (schedules.length === 0) {
     return (
@@ -163,7 +224,6 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
       <View className="flex flex-col gap-[20rpx]">
         {sortedSchedules.map((item) => {
           const status: CourseStatus = item.status || 'upcoming';
-          // 设计稿中 name 对应 note 字段（班级/课程名称），优先级：note > class_info.name > 未命名
           const displayName = item.note || item.class_info?.name || '未命名';
           const teacherName = item.teacher_name || '老师';
           const checked = item.checked_count || 0;
@@ -175,6 +235,12 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
           const isActive = status === 'active';
           const isUrgent = status === 'urgent';
           const countdownText = isUrgent ? getCountdownText(item.start_time) : null;
+          const categoryLabel = item.category_label;
+          const isInlineCheckIn =
+            (item.trial_mode === 'private' && !!item.booking_id) ||
+            (item.schedule_kind === 'venue' && !!item.venue_booking_id);
+          const progressLabel =
+            item.trial_mode === 'private' || item.schedule_kind === 'venue' ? '已签到' : '已点名';
 
           return (
             <View
@@ -185,28 +251,13 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                 getCardOpacity(status),
               )}
               onClick={() => {
-                if (item.tag) {
-                  Taro.navigateTo({
-                    url: `/package-course/pages/booking/index?date=${encodeURIComponent(dayjs().format('YYYY-MM-DD'))}`,
-                  });
-                  return;
-                }
-
-                // 普通排课卡片 → 进入排课签到消课页（lesson-form，与 schedule 班课分类课程卡片点击进入的页面一致）
-                Taro.navigateTo({
-                  url:
-                    `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
-                    `&classId=${encodeURIComponent(item.class_id || '')}` +
-                    `&lessonDate=${encodeURIComponent(dayjs().format('YYYY-MM-DD'))}` +
-                    `&hasTrialStudent=${(item as { hasTrialStudent?: boolean }).hasTrialStudent ? '1' : '0'}`,
-                });
+                if (isInlineCheckIn && !isDone) return;
+                navigateToSchedule(item);
               }}
             >
               <View className="flex">
-                {/* 左侧时间区 - done/urgent/ended 强制 inline 状态色（2026-08-23：兜底避免 CSS 加载顺序导致色错），其余用班级色 / 默认橙 */}
                 {(() => {
                   const timeStatusClass = getTimeBgClass(status);
-                  // 兜底 inline 状态色（解决 course-time-done-v14 等类名在某些情况下未生效的问题）
                   const forcedStatusStyle: React.CSSProperties | null =
                     status === 'done'
                       ? {
@@ -263,7 +314,6 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                   return (
                     <View
                       className={cn(
-                        // 用户口径（2026-08-23）：左侧时间区收窄到 100rpx（原 152rpx 的 2/3，取双数整数）
                         'w-[100rpx] shrink-0 flex flex-col items-center justify-center py-[24rpx] border-r',
                         !colorKey && TIME_AREA_STYLE.bg,
                         !colorKey && TIME_AREA_STYLE.border,
@@ -277,7 +327,6 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                       >
                         {item.start_time}
                       </Text>
-                      {/* 分割线：无班级颜色时用统一橙色，有班级颜色时用班级色覆盖 */}
                       <View
                         className="w-[16rpx] h-[2rpx] my-[4rpx] bg-[hsl(var(--warning)/0.3)]"
                         style={colorKey ? { backgroundColor: colorHex } : undefined}
@@ -292,15 +341,12 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                   );
                 })()}
 
-                {/* 右侧内容区 - 对齐设计稿 px-3=24rpx py-3=24rpx */}
                 <View className="flex-1 px-[24rpx] py-[24rpx] flex items-center justify-between gap-[16rpx]">
                   <View className="min-w-0 flex-1">
-                    {/* 课程名 + 标签 */}
                     <View className="flex items-center gap-[12rpx] mb-[8rpx]">
                       <Text className={cn('text-[30rpx] font-bold truncate', getNameClass(status))}>
                         {displayName}
                       </Text>
-                      {/* 状态标签 - 用户口径（2026-08-23）：flex 居中 + 加宽 padding + shrink-0 + nowrap，解决文字不居中/挤压 */}
                       {isUnattended && (
                         <View className="course-tag-unattended rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">未点名</Text>
@@ -321,21 +367,23 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                           <Text className="text-[20rpx] font-medium">已下课</Text>
                         </View>
                       )}
-                      {/* 非 done/ended/unattended/active 状态显示约课标签 */}
-                      {!isDone && !isEnded && !isUnattended && !isActive && item.tag && (
+                      {!isDone && !isEnded && !isUnattended && !isActive && categoryLabel && (
+                        <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                          <Text className="text-[20rpx] font-medium">{categoryLabel}</Text>
+                        </View>
+                      )}
+                      {!isDone && !isEnded && !isUnattended && !isActive && !categoryLabel && item.tag && (
                         <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                         </View>
                       )}
-                      {/* ended 状态也显示约课标签但半透明 */}
-                      {isEnded && item.tag && (
+                      {isEnded && categoryLabel && (
                         <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
-                          <Text className="text-[20rpx] font-medium">{item.tag}</Text>
+                          <Text className="text-[20rpx] font-medium">{categoryLabel}</Text>
                         </View>
                       )}
                     </View>
 
-                    {/* 老师 + 教室 - 对齐设计稿 text-[11px]=22rpx gap-3=24rpx */}
                     <View className="flex items-center gap-[24rpx] text-[22rpx] course-meta-text">
                       <View className="flex items-center gap-[4rpx]">
                         <Icon name="mdi-account-outline" size="xs" color="muted" />
@@ -349,19 +397,22 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                       )}
                     </View>
 
-                    {/* 点名进度 - ended 状态用灰色文字；done 显示签到/未到/请假明细 */}
                     {isDone ? (
                       <View className="flex items-center gap-[16rpx] text-[22rpx]">
                         <Text className="course-checkin-done">
-                          签到 {checked}
-                          <Text className="text-muted-foreground">
-                            {' '}
-                            · 未到 {item.absent_count || 0}
-                          </Text>
-                          <Text className="text-muted-foreground">
-                            {' '}
-                            · 请假 {item.leave_count || 0}
-                          </Text>
+                          {progressLabel} {checked}
+                          {item.schedule_kind !== 'venue' && item.trial_mode !== 'private' && (
+                            <>
+                              <Text className="text-muted-foreground">
+                                {' '}
+                                · 未到 {item.absent_count || 0}
+                              </Text>
+                              <Text className="text-muted-foreground">
+                                {' '}
+                                · 请假 {item.leave_count || 0}
+                              </Text>
+                            </>
+                          )}
                         </Text>
                         <View className="w-[96rpx] h-[6rpx] course-progress-track rounded-full overflow-hidden">
                           <View
@@ -378,7 +429,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                             isEnded ? 'course-meta-ended' : 'course-meta-text',
                           )}
                         >
-                          已点名{' '}
+                          {progressLabel}{' '}
                           <Text
                             className={cn(
                               'font-semibold',
@@ -398,7 +449,6 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                     )}
                   </View>
 
-                  {/* 操作按钮 - 用户口径（2026-08-23）：按钮贴右下角，底部间距与右侧一致（内容区 py 24rpx） */}
                   <View className="shrink-0 self-stretch flex flex-col items-end justify-end gap-[8rpx]">
                     {countdownText && (
                       <Text className="text-[20rpx] course-urgent-hint font-medium whitespace-nowrap">
@@ -408,10 +458,15 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({ schedules, title 
                     <View
                       className={cn(
                         'px-[32rpx] py-[12rpx] rounded-full text-[24rpx] font-semibold press-scale',
-                        getBtnClass(status),
+                        getBtnClass(status, item),
+                        checkingId === item.id && 'opacity-60',
                       )}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleActionClick(item, status);
+                      }}
                     >
-                      <Text>{getBtnText(status)}</Text>
+                      <Text>{checkingId === item.id ? '处理中' : getBtnText(status, item)}</Text>
                     </View>
                   </View>
                 </View>

@@ -37,6 +37,10 @@ import type { TodoItem } from '@/types/home-todo';
 import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
+import {
+  resolveCategoryLabelByClassId,
+  resolveCategoryLabelByMode,
+} from '@/utils/schedule-category';
 import { get } from '@/utils/request';
 
 const USE_MOCK =
@@ -46,6 +50,87 @@ const USE_MOCK =
 
 type RawHomeTeacher = NonNullable<Awaited<ReturnType<typeof mockGetTeacher>>>;
 type RawHomeSchedule = Awaited<ReturnType<typeof mockGetTodaySchedules>>[number];
+
+interface BackendTodayScheduleItem {
+  classId: string;
+  className?: null | string;
+  color?: null | string;
+  endTime: string;
+  id: string;
+  note?: null | string;
+  room?: null | string;
+  startTime: string;
+  subject?: null | string;
+}
+
+interface BackendTodayScheduleResponse {
+  date: string;
+  dayOfWeek: number;
+  schedules: BackendTodayScheduleItem[];
+}
+
+function isStaffHomeRole(role?: UserRole | null): boolean {
+  return role === 'teacher' || role === 'principal' || role === 'admin' || role === 'assistant';
+}
+
+function isPrincipalLikeRole(role?: UserRole | null): boolean {
+  return role === 'principal' || role === 'admin';
+}
+
+function buildStaffTeacherSummary(userId: string): HomeTeacherSummary {
+  return {
+    id: userId,
+    name: '机构',
+    role: 'lead',
+    status: 'active',
+    totalHours: 0,
+    monthHours: 0,
+    pendingSalary: 0,
+  };
+}
+
+function mapTodayScheduleItem(item: BackendTodayScheduleItem): HomeScheduleItem {
+  return {
+    id: item.id,
+    teacher_id: '',
+    class_id: item.classId,
+    day_of_week: (new Date().getDay() || 7) as Schedule['day_of_week'],
+    start_time: item.startTime,
+    end_time: item.endTime,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    note: item.note || item.className || '未命名课程',
+    class_info: item.className ? { name: item.className } : undefined,
+    status: mapBackendScheduleStatus(item.startTime, item.endTime),
+    checked_count: 0,
+    total_count: 0,
+    room: item.room || undefined,
+    category_label: item.subject || undefined,
+    schedule_kind: 'schedule',
+  };
+}
+
+async function fetchTodaySchedulesFromApi(
+  role?: UserRole | null,
+  campusId?: string,
+): Promise<HomeScheduleItem[]> {
+  if (role === 'teacher') {
+    const params = new URLSearchParams();
+    if (campusId) params.set('campusId', campusId);
+    const query = params.toString();
+    const aggregate = await get<BackendTeacherHomeResponse>(
+      `/home/teacher${query ? `?${query}` : ''}`,
+    );
+    return mapBackendTeacherHome(aggregate).schedules;
+  }
+
+  if (isPrincipalLikeRole(role)) {
+    const data = await get<BackendTodayScheduleResponse>('/schedules/today');
+    return (data.schedules || []).map(mapTodayScheduleItem);
+  }
+
+  return [];
+}
 
 interface BackendTeacherHomeResponse {
   recentRecords: Array<{
@@ -85,6 +170,9 @@ interface BackendTeacherHomeResponse {
     nickname?: null | string;
   };
   todaySchedules: Array<{
+    bookingId?: string | null;
+    categoryLabel?: string | null;
+    checkedCount?: number;
     class?: {
       id: string;
       name: string;
@@ -94,7 +182,14 @@ interface BackendTeacherHomeResponse {
     endTime: string;
     id: string;
     note?: null | string;
+    room?: null | string;
+    scheduleKind?: 'schedule' | 'booking' | 'venue' | null;
+    sourceRoomId?: string | null;
     startTime: string;
+    teacherName?: string | null;
+    totalCount?: number;
+    trialMode?: string | null;
+    venueBookingId?: string | null;
   }>;
 }
 
@@ -247,7 +342,107 @@ function getScheduleStatus(
   return diffMinutes <= 5 ? 'urgent' : 'upcoming';
 }
 
+function mapTodayBookingSchedule(schedule: RawHomeSchedule): HomeScheduleItem {
+  const teacherInfo = TEACHERS.find((item) => item.id === schedule.teacherId);
+  const today = getTodayDateString();
+  const trialStudentId = schedule.trialStudentId;
+  const classId = schedule.classId;
+
+  const matchRecord = (record: typeof LESSON_RECORDS[number]) => {
+    if (record.date !== today || record.teacherId !== schedule.teacherId) return false;
+    if (schedule.trialMode === 'private' && trialStudentId) {
+      return record.studentId === trialStudentId;
+    }
+    if (classId) {
+      return record.classId === classId;
+    }
+    return false;
+  };
+
+  const checkedRecords = LESSON_RECORDS.filter((r) => matchRecord(r) && r.status === 'checked');
+  const absentRecords = LESSON_RECORDS.filter((r) => matchRecord(r) && r.status === 'absent');
+  const leaveRecords = LESSON_RECORDS.filter((r) => matchRecord(r) && r.status === 'leave');
+  const checkedCount = checkedRecords.length;
+  const absentCount = absentRecords.length;
+  const leaveCount = leaveRecords.length;
+  const attendedCount = checkedCount + absentCount + leaveCount;
+
+  let totalCount = 1;
+  if (schedule.trialMode === 'group' && classId) {
+    const classInfo = CLASSES.find((item) => item.id === classId);
+    totalCount = classInfo?.studentCount ?? 1;
+  }
+
+  const displayName = schedule.displayName || '未命名课程';
+  const categoryLabel =
+    schedule.categoryLabel ||
+    resolveCategoryLabelByClassId(classId) ||
+    resolveCategoryLabelByMode(schedule.trialMode);
+
+  return {
+    id: schedule.id,
+    booking_id: schedule.bookingId,
+    trial_mode: schedule.trialMode,
+    teacher_id: schedule.teacherId,
+    class_id: classId || undefined,
+    student_id: schedule.trialMode === 'private' ? trialStudentId : undefined,
+    day_of_week: schedule.dayOfWeek,
+    start_time: schedule.startTime,
+    end_time: schedule.endTime,
+    room: schedule.room,
+    color: schedule.color,
+    status: getScheduleStatus(schedule, attendedCount, totalCount),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    note: displayName,
+    class_info: classId ? { name: displayName } : undefined,
+    checked_count: checkedCount,
+    absent_count: absentCount,
+    leave_count: leaveCount,
+    total_count: totalCount,
+    teacher_name: teacherInfo?.name || '授课老师',
+    has_trial_student: true,
+    category_label: categoryLabel,
+    schedule_kind: 'booking',
+  };
+}
+
+function mapTodayVenueSchedule(schedule: RawHomeSchedule): HomeScheduleItem {
+  const displayName = schedule.displayName || '场地预约';
+  const isCheckedIn = schedule.status === 'done';
+  const totalCount = 1;
+  const checkedCount = isCheckedIn ? 1 : 0;
+
+  return {
+    id: schedule.id,
+    venue_booking_id: schedule.venueBookingId,
+    room_id: schedule.sourceRoomId,
+    schedule_kind: 'venue',
+    category_label: schedule.categoryLabel || '场地',
+    teacher_id: schedule.teacherId,
+    day_of_week: schedule.dayOfWeek,
+    start_time: schedule.startTime,
+    end_time: schedule.endTime,
+    room: schedule.room,
+    color: schedule.color,
+    status: getScheduleStatus(schedule, checkedCount, totalCount),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    note: displayName,
+    checked_count: checkedCount,
+    total_count: totalCount,
+    teacher_name: '场地负责人',
+  };
+}
+
 function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
+  if (schedule.scheduleKind === 'venue') {
+    return mapTodayVenueSchedule(schedule);
+  }
+  if (schedule.bookingId || schedule.scheduleKind === 'booking') {
+    return mapTodayBookingSchedule(schedule);
+  }
+
   const classInfo = CLASSES.find((item) => item.id === schedule.classId);
   const teacherInfo = TEACHERS.find((item) => item.id === schedule.teacherId);
   const today = getTodayDateString();
@@ -298,6 +493,10 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     leave_count: leaveCount,
     total_count: totalCount,
     teacher_name: teacherInfo?.name || '授课老师',
+    category_label:
+      resolveCategoryLabelByClassId(schedule.classId) ||
+      schedule.categoryLabel,
+    schedule_kind: 'schedule',
   };
 }
 
@@ -355,10 +554,19 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
       note: schedule.note || schedule.class?.name || '未命名课程',
       class_info: schedule.class ? { name: schedule.class.name } : undefined,
       status: mapBackendScheduleStatus(schedule.startTime, schedule.endTime),
-      checked_count: 0,
-      total_count: 0,
-      teacher_name: teacher.nickname || teacher.name || '授课老师',
-      room: schedule.color || undefined,
+      checked_count: schedule.checkedCount ?? 0,
+      total_count: schedule.totalCount ?? 0,
+      teacher_name: schedule.teacherName || teacher.nickname || teacher.name || '授课老师',
+      room: schedule.room || undefined,
+      booking_id: schedule.bookingId || undefined,
+      trial_mode:
+        schedule.trialMode === 'private' || schedule.trialMode === 'group'
+          ? schedule.trialMode
+          : undefined,
+      venue_booking_id: schedule.venueBookingId || undefined,
+      room_id: schedule.sourceRoomId || undefined,
+      category_label: schedule.categoryLabel || undefined,
+      schedule_kind: schedule.scheduleKind || 'schedule',
     })),
     teacher: {
       id: teacher.id,
@@ -534,7 +742,12 @@ export const homeService = {
     userId: string,
     role?: UserRole | null,
   ): Promise<HomeTeacherSummary | null> => {
-    if (!USE_MOCK && role === 'teacher') {
+    if (USE_MOCK) {
+      const teacher = await mockGetTeacher(userId);
+      return teacher ? mapTeacher(teacher) : null;
+    }
+
+    if (role === 'teacher') {
       try {
         const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');
         return mapBackendTeacherHome(aggregate).teacher;
@@ -543,34 +756,35 @@ export const homeService = {
       }
     }
 
-    const teacher = await mockGetTeacher(userId);
-    return teacher ? mapTeacher(teacher) : null;
+    if (isPrincipalLikeRole(role) || role === 'assistant') {
+      return buildStaffTeacherSummary(userId);
+    }
+
+    return null;
   },
 
   /** 获取教师的学生列表 */
   getStudents: (teacherId: string, limit?: number) => mockGetStudents(teacherId, limit),
 
-  /** 获取今日排课 */
+  /** 获取今日排课（仅本人主讲或助教，不按课程分类过滤） */
   getTodaySchedules: async (
     teacherId: string,
     role?: UserRole | null,
     campusId?: string,
   ): Promise<HomeScheduleItem[]> => {
-    if (!USE_MOCK && role === 'teacher') {
-      try {
-        const params = new URLSearchParams();
-        if (campusId) params.set('campusId', campusId);
-        const query = params.toString();
-        const aggregate = await get<BackendTeacherHomeResponse>(
-          `/home/teacher${query ? `?${query}` : ''}`,
-        );
-        return mapBackendTeacherHome(aggregate).schedules;
-      } catch {
-        return [];
-      }
+    if (USE_MOCK) {
+      return (await mockGetTodaySchedules(teacherId, campusId)).map(mapTodaySchedule);
     }
 
-    return (await mockGetTodaySchedules(teacherId, campusId)).map(mapTodaySchedule);
+    if (!isStaffHomeRole(role)) {
+      return [];
+    }
+
+    try {
+      return await fetchTodaySchedulesFromApi(role, campusId);
+    } catch {
+      return [];
+    }
   },
 
   /** 获取最近消课记录 */
@@ -585,7 +799,11 @@ export const homeService = {
 
   /** 获取未读通知数 */
   getUnreadCount: async (userId: string, role?: UserRole | null) => {
-    if (!USE_MOCK && (role === 'teacher' || role === 'parent')) {
+    if (USE_MOCK) {
+      return mockGetUnreadCount(userId);
+    }
+
+    if (role === 'teacher' || role === 'parent' || isPrincipalLikeRole(role)) {
       try {
         const data = await get<BackendUnreadCountResponse>('/home/notifications/unread-count');
         return data.count;
@@ -594,7 +812,7 @@ export const homeService = {
       }
     }
 
-    return mockGetUnreadCount(userId);
+    return 0;
   },
 
   /** 获取今日已消课数 */
@@ -782,7 +1000,11 @@ export const homeService = {
     role?: UserRole | null,
     campusId?: string,
   ): Promise<HomeRecentGroup[]> => {
-    if (!USE_MOCK && role === 'teacher') {
+    if (USE_MOCK) {
+      return (await mockGetRecentGroups(teacherId, campusId)).map(mapRecentGroup);
+    }
+
+    if (role === 'teacher') {
       try {
         const params = new URLSearchParams();
         if (campusId) params.set('campusId', campusId);
@@ -796,7 +1018,7 @@ export const homeService = {
       }
     }
 
-    return (await mockGetRecentGroups(teacherId, campusId)).map(mapRecentGroup);
+    return [];
   },
 
   // 家长端

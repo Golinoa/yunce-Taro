@@ -18,6 +18,7 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import SegmentedControl from '@/components/SegmentedControl';
 import { myCourseService } from '@/services';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import type { MyCourseItem, MyCourseStatus } from '@/services/my-course';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -132,6 +133,10 @@ const MyCourse: React.FC = () => {
                       ),
                     );
                     Taro.showToast({ title: '已取消预约', icon: 'success' });
+                    void subscribeMessageService.runFlow('E25', {
+                      bookingLabel: item.courseName,
+                      className: item.courseName,
+                    });
                   }
                 },
               });
@@ -173,6 +178,10 @@ const MyCourse: React.FC = () => {
                       ),
                     );
                     Taro.showToast({ title: '已取消排队', icon: 'success' });
+                    void subscribeMessageService.runFlow('E25', {
+                      bookingLabel: item.courseName,
+                      className: item.courseName,
+                    });
                   }
                 },
               });

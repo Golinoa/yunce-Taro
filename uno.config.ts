@@ -155,19 +155,19 @@ export default defineConfig({
         'radar-ring':
           '{0% { transform: scale(1); opacity: 0 } 20% { opacity: 0.45 } 100% { transform: scale(2.4); opacity: 0 }}',
         'popover-in':
-          '{0% { opacity: 0; transform: translateY(-8rpx) scale(0.96) } 100% { opacity: 1; transform: translateY(0) scale(1) }}',
+          '{0% { opacity: 0; transform: translateY(16rpx) scale(0.98) } 100% { opacity: 1; transform: translateY(0) scale(1) }}',
       },
       durations: {
         float: '3s',
         'badge-scale': '2s',
         'radar-ring': '2s',
-        'popover-in': '200ms',
+        'popover-in': '160ms',
       },
       timingFns: {
         float: 'ease-in-out',
         'badge-scale': 'ease-in-out',
         'radar-ring': 'ease-out',
-        'popover-in': 'ease-out',
+        'popover-in': 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
       counts: {
         float: 'infinite',
@@ -624,7 +624,7 @@ export default defineConfig({
     [
       'popover-in',
       {
-        animation: 'popover-in 200ms ease-out forwards',
+        animation: 'popover-in 160ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
     ],
 

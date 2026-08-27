@@ -9,7 +9,7 @@ import React, { useCallback, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
-import { BRAND_NAME_ZH } from '@/constants/brand';
+import { authCapabilities } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import {
   ACCOUNT_MAX_LENGTH,
@@ -27,12 +27,27 @@ const RegisterStep1: React.FC = () => {
   const { setAgreed } = useAgreementStore();
   const navHeight = useNavSafeHeight();
 
+  const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showAgreementSheet, setShowAgreementSheet] = useState(false);
+  const usesMockRegister = authCapabilities.usesMockRegister;
 
   const validate = useCallback(() => {
+    if (!usesMockRegister) {
+      const normalizedPhone = phone.trim();
+      if (!normalizedPhone) {
+        Taro.showToast({ title: '请输入手机号', icon: 'none' });
+        return false;
+      }
+      if (!/^1[3-9]\d{9}$/.test(normalizedPhone)) {
+        Taro.showToast({ title: '请输入正确的手机号', icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
     const normalizedUsername = username.trim();
     const normalizedPassword = password.trim();
 
@@ -53,7 +68,7 @@ const RegisterStep1: React.FC = () => {
       return false;
     }
     return true;
-  }, [username, password]);
+  }, [usesMockRegister, phone, username, password]);
 
   const handleUsernameInput = useCallback((value: string) => {
     // 注册账号只允许安全白名单字符，输入阶段直接过滤掉汉字、空格和特殊符号。
@@ -64,7 +79,9 @@ const RegisterStep1: React.FC = () => {
     if (submitting) return;
 
     setSubmitting(true);
-    const { error } = await signUpStep1(username.trim(), password.trim());
+    const { error } = usesMockRegister
+      ? await signUpStep1({ username: username.trim(), password: password.trim() })
+      : await signUpStep1({ phone: phone.trim() });
     setSubmitting(false);
     setShowAgreementSheet(false);
 
@@ -74,7 +91,7 @@ const RegisterStep1: React.FC = () => {
     }
 
     Taro.navigateTo({ url: '/package-auth/pages/register/role-select' });
-  }, [submitting, username, password, signUpStep1]);
+  }, [submitting, usesMockRegister, username, password, phone, signUpStep1]);
 
   const handleRegisterClick = useCallback(() => {
     if (!validate()) return;
@@ -118,29 +135,39 @@ const RegisterStep1: React.FC = () => {
         </View>
         <FormInput
           variant="capsule"
-          placeholder="请输入账号（字母/数字/下划线）"
-          value={username}
-          onInput={(e) => handleUsernameInput(e.detail.value)}
-          maxlength={ACCOUNT_MAX_LENGTH}
-          hint={`仅支持${ACCOUNT_RULE_TEXT}`}
+          placeholder={usesMockRegister ? '请输入账号（字母/数字/下划线）' : '请输入手机号'}
+          value={usesMockRegister ? username : phone}
+          onInput={(e) =>
+            usesMockRegister
+              ? handleUsernameInput(e.detail.value)
+              : setPhone(e.detail.value.replace(/\D/g, '').slice(0, 11))
+          }
+          maxlength={usesMockRegister ? ACCOUNT_MAX_LENGTH : 11}
+          hint={usesMockRegister ? `仅支持${ACCOUNT_RULE_TEXT}` : '手机号将作为登录账号'}
           className="mb-[24rpx]"
         />
 
-        <FormInput
-          variant="capsule"
-          placeholder="设置6位以上密码"
-          value={password}
-          onInput={(e) => setPassword(e.detail.value)}
-          password
-          className="mb-[48rpx]"
-        />
+        {usesMockRegister ? (
+          <FormInput
+            variant="capsule"
+            placeholder="设置6位以上密码"
+            value={password}
+            onInput={(e) => setPassword(e.detail.value)}
+            password
+            className="mb-[48rpx]"
+          />
+        ) : (
+          <View className="mb-[48rpx]" />
+        )}
 
         {/* 立即注册按钮 */}
         <View
           className={cn(
             'h-[96rpx] rounded-full flex items-center justify-center mb-[28rpx]',
             'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
-            (submitting || !username.trim() || !password.trim()) && 'opacity-50',
+            (submitting ||
+              (usesMockRegister ? !username.trim() || !password.trim() : !phone.trim())) &&
+              'opacity-50',
           )}
           onClick={handleRegisterClick}
         >

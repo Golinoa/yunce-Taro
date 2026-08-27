@@ -6,7 +6,7 @@
  */
 import dayjs from 'dayjs';
 import { CLASSES, COURSE_PACKAGES, STUDENTS, TEACHERS, type Student } from '@/data/mock-database';
-import { getActorScope } from '@/data/students';
+import { getActorScope, resolveMyTeachingActorIds } from '@/data/students';
 import type {
   Lead,
   LeadBooking,
@@ -380,7 +380,8 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-001',
     teacher_name: '张老师',
-    lesson_date: dayjs().format('YYYY-MM-DD'),
+    // 非今日，避免首页今日课表与专用 mock 重复堆叠团课卡片
+    lesson_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
     start_time: '14:00',
     end_time: '15:30',
     room: '琴房A1',
@@ -404,7 +405,7 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     campus_name: '曦绘艺术',
     teacher_id: 'user-teacher-002',
     teacher_name: '李老师',
-    lesson_date: dayjs().format('YYYY-MM-DD'),
+    lesson_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
     start_time: '15:00',
     end_time: '16:30',
     room: '画室B2',
@@ -651,7 +652,12 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
     for (let i = 0; i < slotCount; i++) {
       const time = timeSlots[(index + i) % timeSlots.length];
       const maxCount = [2, 3, 4][index % 3];
-      const currentCount = i === 0 ? Math.min(1, maxCount - 1) : 0;
+      let currentCount = i === 0 ? Math.min(1, maxCount - 1) : 0;
+      const lessonDate = baseDate.add(i === 1 ? 1 : 0, 'day').format('YYYY-MM-DD');
+      // 今日 teacher-001 的私教由首页专用 mock 提供，避免派生再多出一张
+      if (teacher.teacherId === 'teacher-001' && lessonDate === today.format('YYYY-MM-DD')) {
+        currentCount = 0;
+      }
       configs.push({
         id: `tsc-gen-${index}-${i}`,
         course_id: teacher.courseId,
@@ -661,7 +667,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
         campus_name: teacher.campusName,
         teacher_id: teacher.teacherId,
         teacher_name: teacher.teacherName,
-        lesson_date: baseDate.add(i === 1 ? 1 : 0, 'day').format('YYYY-MM-DD'),
+        lesson_date: lessonDate,
         start_time: time.start,
         end_time: time.end,
         room: `${teacher.subjectName}教室${String.fromCharCode(65 + (index % 5))}${(index % 3) + 1}`,
@@ -692,7 +698,8 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       end_time: '10:00',
       room: '琴房A1',
       max_count: 3,
-      current_count: 1,
+      // 0：不派生今日私教预约，首页私教卡片只保留 lb-home-today-private-001
+      current_count: 0,
       status: 'active',
       creator_teacher_id: 'user-teacher-001',
       creator_teacher_name: '王老师',
@@ -713,7 +720,7 @@ function buildTrialSlotConfigs(): TrialSlotConfig[] {
       end_time: '15:00',
       room: '声乐室B1',
       max_count: 4,
-      current_count: 2,
+      current_count: 0,
       status: 'active',
       creator_teacher_id: 'user-teacher-001',
       creator_teacher_name: '王老师',
@@ -804,8 +811,8 @@ function buildTrialBookingsFromSlots(): LeadBooking[] {
         room: slot.room,
         status,
         booking_type: 'self',
-        // operator_id 设为登录用户，确保 getLeadBookingsByTeacher(currentUserId) 能查到
-        operator_id: 'user-teacher-001',
+        // 操作人与授课老师一致，避免全部挂到 user-teacher-001 导致首页今日课表被灌满
+        operator_id: slot.teacher_id,
         created_at: today.subtract(1, 'day').toISOString(),
         updated_at: today.toISOString(),
       });
@@ -817,6 +824,107 @@ function buildTrialBookingsFromSlots(): LeadBooking[] {
 
 /** 追加派生的预约记录到内存列表 */
 LEAD_BOOKINGS.push(...buildTrialBookingsFromSlots());
+
+/**
+ * 首页今日课表专用 mock：每种形态各 1 条
+ * - 私教 1 条、团课试听 1 条（班课走固定排课，场地走 venue-booking）
+ */
+function buildHomeTodayMockBookings(): LeadBooking[] {
+  const today = dayjs().format('YYYY-MM-DD');
+  return [
+    {
+      id: 'lb-home-today-private-001',
+      lead_id: 'lead-0001',
+      trial_student_id: 'TS-home-001',
+      trial_mode: 'private',
+      course_id: 'course-piano-01',
+      course_name: '钢琴一对一',
+      subject_name: '钢琴',
+      campus_id: 'campus-center',
+      campus_name: '曦绘艺术',
+      teacher_id: 'teacher-001',
+      teacher_name: '王老师',
+      child_name: '林小宇',
+      parent_name: '林先生',
+      parent_phone: '13800001234',
+      lesson_date: today,
+      start_time: '11:00',
+      end_time: '12:00',
+      room: '琴房A2',
+      status: 'confirmed',
+      booking_type: 'proxy',
+      operator_id: 'user-teacher-001',
+      created_at: dayjs().subtract(1, 'day').toISOString(),
+      updated_at: dayjs().toISOString(),
+    },
+    {
+      id: 'lb-home-today-group-001',
+      lead_id: 'lead-0005',
+      trial_student_id: 'TS-home-003',
+      trial_mode: 'group',
+      class_id: 'cls-004',
+      class_name: '声乐初级班',
+      course_id: 'course-vocal-01',
+      course_name: '声乐小组课',
+      subject_name: '声乐',
+      campus_id: 'campus-center',
+      campus_name: '曦绘艺术',
+      teacher_id: 'teacher-001',
+      teacher_name: '王老师',
+      child_name: '赵雨萱',
+      parent_name: '赵明',
+      lesson_date: today,
+      start_time: '18:00',
+      end_time: '19:00',
+      room: '声乐室B1',
+      status: 'confirmed',
+      difficulty: 'basic',
+      booking_type: 'proxy',
+      operator_id: 'user-teacher-001',
+      created_at: dayjs().subtract(1, 'day').toISOString(),
+      updated_at: dayjs().toISOString(),
+    },
+  ];
+}
+
+LEAD_BOOKINGS.push(...buildHomeTodayMockBookings());
+
+/** 私教试听预约一键签到（首页今日课表，不跳转） */
+export async function mockCheckInPrivateLeadBooking(
+  bookingId: string,
+): Promise<LeadBooking | null> {
+  await delay();
+  const booking = LEAD_BOOKINGS.find((item) => item.id === bookingId);
+  if (!booking || booking.trial_mode !== 'private') return null;
+  if (booking.status === 'cancelled') return null;
+  if (booking.status === 'completed') return booking;
+
+  booking.status = 'completed';
+  booking.updated_at = dayjs().toISOString();
+  return booking;
+}
+
+/**
+ * 首页今日课表：当天本人主讲或代约的试听/私教预约（不含已取消）。
+ * 与固定周排课合并展示，不按班课/团课/私教分类过滤。
+ */
+export function filterMyTodayLeadBookings(
+  actorOrTeacherId: string,
+  campusId?: string,
+): LeadBooking[] {
+  const actorIds = new Set(resolveMyTeachingActorIds(actorOrTeacherId));
+  const today = dayjs().format('YYYY-MM-DD');
+  return LEAD_BOOKINGS.filter((booking) => {
+    if (booking.lesson_date !== today) return false;
+    if (booking.status === 'cancelled') return false;
+    const isMyBooking =
+      actorIds.has(booking.teacher_id) ||
+      (booking.operator_id && actorIds.has(booking.operator_id));
+    if (!isMyBooking) return false;
+    if (campusId && booking.campus_id !== campusId) return false;
+    return true;
+  });
+}
 
 /** 内存中的跟进记录 */
 const LEAD_FOLLOW_UPS: LeadFollowUp[] = [

@@ -11,6 +11,7 @@ import { defaultRoleGrant, type DataModule } from '@/types/permission';
 import type { Profile, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
 import { reportLocalDebug } from '@/utils/local-debug';
+import { isColdStartGracePeriod } from '@/utils/launch-scene';
 import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 
 // 无需登录即可访问的页面
@@ -23,6 +24,7 @@ const PUBLIC_PAGES = [
   '/package-auth/pages/register/role-select',
   '/package-auth/pages/register/role-info',
   '/package-settings/pages/agreement/index',
+  '/package-settings/pages/about/index',
   '/package-settings/pages/feedback/index',
   '/package-student/pages/parent-bind/index',
 ];
@@ -87,6 +89,7 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-statistics/pages/record-transaction/index': MANAGER_ROLES,
   // —— 门店入驻（仅 admin/principal） ——
   'package-settings/pages/store-entry/index': MANAGER_ROLES,
+  'package-settings/pages/store-entry/pending/index': MANAGER_ROLES,
 };
 
 /**
@@ -126,6 +129,7 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-statistics/pages/salary-data/index': 'finance',
   'package-statistics/pages/record-transaction/index': 'finance',
   'package-settings/pages/store-entry/index': 'settings',
+  'package-settings/pages/store-entry/pending/index': 'settings',
 };
 
 /** 模块授权校验：读持久化的 grants（系统角色覆盖），未覆盖回退角色默认 */
@@ -182,22 +186,31 @@ function hasValidStoredSession(): boolean {
   }
 }
 
-/** 跳转到登录页并记录来源路径 */
+/** 跳转到登录页并记录来源路径（冷启动期间延后，避免 reLaunch 闪退） */
 let isRedirecting = false;
 function redirectToLogin(fromPath: string) {
-  if (isRedirecting) return;
-  isRedirecting = true;
-  Taro.setStorageSync(REDIRECT_KEY, fromPath);
-  // TabBar 页面不能用 navigateTo 压一个登录页，否则左滑返回会回到受保护页，
-  // 又被守卫重新打回登录页，形成“首页 <-> 登录页”来回跳。
-  if (isTabBarPage(fromPath)) {
-    void safeReLaunch(LOGIN_PAGE);
-  } else {
-    void Taro.redirectTo({ url: LOGIN_PAGE });
+  const run = () => {
+    if (isRedirecting) return;
+    isRedirecting = true;
+    void Taro.setStorage({ key: REDIRECT_KEY, data: fromPath }).finally(() => {
+      // TabBar 页面不能用 navigateTo 压一个登录页，否则左滑返回会回到受保护页，
+      // 又被守卫重新打回登录页，形成“首页 <-> 登录页”来回跳。
+      if (isTabBarPage(fromPath)) {
+        void safeReLaunch(LOGIN_PAGE);
+      } else {
+        void Taro.redirectTo({ url: LOGIN_PAGE });
+      }
+      setTimeout(() => {
+        isRedirecting = false;
+      }, 100);
+    });
+  };
+
+  if (isColdStartGracePeriod()) {
+    setTimeout(run, 450);
+    return;
   }
-  setTimeout(() => {
-    isRedirecting = false;
-  }, 100);
+  run();
 }
 
 /** 登录后跳转逻辑
@@ -253,8 +266,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     const isPublicPage = PUBLIC_PAGES.some((p) => currentPath.includes(p));
     const normPath = currentPath.replace(/^\//, '');
 
-    // 未登录且不在公开页 → 跳转登录
+    // 未登录且不在公开页 → 跳转登录（冷启动 + 有效 token 时延后，等 session 恢复）
     if (!profile && !isPublicPage) {
+      if (hasValidStoredSession() && isColdStartGracePeriod()) {
+        setAuthorized(false);
+        return;
+      }
       if (!currentPath.includes(LOGIN_PAGE)) {
         redirectToLogin(currentPath);
       }
@@ -327,20 +344,10 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   }, [checkAuth, refreshProfile, profile]);
 
-  // 后续 useDidShow 仅做本地 token 检查，不再 refreshProfile
+  // 后续 useDidShow 走统一校验，避免冷启动时盲目 setAuthorized(true) 导致竞态
   useDidShow(() => {
     if (hasRefreshed.current) {
-      const hasValidSession = hasValidStoredSession();
-      if (!hasValidSession && !profile) {
-        const currentInstance = Taro.getCurrentInstance();
-        const currentPath = currentInstance?.router?.path || '';
-        const isPublicPage = PUBLIC_PAGES.some((p) => currentPath.includes(p));
-        if (!isPublicPage && !currentPath.includes(LOGIN_PAGE)) {
-          redirectToLogin(currentPath);
-        }
-      } else {
-        setAuthorized(true);
-      }
+      checkAuth();
     }
   });
 

@@ -394,6 +394,8 @@ export interface Venue {
   address?: string;
   /** 场地状态 */
   status: VenueStatus;
+  /** 场地负责人用户 ID，默认机构管理员 */
+  managerUserId?: string;
   /** 创建时间 */
   createdAt: string;
   /** 更新时间 */
@@ -429,6 +431,8 @@ export interface Room {
   pricePerSession?: number;
   /** 是否开启分时段收费 */
   timeBasedPricing?: boolean;
+  /** 场地负责人用户 ID（默认同所属场馆；未设则机构管理员） */
+  managerUserId?: string;
   /** 创建时间 */
   createdAt: string;
   /** 更新时间 */
@@ -462,4 +466,6 @@ export interface RoomFormData {
   pricePerSession?: number;
   /** 是否开启分时段收费 */
   timeBasedPricing?: boolean;
+  /** 场地负责人用户 ID */
+  managerUserId?: string;
 }

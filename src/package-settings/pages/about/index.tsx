@@ -4,18 +4,18 @@
  * 门店入驻引导页（品牌介绍落地页），从「我的」页「关于松果排课」按钮进入。
  * 分区顺序（对齐优化版设计稿）：
  *  Hero(蓝渐变 + 安全保障标签) → 数据背书(2×2) → 痛点共鸣 → 安全保障 →
- *  核心功能(6) → 为什么选择我们(2) → 入驻流程(纵向三步) → 底部悬浮「免费开通门店」按钮。
- * 已按优化版移除收尾 CTA 与 Footer；CTA 文案统一为「免费开通门店」。
+ *  核心功能(6) → 为什么选择我们(2) → 入驻流程(纵向三步) → 底部悬浮「免费开通门店」长按钮。
+ * Hero 区 CTA 为「免费开通门店」+「邀请朋友入驻」并排；分享仅保留在 Hero 与右上角菜单。
  *
  * 技术约束：UnoCSS Token + rpx，随主题色(blue/coral/orange)联动；无 SCSS、无内联 style；
  * 图标统一走 @/components/Icon（仅支持 MDI_ICONS 表内名称）。
  */
-import { View, Text, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import { View, Text, ScrollView, Button } from '@tarojs/components';
+import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback } from 'react';
 import Icon, { IconName } from '@/components/Icon';
-import { BRAND_NAME_ZH } from '@/constants/brand';
+import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
 import { useThemeStore } from '@/stores/theme';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -122,9 +122,35 @@ const STEPS: { step: string; title: string; desc: string }[] = [
   { step: '03', title: '开通使用', desc: '配置完成，即刻上手' },
 ];
 
+/** 门店入驻引导页分享路径（分包完整路径，确保被分享者直达落地页） */
+export const ABOUT_SHARE_PATH = '/package-settings/pages/about/index';
+
+/**
+ * 好友转发 / 朋友圈分享文案（不含小程序名，卡片已展示品牌）
+ */
+export const ABOUT_SHARE_SLOGAN = '告别 Excel 排课！5 分钟免费开通，馆长都在用';
+
 const About: React.FC = () => {
   usePrimaryNavigationBar();
   const { activeTheme } = useThemeStore();
+
+  useShareAppMessage(() => ({
+    title: ABOUT_SHARE_SLOGAN,
+    path: ABOUT_SHARE_PATH,
+    imageUrl: BRAND_LOGO,
+  }));
+
+  useShareTimeline(() => ({
+    title: ABOUT_SHARE_SLOGAN,
+    imageUrl: BRAND_LOGO,
+  }));
+
+  useDidShow(() => {
+    // 微信「···」菜单：转发好友在前，朋友圈在后
+    Taro.showShareMenu({
+      showShareItems: ['shareAppMessage', 'shareTimeline'],
+    });
+  });
 
   const handleEntry = useCallback(() => {
     Taro.navigateTo({ url: '/package-settings/pages/store-entry/index' });
@@ -170,13 +196,20 @@ const About: React.FC = () => {
               <Text className="block">一套系统覆盖经营全流程，数据端到端加密</Text>
             </Text>
 
-            {/* Hero CTA */}
-            <View
-              className="mt-[44rpx] h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg"
-              onClick={handleEntry}
-            >
-              <Text className="text-[32rpx] font-bold text-primary">免费开通门店</Text>
-              <Icon name="mdi-chevron-right" size={28} color="primary" />
+            {/* Hero CTA：开通 + 邀请并排 */}
+            <View className="mt-[44rpx] flex gap-[16rpx]">
+              <View
+                className="flex-1 h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg"
+                onClick={handleEntry}
+              >
+                <Text className="text-[28rpx] font-bold text-primary">免费开通门店</Text>
+              </View>
+              <Button
+                openType="share"
+                className="flex-1 h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg m-0 p-0 leading-none after:border-none"
+              >
+                <Text className="text-[28rpx] font-bold text-primary">邀请朋友入驻</Text>
+              </Button>
             </View>
           </View>
         </View>
@@ -333,7 +366,7 @@ const About: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* ===== 底部悬浮入驻按钮 ===== */}
+      {/* ===== 底部悬浮入驻按钮（仅开通，分享入口在 Hero 区） ===== */}
       <View className="fixed left-0 right-0 bottom-0 px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[16rpx] bg-gradient-to-t from-background via-background to-transparent z-50">
         <View
           className="h-[92rpx] rounded-[28rpx] bg-gradient-primary center shadow-lg press-scale"

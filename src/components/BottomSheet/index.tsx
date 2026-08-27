@@ -155,8 +155,11 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   const panelPositionStyle =
     keyboardAware && keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined;
 
+  // fillHeight 时内容区用 flex-1 而非 h-full：面板是 flex-col，标题栏占去一部分高度后，
+  // h-full（100% 面板高）会把内容区撑出面板底部、被 overflow-hidden 裁剪（确认按钮被遮）。
+  // flex-1 min-h-0 让内容区正确压缩在标题栏下方的剩余空间内。
   const content = fillHeight ? (
-    <View className="bg-white h-full flex flex-col">{children}</View>
+    <View className="bg-white flex-1 min-h-0 flex flex-col">{children}</View>
   ) : (
     <View className="bg-white">{children}</View>
   );
@@ -176,10 +179,11 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         }}
         catchMove
       />
-      {/* 内容面板 — 阻止点击冒泡到遮罩层；不 catchMove，避免拦截内部 PickerView/ScrollView 滚动 */}
+      {/* 内容面板 — 阻止点击冒泡到遮罩层；不 catchMove，避免拦截内部 PickerView/ScrollView 滚动
+          面板为 flex-col：标题栏 shrink-0，内容区 flex-1 撑满剩余空间，避免内容溢出底部被裁剪 */}
       <View
         className={cn(
-          'absolute bottom-0 left-0 right-0 rounded-t-[40rpx] bg-white overflow-hidden',
+          'absolute bottom-0 left-0 right-0 rounded-t-[40rpx] bg-white overflow-hidden flex flex-col',
           'transition-transform duration-300 ease-in-out',
           animating ? 'translate-y-0' : 'translate-y-full',
           className,
@@ -190,7 +194,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       >
         {/* 标题栏 */}
         {title && (
-          <View className="px-[40rpx] pb-[12rpx] pt-[28rpx] bg-white">
+          <View className="shrink-0 px-[40rpx] pb-[12rpx] pt-[28rpx] bg-white">
             <Text className="text-[32rpx] font-semibold text-foreground">{title}</Text>
           </View>
         )}

@@ -360,9 +360,38 @@ export const statisticsService = {
    * 详情页统一走 Service，避免页面直接依赖 @/data/statistics
    */
   getAlertById: async (alertId: string): Promise<AlertItem | null> => {
-    const [op, fin] = await Promise.all([mockGetOperationAlerts(), mockGetFinanceAlerts()]);
-    const alert = [...op, ...fin].map(normalizeAlertItem).find((item) => item.id === alertId);
-    return alert || null;
+    if (USE_MOCK) {
+      const [op, fin] = await Promise.all([mockGetOperationAlerts(), mockGetFinanceAlerts()]);
+      const alert = [...op, ...fin].map(normalizeAlertItem).find((item) => item.id === alertId);
+      return alert || null;
+    }
+
+    try {
+      const alert = await get<BackendAlertItem>(
+        `/statistics/alerts/${encodeURIComponent(alertId)}`,
+      );
+      return mapBackendAlertItem(alert);
+    } catch {
+      // 单条接口未就绪时回退列表查找
+      const [op, fin] = await Promise.all([
+        get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery({
+          viewType: 'operation',
+          year: new Date().getFullYear(),
+          month: new Date().getMonth() + 1,
+          filterMode: 'month',
+        })}`).catch(() => [] as BackendAlertItem[]),
+        get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery({
+          viewType: 'finance',
+          year: new Date().getFullYear(),
+          month: new Date().getMonth() + 1,
+          filterMode: 'month',
+        })}`).catch(() => [] as BackendAlertItem[]),
+      ]);
+      const found = [...op, ...fin]
+        .map(mapBackendAlertItem)
+        .find((item) => item.id === alertId || item.id.endsWith(alertId));
+      return found || null;
+    }
   },
   // ---------- 同步 Fallback ----------
   getLessonTrendFallback,

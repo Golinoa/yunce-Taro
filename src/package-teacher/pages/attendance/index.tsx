@@ -4,6 +4,7 @@ import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
+  navigateToLessonDetail,
 } from '@/components/lesson/LessonConsumptionList';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -293,7 +294,11 @@ const AttendancePage: React.FC = () => {
 
         {/* ====== 考勤列表 ====== */}
         <View className="px-[32rpx] mt-[24rpx]" onClick={() => setActiveFilterId(null)}>
-          <LessonConsumptionList sections={consumptionSections} emptyText="暂无考勤记录" />
+          <LessonConsumptionList
+            sections={consumptionSections}
+            emptyText="暂无考勤记录"
+            onRecordClick={navigateToLessonDetail}
+          />
         </View>
 
         {/* 自定义日期弹窗 */}

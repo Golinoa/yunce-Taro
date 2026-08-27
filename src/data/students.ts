@@ -282,6 +282,54 @@ export function filterSchedulesByActor(actorId: string) {
   return SCHEDULES.filter((schedule) => schedule.teacherId === actorId);
 }
 
+/** 解析当前用户对应的教师档案 ID */
+export function resolveMyTeacherIds(actorOrTeacherId: string): string[] {
+  const matched = DB_TEACHERS.filter(
+    (teacher) => teacher.id === actorOrTeacherId || teacher.userId === actorOrTeacherId,
+  );
+  if (matched.length) {
+    return matched.map((teacher) => teacher.id);
+  }
+  return [actorOrTeacherId];
+}
+
+/** 解析本人授课相关 ID（教师档案 ID + 用户 ID），用于匹配预约记录中的 teacher_id / operator_id */
+export function resolveMyTeachingActorIds(actorOrTeacherId: string): string[] {
+  const teacherIds = resolveMyTeacherIds(actorOrTeacherId);
+  const matched = DB_TEACHERS.filter(
+    (teacher) =>
+      teacherIds.includes(teacher.id) ||
+      teacher.id === actorOrTeacherId ||
+      teacher.userId === actorOrTeacherId,
+  );
+  const ids = new Set<string>([actorOrTeacherId, ...teacherIds]);
+  matched.forEach((teacher) => {
+    ids.add(teacher.id);
+    ids.add(teacher.userId);
+  });
+  return [...ids];
+}
+
+/** 排课是否由当前用户主讲或担任助教 */
+export function isMyTeachingSchedule(
+  schedule: { teacherId: string; assistantTeacherId?: string },
+  teacherIds: string[],
+): boolean {
+  if (teacherIds.includes(schedule.teacherId)) {
+    return true;
+  }
+  return Boolean(schedule.assistantTeacherId && teacherIds.includes(schedule.assistantTeacherId));
+}
+
+/**
+ * 首页今日课表：仅本人主讲或助教的排课。
+ * 不按班课/团课/私教分类，也不按管辖范围扩权展示他人课表。
+ */
+export function filterSchedulesForMyToday(actorOrTeacherId: string) {
+  const teacherIds = resolveMyTeacherIds(actorOrTeacherId);
+  return SCHEDULES.filter((schedule) => isMyTeachingSchedule(schedule, teacherIds));
+}
+
 export function filterLessonRecordsByActor(actorId: string) {
   const scope = getActorScope(actorId);
 
@@ -1055,7 +1103,8 @@ export async function mockUpdateLessonRecord(
   const diff = newHours - oldHours;
 
   record.hours = newHours;
-  if (updates.note !== undefined) record.note = updates.note;
+  // 备注写入 record.remark（note 字段承载课程内容 content，两者语义不同不可混用）
+  if (updates.note !== undefined) record.remark = updates.note;
 
   // 差额同步到关联课包：改大 → 追扣（remaining 减 diff）；改小 → 回补（remaining 加 diff）
   if (record.packageId && diff !== 0) {

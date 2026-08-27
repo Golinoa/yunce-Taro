@@ -17,6 +17,7 @@ import {
   studentService,
   teacherService,
   temporaryRescheduleService,
+  calendarSyncService,
 } from '@/services';
 import type { TemporaryReschedule } from '@/types';
 import type { Class } from '@/types/class';
@@ -301,6 +302,12 @@ const BatchRescheduleConfirmPage: React.FC = () => {
       }
 
       Taro.showToast({ title: '批量调课成功', icon: 'success' });
+      void calendarSyncService.syncAfterScheduleChange({
+        userId: currentUserId,
+        teacherId: currentUserId,
+        campusId: profile?.currentContext?.campusId,
+        role: profile?.currentContext?.role,
+      });
       setTimeout(() => {
         void Taro.navigateBack({ delta: 2 });
       }, 1200);
@@ -314,6 +321,8 @@ const BatchRescheduleConfirmPage: React.FC = () => {
     affectedSchedules,
     classById,
     currentUserId,
+    profile?.currentContext?.campusId,
+    profile?.currentContext?.role,
     notifyStudentAndParents,
     saving,
     schedules,

@@ -5,9 +5,12 @@
  */
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import type { TodoLevel } from '@/components/AccentBarCard';
-import type { TodoItem } from '@/types/home-todo';
-import type { TodoCollaborationMode, TodoMemberCompletion } from '@/types/home-todo';
+import type {
+  TodoCollaborationMode,
+  TodoItem,
+  TodoLevel,
+  TodoMemberCompletion,
+} from '@/types/home-todo';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { TODO_CATEGORY_INBOX_ID } from '@/utils/todo-categories';
 import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
@@ -152,6 +155,76 @@ export function updateCustomTodoQuadrant(
   store[userId] = list;
   persistStore();
   return true;
+}
+
+export type UpdateCustomTodoInput = Partial<AddCustomTodoInput>;
+
+/** 更新自定义待办（标题/备注/提醒/象限/分类/协作人） */
+export function updateCustomTodo(
+  userId: string,
+  todoId: string,
+  input: UpdateCustomTodoInput,
+): CustomTodoRecord | null {
+  if (!userId || !isCustomTodoId(todoId)) return null;
+  const store = loadStore();
+  const list = store[userId] || [];
+  const index = list.findIndex((item) => item.id === todoId);
+  if (index < 0) return null;
+
+  const current = list[index];
+  const nextTitle =
+    input.title !== undefined ? input.title.trim() : current.title;
+  if (!nextTitle) return null;
+
+  const remindEnabled =
+    input.remindEnabled !== undefined
+      ? input.remindEnabled !== false
+      : current.remindEnabled !== false;
+  const collaboratorIds =
+    input.collaboratorIds !== undefined
+      ? input.collaboratorIds.length > 0
+        ? [...input.collaboratorIds]
+        : undefined
+      : current.collaboratorIds;
+
+  const next: CustomTodoRecord = {
+    ...current,
+    title: nextTitle,
+    note:
+      input.note !== undefined
+        ? input.note.trim() || undefined
+        : current.note,
+    remindEnabled,
+    remindDate: remindEnabled
+      ? input.remindDate !== undefined
+        ? input.remindDate
+        : current.remindDate || dayjs().format('YYYY-MM-DD')
+      : undefined,
+    remindTime: remindEnabled
+      ? input.remindTime !== undefined
+        ? input.remindTime
+        : current.remindTime || '09:00'
+      : undefined,
+    quadrant: input.quadrant !== undefined ? input.quadrant : current.quadrant,
+    categoryId:
+      input.categoryId !== undefined ? input.categoryId : current.categoryId,
+    collaboratorIds,
+    collaborationMode:
+      collaboratorIds && collaboratorIds.length > 0
+        ? input.collaborationMode !== undefined
+          ? input.collaborationMode
+          : current.collaborationMode || 'collaborative'
+        : undefined,
+    memberCompletions:
+      collaboratorIds && collaboratorIds.length > 0
+        ? current.memberCompletions
+        : undefined,
+  };
+
+  list[index] = next;
+  store[userId] = list;
+  persistStore();
+  return next;
 }
 
 /** 各自完成模式下需全部完成的成员 id（创建者 + 协作人） */
