@@ -24,7 +24,7 @@ const baseProfile = (patch: Partial<Profile> = {}): Profile => ({
       id: 'identity-1',
       role: 'principal',
       organizationId: 'org-1',
-      organizationName: '好用消课',
+      organizationName: '松果排课',
       isDefault: true,
     },
   ],

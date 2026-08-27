@@ -11,7 +11,7 @@ export const ONBOARDING_SKIPPED_KEY = 'yunce:onboarding-skipped';
 /** 待完成「选择身份」标记：新用户未完成身份选择前保持，完成入驻/绑定后清除 */
 export const IDENTITY_SELECT_PENDING_KEY = 'yunce:identity-select-pending';
 
-const DEFAULT_ORG_NAMES = new Set(['好用消课', '未知机构']);
+const DEFAULT_ORG_NAMES = new Set(['松果排课', '未知机构']);
 
 export function markLastLoginAsNewUser(): void {
   try {
