@@ -1,4 +1,3 @@
-import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetSubscribeClassViewForTest,

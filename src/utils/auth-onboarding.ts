@@ -1,12 +1,15 @@
 /**
- * 登录后引导：完善资料 / 机构入驻 / 家长绑定
+ * 登录后引导：完善资料 / 选择身份（门店入驻|绑定机构）/ 机构入驻 / 家长绑定 / 分享归属
  */
 import Taro from '@tarojs/taro';
 import type { Profile } from '@/types/profile';
+import { hasPendingInviteCode, consumePendingInviteCode } from '@/utils/invite-parent-link';
 import { navigateAfterLogin } from '@/utils/route-guard';
 
 export const LAST_LOGIN_IS_NEW_USER_KEY = 'yunce:last-login-is-new-user';
 export const ONBOARDING_SKIPPED_KEY = 'yunce:onboarding-skipped';
+/** 待完成「选择身份」标记：新用户未完成身份选择前保持，完成入驻/绑定后清除 */
+export const IDENTITY_SELECT_PENDING_KEY = 'yunce:identity-select-pending';
 
 const DEFAULT_ORG_NAMES = new Set(['好用消课', '未知机构']);
 
@@ -25,6 +28,42 @@ export function consumeLastLoginIsNewUser(): boolean {
     return value === '1' || value === true;
   } catch {
     return false;
+  }
+}
+
+export function markIdentitySelectionPending(): void {
+  try {
+    Taro.setStorageSync(IDENTITY_SELECT_PENDING_KEY, '1');
+  } catch {
+    /* 静默 */
+  }
+}
+
+export function hasIdentitySelectionPending(): boolean {
+  try {
+    return Taro.getStorageSync(IDENTITY_SELECT_PENDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function consumeIdentitySelectionPending(): boolean {
+  const has = hasIdentitySelectionPending();
+  if (has) {
+    try {
+      Taro.removeStorageSync(IDENTITY_SELECT_PENDING_KEY);
+    } catch {
+      /* 静默 */
+    }
+  }
+  return has;
+}
+
+export function clearIdentitySelectionPending(): void {
+  try {
+    Taro.removeStorageSync(IDENTITY_SELECT_PENDING_KEY);
+  } catch {
+    /* 静默 */
   }
 }
 
@@ -86,14 +125,39 @@ export function needsOnboarding(profile: Profile | null): boolean {
   return false;
 }
 
-/** 登录成功后的统一跳转 */
-export function navigateAfterAuth(profile: Profile | null, options?: { isNewUser?: boolean }): void {
+/** 登录成功后的统一跳转
+ *
+ * 分流（R1）：新用户 → 选择身份页（门店入驻 / 绑定机构）；
+ * 携带分享上下文（inviteCode/teacherCode 参数）→ 直接走归属流程（进首页弹关系确认），不经过身份选择；
+ * 老用户保持现状。
+ */
+export function navigateAfterAuth(
+  profile: Profile | null,
+  options?: { isNewUser?: boolean },
+): void {
   if (!profile) {
     return;
   }
 
+  // 新用户（含上次登录未消费标记 + 尚未完成选择身份）
+  const isNewUser = Boolean(options?.isNewUser) || hasIdentitySelectionPending();
+
   if (needsProfileSetup(profile, options?.isNewUser)) {
     Taro.redirectTo({ url: '/package-auth/pages/profile-setup/index' });
+    return;
+  }
+
+  if (isNewUser) {
+    // 携带员工邀请码分享上下文 → 归属流程已由注册/登录接口完成，直接进首页弹关系确认
+    if (hasPendingInviteCode()) {
+      consumePendingInviteCode();
+      consumeIdentitySelectionPending();
+      navigateAfterLogin(profile);
+      return;
+    }
+    // 普通新用户 → 选择身份页
+    markIdentitySelectionPending();
+    Taro.redirectTo({ url: '/package-auth/pages/identity-select/index' });
     return;
   }
 

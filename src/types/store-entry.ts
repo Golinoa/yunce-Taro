@@ -30,9 +30,33 @@ export interface StoreEntryFormData {
 /** 门店入驻申请结果 */
 export interface StoreEntryResult {
   /** 申请记录 ID */
-  id: string;
+  id?: string;
   /** 申请状态 */
   status: 'pending' | 'approved' | 'rejected';
   /** 关联校区 ID（mock 环境下提交后直接创建） */
   campusId?: string;
+  /** 入驻申请单 ID（POST /store-entry/applications 返回） */
+  applicationId?: string;
+  /** 关联机构 ID */
+  organizationId?: string;
+  /** 拒绝原因（rejected 时展示） */
+  rejectReason?: string;
+}
+
+/** 门店入驻最新申请状态（GET /store-entry/applications/latest 返回） */
+export interface StoreEntryLatestResult {
+  /** 最新申请单；无申请记录时为 null */
+  application?: {
+    id: string;
+    status: 'pending' | 'approved' | 'rejected';
+    rejectReason?: string | null;
+    contactPhone?: string;
+  } | null;
+  /** 关联机构；无申请记录时为 null */
+  organization?: {
+    id: string;
+    status: string;
+    rejectReason?: string | null;
+    name?: string;
+  } | null;
 }

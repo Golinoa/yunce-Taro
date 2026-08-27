@@ -17,7 +17,7 @@ import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { auditLogService } from '@/services/audit-log';
-import { storeEntryService } from '@/services/store-entry';
+import { saveStoreEntryDraft, storeEntryService } from '@/services/store-entry';
 import { useCampusStore } from '@/stores/campus';
 import type { StoreType } from '@/types/store-entry';
 import { useAuth } from '@/utils/auth';
@@ -259,6 +259,19 @@ const StoreEntry: React.FC = () => {
     setSubmitting(true);
     try {
       const result = await storeEntryService.submit({
+        name: form.name.trim(),
+        type: form.type,
+        region: form.region.filter(Boolean),
+        address: form.address.trim(),
+        locationName: form.locationName,
+        latitude: form.latitude || undefined,
+        longitude: form.longitude || undefined,
+        contactName: form.contactName.trim(),
+        contactPhone: form.contactPhone.trim(),
+      });
+
+      // 保存草稿：pending 页被拒绝时可原样重新提交（POST /store-entry/applications/re-submit）
+      saveStoreEntryDraft({
         name: form.name.trim(),
         type: form.type,
         region: form.region.filter(Boolean),

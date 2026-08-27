@@ -27,7 +27,7 @@ export async function addPhoneCalendarEvent(input: PhoneCalendarEventInput): Pro
   try {
     await Taro.addPhoneCalendar({
       title: input.title,
-      startTime: String(input.startTime),
+      startTime: input.startTime,
       endTime: String(input.endTime),
       location: input.location || '',
       description: input.description || '',

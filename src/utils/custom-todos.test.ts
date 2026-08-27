@@ -31,13 +31,17 @@ describe('custom-todos', () => {
     expect(isCustomTodoId(record.id)).toBe(true);
   });
 
-  it('完成后从列表移除', () => {
+  it('完成后标记 completedAt（记录保留，列表隐藏由渲染层 isCompleted 过滤）', () => {
     const record = addCustomTodo('user-1', {
       title: '备课',
       remindDate: '2026-08-25',
     });
     expect(completeCustomTodo('user-1', record.id)).toBe(true);
-    expect(getCustomTodos('user-1')).toHaveLength(0);
+    const todos = getCustomTodos('user-1');
+    expect(todos).toHaveLength(1);
+    expect(todos[0].completedAt).toBeTruthy();
+    // 映射为首页卡片后 completed 标志为 true（渲染层据此从待办列表隐藏）
+    expect(mapCustomTodoToHomeItem(todos[0]).completed).toBe(true);
   });
 
   it('映射为首页待办卡片', () => {

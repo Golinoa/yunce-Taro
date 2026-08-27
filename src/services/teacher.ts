@@ -51,11 +51,8 @@ import type {
   TeacherUIModel,
 } from '@/types/teacher';
 import { notWired } from '@/utils/not-wired';
+import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
-import {
-  type PaginatedResponse,
-  unwrapPaginatedList,
-} from '@/utils/pagination';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -77,9 +74,9 @@ async function resolveSalaryRecordId(teacherId: string, month?: string): Promise
   const detail = await get<RawRecord>(`/teachers/${teacherId}`);
   const monthKey = currentSalaryMonth(month);
   const history = Array.isArray(detail.payHistory) ? detail.payHistory : [];
-  const matched = history.find(
-    (item) => String((item as RawRecord).month ?? '') === monthKey,
-  ) as RawRecord | undefined;
+  const matched = history.find((item) => String((item as RawRecord).month ?? '') === monthKey) as
+    | RawRecord
+    | undefined;
   return matched?.id ? String(matched.id) : null;
 }
 
@@ -195,7 +192,7 @@ export const salaryModelService = {
   getList: async () => {
     if (USE_MOCK) return mockGetSalaryModels();
     const list = await get<RawRecord[]>('/teachers/salary-models');
-    return list.map((item, index) => mapBackendSalaryModel(item));
+    return list.map((item) => mapBackendSalaryModel(item));
   },
 
   create: async (model: SalaryModel) => {

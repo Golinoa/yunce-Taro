@@ -3,8 +3,6 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import AddToDesktopTip from '@/components/AddToDesktopTip';
-import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
-import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
@@ -20,18 +18,26 @@ import LessonConsumptionList, {
   navigateToLessonDetail,
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
+import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
+import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
+import RelationConfirmSheet from '@/components/RelationConfirmSheet';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { ORG_COVER_IMAGE } from '@/constants/brand';
+import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import { lessonRecordService, todoService } from '@/services';
-import { leadService } from '@/services/lead';
-import { venueBookingService } from '@/services/venue-booking';
 import { homeService } from '@/services/home';
 import type { QuickEntry } from '@/services/home';
+import { leadService } from '@/services/lead';
+import {
+  consumePendingRelation,
+  organizationService,
+  type PendingRelation,
+} from '@/services/organization';
+import { venueBookingService } from '@/services/venue-booking';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CampusUIModel } from '@/types/campus';
-import type { TodoItem } from '@/types/home-todo';
-import type { TodoCollaborationMode } from '@/types/home-todo';
+import type { TodoItem, TodoCollaborationMode } from '@/types/home-todo';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
@@ -39,20 +45,22 @@ import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { buildTodoCardDomId } from '@/utils/todo-card-meta';
-import { scrollIntoViewProps } from '@/utils/scroll-view-props';
-import { getTodoShowTabBadge } from '@/utils/todo-settings';
 import {
   TODO_CATEGORY_INBOX_ID,
   addTodoCategory,
   listTodoCategoryTabs,
   type TodoCategoryTab,
 } from '@/utils/todo-categories';
-import { consumeTodoCollaboratorResult, type CollaboratorSummary } from '@/utils/todo-collaborator-select';
+import {
+  consumeTodoCollaboratorResult,
+  type CollaboratorSummary,
+} from '@/utils/todo-collaborator-select';
+import { getTodoShowTabBadge } from '@/utils/todo-settings';
 import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
-import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 
 /** Tab 类型 */
 type HomeTab = 'schedule' | 'todo' | 'recent';
@@ -65,6 +73,16 @@ const FAB_REVEAL_TAB_GAP_RPX = 300;
 const FAB_VIEW_TOGGLE_DELAY_MS = 220;
 /** 待办空状态 Tab 面板兜底高度（rpx @375） */
 const TODO_EMPTY_PANEL_MIN_HEIGHT_RPX = 520;
+/** 关系确认弹窗「暂不选择」当天不再弹的日期存储 key（R11） */
+const RELATION_DISMISS_KEY = 'yunce:relation-dismiss-date';
+
+/** 当日日期 key（yyyy-mm-dd，本地时区） */
+function todayDateKey(): string {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${mm}-${dd}`;
+}
 
 /**
  * Home - 机构端首页
@@ -82,6 +100,10 @@ const Home: React.FC = () => {
   const [roleSheetVisible, setRoleSheetVisible] = useState(false);
   const [showCampusSheet, setShowCampusSheet] = useState(false);
   const navSafeHeight = useNavSafeHeight();
+
+  // ---- 关系确认弹窗（R11）：绑定/归属完成后进入首页弹一次 ----
+  const [pendingRelation, setPendingRelation] = useState<PendingRelation | null>(null);
+  const [relationSheetVisible, setRelationSheetVisible] = useState(false);
 
   const currentCampus = useMemo<CampusUIModel | null>(() => {
     const byId = campuses.find((c) => c.id === currentCampusId);
@@ -113,8 +135,12 @@ const Home: React.FC = () => {
   const [addPopoverVisible, setAddPopoverVisible] = useState(false);
   const [addTodoDefaultQuadrant, setAddTodoDefaultQuadrant] = useState<TodoQuadrant | undefined>();
   const [addCollaboratorIds, setAddCollaboratorIds] = useState<string[]>([]);
-  const [addCollaboratorSummaries, setAddCollaboratorSummaries] = useState<CollaboratorSummary[]>([]);
-  const [categoryTabs, setCategoryTabs] = useState<TodoCategoryTab[]>(() => listTodoCategoryTabs(''));
+  const [addCollaboratorSummaries, setAddCollaboratorSummaries] = useState<CollaboratorSummary[]>(
+    [],
+  );
+  const [categoryTabs, setCategoryTabs] = useState<TodoCategoryTab[]>(() =>
+    listTodoCategoryTabs(''),
+  );
   const [todoViewMode, setTodoViewMode] = useState<TodoViewMode>('timeline');
   const [completeSheetItem, setCompleteSheetItem] = useState<TodoItem | null>(null);
   const [completeSheetVisible, setCompleteSheetVisible] = useState(false);
@@ -388,6 +414,51 @@ const Home: React.FC = () => {
   );
 
   // ============================================
+  // 关系确认弹窗（R11）
+  // ============================================
+  const checkPendingRelation = useCallback(async () => {
+    try {
+      // 1) 本地待确认关系（绑定机构流程写入，优先消费）
+      const local = consumePendingRelation();
+      if (local && local.studentParentId) {
+        setPendingRelation(local);
+        setRelationSheetVisible(true);
+        return;
+      }
+      // 2) 后端待确认关系（分享归属注册等场景）
+      const me = await organizationService.getMyOrganization();
+      const remote = me?.pendingRelation;
+      if (remote && remote.studentParentId) {
+        let dismissedToday = false;
+        try {
+          dismissedToday = Taro.getStorageSync(RELATION_DISMISS_KEY) === todayDateKey();
+        } catch {
+          /* ignore */
+        }
+        if (!dismissedToday) {
+          setPendingRelation(remote);
+          setRelationSheetVisible(true);
+        }
+      }
+    } catch {
+      // 静默：弹窗非核心链路，失败不阻塞首页
+    }
+  }, []);
+
+  const handleRelationClose = useCallback(() => {
+    setRelationSheetVisible(false);
+    try {
+      Taro.setStorageSync(RELATION_DISMISS_KEY, todayDateKey());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const handleRelationConfirmed = useCallback(() => {
+    setRelationSheetVisible(false);
+  }, []);
+
+  // ============================================
   // 初始化
   // ============================================
   useEffect(() => {
@@ -415,6 +486,8 @@ const Home: React.FC = () => {
         setAddCollaboratorSummaries(collaboratorResult.summaries);
       }
     }
+    // 关系确认弹窗（R11）：绑定/归属完成后进入首页弹一次
+    void checkPendingRelation();
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
@@ -695,7 +768,9 @@ const Home: React.FC = () => {
           <View className="mt-[24rpx] flex gap-[16rpx] w-full">
             <View
               className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
-              onClick={() => Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })}
+              onClick={() =>
+                Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })
+              }
             >
               <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
             </View>
@@ -949,6 +1024,14 @@ const Home: React.FC = () => {
       )}
 
       <AddToDesktopTip />
+
+      <RelationConfirmSheet
+        visible={relationSheetVisible}
+        studentName={pendingRelation?.studentName || ''}
+        studentParentId={pendingRelation?.studentParentId || ''}
+        onClose={handleRelationClose}
+        onConfirmed={handleRelationConfirmed}
+      />
     </>
   );
 };

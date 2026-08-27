@@ -11,6 +11,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import RegisterStepper from '@/components/RegisterStepper';
 import { authCapabilities } from '@/services/auth';
+import type { ParentRoleInfo, PrincipalRoleInfo, TeacherRoleInfo, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterLogin } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';

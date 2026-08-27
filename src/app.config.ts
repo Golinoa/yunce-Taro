@@ -21,6 +21,7 @@ export default defineAppConfig({
         'pages/register/role-info',
         'pages/profile-setup/index',
         'pages/onboarding/index',
+        'pages/identity-select/index',
         'pages/parent-onboarding/index',
         'pages/role-switch/index',
         'pages/role-switch/add-role',

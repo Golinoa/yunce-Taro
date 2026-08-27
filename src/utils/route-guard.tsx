@@ -10,8 +10,8 @@ import { getPermissionConfig } from '@/services/permission';
 import { defaultRoleGrant, type DataModule } from '@/types/permission';
 import type { Profile, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
-import { reportLocalDebug } from '@/utils/local-debug';
 import { isColdStartGracePeriod } from '@/utils/launch-scene';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 
 // 无需登录即可访问的页面
@@ -44,6 +44,8 @@ const STAFF_ROLES: UserRole[] = ['admin', 'principal', 'teacher', 'assistant'];
 /**
  * 页面 → 允许访问的角色集合（2026-08-22 用户口径确认）。
  * 未列出的页面对所有已登录用户开放（含家长端页面）；列出的页面仅允许其中角色访问。
+ * 说明：`package-auth/pages/identity-select/index`（选择身份页）面向所有已登录新用户，
+ * 不在此做角色限制；门店入驻相关页（store-entry）仅管理角色可见。
  * 权限体系的类型基座与规划见 types/permission.ts（ROLE_PERMISSION_MAP/DataScope/DataModule），
  * 待「权限分配 UI」落地后，页面访问将由 grantedModules 开关动态推导，本矩阵届时收敛为入口清单。
  * 数据范围过滤（teacher 看自己的学生、家长只看绑定孩子）由数据层 filterXxxByActor 承担。

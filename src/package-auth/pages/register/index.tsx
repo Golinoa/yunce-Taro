@@ -9,6 +9,7 @@ import React, { useCallback, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
+import { BRAND_NAME_ZH } from '@/constants/brand';
 import { authCapabilities } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import {

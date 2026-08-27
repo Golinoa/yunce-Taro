@@ -35,13 +35,13 @@ import type {
 import { CLASSES, COURSE_PACKAGES, LESSON_RECORDS, STUDENTS, TEACHERS } from '@/data/mock-database';
 import type { TodoItem } from '@/types/home-todo';
 import type { UserRole } from '@/types/profile';
-import type { Schedule } from '@/types/schedule';
+import type { Schedule, ScheduleColor } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
+import { get } from '@/utils/request';
 import {
   resolveCategoryLabelByClassId,
   resolveCategoryLabelByMode,
 } from '@/utils/schedule-category';
-import { get } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -49,7 +49,57 @@ const USE_MOCK =
     : true;
 
 type RawHomeTeacher = NonNullable<Awaited<ReturnType<typeof mockGetTeacher>>>;
-type RawHomeSchedule = Awaited<ReturnType<typeof mockGetTodaySchedules>>[number];
+
+/** 合法卡片颜色集合（与 ScheduleColor 对齐），非法值落 undefined 防止脏数据透传 */
+const SCHEDULE_COLORS: readonly ScheduleColor[] = [
+  'primary',
+  'red',
+  'amber',
+  'purple',
+  'info',
+  'teal',
+];
+
+function toScheduleColor(color?: string): ScheduleColor | undefined {
+  if (!color) return undefined;
+  return (SCHEDULE_COLORS as readonly string[]).includes(color)
+    ? (color as ScheduleColor)
+    : undefined;
+}
+
+/**
+ * 首页今日日程行（mock 数据为 camelCase 结构；与 types/schedule.ts 的 snake_case 契约不同，
+ * 此处显式建模 mapper 实际消费的字段，避免从 mock 推断出错误类型）
+ */
+interface RawHomeSchedule {
+  id: string;
+  teacherId: string;
+  classId?: string;
+  campusId?: string;
+  dayOfWeek: Schedule['day_of_week'];
+  startTime: string;
+  endTime: string;
+  room?: string;
+  color?: string;
+  status?: string;
+  note?: string;
+  /** 私教试听学员 */
+  trialStudentId?: string;
+  /** 试听模式：团课 / 私教 */
+  trialMode?: 'group' | 'private';
+  /** 预约合并后的展示名 */
+  displayName?: string;
+  /** 课程分类展示名 */
+  categoryLabel?: string;
+  /** 试听/私教预约 ID */
+  bookingId?: string;
+  /** 场地预约 ID */
+  venueBookingId?: string;
+  /** 场地预约来源教室 ID */
+  sourceRoomId?: string;
+  /** 行类型：固定排课 / 预约 / 场地 */
+  scheduleKind?: 'schedule' | 'booking' | 'venue';
+}
 
 interface BackendTodayScheduleItem {
   classId: string;
@@ -348,7 +398,7 @@ function mapTodayBookingSchedule(schedule: RawHomeSchedule): HomeScheduleItem {
   const trialStudentId = schedule.trialStudentId;
   const classId = schedule.classId;
 
-  const matchRecord = (record: typeof LESSON_RECORDS[number]) => {
+  const matchRecord = (record: (typeof LESSON_RECORDS)[number]) => {
     if (record.date !== today || record.teacherId !== schedule.teacherId) return false;
     if (schedule.trialMode === 'private' && trialStudentId) {
       return record.studentId === trialStudentId;
@@ -390,7 +440,7 @@ function mapTodayBookingSchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     start_time: schedule.startTime,
     end_time: schedule.endTime,
     room: schedule.room,
-    color: schedule.color,
+    color: toScheduleColor(schedule.color),
     status: getScheduleStatus(schedule, attendedCount, totalCount),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -424,7 +474,7 @@ function mapTodayVenueSchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     start_time: schedule.startTime,
     end_time: schedule.endTime,
     room: schedule.room,
-    color: schedule.color,
+    color: toScheduleColor(schedule.color),
     status: getScheduleStatus(schedule, checkedCount, totalCount),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -482,7 +532,7 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     start_time: schedule.startTime,
     end_time: schedule.endTime,
     room: schedule.room,
-    color: schedule.color,
+    color: toScheduleColor(schedule.color),
     status: getScheduleStatus(schedule, attendedCount, totalCount),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -493,9 +543,7 @@ function mapTodaySchedule(schedule: RawHomeSchedule): HomeScheduleItem {
     leave_count: leaveCount,
     total_count: totalCount,
     teacher_name: teacherInfo?.name || '授课老师',
-    category_label:
-      resolveCategoryLabelByClassId(schedule.classId) ||
-      schedule.categoryLabel,
+    category_label: resolveCategoryLabelByClassId(schedule.classId) || schedule.categoryLabel,
     schedule_kind: 'schedule',
   };
 }
@@ -542,32 +590,36 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
         },
       ],
     })),
-    schedules: aggregate.todaySchedules.map((schedule) => ({
-      id: schedule.id,
-      teacher_id: teacher.id,
-      class_id: schedule.class?.id,
-      day_of_week: (new Date().getDay() || 7) as Schedule['day_of_week'],
-      start_time: schedule.startTime,
-      end_time: schedule.endTime,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      note: schedule.note || schedule.class?.name || '未命名课程',
-      class_info: schedule.class ? { name: schedule.class.name } : undefined,
-      status: mapBackendScheduleStatus(schedule.startTime, schedule.endTime),
-      checked_count: schedule.checkedCount ?? 0,
-      total_count: schedule.totalCount ?? 0,
-      teacher_name: schedule.teacherName || teacher.nickname || teacher.name || '授课老师',
-      room: schedule.room || undefined,
-      booking_id: schedule.bookingId || undefined,
-      trial_mode:
+    schedules: aggregate.todaySchedules.map((schedule) => {
+      // 后端 trialMode 为自由字符串，收窄为契约允许的字面量后落库
+      const trialMode: 'group' | 'private' | undefined =
         schedule.trialMode === 'private' || schedule.trialMode === 'group'
           ? schedule.trialMode
-          : undefined,
-      venue_booking_id: schedule.venueBookingId || undefined,
-      room_id: schedule.sourceRoomId || undefined,
-      category_label: schedule.categoryLabel || undefined,
-      schedule_kind: schedule.scheduleKind || 'schedule',
-    })),
+          : undefined;
+      return {
+        id: schedule.id,
+        teacher_id: teacher.id,
+        class_id: schedule.class?.id,
+        day_of_week: (new Date().getDay() || 7) as Schedule['day_of_week'],
+        start_time: schedule.startTime,
+        end_time: schedule.endTime,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        note: schedule.note || schedule.class?.name || '未命名课程',
+        class_info: schedule.class ? { name: schedule.class.name } : undefined,
+        status: mapBackendScheduleStatus(schedule.startTime, schedule.endTime),
+        checked_count: schedule.checkedCount ?? 0,
+        total_count: schedule.totalCount ?? 0,
+        teacher_name: schedule.teacherName || teacher.nickname || teacher.name || '授课老师',
+        room: schedule.room || undefined,
+        booking_id: schedule.bookingId || undefined,
+        trial_mode: trialMode,
+        venue_booking_id: schedule.venueBookingId || undefined,
+        room_id: schedule.sourceRoomId || undefined,
+        category_label: schedule.categoryLabel || undefined,
+        schedule_kind: schedule.scheduleKind || 'schedule',
+      };
+    }),
     teacher: {
       id: teacher.id,
       name: teacher.nickname || teacher.name || '未命名老师',

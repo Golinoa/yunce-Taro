@@ -81,3 +81,15 @@ export { onboardingService } from './onboarding';
 export type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 export { subscribeMessageService } from './subscribe-message';
 export { calendarSyncService } from './calendar-sync';
+export { organizationService } from './organization';
+export type {
+  OrganizationInfo,
+  PendingRelation,
+  Membership,
+  MyOrganizationResult,
+  BindOrganizationResult,
+  ShareContext,
+  StudentParentRelation,
+} from './organization';
+export { storeEntryService, saveStoreEntryDraft, readStoreEntryDraft } from './store-entry';
+export type { StoreEntryLatestResult } from '@/types/store-entry';
