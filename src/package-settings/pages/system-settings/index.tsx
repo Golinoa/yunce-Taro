@@ -28,11 +28,8 @@ import {
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 import { calendarSyncService } from '@/services/calendar-sync';
-import {
-  handleVersionNumberTap,
-  isDeveloperModeUnlocked,
-} from '@/utils/developer-mode';
-
+import { organizationService } from '@/services/organization';
+import { handleVersionNumberTap, isDeveloperModeUnlocked } from '@/utils/developer-mode';
 /** 设置项配置 */
 interface SettingItem {
   title: string;
@@ -91,6 +88,10 @@ const SystemSettings: React.FC = () => {
   const [developerModeVisible, setDeveloperModeVisible] = useState(isDeveloperModeUnlocked());
   const currentUserId = profile?.id || '';
   const showCalendarSyncSwitch = canUseCalendarSync(currentRole);
+  const isManagerRole = isAdmin(currentRole) || currentRole === 'principal';
+  /** 请假自动审批开关（仅校长/管理员可见，null=未加载） */
+  const [leaveAutoApprove, setLeaveAutoApprove] = useState<boolean | null>(null);
+  const [leaveAutoApproveLoading, setLeaveAutoApproveLoading] = useState(false);
 
   // 页面显示时读取最新开关状态
   useDidShow(() => {
@@ -100,7 +101,40 @@ const SystemSettings: React.FC = () => {
     if (currentUserId) {
       setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
     }
+    // 校长/管理员：读取请假自动审批开关
+    if (isManagerRole) {
+      organizationService
+        .getSettings()
+        .then((settings) => {
+          setLeaveAutoApprove(settings.leaveAutoApprove);
+        })
+        .catch(() => {
+          /* 读取失败保持默认，不打断页面 */
+        });
+    }
   });
+
+  /** 请假自动审批开关：乐观更新，失败回滚 */
+  const handleLeaveAutoApproveChange = useCallback(
+    (enabled: boolean) => {
+      const previous = leaveAutoApprove;
+      setLeaveAutoApprove(enabled);
+      setLeaveAutoApproveLoading(true);
+      organizationService
+        .updateSettings({ leaveAutoApprove: enabled })
+        .then((settings) => {
+          setLeaveAutoApprove(settings.leaveAutoApprove);
+        })
+        .catch(() => {
+          setLeaveAutoApprove(previous);
+          Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+        })
+        .finally(() => {
+          setLeaveAutoApproveLoading(false);
+        });
+    },
+    [leaveAutoApprove],
+  );
 
   const handleVenueBookingChange = useCallback((enabled: boolean) => {
     setVenueBookingEnabledState(enabled);
@@ -223,6 +257,23 @@ const SystemSettings: React.FC = () => {
             <Text className="text-[30rpx] text-foreground">场地预约</Text>
             <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
           </View>
+
+          {/* 请假自动审批开关（校长/管理员） */}
+          {isManagerRole && leaveAutoApprove !== null && (
+            <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] border-t border-border">
+              <View className="flex flex-col gap-[8rpx] flex-1 pr-[24rpx]">
+                <Text className="text-[30rpx] text-foreground">家长请假自动审批</Text>
+                <Text className="text-[24rpx] text-muted-foreground leading-snug">
+                  开启后家长提交请假直接通过；关闭后仅给您发送待办通知
+                </Text>
+              </View>
+              <Switch
+                checked={leaveAutoApprove}
+                disabled={leaveAutoApproveLoading}
+                onChange={handleLeaveAutoApproveChange}
+              />
+            </View>
+          )}
 
           {showCalendarSyncSwitch && (
             <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] border-t border-border">

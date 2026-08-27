@@ -14,7 +14,7 @@ import {
   mockGetShareContext,
   mockSaveRelation,
 } from '@/data/organization';
-import { get, post } from '@/utils/request';
+import { get, post, put } from '@/utils/request';
 
 const USE_MOCK =
   typeof process !== 'undefined' && typeof process.env !== 'undefined'
@@ -102,7 +102,29 @@ export const organizationService = {
 
     return get<ShareContext>('/share/context', { inviteCode });
   },
+
+  /** 读取机构设置（校长/管理员，请假自动审批开关等） */
+  getSettings: async (): Promise<OrganizationSettings> => {
+    if (USE_MOCK) {
+      return { leaveAutoApprove: true };
+    }
+    return get<OrganizationSettings>('/organization/settings');
+  },
+
+  /** 更新机构设置（校长/管理员） */
+  updateSettings: async (input: { leaveAutoApprove?: boolean }): Promise<OrganizationSettings> => {
+    if (USE_MOCK) {
+      return { leaveAutoApprove: input.leaveAutoApprove ?? true };
+    }
+    return put<OrganizationSettings>('/organization/settings', input);
+  },
 };
+
+/** 机构设置（与后端 OrgSettings 对齐） */
+export interface OrganizationSettings {
+  /** 家长请假自动审批，默认 true */
+  leaveAutoApprove: boolean;
+}
 
 // ==================== 待确认关系本地存储（首页关系弹窗触发源） ====================
 

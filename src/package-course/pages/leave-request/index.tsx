@@ -187,7 +187,7 @@ const LeaveRequestPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await leaveService.create({
+      const created = await leaveService.create({
         parent_id: currentUserId,
         student_id: studentId,
         teacher_id: '',
@@ -198,7 +198,12 @@ const LeaveRequestPage: React.FC = () => {
         reason: reason.trim(),
         status: 'pending',
       });
-      Taro.showToast({ title: '提交成功', icon: 'success' });
+      // 机构默认自动审批：提交后直接返回已通过；关闭自动审批时返回待校长审批
+      if (created.status === 'approved') {
+        Taro.showToast({ title: '已自动审批通过', icon: 'success' });
+      } else {
+        Taro.showToast({ title: '已提交，待审批', icon: 'success' });
+      }
       setTimeout(() => Taro.navigateBack(), 1500);
     } catch {
       Taro.showToast({ title: '提交失败', icon: 'none' });

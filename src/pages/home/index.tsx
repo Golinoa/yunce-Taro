@@ -7,6 +7,9 @@ import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
 import ExpandableFabMenu from '@/components/home/ExpandableFabMenu';
+import HomeCampusGuideDialog, {
+  hasShownCampusGuide,
+} from '@/components/home/HomeCampusGuideDialog';
 import KingKongSection from '@/components/home/KingKongSection';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import TodoList from '@/components/home/TodoList';
@@ -104,6 +107,27 @@ const Home: React.FC = () => {
   // ---- 关系确认弹窗（R11）：绑定/归属完成后进入首页弹一次 ----
   const [pendingRelation, setPendingRelation] = useState<PendingRelation | null>(null);
   const [relationSheetVisible, setRelationSheetVisible] = useState(false);
+
+  // ---- 新校长校区配置引导弹窗（M1）：机构无校区且未展示过时弹一次 ----
+  const [campusGuideVisible, setCampusGuideVisible] = useState(false);
+  const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
+
+  useEffect(() => {
+    if (!isManagerRole) {
+      return;
+    }
+    if (campuses.length > 0) {
+      return;
+    }
+    if (hasShownCampusGuide()) {
+      return;
+    }
+    // 延迟一小段，避免与其他首屏弹窗（关系确认）同时弹出
+    const timer = setTimeout(() => {
+      setCampusGuideVisible(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [isManagerRole, campuses.length]);
 
   const currentCampus = useMemo<CampusUIModel | null>(() => {
     const byId = campuses.find((c) => c.id === currentCampusId);
@@ -1031,6 +1055,11 @@ const Home: React.FC = () => {
         studentParentId={pendingRelation?.studentParentId || ''}
         onClose={handleRelationClose}
         onConfirmed={handleRelationConfirmed}
+      />
+
+      <HomeCampusGuideDialog
+        visible={campusGuideVisible}
+        onClose={() => setCampusGuideVisible(false)}
       />
     </>
   );
