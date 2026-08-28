@@ -7,18 +7,14 @@
  * - POST /store-entry/applications/re-submit 被拒绝后重新提交
  */
 import Taro from '@tarojs/taro';
-import { mockQueryLatest, mockResubmit, mockSubmitStoreEntry } from '@/data/store-entry';
 import type {
   StoreEntryFormData,
   StoreEntryLatestResult,
   StoreEntryResult,
 } from '@/types/store-entry';
+import { loadStoreEntryMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
 import { get, post } from '@/utils/request';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 /** 门店入驻表单草稿 key：提交后保存，pending 页被拒时可原样重新提交 */
 export const STORE_ENTRY_DRAFT_KEY = 'yunce:store-entry-draft';
@@ -45,7 +41,7 @@ export function readStoreEntryDraft(): StoreEntryFormData | null {
 export const storeEntryService = {
   /** 提交门店入驻申请（真实模式不再 POST /feedback） */
   submit: async (data: StoreEntryFormData): Promise<StoreEntryResult> => {
-    if (USE_MOCK) return mockSubmitStoreEntry(data);
+    if (isUseMock()) { const { mockSubmitStoreEntry } = await loadStoreEntryMock(); return mockSubmitStoreEntry(data); }
 
     return post<StoreEntryResult>('/store-entry/applications', {
       name: data.name,
@@ -62,14 +58,14 @@ export const storeEntryService = {
 
   /** 查询最新申请状态（pending / approved / rejected + 拒绝原因） */
   queryLatest: async (): Promise<StoreEntryLatestResult> => {
-    if (USE_MOCK) return mockQueryLatest();
+    if (isUseMock()) { const { mockQueryLatest } = await loadStoreEntryMock(); return mockQueryLatest(); }
 
     return get<StoreEntryLatestResult>('/store-entry/applications/latest');
   },
 
   /** 被拒绝后重新提交（复用原机构，生成新申请单） */
   resubmit: async (data: StoreEntryFormData): Promise<StoreEntryResult> => {
-    if (USE_MOCK) return mockResubmit(data);
+    if (isUseMock()) { const { mockResubmit } = await loadStoreEntryMock(); return mockResubmit(data); }
 
     return post<StoreEntryResult>('/store-entry/applications/re-submit', {
       name: data.name,

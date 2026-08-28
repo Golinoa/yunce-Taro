@@ -1,46 +1,10 @@
 /**
- * Service 层 — 校区设置 API
- * 定义接口契约，当前由 mock 实现，联调时替换为 request 调用
- * 所有方法统一返回 Promise<T>，保证联调切换后类型一致
+ * Service ? ? ???? API
+ * ?????????? mock ????????? request ??
+ * ???????? Promise<T>????????????
  */
-import {
-  mockGetCampuses,
-  mockGetCampusById,
-  mockAddCampus,
-  mockUpdateCampus,
-  mockDeleteCampus,
-  mockSetMainCampus,
-  mockGetSalaryModels,
-  mockCreateSalaryModel,
-  mockUpdateSalaryModel,
-  mockDeleteSalaryModel,
-  mockGetPayDaySettings,
-  mockUpdatePayDaySettings,
-  mockGetHolidays,
-  mockAddHoliday,
-  mockUpdateHoliday,
-  mockDeleteHoliday,
-  mockGetBusinessHours,
-  mockUpdateBusinessHours,
-  mockGetNotifySettings,
-  mockToggleNotify,
-  mockGetCampusData,
-  mockGetSubjects,
-  mockGetSubjectById,
-  mockAddSubject,
-  mockUpdateSubject,
-  mockDeleteSubject,
-  mockGetVenues,
-  mockGetVenueById,
-  mockAddVenue,
-  mockUpdateVenue,
-  mockDeleteVenue,
-  mockGetRooms,
-  mockGetRoomById,
-  mockAddRoom,
-  mockUpdateRoom,
-  mockDeleteRoom,
-} from '@/data/campus';
+import { loadCampusMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
 import type {
   CampusUIModel,
   CampusFormData,
@@ -62,10 +26,11 @@ import type {
 import { get, put } from '@/utils/request';
 import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+let campusMockMod: Awaited<ReturnType<typeof loadCampusMock>> | undefined;
+async function cm() {
+  campusMockMod ??= await loadCampusMock();
+  return campusMockMod;
+}
 
 interface BackendNotifySettingItem {
   enabled: boolean;
@@ -76,15 +41,15 @@ interface BackendNotifySettingItem {
 }
 
 const NOTIFY_GROUP_TITLE_MAP: Record<string, string> = {
-  parent: '通知学员',
-  student: '通知学员',
-  student_parent: '通知学员',
-  teacher: '通知老师',
-  default: '通知设置',
+  parent: '????',
+  student: '????',
+  student_parent: '????',
+  teacher: '????',
+  default: '????',
 };
 
 function mapNotifyGroupTitle(group: string): string {
-  return NOTIFY_GROUP_TITLE_MAP[group] || group || '通知设置';
+  return NOTIFY_GROUP_TITLE_MAP[group] || group || '????';
 }
 
 function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup[] {
@@ -138,7 +103,7 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     type: campusType,
     phone: raw.phone || '',
     address: raw.address || '',
-    icon: raw.icon || '🏫',
+    icon: raw.icon || '??',
     iconGradient: raw.iconGradient || 'from-blue-400 to-blue-600',
     isMain: Boolean(raw.isMain),
     monthlyRent: raw.monthlyRent ?? 0,
@@ -151,13 +116,13 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
 }
 
 // ============================================
-// 校区 Service
+// ?? Service
 // ============================================
 export const campusService = {
-  /** 获取校区列表 */
+  /** ?????? */
   getList: async (): Promise<CampusUIModel[]> => {
-    if (USE_MOCK) {
-      return mockGetCampuses();
+    if (isUseMock()) {
+      return (await cm()).mockGetCampuses();
     }
 
     const data = await get<PaginatedResponse<BackendCampusItem>>('/campuses', {
@@ -167,108 +132,108 @@ export const campusService = {
     return unwrapPaginatedList(data).map(mapBackendCampus);
   },
 
-  /** 获取校区详情 */
+  /** ?????? */
   getById: async (id: string): Promise<CampusUIModel | null> =>
-    (await mockGetCampusById(id)) ?? null,
+    (await (await cm()).mockGetCampusById(id)) ?? null,
 
-  /** 添加校区 */
-  add: (data: CampusFormData): Promise<CampusUIModel> => mockAddCampus(data),
+  /** ???? */
+  add: async (data: CampusFormData): Promise<CampusUIModel> => (await cm()).mockAddCampus(data),
 
-  /** 更新校区 */
+  /** ???? */
   update: async (id: string, data: Partial<CampusFormData>): Promise<CampusUIModel | null> =>
-    (await mockUpdateCampus(id, data)) ?? null,
+    (await (await cm()).mockUpdateCampus(id, data)) ?? null,
 
-  /** 删除校区 */
-  delete: (id: string): Promise<boolean> => mockDeleteCampus(id),
+  /** ???? */
+  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteCampus(id),
 
-  /** 设为主校区 */
-  setMain: (id: string): Promise<boolean> => mockSetMainCampus(id),
+  /** ????? */
+  setMain: async (id: string): Promise<boolean> => (await cm()).mockSetMainCampus(id),
 };
 
 // ============================================
-// 薪资模板 Service
+// ???? Service
 // ============================================
 export const salaryModelCampusService = {
-  /** 获取薪资模板列表 */
-  getList: (): Promise<SalaryModel[]> => mockGetSalaryModels(),
+  /** ???????? */
+  getList: async (): Promise<SalaryModel[]> => (await cm()).mockGetSalaryModels(),
 
-  /** 创建薪资模板 */
-  create: (model: Omit<SalaryModel, 'id' | 'teacherCount'>): Promise<SalaryModel> =>
-    mockCreateSalaryModel(model),
+  /** ?????? */
+  create: async (model: Omit<SalaryModel, 'id' | 'teacherCount'>): Promise<SalaryModel> =>
+    (await cm()).mockCreateSalaryModel(model),
 
-  /** 更新薪资模板 */
+  /** ?????? */
   update: async (id: string, updates: Partial<SalaryModel>): Promise<SalaryModel | null> =>
-    (await mockUpdateSalaryModel(id, updates)) ?? null,
+    (await (await cm()).mockUpdateSalaryModel(id, updates)) ?? null,
 
-  /** 删除薪资模板 */
-  delete: (id: string): Promise<boolean> => mockDeleteSalaryModel(id),
+  /** ?????? */
+  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteSalaryModel(id),
 };
 
 // ============================================
-// 发薪日设置 Service
+// ????? Service
 // ============================================
 export const payDaySettingsService = {
-  /** 获取发薪日设置 */
-  get: (): Promise<PayDaySettings> => mockGetPayDaySettings(),
+  /** ??????? */
+  get: async (): Promise<PayDaySettings> => (await cm()).mockGetPayDaySettings(),
 
-  /** 更新发薪日设置 */
-  update: (updates: Partial<PayDaySettings>): Promise<PayDaySettings> =>
-    mockUpdatePayDaySettings(updates),
+  /** ??????? */
+  update: async (updates: Partial<PayDaySettings>): Promise<PayDaySettings> =>
+    (await cm()).mockUpdatePayDaySettings(updates),
 };
 
 // ============================================
-// 节假日 Service
+// ??? Service
 // ============================================
 export const holidayService = {
-  /** 获取节假日列表 */
-  getList: (): Promise<Holiday[]> => mockGetHolidays(),
+  /** ??????? */
+  getList: async (): Promise<Holiday[]> => (await cm()).mockGetHolidays(),
 
-  /** 添加节假日 */
-  add: (holiday: Omit<Holiday, 'id'>): Promise<Holiday> => mockAddHoliday(holiday),
+  /** ????? */
+  add: async (holiday: Omit<Holiday, 'id'>): Promise<Holiday> => (await cm()).mockAddHoliday(holiday),
 
-  /** 更新节假日 */
+  /** ????? */
   update: async (id: string, updates: Partial<Holiday>): Promise<Holiday | null> =>
-    (await mockUpdateHoliday(id, updates)) ?? null,
+    (await (await cm()).mockUpdateHoliday(id, updates)) ?? null,
 
-  /** 删除节假日 */
-  delete: (id: string): Promise<boolean> => mockDeleteHoliday(id),
+  /** ????? */
+  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteHoliday(id),
 };
 
 // ============================================
-// 营业时间 Service
+// ???? Service
 // ============================================
 export const businessHoursService = {
-  /** 获取营业时间 */
-  get: (): Promise<BusinessHours> => mockGetBusinessHours(),
+  /** ?????? */
+  get: async (): Promise<BusinessHours> => (await cm()).mockGetBusinessHours(),
 
-  /** 更新营业时间 */
-  update: (updates: Partial<BusinessHours>): Promise<BusinessHours> =>
-    mockUpdateBusinessHours(updates),
+  /** ?????? */
+  update: async (updates: Partial<BusinessHours>): Promise<BusinessHours> =>
+    (await cm()).mockUpdateBusinessHours(updates),
 };
 
 // ============================================
-// 通知设置 Service
+// ???? Service
 // ============================================
 export const notifyService = {
-  /** 获取通知设置 */
+  /** ?????? */
   getList: async (): Promise<NotifyGroup[]> => {
-    if (!USE_MOCK) {
+    if (!isUseMock()) {
       const list = await get<BackendNotifySettingItem[]>('/notify-settings');
       return mapBackendNotifySettings(list);
     }
 
-    return mockGetNotifySettings();
+    return (await cm()).mockGetNotifySettings();
   },
 
-  /** 切换通知项开关 */
+  /** ??????? */
   toggle: async (itemId: string): Promise<NotifyGroup[]> => {
-    if (!USE_MOCK) {
+    if (!isUseMock()) {
       const currentGroups = await notifyService.getList();
       const target = currentGroups
         .flatMap((group) => group.items)
         .find((item) => item.id === itemId);
       if (!target) {
-        throw new Error('通知设置不存在');
+        throw new Error('???????');
       }
 
       await put(`/notify-settings/${itemId}`, {
@@ -278,80 +243,80 @@ export const notifyService = {
       return notifyService.getList();
     }
 
-    return mockToggleNotify(itemId);
+    return (await cm()).mockToggleNotify(itemId);
   },
 };
 
 // ============================================
-// 运营数据 Service
+// ???? Service
 // ============================================
 export const campusDataService = {
-  /** 获取校区运营数据 */
-  get: (campusId: string): Promise<CampusOperationalData | null> => mockGetCampusData(campusId),
-  // 联调时替换为:
+  /** ???????? */
+  get: async (campusId: string): Promise<CampusOperationalData | null> => (await cm()).mockGetCampusData(campusId),
+  // ??????:
   // get: (campusId: string) => get<CampusOperationalData>(`/api/campus-data/${campusId}`),
 };
 
 // ============================================
-// 科目 Service
+// ?? Service
 // ============================================
 export const subjectService = {
-  /** 获取科目列表 */
-  getList: (): Promise<Subject[]> => mockGetSubjects(),
+  /** ?????? */
+  getList: async (): Promise<Subject[]> => (await cm()).mockGetSubjects(),
 
-  /** 获取科目详情 */
-  getById: async (id: string): Promise<Subject | null> => (await mockGetSubjectById(id)) ?? null,
+  /** ?????? */
+  getById: async (id: string): Promise<Subject | null> => (await (await cm()).mockGetSubjectById(id)) ?? null,
 
-  /** 添加科目 */
-  add: (data: SubjectFormData): Promise<Subject> => mockAddSubject(data),
+  /** ???? */
+  add: async (data: SubjectFormData): Promise<Subject> => (await cm()).mockAddSubject(data),
 
-  /** 更新科目 */
+  /** ???? */
   update: async (id: string, data: Partial<SubjectFormData>): Promise<Subject | null> =>
-    (await mockUpdateSubject(id, data)) ?? null,
+    (await (await cm()).mockUpdateSubject(id, data)) ?? null,
 
-  /** 删除科目 */
-  delete: (id: string): Promise<boolean> => mockDeleteSubject(id),
+  /** ???? */
+  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteSubject(id),
 };
 
 // ============================================
-// 场地 Service
+// ?? Service
 // ============================================
 export const venueService = {
-  /** 获取场地列表（可按校区过滤） */
-  getList: (campusId?: string): Promise<Venue[]> => mockGetVenues(campusId),
+  /** ?????????????? */
+  getList: async (campusId?: string): Promise<Venue[]> => (await cm()).mockGetVenues(campusId),
 
-  /** 获取场地详情 */
-  getById: async (id: string): Promise<Venue | null> => (await mockGetVenueById(id)) ?? null,
+  /** ?????? */
+  getById: async (id: string): Promise<Venue | null> => (await (await cm()).mockGetVenueById(id)) ?? null,
 
-  /** 添加场地 */
-  add: (data: VenueFormData): Promise<Venue> => mockAddVenue(data),
+  /** ???? */
+  add: async (data: VenueFormData): Promise<Venue> => (await cm()).mockAddVenue(data),
 
-  /** 更新场地 */
+  /** ???? */
   update: async (id: string, data: Partial<VenueFormData>): Promise<Venue | null> =>
-    (await mockUpdateVenue(id, data)) ?? null,
+    (await (await cm()).mockUpdateVenue(id, data)) ?? null,
 
-  /** 删除场地（有关联教室时不可删除） */
-  delete: (id: string): Promise<boolean> => mockDeleteVenue(id),
+  /** ???????????????? */
+  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteVenue(id),
 };
 
 // ============================================
-// 教室 Service
+// ?? Service
 // ============================================
 export const roomService = {
-  /** 获取教室列表（可按校区/场地过滤） */
-  getList: (options?: { campusId?: string; venueId?: string }): Promise<Room[]> =>
-    mockGetRooms(options),
+  /** ???????????/????? */
+  getList: async (options?: { campusId?: string; venueId?: string }): Promise<Room[]> =>
+    (await cm()).mockGetRooms(options),
 
-  /** 获取教室详情 */
-  getById: async (id: string): Promise<Room | null> => (await mockGetRoomById(id)) ?? null,
+  /** ?????? */
+  getById: async (id: string): Promise<Room | null> => (await (await cm()).mockGetRoomById(id)) ?? null,
 
-  /** 添加教室 */
-  add: (data: RoomFormData): Promise<Room> => mockAddRoom(data),
+  /** ???? */
+  add: async (data: RoomFormData): Promise<Room> => (await cm()).mockAddRoom(data),
 
-  /** 更新教室 */
+  /** ???? */
   update: async (id: string, data: Partial<RoomFormData>): Promise<Room | null> =>
-    (await mockUpdateRoom(id, data)) ?? null,
+    (await (await cm()).mockUpdateRoom(id, data)) ?? null,
 
-  /** 删除教室 */
-  delete: (id: string): Promise<boolean> => mockDeleteRoom(id),
+  /** ???? */
+  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteRoom(id),
 };

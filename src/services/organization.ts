@@ -8,18 +8,9 @@
  * - GET  /share/context?inviteCode=xxx         分享上下文（落地页展示邀请人）
  */
 import Taro from '@tarojs/taro';
-import {
-  mockBindOrganization,
-  mockGetMyOrganization,
-  mockGetShareContext,
-  mockSaveRelation,
-} from '@/data/organization';
+import { isUseMock } from '@/utils/build-env';
+import { loadOrganizationMock } from '@/utils/mock-loaders';
 import { get, post, put } from '@/utils/request';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 /** 与学员的关系（后端 Zod 常量校验，不建枚举列） */
 export type StudentParentRelation = 'self' | 'father' | 'mother';
@@ -72,7 +63,7 @@ export interface ShareContext {
 export const organizationService = {
   /** 绑定机构（学员邀请码 → 自动创建子女 + 机构用户 MEMBER） */
   bind: async (inviteCode: string): Promise<BindOrganizationResult> => {
-    if (USE_MOCK) return mockBindOrganization(inviteCode);
+    if (isUseMock()) { const { mockBindOrganization } = await loadOrganizationMock(); return mockBindOrganization(inviteCode); }
 
     return post<BindOrganizationResult>('/organization/bind', { inviteCode });
   },
@@ -82,7 +73,7 @@ export const organizationService = {
     studentParentId: string,
     relation: StudentParentRelation,
   ): Promise<{ studentParentId: string; relation: StudentParentRelation }> => {
-    if (USE_MOCK) return mockSaveRelation(studentParentId, relation);
+    if (isUseMock()) { const { mockSaveRelation } = await loadOrganizationMock(); return mockSaveRelation(studentParentId, relation); }
 
     return post(`/organization/bindings/${encodeURIComponent(studentParentId)}/relation`, {
       relation,
@@ -91,21 +82,21 @@ export const organizationService = {
 
   /** 我的机构状态 + 待确认关系（首页 useDidShow 调用） */
   getMyOrganization: async (): Promise<MyOrganizationResult> => {
-    if (USE_MOCK) return mockGetMyOrganization();
+    if (isUseMock()) { const { mockGetMyOrganization } = await loadOrganizationMock(); return mockGetMyOrganization(); }
 
     return get<MyOrganizationResult>('/organization/me');
   },
 
   /** 分享上下文（分享落地页展示「xx 邀请你」） */
   getShareContext: async (inviteCode: string): Promise<ShareContext> => {
-    if (USE_MOCK) return mockGetShareContext(inviteCode);
+    if (isUseMock()) { const { mockGetShareContext } = await loadOrganizationMock(); return mockGetShareContext(inviteCode); }
 
     return get<ShareContext>('/share/context', { inviteCode });
   },
 
   /** 读取机构设置（校长/管理员，请假自动审批开关等） */
   getSettings: async (): Promise<OrganizationSettings> => {
-    if (USE_MOCK) {
+    if (isUseMock()) {
       return { leaveAutoApprove: true };
     }
     return get<OrganizationSettings>('/organization/settings');
@@ -113,7 +104,7 @@ export const organizationService = {
 
   /** 更新机构设置（校长/管理员） */
   updateSettings: async (input: { leaveAutoApprove?: boolean }): Promise<OrganizationSettings> => {
-    if (USE_MOCK) {
+    if (isUseMock()) {
       return { leaveAutoApprove: input.leaveAutoApprove ?? true };
     }
     return put<OrganizationSettings>('/organization/settings', input);
@@ -121,7 +112,7 @@ export const organizationService = {
 
   /** 机构配额使用率（校长/管理员，P1） */
   getQuotaUsage: async (): Promise<OrganizationQuotaUsage> => {
-    if (USE_MOCK) {
+    if (isUseMock()) {
       return {
         organizationId: 'org-mock',
         organizationName: '松果排课',

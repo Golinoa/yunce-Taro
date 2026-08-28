@@ -13,6 +13,7 @@ import { subscribeMessageService } from '@/services/subscribe-message';
 import { chooseImageTemp, uploadImage } from '@/utils/image-upload';
 import type { SubscribeFlowId, SubscribeRenewPresetId } from '@/types/subscribe-message';
 import { useAuth } from '@/utils/auth';
+import { getApiBaseUrl, isUseMock } from '@/utils/build-env';
 import {
   clearDeveloperModeSession,
   isDeveloperModeSessionValid,
@@ -24,15 +25,8 @@ import {
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
-
-const API_BASE =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.TARO_API_BASE_URL || '/api/app/v1'
-    : '/api/app/v1';
+const USE_MOCK = isUseMock();
+const API_BASE = getApiBaseUrl();
 
 interface DevAction {
   id: string;

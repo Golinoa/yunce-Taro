@@ -330,6 +330,11 @@ export function filterSchedulesForMyToday(actorOrTeacherId: string) {
   return SCHEDULES.filter((schedule) => isMyTeachingSchedule(schedule, teacherIds));
 }
 
+/** 校长/管理员今日课表：按校区展示全部排课（不按教师过滤） */
+export function filterSchedulesForCampusToday(campusId?: string) {
+  return SCHEDULES.filter((schedule) => !campusId || schedule.campusId === campusId);
+}
+
 export function filterLessonRecordsByActor(actorId: string) {
   const scope = getActorScope(actorId);
 
@@ -587,16 +592,75 @@ export async function mockCheckScheduleConflict(
   startTime: string,
   endTime: string,
   excludeId?: string,
-): Promise<boolean> {
+  extras?: { classId?: string; room?: string },
+): Promise<{
+  hasConflict: boolean;
+  conflictSummary: string;
+  conflicts: Array<{
+    id: string;
+    classId: string | null;
+    className: string | null;
+    teacherId: string;
+    teacherName: string | null;
+    dayOfWeek: number;
+    dayOfWeekText: string;
+    startTime: string;
+    endTime: string;
+    room: string | null;
+    conflictTypes: Array<'time' | 'teacher' | 'room' | 'class'>;
+  }>;
+}> {
   await delay();
-  return SCHEDULES.some(
-    (s) =>
-      s.teacherId === teacherId &&
-      s.dayOfWeek === dayOfWeek &&
-      s.id !== excludeId &&
-      s.status === 'scheduled' &&
-      !(endTime <= s.startTime || startTime >= s.endTime),
-  );
+  const DAY_LABELS = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const room = extras?.room?.trim();
+  const classId = extras?.classId;
+
+  const hits = SCHEDULES.filter((s) => {
+    if (s.id === excludeId || s.status !== 'scheduled') return false;
+    if (s.dayOfWeek !== dayOfWeek) return false;
+    if (endTime <= s.startTime || startTime >= s.endTime) return false;
+    const teacherHit = s.teacherId === teacherId;
+    const roomHit = !!(room && s.room && s.room === room);
+    const classHit = !!(classId && s.classId === classId);
+    return teacherHit || roomHit || classHit;
+  });
+
+  const conflicts = hits.map((s) => {
+    const conflictTypes: Array<'time' | 'teacher' | 'room' | 'class'> = ['time'];
+    if (s.teacherId === teacherId) conflictTypes.push('teacher');
+    if (room && s.room === room) conflictTypes.push('room');
+    if (classId && s.classId === classId) conflictTypes.push('class');
+    const cls = DB_CLASSES.find((c) => c.id === s.classId);
+    const teacher = DB_TEACHERS.find((t) => t.id === s.teacherId);
+    return {
+      id: s.id,
+      classId: s.classId || null,
+      className: cls?.name || null,
+      teacherId: s.teacherId,
+      teacherName: teacher?.name || null,
+      dayOfWeek: s.dayOfWeek,
+      dayOfWeekText: DAY_LABELS[s.dayOfWeek] || '',
+      startTime: s.startTime,
+      endTime: s.endTime,
+      room: s.room || null,
+      conflictTypes,
+    };
+  });
+
+  const typeOrder = ['time', 'teacher', 'room', 'class'] as const;
+  const labels = {
+    time: '时间冲突',
+    teacher: '老师冲突',
+    room: '教室冲突',
+    class: '班级冲突',
+  } as const;
+  const summaryTypes = typeOrder.filter((t) => conflicts.some((c) => c.conflictTypes.includes(t)));
+
+  return {
+    hasConflict: conflicts.length > 0,
+    conflictSummary: summaryTypes.map((t) => labels[t]).join('、'),
+    conflicts,
+  };
 }
 
 // ============================================

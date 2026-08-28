@@ -78,7 +78,7 @@ const PickerItem: React.FC<PickerItemProps> = ({
   // 渲染左侧图标
   const renderIcon = () => {
     if (iconType === 'avatar') {
-      return <Avatar name={avatarChar || title} avatarUrl={avatarUrl} size="md" />;
+      return <Avatar name={avatarChar || title} avatarUrl={avatarUrl} size="md" fallback="initial" />;
     }
     // icon 模式
     return (

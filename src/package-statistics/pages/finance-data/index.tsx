@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import type { FinanceDetailType, RevenueTrendItem } from '@/data/data-center';
+import type { FinanceDetailType, RevenueTrendItem } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';

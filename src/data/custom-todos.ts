@@ -5,6 +5,7 @@
  * 日期按当前时间动态计算，保证随时打开都能看到逾期效果。
  */
 import dayjs from 'dayjs';
+import { isUseMock } from '@/utils/build-env';
 import type { CustomTodoRecord } from '@/utils/custom-todos';
 import {
   CUSTOM_TODO_ID_PREFIX,
@@ -99,12 +100,7 @@ export function ensureMockCustomTodoSeedsForUser(userId: string): void {
 
 /** 模块加载时预置三个测试账号的演示数据 */
 export function mockInitCustomTodoSeeds(): void {
-  const useMock =
-    typeof process !== 'undefined' &&
-    typeof process.env !== 'undefined' &&
-    process.env.VITE_USE_MOCK !== 'false';
-
-  if (!useMock) return;
+  if (!isUseMock()) return;
 
   MOCK_CUSTOM_TODO_SEED_USER_IDS.forEach((userId) => {
     ensureMockCustomTodoSeedsForUser(userId);

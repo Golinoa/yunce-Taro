@@ -391,6 +391,32 @@ const LEAD_BOOKINGS: LeadBooking[] = [
     created_at: '2026-06-21T14:00:00Z',
     updated_at: '2026-06-21T14:00:00Z',
   },
+  // 课表标签演示（仅班课）：赵老师·今天·cls-tag-trial →「试听」；团课无试听勿引用
+  {
+    id: 'lb-tag-trial-today',
+    lead_id: 'lead-0001',
+    trial_student_id: 'TS-00001',
+    trial_mode: 'group',
+    class_id: 'cls-tag-trial',
+    class_name: '班课演示·试听',
+    course_id: 'cls-tag-trial',
+    course_name: '班课演示·试听',
+    subject_name: '书法',
+    campus_id: 'campus-west',
+    campus_name: '城西校区',
+    teacher_id: 'user-teacher-004',
+    teacher_name: '赵老师',
+    lesson_date: dayjs().format('YYYY-MM-DD'),
+    start_time: '10:00',
+    end_time: '11:00',
+    room: '演示教室B',
+    status: 'confirmed',
+    difficulty: 'basic',
+    booking_type: 'proxy',
+    operator_id: 'user-teacher-004',
+    created_at: dayjs().toISOString(),
+    updated_at: dayjs().toISOString(),
+  },
   {
     id: 'lb-0002',
     lead_id: 'lead-0003',
@@ -902,6 +928,17 @@ export async function mockCheckInPrivateLeadBooking(
   booking.status = 'completed';
   booking.updated_at = dayjs().toISOString();
   return booking;
+}
+
+/** 首页今日课表（校长/管理员）：当天校区全部试听/私教预约（不含已取消） */
+export function filterCampusTodayLeadBookings(campusId?: string): LeadBooking[] {
+  const today = dayjs().format('YYYY-MM-DD');
+  return LEAD_BOOKINGS.filter((booking) => {
+    if (booking.lesson_date !== today) return false;
+    if (booking.status === 'cancelled') return false;
+    if (campusId && booking.campus_id !== campusId) return false;
+    return true;
+  });
 }
 
 /**
@@ -1653,6 +1690,21 @@ export async function mockGetLeadBookingsByTeacher(
   return LEAD_BOOKINGS.filter((b) => {
     // 匹配登录用户 ID（user-teacher-xxx）或时段老师 ID（teacher-xxx）
     if (b.teacher_id !== teacherId && b.operator_id !== teacherId) return false;
+    if (params?.startDate && b.lesson_date < params.startDate) return false;
+    if (params?.endDate && b.lesson_date > params.endDate) return false;
+    if (params?.status && b.status !== params.status) return false;
+    return true;
+  });
+}
+
+/** 校长/管理员：按校区查看全部试听预约（Mock） */
+export async function mockListLeadBookingsByCampus(
+  campusId?: string,
+  params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
+): Promise<LeadBooking[]> {
+  await delay();
+  return LEAD_BOOKINGS.filter((b) => {
+    if (campusId && b.campus_id !== campusId) return false;
     if (params?.startDate && b.lesson_date < params.startDate) return false;
     if (params?.endDate && b.lesson_date > params.endDate) return false;
     if (params?.status && b.status !== params.status) return false;

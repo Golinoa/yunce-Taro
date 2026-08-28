@@ -17,7 +17,7 @@ import Card from '@/components/Card';
 import FormRow from '@/components/FormRow';
 import Switch from '@/components/Switch';
 import SalaryRuleEditor from '@/components/teacher/SalaryRuleEditor';
-import { createDefaultSalaryRule } from '@/data/teacher';
+import { createDefaultSalaryRule } from '@/domain/teacher-salary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig } from '@/types/teacher';

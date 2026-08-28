@@ -21,7 +21,7 @@ import Loading from '@/components/Loading';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
-import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
+import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
 import { auditLogService } from '@/services/audit-log';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { useTeacherStore } from '@/stores/teacher';

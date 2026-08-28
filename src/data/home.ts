@@ -19,14 +19,20 @@ import {
   type Schedule,
 } from './mock-database';
 import { COURSE_MANAGEMENT_CLASS_TAB_URL } from './course-category';
+import type { UserRole } from '@/types/profile';
 import {
   filterClassesByActor,
   filterLessonRecordsByActor,
+  filterSchedulesForCampusToday,
   filterSchedulesForMyToday,
   filterStudentsByActor,
   getActorScope,
 } from './students';
-import { filterMyTodayLeadBookings, mockGetLeadFollowingCount } from './lead';
+import {
+  filterCampusTodayLeadBookings,
+  filterMyTodayLeadBookings,
+  mockGetLeadFollowingCount,
+} from './lead';
 import { filterMyTodayVenueBookings } from './venue-booking';
 import type { LeadBooking } from '@/types/lead';
 import type { VenueBookingRecord } from '@/types/venue-booking';
@@ -163,7 +169,7 @@ export const HOME_QUICK_ENTRIES: QuickEntry[] = [
     label: '试听记录',
     icon: 'mdi-clock-outline',
     color: 'icon-glass-purple',
-    url: '/package-student/pages/student-form/index',
+    url: '/package-lead/pages/trial-records/index',
   },
   {
     label: '充值记录',
@@ -495,19 +501,27 @@ function mapVenueBookingToHomeScheduleRow(
 }
 
 /** 获取今日排课（含昨日跨 0 点未完全下课的排课，用户口径 2026-08-24） */
-export async function mockGetTodaySchedules(teacherId: string, campusId?: string) {
+export async function mockGetTodaySchedules(
+  teacherId: string,
+  campusId?: string,
+  role?: UserRole | null,
+) {
   await delay();
   const now = new Date();
   const todayWeekday = now.getDay() || 7; // 周日是0，转为7
   const yesterdayWeekday = todayWeekday === 1 ? 7 : todayWeekday - 1;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const isCampusWide = role === 'principal' || role === 'admin';
   const myTeacherIds = new Set(
     // 与首页专用 mock（teacher-001）对齐，保证演示账号始终有班课卡
     TEACHERS.filter((t) => t.id === teacherId || t.userId === teacherId).map((t) => t.id),
   );
   if (myTeacherIds.size === 0) myTeacherIds.add(teacherId);
 
-  let schedules = filterSchedulesForMyToday(teacherId).filter((schedule) => {
+  const scheduleSource = isCampusWide
+    ? filterSchedulesForCampusToday(campusId)
+    : filterSchedulesForMyToday(teacherId);
+  let schedules = scheduleSource.filter((schedule) => {
     if (schedule.status !== 'scheduled') return false;
     if (schedule.dayOfWeek === todayWeekday) return true;
     // 昨日跨 0 点排课（endTime 超过 24:00，如 23:30-24:30）：次日未完全下课前继续显示
@@ -550,9 +564,11 @@ export async function mockGetTodaySchedules(teacherId: string, campusId?: string
   // 首页演示：班课 / 团课 / 私教 / 场地 各保留 1 张卡片
   const classSchedule = schedules[0] ? [schedules[0]] : [];
 
-  const leadBookings = filterMyTodayLeadBookings(teacherId, campusId).filter(
-    (booking) => !isBookingCoveredByFixedSchedule(booking, classSchedule),
-  );
+  const leadBookings = (
+    isCampusWide
+      ? filterCampusTodayLeadBookings(campusId)
+      : filterMyTodayLeadBookings(teacherId, campusId)
+  ).filter((booking) => !isBookingCoveredByFixedSchedule(booking, classSchedule));
   // 优先用首页专用 mock（lb-home-today-*），避免派生预约抢先
   const privateBooking =
     leadBookings.find((b) => b.trial_mode === 'private' && b.id.startsWith('lb-home-today-')) ||

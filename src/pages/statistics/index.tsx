@@ -13,7 +13,7 @@ import type {
   MemberDataType,
   CardDataType,
   SalaryDataType,
-} from '@/data/data-center';
+} from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';

@@ -15,7 +15,7 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PageIntroSheet from '@/components/PageIntroSheet';
-import { DEFAULT_COURSE_CATEGORIES } from '@/data/course-template';
+import { DEFAULT_COURSE_CATEGORIES } from '@/constants/course-template-ui';
 import { classService } from '@/services';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCourseCategoryStore } from '@/stores/course-category';

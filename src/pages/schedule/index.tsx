@@ -2206,6 +2206,16 @@ const SchedulePage: React.FC = () => {
                       '未分配老师';
                     const duration = getDurationText(slot.start_time, slot.end_time);
                     const isRest = slot.status === 'rest';
+                    const isSlotInProgress =
+                      !isRest &&
+                      date.isSame(currentTime, 'day') &&
+                      (() => {
+                        const nowMinutes =
+                          currentTime.hour() * 60 + currentTime.minute();
+                        const startMinutes = parseTimeToMinutes(slot.start_time);
+                        const endMinutes = parseTimeToMinutes(slot.end_time);
+                        return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+                      })();
 
                     return (
                       <SwappableScheduleCard
@@ -2237,7 +2247,11 @@ const SchedulePage: React.FC = () => {
                         <View
                           className={cn(
                             'rounded-[24rpx] px-[24rpx] py-[20rpx] shadow-card',
-                            isRest ? 'bg-muted border border-border' : 'bg-card',
+                            isRest
+                              ? 'bg-muted border border-border'
+                              : isSlotInProgress
+                                ? 'bg-card course-status-active-border'
+                                : 'bg-card',
                           )}
                         >
                           <View className="flex">
@@ -2283,9 +2297,17 @@ const SchedulePage: React.FC = () => {
                               </Button>
 
                               <View>
-                                <Text className="pr-[44rpx] text-[36rpx] font-bold leading-tight text-foreground">
-                                  {cls?.name || slot.class_name || '未命名班级'}
-                                </Text>
+                                <View className="flex flex-wrap items-center gap-[12rpx] pr-[44rpx]">
+                                  <Text className="text-[36rpx] font-bold leading-tight text-foreground">
+                                    {cls?.name || slot.class_name || '未命名班级'}
+                                  </Text>
+                                  {/* 团课无试听：状态标签仅「上课中」（预约满/可约用人数区表达） */}
+                                  {isSlotInProgress ? (
+                                    <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                                      <Text className="text-[20rpx] font-medium">上课中</Text>
+                                    </View>
+                                  ) : null}
+                                </View>
                                 <View className="mt-[12rpx] flex flex-wrap items-center gap-[12rpx]">
                                   {cls?.level ? (
                                     <View className="rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
@@ -2398,6 +2420,7 @@ const SchedulePage: React.FC = () => {
       errorOpenSlotDates,
       openCardId,
       teacherById,
+      currentTime,
       loadOpenClassSlots,
       handleOpenClassSlotConfig,
       handleProxyBooking,

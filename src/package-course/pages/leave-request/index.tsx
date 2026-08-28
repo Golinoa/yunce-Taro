@@ -11,13 +11,11 @@ import PickerSheet from '@/components/PickerSheet';
 import { studentService, leaveService } from '@/services';
 import type { LeaveRequest, LeaveType, LeaveStatus } from '@/types/leave-request';
 import { isStaffRole, useAuth } from '@/utils/auth';
+import { isUseMock } from '@/utils/build-env';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+const USE_MOCK = isUseMock();
 
 /** 状态标签配置 */
 const STATUS_MAP: Record<LeaveStatus, { label: string; cls: string }> = {

@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import type { ExpenseCategoryType, IncomeCategoryType } from '@/data/data-center';
+import type { ExpenseCategoryType, IncomeCategoryType } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 
 /**

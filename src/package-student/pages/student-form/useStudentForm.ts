@@ -2,20 +2,18 @@ import Taro from '@tarojs/taro';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
-import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/data/course-category';
+import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/constants/course-category-ui';
 import { studentService, packageService, campusService, subscribeMessageService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { CampusUIModel } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { isUseMock } from '@/utils/build-env';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+const USE_MOCK = isUseMock();
 
 /** 支付方式选项 */
 export const FEE_METHOD_OPTIONS = [

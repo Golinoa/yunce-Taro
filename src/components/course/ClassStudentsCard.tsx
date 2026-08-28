@@ -88,7 +88,7 @@ const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({
   return (
     <Card className="p-[32rpx]">
       {/* 头部：标题 + 人数 badge + 管理/添加 */}
-      <View className="flex flex-row items-center justify-between mb-[16rpx]">
+      <View className="flex flex-row items-center justify-between mb-[28rpx]">
         <View className="flex flex-row items-center gap-[12rpx]">
           <View className="w-[6rpx] h-[28rpx] rounded-[4rpx] bg-warning" />
           <Text className="text-[28rpx] font-semibold text-foreground">上课学员</Text>
@@ -109,15 +109,15 @@ const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({
 
       {/* 学员网格：4 列；最后一项为「继续添加」入口 */}
       {selectedStudents.length > 0 ? (
-        <View className="grid grid-cols-4 gap-x-[20rpx] gap-y-[32rpx]">
+        <View className="mt-[8rpx] min-h-[280rpx] grid grid-cols-4 gap-x-[20rpx] gap-y-[40rpx]">
           {selectedStudents.map((student) => {
             const remaining = computeRemaining(student);
             return (
-              <View key={student.id} className="flex flex-col items-center gap-[12rpx] relative">
-                <Avatar name={student.name} avatarUrl={student.avatar_url} size="mlg" />
+              <View key={student.id} className="flex flex-col items-center gap-[14rpx] relative">
+                <Avatar name={student.name} avatarUrl={student.avatar_url} size="lg" />
                 {/* 移除按钮（右上角红×） */}
                 <View
-                  className="absolute -top-[8rpx] -right-[8rpx] w-[36rpx] h-[36rpx] rounded-full bg-destructive border-[2rpx] border-card flex items-center justify-center active:opacity-70 z-10"
+                  className="absolute -top-[8rpx] -right-[8rpx] w-[36rpx] h-[36rpx] rounded-full bg-destructive border-[2rpx] border-card flex items-center justify-center active:opacity-70"
                   onClick={(e) => {
                     e.stopPropagation();
                     void handleRemove(student);
@@ -135,25 +135,25 @@ const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({
             );
           })}
 
-          {/* 继续添加按钮：紧跟学员头像，与头像尺寸保持一致（72rpx 圆形 + 26rpx 文字） */}
+          {/* 继续添加：与头像 lg(80rpx) 对齐 */}
           <View
-            className="flex flex-col items-center gap-[12rpx] active:opacity-70 press-scale"
+            className="flex flex-col items-center gap-[14rpx] active:opacity-70 press-scale"
             onClick={openPicker}
           >
-            <View className="w-[72rpx] h-[72rpx] rounded-full bg-primary/10 flex items-center justify-center border-[2rpx] border-dashed border-primary/40">
-              <Icon name="mdi-plus" size={36} color="primary" />
+            <View className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-[2rpx] border-dashed border-primary/40">
+              <Icon name="mdi-plus" size={40} color="primary" />
             </View>
             <Text className="text-[26rpx] text-foreground text-center">添加</Text>
           </View>
         </View>
       ) : (
-        /* 空态：虚线框 + 圆形加号；圆形与头像尺寸一致 72rpx */
+        /* 空态加高，缩短点选成本 */
         <View
-          className="flex flex-col items-center justify-center gap-[16rpx] py-[48rpx] rounded-[20rpx] border-[2rpx] border-dashed border-border active:opacity-70 press-scale"
+          className="flex flex-col items-center justify-center gap-[20rpx] min-h-[280rpx] py-[64rpx] rounded-[20rpx] border-[2rpx] border-dashed border-border active:opacity-70 press-scale"
           onClick={openPicker}
         >
-          <View className="w-[72rpx] h-[72rpx] rounded-full bg-primary/10 flex items-center justify-center">
-            <Icon name="mdi-plus" size={36} color="primary" />
+          <View className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <Icon name="mdi-plus" size={40} color="primary" />
           </View>
           <Text className="text-[26rpx] text-primary font-medium active:opacity-70">
             点击此处添加

@@ -2,7 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import React, { useCallback, useMemo } from 'react';
 import FilterBar from '@/components/teacher/FilterBar';
 import TeacherCard from '@/components/teacher/TeacherCard';
-import { ROLE_OPTIONS, SUBJECT_OPTIONS, STATUS_OPTIONS } from '@/data/teacher';
+import { ROLE_OPTIONS, SUBJECT_OPTIONS, STATUS_OPTIONS } from '@/constants/teacher-ui';
 import type { TeacherFilter, TeacherUIModel } from '@/types/teacher';
 
 export interface TeacherTabProps {

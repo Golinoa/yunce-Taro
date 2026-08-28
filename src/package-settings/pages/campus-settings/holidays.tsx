@@ -15,7 +15,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import { HOLIDAY_STATUS_MAP } from '@/data/campus';
+import { HOLIDAY_STATUS_MAP } from '@/constants/campus-ui';
 import { useCampusStore } from '@/stores/campus';
 import type { HolidayStatus } from '@/types/campus';
 

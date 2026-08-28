@@ -35,8 +35,8 @@ const TRIPLE_CARD_CONFIG = [
     badge: 'HOT',
   },
   {
-    label: '预约课程',
-    subLabel: '管理 预约制课程',
+    label: '我的预约',
+    subLabel: '查看与我关联的预约',
     icon: 'mdi-account-plus',
     url: '/package-course/pages/booking/index',
   },

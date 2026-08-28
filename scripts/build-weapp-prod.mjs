@@ -49,6 +49,7 @@ function runNpm(script, extraArgs = []) {
 }
 
 async function main() {
+  await runNpm('generate:mock-stubs');
   await runNpm('build:weapp:clean');
   verifyProdDist();
 }

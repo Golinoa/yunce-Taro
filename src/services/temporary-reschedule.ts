@@ -1,13 +1,10 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import type { Class, Schedule, TemporaryReschedule } from '@/types';
+import { isUseMock } from '@/utils/build-env';
 import { get, post } from '@/utils/request';
 
 const STORAGE_KEY = 'yunce-temporary-reschedules';
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 interface SaveBatchParams {
   teacherId: string;
@@ -149,7 +146,7 @@ export const temporaryRescheduleService = {
     startDate: string,
     endDate: string,
   ): Promise<TemporaryReschedule[]> => {
-    if (!USE_MOCK) {
+    if (!isUseMock()) {
       const response = await get<
         BackendTemporaryRescheduleListResponse | BackendTemporaryRescheduleItem[]
       >(
@@ -181,7 +178,7 @@ export const temporaryRescheduleService = {
     targetDate,
     schedules,
   }: SaveBatchParams): Promise<TemporaryReschedule[]> => {
-    if (!USE_MOCK) {
+    if (!isUseMock()) {
       const response = await post<
         BackendTemporaryRescheduleBatchResponse | BackendTemporaryRescheduleItem[]
       >('/temporary-reschedules/batch', {

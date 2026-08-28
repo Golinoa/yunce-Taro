@@ -293,7 +293,7 @@ getList: () => get<TeacherUIModel[]>('/api/teachers'),
 
 ```ts
 // 所有 Service 方法共用一个 USE_MOCK 标志（已存在）
-const USE_MOCK = process.env.VITE_USE_MOCK !== 'false';
+const USE_MOCK = process.env.VITE_USE_MOCK === 'true';
 
 // Service 函数内部判断（已封装在 request.ts 内部）
 ```

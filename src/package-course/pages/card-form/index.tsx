@@ -25,7 +25,7 @@ import {
   CARD_TYPE_TOOLTIPS,
   COMMISSION_OPTIONS,
   WEEKDAY_OPTIONS,
-} from '@/data/card-type';
+} from '@/constants/card-type-ui';
 import { subjectService } from '@/services/campus';
 import { cardTypeService } from '@/services/card-type';
 import { useCourseCategoryStore } from '@/stores/course-category';

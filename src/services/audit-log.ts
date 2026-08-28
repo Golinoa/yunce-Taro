@@ -3,19 +3,15 @@
  * - 查询走 GET /audit-logs
  * - 写入仍由前端 mock 层 append（后端暂未提供写入接口）
  */
-import { addAuditLog, queryAuditLogs } from '@/data/audit-log';
 import type { AuditLogEntry, AuditLogPage, AuditLogQuery } from '@/types/audit-log';
+import { loadAuditLogMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
 import { get } from '@/utils/request';
 import {
   type PaginatedResponse,
   formatApiDateTime,
   unwrapPaginatedList,
 } from '@/utils/pagination';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 export interface AuditLogInput {
   action: AuditLogEntry['action'];
@@ -55,6 +51,7 @@ function mapBackendAuditLog(raw: Record<string, unknown>): AuditLogEntry {
 
 export const auditLogService = {
   record: async (input: AuditLogInput): Promise<AuditLogEntry> => {
+    const { addAuditLog } = await loadAuditLogMock();
     return addAuditLog(input);
   },
 
@@ -64,7 +61,8 @@ export const auditLogService = {
       operatorId: viewer.isManager ? query?.operatorId : viewer.id,
     };
 
-    if (USE_MOCK) {
+    if (isUseMock()) {
+      const { queryAuditLogs } = await loadAuditLogMock();
       return queryAuditLogs(safeQuery);
     }
 

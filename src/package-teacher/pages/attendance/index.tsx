@@ -1,4 +1,5 @@
 import { View, Text, Picker } from '@tarojs/components';
+import Taro, { useRouter } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
@@ -54,19 +55,29 @@ function getMonthRange(): DateRange {
 
 /** 校长考勤记录页面 - 按日期/教师/班级维度查看全校上课情况 */
 const AttendancePage: React.FC = () => {
+  const router = useRouter();
+  const presetClassId = String(router.params?.classId || '').trim();
+  const presetClassName = decodeURIComponent(String(router.params?.className || '').trim());
+
   const [records, setRecords] = useState<LessonRecord[]>([]);
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [quickRange, setQuickRange] = useState<QuickRange>('month');
+  const [quickRange, setQuickRange] = useState<QuickRange>(presetClassId ? 'all' : 'month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [filterTeacherId, setFilterTeacherId] = useState('all');
-  const [filterClassId, setFilterClassId] = useState('all');
+  const [filterClassId, setFilterClassId] = useState(presetClassId || 'all');
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null);
   const [customDateVisible, setCustomDateVisible] = useState(false);
   const [tempCustomStart, setTempCustomStart] = useState('');
   const [tempCustomEnd, setTempCustomEnd] = useState('');
+
+  useEffect(() => {
+    if (presetClassName) {
+      Taro.setNavigationBarTitle({ title: `${presetClassName} · 签到历史` });
+    }
+  }, [presetClassName]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -88,7 +99,7 @@ const AttendancePage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  // 从记录中提取班级选项
+  // 从记录中提取班级选项；课表深链带入的班级即使暂无记录也要出现在筛选项
   const classOptions = useMemo(() => {
     const map = new Map<string, string>();
     records.forEach((r) => {
@@ -96,11 +107,14 @@ const AttendancePage: React.FC = () => {
         map.set(r.class_id, r.class_name);
       }
     });
+    if (presetClassId && !map.has(presetClassId)) {
+      map.set(presetClassId, presetClassName || '当前班级');
+    }
     return [
       { label: '全部班级', value: 'all' },
       ...Array.from(map).map(([id, name]) => ({ label: name, value: id })),
     ];
-  }, [records]);
+  }, [presetClassId, presetClassName, records]);
 
   const teacherOptions = useMemo(() => {
     return [

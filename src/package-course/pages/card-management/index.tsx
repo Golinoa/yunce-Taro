@@ -17,7 +17,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import SwappableCard from '@/components/SwappableCard';
-import { CARD_KIND_LABELS, COURSE_FILTER_TABS } from '@/data/card-type';
+import { CARD_KIND_LABELS, COURSE_FILTER_TABS } from '@/constants/card-type-ui';
 import { cardTypeService } from '@/services/card-type';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCardTypeStore } from '@/stores/card-type';

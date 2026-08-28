@@ -14,7 +14,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import { SUBJECT_ICONS } from '@/data/campus';
+import { SUBJECT_ICONS } from '@/constants/campus-ui';
 import { useCampusStore } from '@/stores/campus';
 
 const Subjects: React.FC = () => {

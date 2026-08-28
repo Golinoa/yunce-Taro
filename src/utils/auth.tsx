@@ -23,6 +23,7 @@ import {
   updateProfile as updateProfileService,
   validateInviteCode as validateInviteCodeService,
   wechatLogin,
+  bindWechatCredentials,
 } from '@/services/auth';
 import type {
   AuthSession,
@@ -63,6 +64,11 @@ export interface AuthState {
   signInWithWechat: (
     code: string,
   ) => Promise<{ error: { message: string } | null; isNewUser?: boolean }>;
+  /** 微信登录后绑定手机号+密码（无短信） */
+  bindWechatPhone: (
+    phone: string,
+    password: string,
+  ) => Promise<{ error: { message: string } | null }>;
   /** 手机号验证码登录 */
   signInWithPhone: (phone: string, code: string) => Promise<{ error: { message: string } | null }>;
   /** 邮箱验证码登录 */
@@ -326,6 +332,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [persistAuth, syncUserRole],
   );
 
+  // 微信登录后绑定手机号+密码
+  const bindWechatPhone = useCallback(
+    async (phone: string, password: string) => {
+      const result = await bindWechatCredentials({ phone, password });
+      if (result.error) return { error: result.error };
+      setSession(result.session);
+      setProfile(result.profile);
+      persistAuth(result.profile, result.session);
+      syncUserRole(result.profile?.currentContext?.role || null);
+      return { error: null };
+    },
+    [persistAuth, syncUserRole],
+  );
+
   // 登录：手机
   const signInWithPhone = useCallback(
     async (phone: string, code: string) => {
@@ -364,7 +384,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }) => {
       const usePhoneRegister = Boolean(payload.phone) && !payload.username;
       const result = usePhoneRegister
-        ? await registerStep1ByPhone(payload.phone!)
+        ? await registerStep1ByPhone(payload.phone!, payload.password || '')
         : await registerStep1(payload.username || '', payload.password || '', payload.inviteCode);
 
       if (result.error || !result.tempToken) {
@@ -526,6 +546,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       registerDraft,
       signInWithUsername,
       signInWithWechat,
+      bindWechatPhone,
       signInWithPhone,
       signInWithEmailCode,
       signUpStep1,
@@ -551,6 +572,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       registerDraft,
       signInWithUsername,
       signInWithWechat,
+      bindWechatPhone,
       signInWithPhone,
       signInWithEmailCode,
       signUpStep1,

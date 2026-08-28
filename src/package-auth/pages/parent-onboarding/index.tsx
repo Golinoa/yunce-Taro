@@ -6,11 +6,12 @@
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import { getSession } from '@/services/auth';
 import { organizationService, savePendingRelation } from '@/services/organization';
 import { useAuth } from '@/utils/auth';
+import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import { navigateAfterLogin } from '@/utils/route-guard';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
@@ -20,6 +21,10 @@ const ParentOnboarding: React.FC = () => {
   const [code, setCode] = useState('');
   const [studentName, setStudentName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    clearIdentitySelectionPending();
+  }, []);
 
   const handleBind = useCallback(async () => {
     const trimmed = code.trim().toUpperCase();

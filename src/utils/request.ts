@@ -4,17 +4,14 @@
  * 联调时只需修改 BASE_URL 和拦截器逻辑
  */
 import Taro from '@tarojs/taro';
+import { getApiBaseUrl } from '@/utils/build-env';
 import { reportLocalDebug } from '@/utils/local-debug';
 
-// 小程序运行时没有 Node.js 的 process，全局访问前必须先做兼容判断。
-// 小程序端默认走 app 口径，避免与 admin 后台接口混用。
-const RAW_BASE_URL =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.TARO_API_BASE_URL || '/api/app/v1'
-    : '/api/app/v1';
+// 必须用 getApiBaseUrl()：小程序运行时通常没有 process，
+// 若写成「有 process 才用绝对地址、否则 /api/app/v1」会打到相对路径 → 一律「网络异常」。
+const BASE_URL = getApiBaseUrl().replace(/\/+$/, '');
 const TIMEOUT = 10000;
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
-const BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
 const buildRequestUrl = (url: string): string => {
   const normalizedPath = url.startsWith('/') ? url : `/${url}`;
   return `${BASE_URL}${normalizedPath}`;

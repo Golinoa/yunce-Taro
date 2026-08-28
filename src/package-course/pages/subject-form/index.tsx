@@ -14,7 +14,7 @@ import FormInput from '@/components/FormInput';
 import FormRow from '@/components/FormRow';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import { SUBJECT_ICONS } from '@/data/campus';
+import { SUBJECT_ICONS } from '@/constants/campus-ui';
 import { subjectService } from '@/services/campus';
 import type { SubjectFormData } from '@/types/campus';
 

@@ -24,7 +24,7 @@ import {
   COURSE_COLOR_OPTIONS,
   DEADLINE_OPTIONS,
   STUDENT_SELF_CHECKIN_OPTIONS,
-} from '@/data/course-template';
+} from '@/constants/course-template-ui';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { classService, subscribeMessageService } from '@/services';
 import { subjectService } from '@/services/campus';
@@ -241,9 +241,9 @@ const CourseFormPage: React.FC = () => {
     [categories, categoryId],
   );
   const category = useMemo<CourseCategory>(
-    // 班级模式：统一按班课模式渲染（名称/分类/颜色/老师/学员），不展示模板专属字段
-    () => (isClassEdit ? 'class' : (selectedCategory?.mode ?? 'class')),
-    [selectedCategory, isClassEdit],
+    // 按所属分类 mode 渲染：班课 / 团课 / 私教字段不同；勿再强制班级编辑=班课，否则团课班也会露出「上课学员」
+    () => selectedCategory?.mode ?? 'class',
+    [selectedCategory],
   );
 
   /** 已选上课学员（从学员列表中按 id 匹配，用于独立卡片展示） */
@@ -257,6 +257,8 @@ const CourseFormPage: React.FC = () => {
 
   /** 班课模式：隐藏开课与价格/预约规则/签到规则，改为班课信息区块 */
   const isClassMode = category === 'class';
+  /** 团课：开放预约制，暂无固定参团名单 */
+  const isGroupMode = category === 'group';
 
   // E02-D：入班后 5 分钟内进入班级页，补充上课提醒次数
   useDidShow(() => {
@@ -1181,47 +1183,7 @@ const CourseFormPage: React.FC = () => {
           {/* 高级设置 - 按"配置类型"分为 6 个子卡片 */}
           {advancedOpen && (
             <View className="flex flex-col gap-[24rpx]">
-              {/* 1. 课程展示 */}
-              <Card className="p-[32rpx]">
-                <SectionTitle title="课程展示" />
-                <View className="flex flex-col">
-                  <FormRow
-                    label="课程颜色"
-                    hint={TOOLTIPS.color}
-                    onClick={() => setColorPickerVisible(true)}
-                  >
-                    {color ? (
-                      <View className="flex flex-row items-center gap-[12rpx]">
-                        <View
-                          className="w-[32rpx] h-[32rpx] rounded-[8rpx]"
-                          style={{ backgroundColor: color }}
-                        />
-                        <Text className="text-[30rpx] text-foreground">已选择</Text>
-                      </View>
-                    ) : (
-                      <Text className="text-[30rpx] text-muted-foreground">请选择</Text>
-                    )}
-                  </FormRow>
-                  <FormRow label="年龄组" onClick={() => openPicker('ageGroup')} border>
-                    <Text className="text-[30rpx] text-foreground">
-                      {ageGroup.startsWith('custom:')
-                        ? ageGroup.slice('custom:'.length)
-                        : AGE_GROUP_OPTIONS.find((a) => a.value === ageGroup)?.label}
-                    </Text>
-                  </FormRow>
-                  <FormRow label="课程难度" onClick={() => openPicker('level')} border={false}>
-                    <View className="px-[20rpx] py-[6rpx] rounded-[8rpx] bg-primary/10">
-                      <Text className="text-[24rpx] font-medium text-primary">
-                        {level.startsWith('custom:')
-                          ? level.slice('custom:'.length)
-                          : CLASS_LEVEL_LABELS[level as keyof typeof CLASS_LEVEL_LABELS]}
-                      </Text>
-                    </View>
-                  </FormRow>
-                </View>
-              </Card>
-
-              {/* 班课信息（仅班课模式） */}
+              {/* 班课信息（仅班课；置于课程展示上方） */}
               {isClassMode && (
                 <Card className="p-[32rpx]">
                   <SectionTitle title="班课信息" />
@@ -1272,8 +1234,64 @@ const CourseFormPage: React.FC = () => {
                 </Card>
               )}
 
-              {/* 上课学员（仅班课模式，统一使用 ClassStudentsCard 共享组件） */}
+              {/* 1. 课程展示 */}
+              <Card className="p-[32rpx]">
+                <SectionTitle title="课程展示" />
+                <View className="flex flex-col">
+                  <FormRow
+                    label="课程颜色"
+                    hint={TOOLTIPS.color}
+                    onClick={() => setColorPickerVisible(true)}
+                  >
+                    {color ? (
+                      <View className="flex flex-row items-center gap-[12rpx]">
+                        <View
+                          className="w-[32rpx] h-[32rpx] rounded-[8rpx]"
+                          style={{ backgroundColor: color }}
+                        />
+                        <Text className="text-[30rpx] text-foreground">已选择</Text>
+                      </View>
+                    ) : (
+                      <Text className="text-[30rpx] text-muted-foreground">请选择</Text>
+                    )}
+                  </FormRow>
+                  <FormRow label="年龄组" onClick={() => openPicker('ageGroup')} border>
+                    <Text className="text-[30rpx] text-foreground">
+                      {ageGroup.startsWith('custom:')
+                        ? ageGroup.slice('custom:'.length)
+                        : AGE_GROUP_OPTIONS.find((a) => a.value === ageGroup)?.label}
+                    </Text>
+                  </FormRow>
+                  <FormRow label="课程难度" onClick={() => openPicker('level')} border={false}>
+                    <View className="px-[20rpx] py-[6rpx] rounded-[8rpx] bg-primary/10">
+                      <Text className="text-[24rpx] font-medium text-primary">
+                        {level.startsWith('custom:')
+                          ? level.slice('custom:'.length)
+                          : CLASS_LEVEL_LABELS[level as keyof typeof CLASS_LEVEL_LABELS]}
+                      </Text>
+                    </View>
+                  </FormRow>
+                </View>
+              </Card>
+
+              {/*
+                上课学员：仅班课展示。
+                团课为预约制，暂无「固定参团」概念 → 页面隐藏；组件与状态保留便于日后开通。
+                恢复：去掉外层 isClassMode 条件即可（或改为 isClassMode || SHOW_GROUP_ROSTER）。
+              */}
               {isClassMode && (
+                <ClassStudentsCard
+                  studentIds={studentIds}
+                  students={selectedStudents}
+                  allStudents={studentList}
+                  subjectId={subjectId}
+                  subjects={subjects}
+                  maxSelectable={Number(capacity) > 0 ? Number(capacity) : undefined}
+                  onChange={setStudentIds}
+                />
+              )}
+              {false && isGroupMode && (
+                // 团课上课学员（固定参团）— 产品未上线，勿删，仅作占位保留
                 <ClassStudentsCard
                   studentIds={studentIds}
                   students={selectedStudents}
@@ -1421,26 +1439,40 @@ const CourseFormPage: React.FC = () => {
               <Card className="p-[32rpx]">
                   <SectionTitle title="课程图片" />
                   <View className="flex flex-col gap-[40rpx]">
-                    {/* 课程背景图：整宽上传框 */}
+                    {/* 课程背景图：班课/团课均展示，暂未开通上传 → 敬请期待（勿删上传组件，仅禁用交互） */}
                     <View className="flex flex-col gap-[16rpx]">
                       <View className="flex flex-row items-center gap-[12rpx]">
                         <Text className="text-[30rpx] font-medium text-foreground">课程背景图</Text>
                         <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
                           <Text className="text-[22rpx] text-primary font-medium">约课首页</Text>
                         </View>
+                        <View className="px-[16rpx] py-[6rpx] rounded-full bg-muted">
+                          <Text className="text-[22rpx] font-medium text-muted-foreground">
+                            敬请期待
+                          </Text>
+                        </View>
                       </View>
                       <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
                         显示在首页课程卡底尾。建议使用 405×190 横图，未上传将使用默认背景。
                       </Text>
-                      <CourseImageUploader
-                        value={backgroundImage}
-                        onChange={(v) => setBackgroundImage(v ?? '')}
-                        title="上传背景图"
-                        subtitle="上传后可预览和更换"
-                        layout="fullWidth"
-                        scrollTopRef={scrollTopRef}
-                        onScrollRestore={(t) => setScrollTop(t)}
-                      />
+                      <View className="relative opacity-55">
+                        <CourseImageUploader
+                          value={backgroundImage}
+                          onChange={() => undefined}
+                          title="上传背景图"
+                          subtitle="功能即将开放"
+                          layout="fullWidth"
+                          scrollTopRef={scrollTopRef}
+                          onScrollRestore={(t) => setScrollTop(t)}
+                        />
+                        {/* 遮罩拦截点击，避免误传图 */}
+                        <View
+                          className="absolute inset-0 z-10"
+                          onClick={() =>
+                            Taro.showToast({ title: '敬请期待', icon: 'none' })
+                          }
+                        />
+                      </View>
                     </View>
 
                     <View className="h-[1rpx] bg-border/30" />

@@ -20,7 +20,7 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import ResignSheet from '@/components/teacher/ResignSheet';
 import { BRAND_LOGO } from '@/constants/brand';
-import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
+import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
 import { auditLogService } from '@/services/audit-log';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useTeacherStore } from '@/stores/teacher';

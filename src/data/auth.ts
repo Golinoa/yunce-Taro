@@ -483,6 +483,48 @@ export async function mockWechatLogin(code: string): Promise<{
   return buildAuthResult(user);
 }
 
+/** 微信登录后绑定手机号+密码（无短信） */
+export async function mockBindWechatCredentials(
+  phone: string,
+  password: string,
+): Promise<{
+  session: AuthSession | null;
+  profile: Profile | null;
+  error: { message: string } | null;
+}> {
+  await delay(400);
+  const trimmedPhone = phone.trim();
+  if (!/^1[3-9]\d{9}$/.test(trimmedPhone)) {
+    return { session: null, profile: null, error: { message: '请输入正确的手机号' } };
+  }
+  if (!password || password.length < 6 || password.length > 20) {
+    return { session: null, profile: null, error: { message: '密码长度应为 6-20 位' } };
+  }
+
+  let session: AuthSession | null = null;
+  let profile: Profile | null = null;
+  try {
+    session = Taro.getStorageSync(AUTH_TOKEN_KEY) as AuthSession | null;
+    profile = Taro.getStorageSync(USER_PROFILE_KEY) as Profile | null;
+  } catch {
+    /* ignore */
+  }
+  if (!session || !profile) {
+    return { session: null, profile: null, error: { message: '请先登录后再绑定' } };
+  }
+
+  const nextProfile: Profile = { ...profile, phone: trimmedPhone };
+  const nextSession: AuthSession = {
+    ...session,
+    access_token: generateToken(),
+    refresh_token: generateToken(),
+    expires_at: Date.now() / 1000 + 3600,
+    user: { ...session.user, phone: trimmedPhone },
+  };
+  saveSession(nextSession, nextProfile);
+  return { session: nextSession, profile: nextProfile, error: null };
+}
+
 /** 手机号验证码登录 */
 export async function mockPhoneLogin(
   phone: string,

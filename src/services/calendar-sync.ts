@@ -25,13 +25,9 @@ import {
   shouldShowCalendarSyncPrompt,
 } from '@/utils/calendar-sync-settings';
 import { logError } from '@/utils/logger';
+import { isUseMock } from '@/utils/build-env';
 import { addPhoneCalendarEvent, isAddPhoneCalendarSupported } from '@/utils/phone-calendar';
 import { post } from '@/utils/request';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 const EVENT_MAP_STORAGE_KEY = 'yunce:calendar-sync-event-map';
 
@@ -190,7 +186,7 @@ async function reportCalendarSync(
   if (items.length === 0) {
     return;
   }
-  if (USE_MOCK) {
+  if (isUseMock()) {
     return;
   }
   try {

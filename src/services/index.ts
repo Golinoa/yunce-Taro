@@ -20,6 +20,7 @@ export { temporaryRescheduleService } from './temporary-reschedule';
 export {
   login,
   wechatLogin,
+  bindWechatCredentials,
   phoneLogin,
   registerStep1,
   registerStep2,

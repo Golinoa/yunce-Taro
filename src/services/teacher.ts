@@ -2,37 +2,9 @@
  * Service 层 — 教师管理 API
  */
 import dayjs from 'dayjs';
-import {
-  mockGetTeachers,
-  mockGetActiveTeachers,
-  mockGetTeacherById,
-  mockAddTeacher,
-  mockUpdateTeacher,
-  mockConfirmSalary,
-  mockBatchConfirm,
-  mockExecutePay,
-  mockSendSalarySlip,
-  mockResignTeacher,
-  mockAddDeduction,
-  mockUpdateDeduction,
-  mockDeleteDeduction,
-  mockGetSalaryModels,
-  mockCreateSalaryModel,
-  mockUpdateSalaryModel,
-  mockGetSettings,
-  mockUpdateSettings,
-  mockGetScheduleData,
-  mockGetSalaryTemplates,
-  mockGetSalaryTemplateById,
-  mockCreateSalaryTemplate,
-  mockUpdateSalaryTemplate,
-  mockDeleteSalaryTemplate,
-  mockApplySalaryTemplate,
-  mockGetTeacherSalaryRule,
-  mockUpdateTeacherSalaryRule,
-  mockCopySalaryRuleToTeachers,
-  createDefaultSalaryRule,
-} from '@/data/teacher';
+import { createDefaultSalaryRule } from '@/domain/teacher-salary';
+import { isUseMock } from '@/utils/build-env';
+import { loadTeacherMock } from '@/utils/mock-loaders';
 import {
   mapBackendDeduction,
   mapBackendSalaryModel,
@@ -53,11 +25,6 @@ import type {
 import { notWired } from '@/utils/not-wired';
 import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 type RawRecord = Record<string, unknown>;
 
@@ -87,7 +54,7 @@ async function fetchSalaryTemplates(params: Record<string, unknown>) {
 
 export const teacherService = {
   getList: async (campusId?: string, month?: string) => {
-    if (USE_MOCK) return mockGetTeachers(campusId, month);
+    if (isUseMock()) { const { mockGetTeachers } = await loadTeacherMock(); return mockGetTeachers(campusId, month); }
     const list = await fetchTeacherList({
       page: 1,
       pageSize: 100,
@@ -97,7 +64,7 @@ export const teacherService = {
   },
 
   getActiveList: async (campusId?: string) => {
-    if (USE_MOCK) return mockGetActiveTeachers(campusId);
+    if (isUseMock()) { const { mockGetActiveTeachers } = await loadTeacherMock(); return mockGetActiveTeachers(campusId); }
     const list = await fetchTeacherList({
       page: 1,
       pageSize: 100,
@@ -107,25 +74,25 @@ export const teacherService = {
   },
 
   getById: async (id: string) => {
-    if (USE_MOCK) return mockGetTeacherById(id);
+    if (isUseMock()) { const { mockGetTeacherById } = await loadTeacherMock(); return mockGetTeacherById(id); }
     const detail = await get<RawRecord>(`/teachers/${id}`);
     return detail ? mapBackendTeacherToUI(detail) : null;
   },
 
   add: async (teacher: TeacherUIModel) => {
-    if (USE_MOCK) return mockAddTeacher(teacher);
+    if (isUseMock()) { const { mockAddTeacher } = await loadTeacherMock(); return mockAddTeacher(teacher); }
     const created = await post<RawRecord>('/teachers', mapUiTeacherToCreatePayload(teacher));
     return mapBackendTeacherToUI(created);
   },
 
   update: async (id: string, updates: Partial<TeacherUIModel>) => {
-    if (USE_MOCK) return mockUpdateTeacher(id, updates);
+    if (isUseMock()) { const { mockUpdateTeacher } = await loadTeacherMock(); return mockUpdateTeacher(id, updates); }
     const updated = await put<RawRecord>(`/teachers/${id}`, mapUiTeacherToUpdatePayload(updates));
     return mapBackendTeacherToUI(updated);
   },
 
   confirmSalary: async (id: string, month?: string) => {
-    if (USE_MOCK) return mockConfirmSalary(id, month);
+    if (isUseMock()) { const { mockConfirmSalary } = await loadTeacherMock(); return mockConfirmSalary(id, month); }
     const recordId = await resolveSalaryRecordId(id, month);
     if (!recordId) return false;
     await post(`/teachers/salary/${recordId}/confirm`);
@@ -133,7 +100,7 @@ export const teacherService = {
   },
 
   batchConfirm: async (ids: string[], month?: string) => {
-    if (USE_MOCK) return mockBatchConfirm(ids, month);
+    if (isUseMock()) { const { mockBatchConfirm } = await loadTeacherMock(); return mockBatchConfirm(ids, month); }
     const recordIds = (
       await Promise.all(ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)))
     ).filter((item): item is string => Boolean(item));
@@ -143,7 +110,7 @@ export const teacherService = {
   },
 
   executePay: async (ids: string[], remark?: string, payMethod?: string, month?: string) => {
-    if (USE_MOCK) return mockExecutePay(ids, remark, payMethod, month);
+    if (isUseMock()) { const { mockExecutePay } = await loadTeacherMock(); return mockExecutePay(ids, remark, payMethod, month); }
     const recordIds = (
       await Promise.all(ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)))
     ).filter((item): item is string => Boolean(item));
@@ -153,18 +120,18 @@ export const teacherService = {
   },
 
   sendSalarySlip: async (ids: string[], remark?: string, month?: string) => {
-    if (USE_MOCK) return mockSendSalarySlip(ids, remark, month);
+    if (isUseMock()) { const { mockSendSalarySlip } = await loadTeacherMock(); return mockSendSalarySlip(ids, remark, month); }
     return notWired('teacher.sendSalarySlip');
   },
 
   resign: async (id: string, resignType: string, reason?: string) => {
-    if (USE_MOCK) return mockResignTeacher(id, resignType, reason);
+    if (isUseMock()) { const { mockResignTeacher } = await loadTeacherMock(); return mockResignTeacher(id, resignType, reason); }
     await post(`/teachers/${id}/resign`, { resignType, reason });
     return true;
   },
 
   addDeduction: async (teacherId: string, deduction: Deduction) => {
-    if (USE_MOCK) return mockAddDeduction(teacherId, deduction);
+    if (isUseMock()) { const { mockAddDeduction } = await loadTeacherMock(); return mockAddDeduction(teacherId, deduction); }
     const created = await post<RawRecord>(`/teachers/${teacherId}/deductions`, {
       reason: deduction.reason,
       amount: deduction.amount,
@@ -178,25 +145,25 @@ export const teacherService = {
     deductionId: string,
     updates: Partial<Pick<Deduction, 'reason' | 'amount' | 'type'>>,
   ) => {
-    if (USE_MOCK) return mockUpdateDeduction(teacherId, deductionId, updates);
+    if (isUseMock()) { const { mockUpdateDeduction } = await loadTeacherMock(); return mockUpdateDeduction(teacherId, deductionId, updates); }
     return notWired('teacher.updateDeduction');
   },
 
   deleteDeduction: async (teacherId: string, deductionId: string) => {
-    if (USE_MOCK) return mockDeleteDeduction(teacherId, deductionId);
+    if (isUseMock()) { const { mockDeleteDeduction } = await loadTeacherMock(); return mockDeleteDeduction(teacherId, deductionId); }
     return notWired('teacher.deleteDeduction');
   },
 };
 
 export const salaryModelService = {
   getList: async () => {
-    if (USE_MOCK) return mockGetSalaryModels();
+    if (isUseMock()) { const { mockGetSalaryModels } = await loadTeacherMock(); return mockGetSalaryModels(); }
     const list = await get<RawRecord[]>('/teachers/salary-models');
     return list.map((item) => mapBackendSalaryModel(item));
   },
 
   create: async (model: SalaryModel) => {
-    if (USE_MOCK) return mockCreateSalaryModel(model);
+    if (isUseMock()) { const { mockCreateSalaryModel } = await loadTeacherMock(); return mockCreateSalaryModel(model); }
     const created = await post<RawRecord>('/teachers/salary-models', {
       name: model.name,
       type: model.type,
@@ -210,7 +177,7 @@ export const salaryModelService = {
   },
 
   update: async (id: string, updates: Partial<SalaryModel>) => {
-    if (USE_MOCK) return mockUpdateSalaryModel(id, updates);
+    if (isUseMock()) { const { mockUpdateSalaryModel } = await loadTeacherMock(); return mockUpdateSalaryModel(id, updates); }
     const updated = await put<RawRecord>(`/teachers/salary-models/${id}`, {
       name: updates.name,
       type: updates.type,
@@ -224,20 +191,20 @@ export const salaryModelService = {
   },
 
   switchModel: async (modelId: string, updates: Partial<SalaryModel>) => {
-    if (USE_MOCK) return mockUpdateSalaryModel(modelId, updates);
+    if (isUseMock()) { const { mockUpdateSalaryModel } = await loadTeacherMock(); return mockUpdateSalaryModel(modelId, updates); }
     return salaryModelService.update(modelId, updates);
   },
 };
 
 export const salarySettingsService = {
   get: async () => {
-    if (USE_MOCK) return mockGetSettings();
+    if (isUseMock()) { const { mockGetSettings } = await loadTeacherMock(); return mockGetSettings(); }
     const settings = await get<RawRecord>('/teachers/salary-settings');
     return mapBackendSalarySettings(settings);
   },
 
   update: async (updates: Partial<SalarySettings>) => {
-    if (USE_MOCK) return mockUpdateSettings(updates);
+    if (isUseMock()) { const { mockUpdateSettings } = await loadTeacherMock(); return mockUpdateSettings(updates); }
     const updated = await put<RawRecord>('/teachers/salary-settings', {
       payDay: updates.payDay,
       pushDaysBefore: updates.pushDaysBefore,
@@ -250,25 +217,25 @@ export const salarySettingsService = {
 
 export const teacherScheduleService = {
   getList: async () => {
-    if (USE_MOCK) return mockGetScheduleData();
+    if (isUseMock()) { const { mockGetScheduleData } = await loadTeacherMock(); return mockGetScheduleData(); }
     return notWired('teacherSchedule.getList');
   },
 };
 
 export const salaryTemplateService = {
   getList: async () => {
-    if (USE_MOCK) return mockGetSalaryTemplates();
+    if (isUseMock()) { const { mockGetSalaryTemplates } = await loadTeacherMock(); return mockGetSalaryTemplates(); }
     return fetchSalaryTemplates({ page: 1, pageSize: 100 });
   },
 
   getById: async (id: string) => {
-    if (USE_MOCK) return mockGetSalaryTemplateById(id);
+    if (isUseMock()) { const { mockGetSalaryTemplateById } = await loadTeacherMock(); return mockGetSalaryTemplateById(id); }
     const list = await fetchSalaryTemplates({ page: 1, pageSize: 100 });
     return list.find((item) => item.id === id) ?? null;
   },
 
   create: async (data: Omit<SalaryTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (USE_MOCK) return mockCreateSalaryTemplate(data);
+    if (isUseMock()) { const { mockCreateSalaryTemplate } = await loadTeacherMock(); return mockCreateSalaryTemplate(data); }
     const created = await post<RawRecord>('/attendance/salary-templates', {
       campusId: data.config ? undefined : undefined,
       name: data.name,
@@ -279,7 +246,7 @@ export const salaryTemplateService = {
   },
 
   update: async (id: string, updates: Partial<Omit<SalaryTemplate, 'id'>>) => {
-    if (USE_MOCK) return mockUpdateSalaryTemplate(id, updates);
+    if (isUseMock()) { const { mockUpdateSalaryTemplate } = await loadTeacherMock(); return mockUpdateSalaryTemplate(id, updates); }
     const updated = await put<RawRecord>(`/attendance/salary-templates/${id}`, {
       name: updates.name,
       rules: updates.config,
@@ -288,13 +255,13 @@ export const salaryTemplateService = {
   },
 
   remove: async (id: string) => {
-    if (USE_MOCK) return mockDeleteSalaryTemplate(id);
+    if (isUseMock()) { const { mockDeleteSalaryTemplate } = await loadTeacherMock(); return mockDeleteSalaryTemplate(id); }
     await del(`/attendance/salary-templates/${id}`);
     return true;
   },
 
   apply: async (templateId: string, teacherIds: string[]) => {
-    if (USE_MOCK) return mockApplySalaryTemplate(templateId, teacherIds);
+    if (isUseMock()) { const { mockApplySalaryTemplate } = await loadTeacherMock(); return mockApplySalaryTemplate(templateId, teacherIds); }
     return notWired('salaryTemplate.apply');
   },
 
@@ -303,17 +270,17 @@ export const salaryTemplateService = {
 
 export const teacherSalaryRuleService = {
   get: async (teacherId: string) => {
-    if (USE_MOCK) return mockGetTeacherSalaryRule(teacherId);
+    if (isUseMock()) { const { mockGetTeacherSalaryRule } = await loadTeacherMock(); return mockGetTeacherSalaryRule(teacherId); }
     return notWired('teacherSalaryRule.get');
   },
 
   update: async (teacherId: string, config: SalaryRuleConfig, templateId?: string) => {
-    if (USE_MOCK) return mockUpdateTeacherSalaryRule(teacherId, config, templateId);
+    if (isUseMock()) { const { mockUpdateTeacherSalaryRule } = await loadTeacherMock(); return mockUpdateTeacherSalaryRule(teacherId, config, templateId); }
     return notWired('teacherSalaryRule.update');
   },
 
   copyToTeachers: async (sourceTeacherId: string, targetTeacherIds: string[]) => {
-    if (USE_MOCK) return mockCopySalaryRuleToTeachers(sourceTeacherId, targetTeacherIds);
+    if (isUseMock()) { const { mockCopySalaryRuleToTeachers } = await loadTeacherMock(); return mockCopySalaryRuleToTeachers(sourceTeacherId, targetTeacherIds); }
     return notWired('teacherSalaryRule.copyToTeachers');
   },
 };

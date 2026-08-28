@@ -149,10 +149,15 @@ function auditPackageSize() {
   );
 
   if (mainBytes > MAIN_PACKAGE_LIMIT_BYTES) {
-    console.error(
-      `[postbuild-weapp-fixes] ERROR: main package exceeds hard 1.5MB limit (${formatKb(mainBytes)} > ${formatKb(MAIN_PACKAGE_LIMIT_BYTES)})`,
-    );
-    process.exitCode = 1;
+    const mockBuild = process.env.VITE_USE_MOCK === 'true';
+    const msg = `[postbuild-weapp-fixes] main package exceeds 1.5MB limit (${formatKb(mainBytes)} > ${formatKb(MAIN_PACKAGE_LIMIT_BYTES)})`;
+    if (mockBuild) {
+      // Mock 包含完整 data 层，本地调试允许超限；真机上传/提审仍须用生产包
+      console.warn(`${msg} — mock 构建仅告警，可继续用开发者工具打开 dist`);
+    } else {
+      console.error(`[postbuild-weapp-fixes] ERROR: ${msg}`);
+      process.exitCode = 1;
+    }
   }
 
   if (oversizedMedia.length > 0) {

@@ -14,7 +14,7 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
-import { CATEGORY_MODE_LABEL } from '@/data/course-category';
+import { CATEGORY_MODE_LABEL } from '@/constants/course-category-ui';
 import type { CourseCategoryConfig, CourseCategoryMode } from '@/types/course-category';
 
 export interface CategoryMultiSheetProps {

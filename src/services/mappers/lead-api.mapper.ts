@@ -29,6 +29,7 @@ export function mapBackendLead(raw: RawRecord): Lead {
     child_nickname: str(raw.child_nickname ?? raw.childNickname),
     child_gender: (raw.child_gender ?? raw.childGender) as Lead['child_gender'],
     child_age: str(raw.child_age ?? raw.childAge),
+    avatar_url: str(raw.avatar_url ?? raw.avatarUrl ?? raw.avatar),
     parent_user_id: str(raw.parent_user_id ?? raw.parentUserId),
     parent_name: str(raw.parent_name ?? raw.parentName),
     parent_phone: str(raw.parent_phone ?? raw.parentPhone),

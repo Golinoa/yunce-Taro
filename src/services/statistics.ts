@@ -9,34 +9,16 @@ import type { AlertItem } from '@/components/statistics/AlertSheet';
 import type { ChartDataItem } from '@/components/statistics/ChartContainer';
 import type { FinanceKpiItem } from '@/components/statistics/FinanceKpi';
 import type { OperationKpiItem } from '@/components/statistics/OperationKpi';
-import {
-  computeOperationKpi,
-  computeFinanceKpi,
-  computeTrend,
-  computeStudentRank,
-  computeTeacherRank,
-  computeCampusRank,
-  computeCompare,
-  computeFinanceAnalysis,
-} from '@/data/mock';
-import {
-  mockGetLessonTrend,
-  mockGetIncomeTrend,
-  mockGetLessonRank,
-  mockGetPaymentRank,
-  mockGetParentTrend,
-  mockGetExpenseRatios,
-  mockGetFinanceAlerts,
-  mockGetOperationAlerts,
-  MOCK_PARENT_TREND,
-  MOCK_PAYMENT_RANK,
-} from '@/data/statistics';
 import { get } from '@/utils/request';
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+import { loadStatisticsMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
+
+let statsMockMod: Awaited<ReturnType<typeof loadStatisticsMock>> | undefined;
+async function sm() {
+  statsMockMod ??= await loadStatisticsMock();
+  return statsMockMod;
+}
 
 // ============================================
 // 类型定义（接口契约）
@@ -170,77 +152,104 @@ function normalizeAlertItem(alert: AlertItem): AlertItem {
 }
 
 // ============================================
-// 同步 Fallback 数据（空数据时的默认展示）
+// 同步 Fallback（空默认，供 useMemo 同步消费；mock 数据走下方 async Service 方法）
 // ============================================
 
-/** 课时趋势 fallback（从全局一致数据源派生） */
 function getLessonTrendFallback(): ChartDataItem[] {
-  return computeTrend().lessonTrend;
+  return [];
 }
 
-/** 收入趋势 fallback（从全局一致数据源派生） */
 function getIncomeTrendFallback(): ChartDataItem[] {
-  return computeTrend().incomeTrend;
+  return [];
 }
 
-/** 课时排行 fallback（从全局一致数据源派生） */
 function getLessonRankFallback(): { label: string; value: number; unit: string }[] {
-  return computeStudentRank();
+  return [];
 }
 
-/** 收费方式排行 fallback */
 function getPaymentRankFallback(): { label: string; value: number; unit: string }[] {
-  return MOCK_PAYMENT_RANK;
+  return [];
 }
 
-/** 家长端课时趋势 fallback */
 function getParentTrendFallback(): ChartDataItem[] {
-  return MOCK_PARENT_TREND;
+  return [];
 }
 
-/** 支出比例配置 fallback（从全局一致数据源派生） */
 function getExpenseRatiosFallback(): { label: string; ratio: number; barClass: string }[] {
-  const analysis = computeFinanceAnalysis();
-  return analysis.expenseComposition.map((item) => ({
-    label: item.label,
-    ratio: item.percent / 100,
-    barClass: item.barClass,
-  }));
+  return [];
 }
 
-/** 运营视图预警 fallback（实时计算，与 getAlerts 同源，消除 L-17-A 静态常量直返） */
 async function getOperationAlertsFallback(): Promise<AlertItem[]> {
-  return (await mockGetOperationAlerts()).map(normalizeAlertItem);
+  return (await (await sm()).mockGetOperationAlerts()).map(normalizeAlertItem);
 }
 
-/** 财务视图预警 fallback（实时计算，与 getAlerts 同源） */
 async function getFinanceAlertsFallback(): Promise<AlertItem[]> {
-  return (await mockGetFinanceAlerts()).map(normalizeAlertItem);
+  return (await (await sm()).mockGetFinanceAlerts()).map(normalizeAlertItem);
 }
 
 function getOperationKpiFallback(): OperationKpiItem {
-  return computeOperationKpi() as OperationKpiItem;
+  return {
+    revenue: '¥0',
+    revenueBadge: '+0%',
+    bills: '0笔收费',
+    avg: '客均 ¥0',
+    lessonAmount: '¥0',
+    lessonTrend: '+0%',
+    newAmount: '¥0',
+    newNote: '0位新学员',
+    pending: '¥0',
+    pendingNote: '无待收',
+    totalRevenue: '¥0',
+    totalExpense: '¥0',
+    netProfit: '¥0',
+    profitMargin: '0%',
+  } as unknown as OperationKpiItem;
 }
 
 function getFinanceKpiFallback(): FinanceKpiItem {
-  return computeFinanceKpi() as FinanceKpiItem;
+  return {
+    revenue: '¥0',
+    revenueBadge: '+0%',
+    bills: '0笔收费',
+    avg: '客均 ¥0',
+    lessonAmount: '¥0',
+    lessonTrend: '+0%',
+    newAmount: '¥0',
+    newNote: '0位新学员',
+    pending: '¥0',
+    pendingNote: '无待收',
+    totalRevenue: '¥0',
+    totalExpense: '¥0',
+    netProfit: '¥0',
+    profitMargin: '0%',
+  } as unknown as FinanceKpiItem;
 }
 
 function getTeacherRankFallback(): RankFallbackItem[] {
-  return computeTeacherRank();
+  return [];
 }
 
 function getCampusRankFallback(): RankFallbackItem[] {
-  return computeCampusRank();
+  return [];
 }
 
 function getCompareFallback() {
-  return computeCompare();
+  return { mom: '+0%', momValue: '上月 ¥0', yoy: '+0%', yoyValue: '去年 ¥0' };
 }
 
 function getFinanceAnalysisComputedFallback() {
-  return computeFinanceAnalysis();
+  return {
+    totalRevenue: '¥0',
+    totalExpense: '¥0',
+    netProfit: '¥0',
+    profitMargin: '0%',
+    expenseTrend: '+0%',
+    incomeComposition: [] as { label: string; amount: string; percent: number; barClass: string }[],
+    expenseComposition: [] as { label: string; amount: string; percent: number; barClass: string }[],
+    compare: getCompareFallback(),
+  };
 }
+
 
 // ============================================
 // 接口契约（联调时替换 mock 为 request 调用）
@@ -249,42 +258,42 @@ function getFinanceAnalysisComputedFallback() {
 export const statisticsService = {
   // ---------- 趋势数据 ----------
   /** 课时趋势（近12个月） */
-  getLessonTrend: (params?: {
+  getLessonTrend: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<ChartDataItem[]> =>
-    USE_MOCK
-      ? mockGetLessonTrend()
+    isUseMock()
+      ? (await sm()).mockGetLessonTrend()
       : get<ChartDataItem[]>(`/statistics/lesson-trend?${buildStatisticsQuery(params || {})}`),
   /** 收入趋势（近12个月） */
-  getIncomeTrend: (params?: {
+  getIncomeTrend: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<ChartDataItem[]> =>
-    USE_MOCK
-      ? mockGetIncomeTrend()
+    isUseMock()
+      ? (await sm()).mockGetIncomeTrend()
       : get<ChartDataItem[]>(`/statistics/income-trend?${buildStatisticsQuery(params || {})}`),
   /** 家长端课时趋势 */
-  getParentTrend: (params?: {
+  getParentTrend: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<ChartDataItem[]> =>
-    USE_MOCK
-      ? mockGetParentTrend()
+    isUseMock()
+      ? (await sm()).mockGetParentTrend()
       : get<ChartDataItem[]>(`/statistics/parent-trend?${buildStatisticsQuery(params || {})}`),
 
   // ---------- 排行数据 ----------
   /** 学员课时消耗排行 */
-  getLessonRank: (params?: {
+  getLessonRank: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<{ label: string; value: number; unit: string }[]> =>
-    USE_MOCK
-      ? mockGetLessonRank()
+    isUseMock()
+      ? (await sm()).mockGetLessonRank()
       : get<BackendLessonRankItem[]>(
           `/statistics/lesson-rank?${buildStatisticsQuery(params || {})}`,
         ).then((list) =>
@@ -295,13 +304,13 @@ export const statisticsService = {
           })),
         ),
   /** 收费方式收入排行 */
-  getPaymentRank: (params?: {
+  getPaymentRank: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<{ label: string; value: number; unit: string }[]> =>
-    USE_MOCK
-      ? mockGetPaymentRank()
+    isUseMock()
+      ? (await sm()).mockGetPaymentRank()
       : get<BackendPaymentRankItem[]>(
           `/statistics/payment-rank?${buildStatisticsQuery(params || {})}`,
         ).then((list) =>
@@ -314,13 +323,13 @@ export const statisticsService = {
 
   // ---------- 财务数据 ----------
   /** 支出比例配置 */
-  getExpenseRatios: (params?: {
+  getExpenseRatios: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<{ label: string; ratio: number; barClass: string }[]> =>
-    USE_MOCK
-      ? mockGetExpenseRatios()
+    isUseMock()
+      ? (await sm()).mockGetExpenseRatios()
       : get<BackendExpenseRatioResponse>(
           `/statistics/expense-ratios?${buildStatisticsQuery(params || {})}`,
         ).then((result) =>
@@ -342,12 +351,12 @@ export const statisticsService = {
    * 后端通过 cron 任务定期扫描，计算结果缓存
    * @param params 视图类型 + 时间范围
    */
-  getAlerts: (params: AlertQueryParams): Promise<AlertItem[]> => {
-    if (USE_MOCK) {
+  getAlerts: async (params: AlertQueryParams): Promise<AlertItem[]> => {
+    if (isUseMock()) {
       if (params.viewType === 'finance') {
-        return mockGetFinanceAlerts().then((alerts) => alerts.map(normalizeAlertItem));
+        return (await sm()).mockGetFinanceAlerts().then((alerts) => alerts.map(normalizeAlertItem));
       }
-      return mockGetOperationAlerts().then((alerts) => alerts.map(normalizeAlertItem));
+      return (await sm()).mockGetOperationAlerts().then((alerts) => alerts.map(normalizeAlertItem));
     }
 
     return get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery(params)}`).then((alerts) =>
@@ -360,8 +369,8 @@ export const statisticsService = {
    * 详情页统一走 Service，避免页面直接依赖 @/data/statistics
    */
   getAlertById: async (alertId: string): Promise<AlertItem | null> => {
-    if (USE_MOCK) {
-      const [op, fin] = await Promise.all([mockGetOperationAlerts(), mockGetFinanceAlerts()]);
+    if (isUseMock()) {
+      const [op, fin] = await Promise.all([(await sm()).mockGetOperationAlerts(), (await sm()).mockGetFinanceAlerts()]);
       const alert = [...op, ...fin].map(normalizeAlertItem).find((item) => item.id === alertId);
       return alert || null;
     }

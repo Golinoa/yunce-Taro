@@ -345,6 +345,12 @@ const ClassSlotConfigPage: React.FC = () => {
       });
 
       await classBookingService.saveClassDaySlots(classId, dateStr, nextSlots);
+      // 预约设置回写班级，与团课排课表单同源
+      await classService.update(classId, {
+        auto_open_type: defaultAutoOpenType,
+        min_open_count: defaultMinOpenCount,
+        student_count: defaultMaxCount,
+      });
       const openedIds = await classBookingService.autoOpenSlotsIfNeeded(classId, dateStr);
 
       if (openedIds.length > 0) {
@@ -368,6 +374,7 @@ const ClassSlotConfigPage: React.FC = () => {
     selectedTimes,
     defaultAutoOpenType,
     defaultMaxCount,
+    defaultMinOpenCount,
     classInfo,
     profile?.teacher_profile?.id,
     profile?.name,

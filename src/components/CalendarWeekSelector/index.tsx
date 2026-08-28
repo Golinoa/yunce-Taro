@@ -9,7 +9,7 @@ export type CalendarDotType = 'none' | 'active' | 'past';
 export interface CalendarWeekSelectorProps {
   /** 当前选中日期 */
   selectedDate: dayjs.Dayjs;
-  /** 日期切换回调 */
+  /** 日期切换回调（单选点选 / 滑动切周月时；多选或 navigateMonthWithoutSelect 时滑动可不触发） */
   onChange: (date: dayjs.Dayjs) => void;
   /** 日期下方红点/灰点状态 */
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
@@ -19,6 +19,14 @@ export interface CalendarWeekSelectorProps {
   showTodayButton?: boolean;
   /** 是否展示展开/收起月历入口 */
   showExpandToggle?: boolean;
+  /** 仅月视图（排课表单等；自带左右滑切月） */
+  monthOnly?: boolean;
+  /** 多选日期（YYYY-MM-DD） */
+  multiSelect?: boolean;
+  selectedDates?: string[];
+  onSelectedDatesChange?: (dates: string[]) => void;
+  /** 左右滑/年月份切换只改展示月，不改选中日（表单草稿确认场景） */
+  navigateMonthWithoutSelect?: boolean;
   /** 额外容器类名 */
   className?: string;
 }
@@ -41,6 +49,7 @@ function buildNextDate(date: dayjs.Dayjs, nextYear: number, nextMonth: number): 
   return dayjs().year(nextYear).month(nextMonth).date(nextDay);
 }
 
+/** 周一对齐月网格，最多 6 行（42 格） */
 function buildCalendarDates(currentMonth: dayjs.Dayjs): dayjs.Dayjs[] {
   const monthStart = currentMonth.startOf('month');
   const monthEnd = currentMonth.endOf('month');
@@ -48,7 +57,7 @@ function buildCalendarDates(currentMonth: dayjs.Dayjs): dayjs.Dayjs[] {
   const gridStart = monthStart.subtract(startOffset, 'day');
   const endOffset = 6 - ((monthEnd.day() + 6) % 7);
   const gridEnd = monthEnd.add(endOffset, 'day');
-  const totalDays = gridEnd.diff(gridStart, 'day') + 1;
+  const totalDays = Math.min(gridEnd.diff(gridStart, 'day') + 1, 42);
 
   return Array.from({ length: totalDays }, (_, index) => gridStart.add(index, 'day'));
 }
@@ -86,10 +95,15 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
   isDateDisabled,
   showTodayButton = true,
   showExpandToggle = true,
+  monthOnly = false,
+  multiSelect = false,
+  selectedDates = [],
+  onSelectedDatesChange,
+  navigateMonthWithoutSelect = false,
   className,
 }) => {
   const [displaySelectedDate, setDisplaySelectedDate] = useState(selectedDate);
-  const [isMonthViewExpanded, setIsMonthViewExpanded] = useState(false);
+  const [isMonthViewExpanded, setIsMonthViewExpanded] = useState(monthOnly);
   const [weekWindow, setWeekWindow] = useState(() => buildWeekWindow(getWeekStart(selectedDate)));
   const [monthWindow, setMonthWindow] = useState(() =>
     buildMonthWindow(selectedDate.startOf('month')),
@@ -119,10 +133,9 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
   const monthIndex = displaySelectedDate.month();
 
   useEffect(() => {
-    if (!selectedDate.isSame(displaySelectedDate, 'day')) {
-      setDisplaySelectedDate(selectedDate);
-    }
-  }, [displaySelectedDate, selectedDate]);
+    // 仅跟外部选中日同步；左右滑换月只改展示时不要被拽回
+    setDisplaySelectedDate(selectedDate);
+  }, [selectedDate]);
 
   useEffect(() => {
     const targetWeekStart = getWeekStart(displaySelectedDate);
@@ -150,6 +163,12 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
     });
   }, [displaySelectedDate]);
 
+  useEffect(() => {
+    if (monthOnly && !isMonthViewExpanded) {
+      setIsMonthViewExpanded(true);
+    }
+  }, [isMonthViewExpanded, monthOnly]);
+
   const commitDateChange = useCallback(
     (date: dayjs.Dayjs) => {
       setDisplaySelectedDate(date);
@@ -157,6 +176,65 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
       onChange(date);
     },
     [onChange],
+  );
+
+  const navigateDisplayMonth = useCallback((date: dayjs.Dayjs) => {
+    setDisplaySelectedDate(date);
+  }, []);
+
+  const toggleMultiDate = useCallback(
+    (date: dayjs.Dayjs) => {
+      const key = date.format('YYYY-MM-DD');
+      const next = selectedDates.includes(key)
+        ? selectedDates.filter((d) => d !== key)
+        : [...selectedDates, key];
+      onSelectedDatesChange?.(next);
+      setDisplaySelectedDate(date);
+    },
+    [onSelectedDatesChange, selectedDates],
+  );
+
+  const handleDayPress = useCallback(
+    (date: dayjs.Dayjs) => {
+      if (isDateDisabled?.(date)) return;
+      if (multiSelect) {
+        toggleMultiDate(date);
+        return;
+      }
+      commitDateChange(date);
+    },
+    [commitDateChange, isDateDisabled, multiSelect, toggleMultiDate],
+  );
+
+  const handleGoToday = useCallback(() => {
+    const today = dayjs();
+    if (multiSelect) {
+      const key = today.format('YYYY-MM-DD');
+      if (!selectedDates.includes(key)) {
+        onSelectedDatesChange?.([...selectedDates, key]);
+      }
+      setDisplaySelectedDate(today);
+      return;
+    }
+    commitDateChange(today);
+  }, [commitDateChange, multiSelect, onSelectedDatesChange, selectedDates]);
+
+  const handleYearOrMonthPick = useCallback(
+    (nextYear: number, nextMonth: number) => {
+      const next = buildNextDate(displaySelectedDate, nextYear, nextMonth);
+      if (navigateMonthWithoutSelect || multiSelect) {
+        navigateDisplayMonth(next);
+        return;
+      }
+      commitDateChange(next);
+    },
+    [
+      commitDateChange,
+      displaySelectedDate,
+      multiSelect,
+      navigateDisplayMonth,
+      navigateMonthWithoutSelect,
+    ],
   );
 
   // 周视图 Swiper 变更
@@ -215,7 +293,11 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
       }
 
       const nextDate = getDefaultDateForMonth(nextMonth);
-      commitDateChange(nextDate);
+      if (navigateMonthWithoutSelect || multiSelect) {
+        navigateDisplayMonth(nextDate);
+      } else {
+        commitDateChange(nextDate);
+      }
 
       if (currentIndex <= WINDOW_PRELOAD_THRESHOLD) {
         const firstMonth = monthWindow[0];
@@ -235,7 +317,14 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         setMonthWindow([...monthWindow, ...appendMonths]);
       }
     },
-    [commitDateChange, monthSwiperCurrent, monthWindow],
+    [
+      commitDateChange,
+      monthSwiperCurrent,
+      monthWindow,
+      multiSelect,
+      navigateDisplayMonth,
+      navigateMonthWithoutSelect,
+    ],
   );
 
   const toggleMonthView = useCallback(() => {
@@ -302,27 +391,27 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
 
   const renderMonthDayItem = (date: dayjs.Dayjs, monthToShow: dayjs.Dayjs) => {
     const inCurrentMonth = date.isSame(monthToShow, 'month');
-    const isSelected = date.isSame(displaySelectedDate, 'day');
+    const key = date.format('YYYY-MM-DD');
+    const isSelected = multiSelect
+      ? selectedDates.includes(key)
+      : date.isSame(displaySelectedDate, 'day');
     const isToday = date.isSame(dayjs(), 'day');
     const dotType = getDateDotType?.(date) || 'none';
     const disabled = isDateDisabled?.(date) ?? false;
 
     return (
       <View
-        key={date.format('YYYY-MM-DD')}
+        key={key}
         className={cn(
-          'flex w-[14.285%] items-center justify-center py-[10rpx]',
+          'flex w-[14.285%] items-center justify-center py-[8rpx]',
           disabled && 'opacity-40',
         )}
-        onClick={() => {
-          if (disabled) return;
-          commitDateChange(date);
-        }}
+        onClick={() => handleDayPress(date)}
       >
         <View className="flex items-center">
           <View
             className={cn(
-              'flex h-[64rpx] w-[64rpx] flex-col items-center justify-center rounded-full',
+              'flex h-[68rpx] w-[68rpx] flex-col items-center justify-center rounded-full',
               isSelected
                 ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
                 : isToday
@@ -332,7 +421,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           >
             <Text
               className={cn(
-                'text-[28rpx] font-semibold',
+                'text-[30rpx] font-semibold leading-[34rpx]',
                 isSelected
                   ? 'text-schedule-calendar-selected'
                   : inCurrentMonth
@@ -344,8 +433,8 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             >
               {date.date()}
             </Text>
-            {dotType !== 'none' && (
-              <View className="mt-[6rpx] h-[8rpx] w-[8rpx] rounded-full">
+            {dotType !== 'none' ? (
+              <View className="mt-[4rpx] h-[8rpx] w-[8rpx] rounded-full">
                 {dotType === 'active' ? (
                   <View
                     className={cn(
@@ -360,12 +449,16 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
                   <View className="h-[8rpx] w-[8rpx] rounded-full bg-muted-foreground" />
                 ) : null}
               </View>
+            ) : (
+              <View className="mt-[4rpx] h-[8rpx] w-[8rpx]" />
             )}
           </View>
         </View>
       </View>
     );
   };
+
+  const showMonthView = monthOnly || isMonthViewExpanded;
 
   return (
     <View className={cn('px-[24rpx] pt-[26rpx]', className)}>
@@ -377,9 +470,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           onChange={(event) => {
             const nextYear =
               yearOptions[Number(event.detail.value || 0)] || displaySelectedDate.year();
-            commitDateChange(
-              buildNextDate(displaySelectedDate, nextYear, displaySelectedDate.month()),
-            );
+            handleYearOrMonthPick(nextYear, displaySelectedDate.month());
           }}
         >
           <View className="flex min-w-[180rpx] items-center gap-[8rpx]">
@@ -393,7 +484,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         {showTodayButton ? (
           <View
             className="flex h-[64rpx] items-center justify-center gap-[8rpx] rounded-full border border-primary/12 bg-primary/8 px-[22rpx] shadow-schedule-today"
-            onClick={() => commitDateChange(dayjs())}
+            onClick={handleGoToday}
           >
             <Icon name="mdi-calendar-check-outline" size="xs" color="primary" />
             <Text className="text-[24rpx] font-semibold text-primary">回到今天</Text>
@@ -408,9 +499,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           value={monthIndex}
           onChange={(event) => {
             const nextMonth = Number(event.detail.value || 0);
-            commitDateChange(
-              buildNextDate(displaySelectedDate, displaySelectedDate.year(), nextMonth),
-            );
+            handleYearOrMonthPick(displaySelectedDate.year(), nextMonth);
           }}
         >
           <View className="flex min-w-[128rpx] items-center justify-end gap-[8rpx]">
@@ -422,7 +511,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         </Picker>
       </View>
 
-      {!isMonthViewExpanded ? (
+      {!showMonthView ? (
         <View className="mt-[20rpx]">
           <Swiper
             className="h-[150rpx]"
@@ -449,16 +538,17 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         </View>
       ) : (
         <View className="mt-[20rpx]">
-          <View className="flex items-center justify-between px-[10rpx]">
+          <View className="flex items-center justify-between px-[6rpx]">
             {WEEKDAY_LABELS.map((label) => (
-              <View key={label} className="flex w-[88rpx] items-center justify-center py-[8rpx]">
-                <Text className="text-[22rpx] font-medium text-muted-foreground">{label}</Text>
+              <View key={label} className="flex w-[14.285%] items-center justify-center py-[8rpx]">
+                <Text className="text-[24rpx] font-medium text-muted-foreground">{label}</Text>
               </View>
             ))}
           </View>
 
+          {/* 固定 6 行高度，左右滑切换月份 */}
           <Swiper
-            className="h-[520rpx]"
+            className="h-[504rpx]"
             current={monthSwiperCurrent}
             duration={SWIPER_DURATION}
             easingFunction="easeOutCubic"
@@ -468,7 +558,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           >
             {monthWindow.map((month) => (
               <SwiperItem key={month.format('YYYY-MM')} itemId={month.format('YYYY-MM')}>
-                <View className="w-full h-full flex flex-wrap">
+                <View className="flex h-full w-full flex-wrap content-start">
                   {buildCalendarDates(month).map((date) => renderMonthDayItem(date, month))}
                 </View>
               </SwiperItem>
@@ -477,7 +567,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         </View>
       )}
 
-      {showExpandToggle ? (
+      {showExpandToggle && !monthOnly ? (
         <View className="mt-[8rpx] flex justify-center pb-[8rpx]">
           <View
             className="flex h-[48rpx] w-[80rpx] items-center justify-center rounded-full bg-muted/60"

@@ -140,7 +140,7 @@ const MemberCardIssuePage: React.FC = () => {
   /** P1：处理学员未结欠课（划扣抵扣 / 平账豁免），UI 提醒老师选择 */
   const handlePendingDebt = useCallback(async (sid: string) => {
     try {
-      const debts = lessonDebtService.getPendingByStudent(sid);
+      const debts = await lessonDebtService.getPendingByStudent(sid);
       const totalDebt = debts.reduce((sum, d) => sum + d.hours, 0);
       if (totalDebt <= 0) return;
 

@@ -5,13 +5,12 @@
  * - 门店入驻 → 门店入驻申请页（package-settings/pages/store-entry/index）
  * - 绑定机构 → 输入学员邀请码绑定（package-auth/pages/parent-onboarding/index）
  *
- * 完成后清除 identity-select pending 标记，后续不再出现。
+ * pending 标记在目标页成功进入后再清除，避免目标页被守卫拦截时丢回流入口。
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback } from 'react';
 import Icon from '@/components/Icon';
-import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const IDENTITY_OPTIONS = [
@@ -35,8 +34,6 @@ const IdentitySelect: React.FC = () => {
   const navHeight = useNavSafeHeight();
 
   const handleSelect = useCallback((url: string) => {
-    // 进入具体流程后即清除选择身份标记；回退时由流程完成态接管
-    clearIdentitySelectionPending();
     Taro.navigateTo({ url });
   }, []);
 

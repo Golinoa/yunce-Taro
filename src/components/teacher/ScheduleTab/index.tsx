@@ -3,7 +3,7 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React from 'react';
 import FilterBar from '@/components/teacher/FilterBar';
-import { CAMPUS_OPTIONS, SUBJECT_OPTIONS } from '@/data/teacher';
+import { CAMPUS_OPTIONS, SUBJECT_OPTIONS } from '@/constants/teacher-ui';
 import type { WeekDay, ScheduleItem } from '@/package-teacher/pages/teacher-list/useTeacherList';
 
 export interface ScheduleTabProps {

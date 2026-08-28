@@ -3,33 +3,6 @@
  * 所有认证相关请求统一通过此处，真实 API 联调时只改此处即可
  */
 import Taro from '@tarojs/taro';
-import {
-  mockCheckLoginAccount,
-  mockPrepareEmailLogin,
-  mockLoginByEmailCode,
-  mockPrepareAccountRecovery,
-  mockRecoverAccountByEmailCode,
-  mockPreparePasswordReset,
-  mockResetPasswordByEmailCode,
-  mockLogin,
-  mockWechatLogin,
-  mockPhoneLogin,
-  mockRegisterStep1,
-  mockRegisterStep2,
-  mockRegisterStep3,
-  mockVerifyCampusCode,
-  mockVerifyStudentCode,
-  mockValidateInviteCode,
-  mockGetSession,
-  mockSwitchIdentity,
-  mockAddIdentity,
-  mockRestoreRegisterDrafts,
-  mockLogout,
-  mockUpdateProfile,
-  mockGetProfileExtra,
-} from '@/data/auth';
-import { TEST_ACCOUNTS, TEST_PASSWORD } from '@/data/mock-database';
-import type { TestAccount } from '@/data/mock-database';
 import type {
   AuthSession,
   Profile,
@@ -39,14 +12,16 @@ import type {
   RegisterDraft,
   TeacherRoleInfo,
 } from '@/types/profile';
+import { isUseMock } from '@/utils/build-env';
+import { loadAuthMock } from '@/utils/mock-loaders';
 import { get, post, put } from '@/utils/request';
 
-type BackendRole = 'ADMIN' | 'ASSISTANT' | 'PARENT' | 'PRINCIPAL' | 'TEACHER';
+export interface TestAccount {
+  username: string;
+  label: string;
+}
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+type BackendRole = 'ADMIN' | 'ASSISTANT' | 'PARENT' | 'PRINCIPAL' | 'TEACHER';
 
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 const USER_PROFILE_KEY = 'yunce-edu-user-profile';
@@ -62,6 +37,7 @@ const AUTH_ENDPOINTS = {
   profile: '/profile',
   switchRole: '/auth/switch-role',
   wechatLogin: '/auth/wechat-login',
+  wechatBind: '/auth/wechat-bind',
 } as const;
 
 const REGISTER_DRAFT_STORAGE_KEY = 'yunce-edu-register-draft-local';
@@ -132,11 +108,11 @@ interface AuthPayload {
 }
 
 export const authCapabilities = {
-  supportsAccountPasswordLogin: USE_MOCK,
-  supportsEmailCodeLogin: USE_MOCK,
-  supportsPhoneLogin: USE_MOCK,
+  supportsAccountPasswordLogin: isUseMock(),
+  supportsEmailCodeLogin: isUseMock(),
+  supportsPhoneLogin: isUseMock(),
   supportsWechatLogin: true,
-  usesMockRegister: USE_MOCK,
+  usesMockRegister: isUseMock(),
 } as const;
 
 const clearStoredAuth = (): void => {
@@ -402,7 +378,7 @@ export interface LoginResult {
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
-  if (USE_MOCK) return mockLogin(username, password);
+  if (isUseMock()) { const { mockLogin } = await loadAuthMock(); return mockLogin(username, password); }
   return {
     session: null,
     profile: null,
@@ -411,7 +387,7 @@ export async function login(username: string, password: string): Promise<LoginRe
 }
 
 export async function wechatLogin(code: string): Promise<LoginResult> {
-  if (USE_MOCK) return mockWechatLogin(code);
+  if (isUseMock()) { const { mockWechatLogin } = await loadAuthMock(); return mockWechatLogin(code); }
   try {
     const data = await post<BackendAuthPayload>(
       AUTH_ENDPOINTS.wechatLogin,
@@ -434,8 +410,36 @@ export async function wechatLogin(code: string): Promise<LoginResult> {
   }
 }
 
+/**
+ * 微信登录后绑定手机号 + 设置密码（无短信）。
+ * 需已登录；成功后返回新 token / profile（可能发生账号合并）。
+ */
+export async function bindWechatCredentials(payload: {
+  phone: string;
+  password: string;
+}): Promise<LoginResult> {
+  if (isUseMock()) {
+    const { mockBindWechatCredentials } = await loadAuthMock();
+    return mockBindWechatCredentials(payload.phone, payload.password);
+  }
+  try {
+    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatBind, {
+      phone: payload.phone.trim(),
+      password: payload.password,
+    });
+    const mapped = mapBackendAuthPayload(data);
+    return { session: mapped.session, profile: mapped.profile, error: null };
+  } catch (error) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: getErrorMessage(error, '绑定失败，请稍后重试') },
+    };
+  }
+}
+
 export async function sendSmsCode(phone: string): Promise<{ error: { message: string } | null }> {
-  if (USE_MOCK) {
+  if (isUseMock()) {
     return { error: null };
   }
   try {
@@ -447,7 +451,7 @@ export async function sendSmsCode(phone: string): Promise<{ error: { message: st
 }
 
 export async function phoneLogin(phone: string, code: string): Promise<LoginResult> {
-  if (USE_MOCK) return mockPhoneLogin(phone, code);
+  if (isUseMock()) { const { mockPhoneLogin } = await loadAuthMock(); return mockPhoneLogin(phone, code); }
   try {
     const data = await post<BackendAuthPayload>(
       AUTH_ENDPOINTS.phoneLogin,
@@ -466,7 +470,7 @@ export async function phoneLogin(phone: string, code: string): Promise<LoginResu
 }
 
 export async function checkLoginAccount(account: string): Promise<LoginAccountCheckResult> {
-  if (USE_MOCK) return mockCheckLoginAccount(account);
+  if (isUseMock()) { const { mockCheckLoginAccount } = await loadAuthMock(); return mockCheckLoginAccount(account); }
   return {
     exists: false,
     account: account.trim(),
@@ -479,7 +483,7 @@ export async function prepareEmailLogin(
   identifier: string,
   mode: 'account' | 'email',
 ): Promise<EmailLoginPrepareResult> {
-  if (USE_MOCK) return mockPrepareEmailLogin(identifier, mode);
+  if (isUseMock()) { const { mockPrepareEmailLogin } = await loadAuthMock(); return mockPrepareEmailLogin(identifier, mode); }
   return {
     status: mode === 'email' ? 'email_not_found' : 'account_not_found',
     error: { message: '邮箱验证码服务暂未接通，请稍后再试' },
@@ -487,7 +491,7 @@ export async function prepareEmailLogin(
 }
 
 export async function loginByEmailCode(email: string, code: string): Promise<LoginResult> {
-  if (USE_MOCK) return mockLoginByEmailCode(email, code);
+  if (isUseMock()) { const { mockLoginByEmailCode } = await loadAuthMock(); return mockLoginByEmailCode(email, code); }
   return {
     session: null,
     profile: null,
@@ -496,7 +500,7 @@ export async function loginByEmailCode(email: string, code: string): Promise<Log
 }
 
 export async function prepareAccountRecovery(email: string): Promise<AccountRecoveryPrepareResult> {
-  if (USE_MOCK) return mockPrepareAccountRecovery(email);
+  if (isUseMock()) { const { mockPrepareAccountRecovery } = await loadAuthMock(); return mockPrepareAccountRecovery(email); }
   return {
     status: 'email_not_found',
     error: { message: '账号找回服务暂未接通，请稍后再试' },
@@ -507,7 +511,7 @@ export async function recoverAccountByEmailCode(
   email: string,
   code: string,
 ): Promise<AccountRecoveryResult> {
-  if (USE_MOCK) return mockRecoverAccountByEmailCode(email, code);
+  if (isUseMock()) { const { mockRecoverAccountByEmailCode } = await loadAuthMock(); return mockRecoverAccountByEmailCode(email, code); }
   return {
     account: null,
     error: { message: '账号找回服务暂未接通，请稍后再试' },
@@ -515,7 +519,7 @@ export async function recoverAccountByEmailCode(
 }
 
 export async function preparePasswordReset(account: string): Promise<PasswordResetPrepareResult> {
-  if (USE_MOCK) return mockPreparePasswordReset(account);
+  if (isUseMock()) { const { mockPreparePasswordReset } = await loadAuthMock(); return mockPreparePasswordReset(account); }
   return {
     status: 'account_not_found',
     error: { message: '密码重置服务暂未接通，请稍后再试' },
@@ -527,7 +531,7 @@ export async function resetPasswordByEmailCode(
   code: string,
   newPassword: string,
 ): Promise<{ error: { message: string } | null }> {
-  if (USE_MOCK) return mockResetPasswordByEmailCode(account, code, newPassword);
+  if (isUseMock()) { const { mockResetPasswordByEmailCode } = await loadAuthMock(); return mockResetPasswordByEmailCode(account, code, newPassword); }
   return {
     error: { message: '密码重置服务暂未接通，请稍后再试' },
   };
@@ -547,18 +551,22 @@ export async function registerStep1(
   password: string,
   inviteCode?: string,
 ): Promise<RegisterStep1Result> {
-  if (USE_MOCK) return mockRegisterStep1(username, password, inviteCode);
+  if (isUseMock()) { const { mockRegisterStep1 } = await loadAuthMock(); return mockRegisterStep1(username, password, inviteCode); }
   return { tempToken: null, error: { message: '请使用手机号注册' } };
 }
 
-export async function registerStep1ByPhone(phone: string): Promise<RegisterStep1Result> {
+export async function registerStep1ByPhone(
+  phone: string,
+  password: string,
+): Promise<RegisterStep1Result> {
   const normalized = phone.trim();
   if (!/^1[3-9]\d{9}$/.test(normalized)) {
     return { tempToken: null, error: { message: '请输入正确的手机号' } };
   }
 
-  if (USE_MOCK) {
-    return mockRegisterStep1(normalized, 'phone-register', undefined);
+  if (isUseMock()) {
+    const { mockRegisterStep1 } = await loadAuthMock();
+    return mockRegisterStep1(normalized, password.trim() || 'phone-register', undefined);
   }
 
   return {
@@ -571,7 +579,7 @@ export async function registerStep2(
   tempToken: string,
   role: UserRole,
 ): Promise<RegisterStep1Result> {
-  if (USE_MOCK) return mockRegisterStep2(tempToken, role);
+  if (isUseMock()) { const { mockRegisterStep2 } = await loadAuthMock(); return mockRegisterStep2(tempToken, role); }
   if (!tempToken) {
     return { tempToken: null, error: { message: '注册已过期，请重新填写' } };
   }
@@ -585,7 +593,7 @@ export async function registerStep3(
   tempToken: string,
   roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo,
 ): Promise<LoginResult> {
-  if (USE_MOCK) return mockRegisterStep3(tempToken, roleInfo);
+  if (isUseMock()) { const { mockRegisterStep3 } = await loadAuthMock(); return mockRegisterStep3(tempToken, roleInfo); }
 
   const draft = readClientRegisterDraft();
   if (!draft?.phone || !draft.role || draft.tempToken !== tempToken) {
@@ -623,17 +631,17 @@ export async function registerStep3(
 // ============================================
 
 export async function verifyCampusCode(code: string) {
-  if (USE_MOCK) return mockVerifyCampusCode(code);
+  if (isUseMock()) { const { mockVerifyCampusCode } = await loadAuthMock(); return mockVerifyCampusCode(code); }
   return { valid: false };
 }
 
 export async function verifyStudentCode(code: string) {
-  if (USE_MOCK) return mockVerifyStudentCode(code);
+  if (isUseMock()) { const { mockVerifyStudentCode } = await loadAuthMock(); return mockVerifyStudentCode(code); }
   return { valid: false };
 }
 
 export async function validateInviteCode(code: string) {
-  if (USE_MOCK) return mockValidateInviteCode(code);
+  if (isUseMock()) { const { mockValidateInviteCode } = await loadAuthMock(); return mockValidateInviteCode(code); }
   try {
     const data = await get<{ valid: boolean; student?: { id: string; name: string } }>(
       `/auth/invite-code/${encodeURIComponent(code)}/validate`,
@@ -659,7 +667,7 @@ export async function getSession(): Promise<{
   session: AuthSession | null;
   profile: Profile | null;
 }> {
-  if (USE_MOCK) return mockGetSession();
+  if (isUseMock()) { const { mockGetSession } = await loadAuthMock(); return mockGetSession(); }
   try {
     const storedSession = readStoredSession();
     if (!storedSession) {
@@ -699,7 +707,7 @@ export async function switchIdentity(identityId: string): Promise<{
   profile: Profile | null;
   error: { message: string } | null;
 }> {
-  if (USE_MOCK) return mockSwitchIdentity(identityId);
+  if (isUseMock()) { const { mockSwitchIdentity } = await loadAuthMock(); return mockSwitchIdentity(identityId); }
   return { profile: null, error: { message: '真实后端联调阶段暂未开放多身份切换' } };
 }
 
@@ -717,7 +725,7 @@ export async function updateProfile(
     address?: string;
   },
 ): Promise<{ profile: Profile | null; error: { message: string } | null }> {
-  if (USE_MOCK) return mockUpdateProfile(patch);
+  if (isUseMock()) { const { mockUpdateProfile } = await loadAuthMock(); return mockUpdateProfile(patch); }
   try {
     const updated = await put<BackendUserInfo>(
       AUTH_ENDPOINTS.profile,
@@ -741,7 +749,7 @@ export async function getProfileExtra(userId: string): Promise<{
   region?: string;
   address?: string;
 }> {
-  if (USE_MOCK) return mockGetProfileExtra(userId);
+  if (isUseMock()) { const { mockGetProfileExtra } = await loadAuthMock(); return mockGetProfileExtra(userId); }
   // 真实接口暂未独立暴露，从 profile 中按需取
   try {
     const data = await get<{
@@ -769,16 +777,16 @@ export async function addIdentity(
   role: UserRole,
   roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo,
 ): Promise<{ profile: Profile | null; error: { message: string } | null }> {
-  if (USE_MOCK) return mockAddIdentity(role, roleInfo);
+  if (isUseMock()) { const { mockAddIdentity } = await loadAuthMock(); return mockAddIdentity(role, roleInfo); }
   return { profile: null, error: { message: '真实后端联调阶段暂未开放新增身份' } };
 }
 
 export function restoreRegisterDrafts(): void {
-  if (USE_MOCK) mockRestoreRegisterDrafts();
+  if (isUseMock()) { void loadAuthMock().then(({ mockRestoreRegisterDrafts }) => mockRestoreRegisterDrafts()); }
 }
 
 export async function logout(): Promise<void> {
-  if (USE_MOCK) return mockLogout();
+  if (isUseMock()) { const { mockLogout } = await loadAuthMock(); return mockLogout(); }
   const storedSession = readStoredSession();
   try {
     await post(
@@ -813,5 +821,17 @@ export async function signUp(
 export type { RegisterDraft };
 
 // 导出测试账号信息（Mock 模式下登录页提示用，联调时置空即可）
-export const testAccounts: TestAccount[] = USE_MOCK ? TEST_ACCOUNTS : [];
-export const testPassword = USE_MOCK ? TEST_PASSWORD : '';
+export const testAccounts: TestAccount[] = [];
+export const testPassword = '';
+
+export async function getTestAccounts(): Promise<TestAccount[]> {
+  if (!isUseMock()) return [];
+  const { TEST_ACCOUNTS } = await import('@/data/mock-database');
+  return TEST_ACCOUNTS;
+}
+
+export async function getTestPassword(): Promise<string> {
+  if (!isUseMock()) return '';
+  const { TEST_PASSWORD } = await import('@/data/mock-database');
+  return TEST_PASSWORD;
+}

@@ -71,6 +71,58 @@ function buildBookingStudents(count: number): { id: string; name: string; avatar
 }
 
 export const CLASS_BOOKING_SLOTS: ClassBookingSlot[] = [
+  // —— 团课演示（今天）：上课中 / 可预约；团课无试听标签 ——
+  ...(() => {
+    const today = BASE_DATE.format('YYYY-MM-DD');
+    const hour = BASE_DATE.hour();
+    const activeStartH = hour >= 23 ? 21 : hour;
+    const activeEndH = Math.min(23, activeStartH + 2);
+    const bookStartH = (activeEndH + 2) % 24;
+    const bookEndH = (bookStartH + 1) % 24;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const bookEnd =
+      bookEndH > bookStartH ? `${pad(bookEndH)}:00` : '23:59';
+    return [
+      {
+        id: 'cbs-group-demo-active',
+        class_id: 'cls-group-tag-active',
+        class_name: '团课演示·上课中',
+        campus_id: 'campus-center',
+        teacher_id: 'teacher-001',
+        teacher_name: '张老师',
+        lesson_date: today,
+        start_time: `${pad(activeStartH)}:00`,
+        end_time: `${pad(activeEndH)}:59`,
+        max_count: 8,
+        current_count: 3,
+        status: 'active' as const,
+        booking_students: buildBookingStudents(3),
+        auto_open_type: 'full_or_time' as const,
+        room: '团课演示室A',
+        created_at: '2026-08-01T00:00:00Z',
+        updated_at: '2026-08-01T00:00:00Z',
+      },
+      {
+        id: 'cbs-group-demo-book',
+        class_id: 'cls-group-tag-book',
+        class_name: '团课演示·可预约',
+        campus_id: 'campus-center',
+        teacher_id: 'teacher-001',
+        teacher_name: '张老师',
+        lesson_date: today,
+        start_time: `${pad(bookStartH)}:00`,
+        end_time: bookEnd,
+        max_count: 6,
+        current_count: 2,
+        status: 'active' as const,
+        booking_students: buildBookingStudents(2),
+        auto_open_type: 'full' as const,
+        room: '团课演示室B',
+        created_at: '2026-08-01T00:00:00Z',
+        updated_at: '2026-08-01T00:00:00Z',
+      },
+    ];
+  })(),
   // cls-004 声乐初级班：周一、周五 15:00-16:30，约满开班（min 5 / max 6）
   {
     id: 'cbs-0001',

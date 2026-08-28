@@ -5,12 +5,14 @@ import UnoCSS from '@unocss/webpack';
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
 import devConfig from './dev';
 import prodConfig from './prod';
+import { applyMockExcludeWebpack } from './mock-exclude';
 
 const packageJson = require('../package.json') as { version: string };
+const PROD_API_BASE_URL = 'https://api.chancore.cn/api/app/v1';
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
-  // 默认关闭 mock（生产安全）：联调/开发时显式传入 VITE_USE_MOCK=true 才启用 mock。
+  // 默认生产模式：Mock 关、API 指向线上。显式 VITE_USE_MOCK=true 才启用 mock（dev:weapp:mock / build:weapp:mock）。
   // 生产构建若误带 VITE_USE_MOCK=true 会被强制关闭并告警（G-01 守卫）。
   let useMock = process.env.VITE_USE_MOCK ?? 'false';
   // G-01 守卫：生产环境默认禁止携带 mock（线上安全）。
@@ -20,7 +22,7 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
     console.warn('[G-01] 生产构建检测到 VITE_USE_MOCK=true，已强制关闭 mock 以保证线上数据真实。');
     useMock = 'false';
   }
-  const apiBaseUrl = process.env.TARO_API_BASE_URL ?? '/api/app/v1';
+  const apiBaseUrl = process.env.TARO_API_BASE_URL ?? PROD_API_BASE_URL;
   /** mock / API 地址切换时必须隔离 webpack 缓存，否则会复用错误产物 */
   const weappCacheKey = crypto
     .createHash('md5')
@@ -70,8 +72,8 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
           to: 'dist/assets/images/cover-home.webp',
         },
         {
-          from: 'src/package-settings/assets/wx.jpg',
-          to: 'dist/package-settings/assets/wx.jpg',
+          from: 'src/package-settings/assets/wx.webp',
+          to: 'dist/package-settings/assets/wx.webp',
         },
       ],
       options: {},
@@ -87,6 +89,9 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
       enable: true,
     },
     mini: {
+      optimizeMainPackage: {
+        enable: true,
+      },
       miniCssExtractPluginOption: {
         ignoreOrder: true,
       },
@@ -123,6 +128,7 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
         });
         chain.resolve.plugin('tsconfig-paths').use(TsconfigPathsPlugin);
         chain.plugin('unocss').use(UnoCSS());
+        applyMockExcludeWebpack(chain, useMock);
         // 关闭 source map，减少包体积（微信主包2MB限制）
         chain.devtool(false);
       },

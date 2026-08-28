@@ -1,14 +1,10 @@
 /**
  * Service 层 — 意见反馈 API
  */
-import { mockCreateFeedback } from '@/data/feedback';
 import type { UserRole } from '@/types/profile';
+import { loadFeedbackMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
 import { post } from '@/utils/request';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 export type FeedbackType = 'BUG' | 'FEATURE' | 'OTHER';
 
@@ -22,7 +18,7 @@ export const feedbackService = {
     images: string[];
     contact?: string;
   }) => {
-    if (!USE_MOCK) {
+    if (!isUseMock()) {
       await post('/feedback', {
         type: data.type || 'OTHER',
         content: data.content,
@@ -31,6 +27,8 @@ export const feedbackService = {
       });
       return true;
     }
+
+    const { mockCreateFeedback } = await loadFeedbackMock();
 
     return mockCreateFeedback({
       user_id: data.user_id,

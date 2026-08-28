@@ -616,6 +616,7 @@ export default defineConfig({
     // ===== z-index =====
     ['z-100', { 'z-index': '100' }],
     ['z-200', { 'z-index': '200' }],
+    ['z-250', { 'z-index': '250' }],
 
     // ===== 阴影 =====
     ['shadow-popup', { 'box-shadow': '0 8rpx 32rpx rgba(0, 0, 0, 0.12)' }],

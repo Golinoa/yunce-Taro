@@ -6,9 +6,9 @@
  */
 import dayjs from 'dayjs';
 import type { AlertItem } from '@/components/statistics/AlertSheet';
-import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/data/course-category';
-import { ensureMockCustomTodoSeedsForUser } from '@/data/custom-todos';
-import { mockGetTodoItems } from '@/data/home';
+import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/constants/course-category-ui';
+import { loadCustomTodosMock, loadHomeMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
 import type { TodoItemData } from '@/data/home';
 import type {
   TodoCompletion,
@@ -57,11 +57,6 @@ import { filterTodosBySettings } from '@/utils/todo-settings';
 import { TODO_CATEGORY_INBOX_ID } from '@/utils/todo-categories';
 import { isTodoInMonth, resolveSystemTodoDisplayDay } from '@/utils/todo-timeline';
 import { statisticsService } from './statistics';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 /** 列表视图：home=首页；all=我的待办全量 */
 export type TodoListView = 'home' | 'all';
@@ -134,8 +129,9 @@ const TODO_TYPE_QUADRANT: Record<TodoItemData['type'], TodoQuadrant> = {
   meeting: 'q4',
 };
 
-function ensureMockCustomTodoSeeds(userId: string): void {
-  if (!userId || !USE_MOCK) return;
+async function ensureMockCustomTodoSeeds(userId: string): Promise<void> {
+  if (!userId || !isUseMock()) return;
+  const { ensureMockCustomTodoSeedsForUser } = await loadCustomTodosMock();
   ensureMockCustomTodoSeedsForUser(userId);
 }
 
@@ -350,7 +346,7 @@ async function getListFromMock(params: TodoListParams): Promise<TodoItem[]> {
   const { teacherId, userId, role, campusId, userName, view, month } = params;
   const monthKey = month || dayjs().format('YYYY-MM');
 
-  ensureMockCustomTodoSeeds(userId);
+  await ensureMockCustomTodoSeeds(userId);
 
   const includeNoRemind = view === 'all';
   const customTodoItems = sortCustomTodos(getCustomTodos(userId))
@@ -382,6 +378,7 @@ async function getListFromMock(params: TodoListParams): Promise<TodoItem[]> {
     enrichTodoItem(todo, userId),
   );
 
+  const { mockGetTodoItems } = await loadHomeMock();
   const fixedTodos = (await mockGetTodoItems(teacherId || '', campusId))
     .map(mapTodoItem)
     .map((todo) => enrichTodoItem(todo, userId));
@@ -411,7 +408,7 @@ async function getListFromApi(params: TodoListParams): Promise<TodoItem[]> {
 
 async function getList(params: TodoListParams): Promise<TodoItem[]> {
   if (!params.userId) return [];
-  if (USE_MOCK) return getListFromMock(params);
+  if (isUseMock()) return getListFromMock(params);
   return getListFromApi(params);
 }
 
@@ -426,7 +423,7 @@ async function completeTodoItem(
     note: payload.note?.trim() || undefined,
   };
 
-  if (USE_MOCK) {
+  if (isUseMock()) {
     if (isCustomTodoId(todoId)) {
       completeCustomTodo(payload.userId, todoId, {
         note: payload.note,
@@ -483,7 +480,7 @@ export const todoService = {
 
   /** 添加自定义待办 */
   add: async (userId: string, input: AddCustomTodoInput): Promise<TodoItem> => {
-    if (USE_MOCK) {
+    if (isUseMock()) {
       const record = addCustomTodo(userId, input);
       return mapCustomTodoToHomeItem(record);
     }
@@ -504,8 +501,8 @@ export const todoService = {
   /** 仅自定义原始记录（调试/兼容，业务列表请用 getList） */
   listCustomRecords: async (userId: string): Promise<CustomTodoRecord[]> => {
     if (!userId) return [];
-    ensureMockCustomTodoSeeds(userId);
-    if (USE_MOCK) {
+    await ensureMockCustomTodoSeeds(userId);
+    if (isUseMock()) {
       return sortCustomTodosByMode(getCustomTodos(userId), 'deadline');
     }
     // 真模式：自定义记录已含在 GET /todos；本方法仅 Mock/调试保留本地副本
@@ -514,7 +511,7 @@ export const todoService = {
 
   /** 删除自定义待办 */
   remove: async (userId: string, todoId: string): Promise<boolean> => {
-    if (USE_MOCK) {
+    if (isUseMock()) {
       return removeCustomTodo(userId, todoId);
     }
     await del<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}`);
@@ -529,7 +526,7 @@ export const todoService = {
     input: UpdateCustomTodoInput,
   ): Promise<TodoItem | null> => {
     if (!userId || !todoId || !isCustomTodoId(todoId)) return null;
-    if (USE_MOCK) {
+    if (isUseMock()) {
       const record = updateCustomTodo(userId, todoId, input);
       return record ? mapCustomTodoToHomeItem(record) : null;
     }
@@ -551,7 +548,7 @@ export const todoService = {
   /** 重新打开待办 */
   reopen: async (userId: string, todoId: string): Promise<boolean> => {
     if (!userId || !todoId) return false;
-    if (USE_MOCK) {
+    if (isUseMock()) {
       if (isCustomTodoId(todoId)) {
         return reopenCustomTodo(userId, todoId);
       }
@@ -576,7 +573,7 @@ export const todoService = {
   ): Promise<boolean> => {
     if (!userId || !todoId) return false;
 
-    if (USE_MOCK) {
+    if (isUseMock()) {
       if (isCustomTodoId(todoId)) {
         if (!updateCustomTodoQuadrant(userId, todoId, quadrant)) return false;
       }

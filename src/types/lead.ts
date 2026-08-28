@@ -46,6 +46,8 @@ export interface Lead {
   child_gender?: 'male' | 'female';
   /** 孩子年龄/年级 */
   child_age?: string;
+  /** 孩子头像（有则真实引用，无则前端按姓名生成色块字） */
+  avatar_url?: string;
   /** 家长账号 ID（未注册时为空） */
   parent_user_id?: string;
   /** 家长姓名 */

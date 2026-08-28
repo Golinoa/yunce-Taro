@@ -2,21 +2,22 @@
 
 .add-to-desktop-tip {
   position: fixed;
-  inset: 0;
   z-index: 1200;
-  pointer-events: auto;
+  /* 仅卡片占位，不铺满全屏，避免拦截滑动 */
+  pointer-events: none;
+  /* 独立合成层，减轻 ScrollView 滚动时位置抖动 */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.add-to-desktop-tip__mask {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: transparent;
+.add-to-desktop-tip__bounce {
+  pointer-events: auto;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .add-to-desktop-tip__panel {
-  position: absolute;
-  z-index: 1;
+  position: relative;
   box-sizing: border-box;
   padding: 18rpx 22rpx 18rpx;
   background: #fff;

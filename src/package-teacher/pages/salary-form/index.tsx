@@ -22,7 +22,7 @@ import SalaryRuleEditor from '@/components/teacher/SalaryRuleEditor';
 import SalaryTemplateActionSheet from '@/components/teacher/SalaryTemplateActionSheet';
 import SaveTemplateDialog from '@/components/teacher/SaveTemplateDialog';
 import TemplatePickerSheet from '@/components/teacher/TemplatePickerSheet';
-import { createDefaultSalaryRule } from '@/data/teacher';
+import { createDefaultSalaryRule } from '@/domain/teacher-salary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig, SalaryTemplate } from '@/types/teacher';

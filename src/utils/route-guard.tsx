@@ -130,8 +130,8 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-statistics/pages/card-data/index': 'finance',
   'package-statistics/pages/salary-data/index': 'finance',
   'package-statistics/pages/record-transaction/index': 'finance',
-  'package-settings/pages/store-entry/index': 'settings',
-  'package-settings/pages/store-entry/pending/index': 'settings',
+  // 门店入驻属于新用户入驻流程，不能挂 settings：校长默认无 settings 模块，
+  // 会导致身份选择点「门店入驻」被守卫踢回首页（表现为「直接进主页」）。
 };
 
 /** 模块授权校验：读持久化的 grants（系统角色覆盖），未覆盖回退角色默认 */

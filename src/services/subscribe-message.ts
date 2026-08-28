@@ -10,11 +10,8 @@ import {
   getRenewPreset,
   MOCK_TMPL_IDS,
 } from '@/constants/subscribe-presets';
-import {
-  mockDismissPending,
-  mockGetBootstrap,
-  mockReportAuth,
-} from '@/data/subscribe-message';
+import { loadSubscribeMessageMock } from '@/utils/mock-loaders';
+import { isUseMock } from '@/utils/build-env';
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
 import type {
   OpenPromptInput,
@@ -41,11 +38,6 @@ import {
 } from '@/utils/subscribe-class-view';
 import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { logError } from '@/utils/logger';
-
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
 
 const MESSAGE_AUTH_PAGE = '/package-settings/pages/message-auth/index';
 
@@ -136,8 +128,8 @@ export const subscribeMessageService = {
       return { templates: [], quotas: [], pendingPrompts: [], lowQuotaGroups: [] };
     }
 
-    if (USE_MOCK) {
-      bootstrapCache = await mockGetBootstrap(userId);
+    if (isUseMock()) {
+      bootstrapCache = await (await loadSubscribeMessageMock()).mockGetBootstrap(userId);
       return bootstrapCache;
     }
 
@@ -159,11 +151,11 @@ export const subscribeMessageService = {
 
     const payload: SubscribeAuthReportBody = { ...body, userId };
 
-    if (USE_MOCK) {
-      const result = await mockReportAuth(userId, payload);
+    if (isUseMock()) {
+      const result = await (await loadSubscribeMessageMock()).mockReportAuth(userId, payload);
       bootstrapCache = bootstrapCache
         ? { ...bootstrapCache, quotas: result.quotas }
-        : await mockGetBootstrap(userId);
+        : await (await loadSubscribeMessageMock()).mockGetBootstrap(userId);
       return result.quotas;
     }
 
@@ -191,7 +183,7 @@ export const subscribeMessageService = {
     const userId = await resolveUserId();
     if (!userId) return;
 
-    if (USE_MOCK) return;
+    if (isUseMock()) return;
 
     try {
       await post(`/subscribe-message/prompts/${encodeURIComponent(promptId)}/consume`);
@@ -204,8 +196,8 @@ export const subscribeMessageService = {
     const userId = await resolveUserId();
     if (!userId) return;
 
-    if (USE_MOCK) {
-      await mockDismissPending(userId, promptId);
+    if (isUseMock()) {
+      await (await loadSubscribeMessageMock()).mockDismissPending(userId, promptId);
       if (bootstrapCache) {
         bootstrapCache = {
           ...bootstrapCache,
@@ -235,16 +227,16 @@ export const subscribeMessageService = {
     scene: string,
     meta?: { role?: string; campusId?: string },
   ): Promise<SubscribeQuotaDto[]> {
-    if (!USE_MOCK && !bootstrapCache) {
+    if (!isUseMock() && !bootstrapCache) {
       await this.bootstrap(meta?.role, meta?.campusId);
     }
 
-    const entries = USE_MOCK
+    const entries = isUseMock()
       ? resolveMockAuthEntries(groups)
       : resolveAuthEntries(groups);
 
     if (entries.length === 0) {
-      if (!USE_MOCK) {
+      if (!isUseMock()) {
         logError('subscribe.requestAuth', new Error('无可授权模板（tmplId 未配置或未 enabled）'));
       }
       return bootstrapCache?.quotas ?? [];

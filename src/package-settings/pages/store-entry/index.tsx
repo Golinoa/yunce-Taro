@@ -10,7 +10,7 @@
 import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
@@ -21,6 +21,7 @@ import { saveStoreEntryDraft, storeEntryService } from '@/services/store-entry';
 import { useCampusStore } from '@/stores/campus';
 import type { StoreType } from '@/types/store-entry';
 import { useAuth } from '@/utils/auth';
+import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -183,6 +184,10 @@ const StoreEntry: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [typePickerVisible, setTypePickerVisible] = useState(false); // 门店类型弹窗（PickerSheet）
+
+  useEffect(() => {
+    clearIdentitySelectionPending();
+  }, []);
 
   const regionText = useMemo(() => form.region.filter(Boolean).join(' '), [form.region]);
 

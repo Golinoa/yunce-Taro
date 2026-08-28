@@ -23,7 +23,7 @@ import {
   CATEGORY_MODE_OPTIONS,
   CATEGORY_TIME_OPTIONS,
   formatCategoryTime,
-} from '@/data/course-category';
+} from '@/constants/course-category-ui';
 import { courseCategoryService } from '@/services/course-category';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';

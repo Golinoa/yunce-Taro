@@ -1,8 +1,7 @@
 /**
- * useTeacherNames - 按员工 id 批量解析姓名
+ * useTeacherNames - 按员�?id 批量解析姓名
  *
- * 使用场景：待办卡片展示协作人 @提及；模块级缓存避免列表重复请求。
- */
+ * 使用场景：待办卡片展示协作人 @提及；模块级缓存避免列表重复请求�? */
 import { useEffect, useMemo, useState } from 'react';
 import { teacherService } from '@/services';
 import { logError } from '@/utils/logger';
@@ -29,8 +28,7 @@ async function loadTeacherNameMap(): Promise<Record<string, string>> {
 }
 
 /**
- * 根据教师 id 列表返回对应姓名（顺序与 ids 一致，未命中则跳过）
- */
+ * 根据教师 id 列表返回对应姓名（顺序与 ids 一致，未命中则跳过�? */
 export function useTeacherNames(ids?: string[]): string[] {
   const [nameMap, setNameMap] = useState<Record<string, string>>(cachedNameMap || {});
 

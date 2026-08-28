@@ -51,6 +51,7 @@ import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { buildTodoCardDomId } from '@/utils/todo-card-meta';
+import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import {
   TODO_CATEGORY_INBOX_ID,
   addTodoCategory,
@@ -870,6 +871,7 @@ const Home: React.FC = () => {
 
             {/* 内容区：校区卡片压住上半部分 */}
             <View className="relative z-10 bg-transparent mx-[28rpx] pt-[0] pb-[100rpx]">
+              <WechatBindReminder className="mb-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
               {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
 
               {isStaffRole(currentRole) && (

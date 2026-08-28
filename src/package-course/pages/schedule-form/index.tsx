@@ -6,20 +6,19 @@
  *
  * 核心业务逻辑：
  *   - 班课（class）：课程内容/人员已提前配置，排课 = 决定「这个班什么时候上」
- *   - 团课（group）：设置开放时段等学员预约，排课 = 「放出哪些时段可约」
- *   - 选中班级后，同步展示关键信息（已扣课时、老师、学员）
- *
+ *   - 团课（group）：同班课表单，但无学员列表（预约制）；含「预约设置」
+ *     （与时段配置 class-slot-config 同步：自动开班 / 每时段可约 / 最少开班）
  * 入参：sourceMode=class|group（来自课表页 FAB 按钮的来源 Tab）
  * 入参：id=xxx（编辑模式，已有排课 ID）
  * 入参：mode=reschedule（调课模式）
  */
 
-import { View, Text, Picker, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Textarea } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import ActionButton from '@/components/ActionButton';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import ClassPickerSheet from '@/components/course/ClassPickerSheet';
 import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
@@ -28,7 +27,10 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
+import ScheduleConflictDialog from '@/components/schedule/ScheduleConflictDialog';
 import Stepper from '@/components/Stepper';
+import TimePickerSheet from '@/components/TimePickerSheet';
+import type { ScheduleConflictResult } from '@/types/schedule-conflict';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
@@ -46,28 +48,94 @@ import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
 import { subjectService } from '@/services/campus';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
-import type { Class } from '@/types/class';
+import type { Class, ClassLevel } from '@/types/class';
+import { CLASS_LEVEL_LABELS } from '@/types/class';
 import type { Schedule, ScheduleColor, DayOfWeek } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
+import { isUseMock } from '@/utils/build-env';
 import { logError } from '@/utils/logger';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /* ======================== 常量 ======================== */
 
-/** 重复方式 */
-
 const MIN_DURATION_MINUTES = 30;
 
-/** 课程类型选项（班课=内容人员已定，排课决定何时上；团课=放时段等预约） */
+/** 与时段配置 class-slot-config 一致的预约设置选项 */
+type AutoOpenType = NonNullable<Class['auto_open_type']>;
+const AUTO_OPEN_OPTIONS: { key: AutoOpenType; label: string }[] = [
+  { key: 'manual', label: '手动开班' },
+  { key: 'full', label: '约满开班' },
+  { key: 'time', label: '到时间自动开班' },
+  { key: 'full_or_time', label: '约满或到时间' },
+];
+const SLOT_MAX_COUNT_OPTIONS = ['1', '2', '3', '4', '5', '6', '8', '10', '12', '15', '20'] as const;
+
+/** 课程类型选项 */
 const SCHEDULE_TYPE_OPTIONS = ['班课', '团课'] as const;
 
-const USE_MOCK =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+type SchedulingMode = 'rule' | 'free';
+type RepeatMode = 'weekly' | 'biweekly' | 'alternate';
+type EndMode = 'never' | 'by_date' | 'by_count';
+
+const WEEKDAY_OPTIONS: { label: string; value: DayOfWeek }[] = [
+  { label: '一', value: 1 },
+  { label: '二', value: 2 },
+  { label: '三', value: 3 },
+  { label: '四', value: 4 },
+  { label: '五', value: 5 },
+  { label: '六', value: 6 },
+  { label: '日', value: 7 },
+];
+
+const REPEAT_OPTIONS: { label: string; value: RepeatMode }[] = [
+  { label: '每周', value: 'weekly' },
+  { label: '隔周', value: 'biweekly' },
+  { label: '隔天', value: 'alternate' },
+];
+
+const END_MODE_OPTIONS: { label: string; value: EndMode }[] = [
+  { label: '不结束', value: 'never' },
+  { label: '限日期', value: 'by_date' },
+  { label: '按次数', value: 'by_count' },
+];
+
+const USE_MOCK = isUseMock();
+
+/** 是/否分段开关（节假日是否排课） */
+const YesNoToggle: React.FC<{
+  value: boolean;
+  onChange: (v: boolean) => void;
+}> = ({ value, onChange }) => (
+  <View className="flex items-center rounded-full bg-muted p-[4rpx]">
+    <View
+      className={cn(
+        'min-w-[72rpx] rounded-full px-[20rpx] py-[10rpx] text-center transition-colors',
+        value ? 'bg-primary' : 'bg-transparent',
+      )}
+      onClick={() => onChange(true)}
+    >
+      <Text className={cn('text-[24rpx] font-medium', value ? 'text-white' : 'text-muted-foreground')}>
+        是
+      </Text>
+    </View>
+    <View
+      className={cn(
+        'min-w-[72rpx] rounded-full px-[20rpx] py-[10rpx] text-center transition-colors',
+        !value ? 'bg-[#64748B]' : 'bg-transparent',
+      )}
+      onClick={() => onChange(false)}
+    >
+      <Text
+        className={cn('text-[24rpx] font-medium', !value ? 'text-white' : 'text-muted-foreground')}
+      >
+        否
+      </Text>
+    </View>
+  </View>
+);
 
 /* ======================== 工具函数 ======================== */
 
@@ -142,6 +210,7 @@ const ScheduleForm: React.FC = () => {
   const fetchStudentsByTeacher = useStudentStore((s) => s.fetchByTeacher);
   const invalidateStudents = useStudentStore((s) => s.invalidate);
   const fetchClassesByTeacher = useClassStore((s) => s.fetchByTeacher);
+  const invalidateClasses = useClassStore((s) => s.invalidate);
   const { currentCampusId } = useCampusStore();
 
   /* ---- 路由参数 ---- */
@@ -174,17 +243,55 @@ const ScheduleForm: React.FC = () => {
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
 
-  /* 表单字段 —— 对齐参考图 */
+  /* 表单字段 —— 对齐班课定稿 */
   const [classId, setClassId] = useState('');
   const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [selectedDays] = useState<DayOfWeek[]>([1]); // 多选
-  const [timeSlots, setTimeSlots] = useState<TimeSlotPair[]>([
-    { id: 1, start: '09:00', end: '10:00' },
-  ]);
+  const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>([1]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlotPair[]>([]);
+  const [schedulingMode, setSchedulingMode] = useState<SchedulingMode>('rule');
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('weekly');
+  const [endMode, setEndMode] = useState<EndMode>('never');
+  const [endDate, setEndDate] = useState(dayjs().add(1, 'month').format('YYYY-MM-DD'));
+  const [endCount, setEndCount] = useState(10);
+  /** 节假日是否排课：是=true，否=false（默认否） */
+  const [scheduleOnHoliday, setScheduleOnHoliday] = useState(false);
+  const [freeDates, setFreeDates] = useState<string[]>([]);
+  const [endDateCalendarVisible, setEndDateCalendarVisible] = useState(false);
+  /** 自由排课：课表同款月历多选 */
+  const [freeCalendarVisible, setFreeCalendarVisible] = useState(false);
+  const [roomPickerVisible, setRoomPickerVisible] = useState(false);
+  const [scrollTop, setScrollTop] = useState(0);
+  const savedScrollTopRef = useRef(0);
+  const autoOpenedClassPickerRef = useRef(false);
+  const [endModePickerVisible, setEndModePickerVisible] = useState(false);
+  const [conflictDialogVisible, setConflictDialogVisible] = useState(false);
+  const [conflictResult, setConflictResult] = useState<ScheduleConflictResult | null>(null);
+  const ignoreConflictRef = useRef(false);
+  const [teacherPickerVisible, setTeacherPickerVisible] = useState(false);
+  const [assistantPickerVisible, setAssistantPickerVisible] = useState(false);
+  const [levelPickerVisible, setLevelPickerVisible] = useState(false);
+  const [courseLevel, setCourseLevel] = useState<ClassLevel>('all');
+  /**
+   * 团课预约设置（与时段配置同步，落库在班级）
+   * - autoOpenType：自动开班条件
+   * - slotMaxCount：每时段可约人数（同步 class.student_count 作为默认容量）
+   * - minOpenCount：最少开班人数
+   */
+  const [autoOpenType, setAutoOpenType] = useState<AutoOpenType>('full');
+  const [slotMaxCount, setSlotMaxCount] = useState(6);
+  const [minOpenCount, setMinOpenCount] = useState(5);
+  /** 上课时间：空态点加号 → 选开始 → 选结束 */
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [timePickerTitle, setTimePickerTitle] = useState('选择开始时间');
+  const [timePickerValue, setTimePickerValue] = useState('09:00');
+  const [timePickerPhase, setTimePickerPhase] = useState<'start' | 'end'>('start');
+  const [draftStartTime, setDraftStartTime] = useState('09:00');
+  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
+  const chainingTimePickerRef = useRef(false);
 
   /* 原有字段（保留兼容） */
   const [campusId, setCampusId] = useState('');
-  const [, setRooms] = useState<Room[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [room, setRoom] = useState('');
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [mode, setMode] = useState<'student' | 'class'>('class');
@@ -213,8 +320,6 @@ const ScheduleForm: React.FC = () => {
   /** 弹窗选择器可见性（统一使用 PickerSheet 标准组件） */
   const [typePickerVisible, setTypePickerVisible] = useState(false);
   const [classPickerVisible, setClassPickerVisible] = useState(false);
-  const [teacherPickerVisible, setTeacherPickerVisible] = useState(false);
-  const [assistantPickerVisible, setAssistantPickerVisible] = useState(false);
   /** 是否团课模式 */
   const isGroupMode = scheduleType === 'group';
 
@@ -289,10 +394,37 @@ const ScheduleForm: React.FC = () => {
         );
         setStartTime(sch.start_time);
         setEndTime(sch.end_time);
+        setTimeSlots([{ id: 1, start: sch.start_time, end: sch.end_time }]);
+        setSelectedDays([sch.day_of_week]);
+        setStartDate(srcDate.format('YYYY-MM-DD'));
         setSelectedTeachingTeacherId(sch.teacher_id || currentUserId);
         setSelectedAssistantTeacherId(sch.assistant_teacher_id || '');
         setColor(sch.color || 'primary');
-        setNote(sch.note || '');
+        const rawNote = sch.note || '';
+        if (/类型:团课/.test(rawNote) || sourceMode === 'group') {
+          setScheduleType('group');
+        }
+        // 预约设置优先从班级回填（见下方 selectedClass effect）；note 仅作兼容兜底
+        const noteAuto = rawNote.match(/自动开班:(manual|full|time|full_or_time)/);
+        if (noteAuto?.[1]) setAutoOpenType(noteAuto[1] as AutoOpenType);
+        const noteMax = rawNote.match(/每时段可约:(\d+)/);
+        if (noteMax?.[1]) setSlotMaxCount(Math.max(1, Number(noteMax[1]) || 6));
+        const noteMin =
+          rawNote.match(/最少开班:(\d+)/) || rawNote.match(/满人开课人数:(\d+)/);
+        if (noteMin?.[1]) setMinOpenCount(Math.max(1, Number(noteMin[1]) || 5));
+        // 备注只回填用户原文，去掉系统拼接的元数据行
+        setNote(
+          rawNote
+            .split('\n')
+            .filter(
+              (line) =>
+                !/(规则:|节假日排课:|消耗课时:|类型:|满人开课|自动开班:|每时段可约:|最少开班:)/.test(
+                  line,
+                ) && !/^日期:\d{4}-\d{2}-\d{2}$/.test(line.trim()),
+            )
+            .join('\n')
+            .trim(),
+        );
         setReminderMinutes(sch.reminder_minutes || 0);
         const cCampusId = sch.class_id
           ? clsList.find((c) => c.id === sch.class_id)?.campus_id
@@ -302,7 +434,7 @@ const ScheduleForm: React.FC = () => {
       } else {
         setOriginalSchedule(null);
         if (stuList.length > 0) setStudentId(stuList[0].id);
-        // 课程名称不默认选中，由用户主动选择
+        // 班级名称不默认选中；进页后自动弹出选择班级（见下方 effect）
         if (!USE_MOCK) setMode('class');
         setSelectedDateValue(dayjs().format('YYYY-MM-DD'));
         setStartDate(dayjs().format('YYYY-MM-DD'));
@@ -315,23 +447,56 @@ const ScheduleForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, currentCampusId, isEdit, isRescheduleMode, lessonDateParam, scheduleId]);
+  }, [currentUserId, currentCampusId, isEdit, isRescheduleMode, lessonDateParam, scheduleId, sourceMode]);
 
   useEffect(() => {
     void loadFormData();
   }, [loadFormData]);
 
-  /* 校区 → 教室联动 */
   useEffect(() => {
-    if (!campusId) {
+    const title = isRescheduleMode ? '班级调课' : isEdit ? '编辑排课' : '新增排课';
+    void Taro.setNavigationBarTitle({ title });
+  }, [isEdit, isRescheduleMode]);
+
+  /* 新增排课：进页默认弹出选择班级，缩短操作路径 */
+  useEffect(() => {
+    if (loading || isEdit || isRescheduleMode) return;
+    if (autoOpenedClassPickerRef.current) return;
+    if (classId || classes.length === 0) return;
+    autoOpenedClassPickerRef.current = true;
+    setClassPickerVisible(true);
+  }, [loading, isEdit, isRescheduleMode, classId, classes.length]);
+
+  /* 校区 → 教室联动：进入机构页必有当前校区，教室只跟当前校区 */
+  useEffect(() => {
+    const effectiveCampusId = currentCampusId || campusId;
+    if (!effectiveCampusId) {
       setRooms([]);
       return;
     }
+    if (effectiveCampusId !== campusId) {
+      setCampusId(effectiveCampusId);
+    }
     roomService
-      .getList({ campusId })
+      .getList({ campusId: effectiveCampusId })
       .then(setRooms)
       .catch(() => setRooms([]));
-  }, [campusId]);
+  }, [campusId, currentCampusId]);
+
+  /* 隔天：仅允许一组上课时间 */
+  useEffect(() => {
+    if (schedulingMode === 'rule' && repeatMode === 'alternate' && timeSlots.length > 1) {
+      setTimeSlots((prev) => prev.slice(0, 1));
+    }
+  }, [repeatMode, schedulingMode, timeSlots.length]);
+
+  /* 同步首组时间到兼容字段（保存/冲突检测仍用） */
+  useEffect(() => {
+    const first = timeSlots[0];
+    if (!first) return;
+    setStartTime(first.start);
+    setEndTime(first.end);
+  }, [timeSlots]);
 
   /* ---- 计算属性 ---- */
   const selectedClass = useMemo(
@@ -339,7 +504,45 @@ const ScheduleForm: React.FC = () => {
     [classId, classes],
   );
 
-  /* 班级切换 → 同步校区 */
+  const classLevelLabel = useMemo(
+    () => CLASS_LEVEL_LABELS[courseLevel] || '所有人',
+    [courseLevel],
+  );
+
+  /* 班级切换 → 同步难度 */
+  useEffect(() => {
+    if (selectedClass?.level) {
+      setCourseLevel(selectedClass.level);
+    }
+  }, [selectedClass?.id, selectedClass?.level]);
+
+  /* 团课：班级切换 → 同步预约设置（与时段配置同一数据源） */
+  useEffect(() => {
+    if (!isGroupMode || !selectedClass) return;
+    setAutoOpenType(selectedClass.auto_open_type || 'full');
+    const max =
+      selectedClass.student_count > 0 ? selectedClass.student_count : 6;
+    setSlotMaxCount(max);
+    setMinOpenCount(
+      selectedClass.min_open_count || selectedClass.student_count || 5,
+    );
+  }, [isGroupMode, selectedClass?.id, selectedClass?.auto_open_type, selectedClass?.min_open_count, selectedClass?.student_count]);
+
+  const selectedRoomName = useMemo(
+    () => rooms.find((r) => r.id === room || r.name === room)?.name || room || '',
+    [room, rooms],
+  );
+
+  const timeDisplayDateLabel = useMemo(() => {
+    const raw =
+      schedulingMode === 'free' && freeDates.length > 0 ? freeDates[0] : startDate;
+    if (!raw || !dayjs(raw).isValid()) return '请选择日期';
+    const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+    const d = dayjs(raw);
+    return `${d.format('YYYY-MM-DD')} 星期${WEEK[d.day()]}`;
+  }, [freeDates, schedulingMode, startDate]);
+
+  /* 班级切换 → 同步校区（班级校区优先，但仍落在当前机构上下文） */
   useEffect(() => {
     if (mode !== 'class') return;
     const cc = selectedClass?.campus_id;
@@ -393,9 +596,8 @@ const ScheduleForm: React.FC = () => {
     campusOptions,
   ]);
 
-  /* 是否已有真实时间组（非默认占位 09:00-10:00） */
-  const hasRealTimeSlots =
-    timeSlots.length > 0 && timeSlots.some((ts) => ts.start !== '09:00' || ts.end !== '10:00');
+  /* 是否已添加上课时间 */
+  const hasRealTimeSlots = timeSlots.length > 0;
 
   const sourceLessonDateText = useMemo(() => {
     if (lessonDateParam && dayjs(lessonDateParam).isValid())
@@ -405,10 +607,38 @@ const ScheduleForm: React.FC = () => {
       : '';
   }, [lessonDateParam, originalSchedule]);
 
+  const scheduledClassIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of allSchedules) {
+      if (s.class_id) ids.add(s.class_id);
+    }
+    return ids;
+  }, [allSchedules]);
+
   const scheduleWeekdaySet = useMemo(
     () => new Set(allSchedules.map((s) => s.day_of_week)),
     [allSchedules],
   );
+
+  const restoreScrollAfterSheet = useCallback(() => {
+    const y = savedScrollTopRef.current;
+    // 微小偏移强制 ScrollView 应用 scrollTop，防止 BottomSheet 关闭后回顶
+    setTimeout(() => {
+      setScrollTop(y + 0.01);
+    }, 80);
+    setTimeout(() => {
+      setScrollTop(y);
+    }, 160);
+  }, []);
+
+  const openFreeCalendar = useCallback(() => {
+    setFreeCalendarVisible(true);
+  }, []);
+
+  const closeFreeCalendar = useCallback(() => {
+    setFreeCalendarVisible(false);
+    restoreScrollAfterSheet();
+  }, [restoreScrollAfterSheet]);
   const getDateDotType = useCallback(
     (date: dayjs.Dayjs): CalendarDotType => {
       const wd = (date.day() || 7) as Schedule['day_of_week'];
@@ -475,20 +705,124 @@ const ScheduleForm: React.FC = () => {
 
   /* ---- 操作方法 ---- */
 
-  /** 添加一组时间 */
-  const addTimeSlot = useCallback(() => {
-    setTimeSlots((prev) => [...prev, { id: Date.now(), start: '10:00', end: '11:00' }]);
-  }, []);
+  const allowMultiTimeSlots = !(schedulingMode === 'rule' && repeatMode === 'alternate');
 
-  /** 删除一组时间 */
+  /** 打开时间选择：空态新增 或 编辑已有时段 */
+  const openTimePickerFlow = useCallback(
+    (slotId?: number) => {
+      if (slotId == null && !allowMultiTimeSlots && timeSlots.length >= 1) {
+        Taro.showToast({ title: '隔天排课仅支持一组时间', icon: 'none' });
+        return;
+      }
+      setEditingSlotId(slotId ?? null);
+      setTimePickerPhase('start');
+      setTimePickerTitle('选择开始时间');
+      const existing = slotId != null ? timeSlots.find((t) => t.id === slotId) : null;
+      const start = existing?.start || '09:00';
+      setDraftStartTime(start);
+      setTimePickerValue(start);
+      setTimePickerVisible(true);
+    },
+    [allowMultiTimeSlots, timeSlots],
+  );
+
+  const handleTimePickerConfirm = useCallback(
+    (time: string) => {
+      if (timePickerPhase === 'start') {
+        setDraftStartTime(time);
+        setTimePickerPhase('end');
+        setTimePickerTitle('选择结束时间');
+        const existing =
+          editingSlotId != null ? timeSlots.find((t) => t.id === editingSlotId) : null;
+        const defaultEnd =
+          existing?.end && existing.end > time
+            ? existing.end
+            : formatMinutesToTime(parseTimeToMinutes(time) + 60);
+        setTimePickerValue(defaultEnd);
+        chainingTimePickerRef.current = true;
+        // TimePickerSheet 确认后会 onClose，下一帧再打开结束时间选择
+        setTimeout(() => {
+          setTimePickerVisible(true);
+          chainingTimePickerRef.current = false;
+        }, 80);
+        return;
+      }
+
+      if (time <= draftStartTime) {
+        Taro.showToast({ title: '结束时间需晚于开始时间', icon: 'none' });
+        chainingTimePickerRef.current = true;
+        setTimeout(() => {
+          setTimePickerVisible(true);
+          chainingTimePickerRef.current = false;
+        }, 80);
+        return;
+      }
+
+      if (editingSlotId != null) {
+        setTimeSlots((prev) =>
+          prev.map((ts) =>
+            ts.id === editingSlotId ? { ...ts, start: draftStartTime, end: time } : ts,
+          ),
+        );
+      } else {
+        setTimeSlots((prev) => [
+          ...prev,
+          { id: Date.now(), start: draftStartTime, end: time },
+        ]);
+      }
+      setEditingSlotId(null);
+      setTimePickerPhase('start');
+      // 仅恢复原滚动位置，不主动滚到时间区（避免弹窗关闭后滚动条跳动）
+      restoreScrollAfterSheet();
+    },
+    [draftStartTime, editingSlotId, restoreScrollAfterSheet, timePickerPhase, timeSlots],
+  );
+
+  /** 删除一组时间（删光后回到中间加号空态） */
   const removeTimeSlot = useCallback((id: number) => {
-    setTimeSlots((prev) => (prev.length > 1 ? prev.filter((ts) => ts.id !== id) : prev));
+    setTimeSlots((prev) => prev.filter((ts) => ts.id !== id));
   }, []);
 
-  /** 更新某组时间的起/止 */
-  const updateTimeSlot = useCallback((id: number, field: 'start' | 'end', val: string) => {
-    setTimeSlots((prev) => prev.map((ts) => (ts.id === id ? { ...ts, [field]: val } : ts)));
+  const handleTeacherConfirm = useCallback((v: string) => {
+    setSelectedTeachingTeacherId(v);
+    setTeacherPickerVisible(false);
   }, []);
+
+  const handleAssistantConfirm = useCallback((v: string) => {
+    setSelectedAssistantTeacherId(v);
+    setAssistantPickerVisible(false);
+  }, []);
+
+  const toggleWeekday = useCallback((day: DayOfWeek) => {
+    setSelectedDays((prev) => {
+      if (prev.includes(day)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((d) => d !== day).sort((a, b) => a - b) as DayOfWeek[];
+      }
+      return [...prev, day].sort((a, b) => a - b) as DayOfWeek[];
+    });
+  }, []);
+
+  const openHolidaySettings = useCallback(() => {
+    const cid = currentCampusId || campusId;
+    Taro.navigateTo({
+      url: `/package-settings/pages/campus-settings/holidays${
+        cid ? `?campusId=${encodeURIComponent(cid)}` : ''
+      }`,
+    });
+  }, [campusId, currentCampusId]);
+
+  const removeFreeDate = useCallback((date: string) => {
+    setFreeDates((prev) => prev.filter((d) => d !== date));
+  }, []);
+
+  const handleFreeDatesConfirm = useCallback(
+    (dates: string[]) => {
+      setFreeDates(dates);
+      restoreScrollAfterSheet();
+    },
+    [restoreScrollAfterSheet],
+  );
 
   /* ---- 课程信息编辑同步 ---- */
 
@@ -540,29 +874,59 @@ const ScheduleForm: React.FC = () => {
   );
 
   /** 调整授课老师 */
-  const handleTeacherConfirm = useCallback((v: string) => {
-    setSelectedTeachingTeacherId(v);
-    setTeacherPickerVisible(false);
-  }, []);
-
-  /** 调整助教 */
-  const handleAssistantConfirm = useCallback((v: string) => {
-    setSelectedAssistantTeacherId(v);
-    setAssistantPickerVisible(false);
-  }, []);
+  /* 班级带出老师/助教只读，不再提供选择器 */
 
   /* ---- 提交校验 ---- */
   const submitBlockedReason = useMemo(() => {
     if (!currentUserId) return '未获取到登录信息';
     if (mode === 'student' && !USE_MOCK) return '真实联调仅支持班级排课';
     if (mode === 'class' && !classId) return '请选择班级';
-    if (!startDate) return '请选择开始日期';
-    if (selectedDays.length === 0) return '请至少选择一个上课周几';
+    if (!selectedTeachingTeacherId) return '请选择主讲老师';
+    if (isGroupMode) {
+      if (!Number.isFinite(slotMaxCount) || slotMaxCount < 1) {
+        return '请设置每时段可约人数';
+      }
+      if (!Number.isFinite(minOpenCount) || minOpenCount < 1) {
+        return '请设置最少开班人数';
+      }
+      if (minOpenCount > slotMaxCount) {
+        return '最少开班人数不能大于每时段可约人数';
+      }
+    }
+    if (timeSlots.length === 0) return '请添加上课时间';
     if (timeSlots.some((ts) => !ts.start || !ts.end)) return '请填写完整的上课时间';
     if (timeSlots.some((ts) => ts.start >= ts.end)) return '结束时间需晚于开始时间';
-    if (!selectedTeachingTeacherId) return '请选择主讲老师';
+    if (schedulingMode === 'rule') {
+      if (!startDate) return '请选择开始日期';
+      if (repeatMode !== 'alternate' && selectedDays.length === 0) return '请至少选择一个上课周几';
+      if (repeatMode === 'alternate' && timeSlots.length !== 1) return '隔天排课仅支持一组时间';
+      if (endMode === 'by_date' && !endDate) return '请选择结束日期';
+      if (endMode === 'by_date' && dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
+        return '结束日期不能早于开始日期';
+      }
+      if (endMode === 'by_count' && endCount < 1) return '按次数至少为 1';
+    } else if (freeDates.length === 0) {
+      return '请选择上课日期';
+    }
     return '';
-  }, [classId, currentUserId, mode, selectedDays, selectedTeachingTeacherId, startDate, timeSlots]);
+  }, [
+    classId,
+    currentUserId,
+    endCount,
+    endDate,
+    endMode,
+    freeDates.length,
+    isGroupMode,
+    minOpenCount,
+    mode,
+    repeatMode,
+    schedulingMode,
+    selectedDays.length,
+    selectedTeachingTeacherId,
+    slotMaxCount,
+    startDate,
+    timeSlots,
+  ]);
 
   const canSubmit = useMemo(
     () => !loading && !loadError && !notFound && !submitBlockedReason,
@@ -662,24 +1026,32 @@ const ScheduleForm: React.FC = () => {
               `${selectedClass?.name || '班级课程'} 已由 ${ot} 调整为 ${nt}，仅本次生效。`,
             );
         }
-        Taro.showToast({ title: '调课成功', icon: 'success' });
         try {
-          Taro.hideToast();
-          await subscribeMessageService.runFlow('E07', {
+          Taro.setStorageSync('yunce:schedule:refresh', String(Date.now()));
+        } catch (err) {
+          logError('emit schedule refresh signal', err);
+        }
+        Taro.showToast({ title: '调课成功', icon: 'success', duration: 800 });
+        void subscribeMessageService
+          .runFlow('E07', {
             className: selectedClass?.name || '',
             role: profile?.currentContext?.role,
             campusId: profile?.currentContext?.campusId,
-          });
-        } catch (error) {
-          logError('subscribe E07 after reschedule', error);
-        }
+          })
+          .catch((error) => logError('subscribe E07 after reschedule', error));
         void calendarSyncService.syncAfterScheduleChange({
           userId: currentUserId,
           teacherId: currentUserId,
           campusId: profile?.currentContext?.campusId,
           role: profile?.currentContext?.role,
         });
-        setTimeout(() => Taro.navigateBack(), 1200);
+        setTimeout(() => {
+          Taro.navigateBack({
+            fail: () => {
+              void Taro.switchTab({ url: '/pages/schedule/index' });
+            },
+          });
+        }, 500);
       } catch {
         Taro.showToast({ title: '调课失败', icon: 'none' });
       } finally {
@@ -689,94 +1061,295 @@ const ScheduleForm: React.FC = () => {
     }
 
     /* 创建/编辑排课 */
-    const targetDow = (dayjs(selectedDateValue).day() || 7) as DayOfWeek;
-    const hasConflict = await scheduleService.checkConflict(
-      currentUserId,
-      targetDow,
-      startTime,
-      endTime,
-      isEdit ? scheduleId : undefined,
-    );
+    const buildRuleNote = () => {
+      const userNote = note.trim();
+      const needFull =
+        autoOpenType === 'full' || autoOpenType === 'full_or_time';
+      const meta = [
+        isGroupMode ? '类型:团课' : '类型:班课',
+        isGroupMode
+          ? [
+              `自动开班:${autoOpenType}`,
+              `每时段可约:${slotMaxCount}`,
+              `最少开班:${Math.max(1, minOpenCount)}`,
+              needFull
+                ? `满人开课:是 | 满人开课人数:${Math.max(1, minOpenCount)}`
+                : '满人开课:否',
+            ].join(' | ')
+          : null,
+        schedulingMode === 'rule' ? `规则:${repeatMode}` : null,
+        schedulingMode === 'rule' ? `开始:${startDate}` : null,
+        schedulingMode === 'rule' && endMode === 'by_date' ? `结束日期:${endDate}` : null,
+        schedulingMode === 'rule' && endMode === 'by_count' ? `次数:${endCount}` : null,
+        schedulingMode === 'rule' && endMode === 'never' ? '结束:不结束' : null,
+        schedulingMode === 'rule' ? `节假日排课:${scheduleOnHoliday ? '是' : '否'}` : null,
+        `消耗课时:${consumedHours}`,
+      ]
+        .filter(Boolean)
+        .join(' | ');
+      return userNote ? `${userNote}\n${meta}` : meta;
+    };
+
+    const targets: { dayOfWeek: DayOfWeek; start: string; end: string; dateHint?: string }[] =
+      [];
+    if (schedulingMode === 'rule') {
+      const days =
+        repeatMode === 'alternate'
+          ? [((dayjs(startDate).day() || 7) as DayOfWeek)]
+          : selectedDays;
+      for (const dow of days) {
+        for (const ts of timeSlots) {
+          targets.push({ dayOfWeek: dow, start: ts.start, end: ts.end });
+        }
+      }
+    } else {
+      for (const d of freeDates) {
+        const dow = (dayjs(d).day() || 7) as DayOfWeek;
+        for (const ts of timeSlots) {
+          targets.push({ dayOfWeek: dow, start: ts.start, end: ts.end, dateHint: d });
+        }
+      }
+    }
+
+    if (targets.length === 0) {
+      Taro.showToast({ title: '请完善排课时间', icon: 'none' });
+      return;
+    }
+
+    const roomName = rooms.find((r) => r.id === room)?.name || room || undefined;
+    const teacherIdForCheck = selectedTeachingTeacherId || currentUserId;
+
+    if (!ignoreConflictRef.current) {
+      const merged: ScheduleConflictResult = {
+        hasConflict: false,
+        conflictSummary: '',
+        conflicts: [],
+      };
+      const seen = new Set<string>();
+      for (const t of targets) {
+        const result = await scheduleService.checkConflict({
+          teacherId: teacherIdForCheck,
+          dayOfWeek: t.dayOfWeek,
+          startTime: t.start,
+          endTime: t.end,
+          classId: mode === 'class' ? classId : undefined,
+          room: roomName,
+          excludeId: isEdit ? scheduleId : undefined,
+          dateHint:
+            t.dateHint ||
+            (schedulingMode === 'rule' ? startDate : undefined),
+        });
+        if (!result.hasConflict) continue;
+        merged.hasConflict = true;
+        for (const c of result.conflicts) {
+          if (seen.has(c.id)) continue;
+          seen.add(c.id);
+          merged.conflicts.push(c);
+        }
+        if (!merged.conflictSummary && result.conflictSummary) {
+          merged.conflictSummary = result.conflictSummary;
+        }
+      }
+      if (merged.hasConflict) {
+        const typeSet = new Set(merged.conflicts.flatMap((c) => c.conflictTypes));
+        const labelMap = {
+          time: '时间冲突',
+          teacher: '老师冲突',
+          room: '教室冲突',
+          class: '班级冲突',
+        } as const;
+        merged.conflictSummary = (['time', 'teacher', 'room', 'class'] as const)
+          .filter((k) => typeSet.has(k))
+          .map((k) => labelMap[k])
+          .join('、');
+        setConflictResult(merged);
+        setConflictDialogVisible(true);
+        return;
+      }
+    }
+
+    const primary = targets[0];
+    const emitScheduleRefresh = () => {
+      try {
+        Taro.setStorageSync('yunce:schedule:refresh', String(Date.now()));
+      } catch (err) {
+        logError('emit schedule refresh signal', err);
+      }
+    };
+    const goBackToSchedule = () => {
+      Taro.navigateBack({
+        fail: () => {
+          void Taro.switchTab({ url: '/pages/schedule/index' });
+        },
+      });
+    };
+
     const doSave = async () => {
       setSaving(true);
       try {
-        const data: Partial<Schedule> = {
-          teacher_id: selectedTeachingTeacherId || currentUserId,
-          assistant_teacher_id: selectedAssistantTeacherId || undefined,
-          student_id: mode === 'student' ? studentId : undefined,
-          class_id: mode === 'class' ? classId : undefined,
-          day_of_week: targetDow,
-          start_time: startTime,
-          end_time: endTime,
-          room: room || undefined,
-          color,
-          note: note.trim() || undefined,
-          reminder_minutes: reminderMinutes,
-        };
-        if (isEdit) {
-          await scheduleService.update(scheduleId, data);
-          Taro.showToast({ title: '更新成功', icon: 'success' });
-        } else {
-          await scheduleService.create(data as Omit<Schedule, 'id' | 'created_at' | 'updated_at'>);
-          Taro.showToast({ title: '添加成功', icon: 'success' });
+        // 团课：预约设置写回班级，与时段配置同源
+        if (isGroupMode && mode === 'class' && classId) {
+          await classService.update(classId, {
+            auto_open_type: autoOpenType,
+            min_open_count: Math.max(1, minOpenCount),
+            student_count: Math.max(1, slotMaxCount),
+          });
+          if (currentUserId) {
+            invalidateClasses(currentUserId, currentCampusId || undefined);
+          }
+          setClasses((prev) =>
+            prev.map((c) =>
+              c.id === classId
+                ? {
+                    ...c,
+                    auto_open_type: autoOpenType,
+                    min_open_count: Math.max(1, minOpenCount),
+                    student_count: Math.max(1, slotMaxCount),
+                  }
+                : c,
+            ),
+          );
         }
-        try {
-          Taro.hideToast();
-          await subscribeMessageService.runFlow('E07', {
+
+        const baseNote = buildRuleNote();
+        const ignoreConflict = ignoreConflictRef.current;
+        const ruleStartDate = schedulingMode === 'rule' ? startDate : undefined;
+        const ruleEndDate =
+          schedulingMode === 'rule' && endMode === 'by_date' ? endDate : undefined;
+        if (isEdit) {
+          const data: Partial<Schedule> & {
+            ignoreConflict?: boolean;
+            start_date?: string;
+            end_date?: string;
+          } = {
+            teacher_id: selectedTeachingTeacherId || currentUserId,
+            assistant_teacher_id: selectedAssistantTeacherId || undefined,
+            student_id: mode === 'student' ? studentId : undefined,
+            class_id: mode === 'class' ? classId : undefined,
+            day_of_week: primary.dayOfWeek,
+            start_time: primary.start,
+            end_time: primary.end,
+            room: roomName,
+            color,
+            note: baseNote,
+            reminder_minutes: reminderMinutes,
+            ignoreConflict,
+            start_date: ruleStartDate || primary.dateHint,
+            end_date: ruleEndDate,
+          };
+          await scheduleService.update(scheduleId, data);
+        } else {
+          for (const t of targets) {
+            const dateLine = t.dateHint ? `日期:${t.dateHint}` : '';
+            const data: Omit<Schedule, 'id' | 'created_at' | 'updated_at'> & {
+              ignoreConflict?: boolean;
+              start_date?: string;
+              end_date?: string;
+            } = {
+              teacher_id: selectedTeachingTeacherId || currentUserId,
+              assistant_teacher_id: selectedAssistantTeacherId || undefined,
+              student_id: mode === 'student' ? studentId : undefined,
+              class_id: mode === 'class' ? classId : undefined,
+              day_of_week: t.dayOfWeek,
+              start_time: t.start,
+              end_time: t.end,
+              room: roomName,
+              color,
+              note: [baseNote, dateLine].filter(Boolean).join('\n') || undefined,
+              reminder_minutes: reminderMinutes,
+              ignoreConflict,
+              start_date: t.dateHint || ruleStartDate,
+              end_date: ruleEndDate,
+            };
+            await scheduleService.create(data);
+          }
+        }
+        ignoreConflictRef.current = false;
+        emitScheduleRefresh();
+        Taro.showToast({
+          title: isEdit
+            ? '保存成功'
+            : targets.length > 1
+              ? `已添加 ${targets.length} 条排课`
+              : '保存成功',
+          icon: 'success',
+          duration: 800,
+        });
+        // 订阅/日历同步不阻断返回课表
+        void subscribeMessageService
+          .runFlow('E07', {
             className: selectedClass?.name || '',
             role: profile?.currentContext?.role,
             campusId: profile?.currentContext?.campusId,
-          });
-        } catch (error) {
-          logError('subscribe E07 after schedule save', error);
-        }
+          })
+          .catch((error) => logError('subscribe E07 after schedule save', error));
         void calendarSyncService.syncAfterScheduleChange({
           userId: currentUserId,
           teacherId: currentUserId,
           campusId: profile?.currentContext?.campusId,
           role: profile?.currentContext?.role,
         });
-        setTimeout(() => Taro.navigateBack(), 1200);
-      } catch {
-        Taro.showToast({ title: '保存失败', icon: 'none' });
+        setTimeout(goBackToSchedule, 500);
+      } catch (err) {
+        logError('schedule-form save', err);
+        const message = err instanceof Error ? err.message : '';
+        if (message.includes('冲突') || message.includes('409')) {
+          Taro.showToast({ title: '存在排课冲突，请返回修改或忽略后重试', icon: 'none' });
+        } else {
+          Taro.showToast({
+            title: message && message.length < 40 ? message : '保存失败，请稍后重试',
+            icon: 'none',
+          });
+        }
       } finally {
         setSaving(false);
       }
     };
-    if (hasConflict) {
-      const { confirm } = await Taro.showModal({
-        title: '时间冲突',
-        content: '该时间段已有课程安排，是否继续保存？',
-      });
-      if (!confirm) return;
-    }
     await doSave();
   }, [
     allSchedules,
     classId,
     color,
+    consumedHours,
     currentUserId,
-    endTime,
+    endCount,
+    endDate,
+    endMode,
+    freeDates,
     handleNotifyStudentAndParents,
     isEdit,
+    isGroupMode,
     isRescheduleMode,
+    minOpenCount,
+    autoOpenType,
+    slotMaxCount,
+    invalidateClasses,
+    currentCampusId,
     mode,
     note,
     originalSchedule,
     profile?.currentContext?.campusId,
     profile?.currentContext?.role,
     reminderMinutes,
+    repeatMode,
     room,
+    rooms,
     saving,
     scheduleId,
+    scheduleOnHoliday,
+    schedulingMode,
     selectedAssistantTeacherId,
     selectedClass?.name,
     selectedDateValue,
+    selectedDays,
     selectedTeachingTeacherId,
+    startDate,
     startTime,
+    endTime,
     studentId,
     submitBlockedReason,
     sourceLessonDateText,
+    timeSlots,
   ]);
 
   /* ---- 渲染：加载态 ---- */
@@ -816,207 +1389,565 @@ const ScheduleForm: React.FC = () => {
     );
 
   /* ======================== 主渲染 ======================== */
+  const renderTimeSlotsBlock = (title = '上课时间') => (
+    <View
+      id="schedule-time-block"
+      className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[28rpx]"
+    >
+      <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">{title}</Text>
+      {hasRealTimeSlots ? (
+        <>
+          <View className="overflow-hidden rounded-[16rpx] bg-muted/70">
+            <View
+              className="flex items-center justify-between border-b border-border/50 px-[24rpx] py-[22rpx]"
+              onClick={() => {
+                if (schedulingMode === 'free') {
+                  openFreeCalendar();
+                } else {
+                  setCalendarVisible(true);
+                }
+              }}
+            >
+              <View className="flex items-center gap-[12rpx]">
+                <Icon name="mdi-calendar" size={28} color="mutedForeground" />
+                <Text className="text-[28rpx] text-foreground">日期</Text>
+              </View>
+              <View className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]">
+                <Text className="text-[26rpx] text-foreground">{timeDisplayDateLabel}</Text>
+              </View>
+            </View>
+            {timeSlots.map((ts, index) => (
+              <View
+                key={ts.id}
+                className={cn(
+                  'flex items-center justify-between px-[24rpx] py-[22rpx]',
+                  index < timeSlots.length - 1 && 'border-b border-border/50',
+                )}
+              >
+                <View className="flex items-center gap-[12rpx]">
+                  <Icon name="mdi-clock-outline" size={28} color="mutedForeground" />
+                  <Text className="text-[28rpx] text-foreground">
+                    {timeSlots.length > 1 ? `时间${index + 1}` : '时间'}
+                  </Text>
+                </View>
+                  <View className="flex items-center gap-[12rpx]">
+                  <View
+                    className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]"
+                    onClick={() => openTimePickerFlow(ts.id)}
+                  >
+                    <Text className="text-[26rpx] text-foreground">
+                      {ts.start}-{ts.end}
+                    </Text>
+                  </View>
+                  {timeSlots.length > 1 ? (
+                    <View
+                      className="flex h-[44rpx] w-[44rpx] items-center justify-center rounded-full bg-error/10"
+                      onClick={() => removeTimeSlot(ts.id)}
+                    >
+                      <Icon name="mdi-close" size={20} color="error" />
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+          </View>
+          <Text className="mt-[16rpx] block text-[22rpx] text-muted-foreground">
+            点击上方日期或时间进行单独修改。
+          </Text>
+          {allowMultiTimeSlots ? (
+            <View
+              className="mt-[16rpx] flex items-center justify-center gap-[8rpx] py-[8rpx]"
+              onClick={() => openTimePickerFlow()}
+            >
+              <Icon name="mdi-plus" size={28} color="primary" />
+              <Text className="text-[26rpx] text-primary">添加时间段</Text>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <View
+          className="flex min-h-[260rpx] flex-col items-center justify-center rounded-[16rpx] border-[2rpx] border-dashed border-border bg-muted/60"
+          onClick={() => openTimePickerFlow()}
+        >
+          <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-[#FF8A2A] shadow-md">
+            <Icon name="mdi-plus" size={40} color="#ffffff" />
+          </View>
+          <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">添加上课时间</Text>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <PageContainer safeBottom className="bg-muted">
-      <ScrollView scrollY className="h-screen" enhanced showScrollbar={false}>
-        <View className="min-h-screen pb-[240rpx]">
-          {/* ===================== 统一排课表单（班课/团课共用） ===================== */}
-          {/* 设计要点：课程类型 → 课程名称 → 消耗课时(步进器) → 上课时间； */}
-          {/* 引用信息（老师/助教/时长/难度）选中课程后带出，折叠到上课时间下方展示 */}
-          <>
-            {/* 主表单 —— 单一大圆角白卡片 */}
-            <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card">
-              {/* 1. 课程类型（班课/团课） */}
-              <View className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60">
-                <Text className="text-[28rpx] text-foreground">课程类型</Text>
-                <View
-                  className="flex items-center gap-[8rpx]"
-                  onClick={() => setTypePickerVisible(true)}
-                >
-                  <Text className="text-[28rpx] text-foreground">
-                    {SCHEDULE_TYPE_OPTIONS[isGroupMode ? 1 : 0]}
-                  </Text>
-                  <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                </View>
-              </View>
-
-              {/* 2. 课程名称（选择对应课程，选中后带出老师/助教/时长/难度） */}
-              <View className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60">
-                <Text className="text-[28rpx] text-foreground">课程名称</Text>
-                <View
-                  className="flex items-center gap-[8rpx]"
-                  onClick={() => setClassPickerVisible(true)}
-                >
-                  <Text
-                    className={cn(
-                      'text-[28rpx]',
-                      selectedClass ? 'text-foreground' : 'text-muted-foreground',
-                    )}
-                  >
-                    {selectedClass?.name || '请选择'}
-                  </Text>
-                  <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                </View>
-              </View>
-
-              {/* 2.5 授课老师 / 助教（选中课程后显示，与课程信息同一卡片不分割） */}
-              {selectedClass && (
-                <>
-                  <View
-                    className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60"
-                    onClick={() => setTeacherPickerVisible(true)}
-                  >
-                    <Text className="text-[28rpx] text-foreground">授课老师</Text>
-                    <View className="flex items-center gap-[8rpx]">
-                      <Text
-                        className={cn(
-                          'text-[28rpx]',
-                          classInfoCard?.teacherName ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                      >
-                        {classInfoCard?.teacherName || '请选择'}
-                      </Text>
-                      <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                    </View>
-                  </View>
-                  <View
-                    className="flex items-center justify-between px-[32rpx] py-[32rpx] border-b border-border/60"
-                    onClick={() => setAssistantPickerVisible(true)}
-                  >
-                    <Text className="text-[28rpx] text-foreground">助教</Text>
-                    <View className="flex items-center gap-[8rpx]">
-                      <Text
-                        className={cn(
-                          'text-[28rpx]',
-                          classInfoCard?.assistantName
-                            ? 'text-foreground'
-                            : 'text-muted-foreground',
-                        )}
-                      >
-                        {classInfoCard?.assistantName || '未安排'}
-                      </Text>
-                      <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {/* 3. 消耗课时（加减步进器） */}
-              <View className="flex items-center justify-between px-[32rpx] py-[32rpx]">
-                <Text className="text-[28rpx] text-foreground">消耗课时</Text>
-                <Stepper
-                  value={consumedHours}
-                  min={0.5}
-                  max={99}
-                  step={0.5}
-                  onChange={setConsumedHours}
-                />
+      <ScrollView
+        scrollY
+        className="h-screen"
+        enhanced
+        showScrollbar={false}
+        scrollTop={scrollTop}
+        scrollWithAnimation={false}
+        onScroll={(e) => {
+          const top = e.detail?.scrollTop;
+          if (typeof top === 'number' && Number.isFinite(top)) {
+            savedScrollTopRef.current = top;
+          }
+        }}
+      >
+        <View className="min-h-screen pb-[200rpx]">
+          {/* 基础信息卡 */}
+          <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card">
+            <View className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]">
+              <Text className="text-[28rpx] text-foreground">课程类型</Text>
+              <View
+                className="flex items-center gap-[8rpx]"
+                onClick={() => setTypePickerVisible(true)}
+              >
+                <Text className="text-[28rpx] text-foreground">
+                  {SCHEDULE_TYPE_OPTIONS[isGroupMode ? 1 : 0]}
+                </Text>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
               </View>
             </View>
 
-            {/* 上课时间 —— 独立区域（虚线加号卡片） */}
-            <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[32rpx]">
-              <Text className="mb-[24rpx] block text-[28rpx] font-medium text-foreground">
-                上课时间
-              </Text>
+            <View className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]">
+              <Text className="text-[28rpx] text-foreground">班级名称</Text>
               <View
-                className="flex min-h-[260rpx] flex-col items-center justify-center rounded-[16rpx] border-[2rpx] border-dashed border-border bg-muted/60"
-                onClick={addTimeSlot}
+                className="flex items-center gap-[8rpx]"
+                onClick={() => setClassPickerVisible(true)}
               >
-                {hasRealTimeSlots ? (
-                  <View className="w-full px-[24rpx] pb-[20rpx]">
-                    {timeSlots.map((ts) => (
-                      <View
-                        key={ts.id}
-                        className="mb-[16rpx] flex items-center justify-between rounded-[12rpx] bg-card px-[24rpx] py-[18rpx] shadow-sm"
-                      >
-                        <View className="flex items-center gap-[16rpx]">
-                          <Picker
-                            mode="time"
-                            value={ts.start}
-                            onChange={(e) => updateTimeSlot(ts.id, 'start', e.detail.value)}
+                <Text
+                  className={cn(
+                    'text-[28rpx]',
+                    selectedClass ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  {selectedClass?.name || '请选择'}
+                </Text>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+              </View>
+            </View>
+
+            <View
+              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
+              onClick={() => setTeacherPickerVisible(true)}
+            >
+              <Text className="text-[28rpx] text-foreground">老师</Text>
+              <View className="flex items-center gap-[8rpx]">
+                <Text
+                  className={cn(
+                    'text-[28rpx]',
+                    selectedTeachingTeacherId ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  {teacherById[selectedTeachingTeacherId]?.name ||
+                    classInfoCard?.teacherName ||
+                    '请选择'}
+                </Text>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+              </View>
+            </View>
+            <View
+              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
+              onClick={() => setAssistantPickerVisible(true)}
+            >
+              <Text className="text-[28rpx] text-foreground">助教</Text>
+              <View className="flex items-center gap-[8rpx]">
+                <Text
+                  className={cn(
+                    'text-[28rpx]',
+                    selectedAssistantTeacherId ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  {teacherById[selectedAssistantTeacherId]?.name ||
+                    classInfoCard?.assistantName ||
+                    '请选择'}
+                </Text>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+              </View>
+            </View>
+            <View
+              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
+              onClick={() => setLevelPickerVisible(true)}
+            >
+              <Text className="text-[28rpx] text-foreground">课程难度</Text>
+              <View className="flex items-center gap-[8rpx]">
+                <View className="rounded-[8rpx] border border-primary px-[16rpx] py-[6rpx]">
+                  <Text className="text-[24rpx] text-primary">{classLevelLabel}</Text>
+                </View>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+              </View>
+            </View>
+
+            <View
+              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
+              onClick={() => setRoomPickerVisible(true)}
+            >
+              <Text className="text-[28rpx] text-foreground">上课教室</Text>
+              <View className="flex items-center gap-[8rpx]">
+                <Text
+                  className={cn(
+                    'text-[28rpx]',
+                    selectedRoomName ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                >
+                  {selectedRoomName || (rooms.length ? '请选择' : '当前校区暂无教室')}
+                </Text>
+                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+              </View>
+            </View>
+
+            <View
+              className={cn(
+                'flex items-center justify-between px-[32rpx] py-[24rpx]',
+                isGroupMode ? 'border-b border-border/60' : '',
+              )}
+            >
+              <Text className="text-[28rpx] text-foreground">消耗课时</Text>
+              <Stepper
+                value={consumedHours}
+                min={0.5}
+                max={99}
+                step={0.5}
+                onChange={setConsumedHours}
+              />
+            </View>
+
+            {isGroupMode ? (
+              <>
+                <View className="border-b border-border/60 px-[32rpx] py-[20rpx]">
+                  <Text className="block text-[28rpx] font-medium text-foreground">
+                    预约设置
+                  </Text>
+                  <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
+                    与时段配置同步，保存后两边一致
+                  </Text>
+                </View>
+                <View
+                  className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx] active:opacity-70"
+                  onClick={() => {
+                    void Taro.showActionSheet({
+                      itemList: AUTO_OPEN_OPTIONS.map((item) => item.label),
+                    })
+                      .then((result) => {
+                        const next = AUTO_OPEN_OPTIONS[result.tapIndex]?.key;
+                        if (next) setAutoOpenType(next);
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  <Text className="text-[28rpx] text-foreground">自动开班条件</Text>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[28rpx] text-muted-foreground">
+                      {AUTO_OPEN_OPTIONS.find((item) => item.key === autoOpenType)?.label}
+                    </Text>
+                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                  </View>
+                </View>
+                <View
+                  className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx] active:opacity-70"
+                  onClick={() => {
+                    void Taro.showActionSheet({
+                      itemList: [...SLOT_MAX_COUNT_OPTIONS],
+                    })
+                      .then((result) => {
+                        const num = Number(SLOT_MAX_COUNT_OPTIONS[result.tapIndex]);
+                        if (!Number.isFinite(num)) return;
+                        setSlotMaxCount(num);
+                        if (minOpenCount > num) setMinOpenCount(num);
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  <Text className="text-[28rpx] text-foreground">每时段可约人数</Text>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[28rpx] text-muted-foreground">{slotMaxCount} 人</Text>
+                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                  </View>
+                </View>
+                <View
+                  className="flex items-center justify-between px-[32rpx] py-[24rpx] active:opacity-70"
+                  onClick={() => {
+                    const options = Array.from({ length: slotMaxCount }, (_, i) =>
+                      String(i + 1),
+                    );
+                    void Taro.showActionSheet({ itemList: options })
+                      .then((result) => {
+                        const num = Number(options[result.tapIndex]);
+                        if (Number.isFinite(num) && num >= 1) setMinOpenCount(num);
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  <Text className="text-[28rpx] text-foreground">最少开班人数</Text>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[28rpx] text-muted-foreground">{minOpenCount} 人</Text>
+                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                  </View>
+                </View>
+              </>
+            ) : null}
+          </View>
+
+          {/* 排课规则卡 */}
+          <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[28rpx]">
+            <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">
+              排课规则
+            </Text>
+            <View className="flex gap-[16rpx]">
+              {(
+                [
+                  { label: '规则排课', value: 'rule' as const },
+                  { label: '自由排课', value: 'free' as const },
+                ] as const
+              ).map((opt) => {
+                const active = schedulingMode === opt.value;
+                return (
+                  <View
+                    key={opt.value}
+                    className={cn(
+                      'flex-1 rounded-[16rpx] py-[20rpx] text-center',
+                      active ? 'bg-primary' : 'bg-muted',
+                    )}
+                    onClick={() => setSchedulingMode(opt.value)}
+                  >
+                    <Text
+                      className={cn(
+                        'text-[28rpx] font-medium',
+                        active ? 'text-white' : 'text-foreground',
+                      )}
+                    >
+                      {opt.label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {schedulingMode === 'rule' ? (
+              <View className="mt-[8rpx]">
+                <View
+                  className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
+                  onClick={() => setCalendarVisible(true)}
+                >
+                  <Text className="text-[28rpx] text-foreground">开始日期</Text>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[28rpx] text-foreground">{startDate}</Text>
+                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                  </View>
+                </View>
+
+                <View className="border-b border-border/60 py-[24rpx]">
+                  <Text className="mb-[16rpx] block text-[28rpx] text-foreground">重复方式</Text>
+                  <View className="flex gap-[12rpx]">
+                    {REPEAT_OPTIONS.map((opt) => {
+                      const active = repeatMode === opt.value;
+                      return (
+                        <View
+                          key={opt.value}
+                          className={cn(
+                            'flex-1 rounded-full py-[14rpx] text-center',
+                            active ? 'bg-primary' : 'bg-muted',
+                          )}
+                          onClick={() => setRepeatMode(opt.value)}
+                        >
+                          <Text
+                            className={cn(
+                              'text-[26rpx]',
+                              active ? 'text-white' : 'text-foreground',
+                            )}
                           >
-                            <View className="rounded-[8rpx] bg-primary/10 px-[18rpx] py-[10rpx]">
-                              <Text className="text-[26rpx] font-semibold text-primary">
-                                {ts.start}
-                              </Text>
-                            </View>
-                          </Picker>
-                          <Text className="text-[24rpx] text-muted-foreground">~</Text>
-                          <Picker
-                            mode="time"
-                            value={ts.end}
-                            onChange={(e) => updateTimeSlot(ts.id, 'end', e.detail.value)}
-                          >
-                            <View className="rounded-[8rpx] bg-primary/10 px-[18rpx] py-[10rpx]">
-                              <Text className="text-[26rpx] font-semibold text-primary">
-                                {ts.end}
-                              </Text>
-                            </View>
-                          </Picker>
+                            {opt.label}
+                          </Text>
                         </View>
-                        {timeSlots.length > 1 && (
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {repeatMode !== 'alternate' ? (
+                  <View className="border-b border-border/60 py-[24rpx]">
+                    <Text className="mb-[16rpx] block text-[28rpx] text-foreground">上课周几</Text>
+                    <View className="flex flex-wrap gap-[12rpx]">
+                      {WEEKDAY_OPTIONS.map((opt) => {
+                        const active = selectedDays.includes(opt.value);
+                        return (
                           <View
-                            className="flex h-[44rpx] w-[44rpx] items-center justify-center rounded-full bg-error/10"
-                            onClick={() => removeTimeSlot(ts.id)}
+                            key={opt.value}
+                            className={cn(
+                              'h-[64rpx] w-[64rpx] rounded-full center flex items-center justify-center',
+                              active ? 'bg-primary' : 'bg-muted',
+                            )}
+                            onClick={() => toggleWeekday(opt.value)}
                           >
-                            <Icon name="mdi-close" size={20} color="error" />
+                            <Text
+                              className={cn(
+                                'text-[26rpx]',
+                                active ? 'text-white' : 'text-foreground',
+                              )}
+                            >
+                              {opt.label}
+                            </Text>
                           </View>
-                        )}
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
+
+                <View
+                  className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
+                  onClick={() => setEndModePickerVisible(true)}
+                >
+                  <Text className="text-[28rpx] text-foreground">结束方式</Text>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[28rpx] text-foreground">
+                      {END_MODE_OPTIONS.find((o) => o.value === endMode)?.label || '不结束'}
+                    </Text>
+                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                  </View>
+                </View>
+
+                {endMode === 'by_date' ? (
+                  <View
+                    className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
+                    onClick={() => setEndDateCalendarVisible(true)}
+                  >
+                    <Text className="text-[28rpx] text-foreground">结束日期</Text>
+                    <View className="flex items-center gap-[8rpx]">
+                      <Text className="text-[28rpx] text-foreground">{endDate}</Text>
+                      <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                    </View>
+                  </View>
+                ) : null}
+
+                {endMode === 'by_count' ? (
+                  <View className="flex items-center justify-between border-b border-border/60 py-[24rpx]">
+                    <Text className="text-[28rpx] text-foreground">上课次数</Text>
+                    <Stepper value={endCount} min={1} max={999} step={1} onChange={setEndCount} />
+                  </View>
+                ) : null}
+
+                <View className="flex items-center justify-between py-[24rpx]">
+                  <View className="flex items-center gap-[16rpx]">
+                    <Text className="text-[28rpx] text-foreground">节假日是否排课</Text>
+                    <Text className="text-[24rpx] text-primary" onClick={openHolidaySettings}>
+                      设置
+                    </Text>
+                  </View>
+                  <YesNoToggle value={scheduleOnHoliday} onChange={setScheduleOnHoliday} />
+                </View>
+              </View>
+            ) : (
+              <View id="schedule-free-dates" className="mt-[8rpx]">
+                <View
+                  className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
+                  onClick={openFreeCalendar}
+                >
+                  <Text className="text-[28rpx] text-foreground">上课日期</Text>
+                  <View className="flex items-center gap-[8rpx]">
+                    <Text className="text-[28rpx] text-primary">
+                      {freeDates.length > 0 ? `已选 ${freeDates.length} 天` : '多选日期'}
+                    </Text>
+                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
+                  </View>
+                </View>
+                {freeDates.length > 0 ? (
+                  <View className="flex flex-wrap gap-[12rpx] pt-[20rpx]">
+                    {freeDates.map((d) => (
+                      <View
+                        key={d}
+                        className="flex items-center gap-[8rpx] rounded-full bg-primary/10 px-[16rpx] py-[10rpx]"
+                        onClick={() => removeFreeDate(d)}
+                      >
+                        <Text className="text-[24rpx] text-primary">
+                          {dayjs(d).format('MM/DD')}
+                        </Text>
+                        <Icon name="mdi-close" size={18} color="primary" />
                       </View>
                     ))}
-                  </View>
-                ) : (
-                  <>
-                    <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-[#FF8A2A] shadow-md">
-                      <Icon name="mdi-plus" size={40} color="#ffffff" />
+                    <View
+                      className="flex items-center gap-[6rpx] rounded-full border border-dashed border-primary/40 px-[16rpx] py-[10rpx]"
+                      onClick={openFreeCalendar}
+                    >
+                      <Icon name="mdi-plus" size={18} color="primary" />
+                      <Text className="text-[24rpx] text-primary">继续选</Text>
                     </View>
-                    <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">
-                      添加上课时间
-                    </Text>
-                  </>
-                )}
-              </View>
-            </View>
-
-            {/* 上课学员：选中课程后显示（核心可编辑区块） */}
-            {selectedClass && (
-              <View className="mx-[24rpx] mt-[24rpx]">
-                <ClassStudentsCard
-                  studentIds={classStudents.map((s) => s.id)}
-                  students={classStudents}
-                  allStudents={students}
-                  subjectId={selectedClass?.subject_id}
-                  subjects={subjects}
-                  onChange={handleStudentsChange}
-                />
+                  </View>
+                ) : null}
               </View>
             )}
-          </>
+          </View>
+
+          {renderTimeSlotsBlock()}
+
+          {selectedClass && !isGroupMode ? (
+            <View className="mx-[24rpx] mt-[32rpx]">
+              <ClassStudentsCard
+                studentIds={classStudents.map((s) => s.id)}
+                students={classStudents}
+                allStudents={students}
+                subjectId={selectedClass?.subject_id}
+                subjects={subjects}
+                onChange={handleStudentsChange}
+              />
+            </View>
+          ) : null}
+
+          {/* 备注置底（机构侧） */}
+          <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[28rpx]">
+            <Text className="mb-[16rpx] block text-[28rpx] font-medium text-foreground">备注</Text>
+            <Textarea
+              className="min-h-[140rpx] w-full rounded-[12rpx] bg-muted px-[20rpx] py-[16rpx] text-[26rpx] text-foreground"
+              placeholder="选填，仅机构可见"
+              maxlength={200}
+              value={note}
+              onInput={(e) => setNote(e.detail.value || '')}
+            />
+          </View>
         </View>
       </ScrollView>
 
-      {/* ====== 底部操作栏 ====== */}
-      <View className="fixed bottom-0 left-0 right-0 border-t border-border bg-card px-[28rpx] py-[18rpx] pb-safe-bar">
+      {/* ====== 底部操作栏：抬高层级+不透明底，避免学员红叉滚动透出 ====== */}
+      <View className="fixed bottom-0 left-0 right-0 z-200 border-t border-border bg-white px-[28rpx] pt-[10rpx] pb-safe-bar">
         {!canSubmit && submitBlockedReason && (
-          <View className="absolute left-[28rpx] right-[28rpx] top-[-64rpx] rounded-[16rpx] bg-background px-[20rpx] py-[14rpx] shadow-soft">
+          <View className="absolute left-[28rpx] right-[28rpx] top-[-56rpx] z-200 rounded-[16rpx] bg-white px-[20rpx] py-[12rpx] shadow-soft">
             <Text className="text-[24rpx] text-muted-foreground">{submitBlockedReason}</Text>
           </View>
         )}
-        <ActionButton
-          text={saving ? '保存中...' : '保存'}
-          fixed={false}
-          onClick={handleSave}
-          disabled={!canSubmit || saving || deleting}
-        />
+        <View
+          className={cn(
+            'flex h-[80rpx] w-full items-center justify-center rounded-full',
+            !canSubmit || saving || deleting ? 'bg-muted' : 'bg-primary',
+          )}
+          onClick={
+            !canSubmit || saving || deleting
+              ? undefined
+              : () => {
+                  void handleSave();
+                }
+          }
+        >
+          <Text
+            className={cn(
+              'text-[30rpx] font-medium',
+              !canSubmit || saving || deleting ? 'text-muted-foreground' : 'text-primary-foreground',
+            )}
+          >
+            {saving ? '保存中...' : isEdit ? (isRescheduleMode ? '确认调课' : '保存修改') : '保存'}
+          </Text>
+        </View>
       </View>
 
-      {/* 日历弹窗 */}
+      {/* 开始日期 */}
       <CalendarMonthSheet
         visible={calendarVisible}
         title="选择开始日期"
         selectedDate={dayjs(startDate)}
-        onClose={() => setCalendarVisible(false)}
+        onClose={() => {
+          setCalendarVisible(false);
+          restoreScrollAfterSheet();
+        }}
         onSelect={(d) => {
           setStartDate(d.format('YYYY-MM-DD'));
           setSelectedDateValue(d.format('YYYY-MM-DD'));
@@ -1026,7 +1957,33 @@ const ScheduleForm: React.FC = () => {
         disablePastDates
       />
 
-      {/* 课程类型选择器（PickerSheet 标准组件） */}
+      {/* 结束日期 */}
+      <CalendarMonthSheet
+        visible={endDateCalendarVisible}
+        title="选择结束日期"
+        selectedDate={dayjs(endDate)}
+        onClose={() => {
+          setEndDateCalendarVisible(false);
+          restoreScrollAfterSheet();
+        }}
+        onSelect={(d) => setEndDate(d.format('YYYY-MM-DD'))}
+        disablePastDates
+      />
+
+      {/* 自由排课：课表同款月历多选 */}
+      <CalendarMonthSheet
+        visible={freeCalendarVisible}
+        title="选择上课日期"
+        selectedDate={dayjs(freeDates[freeDates.length - 1] || startDate)}
+        selectedDates={freeDates}
+        multiSelect
+        onClose={closeFreeCalendar}
+        onSelect={() => undefined}
+        onSelectMulti={handleFreeDatesConfirm}
+        getDateDotType={getDateDotType}
+        disablePastDates
+      />
+
       <PickerSheet
         visible={typePickerVisible}
         title="课程类型"
@@ -1036,25 +1993,54 @@ const ScheduleForm: React.FC = () => {
         ]}
         value={isGroupMode ? 'group' : 'class'}
         onClose={() => setTypePickerVisible(false)}
-        onConfirm={(v) => setScheduleType(v === 'group' ? 'group' : 'class')}
+        onConfirm={(v) => {
+          const next = v === 'group' ? 'group' : 'class';
+          setScheduleType(next);
+          setClassId('');
+          if (next === 'class') {
+            setMinOpenEnabled(false);
+          }
+          setTypePickerVisible(false);
+        }}
       />
 
-      {/* 课程名称选择器（PickerSheet 标准组件） */}
-      <PickerSheet
+      <ClassPickerSheet
         visible={classPickerVisible}
-        title="选择课程"
-        options={classes.map((c): PickerOption => ({ label: c.name, value: c.id }))}
+        title={isGroupMode ? '选择团课班级' : '选择班级'}
+        courseMode={isGroupMode ? 'group' : 'class'}
+        classes={classes}
+        scheduledClassIds={scheduledClassIds}
         value={classId}
         onClose={() => setClassPickerVisible(false)}
         onConfirm={(v) => setClassId(v)}
       />
 
-      {/* 授课老师选择器（PickerSheet 标准组件） */}
+      <PickerSheet
+        visible={roomPickerVisible}
+        title="选择上课教室"
+        options={[
+          { label: '不指定教室', value: '' },
+          ...rooms.map((r): PickerOption => ({ label: r.name, value: r.id || r.name })),
+        ]}
+        value={room}
+        onClose={() => setRoomPickerVisible(false)}
+        onConfirm={(v) => setRoom(v)}
+      />
+
+      <PickerSheet
+        visible={endModePickerVisible}
+        title="结束方式"
+        options={END_MODE_OPTIONS.map((o): PickerOption => ({ label: o.label, value: o.value }))}
+        value={endMode}
+        onClose={() => setEndModePickerVisible(false)}
+        onConfirm={(v) => setEndMode(v as EndMode)}
+      />
+
       <PickerSheet
         visible={teacherPickerVisible}
-        title="选择授课老师"
+        title="选择老师"
         options={[
-          { label: '待分配', value: '' },
+          { label: '请选择', value: '' },
           ...teachers
             .filter((t) => t.role !== 'assist' || t.id === selectedTeachingTeacherId)
             .map((t): PickerOption => ({ label: t.name, value: t.id })),
@@ -1064,7 +2050,6 @@ const ScheduleForm: React.FC = () => {
         onConfirm={handleTeacherConfirm}
       />
 
-      {/* 助教选择器（PickerSheet 标准组件） */}
       <PickerSheet
         visible={assistantPickerVisible}
         title="选择助教"
@@ -1081,6 +2066,49 @@ const ScheduleForm: React.FC = () => {
         value={selectedAssistantTeacherId}
         onClose={() => setAssistantPickerVisible(false)}
         onConfirm={handleAssistantConfirm}
+      />
+
+      <PickerSheet
+        visible={levelPickerVisible}
+        title="课程难度"
+        options={(Object.keys(CLASS_LEVEL_LABELS) as ClassLevel[]).map(
+          (k): PickerOption => ({ label: CLASS_LEVEL_LABELS[k], value: k }),
+        )}
+        value={courseLevel}
+        onClose={() => setLevelPickerVisible(false)}
+        onConfirm={(v) => {
+          setCourseLevel(v as ClassLevel);
+          setLevelPickerVisible(false);
+        }}
+      />
+
+      <TimePickerSheet
+        visible={timePickerVisible}
+        title={timePickerTitle}
+        value={timePickerValue}
+        onClose={() => {
+          setTimePickerVisible(false);
+          if (chainingTimePickerRef.current) return;
+          setTimePickerPhase('start');
+          setEditingSlotId(null);
+          restoreScrollAfterSheet();
+        }}
+        onConfirm={handleTimePickerConfirm}
+      />
+
+      <ScheduleConflictDialog
+        visible={conflictDialogVisible}
+        conflictSummary={conflictResult?.conflictSummary || ''}
+        conflicts={conflictResult?.conflicts || []}
+        onModify={() => {
+          ignoreConflictRef.current = false;
+          setConflictDialogVisible(false);
+        }}
+        onIgnore={() => {
+          ignoreConflictRef.current = true;
+          setConflictDialogVisible(false);
+          void handleSave();
+        }}
       />
     </PageContainer>
   );

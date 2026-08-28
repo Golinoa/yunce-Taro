@@ -98,6 +98,13 @@ export function needsProfileSetup(profile: Profile | null, isNewUser?: boolean):
   return false;
 }
 
+/** 微信登录新用户是否还需绑定手机号 */
+export function needsWechatPhoneBind(profile: Profile | null, isNewUser?: boolean): boolean {
+  if (!isNewUser) return false;
+  if (!profile) return true;
+  return !profile.phone?.trim();
+}
+
 /** 是否尚未完成业务身份（机构入驻 / 绑定孩子） */
 export function needsOnboarding(profile: Profile | null): boolean {
   if (!profile || hasSkippedOnboarding()) {

@@ -11,7 +11,7 @@
 | 模式 | 说明 | 前端状态 |
 |------|------|----------|
 | 班课新增/编辑 | 决定班级「什么时候上」 | **进行中（验收中）** |
-| 团课 | 同班课表单；无学员列表；可开「满多少人开课」 | **已开放**（`sourceMode=group`） |
+| 团课 | 同班课表单；无学员列表；含**预约设置**（与时段配置同步） | **已开放**（`sourceMode=group`） |
 | 班级调课 | 当天实例换时段，长期规则不变 | `mode=reschedule` 已接临时调课 |
 | 学员调课 | 单人补课到别的安排 | 请假/调课页占位 |
 
@@ -28,7 +28,7 @@
 | 课程难度 | `courseLevel` | `class.level` 或排课扩展 | 目前多为本地态，持久化待确认 |
 | 上课教室 | `room` | `room`（名称字符串） | 跟当前校区教室列表联动 |
 | 消耗课时 | `consumedHours` | 建议 `hoursPerLesson` / `consumedHours` | 整页唯一，不按时间组 |
-| **满多少人开课**（仅团课） | `minOpenEnabled` + `minOpenCount` | 建议 `minOpenEnabled` / `minOpenCount` | 默认关；开则校验人数≥1；暂写入 `note` 元数据 |
+| **预约设置**（仅团课） | `autoOpenType` + `slotMaxCount` + `minOpenCount` | `class.autoOpenType` / `class.studentCount`(容量) / `class.minOpenCount` | 与时段配置 `class-slot-config` **同源**；选班带出、保存回写班级；`note` 亦写入元数据兼容 |
 | 排课规则 | `schedulingMode` | `rule` \| `free` | |
 | 开始日期 | `startDate` | `startDate` | 仅规则排课 |
 | 重复方式 | `repeatMode` | `weekly` \| `biweekly` \| `alternate` | |
@@ -194,8 +194,58 @@
 | 人数 7/8 | 班级 `student_count` + 当日 lessonRecords | class students count + lesson-records | — |
 | 教室 | `SCHEDULES.room` | Schedule.room（已有） | 无 room 不展示 |
 | 头像行 | `classService.getStudents` → `avatar_url` | `GET /classes/:id/students` → avatar | 空则品牌占位图 |
-| 上课中样式 | 前端 status=`active`（当日且当前时刻在 start–end） | 同前端时段算法 | 绿边框 + `course-tag-active`；**标题标签仅「上课中」「试听」两种** |
-| 试听标签 | 当天 `classId|lessonDate` 有 pending/confirmed 试听预约 | `GET /leads/bookings` | 不按「班内是否有体验课包」常驻打标 |
+| 上课中样式 | 前端 status=`active`（当日且当前时刻在 start–end） | 同前端时段算法 | 绿边框 + `course-tag-active`；**班课标题状态标签仅「上课中」「试听」** |
+| 试听标签 | 当天 `classId|lessonDate` 有 pending/confirmed 试听预约 | `GET /leads/bookings` | **仅班课**；不按体验课包常驻打标 |
+| **团课卡片** | 开放预约时段列表 | `class-booking` slots | **无试听、无约试听**；状态标签仅「上课中」；满员/可约用 `current/max` 表达 |
+
+### 8.0 班课 vs 团课（勿混）
+
+| | 班课（fixed） | 团课（open 预约） |
+|--|--------------|------------------|
+| 预约形态 | 固定排课；可「约试听」加线索试听 | 家长/代约占时段名额，**全是预约** |
+| 标题状态标签 | **上课中**、**试听** | **仅上课中**（无试听标签） |
+| 分割线操作 | 未开课可「约试听 ›」 | 已约头像 +「+」代约 |
+| **补录** | **有**（历史课 ≤30 天） | **无**（卡片无补录按钮；不走 `action=supplement`） |
+| 入口弹框 | `BookTrialByClassSheet` → `/leads/bookings` | 代约 / 开放时段配置，**不走试听线索** |
+| 列表渲染 | `ScheduleCard` + 固定排课 | 开放时段卡片 `ClassBookingSlot` |
+
+### 8.0.1 用户自定义分类 → 课表 Tab / 卡片（映射规则）
+
+课表顶 Tab 由 `course-category` 驱动，**卡片形态看分类的 `mode`，不看分类名字**：
+
+| 分类配置 | 课表表现 |
+|----------|----------|
+| `mode=class` | 渲染**班课卡片**（点名/补录/约试听） |
+| `mode=group` | 渲染**团课开放时段卡片**（点名/代约，**无补录、无试听**） |
+| `mode=private` | 进私教/预约视图 |
+| `independentDisplay=true` | 独立顶 Tab；只展示 `class.category_id === 该分类 id` 的班级 |
+| `independentDisplay=false` | 并入同 `mode` 的聚合 Tab（如「班课」），聚合内所有非独立分类的班级 |
+
+**班级侧必须对齐**，否则 Tab 可能为空或对不上卡片：
+
+| 字段 | 班课分类下 | 团课分类下 |
+|------|------------|------------|
+| `class.category_id` | 指向该分类（或系统 `cat-class`） | 指向该分类（或系统 `cat-group`） |
+| `class.schedule_mode` | `fixed`（或缺省） | **`open`** |
+| 数据源 | `schedules` 按周几展开 | `class-booking` 当日 slots |
+
+> 缺口：创建/改班级时若只改了 `category_id`、未同步 `schedule_mode`，自定义「团课类」Tab 会滤出班级但 `open` 过滤后无时段 → 空列表。产品上应在选分类时按 `mode` 自动带出 `schedule_mode`（待补）。
+
+系统默认 Mock：`cat-class` / `cat-group` / `cat-private` 均为 `independentDisplay=true`，故顶栏直接显示「班课」「团课」「私教」三个独立 Tab。
+
+### 8.0.2 团课「预约设置」同步
+
+时段配置页（`class-slot-config`）里的预约设置入口较深，已提取到**团课排课表单**，两边读写同一班级字段：
+
+| UI | 班级字段 | 说明 |
+|----|----------|------|
+| 自动开班条件 | `auto_open_type` / `autoOpenType` | `manual` \| `full` \| `time` \| `full_or_time` |
+| 每时段可约人数 | `student_count`（作容量默认值） | 新建时段的 `max_count` 默认取此值 |
+| 最少开班人数 | `min_open_count` / `minOpenCount` | 约满/约满或到时间时生效 |
+
+- 排课表单：选班带出 → 可编辑 → 保存时 `classService.update`
+- 时段配置：保存时段时同步回写上述班级字段
+- 排课 `note` 额外写入元数据便于兼容旧数据
 
 ### 8.5 后端对齐（消课 / 补录）
 
@@ -232,7 +282,7 @@
 | 项 | 约定 |
 |----|------|
 | UI | 居中 Modal：选已有线索（BottomSheet）/ 手动输入姓名+电话 → 提交 |
-| 入口 | 仅 `upcoming` / `urgent` 卡片分割线下「约试听 ›」 |
+| 入口 | **仅班课** `upcoming` / `urgent` 卡片分割线下「约试听 ›」；**团课不提供** |
 | API | `POST /api/app/v1/leads/bookings`（非 trial-invites） |
 | 必填 | `leadId, courseId, courseName, campusId, teacherId, lessonDate, startTime, endTime`；`bookingType=proxy`；`classId/className` 可选但课表应传 |
 | 后端 | ✅ `createLeadBooking` 已落 `classId`、冲突校验、线索 status→`booked` |
@@ -255,3 +305,6 @@
 | 2026-08-28 | 班课卡片：补录改 `neutral` 淡中性色；§6 增助教字段等后端待办；Mock `mapMockSchedule` 解析教师名 |
 | 2026-08-28 | 历史卡点击=补录；约试听弹框恢复；§6/§8 核对后端：MAKEUP create 双缺口、today 全校区已接、约试听走 leads/bookings |
 | 2026-08-28 | 历史卡规则对齐：30 天内可补录/修改；超时隐藏补录按钮；点卡片 `viewOnly` 仅查看；lesson-form 窗口由 24h 改为 30 天 |
+| 2026-08-28 | 厘清：试听仅班课；团课全预约、无试听标签/约试听；团课仅「上课中」状态标签 |
+| 2026-08-28 | 厘清：团课无补录；自定义分类按 `mode`+`category_id`+`schedule_mode` 对齐卡片（§8.0.1） |
+| 2026-08-28 | 团课排课表单提取「预约设置」（自动开班/每时段可约/最少开班），与时段配置 `class-slot-config` 双向同步班级字段 |

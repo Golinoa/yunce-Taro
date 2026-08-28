@@ -8,7 +8,7 @@ import cn from 'classnames';
 import React from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
-import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/data/teacher';
+import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
 import type { TeacherIdentity } from '@/types/teacher';
 import { useMiniProgramNavBarLayout } from '@/utils/use-nav-safe-height';
 import type { CollaboratorSummary } from '@/utils/todo-collaborator-select';

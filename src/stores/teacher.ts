@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { create } from 'zustand';
-import { calcTotal } from '@/data/teacher';
+import { calcTotal } from '@/domain/teacher-salary';
 import {
   teacherService,
   salaryModelService,

@@ -5,6 +5,7 @@
  * 真实：POST /upload/token 拿凭证 → 直传七牛 → 返回 CDN url。
  */
 import Taro from '@tarojs/taro';
+import { isUseMock } from '@/utils/build-env';
 import { post } from '@/utils/request';
 
 /** 与后端 upload-token 一致的类型 */
@@ -36,9 +37,7 @@ interface UploadTokenPayload {
 }
 
 function isMockMode(): boolean {
-  return typeof process !== 'undefined' && typeof process.env !== 'undefined'
-    ? process.env.VITE_USE_MOCK !== 'false'
-    : true;
+  return isUseMock();
 }
 
 function resolveFilename(filePath: string, filename?: string): string {

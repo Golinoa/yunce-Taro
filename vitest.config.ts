@@ -19,7 +19,7 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: ['./vitest.env.ts', './vitest.setup.ts'],
     // 禁用结果缓存写入，规避 Windows 沙箱 EPERM 拦截 results.json
     cache: false,
     coverage: {

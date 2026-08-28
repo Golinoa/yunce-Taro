@@ -14,7 +14,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import { CAMPUS_ICONS, CAMPUS_TYPE_MAP } from '@/data/campus';
+import { CAMPUS_ICONS, CAMPUS_TYPE_MAP } from '@/constants/campus-ui';
 import { useCampusStore } from '@/stores/campus';
 import type { CampusFormData, CampusType, PartnerMode } from '@/types/campus';
 

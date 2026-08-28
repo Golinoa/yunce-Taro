@@ -141,6 +141,7 @@ export default defineAppConfig({
       root: 'package-lead',
       pages: [
         'pages/my-invite/index',
+        'pages/trial-records/index',
         'pages/lead-form/index',
         'pages/lead-detail/index',
         'pages/trial-booking/index',

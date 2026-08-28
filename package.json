@@ -12,6 +12,7 @@
   "scripts": {
     "build:weapp": "taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
     "build:weapp:mock": "node scripts/build-weapp-mock.mjs",
+    "generate:mock-stubs": "node scripts/generate-mock-stubs.mjs",
     "build:weapp:prod": "node scripts/build-weapp-prod.mjs",
     "build:weapp:clean": "node scripts/clean-weapp-cache.mjs && taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
     "build:swan": "taro build --type swan",
@@ -24,6 +25,7 @@
     "build:quickapp": "taro build --type quickapp",
     "optimize:images": "node scripts/optimize-images.mjs",
     "dev:weapp": "node scripts/dev-weapp.mjs",
+    "dev:weapp:mock": "node scripts/dev-weapp-mock.mjs",
     "dev:swan": "npm run build:swan -- --watch",
     "dev:alipay": "npm run build:alipay -- --watch",
     "dev:tt": "npm run build:tt -- --watch",
@@ -78,6 +80,7 @@
     "dayjs": "^1.11.10",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
+    "uqrcodejs": "^4.0.7",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
@@ -96,6 +99,7 @@
     "@typescript-eslint/parser": "^6.2.0",
     "@unocss/preset-icons": "^66.7.0",
     "@unocss/webpack": "^66.7.0",
+    "@vitest/coverage-v8": "^2.1.8",
     "babel-plugin-import": "^1.13.8",
     "babel-preset-taro": "4.1.9",
     "eslint": "^8.12.0",
@@ -121,7 +125,6 @@
     "unocss": "^66.7.0",
     "unocss-applet": "^0.12.2",
     "vitest": "^2.1.8",
-    "@vitest/coverage-v8": "^2.1.8",
     "webpack": "5.78.0"
   }
 }

@@ -15,7 +15,7 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo } from 'react';
 import Icon from '@/components/Icon';
-import { CAMPUS_TYPE_MAP, PARTNER_MODE_MAP } from '@/data/campus';
+import { CAMPUS_TYPE_MAP, PARTNER_MODE_MAP } from '@/constants/campus-ui';
 import type { CampusUIModel } from '@/types/campus';
 
 export interface CampusCardProps {

@@ -27,7 +27,7 @@ import ProfileStats from '@/components/profile/ProfileStats';
 import StoreOnboarding from '@/components/profile/StoreOnboarding';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
-import { markStepVisited } from '@/data/onboarding';
+import { markStepVisited } from '@/utils/onboarding-storage';
 import { onboardingService, studentService } from '@/services';
 import { organizationService, type OrganizationQuotaUsage } from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
@@ -36,6 +36,7 @@ import type { Student } from '@/types/student';
 import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 
 // ============================================
 // 角色标签映射
@@ -575,6 +576,8 @@ const Profile: React.FC = () => {
           items={isTeacher ? teacherStats : parentStats}
           layout="label-top"
         />
+
+        <WechatBindReminder className="mx-[32rpx] mt-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
 
         {/* ====== 会员权益卡片 ====== */}
         <View className="mx-[32rpx] mt-[24rpx] h-[160rpx] rounded-[28rpx] bg-card-gradient overflow-hidden shadow-soft flex relative">

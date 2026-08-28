@@ -9,6 +9,15 @@ import Taro from '@tarojs/taro';
 /** 待归属员工邀请码存储 key：分享落地页/登录页写入，注册登录完成后消费 */
 export const PENDING_INVITE_CODE_KEY = 'yunce:pending-invite-code';
 
+/** 规范化邀请码参数（query / scene） */
+export function normalizeInviteCodeParam(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/^TEACHERCODE[=:]/i, '')
+    .replace(/^CODE[=:]/i, '');
+}
+
 /** 保存待归属邀请码（员工邀请码，注册/登录时作为 inviteCode 携带） */
 export function storePendingInviteCode(code: string): void {
   const trimmed = (code || '').trim().toUpperCase();

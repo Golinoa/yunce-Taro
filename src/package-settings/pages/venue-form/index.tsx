@@ -14,7 +14,7 @@ import ImageUploaderList from '@/components/ImageUploaderList';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
-import { DEFAULT_VENUE_MANAGER_USER_ID } from '@/data/mock-database';
+import { DEFAULT_VENUE_MANAGER_USER_ID } from '@/constants/campus-ui';
 import { roomService, venueService } from '@/services/campus';
 import { teacherService } from '@/services/teacher';
 import { useCampusStore } from '@/stores/campus';
