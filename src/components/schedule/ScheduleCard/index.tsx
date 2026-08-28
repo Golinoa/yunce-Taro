@@ -9,7 +9,7 @@ import { BRAND_LOGO } from '@/constants/brand';
  * ScheduleCard - 排课卡片展示组件
  *
  * 班课布局：
- * - 顶栏：班级名 / 时段 / 上课中标签
+ * - 顶栏：班级名 + 状态标签（仅「上课中」「试听」两种）/ 时段
  * - 信息行：老师(+助教) · 人数 · 教室 | 右侧点名/补录
  * - 分割线下方：圆形头像 + 约试听
  */
@@ -127,16 +127,10 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
           <View className="flex min-w-0 flex-1 flex-col">
             <View className="flex flex-wrap items-center gap-[12rpx]">
               <Text className="text-[34rpx] font-bold text-foreground">{item.className}</Text>
+              {/* 班课标题区状态标签仅两种：上课中 / 试听 */}
               {isActive ? (
                 <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                   <Text className="text-[20rpx] font-medium">上课中</Text>
-                </View>
-              ) : null}
-              {item.bookingTag ? (
-                <View className="rounded-[8rpx] bg-schedule-attend px-[12rpx] py-[4rpx]">
-                  <Text className="text-center text-[20rpx] font-semibold text-primary-foreground">
-                    {item.bookingTag}
-                  </Text>
                 </View>
               ) : null}
               {item.hasTrialStudent ? (

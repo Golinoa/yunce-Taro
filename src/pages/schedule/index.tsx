@@ -46,7 +46,6 @@ import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import type { BookableVenue } from '@/types/venue-booking';
 import { isParentRole, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
-import { hasTrialPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -494,8 +493,6 @@ const SchedulePage: React.FC = () => {
   >({});
   const [lessonRecords, setLessonRecords] = useState<LessonRecord[]>([]);
   const [temporaryReschedules, setTemporaryReschedules] = useState<TemporaryReschedule[]>([]);
-  const [trialClassIds, setTrialClassIds] = useState<Set<string>>(new Set());
-  /** 已约试听的班级时段 key: classId|lessonDate */
   const [trialBookingKeys, setTrialBookingKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   /** 当前左滑打开按钮的卡片 ID，用于卡片互斥 */
@@ -875,7 +872,8 @@ const SchedulePage: React.FC = () => {
         scheduleService.getByTeacher(currentUserId, currentCampusId),
         classService.getByTeacher(currentUserId, currentCampusId),
         teacherService.getList(currentCampusId),
-        leadService.getLeadBookingsByTeacher(currentUserId, { status: 'confirmed' }),
+        // 试听标签按「当天有效预约」判定，含 pending/confirmed（后端新建默认可为 pending）
+        leadService.getLeadBookingsByTeacher(currentUserId),
         fetchCategories(),
       ]);
       await studentService.getByTeacher(currentUserId, currentCampusId);
@@ -884,13 +882,6 @@ const SchedulePage: React.FC = () => {
           classId: classItem.id,
           students: await classService.getStudents(classItem.id),
         })),
-      );
-      const nextTrialClassIds = new Set<string>(
-        classStudentsList
-          .filter((item) =>
-            item.students.some((student) => hasTrialPackage(student.course_packages || [])),
-          )
-          .map((item) => item.classId),
       );
       const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};
       classStudentsList.forEach((item) => {
@@ -902,14 +893,18 @@ const SchedulePage: React.FC = () => {
       });
       const nextTrialBookingKeys = new Set<string>(
         leadBookings
-          .filter((b) => b.class_id && b.lesson_date)
+          .filter(
+            (b) =>
+              b.class_id &&
+              b.lesson_date &&
+              (b.status === 'pending' || b.status === 'confirmed'),
+          )
           .map((b) => `${b.class_id}|${b.lesson_date}`),
       );
       setSchedules(scheduleList);
       setClasses(classList);
       setTeachers(teacherList);
       setClassStudentAvatars(nextClassStudentAvatars);
-      setTrialClassIds(nextTrialClassIds);
       setTrialBookingKeys(nextTrialBookingKeys);
       void calendarSyncService.maybePromptOnSchedulePage({
         userId: currentUserId,
@@ -1188,9 +1183,10 @@ const SchedulePage: React.FC = () => {
             status: statusResult.status,
             countdownText: statusResult.countdownText,
             bookingTag: isBookingSchedule(schedule) ? '约' : undefined,
+            // 试听：仅当天该班有有效试听预约时显示（非「班内曾有体验课包」）
             hasTrialStudent: Boolean(
-              (schedule.class_id && trialClassIds.has(schedule.class_id)) ||
-              trialBookingKeys.has(`${schedule.class_id}|${date.format('YYYY-MM-DD')}`),
+              schedule.class_id &&
+                trialBookingKeys.has(`${schedule.class_id}|${date.format('YYYY-MM-DD')}`),
             ),
             canCancelLesson: statusResult.status !== 'cancelled',
             isTemporaryAdjusted:
@@ -1215,7 +1211,6 @@ const SchedulePage: React.FC = () => {
       filteredSchedules,
       selectedClassId,
       teacherById,
-      trialClassIds,
       trialBookingKeys,
       temporaryReschedules,
     ],

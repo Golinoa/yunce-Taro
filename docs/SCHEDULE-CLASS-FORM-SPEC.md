@@ -194,7 +194,8 @@
 | 人数 7/8 | 班级 `student_count` + 当日 lessonRecords | class students count + lesson-records | — |
 | 教室 | `SCHEDULES.room` | Schedule.room（已有） | 无 room 不展示 |
 | 头像行 | `classService.getStudents` → `avatar_url` | `GET /classes/:id/students` → avatar | 空则品牌占位图 |
-| 上课中样式 | 前端 status=`active` | 同前端时段算法 | 绿边框 + `course-tag-active` |
+| 上课中样式 | 前端 status=`active`（当日且当前时刻在 start–end） | 同前端时段算法 | 绿边框 + `course-tag-active`；**标题标签仅「上课中」「试听」两种** |
+| 试听标签 | 当天 `classId|lessonDate` 有 pending/confirmed 试听预约 | `GET /leads/bookings` | 不按「班内是否有体验课包」常驻打标 |
 
 ### 8.5 后端对齐（消课 / 补录）
 
