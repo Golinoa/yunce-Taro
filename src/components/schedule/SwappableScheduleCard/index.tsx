@@ -5,9 +5,9 @@
  * 点击卡片主体触发点名等主流程跳转。
  *
  * 手势分区设计：
- * - 卡片右侧固定宽度的"滑动触发条"负责左滑显示 / 右滑隐藏按钮；
- * - 触发条宽度动态计算：收起时为固定宽度，打开时为"固定宽度 + 按钮总宽度"；
- * - 触发条内水平滑动时调用 stopPropagation 阻止外层 Swiper 切换日期；
+ * - 卡片右侧贴边窄条负责左滑显示 / 右滑隐藏按钮（须避开点名/约试听/编辑热区）；
+ * - 触发条宽度动态计算：收起时为窄条，打开时为「窄条 + 按钮总宽度」；
+ * - 触发条内水平滑动时 catchMove 阻止外层 Swiper 切换日期；
  * - 触发条外区域不拦截 touchmove，保证 ScrollView 上下滚动和 Swiper 左右切换日期丝滑；
  * - 按钮点击加入滑动保护期，避免右滑收起时误触按钮操作；
  * - 支持卡片互斥：传入 cardId/openCardId/onOpenChange 后，同一时间只能打开一张卡片的按钮。
@@ -25,8 +25,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /** 操作按钮单个宽度（px） */
 const ACTION_ITEM_WIDTH_PX = 65;
-/** 右侧固定触发区宽度（px）：收起状态下只在该窄条内左滑才打开按钮 */
-const SWIPE_TRIGGER_WIDTH_PX = 60;
+/**
+ * 右侧滑动触发条宽度（px）。
+ * 须尽量窄：班课卡片的点名/约试听/编辑都在右侧，过宽会盖住按钮导致点击失效。
+ * 仅保留贴边窄条用于左滑手势，不挡住操作热区。
+ */
+const SWIPE_TRIGGER_WIDTH_PX = 18;
+/** 触发条顶部留白（px），避开右上角编辑笔标热区 */
+const SWIPE_TRIGGER_TOP_INSET_PX = 44;
 /** 滑动触发阈值（px） */
 const MOVE_THRESHOLD = 4;
 /** 滑动后忽略按钮点击的保护时长（ms），避免右滑收起时误触按钮 */
@@ -271,13 +277,16 @@ const SwappableScheduleCard: React.FC<SwappableScheduleCardProps> = ({
         {children}
       </View>
 
-      {/* 右侧滑动触发条：动态宽度，覆盖按钮区域；
-          只在该区域内左滑/右滑控制按钮显示/隐藏，其余区域事件冒泡；
-          使用 catchMove 才能阻止原生 Swiper 切换日期（stopPropagation 对原生组件无效）；
-          z-20 始终在内容层之下但在收起时的按钮层之上；打开时按钮层提升到 z-30 越过触发条 */}
+      {/* 右侧滑动触发条：仅贴边窄条，顶部避开编辑笔；
+          打开时加宽覆盖左滑操作区；打开后按钮层 z-30 高于本条可点。
+          使用 catchMove 阻止原生 Swiper 切日期（stopPropagation 对原生无效） */}
       <View
-        className="absolute right-0 top-0 z-20 h-full"
-        style={{ width: `${triggerWidth}px` }}
+        className="absolute right-0 z-20"
+        style={{
+          width: `${triggerWidth}px`,
+          top: `${SWIPE_TRIGGER_TOP_INSET_PX}px`,
+          bottom: 0,
+        }}
         catchMove
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

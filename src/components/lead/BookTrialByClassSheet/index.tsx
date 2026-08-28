@@ -11,14 +11,17 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ActionButton from '@/components/ActionButton';
+import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Modal from '@/components/Modal';
 import PickerItem from '@/components/PickerItem';
 import { leadService, subscribeMessageService } from '@/services';
+import { useCampusStore } from '@/stores/campus';
 import type { Lead } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 
 type InputMode = 'select' | 'input';
 
@@ -52,6 +55,8 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
 }) => {
   const { session } = useAuth();
   const userId = session?.user.id || '';
+  const currentCampusId = useCampusStore((s) => s.currentCampusId);
+  const resolvedCampusId = campusId || currentCampusId || '';
 
   const [mode, setMode] = useState<InputMode>('select');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -66,19 +71,20 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
   const [parentPhone, setParentPhone] = useState('');
   const [note, setNote] = useState('');
 
-  // 打开线索选择器
+  // 打开线索选择器：始终拉真实线索列表（含资料字段）
   const handleOpenLeadPicker = useCallback(() => {
     setKeyword('');
     setLeadPickerVisible(true);
-    if (leads.length === 0) {
-      setLoading(true);
-      leadService
-        .getLeadsByTeacher(userId)
-        .then((list) => setLeads(list))
-        .catch(() => setLeads([]))
-        .finally(() => setLoading(false));
-    }
-  }, [userId, leads.length]);
+    setLoading(true);
+    leadService
+      .getLeadsByTeacher(userId)
+      .then((list) => setLeads(list))
+      .catch((err) => {
+        logError('BookTrialByClassSheet load leads', err);
+        setLeads([]);
+      })
+      .finally(() => setLoading(false));
+  }, [userId]);
 
   // 选择线索
   const handleSelectLead = useCallback((lead: Lead) => {
@@ -115,6 +121,10 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
 
   const handleSubmit = useCallback(async () => {
     if (!classId || !canSubmit) return;
+    if (!resolvedCampusId) {
+      Taro.showToast({ title: '缺少校区信息，请先选择校区', icon: 'none' });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -125,7 +135,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           {
             child_name: childName.trim(),
             parent_phone: parentPhone.trim(),
-            campus_id: campusId || 'campus-center',
+            campus_id: resolvedCampusId,
             source_type: 'manual',
           },
           userId,
@@ -137,6 +147,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
         leadId: leadId!,
         classId,
         className,
+        campusId: resolvedCampusId,
         lessonDate,
         startTime,
         endTime,
@@ -160,7 +171,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
   }, [
     canSubmit,
     classId,
-    campusId,
+    resolvedCampusId,
     className,
     lessonDate,
     startTime,
@@ -247,9 +258,18 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                 <View className="flex flex-col gap-3">
                   <PickerItem
                     iconType="avatar"
+                    avatarUrl={selectedLead.avatar_url}
                     avatarChar={selectedLead.child_name[0]}
                     title={selectedLead.child_name}
-                    subtitle={selectedLead.parent_phone || '暂无手机号'}
+                    subtitle={
+                      [
+                        selectedLead.parent_name,
+                        selectedLead.parent_phone,
+                        selectedLead.child_age,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '暂无更多资料'
+                    }
                     selected
                     right={{
                       type: 'change-btn',
@@ -339,6 +359,10 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           ) : (
             filteredLeads.map((lead) => {
               const isSelected = selectedLead?.id === lead.id;
+              const leadAvatar = lead.avatar_url;
+              const subtitle =
+                [lead.parent_name, lead.parent_phone, lead.child_age].filter(Boolean).join(' · ') ||
+                '暂无更多资料';
               return (
                 <View
                   key={lead.id}
@@ -348,20 +372,19 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                   )}
                   onClick={() => handleSelectLead(lead)}
                 >
-                  <View
-                    className="w-[68rpx] h-[68rpx] rounded-full center flex-shrink-0"
-                    style={{ background: '#5EC8A820' }}
-                  >
-                    <Text className="text-[28rpx] font-bold text-primary">
-                      {(lead.child_name || '?')[0]}
-                    </Text>
-                  </View>
+                  <Avatar
+                    name={lead.child_name}
+                    avatarUrl={leadAvatar}
+                    size="md"
+                    fallback="initial"
+                  />
                   <View className="flex-1 min-w-0">
                     <Text className="text-base font-medium text-foreground block">
                       {lead.child_name}
+                      {lead.child_nickname ? `（${lead.child_nickname}）` : ''}
                     </Text>
                     <Text className="text-[22rpx] text-muted-foreground/60 block mt-1">
-                      {lead.parent_phone || '暂无手机号'}
+                      {subtitle}
                     </Text>
                   </View>
                   {isSelected && <Text className="text-primary text-lg">✓</Text>}

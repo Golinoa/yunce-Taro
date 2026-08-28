@@ -77,8 +77,18 @@ function getWeekday(dateStr: string): string {
 
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 const FORM_CARD_CLASS_NAME = 'mx-[24rpx] mb-3 overflow-hidden rounded-[20rpx] bg-white shadow-soft';
-/** 已点名班级可修改的时间窗口（小时）：下课 24 小时内可修改，超时只能查看 */
-const LESSON_MODIFY_WINDOW_HOURS = 24;
+/** 上课日起 30 天内可补录 / 修改；超时仅查看 */
+const LESSON_OPERATE_WINDOW_DAYS = 30;
+
+function isWithinLessonOperateWindow(lessonDateStr: string, now = new Date()): boolean {
+  if (!lessonDateStr) return true;
+  const lesson = new Date(`${lessonDateStr}T00:00:00`);
+  if (Number.isNaN(lesson.getTime())) return true;
+  const earliest = new Date(now);
+  earliest.setHours(0, 0, 0, 0);
+  earliest.setDate(earliest.getDate() - LESSON_OPERATE_WINDOW_DAYS);
+  return lesson.getTime() >= earliest.getTime();
+}
 
 /** 签到状态：签到/请假/未到 */
 type CheckinStatus = 'checked' | 'leave' | 'absent';
@@ -446,6 +456,20 @@ const LessonForm: React.FC = () => {
     const v = routeParams.recordId || '';
     return v ? decodeURIComponent(v) : '';
   }, [routeParams]);
+
+  /** 课表卡片「补录」入口：加载完成后自动打开补录选人 */
+  const actionParam = useMemo(() => {
+    const v = routeParams.action || '';
+    return v ? decodeURIComponent(v) : '';
+  }, [routeParams]);
+
+  /** 课表超时历史卡：强制仅查看 */
+  const viewOnlyParam = useMemo(() => {
+    const v = routeParams.viewOnly || '';
+    return (v ? decodeURIComponent(v) : '') === '1';
+  }, [routeParams]);
+
+  const pendingSupplementActionRef = React.useRef(actionParam === 'supplement');
 
   const modeParam = useMemo(() => {
     const v = routeParams.mode || '';
@@ -827,7 +851,10 @@ const LessonForm: React.FC = () => {
         });
         setRecordByStudentId(nextRecordMap);
         setSupplementStudentIds(new Set());
-        setAttendanceMode(hasRecords ? 'view' : 'normal');
+        // 超时 / viewOnly：即使未点名也只读；窗口内未点名可正常提交
+        const canOperate =
+          !viewOnlyParam && isWithinLessonOperateWindow(lessonDate);
+        setAttendanceMode(hasRecords || !canOperate ? 'view' : 'normal');
 
         // 为每个学员匹配课包
         const pkgMap = new Map<string, CoursePackage>();
@@ -862,6 +889,8 @@ const LessonForm: React.FC = () => {
     loadApprovedLeaveStudentIds,
     profile?.name,
     studentIdParam,
+    viewOnlyParam,
+    lessonDate,
   ]);
 
   // 班级/日期变化时重新加载试听学员
@@ -1002,22 +1031,28 @@ const LessonForm: React.FC = () => {
   /** 手动消课：展示当前操作时间（不使用班级固定上课时间） */
   const displayLessonTime = lessonTime || formatTime(new Date());
 
-  /** 24h 修改窗口：按当前操作时间 +1 小时作为下课时间估算 */
+  /** 30 天操作窗口：可补录 / 修改；超时或 viewOnly 仅查看 */
   const canModifyLesson = useMemo(() => {
-    if (!isAlreadyChecked) {
-      return true;
+    if (viewOnlyParam) {
+      return false;
     }
-    const timeText = displayLessonTime;
-    if (!timeText) {
-      return true;
+    return isWithinLessonOperateWindow(lessonDate);
+  }, [lessonDate, viewOnlyParam]);
+
+  /** 课表卡片带 action=supplement 进入：已点名后自动打开补录选人（须在 30 天窗口内） */
+  useEffect(() => {
+    if (!pendingSupplementActionRef.current) return;
+    if (!canModifyLesson) {
+      pendingSupplementActionRef.current = false;
+      return;
     }
-    const [h, m] = timeText.split(':').map((v) => parseInt(v, 10));
-    const endDateTime = new Date(
-      `${lessonDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`,
-    );
-    endDateTime.setTime(endDateTime.getTime() + 60 * 60 * 1000);
-    return Date.now() - endDateTime.getTime() <= LESSON_MODIFY_WINDOW_HOURS * 60 * 60 * 1000;
-  }, [displayLessonTime, isAlreadyChecked, lessonDate]);
+    if (mode !== 'class' || !isAlreadyChecked || attendanceMode !== 'view') return;
+    pendingSupplementActionRef.current = false;
+    const timer = setTimeout(() => {
+      void handleOpenSupplementSheet();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [attendanceMode, canModifyLesson, handleOpenSupplementSheet, isAlreadyChecked, mode]);
 
   const pageTitle = useMemo(() => {
     return mode === 'class' ? '班级消课' : '课时消课';
@@ -1095,8 +1130,9 @@ const LessonForm: React.FC = () => {
       });
       setRecordByStudentId(nextRecordMap);
       setSupplementStudentIds(new Set());
-      // 已点名 → 默认进入查看模式（学员卡片只读，24h 内可点「修改」进入编辑）
-      setAttendanceMode(hasRecords ? 'view' : 'normal');
+      // 已点名 → 查看；未点名且在 30 天窗口内 → 正常点名；超时 → 仅查看
+      const canOperate = !viewOnlyParam && isWithinLessonOperateWindow(lessonDate);
+      setAttendanceMode(hasRecords || !canOperate ? 'view' : 'normal');
 
       // 为每个学员匹配课包
       const pkgMap = new Map<string, CoursePackage>();
@@ -1125,6 +1161,7 @@ const LessonForm: React.FC = () => {
       loadLessonRecordsByDate,
       lessonDate,
       teacherOptions,
+      viewOnlyParam,
     ],
   );
 
@@ -2920,7 +2957,6 @@ const LessonForm: React.FC = () => {
                 <PickerItem
                   key={stu.id}
                   iconType="avatar"
-                  avatarBgColor="#5EC8A8"
                   avatarUrl={stu.avatar_url}
                   avatarChar={stu.name[0]}
                   title={stu.name}
@@ -3075,6 +3111,10 @@ const LessonForm: React.FC = () => {
                   <Text className="text-center text-[28rpx] font-medium text-white">
                     {submitting ? '保存中...' : '保存修改'}
                   </Text>
+                </View>
+              ) : !canModifyLesson ? (
+                <View className="rounded-[48rpx] bg-muted px-[48rpx] py-[22rpx]">
+                  <Text className="text-center text-[28rpx] font-medium text-white">仅查看</Text>
                 </View>
               ) : (
                 <View
