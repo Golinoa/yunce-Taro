@@ -16,6 +16,7 @@ import {
   phoneLogin,
   registerStep1,
   registerStep1ByPhone,
+  registerStep1ByEmail,
   registerStep2,
   registerStep3,
   restoreRegisterDrafts,
@@ -35,6 +36,7 @@ import type {
   TeacherRoleInfo,
   UserRole,
 } from '@/types/profile';
+import { syncTabBarByProfile } from '@/utils/tab-bar';
 
 // ============================================
 // 类型定义
@@ -75,13 +77,14 @@ export interface AuthState {
   signInWithEmailCode: (
     email: string,
     code: string,
-  ) => Promise<{ error: { message: string } | null }>;
+  ) => Promise<{ error: { message: string } | null; isNewUser?: boolean }>;
 
-  /** 注册 Step1：创建账号（Mock：用户名密码；真实：手机号） */
+  /** 注册 Step1：创建账号（邮箱） */
   signUpStep1: (payload: {
     username?: string;
     password?: string;
     phone?: string;
+    email?: string;
     inviteCode?: string;
   }) => Promise<{ error: { message: string } | null }>;
   /** 注册 Step2：选择身份 */
@@ -288,6 +291,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [syncUserRole]);
 
+  // Tab「数据」仅管理员/校长可见：登录、切身份后同步
+  useEffect(() => {
+    if (loading) return;
+    syncTabBarByProfile(profile);
+  }, [loading, profile]);
+
   // 注册草稿持久化
   useEffect(() => {
     try {
@@ -365,11 +374,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (email: string, code: string) => {
       const result = await loginByEmailCode(email, code);
       if (result.error) return { error: result.error };
+      if (result.isNewUser) {
+        markLastLoginAsNewUser();
+      }
       setSession(result.session);
       setProfile(result.profile);
       persistAuth(result.profile, result.session);
       syncUserRole(result.profile?.currentContext?.role || null);
-      return { error: null };
+      return { error: null, isNewUser: result.isNewUser };
     },
     [persistAuth, syncUserRole],
   );
@@ -380,31 +392,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       username?: string;
       password?: string;
       phone?: string;
+      email?: string;
       inviteCode?: string;
     }) => {
-      const usePhoneRegister = Boolean(payload.phone) && !payload.username;
-      const result = usePhoneRegister
-        ? await registerStep1ByPhone(payload.phone!, payload.password || '')
-        : await registerStep1(payload.username || '', payload.password || '', payload.inviteCode);
+      const useEmailRegister = Boolean(payload.email) && !payload.username;
+      const usePhoneRegister = Boolean(payload.phone) && !payload.username && !payload.email;
+      const result = useEmailRegister
+        ? await registerStep1ByEmail(payload.email!, payload.password || '')
+        : usePhoneRegister
+          ? await registerStep1ByPhone(payload.phone!, payload.password || '')
+          : await registerStep1(payload.username || '', payload.password || '', payload.inviteCode);
 
       if (result.error || !result.tempToken) {
         return { error: result.error || { message: '注册失败' } };
       }
 
-      const draft: RegisterDraft = usePhoneRegister
+      const draft: RegisterDraft = useEmailRegister
         ? {
             tempToken: result.tempToken,
-            phone: payload.phone!.trim(),
-            username: '',
-            password: '',
+            email: payload.email!.trim(),
+            username: payload.email!.trim(),
+            password: payload.password || '',
             inviteCode: payload.inviteCode,
           }
-        : {
-            tempToken: result.tempToken,
-            username: payload.username!.trim(),
-            password: payload.password!,
-            inviteCode: payload.inviteCode,
-          };
+        : usePhoneRegister
+          ? {
+              tempToken: result.tempToken,
+              phone: payload.phone!.trim(),
+              username: '',
+              password: '',
+              inviteCode: payload.inviteCode,
+            }
+          : {
+              tempToken: result.tempToken,
+              username: payload.username!.trim(),
+              password: payload.password!,
+              inviteCode: payload.inviteCode,
+            };
       setRegisterDraft(draft);
       return { error: null };
     },

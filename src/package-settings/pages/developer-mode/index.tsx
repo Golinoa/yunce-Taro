@@ -1,6 +1,6 @@
 /**
  * 开发者模式 — 快捷联调入口
- * 默认隐藏；系统设置版本号敲击解锁后可见；进入需密码
+ * 默认隐藏；系统设置「当前版本」连续点击 7 次解锁后可见；进入需密码
  */
 import { View, Text, Input, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -24,6 +24,10 @@ import {
 } from '@/utils/developer-mode';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
+import {
+  buildMockClassTrialInvitePath,
+  buildMockGroupSlotInvitePath,
+} from '@/utils/mock-share-demo';
 
 const USE_MOCK = isUseMock();
 const API_BASE = getApiBaseUrl();
@@ -212,6 +216,33 @@ const DeveloperMode: React.FC = () => {
         ],
       },
       {
+        title: 'Mock · 分享落地体验',
+        actions: [
+          {
+            id: 'mock-invite-class-guest',
+            label: '班课分享 · 未注册填信息',
+            hint: 'guest=1 强制访客表单 → 建线索 → 约试听',
+            run: () => Taro.navigateTo({ url: buildMockClassTrialInvitePath(true) }),
+          },
+          {
+            id: 'mock-invite-group-guest',
+            label: '团课分享 · 未注册填信息',
+            hint: 'guest=1 强制访客表单 → 建线索 → 约课',
+            run: () => Taro.navigateTo({ url: buildMockGroupSlotInvitePath(true) }),
+          },
+          {
+            id: 'mock-invite-class-logged',
+            label: '班课分享 · 已登录约试听',
+            run: () => Taro.navigateTo({ url: buildMockClassTrialInvitePath(false) }),
+          },
+          {
+            id: 'mock-invite-group-logged',
+            label: '团课分享 · 已登录约课',
+            run: () => Taro.navigateTo({ url: buildMockGroupSlotInvitePath(false) }),
+          },
+        ],
+      },
+      {
         title: '登录 /  onboarding',
         actions: [
           {
@@ -270,7 +301,7 @@ const DeveloperMode: React.FC = () => {
           {
             id: 'hide-dev-mode',
             label: '隐藏开发者模式入口',
-            hint: '清除解锁状态，需重新敲击版本号',
+            hint: '清除解锁状态，需重新连点版本号',
             run: () => {
               Taro.showModal({
                 title: '隐藏入口',

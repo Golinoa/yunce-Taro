@@ -439,8 +439,9 @@ export const calendarSyncService = {
 
     try {
       const res = await Taro.showModal({
-        title: '同步到手机日历',
-        content: '开启后，将自动把未来一周课表写入手机日历，上课前可在系统日历收到提醒。',
+        title: '同步到手机日历？',
+        content:
+          '开启后，未来一周课表会写入手机日历，上课前系统日历也会提醒你，比微信消息更稳。也可稍后在「我的 → 消息通知 → 同步日历」手动开启。',
         confirmText: '开启同步',
         cancelText: '暂不',
       });
@@ -458,9 +459,57 @@ export const calendarSyncService = {
 
       markCalendarSyncPromptDismissed(params.userId);
       Taro.showToast({
-        title: '可在「我的 → 系统设置」中开启课表同步',
+        title: '可在「我的 → 消息通知 → 同步日历」开启',
         icon: 'none',
-        duration: 3000,
+        duration: 2800,
+      });
+    } finally {
+      promptInFlight = false;
+    }
+  },
+
+  /**
+   * 排课保存并完成订阅授权后：再询问是否同步日历（默认关，需用户确认）。
+   */
+  async maybePromptAfterScheduleSave(params: {
+    userId: string;
+    teacherId: string;
+    role?: UserRole;
+    campusId?: string;
+  }): Promise<void> {
+    if (!params.userId || !canUseCalendarSync(params.role) || promptInFlight) {
+      return;
+    }
+    if (isCalendarSyncEnabled(params.userId)) {
+      await this.syncAfterScheduleChange(params);
+      return;
+    }
+
+    promptInFlight = true;
+    try {
+      const res = await Taro.showModal({
+        title: '同步到手机日历？',
+        content:
+          '课表已保存。开启后，这节课及未来一周安排会写入手机日历，到点系统日历提醒更准时。也可稍后在「我的 → 消息通知 → 同步日历」手动打开。',
+        confirmText: '开启同步',
+        cancelText: '暂不',
+      });
+
+      if (res.confirm) {
+        await this.enableAndSync({
+          userId: params.userId,
+          teacherId: params.teacherId,
+          role: params.role,
+          campusId: params.campusId,
+          directAuth: true,
+        });
+        return;
+      }
+
+      Taro.showToast({
+        title: '可在「我的 → 消息通知 → 同步日历」开启',
+        icon: 'none',
+        duration: 2800,
       });
     } finally {
       promptInFlight = false;

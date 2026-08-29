@@ -1,5 +1,5 @@
 /**
- * TabBar 同步 �?普通员工弱化「数据」Tab（完整权限由 route-guard 拦截�?
+ * 自定义 TabBar 同步 — 按角色真正隐藏「数据」Tab（非仅改文案）
  */
 import Taro from '@tarojs/taro';
 import type { Profile, UserRole } from '@/types/profile';
@@ -7,20 +7,19 @@ import { isTabBarPage } from '@/utils/navigation';
 
 export const STATISTICS_TAB_INDEX = 2;
 
-const FINANCE_TAB = {
-  text: '数据',
-  iconPath: 'assets/icons/checkin_unselected.png',
-  selectedIconPath: 'assets/icons/checkin_selected.png',
-};
-
-const HIDDEN_TAB = {
-  text: ' ',
-  iconPath: 'assets/icons/checkin_unselected.png',
-  selectedIconPath: 'assets/icons/checkin_unselected.png',
-};
-
-function isFinanceTabRole(role?: UserRole | null): boolean {
+export function isFinanceTabRole(role?: UserRole | null): boolean {
   return role === 'admin' || role === 'principal';
+}
+
+/** 自定义 TabBar 实例方法（由 src/custom-tab-bar 实现） */
+export interface CustomTabBarBridge {
+  setSelectedByPath?: (pagePath: string) => void;
+  refreshByRole?: (role?: UserRole | null) => void;
+  setColors?: (colors: {
+    color: string;
+    selectedColor: string;
+    backgroundColor: string;
+  }) => void;
 }
 
 function getCurrentPagePath(): string {
@@ -29,19 +28,39 @@ function getCurrentPagePath(): string {
   return route ? `/${route}` : '';
 }
 
-/** 同步原生 TabBar：非管理员弱化数�?Tab 展示（仅 Tab 页可�?setTabBarItem�?*/
+function getActiveCustomTabBar(): CustomTabBarBridge | null {
+  try {
+    const page = Taro.getCurrentInstance()?.page;
+    if (!page) return null;
+    return (Taro.getTabBar(page) as CustomTabBarBridge | null) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** 同步自定义 TabBar：仅 admin/principal 渲染「数据」；并刷新当前选中项 */
 export function syncTabBarByProfile(profile?: Profile | null): void {
   const currentPath = getCurrentPagePath();
   if (!currentPath || !isTabBarPage(currentPath)) {
     return;
   }
 
-  const showFinance = isFinanceTabRole(profile?.currentContext?.role);
-  const item = showFinance ? FINANCE_TAB : HIDDEN_TAB;
-  void Taro.setTabBarItem({ index: STATISTICS_TAB_INDEX, ...item }).catch(() => {
-    /* �?Tab 页或 Tab 未就绪时忽略 */
-  });
+  const tabBar = getActiveCustomTabBar();
+  if (!tabBar) return;
+
+  tabBar.refreshByRole?.(profile?.currentContext?.role ?? null);
+  tabBar.setSelectedByPath?.(currentPath);
 }
 
-/** @deprecated 兼容旧调�?*/
+/** 主题色同步到自定义 TabBar */
+export function syncCustomTabBarColors(colors: {
+  color: string;
+  selectedColor: string;
+  backgroundColor: string;
+}): void {
+  const tabBar = getActiveCustomTabBar();
+  tabBar?.setColors?.(colors);
+}
+
+/** @deprecated 兼容旧调用 */
 export const syncCustomTabBar = syncTabBarByProfile;

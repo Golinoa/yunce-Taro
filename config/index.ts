@@ -23,10 +23,10 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
     useMock = 'false';
   }
   const apiBaseUrl = process.env.TARO_API_BASE_URL ?? PROD_API_BASE_URL;
-  /** mock / API 地址切换时必须隔离 webpack 缓存，否则会复用错误产物 */
+  /** mock / API / Node 版本切换时必须隔离 webpack 缓存，否则会复用错误 chunk（如缺失的 sub-common） */
   const weappCacheKey = crypto
     .createHash('md5')
-    .update(`${useMock}|${apiBaseUrl}`)
+    .update(`${useMock}|${apiBaseUrl}|${process.version}`)
     .digest('hex')
     .slice(0, 10);
   // 构建目标平台（taro build --type xxx）。weapp 为纯小程序，组件编译为原生组件，

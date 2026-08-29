@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '消息授权',
+  navigationBarTitleText: '补充发送次数',
   navigationBarBackgroundColor: '#FFFFFF',
   navigationBarTextStyle: 'black',
 });

@@ -1,10 +1,11 @@
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
+import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import SegmentedControl from '@/components/SegmentedControl';
 import type {
   VenueOverviewType,
@@ -16,7 +17,11 @@ import type {
 } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
+import { useAuth } from '@/utils/auth';
+import { isUseMock } from '@/utils/build-env';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
+import { syncTabBarByProfile } from '@/utils/tab-bar';
 
 /**
  * 数据中心首页
@@ -29,6 +34,7 @@ import { useThemedNavigationBar } from '@/utils/navigation-bar';
  */
 const DataCenter: React.FC = () => {
   const { activeTheme } = useThemeStore();
+  const { profile } = useAuth();
   const [venueOverview, setVenueOverview] = useState<VenueOverviewType | null>(null);
 
   // 导航栏背景色与弥散渐变顶部一致，实现无缝衔接
@@ -36,6 +42,10 @@ const DataCenter: React.FC = () => {
     backgroundColor: themeHex.primarySoftBg,
     frontColor: '#000000',
   }));
+
+  useDidShow(() => {
+    syncTabBarByProfile(profile);
+  });
   const [revenueTrend, setRevenueTrend] = useState<RevenueTrendType | null>(null);
   const [financeData, setFinanceData] = useState<FinanceDataType | null>(null);
   const [memberData, setMemberData] = useState<MemberDataType | null>(null);
@@ -538,8 +548,10 @@ const DataCenter: React.FC = () => {
           <Text className="text-[20rpx] text-white font-medium mt-[4rpx]">记一笔</Text>
         </View>
       </View>
+
+      {isUseMock() ? <MockIdentitySwitcher /> : null}
     </View>
   );
 };
 
-export default DataCenter;
+export default withRouteGuard(DataCenter);

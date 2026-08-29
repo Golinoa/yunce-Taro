@@ -123,6 +123,8 @@ export async function createLeadFromInvite(params: {
   parentPhone?: string;
   childName: string;
   childNickname?: string;
+  childGender?: 'male' | 'female';
+  childAge?: string;
   teacherId: string;
   campusId: string;
   sourceType: 'share_link' | 'qr';
@@ -132,6 +134,8 @@ export async function createLeadFromInvite(params: {
   const created = await post<Record<string, unknown>>('/leads', {
     childName: params.childName,
     childNickname: params.childNickname,
+    childGender: params.childGender,
+    childAge: params.childAge,
     parentName: params.parentName,
     parentPhone: params.parentPhone,
     campusId: params.campusId,

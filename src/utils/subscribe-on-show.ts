@@ -30,6 +30,13 @@ export async function consumeSubscribeOnShow(options?: {
     const { profile } = await getSession();
     if (!profile?.id) return;
 
+    // 新用户：若注册手势内未完成授权，进站再试一次微信原生面板（无自定义弹框）
+    const handledLoginOptIn = await subscribeMessageService.maybeRunLoginOptIn({
+      role: options?.role,
+      campusId: options?.campusId,
+    });
+    if (handledLoginOptIn) return;
+
     const data = await subscribeMessageService.bootstrap(options?.role, options?.campusId);
 
     const pending = [...data.pendingPrompts].sort((a, b) => a.priority - b.priority);

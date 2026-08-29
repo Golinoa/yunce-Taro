@@ -1013,7 +1013,7 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     created_at: cls.createdAt,
     updated_at: cls.createdAt,
     type: cls.status === 'ended' ? 'ended' : cls.type,
-    status: cls.status,
+    status: cls.status === 'paused' ? 'paused' : cls.status === 'ended' ? 'ended' : 'active',
     schedule: cls.schedule,
     weekdays: cls.weekdays?.map(String),
     start_time: cls.startTime,
@@ -2173,7 +2173,7 @@ export const classService = {
                   {
                     id: `summary-${item.id}`,
                     name: '课时',
-                    type: 'private' as const,
+                    type: 'hour_package' as const,
                     total_hours: remaining,
                     remaining_hours: remaining,
                     purchased_remaining: remaining,
@@ -2265,6 +2265,10 @@ export const classService = {
 
     return (await getStudentsMock()).mockDeleteClass(classId);
   },
+  /** 停课：课表隐藏该班排课/开放时段，可恢复 */
+  pause: async (classId: string) => classService.update(classId, { status: 'paused' }),
+  /** 恢复上课 */
+  resume: async (classId: string) => classService.update(classId, { status: 'active' }),
   removeStudent: async (classId: string, studentId: string) =>
     isUseMock()
       ? (await getStudentsMock()).mockRemoveStudentFromClass(classId, studentId)

@@ -1,5 +1,6 @@
 import { View, Text, Input, Picker, Textarea, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import ActionButton from '@/components/ActionButton';
 import BottomSheet from '@/components/BottomSheet';
@@ -41,6 +42,8 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
@@ -410,7 +413,7 @@ const StudentEditSheet: React.FC<{
         {/* 确定按钮 */}
         <View className="flex justify-center pb-[8rpx]">
           <View
-            className="flex w-full items-center justify-center rounded-[48rpx] bg-[#FF7E67] py-[24rpx]"
+            className="flex w-full items-center justify-center rounded-[48rpx] bg-primary py-[24rpx]"
             onClick={async () => {
               await onConfirm();
               onClose();
@@ -426,6 +429,7 @@ const StudentEditSheet: React.FC<{
 
 const LessonForm: React.FC = () => {
   const { profile } = useAuth();
+  const themeStore = useThemeStore();
 
   const routeParams = useMemo(() => {
     const instance = Taro.getCurrentInstance();
@@ -776,7 +780,7 @@ const LessonForm: React.FC = () => {
         campusService.getList(),
         classService.getScheduledClassIds(),
       ]);
-      setClasses(classList.filter((item) => item.status === 'active'));
+      setClasses(classList.filter((item) => item.status === 'active' || item.status === 'paused'));
       setScheduledClassIds(new Set(scheduledIds));
       setTeacherOptions(teacherList);
       setCampusOptions(campusList);
@@ -1025,6 +1029,48 @@ const LessonForm: React.FC = () => {
     () => classes.find((item) => item.id === selectedClassId) || null,
     [classes, selectedClassId],
   );
+  const isClassPaused = selectedClass?.status === 'paused';
+
+  const handleToggleClassPause = useCallback(async () => {
+    if (!selectedClassId || !selectedClass) {
+      Taro.showToast({ title: '缺少班级信息', icon: 'none' });
+      return;
+    }
+    const pausing = selectedClass.status !== 'paused';
+    const confirmResult = await Taro.showModal({
+      title: pausing ? '停课确认' : '恢复上课',
+      content: pausing
+        ? `确定暂停【${selectedClass.name}】？停课后课表不再展示该班排课/开放时段，可随时恢复。`
+        : `确定恢复【${selectedClass.name}】上课？`,
+      confirmText: pausing ? '确认停课' : '恢复上课',
+      confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
+    });
+    if (!confirmResult.confirm) return;
+
+    try {
+      const updated = pausing
+        ? await classService.pause(selectedClassId)
+        : await classService.resume(selectedClassId);
+      if (!updated) {
+        Taro.showToast({ title: pausing ? '停课失败' : '恢复失败', icon: 'none' });
+        return;
+      }
+      setClasses((prev) =>
+        prev.map((item) =>
+          item.id === selectedClassId
+            ? { ...item, status: pausing ? 'paused' : 'active' }
+            : item,
+        ),
+      );
+      Taro.showToast({ title: pausing ? '已停课' : '已恢复上课', icon: 'success' });
+      if (pausing) {
+        setTimeout(() => Taro.navigateBack(), 500);
+      }
+    } catch (err) {
+      logError('LessonForm toggle class pause', err);
+      Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
+    }
+  }, [selectedClass, selectedClassId, themeStore.activeTheme]);
   const isClassDirectEntry = Boolean(classIdParam);
   const shouldShowModeTabs = !isClassDirectEntry;
 
@@ -2717,19 +2763,41 @@ const LessonForm: React.FC = () => {
                     </View>
                   </View>
                   {!isAlreadyChecked ? (
-                    <View
-                      className="flex items-center justify-center rounded-[12rpx] bg-[#FF7E67] px-[28rpx] py-[12rpx]"
-                      onClick={() => {
-                        if (!selectedClassId) {
-                          Taro.showToast({ title: '缺少班级信息', icon: 'none' });
-                          return;
-                        }
-                        Taro.navigateTo({
-                          url: `/package-course/pages/course-form/index?id=${encodeURIComponent(selectedClassId)}&type=class`,
-                        });
-                      }}
-                    >
-                      <Text className="text-[24rpx] font-medium leading-none text-white">编辑</Text>
+                    <View className="flex shrink-0 flex-row items-center gap-[12rpx]">
+                      <View
+                        className="flex items-center justify-center rounded-[12rpx] bg-primary px-[28rpx] py-[12rpx]"
+                        onClick={() => {
+                          if (!selectedClassId) {
+                            Taro.showToast({ title: '缺少班级信息', icon: 'none' });
+                            return;
+                          }
+                          Taro.navigateTo({
+                            url: `/package-course/pages/course-form/index?id=${encodeURIComponent(selectedClassId)}&type=class`,
+                          });
+                        }}
+                      >
+                        <Text className="text-[24rpx] font-medium leading-none text-primary-foreground">
+                          编辑
+                        </Text>
+                      </View>
+                      <View
+                        className={cn(
+                          'flex items-center justify-center rounded-[12rpx] px-[28rpx] py-[12rpx]',
+                          isClassPaused
+                            ? 'bg-primary'
+                            : 'border border-warning/30 bg-warning/10',
+                        )}
+                        onClick={() => void handleToggleClassPause()}
+                      >
+                        <Text
+                          className={cn(
+                            'text-[24rpx] font-medium leading-none',
+                            isClassPaused ? 'text-primary-foreground' : 'text-warning',
+                          )}
+                        >
+                          {isClassPaused ? '恢复' : '停课'}
+                        </Text>
+                      </View>
                     </View>
                   ) : null}
                 </View>
@@ -3071,10 +3139,10 @@ const LessonForm: React.FC = () => {
                       </Text>
                     </View>
                     <View
-                      className="rounded-[48rpx] bg-[#FF7E67] px-[36rpx] py-[22rpx]"
+                      className="rounded-[48rpx] bg-primary px-[36rpx] py-[22rpx]"
                       onClick={handleEnterEditMode}
                     >
-                      <Text className="text-center text-[28rpx] font-medium text-white">修改</Text>
+                      <Text className="text-center text-[28rpx] font-medium text-primary-foreground">修改</Text>
                     </View>
                   </View>
                 ) : (
@@ -3105,10 +3173,10 @@ const LessonForm: React.FC = () => {
                 </View>
               ) : isAlreadyChecked && attendanceMode === 'edit' ? (
                 <View
-                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting ? 'bg-muted' : 'bg-[#FF7E67]'}`}
+                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting ? 'bg-muted' : 'bg-primary'}`}
                   onClick={submitting ? undefined : handleSubmit}
                 >
-                  <Text className="text-center text-[28rpx] font-medium text-white">
+                  <Text className="text-center text-[28rpx] font-medium text-primary-foreground">
                     {submitting ? '保存中...' : '保存修改'}
                   </Text>
                 </View>
@@ -3118,11 +3186,19 @@ const LessonForm: React.FC = () => {
                 </View>
               ) : (
                 <View
-                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting || !selectedClassId ? 'bg-muted' : 'bg-[#FF7E67]'}`}
-                  onClick={submitting || !selectedClassId ? undefined : handleSubmit}
+                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting || !selectedClassId || isClassPaused ? 'bg-muted' : 'bg-primary'}`}
+                  onClick={
+                    submitting || !selectedClassId || isClassPaused
+                      ? () => {
+                          if (isClassPaused) {
+                            Taro.showToast({ title: '班级已停课，请先恢复上课', icon: 'none' });
+                          }
+                        }
+                      : handleSubmit
+                  }
                 >
-                  <Text className="text-center text-[28rpx] font-medium text-white">
-                    {submitting ? '提交中...' : '提交点名'}
+                  <Text className="text-center text-[28rpx] font-medium text-primary-foreground">
+                    {submitting ? '提交中...' : isClassPaused ? '已停课' : '提交点名'}
                   </Text>
                 </View>
               )}

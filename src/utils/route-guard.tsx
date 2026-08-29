@@ -27,6 +27,8 @@ const PUBLIC_PAGES = [
   '/package-settings/pages/about/index',
   '/package-settings/pages/feedback/index',
   '/package-student/pages/parent-bind/index',
+  /** 课表分享落地：未登录家长也可填信息建线索 */
+  '/package-lead/pages/invite-landing/index',
 ];
 const LOGIN_PAGE = '/package-auth/pages/login/index';
 const REDIRECT_KEY = 'loginRedirectPath';
@@ -89,6 +91,12 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-statistics/pages/card-data/index': MANAGER_ROLES,
   'package-statistics/pages/salary-data/index': MANAGER_ROLES,
   'package-statistics/pages/record-transaction/index': MANAGER_ROLES,
+  'package-statistics/pages/alert-detail/index': MANAGER_ROLES,
+  // —— 机构配置类系统设置（运行前角色校验） ——
+  'package-settings/pages/permission-settings/index': ['admin'],
+  'package-settings/pages/threshold-config/index': ['admin'],
+  'package-settings/pages/theme-settings/index': MANAGER_ROLES,
+  'package-settings/pages/todo-settings/index': MANAGER_ROLES,
   // —— 门店入驻（仅 admin/principal） ——
   'package-settings/pages/store-entry/index': MANAGER_ROLES,
   'package-settings/pages/store-entry/pending/index': MANAGER_ROLES,
@@ -130,6 +138,9 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-statistics/pages/card-data/index': 'finance',
   'package-statistics/pages/salary-data/index': 'finance',
   'package-statistics/pages/record-transaction/index': 'finance',
+  'package-statistics/pages/alert-detail/index': 'finance',
+  'package-settings/pages/permission-settings/index': 'settings',
+  'package-settings/pages/threshold-config/index': 'settings',
   // 门店入驻属于新用户入驻流程，不能挂 settings：校长默认无 settings 模块，
   // 会导致身份选择点「门店入驻」被守卫踢回首页（表现为「直接进主页」）。
 };

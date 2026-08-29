@@ -1,16 +1,20 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import Icon from '@/components/Icon';
+import { calendarSyncService } from '@/services/calendar-sync';
 import { subscribeMessageService } from '@/services/subscribe-message';
+import { useAuth } from '@/utils/auth';
+import {
+  canUseCalendarSync,
+  getCalendarSyncSettings,
+} from '@/utils/calendar-sync-settings';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
+import { logError } from '@/utils/logger';
 
-/**
- * 通知设置项
- */
 interface NotifyItem {
   id: string;
   label: string;
@@ -18,9 +22,6 @@ interface NotifyItem {
   enabled: boolean;
 }
 
-/**
- * 通知分组
- */
 interface NotifyGroup {
   title: string;
   items: NotifyItem[];
@@ -28,12 +29,33 @@ interface NotifyGroup {
 
 /**
  * 消息通知页面
- *
- * 按系统实际提供的通知能力分组展示，每项使用「左侧标题 + 右侧开关」布局。
- * 未接入业务的功能不展示，避免界面冗余。
+ * - 顶部总开关（默认开）
+ * - 同步日历（默认关）
+ * - 补充发送次数
+ * - 分组业务提醒
  */
 const NotificationsPage: React.FC = () => {
   useCardNavigationBar();
+  const { profile } = useAuth();
+  const currentUserId = profile?.id || '';
+  const currentRole = profile?.currentContext?.role;
+  const navigatingRef = useRef(false);
+  const [masterEnabled, setMasterEnabled] = useState(() =>
+    subscribeMessageService.getMasterNotifyEnabled(),
+  );
+  const [masterBusy, setMasterBusy] = useState(false);
+  const [calendarEnabled, setCalendarEnabled] = useState(false);
+  const [calendarBusy, setCalendarBusy] = useState(false);
+  const showCalendarSwitch = canUseCalendarSync(currentRole);
+
+  useEffect(() => {
+    if (!currentUserId || !showCalendarSwitch) {
+      setCalendarEnabled(false);
+      return;
+    }
+    setCalendarEnabled(getCalendarSyncSettings(currentUserId).enabled);
+  }, [currentUserId, showCalendarSwitch]);
+
   const [groups, setGroups] = useState<NotifyGroup[]>([
     {
       title: '通知学员',
@@ -88,48 +110,155 @@ const NotificationsPage: React.FC = () => {
     },
   ]);
 
-  const handleToggle = useCallback((groupIndex: number, itemIndex: number) => {
-    setGroups((prev) => {
-      const next = prev.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) }));
-      const item = next[groupIndex]?.items[itemIndex];
-      if (item) {
-        item.enabled = !item.enabled;
+  const handleToggle = useCallback(
+    (groupIndex: number, itemIndex: number) => {
+      if (!masterEnabled) {
+        Taro.showToast({ title: '请先打开顶部消息通知开关', icon: 'none' });
+        return;
       }
-      return next;
-    });
+      setGroups((prev) => {
+        const next = prev.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i })) }));
+        const item = next[groupIndex]?.items[itemIndex];
+        if (item) {
+          item.enabled = !item.enabled;
+        }
+        return next;
+      });
+    },
+    [masterEnabled],
+  );
+
+  const handleMasterChange = useCallback(
+    async (next: boolean) => {
+      if (masterBusy) return;
+      setMasterBusy(true);
+      setMasterEnabled(next);
+      try {
+        if (!next) {
+          await subscribeMessageService.setMasterNotifyEnabled(false, { requestAuth: false });
+          Taro.showToast({ title: '已关闭微信提醒', icon: 'none' });
+          return;
+        }
+        await subscribeMessageService.setMasterNotifyEnabled(true, { requestAuth: false });
+        await subscribeMessageService.requestNativeNotifyAuth({ scene: 'settings_toggle' });
+        Taro.showToast({ title: '已开启消息通知', icon: 'none' });
+      } catch (err) {
+        logError('notifications.masterToggle', err);
+        setMasterEnabled(!next);
+        Taro.showToast({ title: '设置失败，请重试', icon: 'none' });
+      } finally {
+        setMasterBusy(false);
+      }
+    },
+    [masterBusy],
+  );
+
+  const handleCalendarChange = useCallback(
+    async (enabled: boolean) => {
+      if (!currentUserId || calendarBusy) return;
+      setCalendarBusy(true);
+      setCalendarEnabled(enabled);
+      try {
+        if (!enabled) {
+          calendarSyncService.disable(currentUserId);
+          Taro.showToast({ title: '已关闭日历同步', icon: 'none' });
+          return;
+        }
+        await calendarSyncService.enableAndSync({
+          userId: currentUserId,
+          teacherId: currentUserId,
+          role: currentRole ?? undefined,
+          campusId: profile?.currentContext?.campusId,
+          directAuth: true,
+        });
+        Taro.showToast({ title: '已开启日历同步', icon: 'none' });
+      } catch (err) {
+        logError('notifications.calendarToggle', err);
+        setCalendarEnabled(getCalendarSyncSettings(currentUserId).enabled);
+        Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
+      } finally {
+        setCalendarBusy(false);
+      }
+    },
+    [calendarBusy, currentRole, currentUserId, profile?.currentContext?.campusId],
+  );
+
+  const handleOpenMessageAuth = useCallback(() => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
+    void Taro.navigateTo({ url: subscribeMessageService.messageAuthPageUrl })
+      .catch((err) => {
+        logError('notifications.navigateMessageAuth', err);
+        Taro.showToast({ title: '页面打开失败', icon: 'none' });
+      })
+      .finally(() => {
+        setTimeout(() => {
+          navigatingRef.current = false;
+        }, 600);
+      });
   }, []);
 
   return (
     <PageContainer>
       <View className="min-h-screen bg-background">
-        {/* 分组列表 */}
-        <View className="px-[32rpx] pt-[24rpx] pb-[60rpx] flex flex-col gap-[24rpx]">
-          <View
-            className="flex flex-row items-center justify-between rounded-[28rpx] bg-card px-[32rpx] py-[28rpx] active:opacity-90"
-            onClick={() => Taro.navigateTo({ url: subscribeMessageService.messageAuthPageUrl })}
-          >
-            <View className="flex-1">
-              <Text className="text-[30rpx] font-medium text-foreground">微信订阅消息授权</Text>
-              <Text className="mt-[8rpx] text-[24rpx] text-muted-foreground">
-                查看剩余可发送次数，点击补充授权
+        <View className="flex flex-col gap-[24rpx] px-[32rpx] pb-[60rpx] pt-[24rpx]">
+          <View className="flex flex-row items-center justify-between rounded-[28rpx] bg-card px-[32rpx] py-[28rpx]">
+            <View className="mr-[24rpx] min-w-0 flex-1">
+              <Text className="block text-[30rpx] font-medium text-foreground">消息通知</Text>
+              <Text className="mt-[8rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
+                打开即同意小程序使用微信订阅消息向您推送提醒；关闭后不再发送微信服务通知
               </Text>
             </View>
-            <Icon name="chevron-right" size={20} className="text-muted-foreground" />
+            <Switch checked={masterEnabled} disabled={masterBusy} onChange={handleMasterChange} />
           </View>
-          <Text className="text-[24rpx] text-muted-foreground leading-relaxed px-[8rpx]">
-            以下开关控制微信订阅消息等站外推送；关闭后不影响首页「待办事项」Tab 内的页面内提醒。
+
+          {showCalendarSwitch ? (
+            <View className="flex flex-row items-center justify-between rounded-[28rpx] bg-card px-[32rpx] py-[28rpx]">
+              <View className="mr-[24rpx] min-w-0 flex-1">
+                <Text className="block text-[30rpx] font-medium text-foreground">同步日历</Text>
+                <Text className="mt-[8rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
+                  默认关闭。开启后将未来一周课表写入手机日历，上课前可在系统日历收到提醒（比微信消息更稳）
+                </Text>
+              </View>
+              <Switch
+                checked={calendarEnabled}
+                disabled={calendarBusy}
+                onChange={handleCalendarChange}
+              />
+            </View>
+          ) : null}
+
+          <View
+            className="flex flex-row items-center justify-between rounded-[28rpx] bg-card px-[32rpx] py-[28rpx] active:opacity-90"
+            onClick={handleOpenMessageAuth}
+          >
+            <View className="mr-[16rpx] min-w-0 flex-1">
+              <Text className="block text-[30rpx] font-medium text-foreground">补充发送次数</Text>
+              <Text className="mt-[8rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
+                微信每次授权可攒 1 次服务通知；次数用完后重要事项仍会在小程序内提醒
+              </Text>
+            </View>
+            <Icon name="mdi-chevron-right" size={20} color="mutedForeground" />
+          </View>
+
+          <Text className="block px-[8rpx] text-[24rpx] leading-relaxed text-muted-foreground">
+            以下开关控制各类业务提醒偏好；关闭后不影响首页「待办事项」内的页面提醒。总开关关闭时微信侧不再推送。
           </Text>
+
           {groups.map((group, groupIndex) => (
-            <View key={group.title} className="bg-card rounded-[28rpx] overflow-hidden">
-              {/* 分组标题 */}
-              <View className="flex flex-row items-center px-[32rpx] pt-[28rpx] pb-[12rpx]">
-                <View className="w-[8rpx] h-[24rpx] rounded-[4rpx] bg-primary mr-[12rpx]" />
+            <View
+              key={group.title}
+              className={`overflow-hidden rounded-[28rpx] bg-card ${
+                masterEnabled ? '' : 'opacity-55'
+              }`}
+            >
+              <View className="flex flex-row items-center px-[32rpx] pb-[12rpx] pt-[28rpx]">
+                <View className="mr-[12rpx] h-[24rpx] w-[8rpx] rounded-[4rpx] bg-primary" />
                 <Text className="text-[26rpx] font-semibold text-muted-foreground">
                   {group.title}
                 </Text>
               </View>
 
-              {/* 通知项 */}
               <View className="flex flex-col">
                 {group.items.map((item, itemIndex) => (
                   <View
@@ -138,16 +267,19 @@ const NotificationsPage: React.FC = () => {
                       itemIndex < group.items.length - 1 ? 'border-b-[1rpx] border-border' : ''
                     }`}
                   >
-                    <View className="flex-1 mr-[24rpx]">
-                      <Text className="text-[30rpx] font-medium text-foreground">{item.label}</Text>
-                      {item.sub && (
-                        <Text className="text-[24rpx] text-muted-foreground mt-[6rpx]">
+                    <View className="mr-[24rpx] min-w-0 flex-1">
+                      <Text className="block text-[30rpx] font-medium text-foreground">
+                        {item.label}
+                      </Text>
+                      {item.sub ? (
+                        <Text className="mt-[6rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
                           {item.sub}
                         </Text>
-                      )}
+                      ) : null}
                     </View>
                     <Switch
-                      checked={item.enabled}
+                      checked={item.enabled && masterEnabled}
+                      disabled={!masterEnabled}
                       onChange={() => handleToggle(groupIndex, itemIndex)}
                     />
                   </View>

@@ -279,18 +279,13 @@ export async function mockPrepareEmailLogin(
         error: { message: '请输入正确的邮箱地址' },
       };
     }
-    const emailUser = findUserByEmail(trimmedIdentifier);
-    if (!emailUser || !emailUser.email) {
-      return {
-        status: 'email_not_found',
-        error: { message: '邮箱不存在' },
-      };
-    }
-    emailLoginCodeMap[normalizeValue(emailUser.email)] = EMAIL_LOGIN_CODE;
+    // 与生产一致：未注册邮箱也可发码，登录/注册时再创建账号
+    const normalizedEmail = normalizeValue(trimmedIdentifier);
+    emailLoginCodeMap[normalizedEmail] = EMAIL_LOGIN_CODE;
     return {
       status: 'ready',
-      email: emailUser.email,
-      maskedEmail: maskEmail(emailUser.email),
+      email: trimmedIdentifier.trim(),
+      maskedEmail: maskEmail(trimmedIdentifier.trim()),
       error: null,
     };
   }
@@ -323,19 +318,45 @@ export async function mockLoginByEmailCode(
 ): Promise<{
   session: AuthSession | null;
   profile: Profile | null;
+  isNewUser?: boolean;
   error: { message: string } | null;
 }> {
   await delay(600);
-  const normalizedEmail = normalizeValue(email);
-  const user = findUserByEmail(normalizedEmail);
-  if (!user || !user.email) {
-    return { session: null, profile: null, error: { message: '邮箱不存在' } };
+  const trimmedEmail = email.trim();
+  if (!isEmail(trimmedEmail)) {
+    return { session: null, profile: null, error: { message: '请输入正确的邮箱地址' } };
   }
+  const normalizedEmail = normalizeValue(trimmedEmail);
   const savedCode = emailLoginCodeMap[normalizedEmail] || EMAIL_LOGIN_CODE;
   if (code.trim() !== savedCode) {
     return { session: null, profile: null, error: { message: '验证码错误' } };
   }
-  return buildAuthResult(user);
+
+  const existing = findUserByEmail(normalizedEmail);
+  if (existing?.email) {
+    return { ...buildAuthResult(existing), isNewUser: false };
+  }
+
+  const localPart = trimmedEmail.split('@')[0] || 'user';
+  const usernameBase = localPart.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16) || 'user';
+  let username = usernameBase;
+  let suffix = 1;
+  while (USERS.some((u) => normalizeValue(u.username) === normalizeValue(username))) {
+    username = `${usernameBase}${suffix}`;
+    suffix += 1;
+  }
+
+  const newUser: User = {
+    id: generateId('user'),
+    username,
+    password: EMAIL_LOGIN_CODE,
+    email: trimmedEmail,
+    name: '',
+    phone: '',
+    createdAt: new Date().toISOString(),
+  };
+  USERS.push(newUser);
+  return { ...buildAuthResult(newUser), isNewUser: true };
 }
 
 export async function mockPrepareAccountRecovery(email: string): Promise<{
@@ -409,15 +430,18 @@ export async function mockPreparePasswordReset(account: string): Promise<{
   if (!trimmedAccount) {
     return {
       status: 'account_not_found',
-      error: { message: '请输入账号' },
+      error: { message: '请输入邮箱' },
     };
   }
 
-  const user = findUserByAccount(trimmedAccount);
+  // 优先按邮箱查找（与生产 /email-code purpose=RESET 一致）
+  const user = isEmail(trimmedAccount)
+    ? findUserByEmail(trimmedAccount)
+    : findUserByAccount(trimmedAccount);
   if (!user) {
     return {
       status: 'account_not_found',
-      error: { message: '账号不存在' },
+      error: { message: isEmail(trimmedAccount) ? '该邮箱未注册' : '账号不存在' },
     };
   }
   if (!user.email) {
@@ -430,7 +454,7 @@ export async function mockPreparePasswordReset(account: string): Promise<{
   passwordResetCodeMap[normalizeValue(user.email)] = EMAIL_LOGIN_CODE;
   return {
     status: 'ready',
-    account: user.username,
+    account: user.email,
     email: user.email,
     maskedEmail: maskEmail(user.email),
     error: null,
@@ -444,9 +468,11 @@ export async function mockResetPasswordByEmailCode(
 ): Promise<{ error: { message: string } | null }> {
   await delay(450);
   const trimmedAccount = account.trim();
-  const user = findUserByAccount(trimmedAccount);
+  const user = isEmail(trimmedAccount)
+    ? findUserByEmail(trimmedAccount)
+    : findUserByAccount(trimmedAccount);
   if (!user) {
-    return { error: { message: '账号不存在' } };
+    return { error: { message: isEmail(trimmedAccount) ? '该邮箱未注册' : '账号不存在' } };
   }
   if (!user.email) {
     return { error: { message: '该账号未绑定邮箱，暂时无法自助重置密码' } };
@@ -553,23 +579,32 @@ export async function mockRegisterStep1(
 ): Promise<{ tempToken: string | null; error: { message: string } | null }> {
   await delay(400);
   if (!username.trim() || !password.trim()) {
-    return { tempToken: null, error: { message: '请填写用户名和密码' } };
+    return { tempToken: null, error: { message: '请填写邮箱和密码' } };
   }
-  if (!isAccountFormatValid(username.trim())) {
+  const trimmedUsername = username.trim();
+  const isEmailUsername = isEmail(trimmedUsername);
+  if (!isEmailUsername && !isAccountFormatValid(trimmedUsername)) {
     return { tempToken: null, error: { message: `账号仅支持${ACCOUNT_RULE_TEXT}` } };
   }
   if (password.length < 6) {
     return { tempToken: null, error: { message: '密码至少6位' } };
   }
-  if (USERS.some((u) => u.username === username)) {
-    return { tempToken: null, error: { message: '用户名已存在' } };
+  if (
+    USERS.some(
+      (u) =>
+        u.username === trimmedUsername ||
+        (isEmailUsername && u.email && normalizeValue(u.email) === normalizeValue(trimmedUsername)),
+    )
+  ) {
+    return { tempToken: null, error: { message: isEmailUsername ? '该邮箱已注册' : '用户名已存在' } };
   }
 
   const tempToken = generateToken();
   const draft: RegisterDraft = {
     tempToken,
-    username: username.trim(),
+    username: trimmedUsername,
     password,
+    email: isEmailUsername ? trimmedUsername : undefined,
     inviteCode: inviteCode?.trim().toUpperCase(),
   };
   registerDrafts[tempToken] = draft;
@@ -621,6 +656,7 @@ export async function mockRegisterStep3(
     id: userId,
     username: draft.username,
     password: draft.password,
+    email: draft.email || (isEmail(draft.username) ? draft.username : undefined),
     name: '',
     phone: '',
     createdAt: new Date().toISOString(),

@@ -12,6 +12,7 @@ import PageContainer from '@/components/PageContainer';
 import { useThemeStore } from '@/stores/theme';
 import { THEME_KEYS, THEME_META, hexThemeColors, type ThemeKey } from '@/theme';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 
 const ThemeSettings: React.FC = () => {
   useCardNavigationBar();
@@ -84,4 +85,4 @@ const ThemeSettings: React.FC = () => {
   );
 };
 
-export default ThemeSettings;
+export default withRouteGuard(ThemeSettings);

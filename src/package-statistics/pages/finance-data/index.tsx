@@ -10,6 +10,7 @@ import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 
 const CHART_CANVAS_W = 340;
 const CHART_CANVAS_H = 260;
@@ -419,4 +420,4 @@ const FinanceData: React.FC = () => {
   );
 };
 
-export default FinanceData;
+export default withRouteGuard(FinanceData);

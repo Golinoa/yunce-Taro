@@ -1032,19 +1032,27 @@ const ScheduleForm: React.FC = () => {
           logError('emit schedule refresh signal', err);
         }
         Taro.showToast({ title: '调课成功', icon: 'success', duration: 800 });
-        void subscribeMessageService
-          .runFlow('E07', {
-            className: selectedClass?.name || '',
-            role: profile?.currentContext?.role,
-            campusId: profile?.currentContext?.campusId,
-          })
-          .catch((error) => logError('subscribe E07 after reschedule', error));
-        void calendarSyncService.syncAfterScheduleChange({
-          userId: currentUserId,
-          teacherId: currentUserId,
-          campusId: profile?.currentContext?.campusId,
-          role: profile?.currentContext?.role,
-        });
+        void (async () => {
+          try {
+            await subscribeMessageService.runFlow('E07', {
+              className: selectedClass?.name || '',
+              role: profile?.currentContext?.role,
+              campusId: profile?.currentContext?.campusId,
+            });
+          } catch (error) {
+            logError('subscribe E07 after reschedule', error);
+          }
+          try {
+            await calendarSyncService.maybePromptAfterScheduleSave({
+              userId: currentUserId,
+              teacherId: currentUserId,
+              campusId: profile?.currentContext?.campusId,
+              role: profile?.currentContext?.role,
+            });
+          } catch (error) {
+            logError('calendar prompt after reschedule', error);
+          }
+        })();
         setTimeout(() => {
           Taro.navigateBack({
             fail: () => {
@@ -1275,20 +1283,28 @@ const ScheduleForm: React.FC = () => {
           icon: 'success',
           duration: 800,
         });
-        // 订阅/日历同步不阻断返回课表
-        void subscribeMessageService
-          .runFlow('E07', {
-            className: selectedClass?.name || '',
-            role: profile?.currentContext?.role,
-            campusId: profile?.currentContext?.campusId,
-          })
-          .catch((error) => logError('subscribe E07 after schedule save', error));
-        void calendarSyncService.syncAfterScheduleChange({
-          userId: currentUserId,
-          teacherId: currentUserId,
-          campusId: profile?.currentContext?.campusId,
-          role: profile?.currentContext?.role,
-        });
+        // 订阅授权后再询问日历同步；不阻断返回课表
+        void (async () => {
+          try {
+            await subscribeMessageService.runFlow('E07', {
+              className: selectedClass?.name || '',
+              role: profile?.currentContext?.role,
+              campusId: profile?.currentContext?.campusId,
+            });
+          } catch (error) {
+            logError('subscribe E07 after schedule save', error);
+          }
+          try {
+            await calendarSyncService.maybePromptAfterScheduleSave({
+              userId: currentUserId,
+              teacherId: currentUserId,
+              campusId: profile?.currentContext?.campusId,
+              role: profile?.currentContext?.role,
+            });
+          } catch (error) {
+            logError('calendar prompt after schedule save', error);
+          }
+        })();
         setTimeout(goBackToSchedule, 500);
       } catch (err) {
         logError('schedule-form save', err);
@@ -1997,9 +2013,6 @@ const ScheduleForm: React.FC = () => {
           const next = v === 'group' ? 'group' : 'class';
           setScheduleType(next);
           setClassId('');
-          if (next === 'class') {
-            setMinOpenEnabled(false);
-          }
           setTypePickerVisible(false);
         }}
       />

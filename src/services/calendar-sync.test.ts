@@ -155,7 +155,7 @@ describe('calendarSyncService.maybePromptOnSchedulePage', () => {
     __resetCalendarSyncEventMapForTest();
   });
 
-  it('用户点暂不后提示系统设置入口', async () => {
+  it('用户点暂不后提示消息通知入口', async () => {
     vi.spyOn(Taro, 'showModal').mockResolvedValue({ confirm: false, cancel: true } as never);
     const showToastSpy = vi.spyOn(Taro, 'showToast');
 
@@ -168,7 +168,7 @@ describe('calendarSyncService.maybePromptOnSchedulePage', () => {
 
     expect(showToastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: expect.stringContaining('系统设置'),
+        title: expect.stringContaining('消息通知'),
       }),
     );
     const settings = getCalendarSyncSettings(USER);

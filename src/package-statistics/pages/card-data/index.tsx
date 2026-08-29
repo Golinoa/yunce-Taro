@@ -9,6 +9,7 @@ import type { CardDetailType } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 
 /**
  * 卡项数据详情页
@@ -188,4 +189,4 @@ const CardData: React.FC = () => {
   );
 };
 
-export default CardData;
+export default withRouteGuard(CardData);

@@ -1019,7 +1019,11 @@ export default defineConfig({
     'bg-f5faf8-border-d5e8e0': { background: '#F5F8FC', border: '3rpx solid #D5E2F5' },
     'bg-gradient-primary-dark2': { background: 'linear-gradient(135deg, #3B6EF5, #2563EB)' },
 
-    // ===== 登录页装饰效果 =====
+    // ===== 登录页 =====
+    'bg-login-page': {
+      background:
+        'radial-gradient(ellipse 58% 42% at 0% 0%, rgba(107, 149, 245, 0.22) 0%, rgba(59, 110, 245, 0.08) 42%, transparent 72%), radial-gradient(ellipse 58% 42% at 100% 0%, rgba(107, 149, 245, 0.2) 0%, rgba(59, 110, 245, 0.07) 42%, transparent 72%), #FFFFFF',
+    },
     'bg-login-gradient': {
       background: 'linear-gradient(180deg, #F0F4FF 0%, #F5F8FF 35%, #FFFFFF 100%)',
     },
@@ -1034,7 +1038,15 @@ export default defineConfig({
       'box-shadow': 'inset 0 0 60rpx rgba(255,255,255,0.9), 0 32rpx 80rpx -28rpx rgba(59,110,245,0.18)',
     },
     'shadow-login-btn': { 'box-shadow': '0 16rpx 44rpx rgba(59,110,245,0.25)' },
-    'shadow-wechat-btn': { 'box-shadow': '0 16rpx 44rpx rgba(7,193,96,0.25)' },
+    'shadow-wechat-btn': { 'box-shadow': '0 16rpx 40rpx rgba(7,193,96,0.28)' },
+    'bg-login-bubble': { 'background-color': '#3B6EF5' },
+    'bg-login-field': { 'background-color': '#F3F3F3' },
+    'border-login-email-btn': { border: '3rpx solid rgba(59, 110, 245, 0.35)' },
+    'bg-gradient-wechat-solid': {
+      background: 'linear-gradient(135deg, #22C55E 0%, #07C160 55%, #06AD56 100%)',
+    },
+    'rotate-login-slogan': { transform: 'rotate(-8deg)' },
+    'shadow-login-sheet': { 'box-shadow': '0 -12rpx 40rpx rgba(59,110,245,0.1)' },
 
     // ===== 品牌色 =====
     'text-wechat': { color: '#07C160' },

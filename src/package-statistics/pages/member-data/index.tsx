@@ -9,6 +9,7 @@ import type { MemberDetailType } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 
 /**
  * 会员数据详情页
@@ -309,4 +310,4 @@ const MemberData: React.FC = () => {
   );
 };
 
-export default MemberData;
+export default withRouteGuard(MemberData);

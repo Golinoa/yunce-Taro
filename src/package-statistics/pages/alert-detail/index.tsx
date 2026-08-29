@@ -8,6 +8,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { AlertItem, AlertDetailItem, AlertLevel } from '@/components/statistics/AlertSheet';
 import { statisticsService } from '@/services';
 import { getAlertReadIds, markAlertRead, markAlertsRead } from '@/utils/alert-read';
+import { withRouteGuard } from '@/utils/route-guard';
 
 /** 预警级别颜色配置 */
 const LEVEL_STYLE: Record<AlertLevel, { bg: string; text: string; dot: string }> = {
@@ -169,7 +170,7 @@ const AlertDetail: React.FC = () => {
   );
 };
 
-export default AlertDetail;
+export default withRouteGuard(AlertDetail);
 
 definePageConfig({
   navigationBarTitleText: '预警详情',

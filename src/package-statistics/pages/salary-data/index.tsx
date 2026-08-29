@@ -9,6 +9,7 @@ import type { SalaryDetailType } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 
 /**
  * 薪资数据详情页
@@ -204,4 +205,4 @@ const SalaryData: React.FC = () => {
   );
 };
 
-export default SalaryData;
+export default withRouteGuard(SalaryData);

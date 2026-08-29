@@ -18,7 +18,7 @@
 | [06-home-ux-backlog.md](./06-home-ux-backlog.md)             | 持续     | 首页 & 周边体验待办（#1–#12）                                          |
 | [07-todo-quadrant-api-contract.md](./07-todo-quadrant-api-contract.md) | 契约 | 待办四象限 API                                                         |
 | [08-todo-module-api-contract.md](./08-todo-module-api-contract.md)   | 契约 | 待办模块 API                                                           |
-| [09-platform-capabilities-backlog.md](./09-platform-capabilities-backlog.md) | 持续 | 小程序平台能力待办（转发分享、添加桌面等）                             |
+| [09-platform-capabilities-backlog.md](./09-platform-capabilities-backlog.md) | 持续 | 小程序平台能力待办（转发分享、添加桌面、NutUI 补通用组件等）          |
 | [subscribe-message/](./subscribe-message/README.md)          | 持续     | 微信订阅消息方案与接口契约                                             |
 
 ---

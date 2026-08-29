@@ -120,6 +120,7 @@ export default defineAppConfig({
         'pages/notification-send/index',
         'pages/agreement/index',
         'pages/about/index',
+        'pages/membership/index',
         'pages/store-entry/index',
         'pages/store-entry/pending/index',
         'pages/notifications/index',
@@ -181,6 +182,7 @@ export default defineAppConfig({
     navigationBarTextStyle: 'white',
   },
   tabBar: {
+    custom: true,
     color: '#999999',
     selectedColor: '#3B6EF5',
     backgroundColor: '#ffffff',

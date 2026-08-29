@@ -1,203 +1,304 @@
 /**
- * 注册 Step1：创建账号 - 支付宝风格
- * 点击注册后检查协议同意状态，未同意则弹出协议确认 BottomSheet
+ * 注册页 — 对齐登录页视觉：邮箱验证码注册（未注册邮箱会创建账号）
  */
-import { View, Text } from '@tarojs/components';
+import { View, Text, Image, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
-import FormInput from '@/components/FormInput';
-import Icon from '@/components/Icon';
-import { BRAND_NAME_ZH } from '@/constants/brand';
-import { authCapabilities } from '@/services/auth';
+import { BRAND_LOGO } from '@/constants/brand';
+import { prepareEmailLogin } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
-import {
-  ACCOUNT_MAX_LENGTH,
-  ACCOUNT_RULE_TEXT,
-  isAccountFormatValid,
-  sanitizeAccountInput,
-} from '@/utils/account';
+import { isUseMock } from '@/utils/build-env';
+import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useAuth } from '@/utils/auth';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
-const MIN_PASSWORD_LENGTH = 6;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODE_COUNTDOWN_SEC = 60;
+const DEMO_CODE_HINT = '演示环境验证码为 123456';
 
-const RegisterStep1: React.FC = () => {
-  const { signUpStep1 } = useAuth();
-  const { setAgreed } = useAgreementStore();
+const Register: React.FC = () => {
+  const { profile, signInWithEmailCode } = useAuth();
+  const { agreed, setAgreed } = useAgreementStore();
   const navHeight = useNavSafeHeight();
 
-  const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [showAgreementDialog, setShowAgreementDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showAgreementSheet, setShowAgreementSheet] = useState(false);
-  const usesMockRegister = authCapabilities.usesMockRegister;
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [pendingRegister, setPendingRegister] = useState(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const validate = useCallback(() => {
-    if (!usesMockRegister) {
-      const normalizedPhone = phone.trim();
-      if (!normalizedPhone) {
-        Taro.showToast({ title: '请输入手机号', icon: 'none' });
-        return false;
+  useEffect(() => {
+    if (profile) {
+      const isNewUser = consumeLastLoginIsNewUser();
+      navigateAfterAuth(profile, isNewUser ? { isNewUser: true } : undefined);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
       }
-      if (!/^1[3-9]\d{9}$/.test(normalizedPhone)) {
-        Taro.showToast({ title: '请输入正确的手机号', icon: 'none' });
-        return false;
-      }
-      return true;
-    }
+    };
+  }, []);
 
-    const normalizedUsername = username.trim();
-    const normalizedPassword = password.trim();
-
-    if (!normalizedUsername) {
-      Taro.showToast({ title: '请输入账号', icon: 'none' });
-      return false;
+  const startCountdown = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
     }
-    if (!isAccountFormatValid(normalizedUsername)) {
-      Taro.showToast({ title: `账号仅支持${ACCOUNT_RULE_TEXT}`, icon: 'none' });
-      return false;
-    }
-    if (!normalizedPassword) {
-      Taro.showToast({ title: '请输入密码', icon: 'none' });
-      return false;
-    }
-    if (normalizedPassword.length < MIN_PASSWORD_LENGTH) {
-      Taro.showToast({ title: `密码至少${MIN_PASSWORD_LENGTH}位`, icon: 'none' });
-      return false;
-    }
-    return true;
-  }, [usesMockRegister, phone, username, password]);
-
-  const handleUsernameInput = useCallback((value: string) => {
-    // 注册账号只允许安全白名单字符，输入阶段直接过滤掉汉字、空格和特殊符号。
-    setUsername(sanitizeAccountInput(value));
+    setCountdown(CODE_COUNTDOWN_SEC);
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   }, []);
 
   const executeRegister = useCallback(async () => {
     if (submitting) return;
+    const trimmedEmail = email.trim();
+    const trimmedCode = code.trim();
 
     setSubmitting(true);
-    const { error } = usesMockRegister
-      ? await signUpStep1({ username: username.trim(), password: password.trim() })
-      : await signUpStep1({ phone: phone.trim() });
-    setSubmitting(false);
-    setShowAgreementSheet(false);
+    try {
+      const { error, isNewUser } = await signInWithEmailCode(trimmedEmail, trimmedCode);
+      if (error) {
+        Taro.showToast({ title: error.message || '注册失败', icon: 'none' });
+        return;
+      }
+      Taro.setStorageSync('justLoggedIn', 'true');
+      if (!isNewUser) {
+        Taro.showToast({ title: '该邮箱已注册，已为您登录', icon: 'none' });
+      }
+    } catch {
+      Taro.showToast({ title: '注册失败', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+      setPendingRegister(false);
+    }
+  }, [code, email, signInWithEmailCode, submitting]);
 
-    if (error) {
-      Taro.showToast({ title: error.message || '注册失败', icon: 'none' });
+  const handleSendCode = useCallback(async () => {
+    if (sendingCode || countdown > 0) return;
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      Taro.showToast({ title: '请输入邮箱', icon: 'none' });
+      return;
+    }
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      Taro.showToast({ title: '请输入正确的邮箱地址', icon: 'none' });
       return;
     }
 
-    Taro.navigateTo({ url: '/package-auth/pages/register/role-select' });
-  }, [submitting, usesMockRegister, username, password, phone, signUpStep1]);
+    setSendingCode(true);
+    const result = await prepareEmailLogin(trimmedEmail, 'email');
+    setSendingCode(false);
 
-  const handleRegisterClick = useCallback(() => {
-    if (!validate()) return;
-    setShowAgreementSheet(true);
-  }, [validate]);
+    if (result.error || result.status !== 'ready') {
+      Taro.showToast({ title: result.error?.message || '验证码发送失败', icon: 'none' });
+      return;
+    }
 
-  const handleConfirmAgreement = useCallback(() => {
+    startCountdown();
+    const tip = isUseMock()
+      ? DEMO_CODE_HINT
+      : `验证码已发送至${result.maskedEmail || result.email || ''}`;
+    Taro.showToast({ title: tip, icon: 'none', duration: 2500 });
+  }, [countdown, email, sendingCode, startCountdown]);
+
+  const handleRegister = useCallback(() => {
+    if (submitting) return;
+    const trimmedEmail = email.trim();
+    const trimmedCode = code.trim();
+    if (!trimmedEmail) {
+      Taro.showToast({ title: '请输入邮箱', icon: 'none' });
+      return;
+    }
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      Taro.showToast({ title: '请输入正确的邮箱地址', icon: 'none' });
+      return;
+    }
+    if (!trimmedCode) {
+      Taro.showToast({ title: '请输入验证码', icon: 'none' });
+      return;
+    }
+    if (trimmedCode.length < 4) {
+      Taro.showToast({ title: '请输入正确的验证码', icon: 'none' });
+      return;
+    }
+    if (!agreed) {
+      setPendingRegister(true);
+      setShowAgreementDialog(true);
+      return;
+    }
+    void executeRegister();
+  }, [agreed, code, email, executeRegister, submitting]);
+
+  const handleAgreementConfirm = useCallback(() => {
     setAgreed(true);
-    setShowAgreementSheet(false);
-    executeRegister();
-  }, [setAgreed, executeRegister]);
+    setShowAgreementDialog(false);
+    if (pendingRegister) {
+      void executeRegister();
+    }
+  }, [executeRegister, pendingRegister, setAgreed]);
 
-  const handleBackToLogin = useCallback(() => {
-    Taro.navigateBack();
+  const goLogin = useCallback(() => {
+    Taro.navigateBack({
+      fail: () => {
+        Taro.redirectTo({ url: '/package-auth/pages/login/index' });
+      },
+    });
   }, []);
 
   return (
-    <View className="min-h-screen flex flex-col bg-background relative overflow-hidden">
-      {/* 顶部装饰背景：覆盖状态栏，统一颜色 */}
-      <View className="absolute top-0 left-0 right-0 h-[520rpx] overflow-hidden bg-register-deco">
-        <View className="absolute w-[400rpx] h-[400rpx] rounded-full bg-register-circle -top-[120rpx] -right-[120rpx]" />
-      </View>
-
-      {/* 导航安全区占位 */}
+    <View className="min-h-screen flex flex-col relative overflow-hidden bg-login-page">
       <View style={{ height: `${navHeight}px` }} className="relative z-10 flex-shrink-0" />
 
-      {/* 顶部 IP：回到登录页同样的视觉位置 */}
-      <View className="relative z-10 flex flex-col items-center justify-start pt-[88rpx]">
-        <View className="absolute w-[420rpx] h-[420rpx] rounded-full bg-login-glow" />
-        <View className="relative w-[220rpx] h-[220rpx] rounded-full bg-login-orb flex items-center justify-center mt-[14rpx]">
-          <Icon name="school" size={120} className="text-primary" />
+      <View className="relative z-10 h-[280rpx] flex items-end justify-center px-[56rpx] pb-[36rpx]">
+        <View className="rotate-login-slogan">
+          <View className="flex flex-row items-start gap-[16rpx]">
+            <Text className="text-[64rpx] font-bold text-primary tracking-[4rpx] leading-[1.08]">
+              智能教务
+            </Text>
+            <View className="relative w-[72rpx] h-[72rpx] mt-[-6rpx] flex-shrink-0">
+              <View className="absolute left-[8rpx] bottom-[-4rpx] w-[22rpx] h-[22rpx] bg-login-bubble rounded-[4rpx_0_16rpx_0] rotate-[28deg]" />
+              <View className="relative z-10 w-[72rpx] h-[72rpx] rounded-full bg-login-bubble flex items-center justify-center shadow-[0_12rpx_32rpx_rgba(59,110,245,0.28)]">
+                <Image
+                  src={BRAND_LOGO}
+                  mode="aspectFill"
+                  className="w-[48rpx] h-[48rpx] rounded-full bg-white"
+                />
+              </View>
+            </View>
+          </View>
+          <Text className="mt-[12rpx] ml-[72rpx] text-[64rpx] font-bold text-primary tracking-[4rpx] leading-[1.08] block">
+            尽在松果
+          </Text>
         </View>
       </View>
 
-      {/* 欢迎语与注册表单：整体下压，并拉开欢迎语与输入框间距 */}
-      <View className="relative z-10 px-[48rpx] pt-[80rpx]">
-        <View className="mb-[120rpx] flex items-center justify-center">
-          <Text className="text-[40rpx] font-semibold text-foreground text-center">
-            你好，欢迎注册{BRAND_NAME_ZH}
+      <View className="relative z-10 flex-1 flex flex-col px-[56rpx] pt-[48rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))] shadow-login-sheet bg-white rounded-t-[72rpx]">
+        <Text className="mb-[32rpx] text-[32rpx] font-semibold text-foreground">邮箱注册</Text>
+
+        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+          <Input
+            className="flex-1 text-[32rpx] font-semibold text-foreground"
+            type="text"
+            placeholder="请输入邮箱"
+            placeholderClass="text-muted-foreground font-normal"
+            value={email}
+            maxlength={64}
+            onInput={(e) => setEmail(e.detail.value)}
+          />
+        </View>
+
+        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+          <Input
+            className="flex-1 text-[32rpx] font-semibold text-foreground"
+            type="number"
+            placeholder="请输入验证码"
+            placeholderClass="text-muted-foreground font-normal"
+            value={code}
+            maxlength={6}
+            onInput={(e) => setCode(e.detail.value.replace(/\D/g, '').slice(0, 6))}
+          />
+          <Text
+            className={cn(
+              'pl-[24rpx] text-[28rpx] font-semibold flex-shrink-0',
+              countdown > 0 || sendingCode ? 'text-muted-foreground' : 'text-primary',
+            )}
+            onClick={() => {
+              void handleSendCode();
+            }}
+          >
+            {sendingCode ? '发送中' : countdown > 0 ? `${countdown}s` : '发送验证码'}
           </Text>
         </View>
-        <FormInput
-          variant="capsule"
-          placeholder={usesMockRegister ? '请输入账号（字母/数字/下划线）' : '请输入手机号'}
-          value={usesMockRegister ? username : phone}
-          onInput={(e) =>
-            usesMockRegister
-              ? handleUsernameInput(e.detail.value)
-              : setPhone(e.detail.value.replace(/\D/g, '').slice(0, 11))
-          }
-          maxlength={usesMockRegister ? ACCOUNT_MAX_LENGTH : 11}
-          hint={usesMockRegister ? `仅支持${ACCOUNT_RULE_TEXT}` : '手机号将作为登录账号'}
-          className="mb-[24rpx]"
-        />
 
-        {usesMockRegister ? (
-          <FormInput
-            variant="capsule"
-            placeholder="设置6位以上密码"
-            value={password}
-            onInput={(e) => setPassword(e.detail.value)}
-            password
-            className="mb-[48rpx]"
-          />
-        ) : (
-          <View className="mb-[48rpx]" />
-        )}
+        <View
+          className="mb-[40rpx] flex flex-row items-start gap-[16rpx]"
+          onClick={() => setAgreed(!agreed)}
+        >
+          <View
+            className={cn(
+              'mt-[4rpx] h-[32rpx] w-[32rpx] rounded-full border-[2rpx] flex items-center justify-center flex-shrink-0',
+              agreed ? 'border-primary bg-primary' : 'border-[#CFCFCF]',
+            )}
+          >
+            {agreed ? <Text className="text-[20rpx] text-white">✓</Text> : null}
+          </View>
+          <Text className="flex-1 text-[24rpx] leading-[36rpx] text-muted-foreground">
+            同意
+            <Text
+              className="text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAgreementDialog(true);
+              }}
+            >
+              《服务协议》
+            </Text>
+            <Text
+              className="text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAgreementDialog(true);
+              }}
+            >
+              《隐私政策》
+            </Text>
+          </Text>
+        </View>
 
-        {/* 立即注册按钮 */}
         <View
           className={cn(
-            'h-[96rpx] rounded-full flex items-center justify-center mb-[28rpx]',
-            'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
-            (submitting ||
-              (usesMockRegister ? !username.trim() || !password.trim() : !phone.trim())) &&
-              'opacity-50',
+            'h-[88rpx] rounded-[28rpx] flex items-center justify-center bg-primary active:opacity-90',
+            submitting && 'opacity-60',
           )}
-          onClick={handleRegisterClick}
+          onClick={handleRegister}
         >
-          <Text className="text-[34rpx] font-semibold text-white">
-            {submitting ? '注册中...' : '立即注册'}
+          <Text className="text-[30rpx] font-semibold text-white">
+            {submitting ? '注册中...' : '注册账号'}
           </Text>
         </View>
-      </View>
 
-      <View className="flex-1" />
-
-      {/* 底部 */}
-      <View className="relative z-10 px-[48rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))]">
-        <View className="flex items-center justify-center">
-          <Text className="text-[28rpx] text-primary" onClick={handleBackToLogin}>
+        <View className="mt-[56rpx] flex flex-row items-center justify-center">
+          <Text className="text-[28rpx] text-muted-foreground font-medium" onClick={goLogin}>
             已有账号？去登录
           </Text>
         </View>
       </View>
 
-      {/* 协议确认弹框 */}
       <AgreementDialog
-        visible={showAgreementSheet}
-        onClose={() => setShowAgreementSheet(false)}
-        onConfirm={handleConfirmAgreement}
-        confirmText="同意协议并注册新账号"
+        visible={showAgreementDialog}
+        onClose={() => {
+          setShowAgreementDialog(false);
+          setPendingRegister(false);
+        }}
+        onConfirm={handleAgreementConfirm}
+        confirmText="同意协议并注册"
       />
     </View>
   );
 };
 
-export default RegisterStep1;
+export default Register;
+
+export function definePageConfig() {
+  return {
+    navigationBarTitleText: '注册',
+    navigationStyle: 'custom',
+  };
+}

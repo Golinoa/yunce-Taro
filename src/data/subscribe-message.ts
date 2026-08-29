@@ -125,6 +125,16 @@ export async function mockConsumeQuota(
   return quotas[idx];
 }
 
+/** 总开关：批量设置各组 notifyEnabled */
+export async function mockSetMasterNotifyEnabled(
+  userId: string,
+  enabled: boolean,
+): Promise<SubscribeQuotaDto[]> {
+  const quotas = getUserQuotas(userId).map((q) => ({ ...q, notifyEnabled: enabled }));
+  saveUserQuotas(userId, quotas);
+  return quotas;
+}
+
 /** 测试用：注入 pending prompt */
 export async function mockEnqueuePending(
   userId: string,

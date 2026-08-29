@@ -13,8 +13,11 @@ import RegisterStepper from '@/components/RegisterStepper';
 import { authCapabilities } from '@/services/auth';
 import type { ParentRoleInfo, PrincipalRoleInfo, TeacherRoleInfo, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
+import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import { logError } from '@/utils/logger';
 
 /** 角色头部配置 */
 const ROLE_HEADER_META: Record<
@@ -130,9 +133,16 @@ const RegisterRoleInfo: React.FC = () => {
     }
 
     Taro.showToast({ title: '注册成功', icon: 'success' });
+    markLoginOptInPending();
+    // 在「完成注册」点击手势内调起微信原生订阅授权
+    try {
+      await subscribeMessageService.requestNativeNotifyAuth({ scene: 'login_opt_in' });
+    } catch (err) {
+      logError('register.roleInfo.notifyAuth', err);
+    }
     setTimeout(() => {
       navigateAfterLogin();
-    }, 800);
+    }, 400);
   }, [submitting, role, signUpStep3]);
 
   const validate = useCallback(() => {
@@ -184,9 +194,15 @@ const RegisterRoleInfo: React.FC = () => {
     }
 
     Taro.showToast({ title: '注册成功', icon: 'success' });
+    markLoginOptInPending();
+    try {
+      await subscribeMessageService.requestNativeNotifyAuth({ scene: 'login_opt_in' });
+    } catch (err) {
+      logError('register.roleInfo.notifyAuth', err);
+    }
     setTimeout(() => {
       navigateAfterLogin();
-    }, 800);
+    }, 400);
   }, [
     submitting,
     role,

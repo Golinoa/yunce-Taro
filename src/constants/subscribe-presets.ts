@@ -228,6 +228,15 @@ export const PROMPT_PRESETS: Record<SubscribePromptPresetId, SubscribePromptPres
     scene: 'calendar_sync_enable',
     primaryAction: 'requestAuth',
   },
+  login_opt_in: {
+    title: '开启消息通知',
+    body: '同意后，小程序可通过微信服务通知向您推送上课、调课、点名等提醒。授权成功将同时攒下可发送次数。',
+    primaryText: '开启并授权',
+    secondaryText: '暂不开启',
+    groups: ['class_remind', 'schedule_change', 'lesson_result', 'todo_remind'],
+    scene: 'login_opt_in',
+    primaryAction: 'requestAuth',
+  },
 };
 
 export interface SubscribeRenewPresetConfig {

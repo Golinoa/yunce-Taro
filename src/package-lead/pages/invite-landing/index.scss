@@ -1,0 +1,152 @@
+/* 邀约落地页：试听券弹框动画 + 票券虚线 + 底部 Dock */
+
+.invite-landing {
+  position: relative;
+}
+
+.invite-b-bg {
+  background: linear-gradient(
+    180deg,
+    hsl(var(--primary) / 0.09) 0%,
+    hsl(var(--background)) 38%
+  );
+}
+
+.invite-dim {
+  filter: blur(2px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.invite-ticket-head {
+  background: linear-gradient(120deg, #f4f7ff, #fff);
+}
+
+.invite-ticket-dash {
+  height: 0;
+  border-top: 3rpx dashed hsl(224 40% 80%);
+  margin: 0 24rpx;
+}
+
+.invite-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent, hsl(var(--background)) 28%);
+}
+
+.invite-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(15, 22, 40, 0.52);
+  display: flex;
+  padding: 32rpx;
+}
+
+.invite-mask.center {
+  align-items: center;
+  justify-content: center;
+}
+
+.invite-mask.bottom {
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0;
+}
+
+.invite-voucher-pop {
+  position: relative;
+  width: 100%;
+  max-width: 600rpx;
+  overflow: hidden;
+  border-radius: 36rpx;
+  background: #fff;
+  box-shadow: 0 48rpx 120rpx rgba(20, 40, 90, 0.35);
+  animation: invite-voucher-in 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.invite-voucher-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 60%
+  );
+  transform: translateX(-120%);
+  animation: invite-shine 2.6s ease-in-out 0.8s infinite;
+}
+
+.invite-voucher-top {
+  position: relative;
+  padding: 36rpx 32rpx 32rpx;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(125deg, #3b6ef5 0%, #5b8af8 45%, #2f5de0 100%);
+}
+
+.invite-voucher-mid {
+  padding: 28rpx 32rpx 16rpx;
+  border-top: 3rpx dashed #c5d2f5;
+  text-align: left;
+}
+
+.invite-cta-pulse {
+  animation: invite-cta-pulse 2s ease-in-out infinite;
+}
+
+.invite-sheet {
+  animation: invite-sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+@keyframes invite-voucher-in {
+  from {
+    opacity: 0;
+    transform: translateY(72rpx) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes invite-shine {
+  0%,
+  35% {
+    transform: translateX(-120%);
+  }
+  70%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes invite-cta-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes invite-sheet-up {
+  from {
+    transform: translateY(80rpx);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

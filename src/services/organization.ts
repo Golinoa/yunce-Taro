@@ -12,6 +12,9 @@ import { isUseMock } from '@/utils/build-env';
 import { loadOrganizationMock } from '@/utils/mock-loaders';
 import { get, post, put } from '@/utils/request';
 
+/** mock 会员状态本地缓存（演示开通/续费） */
+const MOCK_MEMBERSHIP_KEY = 'yunce:mock-org-membership';
+
 /** 与学员的关系（后端 Zod 常量校验，不建枚举列） */
 export type StudentParentRelation = 'self' | 'father' | 'mother';
 
@@ -113,11 +116,20 @@ export const organizationService = {
   /** 机构配额使用率（校长/管理员，P1） */
   getQuotaUsage: async (): Promise<OrganizationQuotaUsage> => {
     if (isUseMock()) {
+      try {
+        const raw = Taro.getStorageSync(MOCK_MEMBERSHIP_KEY);
+        if (raw) {
+          return JSON.parse(String(raw)) as OrganizationQuotaUsage;
+        }
+      } catch {
+        /* ignore */
+      }
       return {
         organizationId: 'org-mock',
         organizationName: '松果排课',
         versionCode: 'FREE',
         versionName: '免费版',
+        expireAt: null,
         members: { current: 5, max: 40 },
         employees: { current: 1, max: 2 },
         campuses: { current: 1, max: 1 },
@@ -125,6 +137,132 @@ export const organizationService = {
       };
     }
     return get<OrganizationQuotaUsage>('/organization/quota-usage');
+  },
+
+  /**
+   * 兑换运营端激活码（开通/续费机构会员）
+   * 生产：POST /organization/redeem-activation-code
+   * mock：演示码 HXK-DEMO-STANDARD / HXK-DEMO-FLAGSHIP / HXK-DEMO-RENEW
+   */
+  redeemActivationCode: async (
+    code: string,
+  ): Promise<RedeemActivationResult> => {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) {
+      return { error: { message: '请输入激活码' } };
+    }
+    if (trimmed.length < 8) {
+      return { error: { message: '激活码格式不正确' } };
+    }
+
+    if (isUseMock()) {
+      await new Promise((r) => setTimeout(r, 450));
+      const current = await organizationService.getQuotaUsage();
+      const now = new Date();
+      const base =
+        current.expireAt && new Date(current.expireAt).getTime() > now.getTime()
+          ? new Date(current.expireAt)
+          : now;
+
+      let versionCode: OrganizationQuotaUsage['versionCode'] = current.versionCode;
+      let versionName = current.versionName;
+      let durationDays = 365;
+      let planName = '标准年卡';
+
+      if (trimmed.includes('FLAGSHIP')) {
+        versionCode = 'FLAGSHIP';
+        versionName = '旗舰版';
+        planName = '旗舰年卡';
+        durationDays = 365;
+      } else if (trimmed.includes('STANDARD') || trimmed === 'HXK-DEMO-STANDARD') {
+        versionCode = 'STANDARD';
+        versionName = '标准版';
+        planName = '标准年卡';
+        durationDays = 365;
+      } else if (trimmed.includes('RENEW')) {
+        durationDays = 180;
+        planName = '续费半年卡';
+      } else if (!trimmed.startsWith('HXK-')) {
+        return { error: { message: '激活码不存在' } };
+      } else {
+        // 通用 HXK-*：按标准版开通/续期
+        if (versionCode === 'FREE') {
+          versionCode = 'STANDARD';
+          versionName = '标准版';
+        }
+      }
+
+      base.setDate(base.getDate() + durationDays);
+      const expireAt = base.toISOString();
+      const next: OrganizationQuotaUsage = {
+        ...current,
+        versionCode,
+        versionName,
+        expireAt,
+        members: {
+          ...current.members,
+          max: versionCode === 'FLAGSHIP' ? 500 : versionCode === 'STANDARD' ? 200 : 40,
+        },
+        employees: {
+          ...current.employees,
+          max: versionCode === 'FLAGSHIP' ? 50 : versionCode === 'STANDARD' ? 10 : 2,
+        },
+        campuses: {
+          ...current.campuses,
+          max: versionCode === 'FLAGSHIP' ? 10 : versionCode === 'STANDARD' ? 3 : 1,
+        },
+        features: {
+          leadTrace: versionCode !== 'FREE',
+          batchImportExport: versionCode === 'FLAGSHIP',
+        },
+      };
+      try {
+        Taro.setStorageSync(MOCK_MEMBERSHIP_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+
+      const validUntil = expireAt.slice(0, 10);
+      const upgraded = versionCode !== current.versionCode;
+      return {
+        expireAt,
+        versionCode,
+        versionName,
+        planName,
+        durationDays,
+        versionUpgraded: upgraded,
+        message: upgraded
+          ? `已开通${versionName}，有效期至 ${validUntil}`
+          : `续费成功，有效期至 ${validUntil}`,
+        error: null,
+      };
+    }
+
+    try {
+      const data = await post<{
+        expireAt?: string | null;
+        versionCode?: string;
+        versionName?: string;
+        planName?: string;
+        durationDays?: number;
+        versionUpgraded?: boolean;
+        message?: string;
+      }>('/organization/redeem-activation-code', { code: trimmed });
+      return {
+        expireAt: data.expireAt ?? undefined,
+        versionCode: data.versionCode,
+        versionName: data.versionName,
+        planName: data.planName,
+        durationDays: data.durationDays,
+        versionUpgraded: data.versionUpgraded,
+        message: data.message || '兑换成功',
+        error: null,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message ? error.message : '兑换失败，请稍后重试';
+      return { error: { message } };
+    }
   },
 };
 
@@ -138,12 +276,38 @@ export interface OrganizationSettings {
 export interface OrganizationQuotaUsage {
   organizationId: string;
   organizationName: string;
-  versionCode: 'FREE' | 'STANDARD' | 'FLAGSHIP';
+  versionCode: 'FREE' | 'TRIAL' | 'STANDARD' | 'FLAGSHIP';
   versionName: string;
+  /** 会员到期时间；空表示未开通付费期 */
+  expireAt?: string | null;
   members: { current: number; max: number };
   employees: { current: number; max: number };
   campuses: { current: number; max: number };
   features: { leadTrace: boolean; batchImportExport: boolean };
+}
+
+export interface RedeemActivationResult {
+  expireAt?: string;
+  versionCode?: string;
+  versionName?: string;
+  planName?: string;
+  durationDays?: number;
+  versionUpgraded?: boolean;
+  message?: string;
+  error: { message: string } | null;
+}
+
+/** 是否视为「已开通有效会员」（非免费档且未过期） */
+export function isOrgMembershipActive(quota: OrganizationQuotaUsage | null | undefined): boolean {
+  if (!quota) return false;
+  if (quota.expireAt) {
+    const t = new Date(quota.expireAt).getTime();
+    if (Number.isFinite(t) && t < Date.now()) return false;
+  }
+  // 免费版视为未开通付费会员，引导兑换激活码
+  if (quota.versionCode === 'FREE') return false;
+  // 付费档：有到期日则需未过期；无到期日视为长期有效
+  return true;
 }
 
 // ==================== 待确认关系本地存储（首页关系弹窗触发源） ====================

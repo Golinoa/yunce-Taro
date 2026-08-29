@@ -32,6 +32,9 @@ const AUTH_ENDPOINTS = {
   logout: '/auth/logout',
   phoneLogin: '/auth/phone-login',
   smsCode: '/auth/sms-code',
+  emailCode: '/auth/email-code',
+  emailLogin: '/auth/email-login',
+  resetPasswordEmail: '/auth/reset-password-email',
   register: '/auth/register',
   refresh: '/auth/refresh',
   profile: '/profile',
@@ -109,11 +112,21 @@ interface AuthPayload {
 
 export const authCapabilities = {
   supportsAccountPasswordLogin: isUseMock(),
-  supportsEmailCodeLogin: isUseMock(),
+  /** mock 与生产后端均已提供邮箱验证码登录 */
+  supportsEmailCodeLogin: true,
   supportsPhoneLogin: isUseMock(),
   supportsWechatLogin: true,
   usesMockRegister: isUseMock(),
 } as const;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function maskEmailAddress(email: string): string {
+  const [localPart = '', domain = ''] = email.split('@');
+  if (!localPart || !domain) return email;
+  if (localPart.length <= 2) return `${localPart[0] || '*'}***@${domain}`;
+  return `${localPart.slice(0, 2)}***@${domain}`;
+}
 
 const clearStoredAuth = (): void => {
   try {
@@ -483,24 +496,78 @@ export async function prepareEmailLogin(
   identifier: string,
   mode: 'account' | 'email',
 ): Promise<EmailLoginPrepareResult> {
-  if (isUseMock()) { const { mockPrepareEmailLogin } = await loadAuthMock(); return mockPrepareEmailLogin(identifier, mode); }
-  return {
-    status: mode === 'email' ? 'email_not_found' : 'account_not_found',
-    error: { message: '邮箱验证码服务暂未接通，请稍后再试' },
-  };
+  if (isUseMock()) {
+    const { mockPrepareEmailLogin } = await loadAuthMock();
+    return mockPrepareEmailLogin(identifier, mode);
+  }
+
+  const trimmed = identifier.trim();
+  if (mode !== 'email') {
+    return {
+      status: 'account_not_found',
+      error: { message: '请使用邮箱验证码登录' },
+    };
+  }
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return {
+      status: 'email_not_found',
+      error: { message: '请输入正确的邮箱地址' },
+    };
+  }
+
+  try {
+    await post(
+      AUTH_ENDPOINTS.emailCode,
+      { email: trimmed, purpose: 'LOGIN' },
+      { skipAuth: true },
+    );
+    return {
+      status: 'ready',
+      email: trimmed,
+      maskedEmail: maskEmailAddress(trimmed),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      status: 'email_not_found',
+      error: { message: getErrorMessage(error, '验证码发送失败') },
+    };
+  }
 }
 
 export async function loginByEmailCode(email: string, code: string): Promise<LoginResult> {
-  if (isUseMock()) { const { mockLoginByEmailCode } = await loadAuthMock(); return mockLoginByEmailCode(email, code); }
-  return {
-    session: null,
-    profile: null,
-    error: { message: '邮箱验证码登录服务暂未接通，请稍后再试' },
-  };
+  if (isUseMock()) {
+    const { mockLoginByEmailCode } = await loadAuthMock();
+    return mockLoginByEmailCode(email, code);
+  }
+
+  try {
+    const data = await post<BackendAuthPayload>(
+      AUTH_ENDPOINTS.emailLogin,
+      { email: email.trim(), code: code.trim() },
+      { skipAuth: true },
+    );
+    const mapped = mapBackendAuthPayload(data);
+    return {
+      session: mapped.session,
+      profile: mapped.profile,
+      isNewUser: data.isNewUser,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: getErrorMessage(error, '邮箱验证码登录失败') },
+    };
+  }
 }
 
 export async function prepareAccountRecovery(email: string): Promise<AccountRecoveryPrepareResult> {
-  if (isUseMock()) { const { mockPrepareAccountRecovery } = await loadAuthMock(); return mockPrepareAccountRecovery(email); }
+  if (isUseMock()) {
+    const { mockPrepareAccountRecovery } = await loadAuthMock();
+    return mockPrepareAccountRecovery(email);
+  }
   return {
     status: 'email_not_found',
     error: { message: '账号找回服务暂未接通，请稍后再试' },
@@ -511,7 +578,10 @@ export async function recoverAccountByEmailCode(
   email: string,
   code: string,
 ): Promise<AccountRecoveryResult> {
-  if (isUseMock()) { const { mockRecoverAccountByEmailCode } = await loadAuthMock(); return mockRecoverAccountByEmailCode(email, code); }
+  if (isUseMock()) {
+    const { mockRecoverAccountByEmailCode } = await loadAuthMock();
+    return mockRecoverAccountByEmailCode(email, code);
+  }
   return {
     account: null,
     error: { message: '账号找回服务暂未接通，请稍后再试' },
@@ -519,11 +589,39 @@ export async function recoverAccountByEmailCode(
 }
 
 export async function preparePasswordReset(account: string): Promise<PasswordResetPrepareResult> {
-  if (isUseMock()) { const { mockPreparePasswordReset } = await loadAuthMock(); return mockPreparePasswordReset(account); }
-  return {
-    status: 'account_not_found',
-    error: { message: '密码重置服务暂未接通，请稍后再试' },
-  };
+  if (isUseMock()) {
+    const { mockPreparePasswordReset } = await loadAuthMock();
+    return mockPreparePasswordReset(account);
+  }
+
+  const trimmed = account.trim();
+  // 生产端按邮箱发码（purpose=RESET）；账号体系未接通时要求直接填邮箱
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return {
+      status: 'account_not_found',
+      error: { message: '请输入绑定邮箱以重置密码' },
+    };
+  }
+
+  try {
+    await post(
+      AUTH_ENDPOINTS.emailCode,
+      { email: trimmed, purpose: 'RESET' },
+      { skipAuth: true },
+    );
+    return {
+      status: 'ready',
+      account: trimmed,
+      email: trimmed,
+      maskedEmail: maskEmailAddress(trimmed),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      status: 'account_not_found',
+      error: { message: getErrorMessage(error, '验证码发送失败') },
+    };
+  }
 }
 
 export async function resetPasswordByEmailCode(
@@ -531,10 +629,26 @@ export async function resetPasswordByEmailCode(
   code: string,
   newPassword: string,
 ): Promise<{ error: { message: string } | null }> {
-  if (isUseMock()) { const { mockResetPasswordByEmailCode } = await loadAuthMock(); return mockResetPasswordByEmailCode(account, code, newPassword); }
-  return {
-    error: { message: '密码重置服务暂未接通，请稍后再试' },
-  };
+  if (isUseMock()) {
+    const { mockResetPasswordByEmailCode } = await loadAuthMock();
+    return mockResetPasswordByEmailCode(account, code, newPassword);
+  }
+
+  const email = account.trim();
+  if (!EMAIL_PATTERN.test(email)) {
+    return { error: { message: '请输入正确的邮箱地址' } };
+  }
+
+  try {
+    await post(
+      AUTH_ENDPOINTS.resetPasswordEmail,
+      { email, code: code.trim(), newPassword },
+      { skipAuth: true },
+    );
+    return { error: null };
+  } catch (error) {
+    return { error: { message: getErrorMessage(error, '密码重置失败') } };
+  }
 }
 
 // ============================================
@@ -552,7 +666,28 @@ export async function registerStep1(
   inviteCode?: string,
 ): Promise<RegisterStep1Result> {
   if (isUseMock()) { const { mockRegisterStep1 } = await loadAuthMock(); return mockRegisterStep1(username, password, inviteCode); }
-  return { tempToken: null, error: { message: '请使用手机号注册' } };
+  return { tempToken: null, error: { message: '请使用邮箱注册' } };
+}
+
+/** 邮箱注册 Step1：校验邮箱格式并写入本地草稿（角色在后续步骤选择） */
+export async function registerStep1ByEmail(
+  email: string,
+  password = '',
+): Promise<RegisterStep1Result> {
+  const normalized = email.trim();
+  if (!EMAIL_PATTERN.test(normalized)) {
+    return { tempToken: null, error: { message: '请输入正确的邮箱地址' } };
+  }
+
+  if (isUseMock()) {
+    const { mockRegisterStep1 } = await loadAuthMock();
+    return mockRegisterStep1(normalized, password.trim() || 'email-register', undefined);
+  }
+
+  return {
+    tempToken: `email-register:${normalized}`,
+    error: null,
+  };
 }
 
 export async function registerStep1ByPhone(
@@ -570,8 +705,8 @@ export async function registerStep1ByPhone(
   }
 
   return {
-    tempToken: `phone-register:${normalized}`,
-    error: null,
+    tempToken: null,
+    error: { message: '请使用邮箱注册' },
   };
 }
 
@@ -596,8 +731,23 @@ export async function registerStep3(
   if (isUseMock()) { const { mockRegisterStep3 } = await loadAuthMock(); return mockRegisterStep3(tempToken, roleInfo); }
 
   const draft = readClientRegisterDraft();
-  if (!draft?.phone || !draft.role || draft.tempToken !== tempToken) {
+  const email =
+    draft?.email?.trim() ||
+    (draft?.tempToken?.startsWith('email-register:')
+      ? draft.tempToken.slice('email-register:'.length)
+      : '') ||
+    (EMAIL_PATTERN.test(draft?.username || '') ? draft!.username.trim() : '');
+
+  if (!email || !draft?.role || draft.tempToken !== tempToken) {
     return { session: null, profile: null, error: { message: '注册信息不完整，请重新填写' } };
+  }
+
+  if (!['parent', 'principal'].includes(draft.role)) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: '当前仅支持注册为校长或家长，教师请通过机构邀请加入' },
+    };
   }
 
   try {
@@ -605,7 +755,7 @@ export async function registerStep3(
     const principalInfo =
       draft.role === 'principal' ? (roleInfo as PrincipalRoleInfo) : undefined;
     const body: Record<string, unknown> = {
-      phone: draft.phone,
+      email,
       role: backendRole,
     };
 
@@ -616,7 +766,7 @@ export async function registerStep3(
 
     const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.register, body, { skipAuth: true });
     const mapped = mapBackendAuthPayload(data);
-    return { session: mapped.session, profile: mapped.profile, error: null };
+    return { session: mapped.session, profile: mapped.profile, isNewUser: true, error: null };
   } catch (error) {
     return {
       session: null,

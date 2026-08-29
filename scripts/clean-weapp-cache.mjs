@@ -30,12 +30,11 @@ for (const t of targets) {
     rmSync(t, { recursive: true, force: true });
     console.log(`[clean] removed: ${t}`);
   } catch (error) {
+    const errCode =
+      error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+    // Node 22 常见 EBUSY；Node 24 / Windows 被微信开发者工具占用时多为 EPERM
     const isDistLocked =
-      t.endsWith('dist') &&
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      error.code === 'EBUSY';
+      t.endsWith('dist') && (errCode === 'EBUSY' || errCode === 'EPERM');
     if (isDistLocked) {
       console.warn('[clean] dist is locked (close WeChat DevTools preview?), skip removing dist');
       continue;

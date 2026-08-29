@@ -29,20 +29,21 @@ import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { markStepVisited } from '@/utils/onboarding-storage';
 import { onboardingService, studentService } from '@/services';
-import { organizationService, type OrganizationQuotaUsage } from '@/services/organization';
+import { organizationService, isOrgMembershipActive, type OrganizationQuotaUsage } from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
 import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { syncTabBarByProfile } from '@/utils/tab-bar';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 
 // ============================================
 // 角色标签映射
 // ============================================
 const ROLE_LABEL: Record<string, string> = {
-  admin: '校长·机构创建者',
+  admin: '管理员',
   principal: '校长',
   teacher: '教师',
   assistant: '助教',
@@ -54,32 +55,15 @@ const ROLE_LABEL: Record<string, string> = {
 // ============================================
 const PLACEHOLDER_TIP = '功能开发中，敬请期待';
 
-/** 配额使用率进度条（达到上限变红） */
-const QuotaBar: React.FC<{ label: string; current: number; max: number }> = ({
-  label,
-  current,
-  max,
-}) => {
-  const ratio = max > 0 ? Math.min(current / max, 1) : 0;
-  const full = current >= max;
-  return (
-    <View className="mt-[20rpx]">
-      <View className="flex flex-row items-center justify-between">
-        <Text className="text-[26rpx] text-foreground">{label}</Text>
-        <Text className={cn('text-[24rpx]', full ? 'text-destructive' : 'text-muted-foreground')}>
-          {current}/{max}
-          {full ? ' 已满' : ''}
-        </Text>
-      </View>
-      <View className="mt-[10rpx] h-[12rpx] rounded-full bg-bg-card overflow-hidden">
-        <View
-          className={cn('h-full rounded-full', full ? 'bg-destructive' : 'bg-primary')}
-          style={{ width: `${Math.max(ratio * 100, 4)}%` }}
-        />
-      </View>
-    </View>
-  );
-};
+function formatMembershipExpire(iso?: string | null): string {
+  if (!iso) return '未开通';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '未开通';
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const Profile: React.FC = () => {
   const { profile, currentRole, currentIdentity } = useAuth();
@@ -103,12 +87,27 @@ const Profile: React.FC = () => {
   const [loadingStoreProgress, setLoadingStoreProgress] = useState(false);
   const [storeOnboardingHidden, setStoreOnboardingHidden] = useState<boolean | null>(null);
 
-  // 会员开通状态（TODO: 后续接入接口）
-  const [isMembershipActive] = useState(true);
-
-  // 机构配额使用率（校长/管理员，P1）
+  // 机构配额（用于会员卡到期展示；详情页展示完整配额）
   const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
   const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
+
+  // 会员开通状态（免费版 / 已到期 → 立即开通；付费未过期 → 立即查看）
+  const isMembershipActive = useMemo(
+    () => isOrgMembershipActive(quotaUsage),
+    [quotaUsage],
+  );
+
+  const membershipExpireLabel = useMemo(
+    () => formatMembershipExpire(quotaUsage?.expireAt),
+    [quotaUsage?.expireAt],
+  );
+
+  const handleOpenMembership = useCallback(() => {
+    const action = isOrgMembershipActive(quotaUsage) ? 'view' : 'redeem';
+    Taro.navigateTo({
+      url: `/package-settings/pages/membership/index?action=${action}`,
+    });
+  }, [quotaUsage]);
 
   // 加载机构配额使用率
   const loadQuotaUsage = useCallback(async () => {
@@ -117,7 +116,7 @@ const Profile: React.FC = () => {
       const data = await organizationService.getQuotaUsage();
       setQuotaUsage(data);
     } catch {
-      /* 非阻塞：配额卡加载失败不影响页面 */
+      /* 非阻塞：会员到期信息加载失败不影响页面 */
     }
   }, [isManagerRole]);
 
@@ -149,9 +148,9 @@ const Profile: React.FC = () => {
     }
   }, []);
 
-  // 加载店铺管理 onboarding 进度
+  // 加载店铺管理 onboarding 进度（仅管理员/校长）
   const loadStoreProgress = useCallback(async () => {
-    if (!isTeacher) return;
+    if (!isManagerRole) return;
     setLoadingStoreProgress(true);
     try {
       const progress = await onboardingService.getStoreProgress();
@@ -167,7 +166,7 @@ const Profile: React.FC = () => {
     } finally {
       setLoadingStoreProgress(false);
     }
-  }, [isTeacher, storeOnboardingHidden]);
+  }, [isManagerRole, storeOnboardingHidden]);
 
   React.useEffect(() => {
     loadStudents();
@@ -177,6 +176,7 @@ const Profile: React.FC = () => {
   }, [loadStudents, loadStoreOnboardingHidden, loadStoreProgress, loadQuotaUsage]);
 
   useDidShow(() => {
+    syncTabBarByProfile(profile);
     loadStudents();
     loadStoreOnboardingHidden();
     loadStoreProgress();
@@ -495,11 +495,6 @@ const Profile: React.FC = () => {
         onClick: () => handleNavigate('/package-course/pages/my-course/index'),
       },
       {
-        label: '我的合同',
-        icon: 'mdi-file-document-outline' as const,
-        onClick: handlePlaceholder,
-      },
-      {
         label: '排行榜',
         icon: 'mdi-trophy-outline' as const,
         onClick: handlePlaceholder,
@@ -518,7 +513,7 @@ const Profile: React.FC = () => {
     [handleNavigate, handlePlaceholder],
   );
 
-  // 家长视图：系统管理
+  // 家长视图：系统管理（不含机构配置 / 用户协议入口）
   const parentSystemItems = useMemo(
     () => [
       {
@@ -537,7 +532,7 @@ const Profile: React.FC = () => {
         onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
       },
       {
-        label: '系统设置',
+        label: '账号设置',
         icon: 'mdi-cog-outline' as const,
         onClick: () => handleNavigate('/package-settings/pages/system-settings/index'),
       },
@@ -579,84 +574,44 @@ const Profile: React.FC = () => {
 
         <WechatBindReminder className="mx-[32rpx] mt-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
 
-        {/* ====== 会员权益卡片 ====== */}
-        <View className="mx-[32rpx] mt-[24rpx] h-[160rpx] rounded-[28rpx] bg-card-gradient overflow-hidden shadow-soft flex relative">
-          {/* 左侧信息区 */}
-          <View className="flex-1 px-[32rpx] py-[28rpx] flex flex-col justify-center relative z-10">
-            <View className="flex items-baseline">
-              <Text className="text-[48rpx] font-black text-primary leading-none italic">V</Text>
-              <Text className="text-[32rpx] font-bold text-primary ml-[6rpx]">会员卡</Text>
-            </View>
-            <Text className="text-[24rpx] text-muted-foreground mt-[14rpx]">
-              {isMembershipActive ? '已开通会员，尊享全部教务特权' : '开通会员，尊享全部教务特权'}
-            </Text>
-          </View>
-
-          {/* 右侧斜切按钮区：开通/已开通统一主色样式 */}
+        {/* ====== 会员权益卡片（仅管理员/校长） ====== */}
+        {isManagerRole && (
           <View
-            className="w-[220rpx] h-full relative flex flex-col items-center justify-center press-opacity bg-primary"
-            style={{
-              clipPath: 'polygon(24rpx 0, 100% 0, 100% 100%, 0 100%)',
-            }}
+            className="mx-[32rpx] mt-[24rpx] h-[160rpx] rounded-[28rpx] bg-card-gradient overflow-hidden shadow-soft flex relative"
+            onClick={handleOpenMembership}
           >
-            <Text className="text-[30rpx] font-bold text-primary-foreground">
-              {isMembershipActive ? '立即查看' : '立即开通'}
-            </Text>
-            <Text className="text-[20rpx] mt-[10rpx] text-primary-foreground/75">
-              {isMembershipActive ? '有效期至 2030-12-31' : '已有 2,333 人开通'}
-            </Text>
-          </View>
-        </View>
-
-        {/* ====== 机构配额使用率卡片（校长/管理员，P1） ====== */}
-        {isManagerRole && quotaUsage && (
-          <View className="mx-[32rpx] mt-[24rpx] bg-card rounded-[28rpx] p-[28rpx] shadow-soft">
-            <View className="flex flex-row items-center justify-between">
-              <View className="flex flex-row items-center gap-[12rpx]">
-                <Text className="text-[30rpx] font-semibold text-foreground">机构配额</Text>
-                <View className="px-[12rpx] py-[4rpx] rounded-full bg-primary-10">
-                  <Text className="text-[22rpx] text-primary">{quotaUsage.versionName}</Text>
-                </View>
+            {/* 左侧信息区 */}
+            <View className="flex-1 px-[32rpx] py-[28rpx] flex flex-col justify-center relative z-10">
+              <View className="flex items-baseline">
+                <Text className="text-[48rpx] font-black text-primary leading-none italic">V</Text>
+                <Text className="text-[32rpx] font-bold text-primary ml-[6rpx]">会员卡</Text>
               </View>
-              <Text
-                className={cn(
-                  'text-[22rpx]',
-                  quotaUsage.members.current >= quotaUsage.members.max ||
-                    quotaUsage.employees.current >= quotaUsage.employees.max
-                    ? 'text-destructive'
-                    : 'text-muted-foreground',
-                )}
-              >
-                {quotaUsage.members.current >= quotaUsage.members.max ||
-                quotaUsage.employees.current >= quotaUsage.employees.max
-                  ? '配额已满，联系运营升级'
-                  : '免费版配额'}
+              <Text className="text-[24rpx] text-muted-foreground mt-[14rpx]">
+                {isMembershipActive
+                  ? `${quotaUsage?.versionName || '会员'} · 有效期至 ${membershipExpireLabel}`
+                  : '兑换激活码，开通机构会员权益'}
               </Text>
             </View>
 
-            <QuotaBar
-              label="会员"
-              current={quotaUsage.members.current}
-              max={quotaUsage.members.max}
-            />
-            <QuotaBar
-              label="员工"
-              current={quotaUsage.employees.current}
-              max={quotaUsage.employees.max}
-            />
-            <QuotaBar
-              label="校区"
-              current={quotaUsage.campuses.current}
-              max={quotaUsage.campuses.max}
-            />
+            {/* 右侧斜切按钮区：开通/已开通统一主色样式 */}
+            <View
+              className="w-[220rpx] h-full relative flex flex-col items-center justify-center press-opacity bg-primary"
+              style={{
+                clipPath: 'polygon(24rpx 0, 100% 0, 100% 100%, 0 100%)',
+              }}
+            >
+              <Text className="text-[30rpx] font-bold text-primary-foreground">
+                {isMembershipActive ? '立即查看' : '立即开通'}
+              </Text>
+              <Text className="text-[20rpx] mt-[10rpx] text-primary-foreground/75">
+                {isMembershipActive ? `至 ${membershipExpireLabel}` : '激活码一键开通'}
+              </Text>
+            </View>
           </View>
         )}
 
         {/* ====== 公众号关注卡片（暂时隐藏） ====== */}
         {false && <ProfileFollowCard className="mt-[24rpx]" onClick={handleFollow} />}
-
-        {/* ====== 我的约课 ====== */}
-        <ProfileGrid className="mt-[24rpx]" title="我的约课" items={parentBookingItems} />
 
         {/* ====== 错误提示 ====== */}
         {errorMsg && (
@@ -671,18 +626,20 @@ const Profile: React.FC = () => {
         {/* ====== 教师视图 ====== */}
         {isTeacher && (
           <>
-            {storeProgress &&
-            (storeProgress.completed < storeProgress.total || storeOnboardingHidden === false) ? (
-              <StoreOnboarding
-                className="mt-[24rpx]"
-                data={storeProgress}
-                loading={loadingStoreProgress}
-                onStepClick={handleStoreStepClick}
-                onExtraClick={handleStoreExtraClick}
-              />
-            ) : (
-              <ProfileGrid className="mt-[24rpx]" title="店铺管理" items={teacherStoreItems} />
-            )}
+            {/* 店铺管理：仅管理员/校长 */}
+            {isManagerRole &&
+              (storeProgress &&
+              (storeProgress.completed < storeProgress.total || storeOnboardingHidden === false) ? (
+                <StoreOnboarding
+                  className="mt-[24rpx]"
+                  data={storeProgress}
+                  loading={loadingStoreProgress}
+                  onStepClick={handleStoreStepClick}
+                  onExtraClick={handleStoreExtraClick}
+                />
+              ) : (
+                <ProfileGrid className="mt-[24rpx]" title="店铺管理" items={teacherStoreItems} />
+              ))}
             <ProfileGrid className="mt-[24rpx]" title="营销活动" items={marketingItems} />
             <ProfileGrid className="mt-[24rpx]" title="系统管理" items={teacherSystemItems} />
           </>

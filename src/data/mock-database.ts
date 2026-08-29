@@ -29,9 +29,10 @@ export interface TestAccount {
   label: string;
 }
 export const TEST_ACCOUNTS: TestAccount[] = [
-  { username: 'principal1', label: '万老师（校长·机构创建者）' },
-  { username: 'teacher1', label: '教师' },
-  { username: 'parent1', label: '家长' },
+  { username: 'principal1', label: '万老师(管理员)' },
+  { username: 'teacher2', label: '李老师(校长)' },
+  { username: 'teacher1', label: '张老师(教师)' },
+  { username: 'parent1', label: '张老师(家长)' },
 ];
 export const TEST_PASSWORD = '123456';
 
@@ -394,7 +395,7 @@ export const USERS: User[] = [
     phone: '13800000001',
     createdAt: '2024-01-01T00:00:00Z',
   },
-  // 教师
+  // 教师（李老师账号在 IDENTITIES 中为校长角色，用于校长端体验）
   {
     id: 'user-teacher-001',
     username: 'teacher1',
@@ -513,13 +514,13 @@ export const IDENTITIES: Identity[] = [
     campusIds: ['campus-center'],
     isDefault: true,
   },
-  // 李老师 - 主讲声乐，在曦绘艺术和城东校区
+  // 李老师 - 校长身份（校区管理者，可对照校长端 UI；仍可授课）
   {
     id: 'identity-teacher-002',
     userId: 'user-teacher-002',
-    role: 'teacher',
+    role: 'principal',
     organizationId: 'org-yunce',
-    campusIds: ['campus-center', 'campus-east'],
+    campusIds: ['campus-center', 'campus-east', 'campus-west'],
     isDefault: true,
   },
   // 王老师 - 主讲舞蹈，在城东校区
@@ -770,7 +771,7 @@ export interface Class {
   endTime: string;
   totalLessons?: number;
   usedLessons: number;
-  status: 'active' | 'ended';
+  status: 'active' | 'paused' | 'ended';
   startDate: string;
   endDate?: string;
   color: ClassColor;
@@ -3227,7 +3228,7 @@ export const SCHEDULES: Schedule[] = [
         ? `${String(trialEndH).padStart(2, '0')}:00`
         : '23:59';
     const days = [1, 2, 3, 4, 5, 6, 7] as const;
-    return days.flatMap((dayOfWeek) => [
+    return days.flatMap((dayOfWeek): Schedule[] => [
       {
         id: `sch-tag-active-${dayOfWeek}`,
         classId: 'cls-tag-active',
@@ -3238,7 +3239,7 @@ export const SCHEDULES: Schedule[] = [
         startTime: activeStart,
         endTime: activeEnd,
         room: '演示教室A',
-        status: 'scheduled' as const,
+        status: 'scheduled',
       },
       {
         id: `sch-tag-trial-${dayOfWeek}`,
@@ -3250,12 +3251,11 @@ export const SCHEDULES: Schedule[] = [
         startTime: trialStart,
         endTime: trialEnd,
         room: '演示教室B',
-        status: 'scheduled' as const,
+        status: 'scheduled',
       },
     ]);
   })(),
 ];
-
 /** 获取所有已排课的班级 id 集合（用于课程管理·班课列表区分"已/未排课"） */
 export function getScheduledClassIdSet(): Set<string> {
   const set = new Set<string>();
@@ -3421,7 +3421,7 @@ function createSamplePersonalLessonRecord(): LessonRecord {
     endTime: '20:00',
     hours: 1,
     status: 'checked',
-    note: '个人消课示例 · 指法强化训练',
+    note: '指法强化训练',
     checkinTime: '19:00:00',
     createdAt: `${sampleDate}T19:00:00Z`,
   };
@@ -3446,7 +3446,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       endTime: '10:00',
       hours: 1,
       status: 'checked',
-      note: '个人消课示例 · 基础指法巩固',
+      note: '基础指法巩固',
       checkinTime: '09:00:00',
       createdAt: `${sampleDate}T09:00:00Z`,
     },
@@ -3462,7 +3462,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       endTime: '11:30',
       hours: 1,
       status: 'checked',
-      note: '个人消课示例 · 跨教师陪练',
+      note: '跨教师陪练',
       checkinTime: '10:30:00',
       createdAt: `${sampleDate}T10:30:00Z`,
     },
@@ -3478,7 +3478,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       endTime: '14:00',
       hours: 1,
       status: 'makeup',
-      note: '个人补课示例 · 节奏纠正加练',
+      note: '节奏纠正加练',
       checkinTime: '13:00:00',
       createdAt: `${sampleDate}T13:00:00Z`,
     },
@@ -3492,9 +3492,10 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       date: sampleDate,
       startTime: '14:30',
       endTime: '15:30',
-      hours: 1,
+      // 取消不扣课时（与签到/补课才扣的规则一致）
+      hours: 0,
       status: 'cancelled',
-      note: '个人取消示例 · 家长临时请假',
+      note: '家长临时改期',
       createdAt: `${sampleDate}T14:30:00Z`,
     },
     {
@@ -3510,7 +3511,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       endTime: '17:30',
       hours: 1.5,
       status: 'checked',
-      note: '班级常规示例 · 手型与节拍训练',
+      note: '手型与节拍训练',
       checkinTime: '16:00:00',
       createdAt: `${sampleDate}T16:00:00Z`,
     },
@@ -3527,7 +3528,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       endTime: '19:10',
       hours: 1.5,
       status: 'makeup',
-      note: '班级补课示例 · 补上周课程',
+      note: '补上周课程',
       checkinTime: '17:40:00',
       createdAt: `${sampleDate}T17:40:00Z`,
     },
@@ -3542,9 +3543,10 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       date: sampleDate,
       startTime: '19:20',
       endTime: '20:50',
-      hours: 1.5,
+      // 整节取消：不扣课时（此前误写成 1.5，会造成「已取消还扣课时」）
+      hours: 0,
       status: 'cancelled',
-      note: '班级取消示例 · 场地临时调整',
+      note: '场地临时调整，本节取消',
       createdAt: `${sampleDate}T19:20:00Z`,
     },
   ];
@@ -3574,7 +3576,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       endTime: '12:00',
       hours: 2,
       status: 'checked',
-      note: '6月28日示例 · 正常签到',
+      note: '正常签到',
       checkinTime: '10:00:00',
       createdAt: `${supplementDate}T10:00:00Z`,
     },
@@ -3590,7 +3592,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       endTime: '12:00',
       hours: 2,
       status: 'makeup',
-      note: '6月28日示例 · 已补录完成',
+      note: '补录签到',
       checkinTime: '10:08:00',
       createdAt: `${supplementDate}T10:08:00Z`,
     },
@@ -3606,7 +3608,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       endTime: '12:00',
       hours: 0,
       status: 'leave',
-      note: '6月28日示例 · 家长请假',
+      note: '家长请假',
       createdAt: `${supplementDate}T09:20:00Z`,
     },
     {
@@ -3621,7 +3623,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       endTime: '12:00',
       hours: 0,
       status: 'absent',
-      note: '6月28日示例 · 缺勤待补录',
+      note: '缺勤待补录',
       createdAt: `${supplementDate}T12:10:00Z`,
     },
     {
@@ -3636,7 +3638,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       endTime: '12:00',
       hours: 0,
       status: 'cancelled',
-      note: '6月28日示例 · 原记录取消',
+      note: '本节取消',
       createdAt: `${supplementDate}T08:40:00Z`,
     },
     {
@@ -3651,7 +3653,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       endTime: '12:00',
       hours: 2,
       status: 'checked',
-      note: '6月28日示例 · 正常签到补充样本',
+      note: '正常签到',
       checkinTime: '10:05:00',
       createdAt: `${supplementDate}T10:05:00Z`,
     },

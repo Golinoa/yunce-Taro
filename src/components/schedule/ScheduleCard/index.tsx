@@ -1,4 +1,4 @@
-import { View, Text, Image } from '@tarojs/components';
+import { View, Text, Image, Button } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
 import ClassAvatar from '@/components/class/ClassAvatar';
@@ -10,6 +10,7 @@ import { BRAND_LOGO } from '@/constants/brand';
  *
  * 班课布局：
  * - 顶栏：班级名 + 状态标签（仅「上课中」「试听」两种）/ 时段
+ * - 右上角：分享（对齐团课）
  * - 信息行：老师(+助教) · 人数 · 教室 | 右侧点名/补录
  * - 分割线下方：圆形头像 + 约试听
  */
@@ -52,9 +53,11 @@ export interface ScheduleCardProps {
   footerAction?: React.ReactNode;
   /** 是否展示头像行（默认有学员或 footerAction 时展示） */
   showStudentRow?: boolean;
-  /** 右上角编辑（笔标） */
-  onEdit?: (item: ScheduleCardItem) => void;
-  /** 右上角更多菜单（与 onEdit 互斥优先 menu） */
+  /** 右上角分享：点击后由页面 useShareAppMessage 读取上下文 */
+  onSharePrepare?: (item: ScheduleCardItem) => void;
+  /** 是否展示分享按钮 */
+  showShare?: boolean;
+  /** 右上角更多菜单（优先于分享按钮） */
   menu?: React.ReactNode;
   /** 额外类名 */
   className?: string;
@@ -70,7 +73,8 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   metaAction,
   footerAction,
   showStudentRow,
-  onEdit,
+  onSharePrepare,
+  showShare,
   menu,
   className,
   children,
@@ -83,19 +87,19 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
     ? `${item.leadTeacherName} / ${item.assistantTeacherName}`
     : item.leadTeacherName;
   const countLabel = item.totalCount > 0 ? `${item.checkedCount}/${item.totalCount}` : '0/0';
+  const showTopActions = Boolean(menu) || Boolean(showShare);
 
   return (
     <View
       className={cn(
         'relative rounded-[14rpx] bg-card px-[24rpx] py-[22rpx] shadow-card',
-        isActive && 'course-status-active-border',
         className,
       )}
       onClick={() => onClick?.(item)}
     >
       {item.status === 'cancelled' ? (
         <View className="absolute right-0 top-0 overflow-hidden rounded-tr-[14rpx]">
-          <View className="bg-destructive px-[20rpx] py-[10rpx] rounded-bl-[16rpx] shadow-card">
+          <View className="rounded-bl-[16rpx] bg-destructive px-[20rpx] py-[10rpx] shadow-card">
             <Text className="text-[20rpx] font-semibold tracking-[2rpx] text-destructive-foreground">
               取消
             </Text>
@@ -103,16 +107,25 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
         </View>
       ) : null}
 
-      {!menu && onEdit && item.status !== 'cancelled' ? (
-        <View
-          className="absolute right-[16rpx] top-[16rpx] z-10 flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full active:opacity-70"
-          hoverStopPropagation
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(item);
-          }}
-        >
-          <Icon name="mdi-pencil" size={28} color="mutedForeground" />
+      {!menu && showTopActions && item.status !== 'cancelled' ? (
+        <View className="absolute right-[8rpx] top-[8rpx] z-10 flex items-center">
+          {showShare ? (
+            <Button
+              className="flex h-[48rpx] w-[48rpx] items-center justify-center border-none bg-transparent p-0 leading-none after:border-none active:opacity-60"
+              openType="share"
+              hoverStopPropagation
+              onClick={(event) => {
+                event.stopPropagation();
+                onSharePrepare?.(item);
+              }}
+            >
+              <Icon
+                name="mdi-share-variant"
+                size={28}
+                color="hsl(var(--muted-foreground))"
+              />
+            </Button>
+          ) : null}
         </View>
       ) : null}
 
@@ -120,7 +133,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
         <View
           className={cn(
             'flex min-w-0 flex-1 flex-wrap items-center gap-[14rpx]',
-            !menu && onEdit && item.status !== 'cancelled' ? 'pr-[56rpx]' : '',
+            showTopActions && item.status !== 'cancelled' ? 'pr-[56rpx]' : '',
           )}
         >
           <ClassAvatar size="sm" />

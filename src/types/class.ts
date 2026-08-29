@@ -19,8 +19,11 @@ export type ClassScheduleMode = 'fixed' | 'open';
 
 /**
  * 班级状态
+ * - active: 正常上课
+ * - paused: 停课（课表不再展示该班排课/开放时段，可恢复）
+ * - ended: 已结课
  */
-export type ClassStatus = 'active' | 'ended';
+export type ClassStatus = 'active' | 'paused' | 'ended';
 
 /**
  * 班级颜色主题

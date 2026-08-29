@@ -1252,6 +1252,8 @@ export async function mockCreateLeadFromInvite(params: {
   parentPhone?: string;
   childName: string;
   childNickname?: string;
+  childGender?: 'male' | 'female';
+  childAge?: string;
   teacherId: string;
   campusId: string;
   sourceType: 'share_link' | 'qr';
@@ -1271,6 +1273,10 @@ export async function mockCreateLeadFromInvite(params: {
   if (existing) {
     // 更新最近邀约老师
     existing.latest_invite_teacher_id = params.teacherId;
+    if (params.childGender) existing.child_gender = params.childGender;
+    if (params.childAge) existing.child_age = params.childAge;
+    if (params.parentPhone) existing.parent_phone = params.parentPhone;
+    if (params.parentName) existing.parent_name = params.parentName;
     existing.updated_at = dayjs().toISOString();
     return existing;
   }
@@ -1281,6 +1287,8 @@ export async function mockCreateLeadFromInvite(params: {
     trial_student_id: nextTrialStudentId(),
     child_name: params.childName,
     child_nickname: params.childNickname,
+    child_gender: params.childGender,
+    child_age: params.childAge,
     parent_user_id: params.parentUserId,
     parent_name: params.parentName,
     parent_phone: params.parentPhone,

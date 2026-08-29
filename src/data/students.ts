@@ -1353,6 +1353,15 @@ export async function mockEndClass(classId: string) {
   return true;
 }
 
+/** 停课 / 恢复上课（与 ended 结课区分：paused 可随时恢复） */
+export async function mockSetClassPaused(classId: string, paused: boolean) {
+  await delay();
+  const classItem = DB_CLASSES.find((c) => c.id === classId);
+  if (!classItem || classItem.status === 'ended') return undefined;
+  classItem.status = paused ? 'paused' : 'active';
+  return classItem;
+}
+
 export async function mockGetSchedulesByTeacher(teacherId: string, campusId?: string) {
   await delay();
   let schedules = filterSchedulesByActor(teacherId);

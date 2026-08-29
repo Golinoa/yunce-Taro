@@ -168,6 +168,51 @@ function auditPackageSize() {
   }
 }
 
+/**
+ * 校验分包页面 require 的 sub-common / sub-vendors 文件是否真实存在。
+ * 这类「module is not defined」不会被 vitest 覆盖，必须在产物层拦截。
+ */
+function verifySubpackageChunkRequires() {
+  const requireRe = /require\(["'](\.\.\/)+((?:sub-common\/[^"']+\.js)|sub-vendors\.js)["']\)/g;
+  const missing = [];
+  const pageJsFiles = collectFiles(distRoot).filter((filePath) => {
+    const rel = path.relative(distRoot, filePath).replace(/\\/g, '/');
+    return /^package-[^/]+\/pages\/.+\/index\.js$/.test(rel);
+  });
+
+  for (const filePath of pageJsFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    let match;
+    requireRe.lastIndex = 0;
+    while ((match = requireRe.exec(content)) !== null) {
+      const requiredRel = match[0].match(/require\(["']([^"']+)["']\)/)?.[1];
+      if (!requiredRel) continue;
+      const resolved = path.normalize(path.join(path.dirname(filePath), requiredRel));
+      if (!fs.existsSync(resolved)) {
+        missing.push({
+          page: path.relative(distRoot, filePath).replace(/\\/g, '/'),
+          require: requiredRel,
+          expected: path.relative(distRoot, resolved).replace(/\\/g, '/'),
+        });
+      }
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error('[postbuild-weapp-fixes] ERROR: missing subpackage chunk(s):');
+    missing.forEach((item) => {
+      console.error(`  - ${item.page} requires ${item.require} (missing ${item.expected})`);
+    });
+    process.exitCode = 1;
+    return false;
+  }
+
+  console.log(
+    `[postbuild-weapp-fixes] verified ${pageJsFiles.length} subpackage page(s) chunk requires`,
+  );
+  return true;
+}
+
 if (!fs.existsSync(distBaseWxmlPath)) {
   console.warn('[postbuild-weapp-fixes] dist/base.wxml not found, skip patch');
   process.exit(0);
@@ -202,4 +247,5 @@ if (wxssCreated > 0) {
 
 ensureLazyCodeLoading();
 cleanupDistArtifacts();
+verifySubpackageChunkRequires();
 auditPackageSize();

@@ -30,9 +30,10 @@ const TrialBookingPage: React.FC = () => {
 
   useLoad((options) => {
     const opt = options as Record<string, string>;
+    const modeRaw = opt.mode;
     setParams({
       leadId: opt.leadId,
-      mode: 'private',
+      mode: modeRaw === 'group' ? 'group' : 'private',
       date: opt.date,
       teacherId: opt.teacherId,
     });

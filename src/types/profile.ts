@@ -94,6 +94,8 @@ export interface RegisterDraft {
   /** 后端临时注册令牌 */
   tempToken: string;
   phone?: string;
+  /** Step1: 邮箱（生产 / 邮箱注册） */
+  email?: string;
   /** Step1: 用户名（Mock） */
   username: string;
   /** Step1: 密码（Mock） */

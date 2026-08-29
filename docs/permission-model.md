@@ -1,6 +1,7 @@
 # 权限体系规划（2026-08-22 用户口径确认）
 
-> 状态：**规划基座已落地（类型模型 + 页面访问矩阵），授权 UI 未实现（规划中）**
+> 状态：**规划基座已落地（类型模型 + 页面访问矩阵），授权 UI 未实现（规划中）**  
+> **UI 可见性落地矩阵（按角色）**：见 [role-visibility-matrix.md](./role-visibility-matrix.md)（Tab / 我的 / 课表 / 系统设置 / 路由守卫，2026-08-29 收口）  
 > 代码落点：`src/types/permission.ts`（模型）、`src/utils/route-guard.tsx`（页面访问矩阵）、
 > 数据层 `filterXxxByActor`（数据范围过滤，已有）
 

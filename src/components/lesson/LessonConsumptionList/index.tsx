@@ -180,7 +180,6 @@ function getTeacherDisplayText(
 function mapRecordToDetail(
   record: LessonRecord,
   teacherNameMap: Record<string, string>,
-  isClassCard: boolean,
 ): LessonConsumptionDetailItem {
   const remainingHours = record.remaining_hours ?? 0;
   const totalHours = Math.max((record.hours_used || 0) + remainingHours, remainingHours);
@@ -203,11 +202,9 @@ function mapRecordToDetail(
       : undefined,
     packageTagText,
     packageTagClassName: getPackageTagClass(packageTagText),
+    // 课程内容优先；无内容时用课包/班级名。不展示「个人消课/班级消课」这类注释性占位文案。
     description:
-      record.content?.trim() ||
-      record.course_package?.name ||
-      record.class_name ||
-      (isClassCard ? '班级消课' : '个人消课'),
+      record.content?.trim() || record.course_package?.name || record.class_name || '',
   };
 }
 
@@ -270,7 +267,7 @@ export function buildLessonConsumptionSections(
         return;
       }
 
-      personalItems.push(mapRecordToDetail(record, teacherNameMap, false));
+      personalItems.push(mapRecordToDetail(record, teacherNameMap));
     });
 
     const cards = Array.from(classCardMap.entries()).map(([cardKey, cardRecords]) => {
@@ -289,7 +286,7 @@ export function buildLessonConsumptionSections(
         studentCount: uniqueStudentIds.size,
         studentCountText: `${uniqueStudentIds.size}人`,
         cardKind: 'class' as const,
-        details: cardRecords.map((record) => mapRecordToDetail(record, teacherNameMap, true)),
+        details: cardRecords.map((record) => mapRecordToDetail(record, teacherNameMap)),
       };
     });
 
@@ -367,7 +364,11 @@ const StudentConsumptionRow: React.FC<StudentConsumptionRowProps> = ({
         </Text>
       </View>
 
-      <Text className="text-[20rpx] text-muted-foreground truncate block">{detail.description}</Text>
+      {detail.description ? (
+        <Text className="text-[20rpx] text-muted-foreground truncate block">
+          {detail.description}
+        </Text>
+      ) : null}
       <Text className="text-[20rpx] text-muted-foreground/90 truncate block mt-[4rpx]">
         {detail.teacherDisplayText}
       </Text>
@@ -536,19 +537,11 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                 key={detail.id}
                 className="bg-card rounded-[24rpx] shadow-card overflow-hidden px-[32rpx] py-[8rpx]"
               >
-                <View className="flex flex-row gap-[20rpx]">
-                  <View
-                    className="w-[16rpx] min-h-[60rpx] self-stretch rounded-full shrink-0 mt-[20rpx]"
-                    style={{ backgroundColor: TODO_LEVEL_BAR_COLOR.low }}
-                  />
-                  <View className="flex-1 min-w-0">
-                    <StudentConsumptionRow
-                      detail={detail}
-                      onStudentClick={handleStudentClick}
-                      onRecordClick={onRecordClick}
-                    />
-                  </View>
-                </View>
+                <StudentConsumptionRow
+                  detail={detail}
+                  onStudentClick={handleStudentClick}
+                  onRecordClick={onRecordClick}
+                />
               </View>
             ))}
           </View>

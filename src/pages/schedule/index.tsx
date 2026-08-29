@@ -32,6 +32,7 @@ import {
   calendarSyncService,
 } from '@/services';
 import { auditLogService } from '@/services/audit-log';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useCampusStore } from '@/stores/campus';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useThemeStore } from '@/stores/theme';
@@ -45,8 +46,14 @@ import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import type { BookableVenue } from '@/types/venue-booking';
 import { isParentRole, useAuth } from '@/utils/auth';
+import {
+  buildLessonSharePath,
+  buildLessonShareTitle,
+  type LessonSharePayload,
+} from '@/utils/lesson-share';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
@@ -428,6 +435,40 @@ function isUpcomingClassCard(status: ScheduleCardItem['status']): boolean {
   return status === 'upcoming' || status === 'urgent';
 }
 
+/** 停课：仅「尚未开课」的这一节可临时取消 */
+function canSuspendThisLesson(
+  item: Pick<ScheduleCardItem, 'status' | 'startTime'>,
+  selectedDate: dayjs.Dayjs,
+  now: dayjs.Dayjs,
+): boolean {
+  if (
+    item.status === 'cancelled' ||
+    item.status === 'done' ||
+    item.status === 'ended' ||
+    item.status === 'active'
+  ) {
+    return false;
+  }
+  if (selectedDate.isBefore(now, 'day')) return false;
+  if (selectedDate.isAfter(now, 'day')) return true;
+  const startMinutes = parseTimeToMinutes(item.startTime);
+  const nowMinutes = now.hour() * 60 + now.minute();
+  return nowMinutes < startMinutes;
+}
+
+function canSuspendOpenSlot(
+  slot: Pick<ClassBookingSlot, 'status' | 'start_time' | 'lesson_date'>,
+  now: dayjs.Dayjs,
+): boolean {
+  if (slot.status === 'rest') return false;
+  const lessonDay = dayjs(slot.lesson_date);
+  if (lessonDay.isBefore(now, 'day')) return false;
+  if (lessonDay.isAfter(now, 'day')) return true;
+  const startMinutes = parseTimeToMinutes(slot.start_time);
+  const nowMinutes = now.hour() * 60 + now.minute();
+  return nowMinutes < startMinutes;
+}
+
 /** 历史课可操作窗口：上课日起 30 天内可补录；超时仅可查看 */
 const LESSON_OPERATE_WINDOW_DAYS = 30;
 
@@ -451,13 +492,38 @@ const SchedulePage: React.FC = () => {
   const { profile, currentRole } = useAuth();
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const themeStore = useThemeStore();
+  const isParent = isParentRole(currentRole);
+  /** 家长绑定孩子所在班级，用于班课只看自己的排班 */
+  const [parentClassIds, setParentClassIds] = useState<Set<string>>(new Set());
 
-  // 家长角色进入课表页时重定向到约课页
-  React.useEffect(() => {
-    if (isParentRole(currentRole)) {
-      Taro.redirectTo({ url: '/package-course/pages/booking/index' });
+  useDidShow(() => {
+    syncTabBarByProfile(profile);
+  });
+
+  useEffect(() => {
+    if (!isParent || !profile?.id) {
+      setParentClassIds(new Set());
+      return;
     }
-  }, [currentRole]);
+    let cancelled = false;
+    void studentService
+      .getByParent(profile.id)
+      .then((list) => {
+        if (cancelled) return;
+        const ids = new Set<string>();
+        list.forEach((stu) => {
+          (stu.class_ids || []).forEach((id) => ids.add(id));
+        });
+        setParentClassIds(ids);
+      })
+      .catch((err) => {
+        logError('SchedulePage load parent classes', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isParent, profile?.id]);
+
   const currentUserId = profile?.id || '';
   const currentTeacherId = profile?.teacher_profile?.id || currentUserId;
   const currentTeacherName = profile?.name || '当前老师';
@@ -471,11 +537,20 @@ const SchedulePage: React.FC = () => {
   const errorOpenSlotDatesRef = useRef<Set<string>>(new Set());
   /** 开放预约数据缓存 ref */
   const openClassSlotsRef = useRef<Record<string, Record<string, ClassBookingSlot[]>>>({});
+  /** 分享上下文：openType=share 前写入，供 useShareAppMessage 读取 */
+  const pendingShareRef = useRef<LessonSharePayload | null>(null);
 
-  // 注册页面分享能力
+  // 注册页面分享能力（班课试听 / 团课约课落地 invite-landing）
   useShareAppMessage(() => {
+    const payload = pendingShareRef.current;
+    if (payload) {
+      return {
+        title: buildLessonShareTitle(payload),
+        path: buildLessonSharePath(payload),
+      };
+    }
     return {
-      title: '松果排课 - 开放预约时段',
+      title: '松果排课',
       path: '/pages/schedule/index',
     };
   });
@@ -655,20 +730,46 @@ const SchedulePage: React.FC = () => {
   const filteredClasses = useMemo(() => {
     if (!activeTab || activeTab.type === 'venue') return [];
     return classes.filter((cls) => {
-      if (cls.category_id) return activeCategoryIds.has(cls.category_id);
-      // 兼容旧数据：无 category_id 时按 schedule_mode 回退推导
-      if (activeTab.mode === 'group') return cls.schedule_mode === 'open';
-      if (activeTab.mode === 'class') return !cls.schedule_mode || cls.schedule_mode === 'fixed';
-      return false;
+      if (cls.category_id) {
+        if (!activeCategoryIds.has(cls.category_id)) return false;
+      } else {
+        // 兼容旧数据：无 category_id 时按 schedule_mode 回退推导
+        if (activeTab.mode === 'group') {
+          if (cls.schedule_mode !== 'open') return false;
+        } else if (activeTab.mode === 'class') {
+          if (cls.schedule_mode && cls.schedule_mode !== 'fixed') return false;
+        } else {
+          return false;
+        }
+      }
+      // 家长 · 班课：只看绑定孩子所在班级的排班
+      if (isParent && activeTab.mode === 'class') {
+        return parentClassIds.has(cls.id);
+      }
+      return true;
     });
-  }, [activeTab, activeCategoryIds, classes]);
+  }, [activeTab, activeCategoryIds, classes, isParent, parentClassIds]);
 
-  /** 按当前 Tab 过滤后的排课规则 */
+  /** 按当前 Tab 过滤后的排课规则（停课班级不展开课表） */
   const filteredSchedules = useMemo(() => {
     if (!activeTab || activeTab.type === 'venue') return [];
     const classIds = new Set(filteredClasses.map((item) => item.id));
-    return schedules.filter((item) => !item.class_id || classIds.has(item.class_id));
+    const pausedIds = new Set(
+      filteredClasses.filter((item) => item.status === 'paused').map((item) => item.id),
+    );
+    return schedules.filter((item) => {
+      if (!item.class_id) return true;
+      if (!classIds.has(item.class_id)) return false;
+      if (pausedIds.has(item.class_id)) return false;
+      return true;
+    });
   }, [activeTab, filteredClasses, schedules]);
+
+  /** 当前 Tab 下已停课的班级（课表底部展示，可恢复） */
+  const pausedClasses = useMemo(
+    () => filteredClasses.filter((item) => item.status === 'paused'),
+    [filteredClasses],
+  );
 
   /** 加载可预约场地列表 */
   const loadVenues = useCallback(async () => {
@@ -1590,6 +1691,192 @@ const SchedulePage: React.FC = () => {
     [lessonRecords, selectedDate, themeStore.activeTheme],
   );
 
+  /** 停课：仅未开课的这一节临时取消，并向学员家长发站内 + 订阅消息 */
+  const handleSuspendLesson = useCallback(
+    async (item: ScheduleCardItem) => {
+      if (!item.classId) {
+        Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
+        return;
+      }
+      if (!canSuspendThisLesson(item, selectedDate, currentTime)) {
+        Taro.showToast({ title: '仅未开课的课程可停课', icon: 'none' });
+        return;
+      }
+
+      const lessonDate = selectedDate.format('YYYY-MM-DD');
+      const confirmResult = await Taro.showModal({
+        title: '停课确认',
+        content: `确定停课【${item.className}】${lessonDate} ${item.startTime}-${item.endTime}？停课后本节课临时取消，将向学员家长发送站内通知与订阅消息。`,
+        confirmText: '确认停课',
+        confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
+      });
+      if (!confirmResult.confirm) return;
+
+      const scheduleInfo = scheduleById[item.id];
+      const selectedClass =
+        filteredClasses.find((classItem) => classItem.id === item.classId) || null;
+      const className = selectedClass?.name || item.className;
+      const changeTime = `${lessonDate} ${item.startTime}-${item.endTime}`;
+
+      try {
+        const students = await classService.getStudents(item.classId);
+        const createdRecords: LessonRecord[] = [];
+
+        for (const student of students) {
+          const createdRecord = await lessonRecordService.create({
+            teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
+            operator_teacher_id: currentTeacherId,
+            assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
+            student_id: student.id,
+            package_id: '',
+            class_id: item.classId,
+            lesson_date: lessonDate,
+            hours_used: 0,
+            status: 'cancelled',
+            content: `停课：${item.className} ${item.startTime}-${item.endTime}`,
+          });
+          createdRecords.push(createdRecord);
+
+          const parents = await studentService.getParents(student.id);
+          for (const binding of parents) {
+            await notificationService.send({
+              sender_id: profile?.id || currentUserId,
+              receiver_id: binding.parent_id,
+              title: `${className}停课通知`,
+              content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
+              related_id: student.id,
+              type: 'schedule_change',
+            });
+            await subscribeMessageService.sendScheduleChangeToReceiver({
+              receiverUserId: binding.parent_id,
+              bizKey: `lesson-suspend:${item.id}:${lessonDate}:${binding.parent_id}`,
+              className,
+              changeTime,
+              changeReason: '本节课临时停课',
+            });
+          }
+        }
+
+        setLessonRecords((prev) => {
+          const filtered = prev.filter(
+            (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
+          );
+          return [...filtered, ...createdRecords];
+        });
+        Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
+      } catch (err) {
+        logError('SchedulePage suspend lesson', err);
+        Taro.showToast({ title: '停课失败，请重试', icon: 'none' });
+      }
+    },
+    [
+      currentTeacherId,
+      currentTime,
+      currentUserId,
+      filteredClasses,
+      profile?.id,
+      scheduleById,
+      selectedDate,
+      themeStore.activeTheme,
+    ],
+  );
+
+  /** 团课停课：仅未开课时段，设为休息并通知已约学员家长 */
+  const handleSuspendOpenSlot = useCallback(
+    async (slot: ClassBookingSlot, className: string) => {
+      if (!canSuspendOpenSlot(slot, currentTime)) {
+        Taro.showToast({ title: '仅未开课的课程可停课', icon: 'none' });
+        return;
+      }
+
+      const displayName = className || slot.class_name || '该班级';
+      const changeTime = `${slot.lesson_date} ${slot.start_time}-${slot.end_time}`;
+      const confirmResult = await Taro.showModal({
+        title: '停课确认',
+        content: `确定停课【${displayName}】${changeTime}？停课后本节开放时段临时取消，将向已约学员家长发送站内通知与订阅消息。`,
+        confirmText: '确认停课',
+        confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
+      });
+      if (!confirmResult.confirm) return;
+
+      try {
+        await classBookingService.updateSlotStatus(slot.id, 'rest');
+        setOpenClassSlots((prev) => {
+          const next = { ...prev };
+          const dateKey = slot.lesson_date;
+          if (next[dateKey]) {
+            next[dateKey] = { ...next[dateKey] };
+            const classSlots = next[dateKey][slot.class_id];
+            if (classSlots) {
+              next[dateKey][slot.class_id] = classSlots.map((s) =>
+                s.id === slot.id ? { ...s, status: 'rest' as const } : s,
+              );
+            }
+          }
+          return next;
+        });
+
+        const bookingStudents = slot.booking_students || [];
+        for (const student of bookingStudents) {
+          const parents = await studentService.getParents(student.id);
+          for (const binding of parents) {
+            await notificationService.send({
+              sender_id: profile?.id || currentUserId,
+              receiver_id: binding.parent_id,
+              title: `${displayName}停课通知`,
+              content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
+              related_id: student.id,
+              type: 'schedule_change',
+            });
+            await subscribeMessageService.sendScheduleChangeToReceiver({
+              receiverUserId: binding.parent_id,
+              bizKey: `slot-suspend:${slot.id}:${binding.parent_id}`,
+              className: displayName,
+              changeTime,
+              changeReason: '本节课临时停课',
+            });
+          }
+        }
+
+        Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
+      } catch (err) {
+        logError('SchedulePage suspend open slot', err);
+        Taro.showToast({ title: '停课失败，请重试', icon: 'none' });
+      }
+    },
+    [currentTime, currentUserId, profile?.id, themeStore.activeTheme],
+  );
+
+  /** 恢复上课 */
+  const handleResumeClass = useCallback(
+    async (classId: string, className: string) => {
+      if (!classId) return;
+      const confirmResult = await Taro.showModal({
+        title: '恢复上课',
+        content: `确定恢复【${className}】上课？恢复后课表将重新展示该班排课/开放时段。`,
+        confirmText: '恢复上课',
+        confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
+      });
+      if (!confirmResult.confirm) return;
+
+      try {
+        const updated = await classService.resume(classId);
+        if (!updated) {
+          Taro.showToast({ title: '恢复失败', icon: 'none' });
+          return;
+        }
+        setClasses((prev) =>
+          prev.map((item) => (item.id === classId ? { ...item, status: 'active' } : item)),
+        );
+        Taro.showToast({ title: '已恢复上课', icon: 'success' });
+      } catch (err) {
+        logError('SchedulePage resume class', err);
+        Taro.showToast({ title: '恢复失败，请重试', icon: 'none' });
+      }
+    },
+    [themeStore.activeTheme],
+  );
+
   const handleConfirmDangerAction = useCallback(async () => {
     const item = dangerActionState.item;
     if (!dangerActionState.type) {
@@ -1863,6 +2150,90 @@ const SchedulePage: React.FC = () => {
                   {cards.map((item) => {
                     const actionVisibility = getCardActionVisibility(item, date, currentTime);
                     const isCancelled = item.status === 'cancelled';
+                    const cardBody = (
+                      <ScheduleCard
+                        item={item}
+                        showShare={!isParent && item.status !== 'cancelled'}
+                        onSharePrepare={
+                          isParent
+                            ? undefined
+                            : (card) => {
+                                pendingShareRef.current = {
+                                  type: 'class_lesson',
+                                  teacherId: currentTeacherId || currentUserId,
+                                  campusId:
+                                    card.campusId ||
+                                    currentCampusId ||
+                                    profile?.currentContext?.campusId ||
+                                    '',
+                                  classId: card.classId || '',
+                                  className: card.className,
+                                  scheduleId: card.id,
+                                  date: date.format('YYYY-MM-DD'),
+                                  start: card.startTime,
+                                  end: card.endTime,
+                                };
+                              }
+                        }
+                        metaAction={
+                          isParent || item.status === 'cancelled'
+                            ? undefined
+                            : isHistoricalClassCard(item.status, date, currentTime) ? (
+                                canOperateHistoricalLesson(date, currentTime) ? (
+                                  <ScheduleActionButton
+                                    label="补录"
+                                    variant="neutral"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      runCardButtonAction(() => handleSupplement(item, date));
+                                    }}
+                                  />
+                                ) : undefined
+                              ) : (
+                                <ScheduleActionButton
+                                  label={item.status === 'urgent' ? '立即点名' : '点名'}
+                                  variant="attend"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    runCardButtonAction(() => handleRollCall(item, date));
+                                  }}
+                                />
+                              )
+                        }
+                        footerAction={
+                          isParent || !isUpcomingClassCard(item.status) ? undefined : (
+                            <View
+                              className="flex min-h-[48rpx] items-center px-[4rpx] active:opacity-70"
+                              hoverStopPropagation
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                runCardButtonAction(() => handleOpenBookSheet(item));
+                              }}
+                            >
+                              <Text className="text-[24rpx] text-primary">约试听</Text>
+                              <Text className="ml-[2rpx] text-[24rpx] text-primary">›</Text>
+                            </View>
+                          )
+                        }
+                        showStudentRow={
+                          item.status !== 'cancelled' &&
+                          (isUpcomingClassCard(item.status) ||
+                            item.status === 'active' ||
+                            (item.students?.length || 0) > 0)
+                        }
+                      />
+                    );
+
+                    if (isParent) {
+                      return (
+                        <View key={item.id} className="rounded-[16rpx]">
+                          {cardBody}
+                        </View>
+                      );
+                    }
+
                     return (
                       <SwappableScheduleCard
                         key={item.id}
@@ -1876,6 +2247,14 @@ const SchedulePage: React.FC = () => {
                             variant: 'default',
                             onClick: () => handleEditSchedule(item),
                             disabled: !actionVisibility.showEditAndReschedule,
+                          },
+                          {
+                            label: '停课',
+                            variant: 'warning',
+                            onClick: () => {
+                              void handleSuspendLesson(item);
+                            },
+                            disabled: !canSuspendThisLesson(item, date, currentTime),
                           },
                           {
                             label: '调课',
@@ -1897,74 +2276,40 @@ const SchedulePage: React.FC = () => {
                               },
                         ]}
                       >
-                        <ScheduleCard
-                          item={item}
-                          onEdit={
-                            isUpcomingClassCard(item.status) || item.status === 'active'
-                              ? () => runCardButtonAction(() => handleEditSchedule(item))
-                              : undefined
-                          }
-                          metaAction={
-                            item.status === 'cancelled' ? undefined : isHistoricalClassCard(
-                                item.status,
-                                date,
-                                currentTime,
-                              ) ? (
-                              canOperateHistoricalLesson(date, currentTime) ? (
-                                <ScheduleActionButton
-                                  label="补录"
-                                  variant="neutral"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    runCardButtonAction(() => handleSupplement(item, date));
-                                  }}
-                                />
-                              ) : undefined
-                            ) : (
-                              <ScheduleActionButton
-                                label={
-                                  item.status === 'urgent'
-                                    ? '立即点名'
-                                    : item.status === 'active'
-                                      ? '继续点名'
-                                      : '点名'
-                                }
-                                variant="attend"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  runCardButtonAction(() => handleRollCall(item, date));
-                                }}
-                              />
-                            )
-                          }
-                          footerAction={
-                            isUpcomingClassCard(item.status) ? (
-                              <View
-                                className="flex min-h-[48rpx] items-center px-[4rpx] active:opacity-70"
-                                hoverStopPropagation
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  runCardButtonAction(() => handleOpenBookSheet(item));
-                                }}
-                              >
-                                <Text className="text-[24rpx] text-primary">约试听</Text>
-                                <Text className="ml-[2rpx] text-[24rpx] text-primary">›</Text>
-                              </View>
-                            ) : undefined
-                          }
-                          showStudentRow={
-                            item.status !== 'cancelled' &&
-                            (isUpcomingClassCard(item.status) ||
-                              item.status === 'active' ||
-                              (item.students?.length || 0) > 0)
-                          }
-                        />
+                        {cardBody}
                       </SwappableScheduleCard>
                     );
                   })}
                 </View>
+
+                {!isParent && pausedClasses.length > 0 ? (
+                  <View className="mt-[28rpx] flex flex-col gap-[14rpx]">
+                    <Text className="px-[4rpx] text-[24rpx] text-muted-foreground">已停课班级</Text>
+                    {pausedClasses.map((cls) => (
+                      <View
+                        key={cls.id}
+                        className="flex items-center gap-[16rpx] rounded-[16rpx] bg-card px-[24rpx] py-[22rpx] shadow-card"
+                      >
+                        <View className="min-w-0 flex-1">
+                          <Text className="block text-[28rpx] font-medium text-foreground truncate">
+                            {cls.name}
+                          </Text>
+                          <Text className="mt-[4rpx] block text-[22rpx] text-muted-foreground">
+                            停课中 · 课表已隐藏排课
+                          </Text>
+                        </View>
+                        <View
+                          className="shrink-0 rounded-[12rpx] bg-primary px-[22rpx] py-[12rpx] active:opacity-85"
+                          onClick={() => void handleResumeClass(cls.id, cls.name)}
+                        >
+                          <Text className="text-[24rpx] font-semibold text-primary-foreground">
+                            恢复上课
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             </View>
           </ScrollView>
@@ -1985,6 +2330,10 @@ const SchedulePage: React.FC = () => {
       handleClassReschedule,
       handleCancelLesson,
       handleRestoreLesson,
+      handleSuspendLesson,
+      handleResumeClass,
+      pausedClasses,
+      isParent,
     ],
   );
 
@@ -2130,9 +2479,13 @@ const SchedulePage: React.FC = () => {
       const isDateError = errorOpenSlotDates.has(dateStr);
       // 用户口径（2026-08-23）：休息（rest）不产生约课，列表不渲染 rest 卡片；
       // 全天休息的日期自然显示"当前日期暂无开放预约时段"空态
+      // 停课班级的时段亦不展示（底部「已停课班级」可恢复）
+      const pausedClassIds = new Set(
+        openClasses.filter((item) => item.status === 'paused').map((item) => item.id),
+      );
       const allSlots = Object.values(dateSlots)
         .flat()
-        .filter((s) => s.status !== 'rest')
+        .filter((s) => s.status !== 'rest' && !pausedClassIds.has(s.class_id))
         .sort(
           (left, right) =>
             parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time),
@@ -2217,43 +2570,14 @@ const SchedulePage: React.FC = () => {
                         return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
                       })();
 
-                    return (
-                      <SwappableScheduleCard
+                    return isParent ? (
+                      <View
                         key={slot.id}
-                        cardId={slot.id}
-                        openCardId={openCardId}
-                        onOpenChange={setOpenCardId}
-                        radiusClassName="rounded-[24rpx]"
-                        onClick={() => handleOpenClassSlotConfig(slot.class_id, slot.lesson_date)}
-                        actions={[
-                          {
-                            label: '编辑',
-                            variant: 'default',
-                            onClick: () => handleEditOpenSlot(slot),
-                          },
-                          isRest
-                            ? {
-                                label: '恢复',
-                                variant: 'warning',
-                                onClick: () => handleRestoreOpenSlot(slot),
-                              }
-                            : {
-                                label: '取消',
-                                variant: 'danger',
-                                onClick: () => handleCancelOpenSlot(slot),
-                              },
-                        ]}
+                        className={cn(
+                          'rounded-[24rpx] px-[24rpx] py-[20rpx] shadow-card',
+                          isRest ? 'bg-muted border border-border' : 'bg-card',
+                        )}
                       >
-                        <View
-                          className={cn(
-                            'rounded-[24rpx] px-[24rpx] py-[20rpx] shadow-card',
-                            isRest
-                              ? 'bg-muted border border-border'
-                              : isSlotInProgress
-                                ? 'bg-card course-status-active-border'
-                                : 'bg-card',
-                          )}
-                        >
                           <View className="flex">
                             {/* 左侧时间轴 */}
                             <View className="flex w-[116rpx] flex-shrink-0 flex-col items-center py-[2rpx]">
@@ -2284,10 +2608,179 @@ const SchedulePage: React.FC = () => {
 
                             {/* 右侧内容 */}
                             <View className="relative ml-[16rpx] flex flex-1 flex-col justify-between">
+                              <View>
+                                <View className="flex flex-wrap items-center gap-[12rpx]">
+                                  <Text className="text-[36rpx] font-bold leading-tight text-foreground">
+                                    {cls?.name || slot.class_name || '未命名班级'}
+                                  </Text>
+                                  {/* 团课无试听：状态标签仅「上课中」（预约满/可约用人数区表达） */}
+                                  {isSlotInProgress ? (
+                                    <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                                      <Text className="text-[20rpx] font-medium">上课中</Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+                                <View className="mt-[12rpx] flex flex-wrap items-center gap-[12rpx]">
+                                  {cls?.level ? (
+                                    <View className="rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
+                                      <Text className="text-[24rpx] font-medium leading-none text-muted-foreground">
+                                        {CLASS_LEVEL_LABELS[cls.level]}
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                  {slot.room ? (
+                                    <View className="flex items-center gap-[6rpx] rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
+                                      <Icon
+                                        name="mdi-map-marker"
+                                        size={18}
+                                        color="hsl(var(--muted-foreground))"
+                                      />
+                                      <Text className="text-[24rpx] font-medium leading-none text-muted-foreground">
+                                        {slot.room}
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+                              </View>
+
+                              <View className="mt-[12rpx] flex items-center justify-between gap-[12rpx]">
+                                <View className="flex min-w-0 flex-1 items-center gap-[12rpx]">
+                                  <Image
+                                    src={BRAND_LOGO}
+                                    className="h-[40rpx] w-[40rpx] flex-shrink-0 rounded-full border border-border bg-card"
+                                    mode="aspectFit"
+                                  />
+                                  <Text className="truncate text-[26rpx] text-foreground">
+                                    {teacherName}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* 底部：已约人数（家长只看可约名额） */}
+                          <View className="mt-[18rpx] flex items-center justify-between border-t border-border pt-[14rpx]">
+                            <View className="flex flex-1 items-center min-w-0 overflow-hidden">
+                              {(slot.booking_students || [])
+                                .slice(0, OPEN_BOOKING_MAX_VISIBLE_AVATARS)
+                                .map((student, index) => (
+                                  <Image
+                                    key={student.id}
+                                    src={student.avatar || BRAND_LOGO}
+                                    className={cn(
+                                      'relative h-[60rpx] w-[60rpx] flex-shrink-0 rounded-full border-2 border-card bg-muted',
+                                      index > 0 && '-ml-[16rpx]',
+                                    )}
+                                    mode="aspectFill"
+                                  />
+                                ))}
+                            </View>
+
+                            <Text className="ml-[24rpx] flex-shrink-0 text-[30rpx] font-semibold text-foreground">
+                              <Text className="text-[34rpx] font-bold text-foreground">
+                                {slot.current_count}
+                              </Text>
+                              <Text className="text-[24rpx] font-medium text-muted-foreground">
+                                /{slot.max_count}人
+                              </Text>
+                            </Text>
+                          </View>
+                      </View>
+                    ) : (
+                      <SwappableScheduleCard
+                        key={slot.id}
+                        cardId={slot.id}
+                        openCardId={openCardId}
+                        onOpenChange={setOpenCardId}
+                        radiusClassName="rounded-[24rpx]"
+                        onClick={() => handleOpenClassSlotConfig(slot.class_id, slot.lesson_date)}
+                        actions={[
+                          {
+                            label: '编辑',
+                            variant: 'default',
+                            onClick: () => handleEditOpenSlot(slot),
+                          },
+                          {
+                            label: '停课',
+                            variant: 'warning',
+                            onClick: () =>
+                              void handleSuspendOpenSlot(
+                                slot,
+                                openClassMap[slot.class_id]?.name ||
+                                  slot.class_name ||
+                                  '该班级',
+                              ),
+                            disabled: !canSuspendOpenSlot(slot, currentTime),
+                          },
+                          isRest
+                            ? {
+                                label: '恢复',
+                                variant: 'warning',
+                                onClick: () => handleRestoreOpenSlot(slot),
+                              }
+                            : {
+                                label: '取消',
+                                variant: 'danger',
+                                onClick: () => handleCancelOpenSlot(slot),
+                              },
+                        ]}
+                      >
+                        <View
+                          className={cn(
+                            'rounded-[24rpx] px-[24rpx] py-[20rpx] shadow-card',
+                            isRest ? 'bg-muted border border-border' : 'bg-card',
+                          )}
+                        >
+                          <View className="flex">
+                            <View className="flex w-[116rpx] flex-shrink-0 flex-col items-center py-[2rpx]">
+                              <View className="flex items-center gap-[8rpx]">
+                                <View className="h-[12rpx] w-[12rpx] rounded-full bg-foreground" />
+                                <Text className="text-[34rpx] font-bold leading-none text-foreground">
+                                  {slot.start_time}
+                                </Text>
+                              </View>
+                              <View className="flex w-[2rpx] flex-1 flex-col items-center py-[4rpx]">
+                                <View className="w-[2rpx] flex-1 bg-border" />
+                                {duration ? (
+                                  <View className="py-[2rpx]">
+                                    <Text className="text-[22rpx] text-muted-foreground">
+                                      {duration}
+                                    </Text>
+                                  </View>
+                                ) : null}
+                                <View className="w-[2rpx] flex-1 bg-border" />
+                              </View>
+                              <View className="flex items-center gap-[8rpx]">
+                                <View className="h-[12rpx] w-[12rpx] rounded-full border-[3rpx] border-foreground bg-transparent" />
+                                <Text className="text-[34rpx] font-bold leading-none text-foreground">
+                                  {slot.end_time}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View className="relative ml-[16rpx] flex flex-1 flex-col justify-between">
                               <Button
                                 className="absolute -right-[8rpx] -top-[8rpx] z-10 flex h-[48rpx] w-[48rpx] items-center justify-center border-none bg-transparent p-0 leading-none after:border-none active:opacity-60"
                                 openType="share"
-                                onClick={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  pendingShareRef.current = {
+                                    type: 'group_slot',
+                                    teacherId: slot.teacher_id || currentTeacherId || currentUserId,
+                                    campusId:
+                                      slot.campus_id ||
+                                      cls?.campus_id ||
+                                      currentCampusId ||
+                                      profile?.currentContext?.campusId ||
+                                      '',
+                                    classId: slot.class_id,
+                                    className: cls?.name || slot.class_name,
+                                    slotId: slot.id,
+                                    date: slot.lesson_date,
+                                    start: slot.start_time,
+                                    end: slot.end_time,
+                                  };
+                                }}
                               >
                                 <Icon
                                   name="mdi-share-variant"
@@ -2301,7 +2794,6 @@ const SchedulePage: React.FC = () => {
                                   <Text className="text-[36rpx] font-bold leading-tight text-foreground">
                                     {cls?.name || slot.class_name || '未命名班级'}
                                   </Text>
-                                  {/* 团课无试听：状态标签仅「上课中」（预约满/可约用人数区表达） */}
                                   {isSlotInProgress ? (
                                     <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                                       <Text className="text-[20rpx] font-medium">上课中</Text>
@@ -2359,10 +2851,8 @@ const SchedulePage: React.FC = () => {
                             </View>
                           </View>
 
-                          {/* 底部操作栏：已约学员头像 + 代约加号按钮 + 人数 */}
                           <View className="mt-[18rpx] flex items-center justify-between border-t border-border pt-[14rpx]">
                             <View className="flex flex-1 items-center min-w-0 overflow-hidden">
-                              {/* 已约学员头像从左往右排列，互相轻微压住，最多展示前 x 个 */}
                               {(slot.booking_students || [])
                                 .slice(0, OPEN_BOOKING_MAX_VISIBLE_AVATARS)
                                 .map((student, index) => (
@@ -2376,8 +2866,6 @@ const SchedulePage: React.FC = () => {
                                     mode="aspectFill"
                                   />
                                 ))}
-
-                              {/* 代约加号按钮：无预约时在最左侧，随头像增多被挤到最右侧 */}
                               <View
                                 className="relative flex h-[60rpx] w-[60rpx] flex-shrink-0 items-center justify-center rounded-full border border-border bg-muted active:opacity-80"
                                 onClick={(event) => {
@@ -2392,7 +2880,6 @@ const SchedulePage: React.FC = () => {
                                 />
                               </View>
                             </View>
-
                             <Text className="ml-[24rpx] flex-shrink-0 text-[30rpx] font-semibold text-foreground">
                               <Text className="text-[34rpx] font-bold text-foreground">
                                 {slot.current_count}
@@ -2407,6 +2894,38 @@ const SchedulePage: React.FC = () => {
                     );
                   })}
                 </View>
+
+                {!isParent &&
+                openClasses.some((item) => item.status === 'paused') ? (
+                  <View className="mt-[28rpx] flex flex-col gap-[14rpx]">
+                    <Text className="px-[4rpx] text-[24rpx] text-muted-foreground">已停课班级</Text>
+                    {openClasses
+                      .filter((item) => item.status === 'paused')
+                      .map((cls) => (
+                        <View
+                          key={cls.id}
+                          className="flex items-center gap-[16rpx] rounded-[24rpx] bg-card px-[24rpx] py-[22rpx] shadow-card"
+                        >
+                          <View className="min-w-0 flex-1">
+                            <Text className="block truncate text-[28rpx] font-medium text-foreground">
+                              {cls.name}
+                            </Text>
+                            <Text className="mt-[4rpx] block text-[22rpx] text-muted-foreground">
+                              停课中 · 开放时段已隐藏
+                            </Text>
+                          </View>
+                          <View
+                            className="shrink-0 rounded-[12rpx] bg-primary px-[22rpx] py-[12rpx] active:opacity-85"
+                            onClick={() => void handleResumeClass(cls.id, cls.name)}
+                          >
+                            <Text className="text-[24rpx] font-semibold text-primary-foreground">
+                              恢复上课
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                  </View>
+                ) : null}
               </View>
             </View>
           </ScrollView>
@@ -2428,7 +2947,14 @@ const SchedulePage: React.FC = () => {
       handleEditOpenSlot,
       handleCancelOpenSlot,
       handleRestoreOpenSlot,
+      handleSuspendOpenSlot,
+      handleResumeClass,
       runCardButtonAction,
+      isParent,
+      currentCampusId,
+      currentTeacherId,
+      currentUserId,
+      profile?.currentContext?.campusId,
     ],
   );
 
@@ -2539,14 +3065,16 @@ const SchedulePage: React.FC = () => {
               </View>
             </ScrollView>
             <View className="ml-[16rpx] flex flex-shrink-0 items-center gap-[16rpx]">
-              <View
-                className="flex items-center gap-[4rpx] active:opacity-70"
-                onClick={handleBatchAction}
-              >
-                <Text className="text-[28rpx] text-foreground-secondary">筛选</Text>
-                <Icon name="mdi-chevron-down" size={20} color="mutedForeground" />
-              </View>
-              {(activeTab?.mode === 'class' || activeTab?.mode === 'group') && (
+              {!isParent && (
+                <View
+                  className="flex items-center gap-[4rpx] active:opacity-70"
+                  onClick={handleBatchAction}
+                >
+                  <Text className="text-[28rpx] text-foreground-secondary">筛选</Text>
+                  <Icon name="mdi-chevron-down" size={20} color="mutedForeground" />
+                </View>
+              )}
+              {!isParent && (activeTab?.mode === 'class' || activeTab?.mode === 'group') && (
                 <View
                   className="flex h-[56rpx] w-[56rpx] items-center justify-center active:opacity-70"
                   onClick={handleBatchAction}
@@ -2821,10 +3349,11 @@ const SchedulePage: React.FC = () => {
           </Swiper>
         )}
 
-        {/* 悬浮排课按钮：班课/团课/私教各自记忆拖动位置 */}
-        {(activeTab?.mode === 'class' ||
-          activeTab?.mode === 'group' ||
-          activeTab?.mode === 'private') &&
+        {/* 悬浮排课按钮：仅机构端；家长只浏览/预约 */}
+        {!isParent &&
+          (activeTab?.mode === 'class' ||
+            activeTab?.mode === 'group' ||
+            activeTab?.mode === 'private') &&
           activeTab?.type === 'category' && (
             <DraggableFab
               containerSelector="#schedule-page-root"
@@ -2864,8 +3393,11 @@ export default withRouteGuard(SchedulePage);
 
 export function definePageConfig() {
   return {
+    navigationStyle: 'custom',
+    navigationBarTextStyle: 'white',
     navigationBarTitleText: '课表',
     enableShareAppMessage: true,
     enableShareTimeline: true,
+    usingComponents: {},
   };
 }

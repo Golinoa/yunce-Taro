@@ -38,8 +38,22 @@ import {
 } from '@/utils/subscribe-class-view';
 import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { logError } from '@/utils/logger';
+import {
+  clearLoginOptInPending,
+  getNotifyMasterEnabled,
+  hasLoginOptInDone,
+  hasLoginOptInPending,
+  markLoginOptInDone,
+  setNotifyMasterEnabled,
+} from '@/utils/notify-master-settings';
 
 const MESSAGE_AUTH_PAGE = '/package-settings/pages/message-auth/index';
+const LOGIN_OPT_IN_GROUPS: SubscribeTemplateGroup[] = [
+  'class_remind',
+  'schedule_change',
+  'lesson_result',
+  'todo_remind',
+];
 
 let bootstrapCache: SubscribeBootstrapDto | null = null;
 
@@ -527,7 +541,142 @@ export const subscribeMessageService = {
     };
   },
 
+  /** 读取本地总开关（默认开） */
+  getMasterNotifyEnabled(): boolean {
+    return getNotifyMasterEnabled();
+  },
+
+  /**
+   * 消息通知总开关：关闭后不发微信服务通知；打开时可顺带申请一次授权攒额度。
+   */
+  async setMasterNotifyEnabled(
+    enabled: boolean,
+    options?: { requestAuth?: boolean; role?: string; campusId?: string },
+  ): Promise<SubscribeQuotaDto[]> {
+    setNotifyMasterEnabled(enabled);
+
+    const userId = await resolveUserId();
+    if (isUseMock() && userId) {
+      const quotas = await (await loadSubscribeMessageMock()).mockSetMasterNotifyEnabled(
+        userId,
+        enabled,
+      );
+      if (bootstrapCache) {
+        bootstrapCache = { ...bootstrapCache, quotas };
+      }
+    }
+
+    if (!enabled) {
+      return bootstrapCache?.quotas ?? [];
+    }
+
+    if (options?.requestAuth === false) {
+      return bootstrapCache?.quotas ?? [];
+    }
+
+    try {
+      return await this.requestAuthAndReport(LOGIN_OPT_IN_GROUPS, 'settings_toggle', {
+        role: options?.role,
+        campusId: options?.campusId,
+      });
+    } catch (error) {
+      logError('subscribe.setMasterNotifyEnabled.auth', error);
+      return bootstrapCache?.quotas ?? [];
+    }
+  },
+
+  /**
+   * 新用户注册后申请消息通知：直接调起微信原生 requestSubscribeMessage，
+   * 同意后上报并攒可发送次数（不再走自定义弹框）。
+   * @returns true 表示本次已处理（含用户拒绝），调用方应跳过其它 onShow 提示
+   */
+  async maybeRunLoginOptIn(meta?: { role?: string; campusId?: string }): Promise<boolean> {
+    const userId = await resolveUserId();
+    if (!userId) return false;
+    if (hasLoginOptInDone(userId)) {
+      clearLoginOptInPending();
+      return false;
+    }
+    if (!hasLoginOptInPending()) return false;
+
+    markLoginOptInDone(userId);
+    setNotifyMasterEnabled(true);
+
+    try {
+      // 微信原生订阅面板（一次授权 = 攒 1 次发送额度）
+      await this.requestAuthAndReport(LOGIN_OPT_IN_GROUPS, 'login_opt_in', meta);
+    } catch (error) {
+      logError('subscribe.loginOptIn.auth', error);
+    }
+    return true;
+  },
+
+  /**
+   * 在用户点击手势内主动调起微信原生订阅授权（注册完成按钮 / 总开关打开等）。
+   */
+  async requestNativeNotifyAuth(meta?: {
+    scene?: string;
+    role?: string;
+    campusId?: string;
+  }): Promise<SubscribeQuotaDto[]> {
+    setNotifyMasterEnabled(true);
+    const userId = await resolveUserId();
+    if (userId) {
+      markLoginOptInDone(userId);
+    }
+    return this.requestAuthAndReport(
+      LOGIN_OPT_IN_GROUPS,
+      meta?.scene || 'login_opt_in',
+      { role: meta?.role, campusId: meta?.campusId },
+    );
+  },
+
   messageAuthPageUrl: MESSAGE_AUTH_PAGE,
+
+  /**
+   * 向家长推送「课表变动」订阅消息（停课/取消本节等）。
+   * mock：扣减 schedule_change 额度；生产：POST /subscribe-message/send。
+   */
+  async sendScheduleChangeToReceiver(params: {
+    receiverUserId: string;
+    bizKey: string;
+    className: string;
+    changeTime: string;
+    changeReason: string;
+  }): Promise<void> {
+    const { receiverUserId, bizKey, className, changeTime, changeReason } = params;
+    if (!receiverUserId) return;
+
+    if (isUseMock()) {
+      try {
+        await (await loadSubscribeMessageMock()).mockConsumeQuota(
+          receiverUserId,
+          'schedule_change',
+        );
+      } catch (error) {
+        logError('subscribe.sendScheduleChange.mock', error);
+      }
+      return;
+    }
+
+    try {
+      await post('/subscribe-message/send', {
+        group: 'schedule_change',
+        receiverUserId,
+        bizKey,
+        page: '/pages/schedule/index',
+        data: {
+          projectName: className.slice(0, 20),
+          changeTime: changeTime.slice(0, 20),
+          changeReason: changeReason.slice(0, 20),
+          tip: '请以最新课表为准',
+        },
+        fallbackInApp: true,
+      });
+    } catch (error) {
+      logError('subscribe.sendScheduleChange', error);
+    }
+  },
 };
 
 /** 单测重置模块内 bootstrap 缓存 */

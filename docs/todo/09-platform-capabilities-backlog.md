@@ -11,6 +11,7 @@
 |---|------|------|------|----------|
 | 13 | 门店入驻页支持转发分享（配图 `sgpk.png`） | 🚀 快 | 2–4h | `package-settings/pages/about`、`constants/brand.ts` |
 | 14 | 小程序支持「添加到桌面」并从桌面打开 | 🐢 慢 | 0.5–1d | `app.tsx`、`pages/home`、引导组件（新建） |
+| 15 | 引入 NutUI React Taro，局部补齐通用组件 | 🐢 慢 | 1–3d（首期） | `package.json`、主题对接、新页优先使用 |
 
 ---
 
@@ -112,12 +113,61 @@
 
 ---
 
+## #15 引入 NutUI React Taro — 局部补齐通用组件
+
+> 录入日期：2026-08-29  
+> 状态：**后续再做**（不阻塞当前业务）
+
+### 问题描述
+
+- **现状**：小程序端无第三方 UI 组件库；界面依赖 `@tarojs/components` + 自研 `src/components/**` + UnoCSS。课表/点名等业务组件已较完整，但通用件（表单控件、Picker、标准 Dialog/Toast、空态等）仍分散自写，新页重复成本高。
+- **期望**：后续引入 **NutUI React Taro**（`@nutui/nutui-react-taro`），**仅局部**用于通用组件补齐；**不**全站替换现有业务组件。
+
+### 推荐理由（已确认）
+
+1. Taro 4 + React 官方生态，与当前 `4.1.9` 契合度最高。
+2. 组件覆盖面适合补「通用层」，文档与维护相对稳定。
+3. 全量替换成本过高（自研组件上百个 + UnoCSS/主题变量）；局部引入风险可控。
+
+### 实现原则
+
+1. **业务层不动**：课表卡、点名页、左滑操作、约试听等继续用现有自研组件。
+2. **新页 / 通用场景优先用库**：表单、日期时间选择、标准弹窗、空态、Loading 等。
+3. **主题对接**：NutUI 主题色对齐现有 CSS 变量 / 品牌主色，避免两套视觉打架。
+4. **体积门禁**：接入前后对比主包体积；按需引入 + tree-shaking，逼近 1.5MB 时优先砍非必要组件。
+5. **禁止一次性大迁移**：旧页不强制改写；有改动需求时再逐步替换通用件。
+
+### 建议首期范围
+
+| 类型 | 示例 | 策略 |
+|------|------|------|
+| 表单 | Input / Switch / Checkbox / Radio | 新页用 NutUI |
+| 选择 | Picker / DatePicker / Cascader | 新页用 NutUI |
+| 反馈 | Dialog / Toast / ActionSheet | 与现有 `ConfirmDialog`/`BottomSheet` 并存，新场景优先评估 |
+| 展示 | Empty / Skeleton / Tag | 可逐步统一 |
+
+### 验收标准（开工后再勾）
+
+- [ ] 依赖与构建配置接入 Taro 4 weapp，`build:weapp:mock` / `build:weapp:prod` 通过
+- [ ] 至少 1 个新业务页（或试点页）使用 NutUI 通用组件且主题色一致
+- [ ] 主包体积增幅可接受（有前后对比记录）
+- [ ] 课表 / 点名等核心业务页回归无回归问题
+
+### 依赖
+
+- 无后端依赖；需评估与 UnoCSS、现有 `theme` / `app.scss` 的样式隔离。
+- 开工前再核对 `@nutui/nutui-react-taro` 与 Taro `4.1.9` 的兼容版本。
+
+---
+
 ## 执行顺序建议
 
 ```
 🚀 #13 门店入驻转发（约半天，可独立上线）
   ↓
 🐢 #14 添加到桌面（需真机 + 多 scene 验证）
+  ↓
+🐢 #15 NutUI 局部补通用组件（后续；不阻塞业务）
 ```
 
 ---
@@ -131,3 +181,5 @@
 | 分享参考（课表页） | `src/pages/schedule/index.tsx` → `useShareAppMessage` |
 | 分享参考（学员详情） | `src/package-student/pages/child-detail/index.tsx` → `showShareMenu` |
 | 应用入口 | `src/app.tsx` |
+| 自研组件目录 | `src/components/` |
+| 主题 / Uno | `src/theme.ts`、`uno.config.ts`、`src/app.scss` |

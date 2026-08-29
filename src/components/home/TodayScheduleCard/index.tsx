@@ -41,7 +41,6 @@ function getBtnText(status: CourseStatus, item: Schedule): string {
   }
   if (status === 'done') return '查看';
   if (status === 'urgent') return '立即点名';
-  if (status === 'active') return '继续点名';
   return '点名';
 }
 

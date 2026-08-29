@@ -2,8 +2,11 @@
  * 系统设置页 package-settings/pages/system-settings/index
  *
  * 所有角色均可进入，内部设置项按角色权限过滤显示：
- * - 通用项（操作日志、用户协议）：所有角色可见（操作日志按角色只看自己/全部员工）
- * - 管理员专属项（主题颜色、角色权限、定时备份、重置新手引导）：仅管理员可见
+ * - 家长：仅用户协议、版本、退出（无机构配置）
+ * - 教师：个人项（同步手机日历、本人操作日志）+ 用户协议 / 版本 / 退出；不可见机构效果配置
+ * - 机构效果与配置（主题颜色、待办提醒）：仅管理员/校长
+ * - 管理员专属（角色权限、定时备份、重置新手引导、预警阈值）：仅管理员
+ * - 机构开关（场地预约、请假自动审批）：仅管理员/校长
  *
  * 视觉风格：简洁文字列表，无图标无描述，右侧箭头/开关。
  */
@@ -19,7 +22,7 @@ import { clearVisitedMap } from '@/services/onboarding';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { getAlertThreshold } from '@/utils/alert-config';
-import { isAdmin, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
+import { isAdmin, isParentRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import {
   canUseCalendarSync,
   getCalendarSyncSettings,
@@ -30,6 +33,7 @@ import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-bo
 import { calendarSyncService } from '@/services/calendar-sync';
 import { organizationService } from '@/services/organization';
 import { handleVersionNumberTap, isDeveloperModeUnlocked } from '@/utils/developer-mode';
+
 /** 设置项配置 */
 interface SettingItem {
   title: string;
@@ -38,6 +42,8 @@ interface SettingItem {
   adminOnly?: boolean;
   /** 管理角色可见（管理员 / 校长） */
   managerOnly?: boolean;
+  /** 家长不可见（机构/教务配置） */
+  hideForParent?: boolean;
 }
 
 /** 系统设置全量分组 */
@@ -45,14 +51,18 @@ const ALL_SETTING_ITEMS: SettingItem[] = [
   {
     title: '操作日志',
     route: '/package-settings/pages/audit-log/index',
+    /** 家长不可见；教师可看本人日志 */
+    hideForParent: true,
   },
   {
     title: '主题颜色',
     route: '/package-settings/pages/theme-settings/index',
+    managerOnly: true,
   },
   {
     title: '待办提醒',
     route: '/package-settings/pages/todo-settings/index',
+    managerOnly: true,
   },
   {
     title: '角色权限',
@@ -87,7 +97,8 @@ const SystemSettings: React.FC = () => {
   const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
   const [developerModeVisible, setDeveloperModeVisible] = useState(isDeveloperModeUnlocked());
   const currentUserId = profile?.id || '';
-  const showCalendarSyncSwitch = canUseCalendarSync(currentRole);
+  const isParent = isParentRole(currentRole);
+  const showCalendarSyncSwitch = !isParent && canUseCalendarSync(currentRole);
   const isManagerRole = isAdmin(currentRole) || currentRole === 'principal';
   /** 请假自动审批开关（仅校长/管理员可见，null=未加载） */
   const [leaveAutoApprove, setLeaveAutoApprove] = useState<boolean | null>(null);
@@ -176,12 +187,15 @@ const SystemSettings: React.FC = () => {
     });
   }, []);
 
-  // 按角色过滤设置项：adminOnly 的仅管理员可见；managerOnly 的管理角色（管理员/校长）可见；其余通用
+  // 按角色过滤设置项
   const visibleItems = useMemo(() => {
     const isManager = isAdmin(currentRole) || currentRole === 'principal';
-    return ALL_SETTING_ITEMS.filter(
-      (item) => (!item.adminOnly || isAdmin(currentRole)) && (!item.managerOnly || isManager),
-    );
+    return ALL_SETTING_ITEMS.filter((item) => {
+      if (item.adminOnly && !isAdmin(currentRole)) return false;
+      if (item.managerOnly && !isManager) return false;
+      if (item.hideForParent && isParentRole(currentRole)) return false;
+      return true;
+    });
   }, [currentRole]);
 
   const handleNavigate = useCallback(
@@ -214,6 +228,10 @@ const SystemSettings: React.FC = () => {
     const result = handleVersionNumberTap();
     if (result === 'unlocked') {
       setDeveloperModeVisible(true);
+      Taro.showToast({ title: '已解锁，请输入密码进入', icon: 'none' });
+      setTimeout(() => {
+        void Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
+      }, 400);
     }
   }, []);
 
@@ -251,12 +269,16 @@ const SystemSettings: React.FC = () => {
             </View>
           ))}
 
-          {/* 场地预约开关 */}
-          {visibleItems.length > 0 && <View className="border-t border-border" />}
-          <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
-            <Text className="text-[30rpx] text-foreground">场地预约</Text>
-            <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
-          </View>
+          {/* 场地预约开关：仅管理员/校长 */}
+          {isManagerRole && (
+            <>
+              {visibleItems.length > 0 && <View className="border-t border-border" />}
+              <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
+                <Text className="text-[30rpx] text-foreground">场地预约</Text>
+                <Switch checked={venueBookingEnabled} onChange={handleVenueBookingChange} />
+              </View>
+            </>
+          )}
 
           {/* 请假自动审批开关（校长/管理员） */}
           {isManagerRole && leaveAutoApprove !== null && (
@@ -300,7 +322,7 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {developerModeVisible && (
+          {developerModeVisible && !isParent && (
             <View
               className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg border-t border-border"
               onClick={handleOpenDeveloperMode}
@@ -310,10 +332,10 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {/* 当前版本（连点解锁开发者模式） */}
+          {/* 当前版本（连点解锁开发者模式；家长仅展示版本） */}
           <View
             className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70"
-            onClick={handleVersionTap}
+            onClick={isParent ? undefined : handleVersionTap}
           >
             <Text className="text-[30rpx] text-foreground">当前版本</Text>
             <Text className="text-[28rpx] text-muted-foreground">v{APP_VERSION}</Text>

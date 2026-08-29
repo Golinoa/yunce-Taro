@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
 import type { ExpenseCategoryType, IncomeCategoryType } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
+import { withRouteGuard } from '@/utils/route-guard';
 
 /**
  * 记一笔页面
@@ -357,4 +358,4 @@ const RecordTransaction: React.FC = () => {
   );
 };
 
-export default RecordTransaction;
+export default withRouteGuard(RecordTransaction);

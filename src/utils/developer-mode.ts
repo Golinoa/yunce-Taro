@@ -1,9 +1,8 @@
 /**
- * 开发者模式：版本号敲击解锁 + 入口可见性
+ * 开发者模式：版本号连续点击解锁 + 入口密码
  *
- * 解锁序列（1 分钟内完成）：
- * 版本号连点 7 次 → 停顿 ≥3 秒 → 再连点 7 次
- * 任一阶段连点超过 20 次则重置
+ * 解锁：在 5 秒内连续点击「当前版本」7 次 → 出现开发者模式入口
+ * 进入：点入口 → 输入密码（默认 25）
  */
 import Taro from '@tarojs/taro';
 
@@ -13,19 +12,16 @@ export const DEVELOPER_MODE_SESSION_KEY = 'yunce:developer-mode-session';
 /** 硬编码入口密码（静默校验，不在 UI 展示） */
 export const DEVELOPER_MODE_PASSWORD = '25';
 
-const UNLOCK_WINDOW_MS = 60_000;
-const PAUSE_MS = 3_000;
-const PHASE_TARGETS = [7, 7] as const;
-const MAX_CLICKS_PER_PHASE = 20;
+/** 连续点击次数 */
+const TAP_TARGET = 7;
+/** 连点有效窗口（超时从头计） */
+const TAP_WINDOW_MS = 5_000;
 
 export type VersionTapResult = 'progress' | 'unlocked' | 'reset';
 
 interface UnlockSequenceState {
   startedAt: number;
-  phaseIndex: number;
-  countInPhase: number;
-  waitingPause: boolean;
-  pauseReadyAt: number;
+  count: number;
 }
 
 let sequenceState: UnlockSequenceState | null = null;
@@ -96,54 +92,24 @@ export function __resetUnlockSequenceForTest(): void {
 }
 
 /**
- * 处理「当前版本」行点击，返回解锁进度
- * 已解锁时返回 unlocked；序列失败静默 reset
+ * 处理「当前版本」行点击
+ * 5 秒内连续点满 7 次即解锁入口
  */
 export function handleVersionNumberTap(now: number = Date.now()): VersionTapResult {
   if (isDeveloperModeUnlocked()) {
     return 'unlocked';
   }
 
-  if (!sequenceState || now - sequenceState.startedAt > UNLOCK_WINDOW_MS) {
-    sequenceState = {
-      startedAt: now,
-      phaseIndex: 0,
-      countInPhase: 1,
-      waitingPause: false,
-      pauseReadyAt: 0,
-    };
+  if (!sequenceState || now - sequenceState.startedAt > TAP_WINDOW_MS) {
+    sequenceState = { startedAt: now, count: 1 };
     return 'progress';
   }
 
-  if (sequenceState.waitingPause) {
-    if (now < sequenceState.pauseReadyAt) {
-      resetSequence();
-      return 'reset';
-    }
-    sequenceState.waitingPause = false;
-    sequenceState.phaseIndex += 1;
-    sequenceState.countInPhase = 1;
-    return 'progress';
-  }
+  sequenceState.count += 1;
 
-  sequenceState.countInPhase += 1;
-
-  if (sequenceState.countInPhase >= MAX_CLICKS_PER_PHASE) {
-    resetSequence();
-    return 'reset';
-  }
-
-  const target = PHASE_TARGETS[sequenceState.phaseIndex];
-
-  if (sequenceState.countInPhase < target) {
-    return 'progress';
-  }
-
-  if (sequenceState.phaseIndex === PHASE_TARGETS.length - 1) {
+  if (sequenceState.count >= TAP_TARGET) {
     return unlockDeveloperMode();
   }
 
-  sequenceState.waitingPause = true;
-  sequenceState.pauseReadyAt = now + PAUSE_MS;
   return 'progress';
 }

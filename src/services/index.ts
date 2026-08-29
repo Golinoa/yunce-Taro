@@ -23,6 +23,7 @@ export {
   bindWechatCredentials,
   phoneLogin,
   registerStep1,
+  registerStep1ByEmail,
   registerStep2,
   registerStep3,
   signUp,

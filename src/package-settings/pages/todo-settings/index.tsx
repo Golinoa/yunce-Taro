@@ -20,6 +20,7 @@ import {
 } from '@/utils/todo-settings';
 import { useAuth } from '@/utils/auth';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 
 interface SettingRow {
   key: TodoReminderKey | 'showTabBadge';
@@ -188,4 +189,4 @@ const TodoSettingsPage: React.FC = () => {
   );
 };
 
-export default TodoSettingsPage;
+export default withRouteGuard(TodoSettingsPage);

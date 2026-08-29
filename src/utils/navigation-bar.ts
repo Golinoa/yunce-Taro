@@ -10,6 +10,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import { useEffect } from 'react';
 import { useThemeStore } from '@/stores/theme';
 import { hexThemeColors, type ThemeKey } from '@/theme';
+import { syncCustomTabBarColors } from '@/utils/tab-bar';
 
 interface NavigationBarOptions {
   /** 导航栏背景色（Hex） */
@@ -162,6 +163,13 @@ export function syncTabBarToTheme(theme: ThemeKey): void {
   } catch {
     // tabBar 可能未初始化，忽略错误
   }
+
+  // 自定义 TabBar 颜色同步
+  syncCustomTabBarColors({
+    color: themeHex.mutedForeground,
+    selectedColor: themeHex.primary,
+    backgroundColor: themeHex.card,
+  });
 }
 
 /**

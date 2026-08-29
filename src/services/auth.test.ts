@@ -54,9 +54,17 @@ describe('auth service', () => {
     Taro.setStorageSync('yunce-edu-register-draft-local', '');
   });
 
-  it('真实模式下注册走手机号', async () => {
+  it('真实模式下支持邮箱验证码登录能力', async () => {
     const { authCapabilities } = await import('@/services/auth');
+    expect(authCapabilities.supportsEmailCodeLogin).toBe(true);
     expect(authCapabilities.usesMockRegister).toBe(false);
+  });
+
+  it('registerStep1ByEmail 校验邮箱格式', async () => {
+    const { registerStep1ByEmail } = await import('@/services/auth');
+    const invalid = await registerStep1ByEmail('not-an-email', '123456');
+    expect(invalid.tempToken).toBeNull();
+    expect(invalid.error?.message).toContain('邮箱');
   });
 
   it('registerStep1ByPhone 校验手机号格式', async () => {

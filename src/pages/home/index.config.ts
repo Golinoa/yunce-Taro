@@ -4,4 +4,6 @@ export default definePageConfig({
   navigationBarTextStyle: 'white',
   /** 禁止页面级滚动，只走内部 ScrollView，避免弹层/输入时整页被系统推走 */
   disableScroll: true,
+  /** 自定义 TabBar 必需 */
+  usingComponents: {},
 });

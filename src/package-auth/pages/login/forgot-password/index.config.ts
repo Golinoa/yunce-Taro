@@ -1,3 +1,4 @@
 export default definePageConfig({
-  navigationBarTitleText: '忘记密码',
+  navigationBarTitleText: '找回密码',
+  navigationStyle: 'custom',
 });

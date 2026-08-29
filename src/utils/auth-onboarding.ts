@@ -4,6 +4,7 @@
 import Taro from '@tarojs/taro';
 import type { Profile } from '@/types/profile';
 import { hasPendingInviteCode, consumePendingInviteCode } from '@/utils/invite-parent-link';
+import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
 
 export const LAST_LOGIN_IS_NEW_USER_KEY = 'yunce:last-login-is-new-user';
@@ -16,6 +17,7 @@ const DEFAULT_ORG_NAMES = new Set(['松果排课', '未知机构']);
 export function markLastLoginAsNewUser(): void {
   try {
     Taro.setStorageSync(LAST_LOGIN_IS_NEW_USER_KEY, '1');
+    markLoginOptInPending();
   } catch {
     /* 静默 */
   }

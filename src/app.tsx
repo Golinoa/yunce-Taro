@@ -9,7 +9,6 @@ import { logError } from '@/utils/logger';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import 'uno.css';
-
 /**
  * 跨分包共享模块必须被主包引用，否则 Taro MiniSplitChunksPlugin
  * 会将它们提取到 <subpackage>/sub-common/ 目录，导致微信小程序运行时

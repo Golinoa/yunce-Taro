@@ -58,7 +58,8 @@ export type SubscribePromptPresetId =
   | 'quota_depleted'
   | 'quota_reactivate'
   | 'booking_success_remind_auth'
-  | 'calendar_sync_enable';
+  | 'calendar_sync_enable'
+  | 'login_opt_in';
 
 export type SubscribeRenewPresetId =
   | 'checkin_renew'

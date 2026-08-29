@@ -3,6 +3,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import AddToDesktopTip from '@/components/AddToDesktopTip';
+import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
@@ -45,12 +46,14 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
+import { isUseMock } from '@/utils/build-env';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { buildTodoCardDomId } from '@/utils/todo-card-meta';
+import { syncTabBarByProfile } from '@/utils/tab-bar';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import {
   TODO_CATEGORY_INBOX_ID,
@@ -500,6 +503,7 @@ const Home: React.FC = () => {
   }, [loadCategories]);
 
   useDidShow(() => {
+    syncTabBarByProfile(profile);
     const collaboratorResult = consumeTodoCollaboratorResult();
     if (collaboratorResult !== null) {
       // 详情弹框未关时从参与人页返回 → 写回详情；否则写回新建弹框
@@ -1063,6 +1067,8 @@ const Home: React.FC = () => {
         visible={campusGuideVisible}
         onClose={() => setCampusGuideVisible(false)}
       />
+
+      {isUseMock() ? <MockIdentitySwitcher /> : null}
     </>
   );
 };
