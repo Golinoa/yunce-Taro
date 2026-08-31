@@ -2,7 +2,7 @@ import { View, Text, Input } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
 import BottomSheet from '@/components/BottomSheet';
-import { TYPE_ICON_MAP } from '@/package-course/pages/package-form/usePackageForm';
+import { getTypeIconMap } from '@/package-course/pages/package-form/constants';
 import type { CoursePackageTemplate } from '@/types/course-package';
 
 export interface PackageSelectSheetProps {
@@ -45,6 +45,7 @@ const PackageSelectSheet: React.FC<PackageSelectSheetProps> = ({
   onCustomValidDaysChange,
   onCustomPriceChange,
 }) => {
+  const TYPE_ICON_MAP = getTypeIconMap();
   if (!show) return null;
 
   return (

@@ -2,6 +2,7 @@
  * 校区设置模块 — Mock 数据适配层
  * 统一把 mock-database 映射成 types/campus.ts 约定的正式类型
  */
+import dayjs from 'dayjs';
 import type {
   BusinessHours,
   CampusFormData,
@@ -231,6 +232,12 @@ function mapCampusToUI(index: number, campus = CAMPUSES[index]): CampusUIModel {
     },
     businessCategories: campus.businessCategories || [],
     tags: campus.tags || [],
+    hoursAlertThreshold:
+      typeof campus.hoursAlertThreshold === 'number' ? campus.hoursAlertThreshold : 5,
+    daysAlertThreshold:
+      typeof campus.daysAlertThreshold === 'number' ? campus.daysAlertThreshold : 7,
+    amountAlertThreshold:
+      typeof campus.amountAlertThreshold === 'number' ? campus.amountAlertThreshold : 200,
   };
 }
 
@@ -357,6 +364,9 @@ export async function mockAddCampus(data: CampusFormData): Promise<CampusUIModel
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
     businessCategories: data.businessCategories || [],
     tags: data.tags || [],
+    hoursAlertThreshold: data.hoursAlertThreshold ?? 5,
+    daysAlertThreshold: data.daysAlertThreshold ?? 7,
+    amountAlertThreshold: data.amountAlertThreshold ?? 200,
   };
   mockCampusOverrides = [...getCampusList(), campus];
   return campus;
@@ -401,9 +411,25 @@ export async function mockUpdateCampus(
     venueImages,
     businessCategories: data.businessCategories ?? current.businessCategories,
     tags: data.tags ?? current.tags,
+    hoursAlertThreshold: data.hoursAlertThreshold ?? current.hoursAlertThreshold ?? 5,
+    daysAlertThreshold: data.daysAlertThreshold ?? current.daysAlertThreshold ?? 7,
+    amountAlertThreshold: data.amountAlertThreshold ?? current.amountAlertThreshold ?? 200,
   };
 
   mockCampusOverrides = campuses.map((item) => (item.id === id ? updated : item));
+  // 同步写回 CAMPUSES 源，保证阈值可被 alert-config 读取
+  const raw = CAMPUSES.find((c) => c.id === id);
+  if (raw) {
+    if (typeof updated.hoursAlertThreshold === 'number') {
+      raw.hoursAlertThreshold = updated.hoursAlertThreshold;
+    }
+    if (typeof updated.daysAlertThreshold === 'number') {
+      raw.daysAlertThreshold = updated.daysAlertThreshold;
+    }
+    if (typeof updated.amountAlertThreshold === 'number') {
+      raw.amountAlertThreshold = updated.amountAlertThreshold;
+    }
+  }
   return updated;
 }
 
@@ -542,6 +568,70 @@ export async function mockDeleteHoliday(id: string): Promise<boolean> {
   await delay();
   mockHolidays = mockHolidays.filter((item) => item.id !== id);
   return true;
+}
+
+export async function mockClearHolidays(): Promise<boolean> {
+  await delay();
+  mockHolidays = [];
+  return true;
+}
+
+/** 按日展开区间 */
+function expandHolidayDays(
+  name: string,
+  startDate: string,
+  endDate: string,
+  icon: string,
+): Omit<Holiday, 'id'>[] {
+  const rows: Omit<Holiday, 'id'>[] = [];
+  let cursor = dayjs(startDate);
+  const end = dayjs(endDate);
+  while (!cursor.isAfter(end, 'day')) {
+    const date = cursor.format('YYYY-MM-DD');
+    rows.push({
+      name,
+      icon,
+      startDate: date,
+      endDate: date,
+      status: 'rest',
+    });
+    cursor = cursor.add(1, 'day');
+  }
+  return rows;
+}
+
+/**
+ * 生成当年法定节假日（逐日一条）。已存在「同名+同日」则跳过。
+ * 日期为常用放假安排近似值，便于本地 mock。
+ */
+export async function mockGenerateStatutoryHolidays(year?: number): Promise<number> {
+  await delay();
+  const y = year || dayjs().year();
+  const ranges: Array<{ name: string; icon: string; start: string; end: string }> = [
+    { name: '元旦', icon: '🎉', start: `${y}-01-01`, end: `${y}-01-03` },
+    { name: '春节', icon: '🧧', start: `${y}-02-15`, end: `${y}-02-20` },
+    { name: '清明节', icon: '🌿', start: `${y}-04-04`, end: `${y}-04-06` },
+    { name: '劳动节', icon: '🛠️', start: `${y}-05-01`, end: `${y}-05-05` },
+    { name: '端午节', icon: '🛶', start: `${y}-06-19`, end: `${y}-06-21` },
+    { name: '中秋节', icon: '🌕', start: `${y}-09-25`, end: `${y}-09-27` },
+    { name: '国庆节', icon: '🇨🇳', start: `${y}-10-01`, end: `${y}-10-07` },
+  ];
+
+  const existing = new Set(mockHolidays.map((h) => `${h.name}|${h.startDate}`));
+  const toAdd: Holiday[] = [];
+  let seq = Date.now();
+  for (const range of ranges) {
+    for (const row of expandHolidayDays(range.name, range.start, range.end, range.icon)) {
+      const key = `${row.name}|${row.startDate}`;
+      if (existing.has(key)) continue;
+      existing.add(key);
+      toAdd.push({ id: `holiday-${seq++}`, ...row });
+    }
+  }
+  mockHolidays = [...mockHolidays, ...toAdd].sort((a, b) =>
+    a.startDate.localeCompare(b.startDate),
+  );
+  return toAdd.length;
 }
 
 export async function mockGetBusinessHours(): Promise<BusinessHours> {

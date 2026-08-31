@@ -1,32 +1,46 @@
 import { View, Text, Input, Textarea } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React from 'react';
+import React, { useEffect } from 'react';
 import ChipPicker from '@/components/ChipPicker';
 import Empty from '@/components/Empty';
 import InstallmentPanel from '@/components/InstallmentPanel';
+import MemberCardIssueForm from '@/components/member-card/MemberCardIssueForm';
 import Loading from '@/components/Loading';
 import PackageSelectSheet from '@/components/package/PackageSelectSheet';
 import StudentSelectSheet from '@/components/package/StudentSelectSheet';
 import PageContainer from '@/components/PageContainer';
+import SegmentedControl from '@/components/SegmentedControl';
 import Stepper from '@/components/Stepper';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import {
-  usePackageForm,
-  QUICK_HOURS,
-  GIFT_OPTIONS,
-  FEE_METHOD_OPTIONS,
-  TYPE_ICON_MAP,
-} from './usePackageForm';
+  getQuickHours,
+  getGiftOptions,
+  getFeeMethodOptions,
+  getTypeIconMap,
+} from './constants';
+import { usePackageForm } from './usePackageForm';
 
-/** 课时充值/编辑页面 */
+/** 课时充值 / 发会员卡 双 Tab 页 */
 const PackageForm: React.FC = () => {
+  useCardNavigationBar();
+  const QUICK_HOURS = getQuickHours();
+  const GIFT_OPTIONS = getGiftOptions();
+  // 局部命名刻意避开 feeMethod / typeIcon 等 hook 字段，降低打包撞名风险
+  const feeMethodOptions = getFeeMethodOptions();
+  const typeIconMap = getTypeIconMap();
   const {
     isEdit,
     loading,
     saving,
     loadError,
     notFound,
+    pageTab,
+    setPageTab,
+    rechargeMode,
+    handleRechargeModeChange,
+    handleInstallmentToggle,
     // 学员
     selectedStudent,
     showStudentSheet,
@@ -80,7 +94,6 @@ const PackageForm: React.FC = () => {
     installmentEnabled,
     installmentPeriod,
     installmentSchedule,
-    setInstallmentEnabled,
     setInstallmentPeriod,
     setInstallmentSchedule,
     // 备注
@@ -102,6 +115,14 @@ const PackageForm: React.FC = () => {
     // 保存
     handleSave,
   } = usePackageForm();
+
+  useEffect(() => {
+    void Taro.setNavigationBarTitle({ title: isEdit ? '编辑套餐' : '课时充值' });
+  }, [isEdit]);
+
+  useDidShow(() => {
+    void Taro.setNavigationBarTitle({ title: isEdit ? '编辑套餐' : '课时充值' });
+  });
 
   if (loading) {
     return (
@@ -146,14 +167,7 @@ const PackageForm: React.FC = () => {
   return (
     <PageContainer safeBottom>
       <View className="min-h-screen pb-[200rpx] bg-f5faf8">
-        {/* 标题 */}
-        <View className="px-8 pt-8 pb-4">
-          <Text className="text-[40rpx] font-bold text-foreground block">
-            {isEdit ? '编辑套餐' : '课时充值'}
-          </Text>
-        </View>
-
-        <View className="px-8">
+        <View className="px-8 pt-4">
           {/* 1. 学生信息卡片 */}
           <View className="mb-6">
             {selectedStudent ? (
@@ -225,8 +239,80 @@ const PackageForm: React.FC = () => {
             )}
           </View>
 
-          {/* 2. 课包选择（非编辑模式） */}
-          {!isEdit && (
+          {/* 主 Tab：课时充值 | 发会员卡（编辑套餐时不显示） */}
+          {!isEdit ? (
+            <View className="mb-6 bg-white rounded-[20rpx] shadow-sm overflow-hidden">
+              <View className="flex">
+                <View
+                  className="flex-1 flex items-center justify-center py-[28rpx] relative"
+                  onClick={() => setPageTab('recharge')}
+                >
+                  <Text
+                    className={`text-[28rpx] font-medium ${pageTab === 'recharge' ? 'text-primary' : 'text-muted-foreground'}`}
+                  >
+                    课时充值
+                  </Text>
+                  {pageTab === 'recharge' ? (
+                    <View className="absolute bottom-0 left-0 right-0 h-[4rpx] bg-primary" />
+                  ) : null}
+                </View>
+                <View
+                  className="flex-1 flex items-center justify-center py-[28rpx] relative"
+                  onClick={() => setPageTab('card')}
+                >
+                  <Text
+                    className={`text-[28rpx] font-medium ${pageTab === 'card' ? 'text-primary' : 'text-muted-foreground'}`}
+                  >
+                    发会员卡
+                  </Text>
+                  {pageTab === 'card' ? (
+                    <View className="absolute bottom-0 left-0 right-0 h-[4rpx] bg-primary" />
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          ) : null}
+
+          {/* 发会员卡 Tab */}
+          {!isEdit && pageTab === 'card' ? (
+            selectedStudent ? (
+              <MemberCardIssueForm
+                student={selectedStudent}
+                showSubmitBar={false}
+                onSuccess={() => setTimeout(() => Taro.navigateBack(), 300)}
+              />
+            ) : (
+              <View className="mb-6 bg-white rounded-[32rpx] p-[48rpx] shadow-soft flex flex-col items-center">
+                <Text className="text-[28rpx] text-muted-foreground">请先选择学员</Text>
+              </View>
+            )
+          ) : null}
+
+          {/* 课时充值内容（用 View 替代 Fragment，避免 Taro 子节点索引错位） */}
+          {isEdit || pageTab === 'recharge' ? (
+            <View>
+          {/* 充值方式：按课包 / 单独充值 */}
+          {!isEdit ? (
+            <View className="mb-6">
+              <Text className="text-lg text-foreground font-medium mb-3 block">充值方式</Text>
+              <SegmentedControl
+                options={[
+                  { label: '按课包', value: 'package' },
+                  { label: '单独充值', value: 'direct' },
+                ]}
+                value={rechargeMode}
+                onChange={(v) => handleRechargeModeChange(v as 'package' | 'direct')}
+              />
+              <Text className="text-[22rpx] text-muted-foreground mt-[12rpx] block">
+                {rechargeMode === 'package'
+                  ? '从课包模板选择，或自定义课包信息'
+                  : '不选课包，直接填写充值课时数'}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* 2. 课包选择（非编辑、按课包模式） */}
+          {!isEdit && rechargeMode === 'package' && (
             <View className="mb-6">
               <View className="flex items-center gap-1 mb-3">
                 <Text className="text-lg text-foreground font-medium">选择课包</Text>
@@ -241,11 +327,11 @@ const PackageForm: React.FC = () => {
                   <View
                     className={cn(
                       'w-[96rpx] h-[96rpx] rounded-[24rpx] flex items-center justify-center flex-shrink-0',
-                      TYPE_ICON_MAP[selectedTemplate.type]?.bgClass || 'bg-success-bg',
+                      typeIconMap[selectedTemplate.type]?.bgClass || 'bg-success-bg',
                     )}
                   >
                     <Text className="text-[48rpx]">
-                      {TYPE_ICON_MAP[selectedTemplate.type]?.icon || '📚'}
+                      {typeIconMap[selectedTemplate.type]?.icon || '📚'}
                     </Text>
                   </View>
                   <View className="flex-1 min-w-0">
@@ -345,11 +431,15 @@ const PackageForm: React.FC = () => {
             </View>
           )}
 
-          {/* 3. 课包信息（仅自定义课包时显示） */}
-          {!isEdit && isCustomPackage && !selectedTemplate && (
+          {/* 3. 课包信息 / 单独充值课时 */}
+          {!isEdit &&
+            ((rechargeMode === 'package' && isCustomPackage && !selectedTemplate) ||
+              rechargeMode === 'direct') && (
             <View className="mb-6 bg-white rounded-[32rpx] p-[32rpx] shadow-soft">
               <View className="flex items-center gap-1 mb-4">
-                <Text className="text-lg text-foreground font-medium">课包信息</Text>
+                <Text className="text-lg text-foreground font-medium">
+                  {rechargeMode === 'direct' ? '充值课时' : '课包信息'}
+                </Text>
                 <Text className="text-lg text-destructive">*</Text>
               </View>
 
@@ -375,6 +465,7 @@ const PackageForm: React.FC = () => {
                 </View>
               </View>
 
+              {rechargeMode === 'package' ? (
               <View>
                 <Text className="text-md text-muted-foreground font-medium mb-2 block">
                   有效天数
@@ -392,9 +483,10 @@ const PackageForm: React.FC = () => {
                   <Text className="text-[24rpx] text-muted-foreground">天</Text>
                 </View>
               </View>
+              ) : null}
 
-              {/* 关联科目 */}
-              {subjects.length > 0 && (
+              {/* 关联科目（仅自定义课包） */}
+              {rechargeMode === 'package' && subjects.length > 0 && (
                 <View className="mt-4">
                   <Text className="text-md text-muted-foreground font-medium mb-2 block">
                     关联科目
@@ -430,7 +522,7 @@ const PackageForm: React.FC = () => {
           )}
 
           {/* 4. 赠送课时 */}
-          {!isEdit && (selectedTemplate || isCustomPackage) && (
+          {!isEdit && (selectedTemplate || isCustomPackage || rechargeMode === 'direct') && (
             <View className="mb-6 bg-white rounded-[32rpx] p-[32rpx] shadow-soft">
               <View className="flex items-center justify-between mb-4">
                 <Text className="text-lg text-foreground font-medium">赠送课时</Text>
@@ -487,7 +579,7 @@ const PackageForm: React.FC = () => {
             </View>
 
             <ChipPicker
-              options={FEE_METHOD_OPTIONS.map((f) => ({ label: f.label, value: f.key }))}
+              options={feeMethodOptions.map((f) => ({ label: f.label, value: f.key }))}
               value={feeMethod}
               onChange={(val) => setFeeMethod(val as typeof feeMethod)}
             />
@@ -506,7 +598,7 @@ const PackageForm: React.FC = () => {
                     Taro.showToast({ title: '请先填写金额', icon: 'none' });
                     return;
                   }
-                  setInstallmentEnabled(!installmentEnabled);
+                  handleInstallmentToggle(!installmentEnabled);
                 }}
               >
                 <View
@@ -518,7 +610,7 @@ const PackageForm: React.FC = () => {
             <InstallmentPanel
               totalAmount={effectiveFeeAmount || '0'}
               enabled={installmentEnabled}
-              onToggle={setInstallmentEnabled}
+              onToggle={handleInstallmentToggle}
               periodCount={installmentPeriod}
               onPeriodChange={setInstallmentPeriod}
               schedule={installmentSchedule}
@@ -541,8 +633,8 @@ const PackageForm: React.FC = () => {
           </View>
 
           {/* 编辑模式额外字段 */}
-          {isEdit && (
-            <>
+          {isEdit ? (
+            <View>
               <View className="mb-6 bg-white rounded-[32rpx] p-[32rpx] shadow-soft">
                 <Text className="text-lg text-foreground font-medium block mb-3">剩余课时</Text>
                 <View className="border-[3rpx] border-input rounded-[24rpx] py-[20rpx] px-[28rpx] bg-white">
@@ -566,11 +658,15 @@ const PackageForm: React.FC = () => {
                   />
                 </View>
               </View>
-            </>
-          )}
+            </View>
+          ) : null}
+            </View>
+          ) : null}
+
         </View>
 
-        {/* 底部按钮 */}
+        {/* 底部按钮：仅课时充值 Tab / 编辑模式 */}
+        {(isEdit || pageTab === 'recharge') ? (
         <View className="fixed bottom-0 left-0 right-0 px-8 py-6 bg-white/95 backdrop-blur-sm border-t-[2rpx] border-border pb-safe-bar z-50 pointer-events-auto shadow-card">
           {!canSubmit && submitBlockedReason ? (
             <View className="mb-3 px-4">
@@ -591,6 +687,7 @@ const PackageForm: React.FC = () => {
             </Text>
           </View>
         </View>
+        ) : null}
 
         {/* 学员选择浮窗 */}
         <StudentSelectSheet

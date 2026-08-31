@@ -83,6 +83,10 @@ export interface Campus {
   businessCategories?: { categoryId: string; subIds: string[] }[];
   /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */
   tags?: string[];
+  /** 课时不足预警阈值（剩余 ≤ 该值黄标），新建默认 5 */
+  hoursAlertThreshold?: number;
+  daysAlertThreshold?: number;
+  amountAlertThreshold?: number;
 }
 
 export const ORGANIZATIONS: Organization[] = [
@@ -117,6 +121,9 @@ export const CAMPUSES: Campus[] = [
     longitude: 120.1551,
     createdAt: '2024-01-15T08:00:00Z',
     tags: ['免费试听', '暑期特惠'],
+    hoursAlertThreshold: 5,
+    daysAlertThreshold: 7,
+    amountAlertThreshold: 200,
   },
   {
     id: 'campus-east',
@@ -137,6 +144,9 @@ export const CAMPUSES: Campus[] = [
     latitude: 30.251,
     longitude: 120.212,
     createdAt: '2024-06-01T08:00:00Z',
+    hoursAlertThreshold: 5,
+    daysAlertThreshold: 7,
+    amountAlertThreshold: 200,
   },
   {
     id: 'campus-west',
@@ -157,6 +167,9 @@ export const CAMPUSES: Campus[] = [
     latitude: 30.28,
     longitude: 119.997,
     createdAt: '2024-09-01T08:00:00Z',
+    hoursAlertThreshold: 5,
+    daysAlertThreshold: 7,
+    amountAlertThreshold: 200,
   },
 ];
 
@@ -759,37 +772,81 @@ export interface Class {
   campusId: string;
   subjectId: string;
   type: 'unlimited' | 'limited';
-  /** 排课模式：fixed=固定排课, open=开放预约 */
   scheduleMode?: 'fixed' | 'open';
-  /** 自动开班条件：manual=手动, full=约满, time=到时间, full_or_time=约满或到时间 */
   autoOpenType?: 'manual' | 'full' | 'time' | 'full_or_time';
-  /** 最少预约人数（仅 full/full_or_time 有效） */
   minOpenCount?: number;
-  schedule: string;
-  weekdays: DayOfWeek[];
-  startTime: string;
-  endTime: string;
+  /** 排课展示文案：已挪到排课侧，班级表单不再维护 */
+  schedule?: string;
+  weekdays?: DayOfWeek[];
+  startTime?: string;
+  endTime?: string;
+  /** 课程时长（分钟），对齐新增班级表单 */
+  durationMinutes?: number;
+  /** 容纳人数；不填表示不限制 */
+  capacity?: number;
   totalLessons?: number;
   usedLessons: number;
   status: 'active' | 'paused' | 'ended';
-  startDate: string;
+  startDate?: string;
   endDate?: string;
   color: ClassColor;
   icon: ClassIcon;
-  /** 课程难度等级 */
   level?: ClassLevel;
   studentCount: number;
-  /** 单次默认消耗课时（手动消课预填） */
   hoursPerLesson?: number;
-  pricePerLesson: number;
-  /** 课程介绍 / 备注说明 */
+  pricePerLesson?: number;
   note?: string;
-  /** 课程分类 ID（决定约课首页 Tab 归属） */
   categoryId?: string;
   createdAt: string;
 }
 
 export const CLASSES: Class[] = [
+  {
+    id: 'cls-art-sketch',
+    name: '美术素描班',
+    teacherId: 'teacher-001',
+    teachers: ['teacher-001'],
+    campusId: 'campus-center',
+    subjectId: 'sub-art',
+    categoryId: 'cat-class',
+    type: 'limited',
+    durationMinutes: 90,
+    capacity: 12,
+    totalLessons: 24,
+    usedLessons: 0,
+    status: 'active',
+    color: 'primary',
+    icon: 'art',
+    level: 'basic',
+    studentCount: 0,
+    hoursPerLesson: 1,
+    pricePerLesson: 0,
+    note: '零基础素描入门，培养观察力与造型能力。',
+    createdAt: '2026-07-01T10:00:00Z',
+  },
+  {
+    id: 'cls-calligraphy-basic',
+    name: '书法基础班',
+    teacherId: 'teacher-001',
+    teachers: ['teacher-001'],
+    campusId: 'campus-center',
+    subjectId: 'sub-calligraphy',
+    categoryId: 'cat-class',
+    type: 'limited',
+    durationMinutes: 60,
+    capacity: 10,
+    totalLessons: 24,
+    usedLessons: 0,
+    status: 'active',
+    color: 'purple',
+    icon: 'calligraphy',
+    level: 'all',
+    studentCount: 0,
+    hoursPerLesson: 1,
+    pricePerLesson: 0,
+    note: '硬笔书法基础训练，规范书写姿势与笔画。',
+    createdAt: '2026-07-02T10:00:00Z',
+  },
   // 曦绘艺术 - 张老师
   {
     id: 'cls-001',
@@ -800,8 +857,9 @@ export const CLASSES: Class[] = [
     subjectId: 'sub-piano',
     categoryId: 'cat-class',
     type: 'limited',
-    schedule: '周一、周三 14:00-15:30',
-    weekdays: [1, 3],
+    schedule: '周一、周三、周日 14:00-15:30 / 10:00-11:30',
+    weekdays: [1, 3, 7],
+    durationMinutes: 90,
     startTime: '14:00',
     endTime: '15:30',
     totalLessons: 48,
@@ -828,6 +886,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周二、周四 16:00-17:30',
     weekdays: [2, 4],
+    durationMinutes: 90,
     startTime: '16:00',
     endTime: '17:30',
     totalLessons: 48,
@@ -853,6 +912,7 @@ export const CLASSES: Class[] = [
     type: 'unlimited',
     schedule: '周六 10:00-11:30',
     weekdays: [6],
+    durationMinutes: 90,
     startTime: '10:00',
     endTime: '11:30',
     usedLessons: 38,
@@ -881,6 +941,7 @@ export const CLASSES: Class[] = [
     level: 'basic',
     schedule: '周一、周五 15:00-16:30',
     weekdays: [1, 5],
+    durationMinutes: 90,
     startTime: '15:00',
     endTime: '16:30',
     totalLessons: 40,
@@ -909,6 +970,7 @@ export const CLASSES: Class[] = [
     level: 'advanced',
     schedule: '周三、周六 09:00-10:30',
     weekdays: [3, 6],
+    durationMinutes: 90,
     startTime: '09:00',
     endTime: '10:30',
     usedLessons: 45,
@@ -932,6 +994,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周二、周四 14:00-15:30',
     weekdays: [2, 4],
+    durationMinutes: 90,
     startTime: '14:00',
     endTime: '15:30',
     totalLessons: 48,
@@ -956,6 +1019,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周六 14:00-16:00',
     weekdays: [6],
+    durationMinutes: 120,
     startTime: '14:00',
     endTime: '16:00',
     totalLessons: 24,
@@ -981,6 +1045,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周五 18:00-20:00',
     weekdays: [5],
+    durationMinutes: 120,
     startTime: '18:00',
     endTime: '20:00',
     totalLessons: 20,
@@ -1006,6 +1071,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周三、周五 15:00-16:30',
     weekdays: [3, 5],
+    durationMinutes: 90,
     startTime: '15:00',
     endTime: '16:30',
     totalLessons: 48,
@@ -1030,6 +1096,7 @@ export const CLASSES: Class[] = [
     type: 'unlimited',
     schedule: '周日 10:00-12:00',
     weekdays: [7],
+    durationMinutes: 120,
     startTime: '10:00',
     endTime: '12:00',
     usedLessons: 22,
@@ -1053,6 +1120,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周日 23:00-24:00',
     weekdays: [7],
+    durationMinutes: 60,
     startTime: '23:00',
     endTime: '24:00',
     totalLessons: 30,
@@ -1077,6 +1145,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '周日 18:00-19:30',
     weekdays: [1, 7],
+    durationMinutes: 90,
     startTime: '18:00',
     endTime: '19:30',
     totalLessons: 24,
@@ -1101,6 +1170,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '每日（班课演示上课中）',
     weekdays: [1, 2, 3, 4, 5, 6, 7],
+    durationMinutes: 1439,
     startTime: '00:00',
     endTime: '23:59',
     totalLessons: 10,
@@ -1124,6 +1194,7 @@ export const CLASSES: Class[] = [
     type: 'limited',
     schedule: '每日（班课演示试听）',
     weekdays: [1, 2, 3, 4, 5, 6, 7],
+    durationMinutes: 1439,
     startTime: '00:00',
     endTime: '23:59',
     totalLessons: 10,
@@ -1153,6 +1224,7 @@ export const CLASSES: Class[] = [
     level: 'all',
     schedule: '周二、周四 16:00-17:00',
     weekdays: [2, 4],
+    durationMinutes: 60,
     startTime: '16:00',
     endTime: '17:00',
     totalLessons: 24,
@@ -1183,6 +1255,7 @@ export const CLASSES: Class[] = [
     level: 'all',
     schedule: '每日（演示上课中）',
     weekdays: [1, 2, 3, 4, 5, 6, 7],
+    durationMinutes: 1439,
     startTime: '00:00',
     endTime: '23:59',
     totalLessons: 20,
@@ -1211,6 +1284,7 @@ export const CLASSES: Class[] = [
     level: 'basic',
     schedule: '每日（演示可预约）',
     weekdays: [1, 2, 3, 4, 5, 6, 7],
+    durationMinutes: 1439,
     startTime: '00:00',
     endTime: '23:59',
     totalLessons: 20,
@@ -1240,6 +1314,7 @@ export const CLASSES: Class[] = [
     level: 'basic',
     schedule: '周一、周四 17:00-18:30',
     weekdays: [1, 4],
+    durationMinutes: 90,
     startTime: '17:00',
     endTime: '18:30',
     totalLessons: 32,
@@ -1318,7 +1393,7 @@ export const STUDENTS: Student[] = [
     parentId: 'user-parent-002',
     campusId: 'campus-center',
     teacherId: 'teacher-001',
-    classIds: ['cls-001'],
+    classIds: ['cls-001', 'cls-002', 'cls-011'],
     totalHours: 38,
     remainingHours: 22,
     status: 'active',
@@ -2562,6 +2637,9 @@ export interface CoursePackage {
   note?: string;
   /** 关联会员卡 ID（次卡发卡时建立，用于「剩余次数 ↔ 剩余课时」双向同步，消除脆弱的 name 字符串匹配） */
   memberCardId?: string;
+  installmentEnabled?: boolean;
+  installmentPeriod?: number;
+  installmentSchedule?: Array<{ period: number; amount: string; date: string; reminder?: boolean }>;
 }
 
 export const COURSE_PACKAGES: CoursePackage[] = [
@@ -2622,8 +2700,8 @@ export const COURSE_PACKAGES: CoursePackage[] = [
   {
     id: 'pkg-004',
     studentId: 'stu-002',
-    classId: 'cls-002',
-    name: '钢琴进阶课包',
+    classId: 'cls-011',
+    name: '钢琴启蒙团课包',
     subjectId: 'sub-piano',
     totalHours: 48,
     purchasedHours: 48,
@@ -2858,6 +2936,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 1,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -2870,6 +2949,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 1,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -2882,6 +2962,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 2,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -2894,6 +2975,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 2,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -2906,6 +2988,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 3,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -2918,6 +3001,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 3,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -2930,6 +3014,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 4,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -2942,6 +3027,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 4,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -2954,6 +3040,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 5,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -2966,6 +3053,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 5,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -2978,6 +3066,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 6,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -2990,6 +3079,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 6,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -3002,6 +3092,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 7,
+    durationMinutes: 30,
     startTime: '00:00',
     endTime: '00:30',
     room: '书法教室1',
@@ -3014,6 +3105,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 7,
+    durationMinutes: 30,
     startTime: '00:30',
     endTime: '01:00',
     room: '水彩教室1',
@@ -3026,8 +3118,22 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-001',
     campusId: 'campus-center',
     dayOfWeek: 1,
+    durationMinutes: 90,
     startTime: '14:00',
     endTime: '15:30',
+    room: '101',
+    status: 'scheduled',
+  },
+  {
+    id: 'sch-001-sun',
+    classId: 'cls-001',
+    color: 'primary',
+    teacherId: 'teacher-001',
+    campusId: 'campus-center',
+    dayOfWeek: 7,
+    durationMinutes: 90,
+    startTime: '10:00',
+    endTime: '11:30',
     room: '101',
     status: 'scheduled',
   },
@@ -3039,6 +3145,7 @@ export const SCHEDULES: Schedule[] = [
     assistantTeacherId: 'teacher-003',
     campusId: 'campus-center',
     dayOfWeek: 3,
+    durationMinutes: 90,
     startTime: '14:00',
     endTime: '15:30',
     room: '101',
@@ -3051,6 +3158,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-001',
     campusId: 'campus-center',
     dayOfWeek: 2,
+    durationMinutes: 90,
     startTime: '16:00',
     endTime: '17:30',
     room: '102',
@@ -3063,6 +3171,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-001',
     campusId: 'campus-center',
     dayOfWeek: 4,
+    durationMinutes: 90,
     startTime: '16:00',
     endTime: '17:30',
     room: '102',
@@ -3075,6 +3184,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-001',
     campusId: 'campus-center',
     dayOfWeek: 6,
+    durationMinutes: 90,
     startTime: '10:00',
     endTime: '11:30',
     room: '201',
@@ -3087,6 +3197,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 1,
+    durationMinutes: 90,
     startTime: '15:00',
     endTime: '16:30',
     room: '301',
@@ -3099,6 +3210,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 5,
+    durationMinutes: 90,
     startTime: '15:00',
     endTime: '16:30',
     room: '301',
@@ -3111,6 +3223,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 3,
+    durationMinutes: 90,
     startTime: '09:00',
     endTime: '10:30',
     room: '302',
@@ -3123,6 +3236,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-002',
     campusId: 'campus-center',
     dayOfWeek: 6,
+    durationMinutes: 90,
     startTime: '09:00',
     endTime: '10:30',
     room: '302',
@@ -3135,6 +3249,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-003',
     campusId: 'campus-east',
     dayOfWeek: 2,
+    durationMinutes: 90,
     startTime: '14:00',
     endTime: '15:30',
     room: '舞蹈教室1',
@@ -3147,6 +3262,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-003',
     campusId: 'campus-east',
     dayOfWeek: 4,
+    durationMinutes: 90,
     startTime: '14:00',
     endTime: '15:30',
     room: '舞蹈教室1',
@@ -3159,6 +3275,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-003',
     campusId: 'campus-east',
     dayOfWeek: 6,
+    durationMinutes: 120,
     startTime: '14:00',
     endTime: '16:00',
     room: '舞蹈教室2',
@@ -3171,6 +3288,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-002',
     campusId: 'campus-east',
     dayOfWeek: 5,
+    durationMinutes: 120,
     startTime: '18:00',
     endTime: '20:00',
     room: '声乐教室1',
@@ -3183,6 +3301,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 3,
+    durationMinutes: 90,
     startTime: '15:00',
     endTime: '16:30',
     room: '书法教室1',
@@ -3195,6 +3314,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 5,
+    durationMinutes: 90,
     startTime: '15:00',
     endTime: '16:30',
     room: '书法教室1',
@@ -3207,6 +3327,7 @@ export const SCHEDULES: Schedule[] = [
     teacherId: 'teacher-004',
     campusId: 'campus-west',
     dayOfWeek: 7,
+    durationMinutes: 120,
     startTime: '10:00',
     endTime: '12:00',
     room: '美术教室1',
@@ -3358,13 +3479,15 @@ function generateLessonRecords(): LessonRecord[] {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
       CLASSES.forEach((cls) => {
-        // 检查今天是否是该班级的上课日
-        if (!cls.weekdays.includes(weekday as DayOfWeek)) return;
+        // 未排课班级（无 weekdays）跳过历史消课生成
+        const weekdays = cls.weekdays ?? [];
+        if (!weekdays.includes(weekday as DayOfWeek)) return;
         // 检查班级是否已经开始
-        if (dateStr < cls.startDate) return;
+        if (cls.startDate && dateStr < cls.startDate) return;
+        if (!cls.startTime || !cls.endTime) return;
 
         const classHours = computeClassHours(cls);
-        const classStudents = STUDENTS.filter((s) => s.classIds.includes(cls.id));
+        const classStudents = STUDENTS.filter((s) => s.classIds?.includes(cls.id));
         classStudents.forEach((student) => {
           const rand = Math.random();
           let status: LessonRecord['status'] = 'checked';
@@ -3417,6 +3540,7 @@ function createSamplePersonalLessonRecord(): LessonRecord {
     operatorTeacherId: 'teacher-001',
     campusId: 'campus-center',
     date: sampleDate,
+    durationMinutes: 60,
     startTime: '19:00',
     endTime: '20:00',
     hours: 1,
@@ -3442,6 +3566,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-001',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 60,
       startTime: '09:00',
       endTime: '10:00',
       hours: 1,
@@ -3458,6 +3583,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-001',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 60,
       startTime: '10:30',
       endTime: '11:30',
       hours: 1,
@@ -3474,6 +3600,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 60,
       startTime: '13:00',
       endTime: '14:00',
       hours: 1,
@@ -3490,6 +3617,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-001',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 60,
       startTime: '14:30',
       endTime: '15:30',
       // 取消不扣课时（与签到/补课才扣的规则一致）
@@ -3507,6 +3635,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       assistantTeacherId: 'teacher-003',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 90,
       startTime: '16:00',
       endTime: '17:30',
       hours: 1.5,
@@ -3524,6 +3653,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       assistantTeacherId: 'teacher-003',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 90,
       startTime: '17:40',
       endTime: '19:10',
       hours: 1.5,
@@ -3541,6 +3671,7 @@ function createLessonCardPreviewRecords(): LessonRecord[] {
       assistantTeacherId: 'teacher-003',
       campusId: 'campus-center',
       date: sampleDate,
+      durationMinutes: 90,
       startTime: '19:20',
       endTime: '20:50',
       // 整节取消：不扣课时（此前误写成 1.5，会造成「已取消还扣课时」）
@@ -3572,6 +3703,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-west',
       date: supplementDate,
+      durationMinutes: 120,
       startTime: '10:00',
       endTime: '12:00',
       hours: 2,
@@ -3588,6 +3720,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-west',
       date: supplementDate,
+      durationMinutes: 120,
       startTime: '10:00',
       endTime: '12:00',
       hours: 2,
@@ -3604,6 +3737,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-west',
       date: supplementDate,
+      durationMinutes: 120,
       startTime: '10:00',
       endTime: '12:00',
       hours: 0,
@@ -3619,6 +3753,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-west',
       date: supplementDate,
+      durationMinutes: 120,
       startTime: '10:00',
       endTime: '12:00',
       hours: 0,
@@ -3634,6 +3769,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-west',
       date: supplementDate,
+      durationMinutes: 120,
       startTime: '10:00',
       endTime: '12:00',
       hours: 0,
@@ -3649,6 +3785,7 @@ function createLessonSupplementPreviewRecords(): LessonRecord[] {
       operatorTeacherId: 'teacher-004',
       campusId: 'campus-west',
       date: supplementDate,
+      durationMinutes: 120,
       startTime: '10:00',
       endTime: '12:00',
       hours: 2,
@@ -3689,6 +3826,7 @@ export const LESSON_RECORDS = [
         classId: 'cls-009',
         campusId: 'campus-west',
         date: dateStr,
+        durationMinutes: 30,
         startTime: '00:00',
         endTime: '00:30',
         hours: 0.5,
@@ -3741,6 +3879,21 @@ export const LEAVE_REQUESTS: LeaveRequest[] = [
     status: 'approved',
     createdAt: '2026-06-17T09:00:00Z',
     processedAt: '2026-06-17T10:00:00Z',
+  },
+  {
+    id: 'leave-zhao-pending',
+    studentId: 'stu-002',
+    classId: 'cls-001',
+    teacherId: 'teacher-001',
+    campusId: 'campus-center',
+    date: (() => {
+      const d = new Date(NOW);
+      d.setDate(d.getDate() + 3);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })(),
+    reason: '家中有事需请假',
+    status: 'pending',
+    createdAt: new Date(NOW.getTime() - 60 * 60 * 1000).toISOString(),
   },
   {
     id: 'leave-003',

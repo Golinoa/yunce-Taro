@@ -148,6 +148,10 @@ const ChildDetail: React.FC = () => {
       Taro.showToast({ title: '缺少学员 ID', icon: 'none' });
       return;
     }
+    const tab = options?.tab as TabKey | undefined;
+    if (tab === 'guardians' || tab === 'packages' || tab === 'records') {
+      setActiveTab(tab);
+    }
     setStudentId(id);
     loadStudent(id);
     loadGuardians(id);

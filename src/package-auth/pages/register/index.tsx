@@ -170,7 +170,7 @@ const Register: React.FC = () => {
         <View className="rotate-login-slogan">
           <View className="flex flex-row items-start gap-[16rpx]">
             <Text className="text-[64rpx] font-bold text-primary tracking-[4rpx] leading-[1.08]">
-              智能教务
+              智慧教务
             </Text>
             <View className="relative w-[72rpx] h-[72rpx] mt-[-6rpx] flex-shrink-0">
               <View className="absolute left-[8rpx] bottom-[-4rpx] w-[22rpx] h-[22rpx] bg-login-bubble rounded-[4rpx_0_16rpx_0] rotate-[28deg]" />
@@ -240,24 +240,15 @@ const Register: React.FC = () => {
             {agreed ? <Text className="text-[20rpx] text-white">✓</Text> : null}
           </View>
           <Text className="flex-1 text-[24rpx] leading-[36rpx] text-muted-foreground">
-            同意
+            我已阅读并同意
             <Text
               className="text-primary"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowAgreementDialog(true);
+                Taro.navigateTo({ url: '/package-settings/pages/agreement/index?type=user' });
               }}
             >
-              《服务协议》
-            </Text>
-            <Text
-              className="text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAgreementDialog(true);
-              }}
-            >
-              《隐私政策》
+              《用户协议》
             </Text>
           </Text>
         </View>
@@ -288,7 +279,7 @@ const Register: React.FC = () => {
           setPendingRegister(false);
         }}
         onConfirm={handleAgreementConfirm}
-        confirmText="同意协议并注册"
+        confirmText="同意并注册"
       />
     </View>
   );

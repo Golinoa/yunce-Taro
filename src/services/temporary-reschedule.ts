@@ -3,6 +3,12 @@ import dayjs from 'dayjs';
 import type { Class, Schedule, TemporaryReschedule } from '@/types';
 import { isUseMock } from '@/utils/build-env';
 import { get, post } from '@/utils/request';
+import {
+  API_PAGE_SIZE_BATCH,
+  asPaginatedResponse,
+  fetchAllPages,
+  type PaginatedResponse,
+} from '@/utils/pagination';
 
 const STORAGE_KEY = 'yunce-temporary-reschedules';
 
@@ -138,7 +144,7 @@ function buildAdjustmentSlot(
 
 export const temporaryRescheduleService = {
   /**
-   * 获取指定日期范围内的临时调课记录。
+   * 获取指定日期范围内的临时调课记录（分批拉全；pageSize 不得超过后端 max=100）。
    * 只要原日期或目标日期落在范围内，就需要返回给页面参与渲染。
    */
   getByTeacherAndRange: async (
@@ -147,14 +153,16 @@ export const temporaryRescheduleService = {
     endDate: string,
   ): Promise<TemporaryReschedule[]> => {
     if (!isUseMock()) {
-      const response = await get<
-        BackendTemporaryRescheduleListResponse | BackendTemporaryRescheduleItem[]
-      >(
-        `/temporary-reschedules?page=1&pageSize=200&teacherId=${encodeURIComponent(
-          teacherId,
-        )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
-      );
-      const list = Array.isArray(response) ? response : response.list || [];
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const response = await get<
+          PaginatedResponse<BackendTemporaryRescheduleItem> | BackendTemporaryRescheduleItem[]
+        >(
+          `/temporary-reschedules?page=${page}&pageSize=${pageSize}&teacherId=${encodeURIComponent(
+            teacherId,
+          )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+        );
+        return asPaginatedResponse(response, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
       return list.map(mapBackendTemporaryReschedule);
     }
 

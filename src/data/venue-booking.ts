@@ -67,6 +67,67 @@ function seedMockBookings(): void {
       managerUserId: resolveRoomManagerUserId(homeRoomId),
       createdAt: dayjs().subtract(1, 'day').toISOString(),
     },
+    {
+      id: `vb-seed-${homeRoomId}-completed`,
+      userId: 'user-parent-001',
+      userName: '会员1',
+      roomId: homeRoomId,
+      date: dayjs().subtract(3, 'day').format('YYYY-MM-DD'),
+      startTime: '10:00',
+      endTime: '11:00',
+      peopleCount: 1,
+      unitPrice: 50,
+      totalPrice: 50,
+      status: 'checked_in',
+      managerUserId: resolveRoomManagerUserId(homeRoomId),
+      createdAt: dayjs().subtract(4, 'day').toISOString(),
+    },
+    // 「我的预约」演示：多状态场地
+    {
+      id: `vb-seed-${homeRoomId}-completed-2`,
+      userId: 'user-parent-002',
+      userName: '王妈妈',
+      roomId: homeRoomId,
+      date: dayjs().subtract(7, 'day').format('YYYY-MM-DD'),
+      startTime: '18:00',
+      endTime: '19:00',
+      peopleCount: 2,
+      unitPrice: 50,
+      totalPrice: 100,
+      status: 'checked_in',
+      managerUserId: resolveRoomManagerUserId(homeRoomId),
+      createdAt: dayjs().subtract(8, 'day').toISOString(),
+    },
+    {
+      id: `vb-seed-${homeRoomId}-pending`,
+      userId: 'user-parent-003',
+      userName: '李爸爸',
+      roomId: homeRoomId,
+      date: dayjs().add(5, 'day').format('YYYY-MM-DD'),
+      startTime: '09:00',
+      endTime: '10:00',
+      peopleCount: 1,
+      unitPrice: 50,
+      totalPrice: 50,
+      status: 'pending',
+      managerUserId: resolveRoomManagerUserId(homeRoomId),
+      createdAt: dayjs().toISOString(),
+    },
+    {
+      id: `vb-seed-${homeRoomId}-cancelled`,
+      userId: 'user-parent-001',
+      userName: '会员1',
+      roomId: homeRoomId,
+      date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
+      startTime: '20:00',
+      endTime: '21:00',
+      peopleCount: 1,
+      unitPrice: 50,
+      totalPrice: 50,
+      status: 'cancelled',
+      managerUserId: resolveRoomManagerUserId(homeRoomId),
+      createdAt: dayjs().subtract(2, 'day').toISOString(),
+    },
   ];
 }
 
@@ -281,4 +342,34 @@ export async function mockGetMyVenueBookings(userId?: string): Promise<VenueBook
   return mockBookingRecords.filter(
     (record) => record.userId === userId && record.status !== 'cancelled',
   );
+}
+
+/**
+ * 与我相关的场地预约：
+ * - 我是场地/场馆负责人（managerUserId）
+ * - 或我是预约操作人（userId）
+ */
+export async function mockListRelatedVenueBookings(
+  actorIds: string[],
+  params?: { startDate?: string; endDate?: string },
+): Promise<VenueBookingRecord[]> {
+  await delay();
+  if (actorIds.length === 0) return [];
+
+  const actorSet = new Set(actorIds);
+  // 展开每个 actor 的教学身份，覆盖 teacher-001 / user-teacher-001 等别名
+  actorIds.forEach((id) => {
+    try {
+      resolveMyTeachingActorIds(id).forEach((aid) => actorSet.add(aid));
+    } catch {
+      // ignore
+    }
+  });
+
+  return mockBookingRecords.filter((record) => {
+    if (params?.startDate && record.date < params.startDate) return false;
+    if (params?.endDate && record.date > params.endDate) return false;
+    const managerId = record.managerUserId || resolveRoomManagerUserId(record.roomId);
+    return actorSet.has(managerId) || actorSet.has(record.userId);
+  });
 }

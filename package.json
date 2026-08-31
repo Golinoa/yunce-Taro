@@ -25,6 +25,7 @@
     "build:quickapp": "taro build --type quickapp",
     "optimize:images": "node scripts/optimize-images.mjs",
     "dev:weapp": "node scripts/dev-weapp.mjs",
+    "dev:weapp:dev": "node scripts/dev-weapp-dev.mjs",
     "dev:weapp:mock": "node scripts/dev-weapp-mock.mjs",
     "dev:swan": "npm run build:swan -- --watch",
     "dev:alipay": "npm run build:alipay -- --watch",

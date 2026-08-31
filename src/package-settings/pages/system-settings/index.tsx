@@ -2,9 +2,9 @@
  * 系统设置页 package-settings/pages/system-settings/index
  *
  * 所有角色均可进入，内部设置项按角色权限过滤显示：
- * - 家长：仅用户协议、版本、退出（无机构配置）
- * - 教师：个人项（同步手机日历、本人操作日志）+ 用户协议 / 版本 / 退出；不可见机构效果配置
- * - 机构效果与配置（主题颜色、待办提醒）：仅管理员/校长
+ * - 家长：用户协议、主题颜色、版本、退出（无机构配置）
+ * - 教师：个人项（主题颜色、同步手机日历、本人操作日志）+ 用户协议 / 版本 / 退出
+ * - 机构效果与配置（待办提醒）：仅管理员/校长
  * - 管理员专属（角色权限、定时备份、重置新手引导、预警阈值）：仅管理员
  * - 机构开关（场地预约、请假自动审批）：仅管理员/校长
  *
@@ -13,15 +13,17 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import { APP_VERSION } from '@/constants/version';
 import { clearVisitedMap } from '@/services/onboarding';
+import { organizationService } from '@/services/organization';
+import { campusService } from '@/services/campus';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
-import { getAlertThreshold } from '@/utils/alert-config';
+import { getAlertThreshold, syncAlertThresholdFromCampus } from '@/utils/alert-config';
 import { isAdmin, isParentRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import {
   canUseCalendarSync,
@@ -31,8 +33,15 @@ import {
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 import { calendarSyncService } from '@/services/calendar-sync';
-import { organizationService } from '@/services/organization';
-import { handleVersionNumberTap, isDeveloperModeUnlocked } from '@/utils/developer-mode';
+import {
+  getDeveloperModeRemainingMs,
+  handleVersionNumberTap,
+  isDeveloperModeSessionValid,
+  isDeveloperModeUnlocked,
+  setDeveloperModeSessionValid,
+  verifyDeveloperModePassword,
+} from '@/utils/developer-mode';
+import { showInputModal } from '@/utils/modal';
 
 /** 设置项配置 */
 interface SettingItem {
@@ -57,7 +66,7 @@ const ALL_SETTING_ITEMS: SettingItem[] = [
   {
     title: '主题颜色',
     route: '/package-settings/pages/theme-settings/index',
-    managerOnly: true,
+    /** 全员可见；个人偏好存本地（当前库无校区主题字段） */
   },
   {
     title: '待办提醒',
@@ -96,6 +105,7 @@ const SystemSettings: React.FC = () => {
   const [calendarSyncEnabled, setCalendarSyncEnabledState] = useState(false);
   const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
   const [developerModeVisible, setDeveloperModeVisible] = useState(isDeveloperModeUnlocked());
+  const developerExpireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUserId = profile?.id || '';
   const isParent = isParentRole(currentRole);
   const showCalendarSyncSwitch = !isParent && canUseCalendarSync(currentRole);
@@ -104,13 +114,74 @@ const SystemSettings: React.FC = () => {
   const [leaveAutoApprove, setLeaveAutoApprove] = useState<boolean | null>(null);
   const [leaveAutoApproveLoading, setLeaveAutoApproveLoading] = useState(false);
 
+  const scheduleDeveloperModeExpiry = useCallback(() => {
+    if (developerExpireTimerRef.current) {
+      clearTimeout(developerExpireTimerRef.current);
+      developerExpireTimerRef.current = null;
+    }
+    const remaining = getDeveloperModeRemainingMs();
+    if (remaining <= 0) {
+      setDeveloperModeVisible(false);
+      return;
+    }
+    setDeveloperModeVisible(true);
+    developerExpireTimerRef.current = setTimeout(() => {
+      setDeveloperModeVisible(isDeveloperModeUnlocked());
+      developerExpireTimerRef.current = null;
+    }, remaining + 50);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (developerExpireTimerRef.current) {
+        clearTimeout(developerExpireTimerRef.current);
+      }
+    };
+  }, []);
+
+  const promptDeveloperPassword = useCallback(() => {
+    showInputModal({
+      title: '开发者模式',
+      placeholderText: '请输入密码',
+      confirmColor: getThemeHexColors(activeTheme).primary,
+      success: (res) => {
+        if (!res.confirm) return;
+        if (!verifyDeveloperModePassword(res.content ?? '')) {
+          Taro.showToast({ title: '密码错误', icon: 'none' });
+          return;
+        }
+        setDeveloperModeSessionValid(true);
+        void Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
+      },
+    });
+  }, [activeTheme]);
+
   // 页面显示时读取最新开关状态
   useDidShow(() => {
+    scheduleDeveloperModeExpiry();
     setVenueBookingEnabledState(getVenueBookingEnabled());
-    setAlertThresholdState(getAlertThreshold());
-    setDeveloperModeVisible(isDeveloperModeUnlocked());
     if (currentUserId) {
       setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
+    }
+    const campusId = profile?.currentContext?.campusId;
+    if (campusId) {
+      void campusService
+        .getById(campusId)
+        .then((campus) => {
+          if (campus) {
+            const cfg = syncAlertThresholdFromCampus({
+              hoursAlertThreshold: campus.hoursAlertThreshold,
+              daysAlertThreshold: campus.daysAlertThreshold,
+              amountAlertThreshold: campus.amountAlertThreshold,
+            });
+            setAlertThresholdState(cfg.hours);
+          } else {
+            setAlertThresholdState(getAlertThreshold());
+          }
+        })
+        .catch(() => setAlertThresholdState(getAlertThreshold()));
+    } else {
+      setAlertThresholdState(getAlertThreshold());
     }
     // 校长/管理员：读取请假自动审批开关
     if (isManagerRole) {
@@ -180,10 +251,10 @@ const SystemSettings: React.FC = () => {
     [currentRole, currentUserId, profile?.currentContext?.campusId],
   );
 
-  /** 预警阈值配置：跳转到专用表单页（用户口径 2026-08-22：单独页面，非弹框） */
+  /** 预警阈值：合并到续费提醒页的提醒设置 */
   const handleAlertThresholdChange = useCallback(() => {
     Taro.navigateTo({
-      url: '/package-settings/pages/threshold-config/index',
+      url: '/package-student/pages/renewal-reminder/index',
     });
   }, []);
 
@@ -228,16 +299,26 @@ const SystemSettings: React.FC = () => {
     const result = handleVersionNumberTap();
     if (result === 'unlocked') {
       setDeveloperModeVisible(true);
-      Taro.showToast({ title: '已解锁，请输入密码进入', icon: 'none' });
+      scheduleDeveloperModeExpiry();
+      Taro.showToast({ title: '已解锁（10 分钟）', icon: 'none' });
       setTimeout(() => {
-        void Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
+        promptDeveloperPassword();
       }, 400);
     }
-  }, []);
+  }, [promptDeveloperPassword, scheduleDeveloperModeExpiry]);
 
   const handleOpenDeveloperMode = useCallback(() => {
-    Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
-  }, []);
+    if (!isDeveloperModeUnlocked()) {
+      setDeveloperModeVisible(false);
+      Taro.showToast({ title: '入口已关闭', icon: 'none' });
+      return;
+    }
+    if (isDeveloperModeSessionValid()) {
+      void Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
+      return;
+    }
+    promptDeveloperPassword();
+  }, [promptDeveloperPassword]);
 
   const handleSignOut = useCallback(async () => {
     const res = await Taro.showModal({
@@ -309,15 +390,15 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {/* 运营预警阈值配置（adminOnly） */}
-          {isAdmin(currentRole) && (
+          {/* 运营预警阈值配置（管理员/校长） */}
+          {(isAdmin(currentRole) || currentRole === 'principal') && (
             <View
               className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg border-t border-border"
               onClick={handleAlertThresholdChange}
             >
-              <Text className="text-[30rpx] text-foreground">课时不足预警阈值</Text>
+              <Text className="text-[30rpx] text-foreground">续费提醒阈值</Text>
               <Text className="text-[28rpx] text-muted-foreground">
-                ≤ {alertThreshold} 课时触发
+                ≤ {alertThreshold} 课时等 · 去设置
               </Text>
             </View>
           )}

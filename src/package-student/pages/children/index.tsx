@@ -60,19 +60,30 @@ const Children: React.FC = () => {
     loadStudents();
   }, [loadStudents]);
 
-  // 邀请亲属：当前阶段为占位（共享档案能力后续接入）
+  // 邀请亲属：复制后端真实 inviteCode（无码则提示联系老师）
   const handleInviteRelatives = useCallback((student: Student) => {
+    const code = student.invite_code?.trim();
+    const hasCode = Boolean(code && code !== '请联系老师');
     Taro.showModal({
       title: '邀请亲属查看',
-      content: `已为你生成 ${student.name} 的专属邀请码，你可以通过分享小程序二维码或链接给配偶/家人，对方完成注册后即可查看孩子的课表与约课。`,
-      confirmText: '复制邀请码',
+      content: hasCode
+        ? `已为你生成 ${student.name} 的专属邀请码，你可以通过分享小程序二维码或链接给配偶/家人，对方完成注册后即可查看孩子的课表与约课。`
+        : `${student.name} 暂无可用邀请码，请联系老师生成后再邀请亲属。`,
+      confirmText: hasCode ? '复制邀请码' : '我知道了',
+      showCancel: hasCode,
       cancelText: '关闭',
       success: ({ confirm }) => {
-        if (confirm && student.invite_code) {
-          Taro.setClipboardData({ data: student.invite_code });
+        if (confirm && hasCode && code) {
+          Taro.setClipboardData({ data: code });
           Taro.showToast({ title: '邀请码已复制', icon: 'success' });
         }
       },
+    });
+  }, []);
+
+  const handleOpenDetail = useCallback((student: Student) => {
+    Taro.navigateTo({
+      url: `/package-student/pages/child-detail/index?id=${encodeURIComponent(student.id)}`,
     });
   }, []);
 
@@ -137,6 +148,7 @@ const Children: React.FC = () => {
                     key={student.id}
                     student={student}
                     onInviteRelatives={handleInviteRelatives}
+                    onOpenDetail={handleOpenDetail}
                   />
                 ))}
               </View>
@@ -156,15 +168,19 @@ export default Children;
 interface StudentCardProps {
   student: Student;
   onInviteRelatives: (student: Student) => void;
+  onOpenDetail: (student: Student) => void;
 }
 
-const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives }) => {
+const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives, onOpenDetail }) => {
   const genderLabel = student.gender ? GENDER_MAP[student.gender] : '未设置';
   const birthdayLabel = student.birthday || '未设置';
   const avatarSrc = student.avatar_url || BRAND_LOGO;
 
   return (
-    <View className="rounded-[32rpx] bg-card shadow-soft p-[28rpx]">
+    <View
+      className="rounded-[32rpx] bg-card shadow-soft p-[28rpx] active:opacity-90"
+      onClick={() => onOpenDetail(student)}
+    >
       {/* 头部：头像 + 姓名 + 标签 */}
       <View className="flex items-center gap-[20rpx]">
         <View className="relative w-[112rpx] h-[112rpx] rounded-full border-[4rpx] border-solid border-white shadow-soft bg-white overflow-hidden">
@@ -189,7 +205,10 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives })
         </View>
         <View
           className="w-[88rpx] h-[88rpx] rounded-2xl bg-primary-bg center active:bg-primary-10 press-scale"
-          onClick={() => onInviteRelatives(student)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onInviteRelatives(student);
+          }}
         >
           <Icon name="mdi-share-variant-outline" size={36} color="primary" />
         </View>
@@ -199,7 +218,11 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives })
       <View className="mt-[24rpx] flex flex-col">
         <InfoRow label="性别" value={genderLabel} />
         <InfoRow label="生日" value={birthdayLabel} />
-        <InfoRow label="学员邀请码" value={student.invite_code} copyable />
+        <InfoRow
+          label="学员邀请码"
+          value={student.invite_code}
+          copyable={Boolean(student.invite_code && student.invite_code !== '请联系老师')}
+        />
         <InfoRow label="所属校区" value={student.campus_name || '由教师分配'} />
       </View>
 
@@ -209,7 +232,10 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives })
           'mt-[28rpx] flex items-center justify-center gap-[8rpx] py-[22rpx] rounded-2xl press-scale',
           'bg-primary-bg text-primary',
         )}
-        onClick={() => onInviteRelatives(student)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onInviteRelatives(student);
+        }}
       >
         <Icon name="mdi-account-multiple-plus-outline" size="sm" color="primary" />
         <Text className="text-[28rpx] font-semibold text-primary">邀请亲属查看</Text>

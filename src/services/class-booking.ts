@@ -28,12 +28,10 @@ export const classBookingService = {
     slots: Omit<ClassBookingSlot, 'id'>[],
   ): Promise<ClassBookingSlot[]> => {
     if (!isUseMock()) {
-      const data = await post<{ list: ClassBookingSlot[] }>('/class-booking/slots/batch', {
-        classId,
-        lessonDate,
-        slots,
-      });
-      return data.list;
+      void classId;
+      void lessonDate;
+      void slots;
+      throw new Error('批量配置开放时段尚未开通');
     }
     const { mockSaveClassDaySlots } = await loadClassBookingMock();
     return mockSaveClassDaySlots(classId, lessonDate, slots);
@@ -42,8 +40,8 @@ export const classBookingService = {
   /** 删除开放时段 */
   deleteSlot: async (id: string): Promise<void> => {
     if (!isUseMock()) {
-      await del(`/class-booking/slots/${id}`);
-      return;
+      void id;
+      throw new Error('删除开放时段尚未开通');
     }
     const { mockDeleteSlot } = await loadClassBookingMock();
     return mockDeleteSlot(id);
@@ -52,8 +50,9 @@ export const classBookingService = {
   /** 获取单个开放时段详情 */
   getSlotById: async (id: string): Promise<ClassBookingSlot | null> => {
     if (!isUseMock()) {
-      const data = await get<ClassBookingSlot>(`/class-booking/slots/${id}`);
-      return data;
+      // 后端暂无单条详情：用列表按 id 兜底不可行时返回 null
+      void id;
+      return null;
     }
     const { mockGetSlotById } = await loadClassBookingMock();
     return mockGetSlotById(id);
@@ -111,13 +110,82 @@ export const classBookingService = {
     return mockRemoveBookingRecord(recordId);
   },
 
+  /** 家长/本人：我的班课预约（含时段） */
+  listMyRecords: async (): Promise<
+    Array<{
+      id: string;
+      slot_id: string;
+      class_id: string;
+      student_id: string;
+      student_name?: string;
+      status: ClassBookingRecord['status'];
+      created_at: string;
+      updated_at: string;
+      slot: {
+        id: string;
+        class_id: string;
+        class_name?: string | null;
+        campus_id: string;
+        teacher_id: string;
+        teacher_name?: string | null;
+        lesson_date: string;
+        start_time: string;
+        end_time: string;
+        room?: string | null;
+        booking_kind?: string;
+      };
+    }>
+  > => {
+    if (!isUseMock()) {
+      const data = await get<{
+        list: Array<{
+          id: string;
+          slot_id: string;
+          class_id: string;
+          student_id: string;
+          student_name?: string;
+          status: ClassBookingRecord['status'];
+          created_at: string;
+          updated_at: string;
+          slot: {
+            id: string;
+            class_id: string;
+            class_name?: string | null;
+            campus_id: string;
+            teacher_id: string;
+            teacher_name?: string | null;
+            lesson_date: string;
+            start_time: string;
+            end_time: string;
+            room?: string | null;
+            booking_kind?: string;
+          };
+        }>;
+      }>('/class-booking/my-records');
+      return data.list || [];
+    }
+    return [];
+  },
+
+  /** 老师相关的班课开放约记录（含时段） */
+  listRelatedBookings: async (
+    actorIds: string[],
+    params?: { startDate?: string; endDate?: string },
+  ): Promise<Array<{ record: ClassBookingRecord; slot: ClassBookingSlot }>> => {
+    if (!isUseMock()) {
+      void actorIds;
+      void params;
+      return [];
+    }
+    const { mockListRelatedClassBookings } = await loadClassBookingMock();
+    return mockListRelatedClassBookings(actorIds, params);
+  },
+
   /** 获取指定班级集合存在开放预约时段的日期列表（日历红点用） */
   getOpenSlotDates: async (classIds: string[]): Promise<string[]> => {
     if (!isUseMock()) {
-      const data = await get<{ dates: string[] }>(
-        `/class-booking/slot-dates?classIds=${encodeURIComponent(classIds.join(','))}`,
-      );
-      return data.dates;
+      void classIds;
+      return [];
     }
     const { mockGetOpenSlotDates } = await loadClassBookingMock();
     return mockGetOpenSlotDates(classIds);
@@ -126,11 +194,9 @@ export const classBookingService = {
   /** 检查并自动开班，返回已开班的 scheduleIds */
   autoOpenSlotsIfNeeded: async (classId: string, lessonDate: string): Promise<string[]> => {
     if (!isUseMock()) {
-      const data = await post<{ scheduleIds: string[] }>('/class-booking/auto-open', {
-        classId,
-        lessonDate,
-      });
-      return data.scheduleIds;
+      void classId;
+      void lessonDate;
+      return [];
     }
     const { mockAutoOpenSlotsIfNeeded } = await loadClassBookingMock();
     return mockAutoOpenSlotsIfNeeded(classId, lessonDate);
@@ -139,7 +205,12 @@ export const classBookingService = {
   /** 更新时段状态（active/rest/full） */
   updateSlotStatus: async (slotId: string, status: ClassBookingSlot['status']): Promise<void> => {
     if (!isUseMock()) {
-      await post(`/class-booking/slots/${slotId}/status`, { status });
+      // 走通用更新接口字段 status（若后端支持）；否则静默跳过避免 404
+      try {
+        await post(`/class-booking/slots/${slotId}`, { status });
+      } catch {
+        throw new Error('更新时段状态失败');
+      }
       return;
     }
     // Mock: 直接修改内存数据

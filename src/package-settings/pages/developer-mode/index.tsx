@@ -2,10 +2,10 @@
  * 开发者模式 — 快捷联调入口
  * 默认隐藏；系统设置「当前版本」连续点击 7 次解锁后可见；进入需密码
  */
-import { View, Text, Input, ScrollView } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import { View, Text } from '@tarojs/components';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import { APP_VERSION } from '@/constants/version';
 import { SUBSCRIBE_GROUP_LABELS, SUBSCRIBE_TEMPLATE_GROUPS } from '@/constants/subscribe-presets';
@@ -16,12 +16,14 @@ import { useAuth } from '@/utils/auth';
 import { getApiBaseUrl, isUseMock } from '@/utils/build-env';
 import {
   clearDeveloperModeSession,
+  getDeveloperModeRemainingMs,
   isDeveloperModeSessionValid,
   isDeveloperModeUnlocked,
   setDeveloperModeSessionValid,
   setDeveloperModeUnlocked,
   verifyDeveloperModePassword,
 } from '@/utils/developer-mode';
+import { showInputModal } from '@/utils/modal';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import {
@@ -59,9 +61,77 @@ const MOCK_CTX = {
 const DeveloperMode: React.FC = () => {
   useCardNavigationBar();
   const { profile, currentRole } = useAuth();
-  const [passwordInput, setPasswordInput] = useState('');
   const [authed, setAuthed] = useState(isDeveloperModeSessionValid());
   const [runningId, setRunningId] = useState<string | null>(null);
+  const expireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptingRef = useRef(false);
+
+  const leaveIfExpired = useCallback(() => {
+    if (isDeveloperModeUnlocked()) return false;
+    clearDeveloperModeSession();
+    setAuthed(false);
+    Taro.showToast({ title: '开发者模式已关闭', icon: 'none' });
+    void Taro.navigateBack();
+    return true;
+  }, []);
+
+  const scheduleExpiry = useCallback(() => {
+    if (expireTimerRef.current) {
+      clearTimeout(expireTimerRef.current);
+      expireTimerRef.current = null;
+    }
+    const remaining = getDeveloperModeRemainingMs();
+    if (remaining <= 0) {
+      leaveIfExpired();
+      return;
+    }
+    expireTimerRef.current = setTimeout(() => {
+      leaveIfExpired();
+    }, remaining + 50);
+  }, [leaveIfExpired]);
+
+  const promptPassword = useCallback(() => {
+    if (promptingRef.current) return;
+    promptingRef.current = true;
+    showInputModal({
+      title: '开发者模式',
+      placeholderText: '请输入密码',
+      success: (res) => {
+        promptingRef.current = false;
+        if (!res.confirm) {
+          void Taro.navigateBack();
+          return;
+        }
+        if (!verifyDeveloperModePassword(res.content ?? '')) {
+          Taro.showToast({ title: '密码错误', icon: 'none' });
+          void Taro.navigateBack();
+          return;
+        }
+        setDeveloperModeSessionValid(true);
+        setAuthed(true);
+        scheduleExpiry();
+      },
+    });
+  }, [scheduleExpiry]);
+
+  useDidShow(() => {
+    if (leaveIfExpired()) return;
+    scheduleExpiry();
+    if (!isDeveloperModeSessionValid()) {
+      setAuthed(false);
+      promptPassword();
+    } else {
+      setAuthed(true);
+    }
+  });
+
+  useEffect(() => {
+    return () => {
+      if (expireTimerRef.current) {
+        clearTimeout(expireTimerRef.current);
+      }
+    };
+  }, []);
 
   const meta = useMemo(
     () => ({
@@ -73,6 +143,7 @@ const DeveloperMode: React.FC = () => {
 
   const runAction = useCallback(async (action: DevAction) => {
     if (runningId) return;
+    if (leaveIfExpired()) return;
     setRunningId(action.id);
     try {
       await action.run();
@@ -81,17 +152,7 @@ const DeveloperMode: React.FC = () => {
     } finally {
       setRunningId(null);
     }
-  }, [runningId]);
-
-  const handlePasswordSubmit = useCallback(() => {
-    if (!verifyDeveloperModePassword(passwordInput)) {
-      setPasswordInput('');
-      return;
-    }
-    setDeveloperModeSessionValid(true);
-    setAuthed(true);
-    setPasswordInput('');
-  }, [passwordInput]);
+  }, [leaveIfExpired, runningId]);
 
   const sections: DevSection[] = useMemo(() => {
     const subscribeFlows: Array<{ id: SubscribeFlowId; label: string; ctx?: Record<string, string> }> = [
@@ -322,46 +383,19 @@ const DeveloperMode: React.FC = () => {
             run: () => {
               clearDeveloperModeSession();
               setAuthed(false);
-              setPasswordInput('');
+              promptPassword();
             },
           },
         ],
       },
     ];
-  }, [meta]);
+  }, [meta, promptPassword]);
 
-  if (!isDeveloperModeUnlocked()) {
+  if (!isDeveloperModeUnlocked() || !authed) {
     return (
       <PageContainer safeBottom>
-        <View className="flex-1 flex items-center justify-center px-[64rpx]">
-          <Text className="text-[28rpx] text-muted-foreground text-center">无权访问</Text>
-        </View>
-      </PageContainer>
-    );
-  }
-
-  if (!authed) {
-    return (
-      <PageContainer safeBottom>
-        <View className="flex-1 flex flex-col items-center justify-center px-[64rpx]">
-          <Text className="text-[32rpx] font-semibold text-foreground mb-[48rpx]">开发者模式</Text>
-          <View className="w-full bg-card rounded-[28rpx] px-[32rpx] py-[24rpx] border border-border mb-[32rpx]">
-            <Input
-              className="w-full text-[32rpx] text-foreground text-center"
-              type="number"
-              password
-              placeholder="请输入密码"
-              value={passwordInput}
-              onInput={(e) => setPasswordInput(e.detail.value)}
-              onConfirm={handlePasswordSubmit}
-            />
-          </View>
-          <View
-            className="w-full h-[88rpx] rounded-full bg-primary flex items-center justify-center active:opacity-90"
-            onClick={handlePasswordSubmit}
-          >
-            <Text className="text-[30rpx] font-semibold text-white">进入</Text>
-          </View>
+        <View className="flex min-h-screen items-center justify-center px-[64rpx]">
+          <Text className="text-center text-[28rpx] text-muted-foreground">验证中…</Text>
         </View>
       </PageContainer>
     );
@@ -369,41 +403,39 @@ const DeveloperMode: React.FC = () => {
 
   return (
     <PageContainer safeBottom>
-      <ScrollView scrollY className="h-full">
-        <View className="px-[32rpx] pt-[24rpx] pb-[48rpx]">
-          <Text className="text-[24rpx] text-muted-foreground block mb-[32rpx]">
-            快捷触发联调链路；订阅弹框需 App 内 SubscribeAuthHost 渲染。
-          </Text>
+      <View className="px-[32rpx] pt-[24rpx] pb-[48rpx]">
+        <Text className="mb-[32rpx] block text-[24rpx] text-muted-foreground">
+          快捷触发联调链路；订阅弹框需 App 内 SubscribeAuthHost 渲染。
+        </Text>
 
-          {sections.map((section) => (
-            <View key={section.title} className="mb-[32rpx]">
-              <Text className="text-[26rpx] font-semibold text-muted-foreground mb-[16rpx] block px-[8rpx]">
-                {section.title}
-              </Text>
-              <View className="bg-card rounded-[28rpx] shadow-soft overflow-hidden border border-border">
-                {section.actions.map((action, index) => (
-                  <View
-                    key={action.id}
-                    className={cn(
-                      'px-[28rpx] py-[24rpx] active:opacity-70 press-bg',
-                      index !== section.actions.length - 1 && 'border-b border-border',
-                      runningId === action.id && 'opacity-50',
-                    )}
-                    onClick={() => void runAction(action)}
-                  >
-                    <Text className="text-[28rpx] text-foreground block">{action.label}</Text>
-                    {action.hint ? (
-                      <Text className="text-[22rpx] text-muted-foreground mt-[8rpx] block break-all">
-                        {action.hint}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
+        {sections.map((section) => (
+          <View key={section.title} className="mb-[32rpx]">
+            <Text className="mb-[16rpx] block px-[8rpx] text-[26rpx] font-semibold text-muted-foreground">
+              {section.title}
+            </Text>
+            <View className="overflow-hidden rounded-[28rpx] border border-border bg-card shadow-soft">
+              {section.actions.map((action, index) => (
+                <View
+                  key={action.id}
+                  className={cn(
+                    'px-[28rpx] py-[24rpx] active:opacity-70 press-bg',
+                    index !== section.actions.length - 1 && 'border-b border-border',
+                    runningId === action.id && 'opacity-50',
+                  )}
+                  onClick={() => void runAction(action)}
+                >
+                  <Text className="block text-[28rpx] text-foreground">{action.label}</Text>
+                  {action.hint ? (
+                    <Text className="mt-[8rpx] block break-all text-[22rpx] text-muted-foreground">
+                      {action.hint}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      </ScrollView>
+          </View>
+        ))}
+      </View>
     </PageContainer>
   );
 };

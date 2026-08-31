@@ -27,7 +27,7 @@ const PUBLIC_PAGES = [
   '/package-settings/pages/about/index',
   '/package-settings/pages/feedback/index',
   '/package-student/pages/parent-bind/index',
-  /** 课表分享落地：未登录家长也可填信息建线索 */
+  /** 课表分享落地：页内微信登录门禁，登录后查看内容 */
   '/package-lead/pages/invite-landing/index',
 ];
 const LOGIN_PAGE = '/package-auth/pages/login/index';
@@ -66,6 +66,7 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-teacher/pages/teacher-list/index': MANAGER_ROLES,
   'package-teacher/pages/teacher-form/index': MANAGER_ROLES,
   'package-teacher/pages/teacher-detail/index': MANAGER_ROLES,
+  'package-teacher/pages/staff-invite/index': MANAGER_ROLES,
   'package-teacher/pages/attendance/index': STAFF_ROLES,
   // —— 学员管理（机构端 STAFF；teacher/assistant 默认 own 范围由数据层过滤） ——
   'package-student/pages/students/index': STAFF_ROLES,
@@ -75,6 +76,8 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-student/pages/member-card-issue/index': STAFF_ROLES,
   'package-student/pages/member-card-edit/index': STAFF_ROLES,
   'package-student/pages/follow-record-form/index': STAFF_ROLES,
+  'package-student/pages/attendance-anomaly/index': STAFF_ROLES,
+  'package-student/pages/renewal-reminder/index': STAFF_ROLES,
   // —— 课程 / 班级（教学角色可进；配置类仅管理角色） ——
   'package-course/pages/course-management/index': MANAGER_ROLES,
   'package-course/pages/subject-management/index': MANAGER_ROLES,
@@ -84,6 +87,7 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-course/pages/card-member-list/index': STAFF_ROLES,
   'package-course/pages/category-form/index': MANAGER_ROLES,
   'package-course/pages/course-form/index': MANAGER_ROLES,
+  'package-course/pages/booking-rule/index': MANAGER_ROLES,
   // —— 经营数据看板（仅 admin/principal；家长与教学角色不可见） ——
   'pages/statistics/index': MANAGER_ROLES,
   'package-statistics/pages/finance-data/index': MANAGER_ROLES,
@@ -95,11 +99,18 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   // —— 机构配置类系统设置（运行前角色校验） ——
   'package-settings/pages/permission-settings/index': ['admin'],
   'package-settings/pages/threshold-config/index': ['admin'],
-  'package-settings/pages/theme-settings/index': MANAGER_ROLES,
+  // 主题颜色：全员个人偏好（本地缓存），不限制角色
   'package-settings/pages/todo-settings/index': MANAGER_ROLES,
   // —— 门店入驻（仅 admin/principal） ——
   'package-settings/pages/store-entry/index': MANAGER_ROLES,
   'package-settings/pages/store-entry/pending/index': MANAGER_ROLES,
+  // —— 机构会员权益（仅 admin/principal） ——
+  'package-settings/pages/membership/index': MANAGER_ROLES,
+  // —— 家长专属页 ——
+  'package-student/pages/children/index': ['parent'],
+  'package-student/pages/child-detail/index': ['parent'],
+  'package-student/pages/parent-bind/index': ['parent'],
+  'package-course/pages/my-course/index': ['parent'],
 };
 
 /**
@@ -124,6 +135,8 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-student/pages/member-card-issue/index': 'students',
   'package-student/pages/member-card-edit/index': 'students',
   'package-student/pages/follow-record-form/index': 'students',
+  'package-student/pages/attendance-anomaly/index': 'students',
+  'package-student/pages/renewal-reminder/index': 'students',
   'package-course/pages/course-management/index': 'classes',
   'package-course/pages/subject-management/index': 'classes',
   'package-course/pages/subject-form/index': 'classes',
@@ -174,10 +187,18 @@ export function requireRole(allowed: UserRole[] | undefined, profile?: Profile |
 
 /** 越权时跳回首页并提示（与登录跳转同理加单次守卫，避免抖动） */
 let isRedirectingForbidden = false;
-function redirectToForbidden() {
+function redirectToForbidden(reason?: 'manager' | 'staff' | 'parent' | 'generic') {
   if (isRedirectingForbidden) return;
   isRedirectingForbidden = true;
-  Taro.showToast({ title: '无权限访问该页面', icon: 'none' });
+  const title =
+    reason === 'manager'
+      ? '该功能需校长处理'
+      : reason === 'parent'
+        ? '该页面仅家长可用'
+        : reason === 'staff'
+          ? '该功能未对当前身份开放'
+          : '无权限访问该页面';
+  Taro.showToast({ title, icon: 'none' });
   Taro.switchTab({ url: '/pages/home/index' });
   setTimeout(() => {
     isRedirectingForbidden = false;
@@ -296,14 +317,20 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     if (profile) {
       const required = PAGE_ROLE_REQUIREMENTS[normPath];
       if (required && !requireRole(required, profile)) {
-        redirectToForbidden();
+        const reason =
+          required.every((r) => r === 'admin' || r === 'principal')
+            ? 'manager'
+            : required.every((r) => r === 'parent')
+              ? 'parent'
+              : 'staff';
+        redirectToForbidden(reason);
         setAuthorized(false);
         return;
       }
       // 授权开关：角色门槛通过后，再按 admin 对当前角色的模块授权动态放行
       const pageModule = PAGE_MODULE_MAP[normPath];
       if (pageModule && !hasModuleAccess(profile, pageModule)) {
-        redirectToForbidden();
+        redirectToForbidden('staff');
         setAuthorized(false);
         return;
       }

@@ -191,7 +191,9 @@ const CourseManagementPage: React.FC = () => {
     }
   }, [deleteTarget, remove]);
 
-  if (loading && templates.length === 0) {
+  // 班课 tab 以班级列表为准，不因模板为空而整页 loading
+  const isClassTabLoading = activeCategoryItem?.mode === 'class';
+  if (loading && templates.length === 0 && !(isClassTabLoading && activeClasses.length > 0)) {
     return (
       <PageContainer safeBottom>
         <View className="min-h-screen flex items-center justify-center">
@@ -278,8 +280,9 @@ const CourseManagementPage: React.FC = () => {
       <View className="px-[32rpx] pb-[calc(220rpx+env(safe-area-inset-bottom))]">
         {(() => {
           const isClassTab = activeCategoryItem?.mode === 'class';
+          // 班课 tab 只展示班级实例；团课/私教仍展示课程模板（避免未排课模板点进「新增/编辑课程」）
           const showClasses = isClassTab && activeClasses.length > 0;
-          const showTemplates = templates.length > 0;
+          const showTemplates = !isClassTab && templates.length > 0;
           if (!showClasses && !showTemplates) {
             if (error && templates.length === 0) {
               return (

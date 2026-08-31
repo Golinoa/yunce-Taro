@@ -1,7 +1,8 @@
-import { View, Text, Picker } from '@tarojs/components';
+import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -66,6 +67,7 @@ const RecordsPage: React.FC = () => {
   const [quickRange, setQuickRange] = useState<QuickRange>('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [datePickerField, setDatePickerField] = useState<'start' | 'end' | null>(null);
   const [filterStudentId, setFilterStudentId] = useState('all');
 
   const dateRange = useMemo<DateRange>(() => {
@@ -115,7 +117,10 @@ const RecordsPage: React.FC = () => {
         if (routeStudentId) {
           allRecords = await lessonRecordService.getByStudent(routeStudentId);
         } else if (relatedStudents.length > 0) {
-          allRecords = await lessonRecordService.getByStudent(relatedStudents[0].id);
+          const recordGroups = await Promise.all(
+            relatedStudents.map((student) => lessonRecordService.getByStudent(student.id)),
+          );
+          allRecords = recordGroups.flat();
         }
       }
 
@@ -148,11 +153,11 @@ const RecordsPage: React.FC = () => {
     result = result.filter(
       (r) => r.lesson_date >= dateRange.start && r.lesson_date <= dateRange.end,
     );
-    if (isTeacher && filterStudentId !== 'all') {
+    if (filterStudentId !== 'all') {
       result = result.filter((r) => r.student_id === filterStudentId);
     }
     return result;
-  }, [records, dateRange, isTeacher, filterStudentId]);
+  }, [records, dateRange, filterStudentId]);
 
   const consumptionSections = useMemo(
     () => buildLessonConsumptionSections(filteredRecords),
@@ -224,48 +229,32 @@ const RecordsPage: React.FC = () => {
                 </Text>
               </View>
             ))}
-            <Picker
-              mode="date"
-              value={customStart || ''}
-              onChange={(e) => {
-                setCustomStart(e.detail.value);
-                setQuickRange('custom' as QuickRange);
-              }}
+            <View
+              className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === 'custom' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+              onClick={() => setDatePickerField('start')}
             >
-              <View
-                className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === 'custom' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+              <Text
+                className={`text-sm font-medium ${quickRange === 'custom' ? 'text-white' : 'text-white/80'}`}
               >
-                <Text
-                  className={`text-sm font-medium ${quickRange === 'custom' ? 'text-white' : 'text-white/80'}`}
-                >
-                  {customStart || '开始'}
-                </Text>
-              </View>
-            </Picker>
+                {customStart || '开始'}
+              </Text>
+            </View>
             <Text className="text-sm text-white/60 px-[4rpx]">~</Text>
-            <Picker
-              mode="date"
-              value={customEnd || ''}
-              onChange={(e) => {
-                setCustomEnd(e.detail.value);
-                setQuickRange('custom' as QuickRange);
-              }}
+            <View
+              className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === 'custom' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+              onClick={() => setDatePickerField('end')}
             >
-              <View
-                className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === 'custom' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+              <Text
+                className={`text-sm font-medium ${quickRange === 'custom' ? 'text-white' : 'text-white/80'}`}
               >
-                <Text
-                  className={`text-sm font-medium ${quickRange === 'custom' ? 'text-white' : 'text-white/80'}`}
-                >
-                  {customEnd || '结束'}
-                </Text>
-              </View>
-            </Picker>
+                {customEnd || '结束'}
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* 教师视图：学生筛选 */}
-        {isTeacher && students.length > 0 && (
+        {/* 多孩筛选（教师 / 家长） */}
+        {students.length > 1 && (
           <View className="flex gap-[12rpx] px-4 pb-[20rpx] overflow-x-auto flex-nowrap">
             <View
               className={`py-[10rpx] px-3 rounded-round border flex-shrink-0 transition-all ${filterStudentId === 'all' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
@@ -325,6 +314,23 @@ const RecordsPage: React.FC = () => {
           </View>
         )}
       </View>
+
+      <DatePickerSheet
+        visible={Boolean(datePickerField)}
+        title={datePickerField === 'end' ? '选择结束日期' : '选择开始日期'}
+        value={
+          datePickerField === 'end'
+            ? customEnd || new Date().toISOString().split('T')[0]
+            : customStart || new Date().toISOString().split('T')[0]
+        }
+        onClose={() => setDatePickerField(null)}
+        onConfirm={(date) => {
+          if (datePickerField === 'end') setCustomEnd(date);
+          else setCustomStart(date);
+          setQuickRange('custom');
+          setDatePickerField(null);
+        }}
+      />
     </PageContainer>
   );
 };

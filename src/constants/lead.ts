@@ -8,6 +8,8 @@
 import type {
   FollowUpAction,
   IntentLevel,
+  LeadBooking,
+  LeadBookingStatus,
   LeadFilterTab,
   LeadSourceType,
   LeadStatus,
@@ -58,8 +60,48 @@ export const INTENT_LEVEL_META: Record<IntentLevel, { label: string; badgeClassN
   none: { label: '无意向', badgeClassName: 'bg-[#fff0f1] text-[#ef4444]' },
 };
 
-/** 试听模式 → 显示文本 + 样式 */
+/** 试听模式 → 显示文本 + 样式（与试听记录卡片口径对齐） */
 export const TRIAL_MODE_META: Record<TrialMode, { label: string; badgeClassName: string }> = {
-  group: { label: '团课试听', badgeClassName: 'bg-primary/10 text-primary' },
-  private: { label: '私教试听', badgeClassName: 'bg-accent/10 text-accent' },
+  group: { label: '跟班试听', badgeClassName: 'bg-muted text-muted-foreground' },
+  private: { label: '一对一', badgeClassName: 'bg-muted text-muted-foreground' },
 };
+
+/**
+ * 试听预约状态标签（线索详情 / 试听记录共用）
+ * 实色底 + 边框，避免小程序主题 token 导致文字不可见
+ */
+export const LEAD_BOOKING_STATUS_META: Record<
+  LeadBookingStatus,
+  { label: string; className: string }
+> = {
+  pending: {
+    label: '待确认',
+    className: 'bg-[#f3f4f6] text-[#6b7280] border border-[#d1d5db]',
+  },
+  confirmed: {
+    label: '已预约',
+    className: 'bg-[#eff6ff] text-[#2563eb] border border-[#93c5fd]',
+  },
+  completed: {
+    label: '已完成',
+    className: 'bg-[#ecfdf5] text-[#059669] border border-[#6ee7b7]',
+  },
+  no_show: {
+    label: '未到店',
+    className: 'bg-[#fef2f2] text-[#dc2626] border border-[#fca5a5]',
+  },
+  cancelled: {
+    label: '已取消',
+    className: 'bg-[#f3f4f6] text-[#6b7280] border border-[#d1d5db]',
+  },
+};
+
+/** 试听模式标签 pill 样式（线索详情 / 试听记录共用） */
+export const LEAD_BOOKING_MODE_BADGE_CLASS = 'rounded-full bg-muted px-[12rpx] py-[4rpx]';
+
+/** 仅两种形态：一对一 / 跟班试听 */
+export function getLeadBookingModeLabel(
+  item: Pick<LeadBooking, 'trial_mode'>,
+): string {
+  return item.trial_mode === 'private' ? '一对一' : '跟班试听';
+}

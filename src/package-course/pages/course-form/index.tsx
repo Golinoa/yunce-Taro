@@ -18,6 +18,7 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
+import Switch from '@/components/Switch';
 import {
   AGE_GROUP_OPTIONS,
   CHECKIN_ROLE_OPTIONS,
@@ -34,7 +35,7 @@ import { useCourseTemplateStore } from '@/stores/course-template';
 import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
 import type { Subject } from '@/types/campus';
-import { CLASS_LEVEL_LABELS } from '@/types/class';
+import { CLASS_LEVEL_LABELS, CLASS_LEVEL_BADGE_WRAP, CLASS_LEVEL_BADGE_TEXT } from '@/types/class';
 import type { Class, ClassLevel } from '@/types/class';
 import type { CourseCategoryConfig } from '@/types/course-category';
 import type {
@@ -75,6 +76,7 @@ interface FormErrors {
   subjectId?: string;
   duration?: string;
   capacity?: string;
+  maxLessons?: string;
   experiencePrice?: string;
   price?: string;
 }
@@ -86,6 +88,15 @@ function parseDurationMinutes(start?: string, end?: string): string {
   const [eh, em] = end.split(':').map((v) => Number(v) || 0);
   const minutes = eh * 60 + em - (sh * 60 + sm);
   return minutes > 0 ? String(minutes) : '';
+}
+
+/** 课程时长 → 默认时段（仅用于落库 start/end，表单以分钟为准） */
+function durationToTimeRange(minutes: number): { start: string; end: string } {
+  const startMinutes = 9 * 60;
+  const endMinutes = startMinutes + Math.max(1, minutes);
+  const fmt = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return { start: fmt(startMinutes), end: fmt(endMinutes) };
 }
 
 type PickerType =
@@ -173,6 +184,9 @@ const CourseFormPage: React.FC = () => {
   const [duration, setDuration] = useState('60');
   // 容纳人数：默认留空，表示不限制人数；用户填写后才按数值约束。
   const [capacity, setCapacity] = useState('');
+  /** 结束班级：关=不限制课时；开=须填上限课时，并与排课时间限制联动 */
+  const [endClassEnabled, setEndClassEnabled] = useState(false);
+  const [maxLessons, setMaxLessons] = useState('');
 
   // 高级设置展开
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -311,8 +325,12 @@ const CourseFormPage: React.FC = () => {
         ? String(cls.pricePerLesson)
         : '',
     );
-    setDuration(parseDurationMinutes(cls.start_time, cls.end_time));
-    setCapacity('');
+    const durationFromTime = parseDurationMinutes(cls.start_time, cls.end_time);
+    setDuration(durationFromTime || '60');
+    setCapacity(cls.capacity && cls.capacity > 0 ? String(cls.capacity) : '');
+    const limited = cls.type === 'limited';
+    setEndClassEnabled(limited);
+    setMaxLessons(limited && cls.total_lessons ? String(cls.total_lessons) : '');
     setAgeGroup('mix');
     setCustomAgeGroups([]);
     setLevel(cls.level || 'all');
@@ -830,6 +848,12 @@ const CourseFormPage: React.FC = () => {
     if (capacity && (Number.isNaN(capacityNum) || capacityNum <= 0)) {
       nextErrors.capacity = '请输入正确的容纳人数';
     }
+    if (isClassMode && endClassEnabled) {
+      const maxNum = Number(maxLessons);
+      if (!maxLessons || Number.isNaN(maxNum) || maxNum < 1) {
+        nextErrors.maxLessons = '请输入上限课时';
+      }
+    }
     // 非班课模式的价格字段校验（必填且需为有效数字）
     if (!isClassMode) {
       if (!experiencePrice) {
@@ -845,7 +869,7 @@ const CourseFormPage: React.FC = () => {
     }
     setErrors(nextErrors);
     return nextErrors;
-  }, [name, categoryId, subjectId, duration, capacity, isClassMode, experiencePrice, price]);
+  }, [name, categoryId, subjectId, duration, capacity, endClassEnabled, maxLessons, isClassMode, experiencePrice, price]);
 
   const handleSubmit = useCallback(async () => {
     const errorsResult = validate();
@@ -931,14 +955,17 @@ const CourseFormPage: React.FC = () => {
     };
 
     try {
-      if (isClassEdit) {
-        // 班级模式（用户口径 2026-08-23）：更新班级基础信息 + 学员增删同步
-        const currentStudents = await classService.getStudents(courseId);
-        const currentIds = currentStudents.map((s) => s.id);
-        const toAdd = studentIds.filter((id) => !currentIds.includes(id));
-        const toRemove = currentIds.filter((id) => !studentIds.includes(id));
+      if (isClassEdit || (!isEdit && isClassMode)) {
         const classColor = (FORM_HEX_TO_CLASS_COLOR[color] || 'primary') as Class['color'];
-        await classService.update(courseId, {
+        const durationNum = Number(duration) || 60;
+        const timeRange = durationToTimeRange(durationNum);
+        const classPayload: Partial<Class> & {
+          capacity?: number;
+          type: Class['type'];
+          total_lessons?: number;
+          start_time?: string;
+          end_time?: string;
+        } = {
           name: name.trim(),
           color: classColor,
           teacher_id: teacherId,
@@ -950,32 +977,52 @@ const CourseFormPage: React.FC = () => {
           min_open_count: minOpenCount ? Number(minOpenCount) : undefined,
           hours_per_lesson: hoursPerLesson ? Number(hoursPerLesson) : 1,
           pricePerLesson: feePerLesson ? Number(feePerLesson) : 0,
-        });
-        for (const sid of toAdd) await classService.addStudents(courseId, [sid]);
-        for (const sid of toRemove) await classService.removeStudent(courseId, sid);
-        Taro.showToast({ title: '保存成功', icon: 'success' });
-        // E02A：操作人入班成功后弹框订阅班级变动
-        if (toAdd.length > 0) {
-          try {
-            Taro.hideToast();
-            await subscribeMessageService.runFlow('E02A', {
-              classId: courseId,
-              className: name.trim(),
-              role: profile?.currentContext?.role,
-              navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&type=class`,
-            });
-          } catch (error) {
-            logError('subscribe E02A after class assign', error);
+          type: endClassEnabled ? 'limited' : 'unlimited',
+          total_lessons: endClassEnabled ? Number(maxLessons) : undefined,
+          capacity: capacity ? Number(capacity) : undefined,
+          start_time: timeRange.start,
+          end_time: timeRange.end,
+          student_count: studentIds.length,
+          status: 'active',
+          campus_id: profile?.currentContext?.campusId || undefined,
+        };
+
+        if (isClassEdit) {
+          const currentStudents = await classService.getStudents(courseId);
+          const currentIds = currentStudents.map((s) => s.id);
+          const toAdd = studentIds.filter((id) => !currentIds.includes(id));
+          const toRemove = currentIds.filter((id) => !studentIds.includes(id));
+          // 编辑不写入 used_lessons，避免把已上课时清零
+          await classService.update(courseId, classPayload);
+          for (const sid of toAdd) await classService.addStudents(courseId, [sid]);
+          for (const sid of toRemove) await classService.removeStudent(courseId, sid);
+          Taro.showToast({ title: '保存成功', icon: 'success' });
+          if (toAdd.length > 0) {
+            try {
+              Taro.hideToast();
+              await subscribeMessageService.runFlow('E02A', {
+                classId: courseId,
+                className: name.trim(),
+                role: profile?.currentContext?.role,
+                navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&type=class`,
+              });
+            } catch (error) {
+              logError('subscribe E02A after class assign', error);
+            }
           }
-        }
-      } else if (isEdit) {
-        await update(courseId, formData);
-        Taro.showToast({ title: '保存成功', icon: 'success' });
-      } else {
-        await create(formData);
-        Taro.showToast({ title: '新增成功', icon: 'success' });
-        // E06：新建班级成功后弹框
-        if (isClassMode) {
+        } else {
+          const leadTeacherId = teacherId || profile?.id || '';
+          const created = await classService.create({
+            ...(classPayload as Omit<Class, 'id' | 'created_at' | 'updated_at'>),
+            teacher_id: leadTeacherId,
+            teachers: [leadTeacherId, assistantId].filter(Boolean),
+            used_lessons: 0,
+            student_count: studentIds.length,
+          });
+          if (created?.id && studentIds.length > 0) {
+            await classService.addStudents(created.id, studentIds);
+          }
+          Taro.showToast({ title: '新增成功', icon: 'success' });
           try {
             Taro.hideToast();
             await subscribeMessageService.runFlow('E06', {
@@ -986,6 +1033,12 @@ const CourseFormPage: React.FC = () => {
             logError('subscribe E06 after class create', error);
           }
         }
+      } else if (isEdit) {
+        await update(courseId, formData);
+        Taro.showToast({ title: '保存成功', icon: 'success' });
+      } else {
+        await create(formData);
+        Taro.showToast({ title: '新增成功', icon: 'success' });
       }
       // 保存成功后关闭离开确认，避免返回时再弹「未保存」误扰
       setLeaveGuard(false);
@@ -1044,8 +1097,12 @@ const CourseFormPage: React.FC = () => {
     feePerLesson,
     isClassMode,
     isClassEdit,
+    endClassEnabled,
+    maxLessons,
     formStorageScope,
     profile?.currentContext?.role,
+    profile?.currentContext?.campusId,
+    profile?.id,
   ]);
 
   const handleDelete = useCallback(async () => {
@@ -1163,6 +1220,33 @@ const CourseFormPage: React.FC = () => {
               inputType="number"
               error={errors.capacity}
             />
+
+            {isClassMode ? (
+              <>
+                <FormRow label="结束班级" border={false}>
+                  <Switch
+                    checked={endClassEnabled}
+                    onChange={(on) => {
+                      setEndClassEnabled(on);
+                      if (!on) setMaxLessons('');
+                    }}
+                  />
+                </FormRow>
+                {endClassEnabled ? (
+                  <FormRow
+                    label="上限课时"
+                    required
+                    editable
+                    placeholder="上完这么多课即结束"
+                    value={maxLessons}
+                    onInput={(e) => setMaxLessons(e.detail.value)}
+                    inputType="number"
+                    error={errors.maxLessons}
+                    helperText="与排课「限日期/按次数」同时生效，先到先结束"
+                  />
+                ) : null}
+              </>
+            ) : null}
           </Card>
 
           {/* 高级设置展开按钮 - 保留现状 */}
@@ -1263,8 +1347,8 @@ const CourseFormPage: React.FC = () => {
                     </Text>
                   </FormRow>
                   <FormRow label="课程难度" onClick={() => openPicker('level')} border={false}>
-                    <View className="px-[20rpx] py-[6rpx] rounded-[8rpx] bg-primary/10">
-                      <Text className="text-[24rpx] font-medium text-primary">
+                    <View className={CLASS_LEVEL_BADGE_WRAP}>
+                      <Text className={CLASS_LEVEL_BADGE_TEXT}>
                         {level.startsWith('custom:')
                           ? level.slice('custom:'.length)
                           : CLASS_LEVEL_LABELS[level as keyof typeof CLASS_LEVEL_LABELS]}

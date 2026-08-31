@@ -468,6 +468,8 @@ export interface TeacherUIModel {
   salaryTemplateId?: string;
   /** 按课程分类的课时费汇总（班课/团课/私教） */
   categoryLessonFees?: CategoryLessonFeeItem[];
+  /** 本月消课次数（详情接口） */
+  lessonCount?: number;
 }
 
 /** 筛选条件 */

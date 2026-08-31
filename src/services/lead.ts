@@ -29,33 +29,70 @@ import { isUseMock } from '@/utils/build-env';
 import { loadLeadMock } from '@/utils/mock-loaders';
 import { del, get, patch, post, put } from '@/utils/request';
 import {
+  API_PAGE_SIZE_BATCH,
+  asPaginatedResponse,
+  fetchAllPages,
   type PaginatedResponse,
-  unwrapPaginatedList,
 } from '@/utils/pagination';
 
-async function fetchLeadList(params: Record<string, unknown>) {
+async function fetchLeadListPage(
+  params: Record<string, unknown>,
+): Promise<PaginatedResponse<Lead>> {
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.pageSize) || API_PAGE_SIZE_BATCH;
   const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads', params);
-  return unwrapPaginatedList(data).map(mapBackendLead);
+  const normalized = asPaginatedResponse(data, page, pageSize);
+  return {
+    list: normalized.list.map(mapBackendLead),
+    pagination: normalized.pagination,
+  };
 }
 
-async function fetchLeadBookings(params: Record<string, unknown>) {
+async function fetchLeadBookingsPage(
+  params: Record<string, unknown>,
+): Promise<PaginatedResponse<LeadBooking>> {
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.pageSize) || API_PAGE_SIZE_BATCH;
   const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads/bookings', params);
-  return unwrapPaginatedList(data).map(mapBackendLeadBooking);
+  const normalized = asPaginatedResponse(data, page, pageSize);
+  return {
+    list: normalized.list.map(mapBackendLeadBooking),
+    pagination: normalized.pagination,
+  };
 }
 
-async function fetchLeadFollowUps(params: Record<string, unknown>) {
+async function fetchLeadFollowUpsPage(
+  params: Record<string, unknown>,
+): Promise<PaginatedResponse<LeadFollowUp>> {
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.pageSize) || API_PAGE_SIZE_BATCH;
   const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads/follow-ups', params);
-  return unwrapPaginatedList(data).map(mapBackendLeadFollowUp);
+  const normalized = asPaginatedResponse(data, page, pageSize);
+  return {
+    list: normalized.list.map(mapBackendLeadFollowUp),
+    pagination: normalized.pagination,
+  };
 }
 
-async function fetchTrialSlotList(params: Record<string, unknown>) {
+async function fetchTrialSlotListPage(
+  params: Record<string, unknown>,
+): Promise<PaginatedResponse<TrialSlotConfig>> {
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.pageSize) || API_PAGE_SIZE_BATCH;
   const data = await get<PaginatedResponse<Record<string, unknown>>>('/leads/trial-slots', params);
-  return unwrapPaginatedList(data).map(mapBackendTrialSlotConfig);
+  const normalized = asPaginatedResponse(data, page, pageSize);
+  return {
+    list: normalized.list.map(mapBackendTrialSlotConfig),
+    pagination: normalized.pagination,
+  };
 }
 
 export async function getLeadsByTeacher(teacherId: string): Promise<Lead[]> {
   if (isUseMock()) { const { mockGetLeadsByTeacher } = await loadLeadMock(); return mockGetLeadsByTeacher(teacherId); }
-  return fetchLeadList({ teacherId, page: 1, pageSize: 100 });
+  return fetchAllPages(
+    (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize }),
+    API_PAGE_SIZE_BATCH,
+  );
 }
 
 export async function getLeadById(leadId: string): Promise<Lead | null> {
@@ -70,7 +107,10 @@ export async function getLeadCards(
   filterTab?: LeadFilterTab,
 ): Promise<LeadCardModel[]> {
   if (isUseMock()) { const { mockGetLeadCardsByTeacher } = await loadLeadMock(); return mockGetLeadCardsByTeacher(teacherId, filterTab); }
-  const leads = await fetchLeadList({ teacherId, page: 1, pageSize: 100, filterTab });
+  const leads = await fetchAllPages(
+    (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize, filterTab }),
+    API_PAGE_SIZE_BATCH,
+  );
   const cards = leads.map((lead) => ({
     id: lead.id,
     trial_student_id: lead.trial_student_id,
@@ -129,6 +169,7 @@ export async function createLeadFromInvite(params: {
   campusId: string;
   sourceType: 'share_link' | 'qr';
   sourceCourseId?: string;
+  visitorKey?: string;
 }): Promise<Lead> {
   if (isUseMock()) { const { mockCreateLeadFromInvite } = await loadLeadMock(); return mockCreateLeadFromInvite(params); }
   const created = await post<Record<string, unknown>>('/leads', {
@@ -138,11 +179,130 @@ export async function createLeadFromInvite(params: {
     childAge: params.childAge,
     parentName: params.parentName,
     parentPhone: params.parentPhone,
+    parentUserId: params.parentUserId,
+    inviteTeacherId: params.teacherId,
+    visitorKey: params.visitorKey,
     campusId: params.campusId,
     sourceCourseId: params.sourceCourseId,
     sourceType: params.sourceType,
   });
   return mapBackendLead(created);
+}
+
+/** 家长邀约落地页一键提交（公开）：建线索 + 可选本场预约 */
+export async function submitInviteLanding(params: {
+  teacherId: string;
+  campusId: string;
+  sourceType?: 'share_link' | 'qr';
+  childName: string;
+  childNickname?: string;
+  childGender?: 'male' | 'female';
+  childAge?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentUserId?: string;
+  visitorKey?: string;
+  sourceCourseId?: string;
+  type?: 'class_lesson' | 'group_slot';
+  classId?: string;
+  className?: string;
+  scheduleId?: string;
+  slotId?: string;
+  date?: string;
+  start?: string;
+  end?: string;
+  /** 过期场次应传 false，仅留线索意向 */
+  bookLesson?: boolean;
+}): Promise<{
+  success: boolean;
+  message: string;
+  lead_id: string;
+  booking_id: string | null;
+  status: string;
+  booking_status: string | null;
+  lesson_expired: boolean;
+  booked: boolean;
+}> {
+  if (isUseMock()) {
+    const { mockSubmitInviteLanding } = await loadLeadMock();
+    return mockSubmitInviteLanding(params);
+  }
+  return post(
+    '/leads/landing/submit',
+    {
+      teacherId: params.teacherId,
+      campusId: params.campusId,
+      sourceType: params.sourceType || 'share_link',
+      childName: params.childName,
+      childNickname: params.childNickname,
+      childGender: params.childGender,
+      childAge: params.childAge,
+      parentName: params.parentName,
+      parentPhone: params.parentPhone,
+      parentUserId: params.parentUserId,
+      visitorKey: params.visitorKey,
+      sourceCourseId: params.sourceCourseId,
+      type: params.type,
+      classId: params.classId,
+      className: params.className,
+      scheduleId: params.scheduleId,
+      slotId: params.slotId,
+      date: params.date,
+      start: params.start,
+      end: params.end,
+      bookLesson: params.bookLesson,
+    },
+    { skipAuth: true },
+  );
+}
+
+/** 邀约落地页访问埋点（公开接口，服务端记 IP） */
+export async function trackLandingVisit(params: {
+  teacherId: string;
+  campusId: string;
+  sourceType?: 'share_link' | 'qr' | 'manual';
+  parentUserId?: string;
+  visitorKey?: string;
+  leadId?: string;
+  inviteCode?: string;
+  lessonExpired?: boolean;
+  lessonKey?: string;
+  className?: string;
+  date?: string;
+  start?: string;
+  end?: string;
+}): Promise<{
+  visit_id?: string;
+  lead_id?: string | null;
+  visit_count: number;
+  first_ip?: string | null;
+  last_visit_at?: string;
+  attributed: boolean;
+  expired_watch?: {
+    counted: boolean;
+    view_count: number;
+    already_notified: boolean;
+  };
+}> {
+  if (isUseMock()) {
+    const { mockTrackLandingVisit } = await loadLeadMock();
+    return mockTrackLandingVisit(params);
+  }
+  return post('/leads/landing/visit', {
+    teacherId: params.teacherId,
+    campusId: params.campusId,
+    sourceType: params.sourceType,
+    parentUserId: params.parentUserId,
+    visitorKey: params.visitorKey,
+    leadId: params.leadId,
+    inviteCode: params.inviteCode,
+    lessonExpired: params.lessonExpired,
+    lessonKey: params.lessonKey,
+    className: params.className,
+    date: params.date,
+    start: params.start,
+    end: params.end,
+  }, { skipAuth: true });
 }
 
 export async function updateLeadStatus(
@@ -184,15 +344,15 @@ export async function reassignLead(
   reason: string,
   opts?: { forceReassign?: boolean; operatorId?: string },
 ): Promise<Lead | null> {
-  if (isUseMock()) { const { mockReassignLead } = await loadLeadMock(); return mockReassignLead(leadId, newOwnerId, reason, opts); }
-  return updateLead(
-    leadId,
-    {
-      owner_teacher_id: newOwnerId,
-      reassign_reason: reason,
-    },
-    opts,
-  );
+  if (isUseMock()) {
+    const { mockReassignLead } = await loadLeadMock();
+    return mockReassignLead(leadId, newOwnerId, reason, opts);
+  }
+  await post<Record<string, unknown>>(`/leads/${leadId}/reassign`, {
+    ownerTeacherId: newOwnerId,
+    reason,
+  });
+  return getLeadById(leadId);
 }
 
 export async function deleteLead(leadId: string): Promise<boolean> {
@@ -285,7 +445,10 @@ export async function bookTrialByClass(params: {
 
 export async function getLeadBookings(leadId: string): Promise<LeadBooking[]> {
   if (isUseMock()) { const { mockGetLeadBookings } = await loadLeadMock(); return mockGetLeadBookings(leadId); }
-  return fetchLeadBookings({ leadId, page: 1, pageSize: 100 });
+  return fetchAllPages(
+    (page, pageSize) => fetchLeadBookingsPage({ leadId, page, pageSize }),
+    API_PAGE_SIZE_BATCH,
+  );
 }
 
 export async function getLeadBookingsByTeacher(
@@ -293,14 +456,41 @@ export async function getLeadBookingsByTeacher(
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
   if (isUseMock()) { const { mockGetLeadBookingsByTeacher } = await loadLeadMock(); return mockGetLeadBookingsByTeacher(teacherId, params); }
-  return fetchLeadBookings({
-    teacherId,
-    startDate: params?.startDate,
-    endDate: params?.endDate,
-    status: params?.status,
-    page: 1,
-    pageSize: 100,
-  });
+  return fetchAllPages(
+    (page, pageSize) =>
+      fetchLeadBookingsPage({
+        teacherId,
+        startDate: params?.startDate,
+        endDate: params?.endDate,
+        status: params?.status,
+        page,
+        pageSize,
+      }),
+    API_PAGE_SIZE_BATCH,
+  );
+}
+
+/** 校长/管理员：按校区查看试听预约 */
+export async function getLeadBookingsByCampus(
+  campusId?: string,
+  params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
+): Promise<LeadBooking[]> {
+  if (isUseMock()) {
+    const { mockListLeadBookingsByCampus } = await loadLeadMock();
+    return mockListLeadBookingsByCampus(campusId, params);
+  }
+  return fetchAllPages(
+    (page, pageSize) =>
+      fetchLeadBookingsPage({
+        campusId,
+        startDate: params?.startDate,
+        endDate: params?.endDate,
+        status: params?.status,
+        page,
+        pageSize,
+      }),
+    API_PAGE_SIZE_BATCH,
+  );
 }
 
 export async function checkInPrivateLeadBooking(
@@ -309,6 +499,20 @@ export async function checkInPrivateLeadBooking(
   if (isUseMock()) { const { mockCheckInPrivateLeadBooking } = await loadLeadMock(); return mockCheckInPrivateLeadBooking(bookingId); }
   const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     status: 'completed',
+  });
+  return mapBackendLeadBooking(updated);
+}
+
+/** 手动标记试听未到 */
+export async function markLeadBookingNoShow(
+  bookingId: string,
+): Promise<LeadBooking | null> {
+  if (isUseMock()) {
+    const { mockMarkLeadBookingNoShow } = await loadLeadMock();
+    return mockMarkLeadBookingNoShow(bookingId);
+  }
+  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+    status: 'no_show',
   });
   return mapBackendLeadBooking(updated);
 }
@@ -358,7 +562,10 @@ export async function updateLeadBooking(
 
 export async function getLeadFollowUps(leadId: string): Promise<LeadFollowUp[]> {
   if (isUseMock()) { const { mockGetLeadFollowUps } = await loadLeadMock(); return mockGetLeadFollowUps(leadId); }
-  return fetchLeadFollowUps({ leadId, page: 1, pageSize: 100 });
+  return fetchAllPages(
+    (page, pageSize) => fetchLeadFollowUpsPage({ leadId, page, pageSize }),
+    API_PAGE_SIZE_BATCH,
+  );
 }
 
 export async function createFollowUp(params: {
@@ -409,12 +616,16 @@ export async function createConversion(params: {
 
 export async function getTrialCourseSlots(campusId?: string): Promise<TrialCourseSlot[]> {
   if (isUseMock()) { const { mockGetTrialCourseSlots } = await loadLeadMock(); return mockGetTrialCourseSlots(campusId); }
-  const slots = await fetchTrialSlotList({
-    campusId,
-    status: 'active',
-    page: 1,
-    pageSize: 100,
-  });
+  const slots = await fetchAllPages(
+    (page, pageSize) =>
+      fetchTrialSlotListPage({
+        campusId,
+        status: 'active',
+        page,
+        pageSize,
+      }),
+    API_PAGE_SIZE_BATCH,
+  );
   return slots.map(mapTrialSlotToCourseSlot);
 }
 
@@ -423,17 +634,24 @@ export async function getTrialSlotConfigs(
   campusId?: string,
 ): Promise<TrialSlotConfig[]> {
   if (isUseMock()) { const { mockGetTrialSlotConfigs } = await loadLeadMock(); return mockGetTrialSlotConfigs(teacherId, campusId); }
-  return fetchTrialSlotList({
-    teacherId,
-    campusId,
-    page: 1,
-    pageSize: 100,
-  });
+  return fetchAllPages(
+    (page, pageSize) =>
+      fetchTrialSlotListPage({
+        teacherId,
+        campusId,
+        page,
+        pageSize,
+      }),
+    API_PAGE_SIZE_BATCH,
+  );
 }
 
 export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfig | null> {
   if (isUseMock()) { const { mockGetTrialSlotConfigById } = await loadLeadMock(); return mockGetTrialSlotConfigById(id); }
-  const list = await fetchTrialSlotList({ page: 1, pageSize: 100 });
+  const list = await fetchAllPages(
+    (page, pageSize) => fetchTrialSlotListPage({ page, pageSize }),
+    API_PAGE_SIZE_BATCH,
+  );
   return list.find((item) => item.id === id) ?? null;
 }
 
@@ -532,6 +750,8 @@ export const leadService = {
   getLeadSummary,
   createLead,
   createLeadFromInvite,
+  submitInviteLanding,
+  trackLandingVisit,
   updateLeadStatus,
   updateLead,
   reassignLead,
@@ -541,8 +761,10 @@ export const leadService = {
   bookTrialByClass,
   getLeadBookings,
   getLeadBookingsByTeacher,
+  getLeadBookingsByCampus,
   cancelLeadBooking,
   checkInPrivateLeadBooking,
+  markLeadBookingNoShow,
   restoreLeadBooking,
   updateLeadBooking,
   getLeadFollowUps,

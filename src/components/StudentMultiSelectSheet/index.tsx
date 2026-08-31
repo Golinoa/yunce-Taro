@@ -14,10 +14,10 @@ import { Input, ScrollView, View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
+import StudentAvatar from '@/components/student/StudentAvatar';
 import type { Subject } from '@/types/campus';
 import type { Student } from '@/types/student';
 
@@ -83,13 +83,13 @@ const StudentRow: React.FC<{
       className="flex flex-row items-center gap-[20rpx] px-[16rpx] py-[28rpx] press-bg border-b-[2rpx] border-border/40"
       onClick={onToggle}
     >
-      {/* 头像 */}
-      <Avatar name={student.name} avatarUrl={student.avatar_url} size="lg" />
+      {/* 头像：统一 StudentAvatar */}
+      <StudentAvatar name={student.name} src={student.avatar_url} size="md" />
 
       {/* 学员信息（会员卡 + 课时，精简） */}
       <View className="flex-1 min-w-0 flex flex-col gap-[10rpx]">
         <View className="flex flex-row items-center gap-[12rpx]">
-          <Text className="text-[30rpx] font-medium text-foreground truncate">{student.name}</Text>
+          <Text className="text-[32rpx] font-semibold text-foreground truncate">{student.name}</Text>
           {student.nickname && (
             <Text className="text-[24rpx] text-muted-foreground truncate max-w-[200rpx]">
               {student.nickname}
@@ -214,6 +214,11 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
       // 已选中：随时允许取消
       if (tempIds.includes(id)) {
         setTempIds((prev) => prev.filter((i) => i !== id));
+        return;
+      }
+      // 单选上限 1：点选新学员直接替换，无需先取消
+      if (maxSelectable === 1) {
+        setTempIds([id]);
         return;
       }
       // 未选中且已达上限：禁止勾选并提醒
@@ -455,7 +460,11 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
                 tempIds.length > 0 ? 'text-white' : 'text-muted-foreground',
               )}
             >
-              {tempIds.length > 0 ? `确认选择（${tempIds.length}人）` : '请选择学员'}
+              {tempIds.length === 0
+                ? '请选择学员'
+                : maxSelectable === 1
+                  ? '确认选择'
+                  : `确认选择（${tempIds.length}人）`}
             </Text>
           </View>
         </View>

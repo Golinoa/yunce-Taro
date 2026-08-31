@@ -13,8 +13,10 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import { leadService } from '@/services';
+import { useCampusStore } from '@/stores/campus';
 import type { LeadBooking } from '@/types/lead';
-import { useAuth } from '@/utils/auth';
+import { isPrincipalOrAbove, useAuth } from '@/utils/auth';
+import { resolveTeachingActorId } from '@/utils/trial-booking-scope';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 interface PageParams {
@@ -23,6 +25,9 @@ interface PageParams {
 
 const LeadBookingDetailPage: React.FC = () => {
   const { profile } = useAuth();
+  const currentCampusId = useCampusStore((s) => s.currentCampusId);
+  const teachingActorId = resolveTeachingActorId(profile);
+  const role = profile?.currentContext?.role;
   const navSafeHeight = useNavSafeHeight();
   const [params, setParams] = useState<PageParams>({});
   const [booking, setBooking] = useState<LeadBooking | null>(null);
@@ -43,10 +48,13 @@ const LeadBookingDetailPage: React.FC = () => {
     if (!params.bookingId) return;
     setLoading(true);
     try {
-      const list = await leadService.getLeadBookingsByTeacher(profile?.id || '', {
+      const dateRange = {
         startDate: dayjs().subtract(30, 'day').format('YYYY-MM-DD'),
         endDate: dayjs().add(30, 'day').format('YYYY-MM-DD'),
-      });
+      };
+      const list = isPrincipalOrAbove(role)
+        ? await leadService.getLeadBookingsByCampus(currentCampusId, dateRange)
+        : await leadService.getLeadBookingsByTeacher(teachingActorId, dateRange);
       const found = list.find((b) => b.id === params.bookingId) || null;
       setBooking(found);
     } catch {
@@ -54,7 +62,11 @@ const LeadBookingDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [params.bookingId, profile?.id]);
+  }, [currentCampusId, params.bookingId, role, teachingActorId]);
+
+  useEffect(() => {
+    void loadBooking();
+  }, [loadBooking]);
 
   useDidShow(() => {
     void loadBooking();

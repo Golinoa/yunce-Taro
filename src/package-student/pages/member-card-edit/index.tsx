@@ -1,8 +1,9 @@
-import { Picker, ScrollView, Text, Textarea, View } from '@tarojs/components';
+import { ScrollView, Text, Textarea, View } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -125,6 +126,9 @@ const MemberCardEditPage: React.FC = () => {
   const [remainingAmount, setRemainingAmount] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [remark, setRemark] = useState('');
+  const [datePickerField, setDatePickerField] = useState<
+    'purchase' | 'activated' | 'expired' | null
+  >(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -303,29 +307,20 @@ const MemberCardEditPage: React.FC = () => {
               <FormRow label="卡号">
                 <Text className="text-[30rpx] text-muted-foreground">{card.cardNo}</Text>
               </FormRow>
-              <Picker
-                mode="date"
-                value={purchaseAt}
-                onChange={(e) => setPurchaseAt(e.detail.value)}
+              <FormRow label="发卡日期" arrow onClick={() => setDatePickerField('purchase')}>
+                <Text className="text-[30rpx] text-foreground">{purchaseAt || '请选择'}</Text>
+              </FormRow>
+              <FormRow label="开卡日期" arrow onClick={() => setDatePickerField('activated')}>
+                <Text className="text-[30rpx] text-foreground">{activatedAt || '请选择'}</Text>
+              </FormRow>
+              <FormRow
+                label="有效期至"
+                required
+                arrow
+                onClick={() => setDatePickerField('expired')}
               >
-                <FormRow label="发卡日期" arrow>
-                  <Text className="text-[30rpx] text-foreground">{purchaseAt || '请选择'}</Text>
-                </FormRow>
-              </Picker>
-              <Picker
-                mode="date"
-                value={activatedAt}
-                onChange={(e) => setActivatedAt(e.detail.value)}
-              >
-                <FormRow label="开卡日期" arrow>
-                  <Text className="text-[30rpx] text-foreground">{activatedAt || '请选择'}</Text>
-                </FormRow>
-              </Picker>
-              <Picker mode="date" value={expiredAt} onChange={(e) => setExpiredAt(e.detail.value)}>
-                <FormRow label="有效期至" required arrow>
-                  <Text className="text-[30rpx] text-foreground">{expiredAt || '请选择'}</Text>
-                </FormRow>
-              </Picker>
+                <Text className="text-[30rpx] text-foreground">{expiredAt || '请选择'}</Text>
+              </FormRow>
               {isCount && (
                 <FormRow
                   label="剩余卡次"
@@ -453,6 +448,31 @@ const MemberCardEditPage: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        <DatePickerSheet
+          visible={Boolean(datePickerField)}
+          title={
+            datePickerField === 'purchase'
+              ? '选择发卡日期'
+              : datePickerField === 'activated'
+                ? '选择开卡日期'
+                : '选择有效期'
+          }
+          value={
+            datePickerField === 'purchase'
+              ? purchaseAt || dayjs().format('YYYY-MM-DD')
+              : datePickerField === 'activated'
+                ? activatedAt || dayjs().format('YYYY-MM-DD')
+                : expiredAt || dayjs().format('YYYY-MM-DD')
+          }
+          onClose={() => setDatePickerField(null)}
+          onConfirm={(date) => {
+            if (datePickerField === 'purchase') setPurchaseAt(date);
+            else if (datePickerField === 'activated') setActivatedAt(date);
+            else if (datePickerField === 'expired') setExpiredAt(date);
+            setDatePickerField(null);
+          }}
+        />
       </View>
     </PageContainer>
   );

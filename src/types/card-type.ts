@@ -80,10 +80,10 @@ export interface CardType {
   advanceBookingMinutes: number;
   /** 可约课星期，空数组表示全周可用 */
   availableWeekdays: number[];
-  /** 是否支持线上购买 */
-  onlinePurchase: boolean;
-  /** 是否有学生身份购买限制 */
-  studentIdentityLimit: boolean;
+  /** @deprecated 已下线：线上购买，库字段暂留兼容 */
+  onlinePurchase?: boolean;
+  /** @deprecated 已下线：学生身份购买限制，库字段暂留兼容 */
+  studentIdentityLimit?: boolean;
   /** 是否赠卡 */
   isGiftCard: boolean;
   /** 是否允许转卡 */
@@ -129,8 +129,6 @@ export interface CardTypeFormData {
   freeCancelCount: number;
   advanceBookingMinutes: number;
   availableWeekdays: number[];
-  onlinePurchase: boolean;
-  studentIdentityLimit: boolean;
   isGiftCard: boolean;
   allowTransfer: boolean;
   usageLimit: number;

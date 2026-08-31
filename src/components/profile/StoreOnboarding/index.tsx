@@ -16,8 +16,8 @@ import type { StoreOnboardingStep } from '@/types/onboarding';
 import type { StoreOnboardingProps } from './types';
 
 // 引导态中不参与步骤统计的固定入口
-const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-email-outline' }> = [
-  { label: '学员信箱', icon: 'mdi-email-outline' },
+const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-calendar-remove' }> = [
+  { label: '停课放假', icon: 'mdi-calendar-remove' },
 ];
 
 // 进度条宽度映射（6 等分，避免内联 style）

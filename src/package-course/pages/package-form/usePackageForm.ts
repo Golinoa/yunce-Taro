@@ -1,45 +1,27 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import { type ScheduleItem } from '@/components/InstallmentPanel';
+import { type ScheduleItem, buildInstallmentSchedule } from '@/components/InstallmentPanel';
 import { studentService, packageService, subjectService, subscribeMessageService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { Subject } from '@/types/campus';
-import type { CoursePackageTemplate, FeeMethod, PackageType } from '@/types/course-package';
+import type { CoursePackageTemplate, FeeMethod } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
+import type { PageTab, RechargeMode } from './constants';
 
-// ============================================
-// 常量
-// ============================================
-export const QUICK_HOURS = [10, 16, 24, 36, 48];
-export const GIFT_OPTIONS = [0, 1, 2, 4];
-export const FEE_METHOD_OPTIONS: { key: FeeMethod; label: string }[] = [
-  { key: 'wechat', label: '微信' },
-  { key: 'alipay', label: '支付宝' },
-  { key: 'cash', label: '现金' },
-  { key: 'transfer', label: '转账' },
-  { key: 'other', label: '其他' },
-];
-
-/** 课包类型图标和颜色映射（使用 UnoCSS Token 类名） */
-export const TYPE_ICON_MAP: Record<
-  PackageType,
-  { icon: string; colorClass: string; bgClass: string; label: string }
-> = {
-  hour_package: {
-    icon: '📚',
-    colorClass: 'text-success',
-    bgClass: 'bg-success-bg',
-    label: '课时包',
-  },
-  term: { icon: '📅', colorClass: 'text-amber', bgClass: 'bg-warning-bg', label: '期课' },
-  monthly: { icon: '🔄', colorClass: 'text-accent', bgClass: 'bg-accent-bg', label: '月卡' },
-  trial: { icon: '🎁', colorClass: 'text-info', bgClass: 'bg-info-bg', label: '体验课' },
-};
+/**
+ * 安全取用 useState，禁止数组解构。
+ * Taro weapp 压缩 + ModuleConcatenation 时，`const [a,setA]=useState()` 可能被编译成
+ * 对模块级同名绑定的裸赋值，从而覆盖 hook / 常量，页面二次渲染白屏。
+ */
+function useStatePair<T>(initial: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {
+  const pair = useState(initial);
+  return [pair[0], pair[1]];
+}
 
 /**
  * 课包充值/编辑表单逻辑 Hook
@@ -58,61 +40,130 @@ export function usePackageForm() {
   }, []);
   const packageId = decodeURIComponent(params.id || '');
   const routeStudentId = decodeURIComponent(params.studentId || '');
+  const routeTab = decodeURIComponent(params.tab || '');
   const isEdit = !!packageId;
+
+  // ===== 页面 Tab / 充值模式 =====
+  const pageTabPair = useStatePair<PageTab>(routeTab === 'card' ? 'card' : 'recharge');
+  const pageTab = pageTabPair[0];
+  const setPageTab = pageTabPair[1];
+  const rechargeModePair = useStatePair<RechargeMode>('package');
+  const rechargeMode = rechargeModePair[0];
+  const setRechargeMode = rechargeModePair[1];
 
   // ===== 加载状态 =====
   const { loading, setLoading } = useDelayedLoading();
-  const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const [notFound, setNotFound] = useState(false);
+  const savingPair = useStatePair(false);
+  const saving = savingPair[0];
+  const setSaving = savingPair[1];
+  const loadErrorPair = useStatePair('');
+  const loadError = loadErrorPair[0];
+  const setLoadError = loadErrorPair[1];
+  const notFoundPair = useStatePair(false);
+  const notFound = notFoundPair[0];
+  const setNotFound = notFoundPair[1];
 
   // ===== 学员选择 =====
-  const [students, setStudents] = useState<Student[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [showStudentSheet, setShowStudentSheet] = useState(false);
-  const [studentSheetVisible, setStudentSheetVisible] = useState(false);
-  const [studentSearch, setStudentSearch] = useState('');
+  const studentsPair = useStatePair<Student[]>([]);
+  const students = studentsPair[0];
+  const setStudents = studentsPair[1];
+  const selectedStudentPair = useStatePair<Student | null>(null);
+  const selectedStudent = selectedStudentPair[0];
+  const setSelectedStudent = selectedStudentPair[1];
+  const showStudentSheetPair = useStatePair(false);
+  const showStudentSheet = showStudentSheetPair[0];
+  const setShowStudentSheet = showStudentSheetPair[1];
+  const studentSheetVisiblePair = useStatePair(false);
+  const studentSheetVisible = studentSheetVisiblePair[0];
+  const setStudentSheetVisible = studentSheetVisiblePair[1];
+  const studentSearchPair = useStatePair('');
+  const studentSearch = studentSearchPair[0];
+  const setStudentSearch = studentSearchPair[1];
 
   // ===== 课包选择 =====
-  const [templates, setTemplates] = useState<CoursePackageTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<CoursePackageTemplate | null>(null);
-  const [isCustomPackage, setIsCustomPackage] = useState(false);
-  const [showPackageSheet, setShowPackageSheet] = useState(false);
-  const [packageSheetVisible, setPackageSheetVisible] = useState(false);
+  const templatesPair = useStatePair<CoursePackageTemplate[]>([]);
+  const templates = templatesPair[0];
+  const setTemplates = templatesPair[1];
+  const selectedTemplatePair = useStatePair<CoursePackageTemplate | null>(null);
+  const selectedTemplate = selectedTemplatePair[0];
+  const setSelectedTemplate = selectedTemplatePair[1];
+  const isCustomPackagePair = useStatePair(false);
+  const isCustomPackage = isCustomPackagePair[0];
+  const setIsCustomPackage = isCustomPackagePair[1];
+  const showPackageSheetPair = useStatePair(false);
+  const showPackageSheet = showPackageSheetPair[0];
+  const setShowPackageSheet = showPackageSheetPair[1];
+  const packageSheetVisiblePair = useStatePair(false);
+  const packageSheetVisible = packageSheetVisiblePair[0];
+  const setPackageSheetVisible = packageSheetVisiblePair[1];
 
   // ===== 自定义课包表单 =====
-  const [customName, setCustomName] = useState('');
-  const [customHours, setCustomHours] = useState('');
-  const [customValidDays, setCustomValidDays] = useState('');
-  const [customPrice, setCustomPrice] = useState('');
-  const [customSubjectId, setCustomSubjectId] = useState('');
+  const customNamePair = useStatePair('');
+  const customName = customNamePair[0];
+  const setCustomName = customNamePair[1];
+  const customHoursPair = useStatePair('');
+  const customHours = customHoursPair[0];
+  const setCustomHours = customHoursPair[1];
+  const customValidDaysPair = useStatePair('');
+  const customValidDays = customValidDaysPair[0];
+  const setCustomValidDays = customValidDaysPair[1];
+  const customPricePair = useStatePair('');
+  const customPrice = customPricePair[0];
+  const setCustomPrice = customPricePair[1];
+  const customSubjectIdPair = useStatePair('');
+  const customSubjectId = customSubjectIdPair[0];
+  const setCustomSubjectId = customSubjectIdPair[1];
 
   // ===== 科目列表 =====
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const subjectsPair = useStatePair<Subject[]>([]);
+  const subjects = subjectsPair[0];
+  const setSubjects = subjectsPair[1];
 
   // ===== 课包信息 =====
-  const [totalHours, setTotalHours] = useState(0);
-  const [validDays, setValidDays] = useState(0);
+  const totalHoursPair = useStatePair(0);
+  const totalHours = totalHoursPair[0];
+  const setTotalHours = totalHoursPair[1];
+  const validDaysPair = useStatePair(0);
+  const validDays = validDaysPair[0];
+  const setValidDays = validDaysPair[1];
 
   // ===== 赠送课时 =====
-  const [giftHours, setGiftHours] = useState(0);
+  const giftHoursPair = useStatePair(0);
+  const giftHours = giftHoursPair[0];
+  const setGiftHours = giftHoursPair[1];
 
   // ===== 收费信息 =====
-  const [feeAmount, setFeeAmount] = useState('');
-  const [feeMethod, setFeeMethod] = useState<FeeMethod | ''>('');
+  const feeAmountPair = useStatePair('');
+  const feeAmount = feeAmountPair[0];
+  const setFeeAmount = feeAmountPair[1];
+  const feeMethodPair = useStatePair<FeeMethod | ''>('');
+  const feeMethod = feeMethodPair[0];
+  const setFeeMethod = feeMethodPair[1];
 
   // ===== 分期付款 =====
-  const [installmentEnabled, setInstallmentEnabled] = useState(false);
-  const [installmentPeriod, setInstallmentPeriod] = useState(2);
-  const [installmentSchedule, setInstallmentSchedule] = useState<ScheduleItem[]>([]);
+  const installmentEnabledPair = useStatePair(false);
+  const installmentEnabled = installmentEnabledPair[0];
+  const setInstallmentEnabled = installmentEnabledPair[1];
+  const installmentPeriodPair = useStatePair(2);
+  const installmentPeriod = installmentPeriodPair[0];
+  const setInstallmentPeriod = installmentPeriodPair[1];
+  const installmentSchedulePair = useStatePair<ScheduleItem[]>([]);
+  const installmentSchedule = installmentSchedulePair[0];
+  const setInstallmentSchedule = installmentSchedulePair[1];
 
   // ===== 备注 =====
-  const [note, setNote] = useState('');
+  const notePair = useStatePair('');
+  const note = notePair[0];
+  const setNote = notePair[1];
 
   // ===== 编辑模式回填 =====
-  const [editRemainingHours, setEditRemainingHours] = useState('');
-  const [editExpiryDate, setEditExpiryDate] = useState('');
-  const initStartAtRef = useState({ current: 0 })[0];
+  const editRemainingHoursPair = useStatePair('');
+  const editRemainingHours = editRemainingHoursPair[0];
+  const setEditRemainingHours = editRemainingHoursPair[1];
+  const editExpiryDatePair = useStatePair('');
+  const editExpiryDate = editExpiryDatePair[0];
+  const setEditExpiryDate = editExpiryDatePair[1];
+  const initStartAtRef = useStatePair({ current: 0 })[0];
 
   // ============================================
   // 初始化
@@ -139,10 +190,12 @@ export function usePackageForm() {
       }
 
       try {
-        const [stuList, tplList] = await Promise.all([
+        const stuAndTpl = await Promise.all([
           fetchStudentsByTeacher(currentUserId),
           fetchPackageTemplatesByTeacher(currentUserId),
         ]);
+        const stuList = stuAndTpl[0];
+        const tplList = stuAndTpl[1];
         setStudents(stuList);
         setTemplates(tplList);
 
@@ -280,8 +333,10 @@ export function usePackageForm() {
       return '';
     }
 
-    if (!selectedTemplate && !isCustomPackage) return '请选择课包';
-    if (isCustomPackage && totalHours <= 0) return '请输入有效的课时数量';
+    if (!selectedTemplate && !isCustomPackage && rechargeMode !== 'direct') return '请选择课包';
+    if ((isCustomPackage || rechargeMode === 'direct') && totalHours <= 0) {
+      return '请输入有效的课时数量';
+    }
     if (effectiveFeeAmount) {
       const amount = parseFloat(effectiveFeeAmount);
       if (Number.isNaN(amount) || amount < 0) return '收费金额不能为负数';
@@ -310,6 +365,7 @@ export function usePackageForm() {
     feeAmount,
     selectedTemplate,
     isCustomPackage,
+    rechargeMode,
     totalHours,
     effectiveFeeAmount,
     installmentEnabled,
@@ -414,11 +470,11 @@ export function usePackageForm() {
       Taro.showToast({ title: '请选择学生', icon: 'none' });
       return;
     }
-    if (!isEdit && !selectedTemplate && !isCustomPackage) {
+    if (!isEdit && !selectedTemplate && !isCustomPackage && rechargeMode !== 'direct') {
       Taro.showToast({ title: '请选择课包', icon: 'none' });
       return;
     }
-    if (isCustomPackage && totalHours <= 0) {
+    if ((isCustomPackage || rechargeMode === 'direct') && totalHours <= 0) {
       Taro.showToast({ title: '请输入有效的课时数量', icon: 'none' });
       return;
     }
@@ -457,10 +513,13 @@ export function usePackageForm() {
       } else {
         await packageService.createRecharge({
           student_id: selectedStudent.id,
-          template_id: selectedTemplate?.id,
-          name: isCustomPackage
-            ? customName.trim() || '课时充值'
-            : selectedTemplate?.name || '课时充值',
+          template_id: rechargeMode === 'direct' ? undefined : selectedTemplate?.id,
+          name:
+            rechargeMode === 'direct'
+              ? '课时充值'
+              : isCustomPackage
+                ? customName.trim() || '课时充值'
+                : selectedTemplate?.name || '课时充值',
           total_hours: totalHours,
           valid_days: effectiveValidDays || undefined,
           gift_hours: giftHours > 0 ? giftHours : undefined,
@@ -470,7 +529,12 @@ export function usePackageForm() {
           installment_period: installmentEnabled ? installmentPeriod : undefined,
           installment_schedule: installmentEnabled ? installmentSchedule : undefined,
           note: note.trim() || undefined,
-          subject_id: isCustomPackage ? customSubjectId || undefined : selectedTemplate?.subject_id,
+          subject_id:
+            rechargeMode === 'direct'
+              ? undefined
+              : isCustomPackage
+                ? customSubjectId || undefined
+                : selectedTemplate?.subject_id,
         });
         invalidateStudents(currentUserId);
         // 充值成功后提示到期日
@@ -504,6 +568,7 @@ export function usePackageForm() {
     isEdit,
     selectedTemplate,
     isCustomPackage,
+    rechargeMode,
     totalHours,
     submitBlockedReason,
     packageId,
@@ -525,9 +590,41 @@ export function usePackageForm() {
     profile?.currentContext?.role,
   ]);
 
+  const handleRechargeModeChange = useCallback((mode: RechargeMode) => {
+    setRechargeMode(mode);
+    if (mode === 'direct') {
+      setIsCustomPackage(true);
+      setSelectedTemplate(null);
+      setCustomName('课时充值');
+      if (totalHours <= 0) setTotalHours(10);
+    } else {
+      setIsCustomPackage(false);
+      setCustomName('');
+    }
+  }, [totalHours]);
+
+  const handleInstallmentToggle = useCallback(
+    (on: boolean) => {
+      setInstallmentEnabled(on);
+      if (on) {
+        const amount = parseFloat(effectiveFeeAmount || feeAmount || '0') || 0;
+        setInstallmentSchedule(buildInstallmentSchedule(amount, installmentPeriod || 2));
+      } else {
+        setInstallmentSchedule([]);
+      }
+    },
+    [effectiveFeeAmount, feeAmount, installmentPeriod],
+  );
+
   return {
     // 路由参数
     isEdit,
+    // Tab / 模式
+    pageTab,
+    setPageTab,
+    rechargeMode,
+    handleRechargeModeChange,
+    handleInstallmentToggle,
     // 加载
     loading,
     saving,

@@ -1,7 +1,7 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
@@ -16,6 +16,7 @@ import type {
   SalaryDataType,
 } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
+import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import { useAuth } from '@/utils/auth';
 import { isUseMock } from '@/utils/build-env';
@@ -35,7 +36,15 @@ import { syncTabBarByProfile } from '@/utils/tab-bar';
 const DataCenter: React.FC = () => {
   const { activeTheme } = useThemeStore();
   const { profile } = useAuth();
+  const campuses = useCampusStore((s) => s.campuses);
+  const currentCampusId = useCampusStore((s) => s.currentCampusId);
+  const fetchCampuses = useCampusStore((s) => s.fetchCampuses);
   const [venueOverview, setVenueOverview] = useState<VenueOverviewType | null>(null);
+
+  const campusName = useMemo(() => {
+    const current = campuses.find((c) => c.id === currentCampusId);
+    return current?.name || venueOverview?.venueName || '加载中';
+  }, [campuses, currentCampusId, venueOverview?.venueName]);
 
   // 导航栏背景色与弥散渐变顶部一致，实现无缝衔接
   useThemedNavigationBar((themeHex) => ({
@@ -45,6 +54,9 @@ const DataCenter: React.FC = () => {
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
+    if (campuses.length === 0) {
+      void fetchCampuses();
+    }
   });
   const [revenueTrend, setRevenueTrend] = useState<RevenueTrendType | null>(null);
   const [financeData, setFinanceData] = useState<FinanceDataType | null>(null);
@@ -214,7 +226,7 @@ const DataCenter: React.FC = () => {
           >
             <Icon name="mdi-office-building-outline" size={20} color="primary" />
             <Text className="text-[26rpx] text-foreground font-medium">
-              {venueOverview?.venueName || '加载中'}
+              {campusName}
             </Text>
             <Icon name="mdi-chevron-down" size={20} color="muted" />
           </View>

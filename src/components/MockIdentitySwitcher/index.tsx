@@ -3,6 +3,7 @@
  * 用于快速切换管理员 / 校长 / 教师 / 家长，方便对照各端 UI。
  *
  * 必须用 RootPortal：App 根上的 fixed 在微信里常被页面层盖住，刷新也看不见。
+ * 挂在 PageContainer（及未用容器的首页/数据页），各身份进任何页都能看到。
  */
 import { View, Text, ScrollView, RootPortal } from '@tarojs/components';
 import Taro from '@tarojs/taro';

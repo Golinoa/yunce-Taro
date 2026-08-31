@@ -53,8 +53,6 @@ type PickerType =
   | 'bookingMethod'
   | 'cardCategory'
   | 'commissionCalc'
-  | 'onlinePurchase'
-  | 'studentIdentityLimit'
   | 'isGiftCard'
   | 'allowTransfer'
   | 'subject';
@@ -141,8 +139,6 @@ const CardFormPage: React.FC = () => {
   const [advanceBookingMinutes, setAdvanceBookingMinutes] = useState('0');
   const [allWeekAvailable, setAllWeekAvailable] = useState(true);
   const [availableWeekdays, setAvailableWeekdays] = useState<number[]>([]);
-  const [onlinePurchase, setOnlinePurchase] = useState(true);
-  const [studentIdentityLimit, setStudentIdentityLimit] = useState(false);
   const [isGiftCard, setIsGiftCard] = useState(false);
   const [allowTransfer, setAllowTransfer] = useState(false);
   const [usageLimit, setUsageLimit] = useState('0');
@@ -180,8 +176,6 @@ const CardFormPage: React.FC = () => {
     setAdvanceBookingMinutes(String(data.advanceBookingMinutes));
     setAllWeekAvailable(data.availableWeekdays.length === 0);
     setAvailableWeekdays(data.availableWeekdays);
-    setOnlinePurchase(data.onlinePurchase);
-    setStudentIdentityLimit(data.studentIdentityLimit);
     setIsGiftCard(data.isGiftCard);
     setAllowTransfer(data.allowTransfer);
     setUsageLimit(String(data.usageLimit));
@@ -268,20 +262,6 @@ const CardFormPage: React.FC = () => {
           onConfirm: (value: string) => setSubjectId(value),
         };
       }
-      case 'onlinePurchase':
-        return {
-          title: '线上购买',
-          options: BOOLEAN_OPTIONS,
-          value: String(onlinePurchase),
-          onConfirm: (value: string) => setOnlinePurchase(value === 'true'),
-        };
-      case 'studentIdentityLimit':
-        return {
-          title: '学生身份购买限制',
-          options: BOOLEAN_OPTIONS,
-          value: String(studentIdentityLimit),
-          onConfirm: (value: string) => setStudentIdentityLimit(value === 'true'),
-        };
       case 'isGiftCard':
         return {
           title: '是否赠卡',
@@ -305,8 +285,6 @@ const CardFormPage: React.FC = () => {
     bookingMethod,
     cardCategory,
     commissionCalc,
-    onlinePurchase,
-    studentIdentityLimit,
     isGiftCard,
     allowTransfer,
     subjects,
@@ -385,8 +363,6 @@ const CardFormPage: React.FC = () => {
       freeCancelCount: Number(freeCancelCount) || 0,
       advanceBookingMinutes: Number(advanceBookingMinutes) || 0,
       availableWeekdays: allWeekAvailable ? [] : availableWeekdays,
-      onlinePurchase,
-      studentIdentityLimit,
       isGiftCard,
       allowTransfer,
       usageLimit: Number(usageLimit) || 0,
@@ -438,8 +414,6 @@ const CardFormPage: React.FC = () => {
     advanceBookingMinutes,
     allWeekAvailable,
     availableWeekdays,
-    onlinePurchase,
-    studentIdentityLimit,
     isGiftCard,
     allowTransfer,
     usageLimit,
@@ -775,24 +749,6 @@ const CardFormPage: React.FC = () => {
                   })}
                 </View>
               )}
-
-              <FormRow
-                label="线上购买"
-                hint={CARD_TYPE_TOOLTIPS.onlinePurchase}
-                onClick={() => openPicker('onlinePurchase')}
-              >
-                <Text className="text-[30rpx] text-foreground">{onlinePurchase ? '是' : '否'}</Text>
-              </FormRow>
-
-              <FormRow
-                label="学生身份购买限制"
-                hint={CARD_TYPE_TOOLTIPS.studentIdentityLimit}
-                onClick={() => openPicker('studentIdentityLimit')}
-              >
-                <Text className="text-[30rpx] text-foreground">
-                  {studentIdentityLimit ? '是' : '否'}
-                </Text>
-              </FormRow>
 
               <FormRow
                 label="是否赠卡"

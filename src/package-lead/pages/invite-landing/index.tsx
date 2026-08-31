@@ -1,7 +1,9 @@
 /**
  * 家长邀约落地页 package-lead/pages/invite-landing
  *
- * 流程：试听券弹框领取 → 方案 B 票券页 → 微信登录+订阅 → 填表预约 → 成功页（头图+校区卡片）
+ * 须先微信登录再查看内容（不引导绑定邮箱）。
+ * 未过期：试听券 → 填表预约 → 成功页。
+ * 已过期：提示联系老师另约；上报访问，半小时后站内提醒老师一次（含查看次数）。
  */
 import { View, Text, Image, ScrollView } from '@tarojs/components';
 import Taro, { useLoad } from '@tarojs/taro';
@@ -10,15 +12,28 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
+import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { BRAND_LOGO, ORG_COVER_IMAGE } from '@/constants/brand';
-import { classBookingService, campusService, leadService, teacherService } from '@/services';
+import { campusService, leadService, teacherService } from '@/services';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { useAgreementStore } from '@/stores/agreement';
 import type { CampusUIModel } from '@/types/campus';
-import { useAuth } from '@/utils/auth';
+import { isStaffRole, useAuth } from '@/utils/auth';
+import {
+  clearIdentitySelectionPending,
+  markOnboardingSkipped,
+} from '@/utils/auth-onboarding';
 import { isCampusOpen, parseBusinessHours } from '@/utils/campus';
+import {
+  buildInviteLessonKey,
+  findInviteLandingSuccess,
+  saveInviteLandingSuccess,
+} from '@/utils/invite-landing-success';
+import { isInviteLessonExpired } from '@/utils/invite-lesson-expired';
+import { getOrCreateInviteVisitorKey } from '@/utils/invite-visitor-key';
 import { logError } from '@/utils/logger';
+import { useMiniProgramNavBarLayout } from '@/utils/use-nav-safe-height';
 import './index.scss';
 
 interface LandingParams {
@@ -58,10 +73,15 @@ function formatDateLabel(date?: string): string {
 }
 
 const InviteLandingPage: React.FC = () => {
-  const { profile, session, signInWithWechat } = useAuth();
+  const { profile, session, signInWithWechat, currentRole, loading: authLoading } = useAuth();
   const { agreed, setAgreed } = useAgreementStore();
+  const { statusBarHeight, navBarHeight } = useMiniProgramNavBarLayout();
+  const homeBtnTop = statusBarHeight + Math.max((navBarHeight - 32) / 2, 4);
 
   const [params, setParams] = useState<LandingParams>({ t: '', c: '' });
+  const [paramsReady, setParamsReady] = useState(false);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const [staffBlocked, setStaffBlocked] = useState(false);
   const [guestMode, setGuestMode] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [showVoucher, setShowVoucher] = useState(true);
@@ -81,6 +101,9 @@ const InviteLandingPage: React.FC = () => {
 
   const subscribedRef = useRef(false);
   const openFormAfterLoginRef = useRef(false);
+  const visitReportedRef = useRef(false);
+  const visitorKeyRef = useRef(getOrCreateInviteVisitorKey());
+  const staffRedirectedRef = useRef(false);
 
   useLoad((options) => {
     const opt = options as Record<string, string>;
@@ -102,7 +125,122 @@ const InviteLandingPage: React.FC = () => {
     };
     setParams(next);
     setGuestMode(Boolean(next.guest));
+    setParamsReady(true);
   });
+
+  const lessonKey = useMemo(
+    () =>
+      buildInviteLessonKey({
+        type: params.type,
+        teacherId: params.t,
+        campusId: params.c,
+        classId: params.classId,
+        scheduleId: params.scheduleId,
+        slotId: params.slotId,
+        date: params.date,
+        start: params.start,
+        end: params.end,
+      }),
+    [params],
+  );
+
+  /** 机构端不可访问家长邀约落地（guest=1 仅用于 Mock 强制访客演示） */
+  useEffect(() => {
+    if (authLoading || !paramsReady) return;
+    if (!isStaffRole(currentRole) || params.guest) return;
+    setStaffBlocked(true);
+    setBootstrapped(true);
+    if (staffRedirectedRef.current) return;
+    staffRedirectedRef.current = true;
+    void Taro.showToast({ title: '该页面仅家长可访问', icon: 'none' });
+    setTimeout(() => {
+      void Taro.switchTab({ url: '/pages/home/index' }).catch(() => {
+        void Taro.reLaunch({ url: '/pages/home/index' });
+      });
+    }, 400);
+  }, [authLoading, currentRole, params.guest, paramsReady]);
+
+  /** 已登录后才进入内容；已预约直接成功页；过期跳过领券 */
+  useEffect(() => {
+    if (authLoading || !paramsReady || staffBlocked) return;
+    if (isStaffRole(currentRole) && !params.guest) return;
+    if (bootstrapped) return;
+
+    const loggedIn = Boolean(session) && !params.guest;
+    if (!loggedIn && !params.guest) {
+      setShowLogin(true);
+      setShowVoucher(false);
+      setBootstrapped(true);
+      return;
+    }
+
+    const record = findInviteLandingSuccess({
+      lessonKey,
+      visitorKey: visitorKeyRef.current,
+      parentUserId: session?.user.id,
+    });
+    if (record) {
+      setChildName(record.childName);
+      setChildAge(record.childAge);
+      setChildGender(record.childGender === 'male' || record.childGender === 'female' ? record.childGender : '');
+      setParentPhone(record.parentPhone);
+      setClaimed(true);
+      setShowVoucher(false);
+      setShowLogin(false);
+      setSuccess(true);
+    } else if (isInviteLessonExpired(params.date, params.end)) {
+      setShowVoucher(false);
+      setShowLogin(false);
+      setClaimed(true);
+    } else {
+      setShowLogin(false);
+    }
+    setBootstrapped(true);
+  }, [
+    authLoading,
+    bootstrapped,
+    currentRole,
+    lessonKey,
+    params.date,
+    params.end,
+    params.guest,
+    paramsReady,
+    session,
+    staffBlocked,
+  ]);
+
+  /** 登录成功后若尚未进入主流程，补一次 bootstrap */
+  useEffect(() => {
+    if (authLoading || !paramsReady || staffBlocked || !bootstrapped) return;
+    if (isStaffRole(currentRole) && !params.guest) return;
+    if (!session || guestMode) return;
+    if (success || claimed || showForm) return;
+    if (isInviteLessonExpired(params.date, params.end)) {
+      setShowVoucher(false);
+      setClaimed(true);
+      setShowLogin(false);
+      return;
+    }
+    if (!showVoucher && !claimed) {
+      setShowVoucher(true);
+      setShowLogin(false);
+    }
+  }, [
+    authLoading,
+    bootstrapped,
+    claimed,
+    currentRole,
+    guestMode,
+    params.date,
+    params.end,
+    params.guest,
+    paramsReady,
+    session,
+    showForm,
+    showVoucher,
+    staffBlocked,
+    success,
+  ]);
 
   useEffect(() => {
     if (!params.c) return;
@@ -118,9 +256,53 @@ const InviteLandingPage: React.FC = () => {
     });
   }, [params.t]);
 
+  /** 已登录后上报访问；过期场次附带半小时站内提醒登记 */
+  useEffect(() => {
+    if (!bootstrapped || staffBlocked || success) return;
+    if (!params.t || !params.c) return;
+    const loggedIn = Boolean(session?.user.id) && !guestMode;
+    if (!loggedIn) return;
+    if (visitReportedRef.current) return;
+    visitReportedRef.current = true;
+    const expired = isInviteLessonExpired(params.date, params.end);
+    void leadService
+      .trackLandingVisit({
+        teacherId: params.t,
+        campusId: params.c,
+        sourceType: params.st || 'share_link',
+        parentUserId: session?.user.id,
+        visitorKey: visitorKeyRef.current,
+        lessonExpired: expired,
+        lessonKey: expired ? lessonKey : undefined,
+        className: params.className,
+        date: params.date,
+        start: params.start,
+        end: params.end,
+      })
+      .catch((err) => logError('invite-landing.trackVisit', err));
+  }, [
+    bootstrapped,
+    guestMode,
+    lessonKey,
+    params.c,
+    params.className,
+    params.date,
+    params.end,
+    params.st,
+    params.start,
+    params.t,
+    session?.user.id,
+    staffBlocked,
+    success,
+  ]);
+
   const isLoggedIn = Boolean(session) && !guestMode;
   const isGroupBook = params.type === 'group_slot';
   const hasLessonContext = Boolean(params.classId && params.date && params.start && params.end);
+  const lessonExpired = useMemo(
+    () => isInviteLessonExpired(params.date, params.end),
+    [params.date, params.end],
+  );
 
   const businessTime = useMemo(() => {
     const parsed = parseBusinessHours(campus?.businessHours);
@@ -161,13 +343,14 @@ const InviteLandingPage: React.FC = () => {
   }, [ensureSubscribe, profile?.phone]);
 
   const handleBookClick = useCallback(() => {
+    if (lessonExpired) return;
     if (!isLoggedIn) {
       openFormAfterLoginRef.current = true;
       setShowLogin(true);
       return;
     }
     void openBookingForm();
-  }, [isLoggedIn, openBookingForm]);
+  }, [isLoggedIn, lessonExpired, openBookingForm]);
 
   const executeWechatLogin = useCallback(async () => {
     if (wechatSubmitting) return;
@@ -183,13 +366,27 @@ const InviteLandingPage: React.FC = () => {
         Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
         return;
       }
+      // 邀约落地：只做微信登录，不引导绑定邮箱 / 身份选择，避免流失
+      markOnboardingSkipped();
+      clearIdentitySelectionPending();
       setGuestMode(false);
       setShowLogin(false);
       Taro.showToast({ title: '登录成功', icon: 'success' });
+      visitReportedRef.current = false;
+
+      if (isInviteLessonExpired(params.date, params.end)) {
+        setShowVoucher(false);
+        setClaimed(true);
+        return;
+      }
+
       if (openFormAfterLoginRef.current) {
         openFormAfterLoginRef.current = false;
+        setShowVoucher(false);
+        setClaimed(true);
         await openBookingForm();
       } else {
+        setShowVoucher(true);
         await ensureSubscribe();
       }
     } catch (err) {
@@ -198,14 +395,21 @@ const InviteLandingPage: React.FC = () => {
     } finally {
       setWechatSubmitting(false);
     }
-  }, [ensureSubscribe, openBookingForm, signInWithWechat, wechatSubmitting]);
+  }, [
+    ensureSubscribe,
+    openBookingForm,
+    params.date,
+    params.end,
+    signInWithWechat,
+    wechatSubmitting,
+  ]);
 
   const handleWechatLogin = useCallback(() => {
     if (wechatSubmitting) return;
     if (!agreed) {
       void Taro.showModal({
-        title: '服务协议及隐私保护',
-        content: '登录前请阅读并同意《用户协议》和《隐私政策》。',
+        title: '用户协议',
+        content: '请阅读并同意《用户协议》',
         confirmText: '同意并登录',
         cancelText: '取消',
         success: (res) => {
@@ -219,46 +423,36 @@ const InviteLandingPage: React.FC = () => {
     void executeWechatLogin();
   }, [agreed, executeWechatLogin, setAgreed, wechatSubmitting]);
 
-  const bookLesson = useCallback(
-    async (leadId: string) => {
-      if (!hasLessonContext || !params.classId || !params.date || !params.start || !params.end) {
-        Taro.navigateTo({
-          url: `/package-lead/pages/trial-booking/index?teacherId=${encodeURIComponent(params.t)}&campusId=${encodeURIComponent(params.c)}&leadId=${encodeURIComponent(leadId)}&mode=${isGroupBook ? 'group' : 'private'}`,
-        });
-        return false;
-      }
-
-      if (isGroupBook) {
-        const slotId = params.slotId;
-        if (!slotId) {
-          Taro.showToast({ title: '时段信息缺失', icon: 'none' });
-          return false;
-        }
-        const studentId = session?.user.id || leadId;
-        await classBookingService.addBookingRecord(slotId, studentId);
-        return true;
-      }
-
-      await leadService.bookTrialByClass({
-        leadId,
-        classId: params.classId,
-        className: params.className,
+  const persistSuccess = useCallback(
+    (payload: {
+      childName: string;
+      childAge: string;
+      childGender: ChildGender | '';
+      parentPhone: string;
+    }) => {
+      saveInviteLandingSuccess({
+        lessonKey,
+        visitorKey: visitorKeyRef.current,
+        parentUserId: session?.user.id,
+        childName: payload.childName,
+        childAge: payload.childAge,
+        childGender: payload.childGender,
+        parentPhone: payload.parentPhone,
+        courseTitle,
+        date: params.date,
+        start: params.start,
+        end: params.end,
+        type: params.type,
         campusId: params.c,
-        lessonDate: params.date,
-        startTime: params.start,
-        endTime: params.end,
         teacherId: params.t,
-        teacherName: teacherName || undefined,
-        operatorId: session?.user.id,
-        note: '家长分享入口自助约试听',
+        bookedAt: dayjs().toISOString(),
       });
-      return true;
     },
-    [hasLessonContext, isGroupBook, params, session?.user.id, teacherName],
+    [courseTitle, lessonKey, params.c, params.date, params.end, params.start, params.t, params.type, session?.user.id],
   );
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) return;
+    if (submitting || lessonExpired) return;
     if (!childName.trim()) {
       Taro.showToast({ title: '请输入孩子姓名', icon: 'none' });
       return;
@@ -278,36 +472,60 @@ const InviteLandingPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const lead = await leadService.createLeadFromInvite({
-        parentUserId: session?.user.id || '',
-        parentName: profile?.name || undefined,
-        parentPhone: parentPhone.trim(),
-        childName: childName.trim(),
-        childGender,
-        childAge: `${childAge.trim()}岁`,
+      const result = await leadService.submitInviteLanding({
         teacherId: params.t,
         campusId: params.c,
         sourceType: params.st || 'share_link',
+        childName: childName.trim(),
+        childGender,
+        childAge: `${childAge.trim()}岁`,
+        parentName: profile?.name || undefined,
+        parentPhone: parentPhone.trim(),
+        parentUserId: session?.user.id,
+        visitorKey: visitorKeyRef.current,
         sourceCourseId: params.course || params.classId,
+        type: params.type,
+        classId: params.classId,
+        className: params.className,
+        scheduleId: params.scheduleId,
+        slotId: params.slotId,
+        date: params.date,
+        start: params.start,
+        end: params.end,
+        bookLesson: hasLessonContext,
       });
-      const ok = await bookLesson(lead.id);
-      if (ok) {
-        setShowForm(false);
-        setSuccess(true);
+
+      if (!hasLessonContext && result.lead_id && !result.booked) {
+        Taro.navigateTo({
+          url: `/package-lead/pages/trial-booking/index?teacherId=${encodeURIComponent(params.t)}&campusId=${encodeURIComponent(params.c)}&leadId=${encodeURIComponent(result.lead_id)}&mode=${isGroupBook ? 'group' : 'private'}`,
+        });
+        return;
       }
+
+      persistSuccess({
+        childName: childName.trim(),
+        childAge: childAge.trim(),
+        childGender,
+        parentPhone: parentPhone.trim(),
+      });
+      setShowForm(false);
+      setSuccess(true);
     } catch (err) {
       logError('invite-landing.submit', err);
-      Taro.showToast({ title: '预约失败，请重试', icon: 'none' });
+      Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
     } finally {
       setSubmitting(false);
     }
   }, [
-    bookLesson,
     childAge,
     childGender,
     childName,
+    hasLessonContext,
+    isGroupBook,
+    lessonExpired,
     params,
     parentPhone,
+    persistSuccess,
     profile?.name,
     session?.user.id,
     submitting,
@@ -345,11 +563,63 @@ const InviteLandingPage: React.FC = () => {
   }, []);
 
   const genderLabel = childGender === 'male' ? '男' : childGender === 'female' ? '女' : '';
+  const needLoginGate = bootstrapped && !guestMode && !session && !staffBlocked && !success;
+
+  if (!bootstrapped || authLoading || staffBlocked) {
+    return (
+      <PageContainer className="invite-landing">
+        <View className="center min-h-screen">
+          <Loading text={staffBlocked ? '仅家长可访问...' : '加载中...'} />
+        </View>
+      </PageContainer>
+    );
+  }
+
+  /* ---------- 须先微信登录 ---------- */
+  if (needLoginGate) {
+    return (
+      <PageContainer className="invite-landing">
+        <View
+          className="invite-b-bg center min-h-screen px-[48rpx]"
+          style={{ paddingTop: `${statusBarHeight + navBarHeight}px` }}
+        >
+          <View className="w-full max-w-[600rpx] rounded-[32rpx] bg-card px-[36rpx] py-[48rpx] shadow-card">
+            <View className="mb-[28rpx] flex flex-col items-center">
+              <Image src={BRAND_LOGO} className="mb-[20rpx] h-[88rpx] w-[88rpx]" mode="aspectFit" />
+              <Text className="text-[34rpx] font-bold text-foreground">老师邀请你预约试听</Text>
+              <Text className="mt-[12rpx] text-center text-[26rpx] leading-relaxed text-muted-foreground">
+                请先微信登录后查看课程详情。仅需微信授权，无需绑定邮箱。
+              </Text>
+            </View>
+            <View
+              className={cn(
+                'center h-[96rpx] rounded-[28rpx] bg-gradient-wechat shadow-wechat-btn active:opacity-90',
+                wechatSubmitting && 'opacity-60',
+              )}
+              onClick={handleWechatLogin}
+            >
+              <Text className="text-[30rpx] font-semibold text-white">
+                {wechatSubmitting ? '登录中...' : '微信一键登录'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </PageContainer>
+    );
+  }
 
   /* ---------- 预约成功页 ---------- */
   if (success) {
     return (
       <PageContainer className="invite-landing">
+        <View
+          className="invite-home-btn"
+          style={{ top: `${homeBtnTop}px` }}
+          onClick={handleDone}
+        >
+          <Icon name="mdi-home" size={36} color="foreground" />
+        </View>
+
         <ScrollView scrollY className="h-screen" showScrollbar={false}>
           <View className="invite-success-banner relative h-[340rpx] overflow-hidden">
             <Image
@@ -357,13 +627,7 @@ const InviteLandingPage: React.FC = () => {
               className="absolute inset-0 h-full w-full"
               mode="aspectFill"
             />
-            <View className="absolute inset-0 bg-black/35" />
-            <View className="absolute bottom-[72rpx] left-0 right-0 z-[2] flex items-center justify-center gap-[16rpx]">
-              <View className="flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-success text-white shadow-card">
-                <Text className="text-[28rpx] font-bold">✓</Text>
-              </View>
-              <Text className="text-[36rpx] font-bold text-white">预约成功</Text>
-            </View>
+            <View className="absolute inset-0 bg-black/30" />
           </View>
 
           <View className="relative z-[3] -mt-[80rpx] mx-[28rpx] rounded-[32rpx] bg-card p-[28rpx] shadow-campus">
@@ -462,10 +726,20 @@ const InviteLandingPage: React.FC = () => {
             </View>
           </View>
 
-          <View className="mx-[28rpx] mt-[24rpx] pb-[160rpx]">
-            <Text className="mb-[16rpx] block text-center text-[24rpx] text-muted-foreground">
+          {/* 大对号：居中放在校区卡片下方 */}
+          <View className="invite-success-check">
+            <View className="invite-success-check__ring">
+              <View className="invite-success-check__mark">
+                <Text className="text-[64rpx] font-bold leading-none text-white">✓</Text>
+              </View>
+            </View>
+            <Text className="mt-[24rpx] text-[40rpx] font-bold text-foreground">预约成功</Text>
+            <Text className="mt-[12rpx] text-center text-[24rpx] leading-relaxed text-muted-foreground">
               试听名额已锁定。可导航到店或电话联系校区。
             </Text>
+          </View>
+
+          <View className="mx-[28rpx] mt-[16rpx] pb-[160rpx]">
             <View className="rounded-[24rpx] border border-border bg-card p-[28rpx]">
               <Text className="mb-[16rpx] block text-[30rpx] font-bold text-foreground">
                 {courseTitle}
@@ -520,7 +794,10 @@ const InviteLandingPage: React.FC = () => {
         className={cn('h-screen', showVoucher && 'invite-dim')}
         showScrollbar={false}
       >
-        <View className="invite-b-bg min-h-screen pb-[200rpx]">
+        <View
+          className="invite-b-bg min-h-screen pb-[200rpx]"
+          style={{ paddingTop: `${statusBarHeight + navBarHeight}px` }}
+        >
           <View className="flex items-center justify-center gap-[16rpx] px-[32rpx] pt-[24rpx]">
             <View
               className="h-[72rpx] w-[72rpx] overflow-hidden rounded-[20rpx]"
@@ -554,7 +831,11 @@ const InviteLandingPage: React.FC = () => {
                     {isGroupBook ? '团课预约' : '免费试听'}
                   </Text>
                 </View>
-                {claimed ? (
+                {lessonExpired ? (
+                  <View className="rounded-full bg-muted px-[20rpx] py-[6rpx]">
+                    <Text className="text-[22rpx] font-semibold text-muted-foreground">已结束</Text>
+                  </View>
+                ) : claimed ? (
                   <View className="rounded-full bg-success/10 px-[20rpx] py-[6rpx]">
                     <Text className="text-[22rpx] font-semibold text-success">已领券</Text>
                   </View>
@@ -600,12 +881,20 @@ const InviteLandingPage: React.FC = () => {
               </View>
             ) : null}
             <Text className="block text-[30rpx] font-bold text-foreground">
-              {claimed ? (isGroupBook ? '预约本场团课' : '预约本场免费试听') : '领取试听券后可预约'}
+              {lessonExpired
+                ? '本场课程已结束'
+                : claimed
+                  ? isGroupBook
+                    ? '预约本场团课'
+                    : '预约本场免费试听'
+                  : '领取试听券后可预约'}
             </Text>
             <Text className="mt-[8rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
-              {claimed
-                ? '点击下方立即预约；未登录将先完成微信一键登录，并开通上课提醒。'
-                : '老师分享了本场课程。请先领取免费试听券，再完成登录与预约。'}
+              {lessonExpired
+                ? `这场课已经上过了，无法再预约该时段。请联系${teacherName ? `老师「${teacherName}」` : '老师'}重新安排试听时间${campus?.phone ? '，也可直接电话联系校区' : ''}。`
+                : claimed
+                  ? '点击下方立即预约，并开通上课提醒。'
+                  : '老师分享了本场课程。请先领取免费试听券，再完成预约。'}
             </Text>
           </View>
         </View>
@@ -613,17 +902,34 @@ const InviteLandingPage: React.FC = () => {
 
       {claimed ? (
         <View className="invite-dock">
-          <View
-            className="center h-[96rpx] rounded-[28rpx] bg-gradient-primary shadow-card active:opacity-90"
-            onClick={handleBookClick}
-          >
-            <Text className="text-[32rpx] font-bold text-white">立即预约</Text>
-          </View>
+          {lessonExpired ? (
+            campus?.phone ? (
+              <View
+                className="center h-[96rpx] rounded-[28rpx] bg-gradient-primary shadow-card active:opacity-90"
+                onClick={handleCallPhone}
+              >
+                <Text className="text-[32rpx] font-bold text-white">联系校区重新约课</Text>
+              </View>
+            ) : (
+              <View className="center h-[96rpx] rounded-[28rpx] border border-border bg-card">
+                <Text className="text-[28rpx] text-muted-foreground">
+                  请联系老师{teacherName ? `「${teacherName}」` : ''}另约时间
+                </Text>
+              </View>
+            )
+          ) : (
+            <View
+              className="center h-[96rpx] rounded-[28rpx] bg-gradient-primary shadow-card active:opacity-90"
+              onClick={handleBookClick}
+            >
+              <Text className="text-[32rpx] font-bold text-white">立即预约</Text>
+            </View>
+          )}
         </View>
       ) : null}
 
-      {/* 试听券弹框 */}
-      {showVoucher ? (
+      {/* 试听券弹框（场次未过期才展示） */}
+      {showVoucher && !lessonExpired ? (
         <View className="invite-mask center">
           <View className="invite-voucher-pop">
             <View className="invite-voucher-shine" />
@@ -665,15 +971,15 @@ const InviteLandingPage: React.FC = () => {
         </View>
       ) : null}
 
-      {/* 微信登录弹框 */}
-      {showLogin ? (
+      {/* 微信登录弹框（预约流程中途补登） */}
+      {showLogin && isLoggedIn === false && !needLoginGate ? (
         <View className="invite-mask center">
           <View className="w-[600rpx] rounded-[32rpx] bg-card px-[36rpx] py-[40rpx]">
             <Text className="mb-[12rpx] block text-center text-[34rpx] font-bold text-foreground">
               微信一键登录
             </Text>
             <Text className="mb-[32rpx] block text-center text-[26rpx] leading-relaxed text-muted-foreground">
-              预约前请先登录。登录后将开启微信提醒，方便校区通知你预约确认、开课提醒和课后反馈。
+              预约前请先登录。仅需微信授权，无需绑定邮箱。
             </Text>
             <View
               className={cn(
@@ -686,21 +992,12 @@ const InviteLandingPage: React.FC = () => {
                 {wechatSubmitting ? '登录中...' : '微信一键登录'}
               </Text>
             </View>
-            <View
-              className="center mt-[16rpx] h-[72rpx] active:opacity-70"
-              onClick={() => {
-                openFormAfterLoginRef.current = false;
-                setShowLogin(false);
-              }}
-            >
-              <Text className="text-[26rpx] text-muted-foreground">取消</Text>
-            </View>
           </View>
         </View>
       ) : null}
 
-      {/* 填表弹层 */}
-      {showForm ? (
+      {/* 填表弹层（过期场次不展示） */}
+      {showForm && !lessonExpired ? (
         <View className="invite-mask bottom">
           <View className="invite-sheet w-full rounded-t-[32rpx] bg-card px-[32rpx] pb-[48rpx] pt-[16rpx]">
             <View className="mx-auto mb-[24rpx] h-[8rpx] w-[72rpx] rounded-full bg-border" />

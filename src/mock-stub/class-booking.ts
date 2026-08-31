@@ -14,3 +14,4 @@ export async function mockAddBookingRecord(..._args: any[]): Promise<any> { retu
 export async function mockRemoveBookingRecord(..._args: any[]): Promise<any> { return null; }
 export async function mockAutoOpenSlotsIfNeeded(..._args: any[]): Promise<any> { return null; }
 export async function mockUpdateSlotStatus(..._args: any[]): Promise<any> { return null; }
+export async function mockListRelatedClassBookings(..._args: any[]): Promise<any> { return null; }

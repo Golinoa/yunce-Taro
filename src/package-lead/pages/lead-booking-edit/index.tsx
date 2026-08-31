@@ -14,9 +14,11 @@ import Icon from '@/components/Icon';
 import PickerSheet, { type PickerOption } from '@/components/PickerSheet';
 import TimePickerSheet from '@/components/TimePickerSheet';
 import { leadService, teacherService } from '@/services';
+import { useCampusStore } from '@/stores/campus';
 import type { LeadBooking, LeadBookingDifficulty } from '@/types/lead';
 import type { TeacherUIModel } from '@/types/teacher';
-import { useAuth } from '@/utils/auth';
+import { isPrincipalOrAbove, useAuth } from '@/utils/auth';
+import { resolveTeachingActorId } from '@/utils/trial-booking-scope';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 interface PageParams {
@@ -114,6 +116,9 @@ const FormRow: React.FC<{
 
 const LeadBookingEditPage: React.FC = () => {
   const { profile } = useAuth();
+  const currentCampusId = useCampusStore((s) => s.currentCampusId);
+  const teachingActorId = resolveTeachingActorId(profile);
+  const role = profile?.currentContext?.role;
   const navSafeHeight = useNavSafeHeight();
   const [params, setParams] = useState<PageParams>({});
   const [booking, setBooking] = useState<LeadBooking | null>(null);
@@ -157,11 +162,14 @@ const LeadBookingEditPage: React.FC = () => {
     if (!params.bookingId) return;
     setLoading(true);
     try {
+      const dateRange = {
+        startDate: dayjs().subtract(30, 'day').format('YYYY-MM-DD'),
+        endDate: dayjs().add(30, 'day').format('YYYY-MM-DD'),
+      };
       const [list, teacherList] = await Promise.all([
-        leadService.getLeadBookingsByTeacher(profile?.id || '', {
-          startDate: dayjs().subtract(30, 'day').format('YYYY-MM-DD'),
-          endDate: dayjs().add(30, 'day').format('YYYY-MM-DD'),
-        }),
+        isPrincipalOrAbove(role)
+          ? leadService.getLeadBookingsByCampus(currentCampusId, dateRange)
+          : leadService.getLeadBookingsByTeacher(teachingActorId, dateRange),
         teacherService.getList(),
       ]);
       const found = list.find((b) => b.id === params.bookingId) || null;
@@ -182,7 +190,11 @@ const LeadBookingEditPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [params.bookingId, profile?.id]);
+  }, [currentCampusId, params.bookingId, role, teachingActorId]);
+
+  useEffect(() => {
+    void loadBooking();
+  }, [loadBooking]);
 
   useDidShow(() => {
     void loadBooking();

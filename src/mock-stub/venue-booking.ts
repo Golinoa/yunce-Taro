@@ -8,4 +8,5 @@ export async function mockCreateVenueBooking(..._args: any[]): Promise<any> { re
 export async function mockCancelVenueBooking(..._args: any[]): Promise<any> { return null; }
 export async function mockCheckInVenueBooking(..._args: any[]): Promise<any> { return null; }
 export async function mockGetMyVenueBookings(..._args: any[]): Promise<any> { return null; }
+export async function mockListRelatedVenueBookings(..._args: any[]): Promise<any> { return null; }
 export async function filterMyTodayVenueBookings(..._args: any[]): Promise<any> { return null; }

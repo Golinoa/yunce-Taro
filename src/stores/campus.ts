@@ -80,6 +80,8 @@ interface CampusState {
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<Holiday | null>;
   updateHoliday: (id: string, updates: Partial<Holiday>) => Promise<boolean>;
   deleteHoliday: (id: string) => Promise<boolean>;
+  clearHolidays: () => Promise<boolean>;
+  generateStatutoryHolidays: (year?: number) => Promise<number>;
 
   // 营业时间操作
   fetchBusinessHours: () => Promise<void>;
@@ -339,6 +341,34 @@ export const useCampusStore = create<CampusState>((set) => ({
       logError('deleteHoliday', err);
       set({ error: '删除节假日失败' });
       return false;
+    }
+  },
+
+  clearHolidays: async () => {
+    try {
+      const success = await holidayService.clearAll();
+      if (success) {
+        set({ holidays: [], error: null });
+        return true;
+      }
+      return false;
+    } catch (err) {
+      logError('clearHolidays', err);
+      set({ error: '清空节假日失败' });
+      return false;
+    }
+  },
+
+  generateStatutoryHolidays: async (year) => {
+    try {
+      const count = await holidayService.generateStatutory(year);
+      const holidays = await holidayService.getList();
+      set({ holidays, error: null });
+      return count;
+    } catch (err) {
+      logError('generateStatutoryHolidays', err);
+      set({ error: '生成法定节假日失败' });
+      return -1;
     }
   },
 

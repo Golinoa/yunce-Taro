@@ -6,11 +6,11 @@
  */
 import dayjs from 'dayjs';
 import type { AlertItem } from '@/components/statistics/AlertSheet';
-import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/constants/course-category-ui';
-import { loadCustomTodosMock, loadHomeMock } from '@/utils/mock-loaders';
+import { loadCustomTodosMock, loadHomeMock, loadStudentsMock } from '@/utils/mock-loaders';
 import { isUseMock } from '@/utils/build-env';
 import type { TodoItemData } from '@/data/home';
 import type {
+  TodoCollaborationMode,
   TodoCompletion,
   TodoItem,
   TodoItemCategory,
@@ -38,13 +38,21 @@ import { del, get, post, put } from '@/utils/request';
 import {
   buildStudentRechargeTodoDesc,
   buildStudentRechargeTodoTitle,
+  buildStudentRechargeTodoUrl,
+  isStudentRechargeTodoId,
   normalizeStudentRechargeTodoDesc,
+  parseStudentIdFromRechargeTodoId,
+  resolveDefaultRechargeAssigneeIds,
 } from '@/utils/student-recharge-todo';
 import {
   clearTodoCompletion,
   getTodoCompletion,
   saveTodoCompletion,
 } from '@/utils/todo-completion';
+import {
+  getTodoAssigneeOverride,
+  saveTodoAssigneeOverride,
+} from '@/utils/todo-assignee-override';
 import { getTodoQuadrantOverride, saveTodoQuadrantOverride } from '@/utils/todo-quadrant-override';
 import {
   clearTodoRead,
@@ -90,9 +98,10 @@ interface BackendTodoMutationResponse {
 }
 
 const TODO_TYPE_URL: Partial<Record<TodoItemData['type'], string>> = {
-  recharge: '/package-course/pages/recharge-records/index',
-  salary: '/package-teacher/pages/salary-payment/index',
-  checkin: COURSE_MANAGEMENT_CLASS_TAB_URL,
+  // 教师自查工资台账；发薪管理页仅校长（见 route-guard）
+  salary: '/package-teacher/pages/monthly-flow/index?tab=salary',
+  // 缺 scheduleId 时进课表今日，禁止跳课程管理（教师无权限）
+  checkin: '/pages/schedule/index',
   lead: '/package-lead/pages/my-invite/index',
 };
 
@@ -190,6 +199,9 @@ function enrichTodoItem(todo: TodoItem, userId?: string): TodoItem {
         : dayjs().format('YYYY-MM-DD'));
 
   const quadrantOverride = userId ? getTodoQuadrantOverride(userId, todo.id) : null;
+  const assigneeOverride = isStudentRechargeTodoId(todo.id)
+    ? getTodoAssigneeOverride(todo.id)
+    : null;
   const sourceType = todo.sourceType || (todo.pushedAt ? 'system' : undefined);
 
   return {
@@ -201,6 +213,7 @@ function enrichTodoItem(todo: TodoItem, userId?: string): TodoItem {
     completion,
     completed: Boolean(completion || todo.completed),
     ...(quadrantOverride ? { quadrant: quadrantOverride } : {}),
+    ...(assigneeOverride ? { assigneeTeacherIds: assigneeOverride } : {}),
   };
 }
 
@@ -211,12 +224,17 @@ function mapTodoItem(item: TodoItemData): TodoItem {
       : item.type === 'recharge'
         ? buildStudentRechargeTodoDesc(item.remainingHours)
         : item.type === 'salary'
-          ? `${item.time} 前往薪资管理`
+          ? `${item.time} 查看工资记录`
           : item.type === 'checkin'
             ? `${item.time}，点击进入补点名`
             : item.type === 'lead'
               ? `${item.time} 查看线索跟进`
               : `${item.time} 查看安排`;
+
+  const isRecharge = item.type === 'recharge';
+  const studentId = isRecharge
+    ? parseStudentIdFromRechargeTodoId(item.id) || item.id.replace(/^alert-recharge-/, '')
+    : undefined;
 
   const url =
     item.type === 'checkin' && item.scheduleId
@@ -224,10 +242,9 @@ function mapTodoItem(item: TodoItemData): TodoItem {
         `&classId=${encodeURIComponent(item.classId || '')}` +
         `&lessonDate=${encodeURIComponent(item.lessonDate || '')}` +
         `&hasTrialStudent=0`
-      : TODO_TYPE_URL[item.type];
-
-  const isRecharge = item.type === 'recharge';
-  const studentId = isRecharge ? item.id.replace(/^alert-recharge-/, '') : undefined;
+      : isRecharge && studentId
+        ? buildStudentRechargeTodoUrl(studentId)
+        : TODO_TYPE_URL[item.type];
 
   return {
     id: item.id,
@@ -299,7 +316,7 @@ function mapOperationAlertToStudentTodos(alert: {
       id: todoId,
       title: buildStudentRechargeTodoTitle(detail.name),
       desc: normalizeStudentRechargeTodoDesc(detail.info),
-      url: '/package-course/pages/recharge-records/index',
+      url: buildStudentRechargeTodoUrl(detail.refId),
       level: detail.info.includes('已用尽') ? 'urgent' : mapAlertLevelToTodoLevel(alert.level),
       category: 'studentRecharge',
       sourceType: 'system',
@@ -307,11 +324,72 @@ function mapOperationAlertToStudentTodos(alert: {
       pushedAt,
       remindAt: pushedAt,
       remindEnabled: true,
+      collaborationMode: 'collaborative',
       refType: 'student',
       refId: detail.refId,
     });
   }
   return todos;
+}
+
+/** Mock：校长/管理员/负责老师 → 默认参与人；手动覆盖优先 */
+async function attachMockRechargeAssignees(
+  todos: TodoItem[],
+  campusId?: string,
+): Promise<TodoItem[]> {
+  const need = todos.filter((todo) => isStudentRechargeTodoId(todo.id));
+  if (need.length === 0) return todos;
+
+  const [{ mockGetStudentById, mockGetTeachers }, { IDENTITIES }] = await Promise.all([
+    loadStudentsMock(),
+    import('@/data/mock-database'),
+  ]);
+  const teachers = await mockGetTeachers();
+  const roleByUserId = new Map(IDENTITIES.map((identity) => [identity.userId, identity.role]));
+
+  const staff = teachers.map((teacher) => ({
+    id: teacher.id,
+    identity: teacher.id === 'teacher-principal-001' ? 'principal' : undefined,
+    orgRole: roleByUserId.get(teacher.userId) || null,
+    campusIds: teacher.campusIds,
+  }));
+
+  const assigneeByTodoId = new Map<string, string[]>();
+  await Promise.all(
+    need.map(async (todo) => {
+      const override = getTodoAssigneeOverride(todo.id);
+      if (override) {
+        assigneeByTodoId.set(todo.id, override);
+        return;
+      }
+      const studentId = todo.refId || parseStudentIdFromRechargeTodoId(todo.id);
+      if (!studentId) {
+        assigneeByTodoId.set(todo.id, []);
+        return;
+      }
+      const student = await mockGetStudentById(studentId);
+      const responsibleTeacherId = student?.teacherId || null;
+      const studentCampusId = campusId || student?.campusId;
+      assigneeByTodoId.set(
+        todo.id,
+        resolveDefaultRechargeAssigneeIds({
+          responsibleTeacherId,
+          staff,
+          campusId: studentCampusId,
+        }),
+      );
+    }),
+  );
+
+  return todos.map((todo) => {
+    const assignees = assigneeByTodoId.get(todo.id);
+    if (!assignees) return todo;
+    return {
+      ...todo,
+      assigneeTeacherIds: assignees,
+      collaborationMode: todo.collaborationMode || 'collaborative',
+    };
+  });
 }
 
 function dedupeTodosById(items: TodoItem[]): TodoItem[] {
@@ -365,23 +443,34 @@ async function getListFromMock(params: TodoListParams): Promise<TodoItem[]> {
     statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch((): AlertItem[] => []),
   ]);
 
-  const operationTodos = operationAlertList
-    .flatMap(mapOperationAlertToStudentTodos)
-    .filter((todo) => canShared || todo.sharedScope !== 'campus_ops');
-  const financeTodos = financeAlertList
-    .filter((alert) => alert.id !== 'fin-stable')
-    .map(mapAlertToTodoItem)
-    .map((todo) =>
-      enrichTodoItem({ ...todo, sourceType: 'system', pushedAt: new Date().toISOString() }, userId),
-    );
+  const operationTodos = await attachMockRechargeAssignees(
+    operationAlertList
+      .flatMap(mapOperationAlertToStudentTodos)
+      .filter((todo) => canShared || todo.sharedScope !== 'campus_ops'),
+    campusId,
+  );
+  // 经营预警详情页仅校长/管理员可进；教师不下发该类待办，避免点进无权限
+  const financeTodos =
+    role === 'admin' || role === 'principal'
+      ? financeAlertList
+          .filter((alert) => alert.id !== 'fin-stable')
+          .map(mapAlertToTodoItem)
+          .map((todo) =>
+            enrichTodoItem(
+              { ...todo, sourceType: 'system', pushedAt: new Date().toISOString() },
+              userId,
+            ),
+          )
+      : [];
   const alertTodoItems = [...operationTodos, ...financeTodos].map((todo) =>
     enrichTodoItem(todo, userId),
   );
 
   const { mockGetTodoItems } = await loadHomeMock();
-  const fixedTodos = (await mockGetTodoItems(teacherId || '', campusId))
-    .map(mapTodoItem)
-    .map((todo) => enrichTodoItem(todo, userId));
+  const fixedTodos = await attachMockRechargeAssignees(
+    (await mockGetTodoItems(teacherId || '', campusId)).map(mapTodoItem),
+    campusId,
+  ).then((items) => items.map((todo) => enrichTodoItem(todo, userId)));
 
   // 预警续费优先：同 id 时保留先出现的 alert 项
   const result = filterTodosBySettings(
@@ -519,13 +608,60 @@ export const todoService = {
     return true;
   },
 
-  /** 更新自定义待办（仅 custom） */
+  /** 更新待办：自定义全量；续费系统待办仅参与人（+四象限） */
   update: async (
     userId: string,
     todoId: string,
     input: UpdateCustomTodoInput,
   ): Promise<TodoItem | null> => {
-    if (!userId || !todoId || !isCustomTodoId(todoId)) return null;
+    if (!userId || !todoId) return null;
+
+    if (isStudentRechargeTodoId(todoId)) {
+      if (input.collaboratorIds !== undefined) {
+        saveTodoAssigneeOverride(todoId, input.collaboratorIds || []);
+      }
+      if (input.quadrant) {
+        saveTodoQuadrantOverride(userId, todoId, input.quadrant);
+      }
+      if (!isUseMock()) {
+        try {
+          await put<TodoItem>(`/todos/${encodeURIComponent(todoId)}`, {
+            collaboratorIds: input.collaboratorIds,
+            collaborationMode: input.collaborationMode,
+            quadrant: input.quadrant,
+          });
+        } catch {
+          // 后端暂未支持系统待办编辑时，保留本地覆盖
+        }
+      }
+      const studentId = parseStudentIdFromRechargeTodoId(todoId) || '';
+      const assignees =
+        input.collaboratorIds !== undefined
+          ? input.collaboratorIds
+          : getTodoAssigneeOverride(todoId) || [];
+      return enrichTodoItem(
+        {
+          id: todoId,
+          title: input.title || '课时续费提醒',
+          desc: input.note || '',
+          url: studentId ? buildStudentRechargeTodoUrl(studentId) : undefined,
+          category: 'studentRecharge',
+          sourceType: 'system',
+          sharedScope: 'campus_ops',
+          assigneeTeacherIds: assignees,
+          collaborationMode:
+            (input.collaborationMode as TodoCollaborationMode | undefined) ||
+            (assignees.length > 0 ? 'collaborative' : undefined),
+          quadrant: input.quadrant,
+          remindEnabled: true,
+          refType: 'student',
+          refId: studentId || undefined,
+        },
+        userId,
+      );
+    }
+
+    if (!isCustomTodoId(todoId)) return null;
     if (isUseMock()) {
       const record = updateCustomTodo(userId, todoId, input);
       return record ? mapCustomTodoToHomeItem(record) : null;

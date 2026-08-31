@@ -38,6 +38,7 @@ import { resolveTodoQuadrant } from '@/types/todo-quadrant';
 import { useAuth } from '@/utils/auth';
 import { isCustomTodoId } from '@/utils/custom-todos';
 import { logError } from '@/utils/logger';
+import { isStudentRechargeTodoId } from '@/utils/student-recharge-todo';
 import {
   TODO_CATEGORY_ALL_ID,
   TODO_CATEGORY_INBOX_ID,
@@ -147,6 +148,9 @@ function TodoDetailPopover({
   const keyboardHeight = useKeyboardHeight(isOpen && !subSheetOpen);
 
   const isCustom = Boolean(item && (item.sourceType === 'custom' || isCustomTodoId(item.id)));
+  /** 课时续费系统待办：允许改参与人 / 优先级并保存 */
+  const isEditableSystemRecharge = Boolean(item && isStudentRechargeTodoId(item.id));
+  const canSave = isCustom || isEditableSystemRecharge;
   const hasProcessUrl = Boolean(item?.url);
 
   const categoryOptions = useMemo(
@@ -251,6 +255,13 @@ function TodoDetailPopover({
   const isDirty = useMemo(() => {
     const snap = snapshotRef.current;
     if (!snap) return false;
+    if (isEditableSystemRecharge) {
+      return (
+        quadrant !== snap.quadrant ||
+        collaborationMode !== snap.collaborationMode ||
+        !sameIdList(collaboratorIds, snap.collaboratorIds)
+      );
+    }
     return (
       title.trim() !== snap.title.trim() ||
       note.trim() !== snap.note.trim() ||
@@ -266,6 +277,7 @@ function TodoDetailPopover({
     categoryId,
     collaborationMode,
     collaboratorIds,
+    isEditableSystemRecharge,
     note,
     quadrant,
     remindDate,
@@ -288,35 +300,37 @@ function TodoDetailPopover({
 
   const handleSave = useCallback(async () => {
     if (!item || busy) return;
-    if (!isCustom) {
+    if (!canSave) {
       Taro.showToast({ title: '系统待办暂不支持修改', icon: 'none' });
       return;
     }
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      Taro.showToast({ title: '请填写标题', icon: 'none' });
-      return;
-    }
-    if (trimmedTitle.length > 50) {
-      Taro.showToast({ title: '标题不超过50字', icon: 'none' });
-      return;
+    if (isCustom) {
+      if (!trimmedTitle) {
+        Taro.showToast({ title: '请填写标题', icon: 'none' });
+        return;
+      }
+      if (trimmedTitle.length > 50) {
+        Taro.showToast({ title: '标题不超过50字', icon: 'none' });
+        return;
+      }
     }
 
     setBusy(true);
     try {
       await onSave(item, {
-        title: trimmedTitle,
+        title: trimmedTitle || item.title,
         note: note.trim() || undefined,
-        remindEnabled,
-        remindDate: remindEnabled ? remindDate : undefined,
-        remindTime: remindEnabled ? remindTime : undefined,
+        remindEnabled: isCustom ? remindEnabled : Boolean(item.remindEnabled !== false),
+        remindDate: isCustom && remindEnabled ? remindDate : undefined,
+        remindTime: isCustom && remindEnabled ? remindTime : undefined,
         quadrant,
-        categoryId,
-        collaboratorIds: collaboratorIds.length > 0 ? collaboratorIds : undefined,
+        categoryId: isCustom ? categoryId : item.todoCategoryId,
+        collaboratorIds: collaboratorIds.length > 0 ? collaboratorIds : [],
         collaborationMode: collaboratorIds.length > 0 ? collaborationMode : undefined,
       });
       snapshotRef.current = {
-        title: trimmedTitle,
+        title: trimmedTitle || item.title,
         note: note.trim(),
         remindEnabled,
         remindDate,
@@ -336,6 +350,7 @@ function TodoDetailPopover({
     }
   }, [
     busy,
+    canSave,
     categoryId,
     collaborationMode,
     collaboratorIds,
@@ -432,21 +447,24 @@ function TodoDetailPopover({
           >
             <View className="px-[40rpx] pt-[28rpx] pb-[calc(28rpx+env(safe-area-inset-bottom))]">
               <CustomTodoCategoryHeader
-                categoryLabel={categoryLabel}
-                categoryMenuOpen={categoryMenuOpen}
-                categoryOptions={categoryOptions}
+                categoryLabel={isCustom ? categoryLabel : '课时续费'}
+                categoryMenuOpen={isCustom ? categoryMenuOpen : false}
+                categoryOptions={isCustom ? categoryOptions : []}
                 categoryId={categoryId}
-                onToggleMenu={() => setCategoryMenuOpen((open) => !open)}
+                onToggleMenu={isCustom ? () => setCategoryMenuOpen((open) => !open) : () => undefined}
                 onCloseMenu={() => setCategoryMenuOpen(false)}
                 onSelectCategory={(id) => {
+                  if (!isCustom) return;
                   setCategoryId(id);
                   setCategoryMenuOpen(false);
                 }}
-                onCreateCategory={onCreateCategory ? handleOpenAddCategory : undefined}
+                onCreateCategory={
+                  isCustom && onCreateCategory ? handleOpenAddCategory : undefined
+                }
                 onClosePopover={onClose}
               />
 
-              {formReady ? (
+              {isCustom && formReady ? (
                 <CustomTodoTitleNoteFields
                   title={title}
                   note={note}
@@ -460,12 +478,12 @@ function TodoDetailPopover({
                   </Text>
                   <View className="my-[14rpx] h-[2rpx] bg-border" />
                   <Text className="block min-h-[108rpx] text-[26rpx] leading-[40rpx] text-muted-foreground">
-                    {note || '待办描述（选填）'}
+                    {note || item.desc || '待办描述（选填）'}
                   </Text>
                 </View>
               )}
 
-              {remindEditing ? (
+              {isCustom && remindEditing ? (
                 <CustomTodoRemindSwitchRow
                   remindEnabled={remindEnabled}
                   remindDate={remindDate}
@@ -479,7 +497,7 @@ function TodoDetailPopover({
               ) : (
                 <CustomTodoRemindDisplayRow
                   displayText={remindDisplayText}
-                  onEdit={() => setRemindEditing(true)}
+                  onEdit={isCustom ? () => setRemindEditing(true) : undefined}
                 />
               )}
 
@@ -527,7 +545,7 @@ function TodoDetailPopover({
                   className={cn(
                     'center h-[80rpx] flex-1 rounded-[16rpx] press-scale',
                     busy && !showProcessAction ? 'bg-muted' : 'bg-primary',
-                    !isCustom && !showProcessAction && 'opacity-60',
+                    !canSave && !showProcessAction && 'opacity-60',
                   )}
                   onClick={busy ? undefined : handlePrimary}
                 >

@@ -538,6 +538,54 @@ button.privacy-agree-btn:active {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+
+/**
+ * 家长首页板块外壳：干净白卡片（轻阴影）
+ * 内层小卡再用淡色磨砂点缀
+ */
+.parent-glass-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 32rpx;
+  padding: 28rpx 24rpx 24rpx;
+  border: 2rpx solid hsl(var(--border) / 0.55);
+  background: hsl(var(--card));
+  box-shadow: 0 8rpx 28rpx -10rpx hsl(var(--primary) / 0.08);
+}
+
+/* 外层不再用重色光斑，保留类名避免 JSX 报空 */
+.parent-glass-shell__orb {
+  display: none;
+}
+
+.parent-glass-shell__orb--tr,
+.parent-glass-shell__orb--bl {
+  display: none;
+}
+
+/**
+ * 内层小卡：淡主题色磨砂玻璃，点缀即可勿过重
+ */
+.parent-glass-inner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24rpx;
+  border: 2rpx solid hsl(var(--primary) / 0.08);
+  background:
+    linear-gradient(
+      145deg,
+      hsl(var(--primary) / 0.06) 0%,
+      rgba(255, 255, 255, 0.72) 48%,
+      hsl(var(--primary-glow) / 0.05) 100%
+    ),
+    rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 2rpx 12rpx hsl(var(--primary) / 0.04),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+}
+
 .icon-glass {
   background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(12px) saturate(180%);
@@ -679,6 +727,45 @@ button.privacy-agree-btn:active {
   opacity: 0.65;
   z-index: -1;
   animation: tab-indicator-pulse 2s ease-in-out infinite;
+}
+
+/**
+ * 家长首页板块标题：同教师端「今日课表」选中态底色（椭圆弥散笔触）
+ */
+.parent-section-title {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  z-index: 0;
+  padding: 4rpx 6rpx 10rpx;
+  overflow: visible;
+}
+.parent-section-title__label {
+  position: relative;
+  z-index: 1;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: hsl(var(--foreground));
+  line-height: 1.2;
+}
+.parent-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 6rpx;
+  left: 6%;
+  width: 68%;
+  height: 14rpx;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary-glow)) 50%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  filter: blur(3rpx);
+  opacity: 0.58;
+  z-index: 0;
+  transform: rotate(-3deg) skewX(-12deg);
 }
 
 /* 待办 Tab 圆形提醒数字：与文字同行，空为 0 时不渲染 */

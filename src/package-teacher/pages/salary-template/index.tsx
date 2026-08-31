@@ -85,7 +85,7 @@ const SalaryTemplateListPage: React.FC = () => {
     if (ok) {
       Taro.showToast({ title: '套用成功', icon: 'success' });
     } else {
-      Taro.showToast({ title: '套用失败', icon: 'none' });
+      Taro.showToast({ title: '模板套用尚未开通', icon: 'none' });
     }
     setApplyState({ phase: 'none' });
   }, [applyState, applySalaryTemplate]);

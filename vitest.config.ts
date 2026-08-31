@@ -25,7 +25,18 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/data/teacher.ts', 'src/data/lead.ts', 'src/data/store-entry.ts'],
+      // 门禁统计：已进入回归防护的 data/constants；随套件补全逐步扩展
+      include: [
+        'src/data/teacher.ts',
+        'src/data/lead.ts',
+        'src/data/store-entry.ts',
+        'src/constants/home-ui.ts',
+        'src/constants/membership-plans.ts',
+        'src/constants/membership-tips.ts',
+        'src/package-course/pages/package-form/constants.ts',
+        'src/components/InstallmentPanel/installment-utils.ts',
+        'src/components/DatePickerSheet/date-picker-utils.ts',
+      ],
       thresholds: {
         // 起步门槛：随回归套件补全逐步上调至 review 建议的 60%+
         lines: 30,

@@ -1,7 +1,7 @@
 import { View, Text, Input } from '@tarojs/components';
 import React from 'react';
-import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
+import StudentListCard from '@/components/student/StudentListCard';
 import type { Student } from '@/types/student';
 
 export interface StudentSelectSheetProps {
@@ -15,7 +15,7 @@ export interface StudentSelectSheetProps {
   onClose: () => void;
 }
 
-/** 学员选择底部弹窗组件 */
+/** 学员选择底部弹窗 — 行样式对齐意向学员 / StudentListCard */
 const StudentSelectSheet: React.FC<StudentSelectSheetProps> = ({
   show,
   visible,
@@ -30,7 +30,6 @@ const StudentSelectSheet: React.FC<StudentSelectSheetProps> = ({
 
   return (
     <BottomSheet show={show} visible={visible} title="选择学员" onClose={onClose} maxHeight="70vh">
-      {/* 搜索框 */}
       <View className="px-10 pt-4 pb-2">
         <View className="border-[2rpx] border-input rounded-[20rpx] py-[18rpx] px-[24rpx] bg-white">
           <Input
@@ -42,29 +41,32 @@ const StudentSelectSheet: React.FC<StudentSelectSheetProps> = ({
         </View>
       </View>
 
-      {/* 学员列表 */}
       <View className="px-10 pb-10">
-        {filteredStudents.map((stu) => (
-          <View
-            key={stu.id}
-            className={`flex items-center gap-5 py-5 border-b border-input/50 ${selectedStudent?.id === stu.id ? 'bg-primary-5 -mx-4 px-4 rounded-2xl' : ''}`}
-            onClick={() => onSelect(stu)}
-          >
-            <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" />
-            <View className="flex-1 min-w-0">
-              <Text className="text-md font-medium text-foreground block">{stu.name}</Text>
-              <Text className="text-[22rpx] text-muted-foreground/60 block mt-1">
-                {stu.phone || '暂无手机号'} · 剩余
-                {(stu.course_packages || []).reduce((s, p) => s + (p.remaining_hours || 0), 0)}
-                课时
-              </Text>
-            </View>
-            {selectedStudent?.id === stu.id && <Text className="text-primary text-lg">✓</Text>}
-          </View>
-        ))}
+        {filteredStudents.map((stu) => {
+          const remaining = (stu.course_packages || []).reduce(
+            (s, p) => s + (p.remaining_hours || 0),
+            0,
+          );
+          const selected = selectedStudent?.id === stu.id;
+          return (
+            <StudentListCard
+              key={stu.id}
+              variant="row"
+              name={stu.name}
+              nickname={stu.nickname}
+              avatarUrl={stu.avatar_url}
+              selected={selected}
+              subtitle={`${stu.phone || '暂无手机号'} · 剩余 ${remaining} 课时`}
+              right={
+                selected ? <Text className="text-primary text-[32rpx] font-semibold">✓</Text> : null
+              }
+              onClick={() => onSelect(stu)}
+            />
+          );
+        })}
         {filteredStudents.length === 0 && (
           <View className="py-10 text-center">
-            <Text className="text-md text-muted-foreground">未找到学员</Text>
+            <Text className="text-[28rpx] text-muted-foreground">未找到学员</Text>
           </View>
         )}
       </View>

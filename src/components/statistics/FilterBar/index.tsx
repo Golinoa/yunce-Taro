@@ -3,8 +3,9 @@
  * 原版：本月/上月/本年/去年/自定义
  * 激活态：白底绿色文字，未激活：透明底白色文字
  */
-import { View, Text, Picker } from '@tarojs/components';
-import React from 'react';
+import { View, Text } from '@tarojs/components';
+import React, { useState } from 'react';
+import DatePickerSheet from '@/components/DatePickerSheet';
 
 /** 筛选模式 */
 export type FilterMode = 'month' | 'quarter' | 'year' | 'custom';
@@ -51,6 +52,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   const isCustomActive = filterMode === 'custom';
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const [datePickerField, setDatePickerField] = useState<'start' | 'end' | null>(null);
 
   return (
     <View className="w-full">
@@ -83,35 +85,23 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
       {showCustomPicker && (
         <View className="mt-1_d5 flex flex-col gap-1_d5">
-          <View className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
+          <View
+            className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light"
+            onClick={() => setDatePickerField('start')}
+          >
             <Text className="text-base text-muted-foreground whitespace-nowrap">开始</Text>
-            <Picker
-              mode="date"
-              value={startDate || todayStr}
-              onChange={(e: Parameters<CommonEventFunction>[0]) => {
-                const val = (e as { detail?: { value?: string } }).detail?.value || '';
-                onStartChange(val);
-              }}
-            >
-              <Text className="text-lg font-semibold text-foreground">
-                {startDate || '选择开始日期'}
-              </Text>
-            </Picker>
+            <Text className="text-lg font-semibold text-foreground">
+              {startDate || '选择开始日期'}
+            </Text>
           </View>
-          <View className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light">
+          <View
+            className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-solid border-border-light"
+            onClick={() => setDatePickerField('end')}
+          >
             <Text className="text-base text-muted-foreground whitespace-nowrap">结束</Text>
-            <Picker
-              mode="date"
-              value={endDate || todayStr}
-              onChange={(e: Parameters<CommonEventFunction>[0]) => {
-                const val = (e as { detail?: { value?: string } }).detail?.value || '';
-                onEndChange(val);
-              }}
-            >
-              <Text className="text-lg font-semibold text-foreground">
-                {endDate || '选择结束日期'}
-              </Text>
-            </Picker>
+            <Text className="text-lg font-semibold text-foreground">
+              {endDate || '选择结束日期'}
+            </Text>
           </View>
           {startDate && endDate && onCustomQuery && (
             <View
@@ -123,6 +113,22 @@ const FilterBar: React.FC<FilterBarProps> = ({
           )}
         </View>
       )}
+
+      <DatePickerSheet
+        visible={Boolean(datePickerField)}
+        title={datePickerField === 'end' ? '选择结束日期' : '选择开始日期'}
+        value={
+          datePickerField === 'end'
+            ? endDate || todayStr
+            : startDate || todayStr
+        }
+        onClose={() => setDatePickerField(null)}
+        onConfirm={(date) => {
+          if (datePickerField === 'end') onEndChange(date);
+          else onStartChange(date);
+          setDatePickerField(null);
+        }}
+      />
     </View>
   );
 };

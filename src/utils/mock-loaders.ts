@@ -31,4 +31,5 @@ export const loadCardTypeMock = lazy(() => import('@/data/card-type'));
 export const loadLessonDebtMock = lazy(() => import('@/data/lesson-debt'));
 export const loadCustomTodosMock = lazy(() => import('@/data/custom-todos'));
 export const loadOnboardingMock = lazy(() => import('@/data/onboarding'));
+export const loadOpsAlertsMock = lazy(() => import('@/data/ops-alerts'));
 export const loadDataCenterMock = lazy(() => import('@/package-statistics/data/data-center-mock'));

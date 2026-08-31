@@ -3,17 +3,15 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
 import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/constants/course-category-ui';
+import { subjectService } from '@/services/campus';
 import { studentService, packageService, campusService, subscribeMessageService } from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
-import type { CampusUIModel } from '@/types/campus';
+import type { CampusUIModel, Subject } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
-import { useAuth } from '@/utils/auth';
-import { isUseMock } from '@/utils/build-env';
+import { isAdmin, useAuth } from '@/utils/auth';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
-
-const USE_MOCK = isUseMock();
 
 /** 支付方式选项 */
 export const FEE_METHOD_OPTIONS = [
@@ -27,8 +25,15 @@ export const FEE_METHOD_OPTIONS = [
 /** 学生类型 */
 export type StudentType = 'new' | 'old';
 
-/** 老生课时构成 */
-export type HoursComposition = 'purchased' | 'bonus' | 'mixed';
+/** 老生迁移课包草稿：科目 + 剩余课时 + 可选有效期 */
+export interface LegacyPackageDraft {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  remainingHours: string;
+  expireEnabled: boolean;
+  expireDate: string;
+}
 
 /** 表单错误 */
 export interface FormErrors {
@@ -36,19 +41,26 @@ export interface FormErrors {
   phone?: string;
   birthday?: string;
   initHours?: string;
-  totalHours?: string;
-  usedHours?: string;
-  hours?: string;
+  legacyPackages?: string;
   feeAmount?: string;
+}
+
+function createEmptyLegacyPackage(): LegacyPackageDraft {
+  return {
+    id: `lp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    subjectId: '',
+    subjectName: '',
+    remainingHours: '',
+    expireEnabled: false,
+    expireDate: '',
+  };
 }
 
 /** useStudentForm 返回值类型 */
 export interface UseStudentFormReturn {
-  // 路由参数
   isEdit: boolean;
   studentId: string;
 
-  // 基础信息字段
   name: string;
   setName: React.Dispatch<React.SetStateAction<string>>;
   nickname: string;
@@ -70,23 +82,25 @@ export interface UseStudentFormReturn {
   feeMethod: string;
   setFeeMethod: React.Dispatch<React.SetStateAction<string>>;
 
-  // 学生类型 & 课时
   studentType: StudentType;
   setStudentType: React.Dispatch<React.SetStateAction<StudentType>>;
   initHours: string;
   setInitHours: React.Dispatch<React.SetStateAction<string>>;
-  totalHours: string;
-  setTotalHours: React.Dispatch<React.SetStateAction<string>>;
-  usedHours: string;
-  setUsedHours: React.Dispatch<React.SetStateAction<string>>;
-  hoursComposition: HoursComposition;
-  setHoursComposition: React.Dispatch<React.SetStateAction<HoursComposition>>;
 
-  // 联系人
+  /** 老生：多课包迁移 */
+  legacyPackages: LegacyPackageDraft[];
+  addLegacyPackage: () => void;
+  removeLegacyPackage: (id: string) => void;
+  updateLegacyPackage: (id: string, patch: Partial<LegacyPackageDraft>) => void;
+  subjects: Subject[];
+
+  /** 可选：缴费信息 */
+  paymentEnabled: boolean;
+  setPaymentEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+
   contacts: ContactItem[];
   setContacts: React.Dispatch<React.SetStateAction<ContactItem[]>>;
 
-  // 分期付款
   installmentEnabled: boolean;
   setInstallmentEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   installmentPeriod: number;
@@ -94,11 +108,9 @@ export interface UseStudentFormReturn {
   schedule: ScheduleItem[];
   setSchedule: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
 
-  // 其他支付方式
   feeMethodOther: string;
   setFeeMethodOther: React.Dispatch<React.SetStateAction<string>>;
 
-  // 课包模板
   packageTemplates: CoursePackageTemplate[];
   selectedPackageId: string;
   setSelectedPackageId: React.Dispatch<React.SetStateAction<string>>;
@@ -106,15 +118,10 @@ export interface UseStudentFormReturn {
   showPackagePicker: boolean;
   setShowPackagePicker: React.Dispatch<React.SetStateAction<boolean>>;
 
-  // 所属校区
   campusId: string;
   setCampusId: React.Dispatch<React.SetStateAction<string>>;
   campusOptions: CampusUIModel[];
 
-  // 计算值
-  remainingHours: number;
-
-  // 表单状态
   loading: boolean;
   loadError: string;
   notFound: boolean;
@@ -123,7 +130,6 @@ export interface UseStudentFormReturn {
   canSubmit: boolean;
   submitBlockedReason: string;
 
-  // 方法
   clearError: (field: keyof FormErrors) => void;
   validate: () => boolean;
   handleChooseAvatar: () => Promise<void>;
@@ -136,7 +142,6 @@ export function useStudentForm(): UseStudentFormReturn {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
 
-  // 判断是编辑还是创建
   const { isEdit, studentId } = useMemo(() => {
     const instance = Taro.getCurrentInstance();
     const params = instance?.router?.params || {};
@@ -144,7 +149,6 @@ export function useStudentForm(): UseStudentFormReturn {
     return { isEdit: Boolean(id), studentId: id };
   }, []);
 
-  // 表单字段
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [gender, setGender] = useState('');
@@ -156,51 +160,36 @@ export function useStudentForm(): UseStudentFormReturn {
   const [feeAmount, setFeeAmount] = useState('');
   const [feeMethod, setFeeMethod] = useState<string>('');
 
-  // 学生类型 & 课时（仅新建模式）
   const [studentType, setStudentType] = useState<StudentType>('new');
   const [initHours, setInitHours] = useState('');
-  const [totalHours, setTotalHours] = useState('');
-  const [usedHours, setUsedHours] = useState('');
-  const [hoursComposition, setHoursComposition] = useState<HoursComposition>('purchased');
+  const [legacyPackages, setLegacyPackages] = useState<LegacyPackageDraft[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
 
-  // 联系人列表
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
+
   const [contacts, setContacts] = useState<ContactItem[]>([
     { id: '1', relation: '妈妈', phone: '' },
   ]);
 
-  // 分期付款
   const [installmentEnabled, setInstallmentEnabled] = useState(false);
   const [installmentPeriod, setInstallmentPeriod] = useState(3);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
-
-  // "其他"支付方式自定义输入
   const [feeMethodOther, setFeeMethodOther] = useState('');
 
-  // 课包模板（新生选择课包用）
   const [packageTemplates, setPackageTemplates] = useState<CoursePackageTemplate[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [showPackagePicker, setShowPackagePicker] = useState(false);
 
-  // 所属校区
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
   const [campusId, setCampusId] = useState('');
 
-  // Store 实例
   const updateStudentInCache = useStudentStore((state) => state.updateInCache);
   const fetchPackageTemplatesByTeacher = usePackageTemplateStore((state) => state.fetchByTeacher);
 
-  // 当前选中的课包模板
   const selectedPackage = useMemo(
     () => packageTemplates.find((t) => t.id === selectedPackageId),
     [packageTemplates, selectedPackageId],
   );
-
-  // 老学生剩余课时
-  const remainingHours = useMemo(() => {
-    const total = parseInt(totalHours) || 0;
-    const used = parseInt(usedHours) || 0;
-    return total - used;
-  }, [totalHours, usedHours]);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -209,16 +198,28 @@ export function useStudentForm(): UseStudentFormReturn {
   const [saving, setSaving] = useState(false);
   const initStartAtRef = useState({ current: 0 })[0];
 
+  const addLegacyPackage = useCallback(() => {
+    setLegacyPackages((prev) => [...prev, createEmptyLegacyPackage()]);
+  }, []);
+
+  const removeLegacyPackage = useCallback((id: string) => {
+    setLegacyPackages((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const updateLegacyPackage = useCallback((id: string, patch: Partial<LegacyPackageDraft>) => {
+    setLegacyPackages((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }, []);
+
   const loadFormData = useCallback(async () => {
     initStartAtRef.current = Date.now();
-    // #region debug-point H2:student-form-init-start
     reportLocalDebug({
       hypothesisId: 'H2',
       location: 'src/package-student/pages/student-form/useStudentForm.ts:loadFormData',
       msg: '[DEBUG] student form init start',
       data: { currentUserId, isEdit, studentId },
     });
-    // #endregion
     setLoading(true);
     setLoadError('');
     setNotFound(false);
@@ -230,8 +231,12 @@ export function useStudentForm(): UseStudentFormReturn {
     }
 
     try {
-      const campusList = await campusService.getList();
+      const [campusList, subjectList] = await Promise.all([
+        campusService.getList(),
+        subjectService.getList(),
+      ]);
       setCampusOptions(campusList);
+      setSubjects(subjectList);
       const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
 
       if (isEdit) {
@@ -251,6 +256,7 @@ export function useStudentForm(): UseStudentFormReturn {
         setAvatarUrl(stu.avatar_url || '');
         setFeeAmount(stu.fee_amount ? String(stu.fee_amount) : '');
         setFeeMethod(stu.fee_method || '');
+        setPaymentEnabled(Boolean(stu.fee_amount || stu.fee_method));
         setCampusId(stu.campus_id || mainCampusId);
         return;
       }
@@ -262,7 +268,6 @@ export function useStudentForm(): UseStudentFormReturn {
       logError('init student form', error);
       setLoadError('学员表单初始化失败，请稍后重试');
     } finally {
-      // #region debug-point H2:student-form-init-end
       reportLocalDebug({
         hypothesisId: 'H2',
         location: 'src/package-student/pages/student-form/useStudentForm.ts:loadFormData',
@@ -274,7 +279,6 @@ export function useStudentForm(): UseStudentFormReturn {
           durationMs: Date.now() - initStartAtRef.current,
         },
       });
-      // #endregion
       setLoading(false);
     }
   }, [currentUserId, isEdit, studentId, fetchPackageTemplatesByTeacher, initStartAtRef]);
@@ -283,7 +287,6 @@ export function useStudentForm(): UseStudentFormReturn {
     void loadFormData();
   }, [loadFormData]);
 
-  // 表单校验
   const validate = useCallback((): boolean => {
     const errs: FormErrors = {};
     const trimmedName = name.trim();
@@ -294,53 +297,57 @@ export function useStudentForm(): UseStudentFormReturn {
       errs.name = '姓名最多20个字';
     }
 
-    if (phone.trim()) {
-      if (!/^1[3-9]\d{9}$/.test(phone.trim())) {
-        errs.phone = '请输入正确的11位手机号';
-      }
+    if (phone.trim() && !/^1[3-9]\d{9}$/.test(phone.trim())) {
+      errs.phone = '请输入正确的11位手机号';
     }
 
     if (birthday) {
       const d = new Date(birthday);
       const now = new Date();
       now.setHours(23, 59, 59, 999);
-      if (d > now) {
-        errs.birthday = '出生日期不能晚于今天';
-      }
+      if (d > now) errs.birthday = '出生日期不能晚于今天';
     }
 
     if (!isEdit) {
       if (studentType === 'old') {
-        const total = parseInt(totalHours) || 0;
-        const used = parseInt(usedHours) || 0;
-        if (used > total) {
-          errs.hours = '已消课时不能大于总充值课时';
-        }
-        if (totalHours && total < 0) {
-          errs.totalHours = '总课时不能为负数';
-        }
-        if (usedHours && used < 0) {
-          errs.usedHours = '已消课时不能为负数';
+        if (legacyPackages.length === 0) {
+          errs.legacyPackages = '请至少添加一个课包';
+        } else {
+          const invalid = legacyPackages.some((pkg) => {
+            const hours = parseInt(pkg.remainingHours, 10);
+            if (!pkg.subjectId) return true;
+            if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) return true;
+            if (pkg.expireEnabled && !pkg.expireDate) return true;
+            return false;
+          });
+          if (invalid) {
+            errs.legacyPackages = '请完善每个课包的科目、剩余课时与有效期';
+          }
         }
       } else {
-        const init = parseInt(initHours) || 0;
-        if (initHours && init < 0) {
-          errs.initHours = '初始课时不能为负数';
-        }
+        const init = parseInt(initHours, 10) || 0;
+        if (initHours && init < 0) errs.initHours = '初始课时不能为负数';
       }
     }
 
-    // 金额校验
-    if (feeAmount.trim()) {
+    if (paymentEnabled && feeAmount.trim()) {
       const amount = parseFloat(feeAmount);
-      if (isNaN(amount) || amount < 0) {
-        errs.feeAmount = '金额不能为负数';
-      }
+      if (isNaN(amount) || amount < 0) errs.feeAmount = '金额不能为负数';
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [name, phone, birthday, isEdit, studentType, totalHours, usedHours, initHours, feeAmount]);
+  }, [
+    name,
+    phone,
+    birthday,
+    isEdit,
+    studentType,
+    initHours,
+    legacyPackages,
+    feeAmount,
+    paymentEnabled,
+  ]);
 
   const submitBlockedReason = useMemo(() => {
     if (!name.trim()) return '请输入学员姓名';
@@ -363,39 +370,45 @@ export function useStudentForm(): UseStudentFormReturn {
         if (!initHours.trim()) return '请填写初始课时';
         if (init <= 0) return '初始课时必须大于 0';
       } else {
-        const total = parseInt(totalHours, 10);
-        const used = parseInt(usedHours, 10);
-        if (!totalHours.trim()) return '请填写总充值课时';
-        if (Number.isNaN(total) || total <= 0) return '总充值课时必须大于 0';
-        if (!usedHours.trim()) return '请填写已消课时';
-        if (Number.isNaN(used) || used < 0) return '已消课时不能小于 0';
-        if (used > total) return '已消课时不能大于总充值课时';
+        if (legacyPackages.length === 0) return '请至少添加一个历史课包';
+        for (let i = 0; i < legacyPackages.length; i += 1) {
+          const pkg = legacyPackages[i];
+          const label = legacyPackages.length > 1 ? `课包${i + 1}` : '课包';
+          if (!pkg.subjectId) return `请选择${label}的科目`;
+          const hours = parseInt(pkg.remainingHours, 10);
+          if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) {
+            return `请填写${label}的剩余课时`;
+          }
+          if (pkg.expireEnabled && !pkg.expireDate) {
+            return `请选择${label}的到期日期`;
+          }
+        }
       }
     }
 
-    if (feeAmount.trim()) {
-      const amount = parseFloat(feeAmount);
-      if (Number.isNaN(amount) || amount < 0) return '缴费金额不能为负数';
-    }
-
-    if (feeMethod === 'other' && !feeMethodOther.trim()) {
-      return '请填写具体支付方式';
-    }
-
-    if (installmentEnabled) {
-      const amount = parseFloat(feeAmount || '0');
-      if (!feeAmount || Number.isNaN(amount) || amount <= 0) return '分期付款前请先填写缴费金额';
-      if (!schedule.length) return '请完善分期付款计划';
-      if (
-        schedule.some(
-          (item) =>
-            !item.date ||
-            !item.amount ||
-            Number.isNaN(parseFloat(String(item.amount))) ||
-            parseFloat(String(item.amount)) <= 0,
-        )
-      ) {
-        return '请填写完整的分期付款计划';
+    if (paymentEnabled) {
+      if (feeAmount.trim()) {
+        const amount = parseFloat(feeAmount);
+        if (Number.isNaN(amount) || amount < 0) return '缴费金额不能为负数';
+      }
+      if (feeMethod === 'other' && !feeMethodOther.trim()) {
+        return '请填写具体支付方式';
+      }
+      if (installmentEnabled) {
+        const amount = parseFloat(feeAmount || '0');
+        if (!feeAmount || Number.isNaN(amount) || amount <= 0) return '分期付款前请先填写缴费金额';
+        if (!schedule.length) return '请完善分期付款计划';
+        if (
+          schedule.some(
+            (item) =>
+              !item.date ||
+              !item.amount ||
+              Number.isNaN(parseFloat(String(item.amount))) ||
+              parseFloat(String(item.amount)) <= 0,
+          )
+        ) {
+          return '请填写完整的分期付款计划';
+        }
       }
     }
 
@@ -407,8 +420,8 @@ export function useStudentForm(): UseStudentFormReturn {
     isEdit,
     studentType,
     initHours,
-    totalHours,
-    usedHours,
+    legacyPackages,
+    paymentEnabled,
     feeAmount,
     feeMethod,
     feeMethodOther,
@@ -418,7 +431,6 @@ export function useStudentForm(): UseStudentFormReturn {
 
   const canSubmit = useMemo(() => !submitBlockedReason, [submitBlockedReason]);
 
-  // 清除某个字段的错误
   const clearError = useCallback((field: keyof FormErrors) => {
     setErrors((prev) => {
       const next = { ...prev };
@@ -427,7 +439,6 @@ export function useStudentForm(): UseStudentFormReturn {
     });
   }, []);
 
-  // 头像上传
   const handleChooseAvatar = useCallback(async () => {
     try {
       const res = await Taro.chooseImage({
@@ -440,11 +451,10 @@ export function useStudentForm(): UseStudentFormReturn {
       setAvatarUrl(tempPath);
       Taro.showToast({ title: '头像已选择', icon: 'success' });
     } catch {
-      // 用户取消选择
+      // 用户取消
     }
   }, []);
 
-  // 保存
   const handleSave = useCallback(async () => {
     if (saving) return;
 
@@ -478,6 +488,14 @@ export function useStudentForm(): UseStudentFormReturn {
         }
       }
 
+      const teacherId = currentUserId;
+      const feePayload = paymentEnabled
+        ? {
+            fee_amount: feeAmount ? parseFloat(feeAmount) : undefined,
+            fee_method: (feeMethod || undefined) as FeeMethod | undefined,
+          }
+        : { fee_amount: undefined, fee_method: undefined };
+
       let newStudent: Student | undefined;
       let packageInitializationFailed = false;
 
@@ -491,18 +509,17 @@ export function useStudentForm(): UseStudentFormReturn {
           address: address.trim() || undefined,
           note: note.trim() || undefined,
           avatar_url: avatarUrl || undefined,
-          fee_amount: feeAmount ? parseFloat(feeAmount) : undefined,
-          fee_method: (feeMethod || undefined) as FeeMethod | undefined,
+          ...feePayload,
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
+          teacher_id: teacherId,
         });
-        // 更新 Store 缓存
         if (updated) updateStudentInCache(currentUserId, updated);
         Taro.showToast({ title: '更新成功', icon: 'success' });
       } else {
         const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         newStudent = await studentService.create({
-          teacher_id: currentUserId,
+          teacher_id: teacherId,
           name: name.trim(),
           nickname: nickname.trim() || undefined,
           invite_code: inviteCode,
@@ -512,46 +529,39 @@ export function useStudentForm(): UseStudentFormReturn {
           address: address.trim() || undefined,
           note: note.trim() || undefined,
           avatar_url: avatarUrl || undefined,
-          fee_amount: feeAmount ? parseFloat(feeAmount) : undefined,
-          fee_method: (feeMethod || undefined) as FeeMethod | undefined,
+          ...feePayload,
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
         });
 
         if (newStudent) {
-          // 更新 Store 缓存
           updateStudentInCache(currentUserId, newStudent);
 
           try {
             if (studentType === 'old') {
-              const total = parseInt(totalHours) || 0;
-              const used = parseInt(usedHours) || 0;
-              const remaining = total - used;
-              if (total > 0) {
-                const createdPackage = await packageService.create({
-                  teacher_id: currentUserId,
+              for (const pkg of legacyPackages) {
+                const hours = parseInt(pkg.remainingHours, 10) || 0;
+                if (hours <= 0 || !pkg.subjectId) continue;
+                await packageService.create({
+                  teacher_id: teacherId,
                   student_id: newStudent.id,
-                  name: '历史课时导入',
-                  total_hours: total,
-                  remaining_hours: remaining,
-                  purchased_remaining: remaining,
+                  name: `${pkg.subjectName || '科目'}（历史导入）`,
+                  total_hours: hours,
+                  remaining_hours: hours,
+                  purchased_remaining: hours,
                   bonus_remaining: 0,
                   status: 'active',
-                  note:
-                    hoursComposition === 'bonus' && !USE_MOCK
-                      ? `总${total}课时，已消${used}课时，剩余${remaining}课时；当前联调阶段按统一课时导入，未区分赠送课时`
-                      : `总${total}课时，已消${used}课时，剩余${remaining}课时`,
+                  subject_id: pkg.subjectId,
+                  end_date: pkg.expireEnabled ? pkg.expireDate || undefined : undefined,
+                  expiry_date: pkg.expireEnabled ? pkg.expireDate || undefined : undefined,
+                  note: `老生迁移：剩余 ${hours} 课时`,
                 });
-
-                if (!USE_MOCK && used > 0) {
-                  await packageService.deductHours(createdPackage.id, used);
-                }
               }
             } else {
-              const init = parseInt(initHours) || 0;
+              const init = parseInt(initHours, 10) || 0;
               if (init > 0) {
                 await packageService.create({
-                  teacher_id: currentUserId,
+                  teacher_id: teacherId,
                   student_id: newStudent.id,
                   name: '初始课时',
                   total_hours: init,
@@ -575,7 +585,6 @@ export function useStudentForm(): UseStudentFormReturn {
         }
       }
 
-      // 新建学员成功后：先订阅消息引导（E01），再询问是否分班
       if (!isEdit && newStudent) {
         Taro.hideToast();
         try {
@@ -588,18 +597,24 @@ export function useStudentForm(): UseStudentFormReturn {
         } catch (error) {
           logError('subscribe E01 after student create', error);
         }
-        const { confirm } = await Taro.showModal({
-          title: '学员已创建',
-          content: '是否立即分班？',
-          confirmText: '立即分班',
-          cancelText: '稍后再说',
-        });
-        if (confirm) {
-          Taro.navigateTo({
-            url: COURSE_MANAGEMENT_CLASS_TAB_URL,
+        const canManageClasses = isAdmin(profile?.currentContext?.role);
+        if (canManageClasses) {
+          const { confirm } = await Taro.showModal({
+            title: '学员已创建',
+            content: '是否立即分班？',
+            confirmText: '立即分班',
+            cancelText: '稍后再说',
           });
+          if (confirm) {
+            Taro.navigateTo({ url: COURSE_MANAGEMENT_CLASS_TAB_URL });
+          } else {
+            Taro.navigateBack();
+          }
         } else {
-          Taro.navigateBack();
+          // 教师无课程管理权限：进学员详情闭环，避免跳转后被守卫拦回
+          Taro.navigateTo({
+            url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(newStudent.id)}`,
+          });
         }
       } else {
         setTimeout(() => Taro.navigateBack(), 1500);
@@ -628,17 +643,15 @@ export function useStudentForm(): UseStudentFormReturn {
     submitBlockedReason,
     studentType,
     initHours,
-    totalHours,
-    usedHours,
+    legacyPackages,
     currentUserId,
     updateStudentInCache,
-    hoursComposition,
     campusId,
     campusOptions,
     profile?.currentContext?.role,
+    paymentEnabled,
   ]);
 
-  // 重置表单
   const handleReset = useCallback(() => {
     setName('');
     setNickname('');
@@ -651,16 +664,16 @@ export function useStudentForm(): UseStudentFormReturn {
     setFeeAmount('');
     setFeeMethod('');
     setInitHours('');
-    setTotalHours('');
-    setUsedHours('');
+    setLegacyPackages([]);
     setStudentType('new');
+    setPaymentEnabled(false);
     setInstallmentEnabled(false);
     setSchedule([]);
     setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
     setSelectedPackageId('');
     setCampusId('');
     setErrors({});
-  }, []);
+  }, [currentUserId]);
 
   return {
     isEdit,
@@ -692,12 +705,13 @@ export function useStudentForm(): UseStudentFormReturn {
     setStudentType,
     initHours,
     setInitHours,
-    totalHours,
-    setTotalHours,
-    usedHours,
-    setUsedHours,
-    hoursComposition,
-    setHoursComposition,
+    legacyPackages,
+    addLegacyPackage,
+    removeLegacyPackage,
+    updateLegacyPackage,
+    subjects,
+    paymentEnabled,
+    setPaymentEnabled,
     contacts,
     setContacts,
     installmentEnabled,
@@ -717,7 +731,6 @@ export function useStudentForm(): UseStudentFormReturn {
     campusId,
     setCampusId,
     campusOptions,
-    remainingHours,
     errors,
     saving,
     canSubmit,

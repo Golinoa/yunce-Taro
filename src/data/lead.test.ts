@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { mockCreateLead } from '@/data/lead';
-import { mockUpdateLead } from '@/data/lead';
-import { mockReassignLead } from '@/data/lead';
+import {
+  mockCreateLead,
+  mockUpdateLead,
+  mockReassignLead,
+  mockGetLeadById,
+  mockGetLeadBookings,
+  mockListLeadBookingsByCampus,
+} from '@/data/lead';
 
 /**
  * 线索归属锁定守卫回归测试（对应修复 L-14）
@@ -52,5 +57,33 @@ describe('线索归属锁定守卫（L-14）', () => {
     expect(ok?.reassign_reason).toBe('家长指定');
     expect(ok?.reassign_operator_id).toBe('op1');
     expect(ok?.reassign_at).toBeTruthy();
+  });
+});
+
+describe('试听预约与线索 mock 打通', () => {
+  it('每条预约都能反查到线索，且详情可拉到同 lead 的预约', async () => {
+    const bookings = await mockListLeadBookingsByCampus();
+    expect(bookings.length).toBeGreaterThan(0);
+
+    for (const booking of bookings) {
+      const lead = await mockGetLeadById(booking.lead_id);
+      expect(lead, `孤立预约 ${booking.id} → ${booking.lead_id}`).toBeTruthy();
+      expect(lead!.child_name).toBeTruthy();
+
+      const leadBookings = await mockGetLeadBookings(booking.lead_id);
+      expect(leadBookings.some((b) => b.id === booking.id)).toBe(true);
+    }
+  });
+
+  it('首页专用预约与线索姓名一致', async () => {
+    const privateLead = await mockGetLeadById('lead-home-private-001');
+    const groupLead = await mockGetLeadById('lead-home-group-001');
+    expect(privateLead?.child_name).toBe('林小宇');
+    expect(groupLead?.child_name).toBe('叶清妍');
+
+    const privateBookings = await mockGetLeadBookings('lead-home-private-001');
+    const groupBookings = await mockGetLeadBookings('lead-home-group-001');
+    expect(privateBookings.some((b) => b.id === 'lb-home-today-private-001')).toBe(true);
+    expect(groupBookings.some((b) => b.id === 'lb-home-today-group-001')).toBe(true);
   });
 });

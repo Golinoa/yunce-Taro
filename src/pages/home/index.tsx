@@ -1,9 +1,8 @@
-import { View, Text, ScrollView, Image, PageMeta } from '@tarojs/components';
+import { View, Text, ScrollView, PageMeta } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import AddToDesktopTip from '@/components/AddToDesktopTip';
-import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
@@ -11,12 +10,16 @@ import ExpandableFabMenu from '@/components/home/ExpandableFabMenu';
 import HomeCampusGuideDialog, {
   hasShownCampusGuide,
 } from '@/components/home/HomeCampusGuideDialog';
+import HomeHeroBanner from '@/components/home/HomeHeroBanner';
 import KingKongSection from '@/components/home/KingKongSection';
+import ParentHoursSection from '@/components/home/ParentHoursSection';
+import ParentScheduleSection from '@/components/home/ParentScheduleSection';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import TodoList from '@/components/home/TodoList';
 import TodoQuadrantBoard from '@/components/home/TodoQuadrantBoard';
 import TodoToolbar, { type TodoViewMode } from '@/components/home/TodoToolbar';
 import Icon from '@/components/Icon';
+import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
   navigateToLessonDetail,
@@ -26,11 +29,10 @@ import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
 import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import RelationConfirmSheet from '@/components/RelationConfirmSheet';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
-import { ORG_COVER_IMAGE } from '@/constants/brand';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import { lessonRecordService, todoService } from '@/services';
 import { homeService } from '@/services/home';
-import type { QuickEntry } from '@/services/home';
+import type { QuickEntry, ParentHomePackageCard } from '@/services/home';
 import { leadService } from '@/services/lead';
 import {
   consumePendingRelation,
@@ -45,7 +47,7 @@ import type { TodoItem, TodoCollaborationMode } from '@/types/home-todo';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
-import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
+import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { isUseMock } from '@/utils/build-env';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
@@ -95,7 +97,7 @@ function todayDateKey(): string {
  * Home - 机构端首页
  *
  * 对齐设计稿：
- * - 机构图片背景头部 + 校区切换卡片
+ * - 机构封面头部（F 风格主题渐变品牌托底）+ 校区切换卡片
  * - 金刚区快捷入口
  * - Tab 切换：今日课表 / 待办事项 / 最近消课
  */
@@ -151,6 +153,11 @@ const Home: React.FC = () => {
 
   // ---- 教师端状态 ----
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+
+  // ---- 家长端状态 ----
+  const [parentSchedules, setParentSchedules] = useState<Schedule[]>([]);
+  const [parentPackages, setParentPackages] = useState<ParentHomePackageCard[]>([]);
+  const [parentFallbackStudentId, setParentFallbackStudentId] = useState('');
 
   // ---- 快捷入口 ----
   const [quickEntries, setQuickEntries] = useState<QuickEntry[]>([]);
@@ -351,6 +358,22 @@ const Home: React.FC = () => {
   const loadData = useCallback(
     async (campusId?: string) => {
       if (!profile?.id) return;
+
+      if (isParentRole(currentRole)) {
+        try {
+          const [parentData, unread] = await Promise.all([
+            homeService.getParent(profile.id),
+            homeService.getUnreadCount(profile.id, currentRole),
+          ]);
+          setUnreadCount(unread || parentData?.unreadCount || 0);
+          setParentSchedules(parentData?.todaySchedules || []);
+          setParentPackages(parentData?.packages || []);
+          setParentFallbackStudentId(parentData?.students?.[0]?.id || '');
+        } catch (err) {
+          logError('Home loadParentData', err);
+        }
+        return;
+      }
 
       if (!isStaffRole(currentRole)) {
         try {
@@ -784,73 +807,46 @@ const Home: React.FC = () => {
     [handleOpenAddTodoSheet, handleFabViewModeToggle, todoViewMode],
   );
 
+  const handleParentAnchor = useCallback((anchor: string) => {
+    setHomeScrollIntoView(anchor);
+    setTimeout(() => setHomeScrollIntoView(''), 500);
+  }, []);
+
   const renderHeader = () => {
-    if (!isStaffRole(currentRole)) {
+    // 家长端与教师端共用上半部分：封面图 + 校区卡片
+    if (isStaffRole(currentRole) || isParentRole(currentRole)) {
       return (
-        <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
-          <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
-          <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">家长端首页</Text>
-          <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
-            当前联调阶段先展示通用运营内容{'\n'}
-            可从消息通知和个人中心继续使用家长侧能力
-          </Text>
-          <View className="mt-[24rpx] flex gap-[16rpx] w-full">
-            <View
-              className="flex-1 rounded-full bg-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
-              onClick={() =>
-                Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })
-              }
-            >
-              <Text className="text-[24rpx] font-medium text-white">消息通知</Text>
-            </View>
-            <View
-              className="flex-1 rounded-full border border-primary px-[24rpx] py-[18rpx] flex items-center justify-center"
-              onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
-            >
-              <Text className="text-[24rpx] font-medium text-primary">个人中心</Text>
-            </View>
+        <>
+          <HomeHeroBanner
+            unreadCount={unreadCount}
+            bellTopPx={navSafeHeight - 4}
+            onNotify={() =>
+              Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })
+            }
+          />
+
+          {/* 校区卡片 */}
+          <View className="relative z-30 -mt-[90rpx] mx-[28rpx]">
+            <HomeCampusCard
+              campus={currentCampus}
+              businessTime={businessTime}
+              isOpen={isOpen}
+              onSwitch={handleOpenCampusSheet}
+              className="shadow-campus"
+            />
           </View>
-        </View>
+        </>
       );
     }
 
     return (
-      <>
-        {/* 机构背景图 */}
-        <View className="relative h-[480rpx] overflow-hidden">
-          <Image
-            src={ORG_COVER_IMAGE}
-            className="absolute inset-0 w-full h-full"
-            mode="aspectFill"
-          />
-          <View className="absolute inset-0 bg-black/35" />
-
-          {/* 通知铃铛 */}
-          <View
-            className="absolute right-[24rpx] z-10"
-            style={{ top: `${navSafeHeight - 4}px` }}
-            onClick={() => Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })}
-          >
-            <View className="relative w-[80rpx] h-[80rpx] flex items-center justify-center">
-              <Icon name="mdi-bell-outline" size={44} color="white" />
-              {unreadCount > 0 && (
-                <View className="absolute top-[10rpx] right-[10rpx] w-[18rpx] h-[18rpx] bg-destructive rounded-full border-[2rpx] border-primary" />
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* 校区卡片 */}
-        <View className="relative z-30 -mt-[90rpx] mx-[28rpx]">
-          <HomeCampusCard
-            campus={currentCampus}
-            businessTime={businessTime}
-            isOpen={isOpen}
-            onSwitch={handleOpenCampusSheet}
-            className="shadow-campus"
-          />
-        </View>
-      </>
+      <View className="mx-[32rpx] mt-[32rpx] p-[40rpx] rounded-[32rpx] bg-card shadow-soft flex flex-col items-center">
+        <Icon name="school" size={80} className="text-primary mb-[24rpx]" />
+        <Text className="text-[32rpx] font-bold text-foreground mb-[12rpx]">首页</Text>
+        <Text className="text-[26rpx] text-muted-foreground text-center leading-normal">
+          请先完成身份选择后继续使用
+        </Text>
+      </View>
     );
   };
 
@@ -877,6 +873,23 @@ const Home: React.FC = () => {
             <View className="relative z-10 bg-transparent mx-[28rpx] pt-[0] pb-[100rpx]">
               <WechatBindReminder className="mb-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
               {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
+
+              {isParentRole(currentRole) && (
+                <>
+                  <KingKongSection
+                    entries={quickEntries}
+                    variant="grid"
+                    onAnchor={handleParentAnchor}
+                  />
+                  <View className="px-[8rpx]">
+                    <ParentScheduleSection schedules={parentSchedules} />
+                    <ParentHoursSection
+                      packages={parentPackages}
+                      fallbackStudentId={parentFallbackStudentId}
+                    />
+                  </View>
+                </>
+              )}
 
               {isStaffRole(currentRole) && (
                 <>
@@ -979,7 +992,7 @@ const Home: React.FC = () => {
                             footerText="查看更多"
                             onFooterClick={() =>
                               Taro.navigateTo({
-                                url: '/package-teacher/pages/attendance/index',
+                                url: '/package-course/pages/records/index',
                               })
                             }
                           />
@@ -995,7 +1008,7 @@ const Home: React.FC = () => {
       </View>
 
       {/* 校区切换 Sheet */}
-      {isStaffRole(currentRole) && (
+      {(isStaffRole(currentRole) || isParentRole(currentRole)) && (
         <CampusSelectSheet
           visible={showCampusSheet}
           currentId={currentCampusId}

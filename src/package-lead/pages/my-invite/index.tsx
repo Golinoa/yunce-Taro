@@ -15,8 +15,10 @@ import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFilterTab } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const MyInvitePage: React.FC = () => {
+  useCardNavigationBar();
   const { session } = useAuth();
   const teacherId = session?.user.id || '';
 

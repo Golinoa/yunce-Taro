@@ -44,6 +44,8 @@ export interface MemberCard {
   purchasePrice: number;
   /** 开卡来源 */
   source?: string;
+  /** 操作人 ID（开卡老师，账单可查） */
+  operatorId?: string;
   /** 操作人名称（开卡/发卡人） */
   operatorName?: string;
   /** 操作人头像 */

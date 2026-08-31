@@ -9,17 +9,19 @@
  *
  * 进入编辑态时首次弹出「私教展示提醒」引导。
  */
-import { View, Text, ScrollView, Switch, Picker, Image } from '@tarojs/components';
+import { View, Text, ScrollView, Switch, Image } from '@tarojs/components';
 import Taro, { useRouter } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import FormCell from '@/components/FormCell';
 import FormInput from '@/components/FormInput';
 import ImageUploaderList from '@/components/ImageUploaderList';
 import Loading from '@/components/Loading';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import PickerSheet from '@/components/PickerSheet';
+import BindEmailSheet from '@/components/BindEmailSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
 import { auditLogService } from '@/services/audit-log';
@@ -30,7 +32,7 @@ import { getThemeHexColors } from '@/theme';
 import type { Gender, TeacherIdentity, TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
-import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { useThemedNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = 'teacher_form_intro_v1';
 
@@ -63,8 +65,12 @@ const DEFAULT_IDENTITY_TO_ROLE: Record<TeacherIdentity, TeacherUIModel['role']> 
 };
 
 const TeacherFormPage: React.FC = () => {
-  useCardNavigationBar();
-  const { profile } = useAuth();
+  // 与「我的」页同款淡主题色头部
+  useThemedNavigationBar((themeHex) => ({
+    backgroundColor: themeHex.primarySoftBg,
+    frontColor: '#000000',
+  }));
+  const { profile, bindAccountEmail, sendBindEmailCode } = useAuth();
   const { id } = useRouter().params;
   const isEdit = !!id;
   const { activeTheme } = useThemeStore();
@@ -74,6 +80,9 @@ const TeacherFormPage: React.FC = () => {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [saving, setSaving] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  const [showBindEmail, setShowBindEmail] = useState(false);
+  const [bindingEmail, setBindingEmail] = useState(false);
+  const [birthdayPickerVisible, setBirthdayPickerVisible] = useState(false);
   const [picker, setPicker] = useState<{
     type: 'identity' | 'gender';
     visible: boolean;
@@ -239,6 +248,26 @@ const TeacherFormPage: React.FC = () => {
     }
   }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher, profile]);
 
+  const boundEmail = profile?.email?.trim() || '';
+  const handleBindEmail = useCallback(
+    async (payload: { email: string; code: string; password: string }) => {
+      if (bindingEmail) return;
+      setBindingEmail(true);
+      try {
+        const { error } = await bindAccountEmail(payload.email, payload.code, payload.password);
+        if (error) {
+          Taro.showToast({ title: error.message || '绑定失败', icon: 'none' });
+          return;
+        }
+        setShowBindEmail(false);
+        Taro.showToast({ title: '邮箱已绑定', icon: 'success' });
+      } finally {
+        setBindingEmail(false);
+      }
+    },
+    [bindAccountEmail, bindingEmail],
+  );
+
   if (isEdit && loading && !formInitializedRef.current) {
     return (
       <View
@@ -254,19 +283,25 @@ const TeacherFormPage: React.FC = () => {
 
   return (
     <View className={cn(`theme-${activeTheme}`, 'flex flex-col h-screen bg-background')}>
-      <ScrollView scrollY enhanced scrollWithAnimation className="flex-1 px-[32rpx] pb-[200rpx]">
-        {/* 头像展示 */}
-        <View className="flex flex-col items-center py-[48rpx]">
-          <View className="w-[160rpx] h-[160rpx] rounded-full p-[6rpx] border-[3rpx] border-primary bg-card">
-            <Image
-              className="w-full h-full rounded-full"
-              src={BRAND_LOGO}
-              mode="aspectFill"
-              lazyLoad
-            />
+      <ScrollView scrollY enhanced scrollWithAnimation className="flex-1 pb-[200rpx]">
+        {/* 头部：与「我的」同款淡主题弥散渐变 */}
+        <View className="bg-gradient-diffuse-top px-[32rpx] pb-[32rpx] relative overflow-hidden">
+          <View className="flex flex-col items-center pt-[24rpx] pb-[16rpx]">
+            <View className="w-[160rpx] h-[160rpx] rounded-full p-[6rpx] border-[3rpx] border-border bg-card">
+              <Image
+                className="w-full h-full rounded-full"
+                src={BRAND_LOGO}
+                mode="aspectFill"
+                lazyLoad
+              />
+            </View>
+            <Text className="mt-[20rpx] text-[32rpx] font-bold text-foreground">
+              {form.name || (isEdit ? '老师资料' : '新增老师')}
+            </Text>
           </View>
         </View>
 
+        <View className="px-[32rpx]">
         {/* 基础信息 */}
         <View className="bg-card rounded-[32rpx] px-[32rpx] mb-[24rpx]">
           <FormCell
@@ -321,6 +356,27 @@ const TeacherFormPage: React.FC = () => {
           </View>
 
           <FormCell
+            label="绑定邮箱"
+            divider
+            showArrow={!boundEmail}
+            onClick={boundEmail ? undefined : () => setShowBindEmail(true)}
+          >
+            {boundEmail ? (
+              <Text className="text-[30rpx] text-foreground">{boundEmail}</Text>
+            ) : (
+              <View
+                className="rounded-full bg-primary/10 px-[24rpx] py-[8rpx] active:opacity-80"
+                onClick={(e) => {
+                  e.stopPropagation?.();
+                  setShowBindEmail(true);
+                }}
+              >
+                <Text className="text-[26rpx] font-semibold text-primary">去绑定</Text>
+              </View>
+            )}
+          </FormCell>
+
+          <FormCell
             label="性别"
             divider
             showArrow
@@ -336,21 +392,19 @@ const TeacherFormPage: React.FC = () => {
             </Text>
           </FormCell>
 
-          <FormCell label="生日" divider={false}>
-            <Picker
-              mode="date"
-              value={form.birthday || dayjs().subtract(25, 'year').format('YYYY-MM-DD')}
-              onChange={(e) => updateField('birthday', e.detail.value)}
+          <FormCell
+            label="生日"
+            divider={false}
+            onClick={() => setBirthdayPickerVisible(true)}
+          >
+            <Text
+              className={cn(
+                'text-[30rpx]',
+                form.birthday ? 'text-foreground' : 'text-muted-foreground',
+              )}
             >
-              <Text
-                className={cn(
-                  'text-[30rpx]',
-                  form.birthday ? 'text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {form.birthday || '选填项'}
-              </Text>
-            </Picker>
+              {form.birthday || '选填项'}
+            </Text>
           </FormCell>
         </View>
 
@@ -405,6 +459,7 @@ const TeacherFormPage: React.FC = () => {
             />
           </View>
         </View>
+        </View>
       </ScrollView>
 
       {/* 底部保存按钮 */}
@@ -426,6 +481,14 @@ const TeacherFormPage: React.FC = () => {
           </Text>
         </View>
       </View>
+
+      <BindEmailSheet
+        visible={showBindEmail}
+        submitting={bindingEmail}
+        onClose={() => setShowBindEmail(false)}
+        onSendCode={sendBindEmailCode}
+        onSubmit={handleBindEmail}
+      />
 
       {/* 身份 / 性别选择器 */}
       <PickerSheet
@@ -457,6 +520,17 @@ const TeacherFormPage: React.FC = () => {
           '如果后续角色变化，可再手动调整这个开关。',
         ]}
         themeColor="primary"
+      />
+
+      <DatePickerSheet
+        visible={birthdayPickerVisible}
+        title="选择生日"
+        value={form.birthday || dayjs().subtract(25, 'year').format('YYYY-MM-DD')}
+        onClose={() => setBirthdayPickerVisible(false)}
+        onConfirm={(date) => {
+          updateField('birthday', date);
+          setBirthdayPickerVisible(false);
+        }}
       />
     </View>
   );

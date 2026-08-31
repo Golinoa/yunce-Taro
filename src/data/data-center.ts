@@ -26,6 +26,7 @@ import type {
   IncomeCategoryType,
   TransactionRecordType,
 } from '@/types/data-center';
+import { useCampusStore } from '@/stores/campus';
 
 export type {
   VenueOverviewType,
@@ -92,8 +93,11 @@ function delay(ms = 100): Promise<void> {
 /** 获取场馆经营概览 */
 export async function mockGetVenueOverview(): Promise<VenueOverviewType> {
   await delay();
+  const campusState = useCampusStore.getState();
+  const campus = campusState.campuses.find((c) => c.id === campusState.currentCampusId);
+  const venueName = campus?.name || VENUE_NAME;
   return {
-    venueName: VENUE_NAME,
+    venueName,
     todayRevenue: 12580,
     revenueChange: 12.5,
     todayOrders: 23,

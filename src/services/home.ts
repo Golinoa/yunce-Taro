@@ -4,7 +4,7 @@
  * 待办请走 `todoService`（唯一出口）。此处仅保留兼容薄封装。
  */
 import type { RecentGroup, RecentStudent } from '@/components/home/RecentLessonList';
-import { HOME_QUICK_ENTRIES } from '@/constants/home-ui';
+import { HOME_QUICK_ENTRIES, PARENT_HOME_QUICK_ENTRIES, TEACHER_HOME_QUICK_ENTRIES } from '@/constants/home-ui';
 import { loadHomeMock, loadMockDatabase } from '@/utils/mock-loaders';
 import { isUseMock } from '@/utils/build-env';
 import type {
@@ -27,7 +27,7 @@ import {
   resolveCategoryLabelByClassId,
   resolveCategoryLabelByMode,
 } from '@/utils/schedule-category';
-
+import { scheduleService, studentService } from '@/services/student';
 type RawHomeTeacher = {
   id: string;
   name: string;
@@ -316,6 +316,129 @@ export type HomeOperationContent = HomeOperationContentData;
 export type OperationActionConfig = OperationActionConfigData;
 export type OperationActivityItem = OperationActivityItemData;
 export type OperationBannerItem = OperationBannerItemData;
+
+export interface ParentHomePackageCard {
+  id: string;
+  name: string;
+  remainingHours: number;
+  usedHours: number;
+  totalHours: number;
+  studentId: string;
+}
+
+export interface ParentHomeStudent {
+  id: string;
+  name: string;
+  avatar?: string | null;
+  remainingHours: number;
+  packages: ParentHomePackageCard[];
+}
+
+export interface ParentHomeData {
+  students: ParentHomeStudent[];
+  todaySchedules: HomeScheduleItem[];
+  packages: ParentHomePackageCard[];
+  unreadCount: number;
+}
+
+interface BackendParentHomeResponse {
+  parent?: {
+    id: string;
+    nickname?: string | null;
+    name?: string | null;
+    avatar?: string | null;
+    relation?: string | null;
+  };
+  stats?: {
+    studentCount?: number;
+    totalRemainingHours?: number;
+    unreadNotificationCount?: number;
+    todayScheduleCount?: number;
+  };
+  students?: Array<{
+    id: string;
+    name: string;
+    avatar?: string | null;
+    nickname?: string | null;
+    remainingHours: number;
+    packages?: Array<{
+      id: string;
+      name: string;
+      totalHours: number;
+      usedHours: number;
+      remainingHours: number;
+      validEnd?: string | null;
+    }>;
+  }>;
+  todaySchedules?: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    class?: { id: string; name: string; subject?: string | null } | null;
+    note?: string | null;
+    color?: string | null;
+    teacherName?: string | null;
+  }>;
+  recentRecords?: Array<{
+    id: string;
+    lessonDate: string;
+    duration?: number;
+    hoursUsed?: number;
+    content?: string | null;
+    performance?: string | null;
+    student?: { id: string; name: string } | null;
+  }>;
+}
+
+function mapBackendParentHome(data: BackendParentHomeResponse): ParentHomeData {
+  const students: ParentHomeStudent[] = (data.students || []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    avatar: s.avatar,
+    remainingHours: s.remainingHours,
+    packages: (s.packages || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      remainingHours: p.remainingHours,
+      usedHours: p.usedHours,
+      totalHours: p.totalHours,
+      studentId: s.id,
+    })),
+  }));
+
+  const packageCards = students
+    .flatMap((s) => s.packages)
+    .filter((p) => p.remainingHours > 0)
+    .sort((a, b) => a.remainingHours - b.remainingHours);
+
+  const allPackages = students.flatMap((s) => s.packages);
+  const today = (new Date().getDay() || 7) as Schedule['day_of_week'];
+
+  return {
+    students,
+    todaySchedules: (data.todaySchedules || []).map((s) => ({
+      id: s.id,
+      teacher_id: '',
+      class_id: s.class?.id,
+      day_of_week: today,
+      start_time: s.startTime,
+      end_time: s.endTime,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      note: s.note || s.class?.name || '未命名课程',
+      class_info: s.class ? { name: s.class.name } : undefined,
+      status: mapBackendScheduleStatus(s.startTime, s.endTime),
+      teacher_name: s.teacherName || undefined,
+      category_label: s.class?.subject || undefined,
+      color: toScheduleColor(s.color || undefined),
+      schedule_kind: 'schedule',
+      checked_count: 0,
+      total_count: 0,
+    })),
+    packages: (packageCards.length > 0 ? packageCards : allPackages).slice(0, 2),
+    unreadCount: data.stats?.unreadNotificationCount ?? 0,
+  };
+}
 
 export type { StatsPeriod, StatsData, QuickEntry };
 
@@ -916,9 +1039,122 @@ export const homeService = {
   /** 获取首页快捷入口配置 */
   getQuickEntries: (role?: UserRole | null): QuickEntry[] => {
     if (role === 'parent') {
-      return [];
+      return PARENT_HOME_QUICK_ENTRIES;
+    }
+    if (role === 'teacher' || role === 'assistant') {
+      return TEACHER_HOME_QUICK_ENTRIES;
     }
     return HOME_QUICK_ENTRIES;
+  },
+
+  /**
+   * 家长端首页聚合：今日课表 + 课包概览 + 孩子列表
+   * 对接 GET /home/parent；Mock 用本地学员/排课/课包拼装
+   */
+  getParent: async (profileId: string): Promise<ParentHomeData | null> => {
+    if (isUseMock()) {
+      await ensureHomeMockDb();
+      const { mockGetStudentsByParent, mockGetPackagesByStudent } = await loadHomeMock();
+      const rawStudents = await mockGetStudentsByParent(profileId);
+      const todayWeekday = (new Date().getDay() || 7) as Schedule['day_of_week'];
+
+      const students: ParentHomeStudent[] = [];
+      const packageCards: ParentHomePackageCard[] = [];
+      const scheduleMap = new Map<string, HomeScheduleItem>();
+
+      for (const raw of rawStudents) {
+        const packages = await mockGetPackagesByStudent(raw.id);
+        const mappedPackages = packages.map((pkg) => {
+          const remaining = pkg.remainingHours ?? 0;
+          const total = pkg.totalHours ?? 0;
+          const used = Math.max(total - remaining, 0);
+          const card: ParentHomePackageCard = {
+            id: pkg.id,
+            name: pkg.name,
+            remainingHours: remaining,
+            usedHours: used,
+            totalHours: total,
+            studentId: raw.id,
+          };
+          packageCards.push(card);
+          return card;
+        });
+
+        students.push({
+          id: raw.id,
+          name: raw.name,
+          avatar: raw.avatar_url,
+          remainingHours: mappedPackages.reduce((sum, p) => sum + p.remainingHours, 0),
+          packages: mappedPackages,
+        });
+
+        const classIds: string[] = raw.classIds || [];
+        const todaySchedules = db().SCHEDULES.filter(
+          (s) => s.dayOfWeek === todayWeekday && classIds.includes(s.classId || ''),
+        );
+        for (const schedule of todaySchedules) {
+          if (!scheduleMap.has(schedule.id)) {
+            scheduleMap.set(schedule.id, mapTodaySchedule(schedule as RawHomeSchedule));
+          }
+        }
+      }
+
+      // 家长今日约课（团课/私教种子）并入「我的课表」，便于赵小红妈妈一眼看到全类型
+      try {
+        const { getMockParentBookingsByUser } = await import('@/data/my-booking-seed');
+        const todayStr = getTodayDateString();
+        getMockParentBookingsByUser(profileId)
+          .filter((item) => item.lessonDate === todayStr && item.status === 'booked')
+          .forEach((item) => {
+            if (scheduleMap.has(item.id)) return;
+            const [start = '00:00', end = '00:00'] = (item.timeRange || '').split('-');
+            scheduleMap.set(item.id, {
+              id: item.id,
+              teacher_id: 'teacher-001',
+              class_id: item.classId,
+              day_of_week: todayWeekday,
+              start_time: start,
+              end_time: end,
+              room: item.room,
+              color: 'primary',
+              status: 'upcoming',
+              created_at: item.createdAt,
+              updated_at: item.createdAt,
+              note: item.courseName,
+              class_info: { name: item.courseName },
+              checked_count: 0,
+              absent_count: 0,
+              leave_count: 0,
+              total_count: 1,
+              teacher_name: item.teacherName,
+              category_label: item.courseType === 'oneOnOne' ? '私教' : '团课',
+              schedule_kind: 'booking',
+            });
+          });
+      } catch {
+        // mock 种子可选
+      }
+
+      const activePackages = packageCards
+        .filter((p) => p.remainingHours > 0)
+        .sort((a, b) => a.remainingHours - b.remainingHours);
+
+      return {
+        students,
+        todaySchedules: Array.from(scheduleMap.values()).sort((a, b) =>
+          a.start_time.localeCompare(b.start_time),
+        ),
+        packages: (activePackages.length > 0 ? activePackages : packageCards).slice(0, 2),
+        unreadCount: 0,
+      };
+    }
+
+    try {
+      const data = await get<BackendParentHomeResponse>('/home/parent');
+      return mapBackendParentHome(data);
+    } catch {
+      return null;
+    }
   },
 
   /** 获取首页运营位内容 */
@@ -1090,7 +1326,14 @@ export const homeService = {
 
   // 家长端
   getStudentsByParent: async (parentId: string) => (await loadHomeMock()).mockGetStudentsByParent(parentId),
-  getSchedulesByStudent: async (studentId: string) => (await loadHomeMock()).mockGetSchedulesByStudent(studentId),
+  getSchedulesByStudent: async (studentId: string) => {
+    if (!isUseMock()) {
+      const student = await studentService.getById(studentId);
+      const classIds = student?.class_ids || [];
+      return scheduleService.listForParent(classIds);
+    }
+    return (await loadHomeMock()).mockGetSchedulesByStudent(studentId);
+  },
   getRecordsByStudent: async (studentId: string, limit?: number) =>
     (await loadHomeMock()).mockGetRecordsByStudent(studentId, limit),
   getPackagesByStudent: async (studentId: string) => (await loadHomeMock()).mockGetPackagesByStudent(studentId),

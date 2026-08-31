@@ -40,16 +40,23 @@ const StudentCard: React.FC<StudentCardProps> = ({
       <PickerItem
         iconType="avatar"
         avatarUrl={avatarUrl}
-        avatarChar={name[0]}
+        avatarChar={name}
         title={name}
         titleExtra={
-          isTrial ? (
-            <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
-              <Text className="text-center text-[20rpx] font-medium text-error">试听</Text>
-            </View>
-          ) : undefined
+          <>
+            {nickname ? (
+              <Text className="text-[24rpx] text-muted-foreground truncate max-w-[160rpx]">
+                {nickname}
+              </Text>
+            ) : null}
+            {isTrial ? (
+              <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
+                <Text className="text-center text-[20rpx] font-medium text-error">试听</Text>
+              </View>
+            ) : null}
+          </>
         }
-        subtitle={nickname ? `${nickname} · ${subtitle}` : subtitle}
+        subtitle={subtitle}
         selected
         right={{ type: 'change-btn', onChangeClick: onChange }}
         onClick={onChange}

@@ -20,6 +20,7 @@ import SegmentedControl from '@/components/SegmentedControl';
 import { myCourseService } from '@/services';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { MyCourseItem, MyCourseStatus } from '@/services/my-course';
+import { useAuth } from '@/utils/auth';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useThemeStore } from '@/stores/theme';
@@ -67,6 +68,7 @@ function formatCourseTime(date: string, startTime: string, endTime: string): str
 
 const MyCourse: React.FC = () => {
   usePrimaryNavigationBar();
+  const { profile } = useAuth();
 
   const [activeTab, setActiveTab] = useState<MyCourseStatus>(() => readTabFromRouter() ?? 'booked');
   const [list, setList] = useState<MyCourseItem[]>([]);
@@ -92,7 +94,7 @@ const MyCourse: React.FC = () => {
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await myCourseService.getList();
+      const data = await myCourseService.getList(profile?.id);
       setList(data);
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -101,7 +103,7 @@ const MyCourse: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile?.id]);
 
   useEffect(() => {
     loadList();
@@ -201,14 +203,13 @@ const MyCourse: React.FC = () => {
     if (item.status === 'pending_evaluate') {
       return (
         <View
-          className="h-[64rpx] px-[28rpx] rounded-[32rpx] bg-gradient-primary center press-scale"
+          className="h-[64rpx] px-[28rpx] rounded-[32rpx] bg-muted center press-scale"
           onClick={(e) => {
             e.stopPropagation();
-            setEvaluateCourse(item);
-            setEvaluateSheetVisible(true);
+            Taro.showToast({ title: '评价功能即将上线', icon: 'none' });
           }}
         >
-          <Text className="text-[26rpx] font-medium text-white">去评价</Text>
+          <Text className="text-[26rpx] text-muted-foreground">评价即将上线</Text>
         </View>
       );
     }

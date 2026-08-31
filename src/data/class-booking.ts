@@ -589,6 +589,34 @@ export const CLASS_BOOKING_SLOTS: ClassBookingSlot[] = [
     updated_at: '2026-06-20T10:00:00Z',
   },
   // ===== 以下为 teacher-001（张老师）团课班级开放名额，日期锚定到当前周，确保默认视图可见 =====
+  // cls-011 赵小红今日可约 / 已约（家长端今天就能看到）
+  {
+    id: 'cbs-011-sun',
+    class_id: 'cls-011',
+    class_name: '钢琴启蒙体验班',
+    campus_id: 'campus-center',
+    teacher_id: 'teacher-001',
+    teacher_name: '张老师',
+    lesson_date: BASE_DATE.format('YYYY-MM-DD'),
+    start_time: '16:00',
+    end_time: '17:00',
+    max_count: 4,
+    current_count: 2,
+    status: 'active',
+    booking_students: [
+      ...buildBookingStudents(1),
+      {
+        id: 'stu-002',
+        name: '赵小红',
+        avatar:
+          'https://api.dicebear.com/7.x/avataaars/png?seed=%E8%B5%B5%E5%B0%8F%E7%BA%A2&size=128',
+      },
+    ],
+    auto_open_type: 'full_or_time',
+    room: '钢琴教室',
+    created_at: '2026-06-20T10:00:00Z',
+    updated_at: '2026-06-20T10:00:00Z',
+  },
   // cls-011 钢琴启蒙体验班（周二、周四 16:00-17:00，约满/到时开班）
   {
     id: 'cbs-0113',
@@ -601,8 +629,16 @@ export const CLASS_BOOKING_SLOTS: ClassBookingSlot[] = [
     start_time: '16:00',
     end_time: '17:00',
     max_count: 4,
-    current_count: 0,
-    status: 'rest',
+    current_count: 1,
+    status: 'active',
+    booking_students: [
+      {
+        id: 'stu-002',
+        name: '赵小红',
+        avatar:
+          'https://api.dicebear.com/7.x/avataaars/png?seed=%E8%B5%B5%E5%B0%8F%E7%BA%A2&size=128',
+      },
+    ],
     auto_open_type: 'full_or_time',
     room: '钢琴教室',
     created_at: '2026-06-20T10:00:00Z',
@@ -619,9 +655,16 @@ export const CLASS_BOOKING_SLOTS: ClassBookingSlot[] = [
     start_time: '16:00',
     end_time: '17:00',
     max_count: 4,
-    current_count: 2,
+    current_count: 3,
     status: 'active',
-    booking_students: buildBookingStudents(2),
+    booking_students: [
+      ...buildBookingStudents(2),
+      {
+        id: 'stu-002',
+        name: '赵小红',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/png?seed=%E8%B5%B5%E5%B0%8F%E7%BA%A2&size=128',
+      },
+    ],
     auto_open_type: 'full_or_time',
     room: '钢琴教室',
     created_at: '2026-06-20T10:00:00Z',
@@ -760,9 +803,79 @@ export const CLASS_BOOKING_SLOTS: ClassBookingSlot[] = [
     created_at: '2026-06-20T10:00:00Z',
     updated_at: '2026-06-20T10:00:00Z',
   },
+  // 「我的预约」演示：近几日已完成 / 待上课的团课开放约（张老师）
+  {
+    id: 'cbs-my-related-done',
+    class_id: 'cls-011',
+    class_name: '钢琴启蒙体验班',
+    campus_id: 'campus-center',
+    teacher_id: 'teacher-001',
+    teacher_name: '张老师',
+    lesson_date: BASE_DATE.subtract(5, 'day').format('YYYY-MM-DD'),
+    start_time: '16:00',
+    end_time: '17:00',
+    max_count: 4,
+    current_count: 2,
+    status: 'full',
+    booking_students: buildBookingStudents(2),
+    auto_open_type: 'full_or_time',
+    room: '钢琴教室',
+    created_at: BASE_DATE.subtract(10, 'day').toISOString(),
+    updated_at: BASE_DATE.subtract(5, 'day').toISOString(),
+  },
+  {
+    id: 'cbs-my-related-upcoming',
+    class_id: 'cls-011',
+    class_name: '钢琴启蒙体验班',
+    campus_id: 'campus-center',
+    teacher_id: 'teacher-001',
+    teacher_name: '张老师',
+    lesson_date: BASE_DATE.add(3, 'day').format('YYYY-MM-DD'),
+    start_time: '16:00',
+    end_time: '17:00',
+    max_count: 4,
+    current_count: 1,
+    status: 'active',
+    booking_students: buildBookingStudents(1),
+    auto_open_type: 'full_or_time',
+    room: '钢琴教室',
+    created_at: BASE_DATE.subtract(1, 'day').toISOString(),
+    updated_at: BASE_DATE.subtract(1, 'day').toISOString(),
+  },
 ];
 
 export const CLASS_BOOKING_RECORDS: ClassBookingRecord[] = [
+  // 赵小红 · 钢琴启蒙体验班（今天 / 明天 / 后天）
+  {
+    id: 'cbr-zhao-011-sun',
+    slot_id: 'cbs-011-sun',
+    class_id: 'cls-011',
+    student_id: 'stu-002',
+    student_name: '赵小红',
+    status: 'confirmed',
+    created_at: '2026-06-20T10:00:00Z',
+    updated_at: '2026-06-20T10:00:00Z',
+  },
+  {
+    id: 'cbr-zhao-0113',
+    slot_id: 'cbs-0113',
+    class_id: 'cls-011',
+    student_id: 'stu-002',
+    student_name: '赵小红',
+    status: 'confirmed',
+    created_at: '2026-06-20T10:00:00Z',
+    updated_at: '2026-06-20T10:00:00Z',
+  },
+  {
+    id: 'cbr-zhao-0114',
+    slot_id: 'cbs-0114',
+    class_id: 'cls-011',
+    student_id: 'stu-002',
+    student_name: '赵小红',
+    status: 'confirmed',
+    created_at: '2026-06-20T10:00:00Z',
+    updated_at: '2026-06-20T10:00:00Z',
+  },
   // cls-004 周五已满时段的 6 条预约记录
   {
     id: 'cbr-0001',
@@ -1210,6 +1323,37 @@ export const CLASS_BOOKING_RECORDS: ClassBookingRecord[] = [
     created_at: '2026-06-20T10:00:00Z',
     updated_at: '2026-06-20T10:00:00Z',
   },
+  // 「我的预约」演示记录
+  {
+    id: 'cbr-my-related-done-1',
+    slot_id: 'cbs-my-related-done',
+    class_id: 'cls-011',
+    student_id: 'student-001',
+    student_name: '张小明',
+    status: 'confirmed',
+    created_at: BASE_DATE.subtract(8, 'day').toISOString(),
+    updated_at: BASE_DATE.subtract(5, 'day').toISOString(),
+  },
+  {
+    id: 'cbr-my-related-done-2',
+    slot_id: 'cbs-my-related-done',
+    class_id: 'cls-011',
+    student_id: 'student-002',
+    student_name: '李小红',
+    status: 'confirmed',
+    created_at: BASE_DATE.subtract(8, 'day').toISOString(),
+    updated_at: BASE_DATE.subtract(5, 'day').toISOString(),
+  },
+  {
+    id: 'cbr-my-related-upcoming-1',
+    slot_id: 'cbs-my-related-upcoming',
+    class_id: 'cls-011',
+    student_id: 'student-003',
+    student_name: '王大力',
+    status: 'confirmed',
+    created_at: BASE_DATE.subtract(1, 'day').toISOString(),
+    updated_at: BASE_DATE.subtract(1, 'day').toISOString(),
+  },
 ];
 
 // ============================================
@@ -1462,6 +1606,17 @@ export async function mockAddBookingRecord(
 
   CLASS_BOOKING_RECORDS.unshift(record);
   slot.current_count += 1;
+  const nextStudents = [...(slot.booking_students || [])];
+  if (!nextStudents.some((item) => item.id === studentId)) {
+    nextStudents.push({
+      id: studentId,
+      name: student?.name || '未知学员',
+      avatar:
+        (student as { avatar_url?: string } | undefined)?.avatar_url ||
+        `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(student?.name || studentId)}&size=128`,
+    });
+  }
+  slot.booking_students = nextStudents;
   if (slot.current_count >= slot.max_count) {
     slot.status = 'full';
   }
@@ -1530,4 +1685,25 @@ export async function mockUpdateSlotStatus(
   }
   slot.status = status;
   slot.updated_at = new Date().toISOString();
+}
+
+/** 老师相关的班课开放约：时段授课老师命中 actorIds 的预约记录 */
+export async function mockListRelatedClassBookings(
+  actorIds: string[],
+  params?: { startDate?: string; endDate?: string },
+): Promise<Array<{ record: ClassBookingRecord; slot: ClassBookingSlot }>> {
+  await delay();
+  if (actorIds.length === 0) return [];
+
+  const actorSet = new Set(actorIds);
+  const slotMap = new Map(CLASS_BOOKING_SLOTS.map((s) => [s.id, s]));
+
+  return CLASS_BOOKING_RECORDS.flatMap((record) => {
+    const slot = slotMap.get(record.slot_id);
+    if (!slot) return [];
+    if (!actorSet.has(slot.teacher_id)) return [];
+    if (params?.startDate && slot.lesson_date < params.startDate) return [];
+    if (params?.endDate && slot.lesson_date > params.endDate) return [];
+    return [{ record, slot }];
+  });
 }

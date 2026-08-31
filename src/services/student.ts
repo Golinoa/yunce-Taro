@@ -36,6 +36,8 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Notification, NotificationType } from '@/types/notification';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
+import type { PaginatedResponse } from '@/utils/pagination';
+import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
 
 interface BackendStudentListItem {
@@ -45,6 +47,7 @@ interface BackendStudentListItem {
   createdAt: string;
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
+  inviteCode?: null | string;
   name: string;
   parentCount?: number;
   phone?: null | string;
@@ -85,6 +88,7 @@ interface BackendStudentDetailResponse {
   createdAt: string;
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
+  inviteCode?: null | string;
   name: string;
   parents?: Array<{
     bindStatus?: string;
@@ -114,16 +118,24 @@ interface BackendStudentDetailResponse {
 }
 
 interface BackendClassListItem {
+  capacity?: null | number;
+  color?: null | string;
   createdAt: string;
+  endTime?: null | string;
   grade?: null | string;
   id: string;
   location?: null | string;
   name: string;
+  note?: null | string;
   schedule?: null | string;
   scheduleCount?: number;
+  startTime?: null | string;
   status?: 'ACTIVE' | 'DISBANDED';
   studentCount?: number;
   subject?: null | string;
+  totalLessons?: null | number;
+  type?: null | string;
+  usedLessons?: null | number;
 }
 
 interface BackendClassListResponse {
@@ -137,10 +149,14 @@ interface BackendClassListResponse {
 }
 
 interface BackendClassDetailResponse {
+  capacity?: null | number;
+  color?: null | string;
   createdAt: string;
+  endTime?: null | string;
   id: string;
   location?: null | string;
   name: string;
+  note?: null | string;
   recentLessons?: Array<{
     duration?: number;
     id: string;
@@ -153,6 +169,7 @@ interface BackendClassDetailResponse {
     id: string;
     startTime: string;
   }>;
+  startTime?: null | string;
   status?: 'ACTIVE' | 'DISBANDED';
   students?: Array<{
     avatar?: null | string;
@@ -167,6 +184,9 @@ interface BackendClassDetailResponse {
     id: string;
     nickname?: null | string;
   } | null;
+  totalLessons?: null | number;
+  type?: null | string;
+  usedLessons?: null | number;
 }
 
 interface BackendPackageListItem {
@@ -249,6 +269,7 @@ interface BackendPackageTransactionRecord {
   reason?: null | string;
   studentId?: string;
   studentName?: string;
+  studentAvatar?: null | string;
   type?: 'RECHARGE' | 'REFUND';
 }
 
@@ -529,7 +550,10 @@ const mapBackendPackageStatus = (
   return 'completed';
 };
 
-const buildInviteCode = (studentId: string): string => `INV-${studentId.slice(-4).toUpperCase()}`;
+const resolveInviteCode = (inviteCode?: null | string): string => {
+  const code = inviteCode?.trim();
+  return code || '请联系老师';
+};
 
 const normalizeLessonDate = (value?: null | string): string => {
   if (!value) return '';
@@ -573,7 +597,7 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
     id: item.id,
     name: item.name,
     teacher_id: '',
-    invite_code: buildInviteCode(item.id),
+    invite_code: resolveInviteCode(item.inviteCode),
     avatar_url: item.avatar || undefined,
     gender: mapBackendGender(item.gender),
     birthday: item.birthday || undefined,
@@ -605,7 +629,7 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
     id: item.id,
     name: item.name,
     teacher_id: item.teacher?.id || '',
-    invite_code: buildInviteCode(item.id),
+    invite_code: resolveInviteCode(item.inviteCode),
     avatar_url: item.avatar || undefined,
     gender: mapBackendGender(item.gender),
     birthday: item.birthday || undefined,
@@ -630,36 +654,56 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
 }
 
 function mapBackendClassListItem(item: BackendClassListItem): Class {
+  const ended = item.status === 'DISBANDED';
+  const type =
+    ended
+      ? 'ended'
+      : item.type === 'limited'
+        ? 'limited'
+        : 'unlimited';
   return {
     id: item.id,
     name: item.name,
     teacher_id: '',
     created_at: item.createdAt,
     updated_at: item.createdAt,
-    type: item.status === 'ACTIVE' ? 'unlimited' : 'ended',
+    type,
     status: mapBackendClassStatus(item.status),
     schedule: item.schedule || undefined,
-    used_lessons: 0,
-    color: 'primary',
+    total_lessons: item.totalLessons ?? undefined,
+    used_lessons: item.usedLessons ?? 0,
+    capacity: item.capacity ?? undefined,
+    color: (item.color as Class['color']) || 'primary',
     student_count: item.studentCount ?? 0,
-    note: item.location || undefined,
+    note: item.note || item.location || undefined,
+    start_time: item.startTime || undefined,
+    end_time: item.endTime || undefined,
   };
 }
 
 function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
+  const ended = item.status === 'DISBANDED';
+  const type =
+    ended
+      ? 'ended'
+      : item.type === 'limited'
+        ? 'limited'
+        : 'unlimited';
   return {
     id: item.id,
     name: item.name,
     teacher_id: item.teacher?.id || '',
     created_at: item.createdAt,
     updated_at: item.createdAt,
-    type: item.status === 'ACTIVE' ? 'unlimited' : 'ended',
+    type,
     status: mapBackendClassStatus(item.status),
     schedule: item.schedule || undefined,
-    used_lessons: item.recentLessons?.length || 0,
-    color: 'primary',
+    total_lessons: item.totalLessons ?? undefined,
+    used_lessons: item.usedLessons ?? item.recentLessons?.length ?? 0,
+    capacity: item.capacity ?? undefined,
+    color: (item.color as Class['color']) || 'primary',
     student_count: item.students?.length || 0,
-    note: item.location || undefined,
+    note: item.note || item.location || undefined,
     weekdays: item.schedules
       ?.map((schedule) => {
         const dayMap: Record<number, string> = {
@@ -674,8 +718,8 @@ function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
         return dayMap[schedule.dayOfWeek ?? 0];
       })
       .filter((day): day is string => Boolean(day)),
-    start_time: item.schedules?.[0]?.startTime,
-    end_time: item.schedules?.[0]?.endTime,
+    start_time: item.startTime || item.schedules?.[0]?.startTime,
+    end_time: item.endTime || item.schedules?.[0]?.endTime,
   };
 }
 
@@ -912,13 +956,14 @@ function mapBackendPackageTransaction(item: BackendPackageTransactionRecord): Pa
     type: item.type === 'REFUND' ? 'refund' : 'recharge',
     student_id: item.studentId || '',
     student_name: item.studentName || '学员',
+    student_avatar: item.studentAvatar || undefined,
     package_id: item.packageId || undefined,
     package_name: item.packageName || undefined,
     purchased_hours: item.purchasedHours,
     gift_hours: item.giftHours ?? 0,
-    fee_amount: item.amount,
+    fee_amount: Math.max(0, Number(item.amount) || 0),
     fee_method: item.feeMethod ? (item.feeMethod as FeeMethod) : undefined,
-    refund_amount: item.type === 'REFUND' ? item.amount : undefined,
+    refund_amount: item.type === 'REFUND' ? Math.max(0, Number(item.amount) || 0) : undefined,
     reason: item.reason || undefined,
     operator_name: item.operatorName || undefined,
     created_at: item.createdAt,
@@ -941,20 +986,23 @@ function mapMockPackageTransaction(item: {
   reason?: string;
   studentId: string;
   studentName: string;
+  studentAvatar?: string;
   type: 'recharge' | 'refund';
 }): PackageTransaction {
+  const amount = Math.max(0, Number(item.feeAmount ?? item.amount) || 0);
   return {
     id: item.id,
     type: item.type,
     student_id: item.studentId,
     student_name: item.studentName,
+    student_avatar: item.studentAvatar,
     package_id: item.packageId,
     package_name: item.packageName,
     purchased_hours: item.purchasedHours,
     gift_hours: item.giftHours ?? 0,
-    fee_amount: item.feeAmount ?? item.amount,
-    fee_method: item.feeMethod ? (item.feeMethod as FeeMethod) : undefined,
-    refund_amount: item.type === 'refund' ? (item.feeAmount ?? item.amount) : undefined,
+    fee_amount: amount,
+    fee_method: (item.feeMethod as FeeMethod) || 'other',
+    refund_amount: item.type === 'refund' ? amount : undefined,
     reason: item.reason,
     operator_name: item.operatorName,
     purchased_remaining_snapshot: item.purchasedRemainingSnapshot,
@@ -1005,6 +1053,21 @@ function mapMockStudent(student: NonNullable<MockStudent>): Student {
 }
 
 function mapMockClass(cls: NonNullable<MockClass>): Class {
+  const durationMinutes =
+    typeof (cls as { durationMinutes?: number }).durationMinutes === 'number'
+      ? (cls as { durationMinutes?: number }).durationMinutes
+      : undefined;
+  let startTime = cls.startTime;
+  let endTime = cls.endTime;
+  if ((!startTime || !endTime) && durationMinutes && durationMinutes > 0 && durationMinutes < 24 * 60) {
+    const startMinutes = 9 * 60;
+    const endMinutes = startMinutes + durationMinutes;
+    const fmt = (m: number) =>
+      `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    startTime = startTime || fmt(startMinutes);
+    endTime = endTime || fmt(endMinutes);
+  }
+
   return {
     id: cls.id,
     name: cls.name,
@@ -1016,8 +1079,8 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     status: cls.status === 'paused' ? 'paused' : cls.status === 'ended' ? 'ended' : 'active',
     schedule: cls.schedule,
     weekdays: cls.weekdays?.map(String),
-    start_time: cls.startTime,
-    end_time: cls.endTime,
+    start_time: startTime,
+    end_time: endTime,
     total_lessons: cls.totalLessons,
     used_lessons: cls.usedLessons,
     teachers: cls.teachers,
@@ -1035,6 +1098,7 @@ function mapMockClass(cls: NonNullable<MockClass>): Class {
     category_id: cls.categoryId,
     hours_per_lesson: cls.hoursPerLesson ?? 1,
     pricePerLesson: cls.pricePerLesson,
+    capacity: cls.capacity,
   };
 }
 
@@ -1284,15 +1348,19 @@ function mapFrontendNotificationType(
 
 function mapMockLeave(leave: MockLeave): LeaveRequest {
   const student = getMockDb().STUDENTS.find((item) => item.id === leave.studentId);
+  const leaveType =
+    (leave as { type?: LeaveRequest['type'] }).type === 'reschedule' ? 'reschedule' : 'leave';
+  const newDate = (leave as { newDate?: string }).newDate;
 
   return {
     id: leave.id,
     parent_id: student?.parentId || '',
     student_id: leave.studentId,
     teacher_id: leave.teacherId,
-    type: 'leave',
+    type: leaveType,
     original_date: leave.date,
     end_date: leave.date,
+    new_date: newDate,
     reason: leave.reason,
     status: leave.status,
     created_at: leave.createdAt,
@@ -1447,14 +1515,27 @@ export function invalidatePackagesCache(studentId?: string) {
 // 学员 Service
 // ============================================
 export const studentService = {
-  /** 获取教师的学员列表 */
+  /** 获取教师的学员列表（分批拉全） */
   getByTeacher: async (teacherId: string, campusId?: string): Promise<Student[]> => {
     if (!isUseMock()) {
-      const params = new URLSearchParams();
-      if (campusId) params.set('campusId', campusId);
-      const query = params.toString();
-      const data = await get<BackendStudentListResponse>(`/students${query ? `?${query}` : ''}`);
-      return data.list.map(mapBackendStudentListItem);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendStudentListItem);
     }
 
     const students = await (await getStudentsMock()).mockGetStudentsByTeacher(teacherId, campusId);
@@ -1528,17 +1609,20 @@ export const studentService = {
     };
   },
 
-  /** 后端搜索学员（最少 2 字符） */
+  /** 后端搜索学员（最少 2 字符；分批拉全匹配结果） */
   search: async (teacherId: string, query: string, campusId?: string) => {
     if (!isUseMock()) {
-      const params = new URLSearchParams({
-        page: '1',
-        pageSize: '100',
-        keyword: query,
-      });
-      if (campusId) params.set('campusId', campusId);
-      const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
-      return data.list.map(mapBackendStudentListItem);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          keyword: query,
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
+        return asPaginatedResponse(data, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendStudentListItem);
     }
 
     return (await (await getStudentsMock()).mockSearchStudents(teacherId, query, campusId)).map(mapMockStudent);
@@ -1610,13 +1694,21 @@ export const studentService = {
 // 课包 Service
 // ============================================
 export const packageService = {
-  /** 获取学员的课包列表 */
+  /** 获取学员的课包列表（分批拉全） */
   getByStudent: async (studentId: string): Promise<CoursePackage[]> => {
     if (!isUseMock()) {
-      const data = await get<BackendPackageListResponse>(
-        `/course-packages?page=1&pageSize=100&studentId=${encodeURIComponent(studentId)}`,
-      );
-      return data.list.map(mapBackendPackage);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          studentId,
+        });
+        const data = await get<BackendPackageListResponse>(
+          `/course-packages?${params.toString()}`,
+        );
+        return asPaginatedResponse(data, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendPackage);
     }
 
     return (await (await getStudentsMock()).mockGetPackagesByStudent(studentId)).map(mapMockPackage);
@@ -1753,25 +1845,52 @@ export const packageService = {
     }).then(mapMockPackageTransaction);
   },
 
-  /** 获取课包流水（充值 + 退费） */
-  getTransactions: async (teacherId: string, studentId?: string): Promise<PackageTransaction[]> => {
+  /**
+   * 获取课包流水（充值 + 退费），分页拉取
+   * 首屏建议 pageSize=30；勿一次 pageSize=100 当全部
+   */
+  getTransactions: async (
+    teacherId: string,
+    options?: {
+      studentId?: string;
+      page?: number;
+      pageSize?: number;
+    },
+  ): Promise<PaginatedResponse<PackageTransaction>> => {
+    const page = Math.max(1, options?.page || 1);
+    const pageSize = Math.max(1, options?.pageSize || 30);
+    const studentId = options?.studentId;
+
     if (!isUseMock()) {
       const params = new URLSearchParams({
-        page: '1',
-        pageSize: '100',
+        page: String(page),
+        pageSize: String(pageSize),
       });
       if (studentId) {
         params.set('studentId', studentId);
       }
 
-      const data = await get<{ list: BackendPackageTransactionRecord[]; pagination: unknown }>(
-        `/package-transactions?${params.toString()}`,
-      );
-      return (data.list || []).map(mapBackendPackageTransaction);
+      const data = await get<{
+        list: BackendPackageTransactionRecord[];
+        pagination?: PaginatedResponse<unknown>['pagination'];
+      }>(`/package-transactions?${params.toString()}`);
+      const list = (data.list || []).map(mapBackendPackageTransaction);
+      const pagination = data.pagination || {
+        page,
+        pageSize,
+        total: list.length,
+        totalPages: 1,
+      };
+      return { list, pagination };
     }
 
-    const transactions = await (await getStudentsMock()).mockGetPackageTransactions(teacherId, studentId);
-    return transactions.map(mapMockPackageTransaction);
+    const result = await (
+      await getStudentsMock()
+    ).mockGetPackageTransactions(teacherId, { studentId, page, pageSize });
+    return {
+      list: result.list.map(mapMockPackageTransaction),
+      pagination: result.pagination,
+    };
   },
 
   /** 获取教师的充值记录（按时间倒序） */
@@ -1779,7 +1898,7 @@ export const packageService = {
     if (!isUseMock()) {
       const params = new URLSearchParams({
         page: '1',
-        pageSize: '100',
+        pageSize: '30',
       });
       const data = await get<
         BackendPackageListResponse | { list: BackendRechargeRecord[]; pagination: unknown }
@@ -1803,7 +1922,11 @@ export const packageService = {
         }));
     }
 
-    const transactions = await packageService.getTransactions(teacherId, studentId);
+    const { list: transactions } = await packageService.getTransactions(teacherId, {
+      studentId,
+      page: 1,
+      pageSize: 30,
+    });
     return transactions
       .filter((item) => item.type === 'recharge')
       .map((item) => ({
@@ -1846,39 +1969,84 @@ export const packageTemplateService = {
 // 消课记录 Service
 // ============================================
 export const lessonRecordService = {
-  /** 获取学员的消课记录 */
+  /** 获取学员的消课记录（分批拉全） */
   getByStudent: async (studentId: string): Promise<LessonRecord[]> => {
     if (!isUseMock()) {
-      const data = await get<BackendLessonRecordListResponse>(
-        `/lesson-records?page=1&pageSize=100&studentId=${encodeURIComponent(studentId)}`,
-      );
-      return data.list.map(mapBackendLessonRecord);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          studentId,
+        });
+        const data = await get<BackendLessonRecordListResponse>(
+          `/lesson-records?${params.toString()}`,
+        );
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendLessonRecord);
     }
 
     return (await (await getStudentsMock()).mockGetRecordsByStudent(studentId)).map(mapMockLessonRecord);
   },
 
-  /** 获取全部消课记录（校长/管理员视角） */
+  /** 获取全部消课记录（校长/管理员视角，分批拉全） */
   getAll: async (): Promise<LessonRecord[]> => {
     if (!isUseMock()) {
-      const data = await get<BackendLessonRecordListResponse>(
-        '/lesson-records?page=1&pageSize=100',
-      );
-      return data.list.map(mapBackendLessonRecord);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        const data = await get<BackendLessonRecordListResponse>(
+          `/lesson-records?${params.toString()}`,
+        );
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendLessonRecord);
     }
 
     return (await (await getStudentsMock()).mockGetAllLessonRecords()).map(mapMockLessonRecord);
   },
 
-  /** 获取教师的消课记录 */
+  /** 获取教师的消课记录（分批拉全） */
   getByTeacher: async (teacherId: string, campusId?: string): Promise<LessonRecord[]> => {
     if (!isUseMock()) {
-      const params = new URLSearchParams({ page: '1', pageSize: '100' });
-      if (campusId) params.set('campusId', campusId);
-      const data = await get<BackendLessonRecordListResponse>(
-        `/lesson-records?${params.toString()}`,
-      );
-      return data.list.map(mapBackendLessonRecord);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendLessonRecordListResponse>(
+          `/lesson-records?${params.toString()}`,
+        );
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendLessonRecord);
     }
 
     return (await (await getStudentsMock()).mockGetLessonRecordsByTeacher(teacherId, campusId)).map(mapMockLessonRecord);
@@ -2013,31 +2181,39 @@ export const lessonRecordService = {
 // 请假 Service
 // ============================================
 export const leaveService = {
+  /** 学员请假列表（分批拉全） */
   getByStudent: async (studentId: string): Promise<LeaveRequest[]> => {
     if (!isUseMock()) {
-      const params = new URLSearchParams({
-        page: '1',
-        pageSize: '100',
-        studentId,
-      });
-      const data = await get<BackendLeaveRequestListResponse>(
-        `/leave-requests?${params.toString()}`,
-      );
-      return data.list.map(mapBackendLeave);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          studentId,
+        });
+        const data = await get<BackendLeaveRequestListResponse>(
+          `/leave-requests?${params.toString()}`,
+        );
+        return asPaginatedResponse(data, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendLeave);
     }
 
     return (await (await getStudentsMock()).mockGetLeavesByStudent(studentId)).map(mapMockLeave);
   },
+  /** 教师请假列表（分批拉全） */
   getByTeacher: async (teacherId: string): Promise<LeaveRequest[]> => {
     if (!isUseMock()) {
-      const params = new URLSearchParams({
-        page: '1',
-        pageSize: '100',
-      });
-      const data = await get<BackendLeaveRequestListResponse>(
-        `/leave-requests?${params.toString()}`,
-      );
-      return data.list.map(mapBackendLeave);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        const data = await get<BackendLeaveRequestListResponse>(
+          `/leave-requests?${params.toString()}`,
+        );
+        return asPaginatedResponse(data, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendLeave);
     }
 
     return (await (await getStudentsMock()).mockGetLeavesByTeacher(teacherId)).map(mapMockLeave);
@@ -2051,17 +2227,26 @@ export const leaveService = {
         startDate: data.original_date,
         endDate: data.end_date || data.original_date,
         reason: data.reason || '',
+        ...(data.type === 'reschedule'
+          ? { type: 'reschedule', newDate: data.new_date }
+          : {}),
       });
-      return mapBackendLeave(created);
+      return {
+        ...mapBackendLeave(created),
+        type: data.type,
+        new_date: data.new_date,
+      };
     }
 
     const student = getMockDb().STUDENTS.find((item) => item.id === data.student_id);
     const created = await (await getStudentsMock()).mockCreateLeaveRequest({
       studentId: data.student_id,
       classId: student?.classIds[0] || '',
-      teacherId: student?.teacherId || data.teacher_id,
+      teacherId: data.teacher_id || student?.teacherId || '',
       campusId: student?.campusId || '',
       date: data.original_date,
+      type: data.type,
+      newDate: data.new_date,
       reason: data.reason,
       status: data.status,
       createdAt: new Date().toISOString(),
@@ -2085,12 +2270,27 @@ export const leaveService = {
 // 班级 Service
 // ============================================
 export const classService = {
+  /** 教师名下班级（分批拉全，课程管理按分类再前端过滤） */
   getByTeacher: async (teacherId: string, campusId?: string): Promise<Class[]> => {
     if (!isUseMock()) {
-      const params = new URLSearchParams({ page: '1', pageSize: '100' });
-      if (campusId) params.set('campusId', campusId);
-      const data = await get<BackendClassListResponse>(`/classes?${params.toString()}`);
-      return data.list.map(mapBackendClassListItem);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendClassListResponse>(`/classes?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendClassListItem);
     }
 
     return (await (await getStudentsMock()).mockGetClassesByTeacher(teacherId, campusId)).map(mapMockClass);
@@ -2107,6 +2307,31 @@ export const classService = {
 
     const cls = await (await getStudentsMock()).mockGetClassById(classId);
     return cls ? mapMockClass(cls) : null;
+  },
+  /** 校区班级列表（家长调课选补课班用；真实环境按校区过滤教师可见班级） */
+  getByCampus: async (campusId: string): Promise<Class[]> => {
+    if (!isUseMock()) {
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendClassListResponse>(`/classes?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendClassListItem);
+    }
+
+    return (await (await getStudentsMock()).mockGetClasses({ campusId })).map(mapMockClass);
   },
   getStudents: async (classId: string): Promise<Student[]> => {
     /** 班级学员列表接口暂无课时；补拉课包后写入 course_packages，供排课页展示剩余课时 */
@@ -2159,7 +2384,7 @@ export const classService = {
           id: item.id,
           name: item.name,
           teacher_id: '',
-          invite_code: buildInviteCode(item.id),
+          invite_code: resolveInviteCode(null),
           avatar_url: item.avatar || undefined,
           gender: mapBackendGender(item.gender),
           phone: item.phone || undefined,
@@ -2201,13 +2426,26 @@ export const classService = {
    */
   getScheduledClassIds: async (): Promise<string[]> => {
     if (!isUseMock()) {
-      const data = await get<{ list: Array<{ classId?: string; class_id?: string }> }>(
-        '/schedules',
-        { page: 1, pageSize: 500 },
-      );
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        const data = await get<BackendScheduleListResponse>(`/schedules?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
       const ids = new Set<string>();
-      for (const item of data.list ?? []) {
-        const classId = item.classId ?? item.class_id;
+      for (const item of list) {
+        const classId = (item as { classId?: string; class_id?: string }).classId
+          ?? (item as { class_id?: string }).class_id;
         if (classId) ids.add(classId);
       }
       return Array.from(ids);
@@ -2219,17 +2457,58 @@ export const classService = {
       const created = await post<BackendClassListItem>('/classes', {
         name: data.name,
         schedule: data.schedule,
+        subject: data.subject_id,
+        type: data.type === 'limited' ? 'limited' : 'unlimited',
+        totalLessons: data.type === 'limited' ? data.total_lessons : null,
+        capacity: data.capacity ?? null,
+        note: data.note,
+        color: data.color,
+        teachers: data.teachers,
+        startTime: data.start_time,
+        endTime: data.end_time,
       });
       return mapBackendClassListItem(created);
     }
 
-    return (await getStudentsMock()).mockCreateClass(data);
+    const mockCreated = await (
+      await getStudentsMock()
+    ).mockCreateClass({
+      name: data.name,
+      teacherId: data.teacher_id,
+      teachers: data.teachers,
+      campusId: data.campus_id,
+      subjectId: data.subject_id,
+      categoryId: data.category_id,
+      type: data.type === 'ended' ? 'limited' : data.type || 'unlimited',
+      totalLessons: data.total_lessons,
+      usedLessons: data.used_lessons || 0,
+      capacity: data.capacity,
+      color: data.color || 'primary',
+      note: data.note,
+      hoursPerLesson: data.hours_per_lesson,
+      pricePerLesson: data.pricePerLesson || 0,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      studentCount: data.student_count || 0,
+      status: data.status === 'paused' ? 'paused' : data.status === 'ended' ? 'ended' : 'active',
+      level: data.level,
+    });
+    return mapMockClass(mockCreated);
   },
   update: async (classId: string, data: Partial<Class>) => {
     if (!isUseMock()) {
       const updated = await put<BackendClassListItem>(`/classes/${classId}`, {
         name: data.name,
         schedule: data.schedule,
+        subject: data.subject_id,
+        type: data.type === 'limited' ? 'limited' : data.type === 'ended' ? 'unlimited' : data.type,
+        totalLessons: data.type === 'limited' ? data.total_lessons : null,
+        capacity: data.capacity ?? null,
+        note: data.note,
+        color: data.color,
+        teachers: data.teachers,
+        startTime: data.start_time,
+        endTime: data.end_time,
       });
       return mapBackendClassListItem(updated);
     }
@@ -2253,6 +2532,18 @@ export const classService = {
     if (data.status !== undefined) mockPatch.status = data.status;
     if (data.campus_id !== undefined) mockPatch.campusId = data.campus_id;
     if (data.room !== undefined) mockPatch.room = data.room;
+    if (data.type !== undefined) {
+      mockPatch.type = data.type === 'ended' ? 'limited' : data.type;
+      if (data.type === 'unlimited') {
+        mockPatch.totalLessons = undefined;
+      }
+    }
+    if (data.total_lessons !== undefined) mockPatch.totalLessons = data.total_lessons;
+    if (data.type === 'unlimited') mockPatch.totalLessons = undefined;
+    if (data.capacity !== undefined) mockPatch.capacity = data.capacity;
+    if (data.start_time !== undefined) mockPatch.startTime = data.start_time;
+    if (data.end_time !== undefined) mockPatch.endTime = data.end_time;
+    if (data.used_lessons !== undefined) mockPatch.usedLessons = data.used_lessons;
 
     const updated = await (await getStudentsMock()).mockUpdateClass(classId, mockPatch);
     return updated ? mapMockClass(updated) : undefined;
@@ -2308,16 +2599,91 @@ export const classService = {
 // 排课 Service
 // ============================================
 export const scheduleService = {
+  /** 教师排课列表（分批拉全） */
   getByTeacher: async (teacherId: string, campusId?: string): Promise<Schedule[]> => {
     if (!isUseMock()) {
-      const params = new URLSearchParams({ page: '1', pageSize: '100' });
-      if (campusId) params.set('campusId', campusId);
-      const data = await get<BackendScheduleListResponse>(`/schedules?${params.toString()}`);
-      return data.list.map(mapBackendSchedule);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendScheduleListResponse>(`/schedules?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendSchedule);
     }
 
     return (await (await getStudentsMock()).mockGetSchedulesByTeacher(teacherId, campusId)).map(mapMockSchedule);
   },
+  /** 校区排课（家长调课补课目标展开用） */
+  getByCampus: async (campusId: string): Promise<Schedule[]> => {
+    if (!isUseMock()) {
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendScheduleListResponse>(`/schedules?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendSchedule);
+    }
+
+    const raw = await (await getStudentsMock()).mockGetSchedulesByCampus(campusId);
+    return raw.map(mapMockSchedule);
+  },
+
+  /**
+   * 家长课表：按绑定孩子班级拉排课（真接口靠 PARENT JWT；Mock 按 classIds 过滤）
+   */
+  listForParent: async (classIds: string[], campusId?: string): Promise<Schedule[]> => {
+    const uniqueIds = [...new Set(classIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return [];
+    const allowed = new Set(uniqueIds);
+
+    if (!isUseMock()) {
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        if (campusId) params.set('campusId', campusId);
+        const data = await get<BackendScheduleListResponse>(`/schedules?${params.toString()}`);
+        return {
+          list: data.list || [],
+          pagination: data.pagination || {
+            page,
+            pageSize,
+            total: data.list?.length || 0,
+            totalPages: 1,
+          },
+        };
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendSchedule).filter((item) => item.class_id && allowed.has(item.class_id));
+    }
+
+    const { SCHEDULES } = await import('@/data/mock-database');
+    return SCHEDULES.filter((s) => s.classId && allowed.has(s.classId)).map(mapMockSchedule);
+  },
+
   getById: async (scheduleId: string): Promise<Schedule | null> => {
     if (!isUseMock()) {
       try {
@@ -2336,6 +2702,7 @@ export const scheduleService = {
       ignoreConflict?: boolean;
       start_date?: string;
       end_date?: string;
+      maxOccurrences?: number;
     },
   ): Promise<Schedule> => {
     if (!isUseMock()) {
@@ -2346,6 +2713,7 @@ export const scheduleService = {
         endTime: data.end_time,
         startDate: data.start_date,
         endDate: data.end_date,
+        maxOccurrences: data.maxOccurrences,
         room: data.room,
         note: data.note,
         ignoreConflict: data.ignoreConflict === true,
@@ -2361,6 +2729,7 @@ export const scheduleService = {
       ignoreConflict?: boolean;
       start_date?: string;
       end_date?: string;
+      maxOccurrences?: number;
     },
   ): Promise<Schedule | null> => {
     if (!isUseMock()) {
@@ -2371,6 +2740,7 @@ export const scheduleService = {
         endTime: data.end_time,
         startDate: data.start_date,
         endDate: data.end_date,
+        maxOccurrences: data.maxOccurrences,
         room: data.room,
         note: data.note,
         ignoreConflict: data.ignoreConflict === true,
@@ -2456,10 +2826,20 @@ export const scheduleService = {
 // 通知 Service
 // ============================================
 export const notificationService = {
+  /** 收件箱（分批拉全；列表页后续可改 usePagedQuery） */
   getByReceiver: async (receiverId: string): Promise<Notification[]> => {
     if (!isUseMock()) {
-      const data = await get<BackendNotificationListResponse>('/notifications?page=1&pageSize=100');
-      return data.list.map(mapBackendNotification);
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        const data = await get<BackendNotificationListResponse>(
+          `/notifications?${params.toString()}`,
+        );
+        return asPaginatedResponse(data, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendNotification);
     }
 
     return (await (await getStudentsMock()).mockGetNotificationsByReceiver(receiverId)).map(mapMockNotification);

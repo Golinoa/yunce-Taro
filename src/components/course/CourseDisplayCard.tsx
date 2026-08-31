@@ -10,6 +10,7 @@ import { View, Text } from '@tarojs/components';
 import React from 'react';
 import Card from '@/components/Card';
 import FormRow from '@/components/FormRow';
+import { CLASS_LEVEL_BADGE_TEXT, CLASS_LEVEL_BADGE_WRAP } from '@/types/class';
 
 export interface CourseDisplayCardProps {
   /** 课程颜色（hex/rgba 等 CSS color） */
@@ -58,8 +59,8 @@ const CourseDisplayCard: React.FC<CourseDisplayCardProps> = ({
     {/* 课程难度 */}
     <FormRow label="课程难度" onClick={onPickLevel} border={false}>
       {levelLabel ? (
-        <View className="px-[20rpx] py-[6rpx] rounded-[8rpx] bg-primary/10">
-          <Text className="text-[24rpx] font-medium text-primary">{levelLabel}</Text>
+        <View className={CLASS_LEVEL_BADGE_WRAP}>
+          <Text className={CLASS_LEVEL_BADGE_TEXT}>{levelLabel}</Text>
         </View>
       ) : (
         <Text className="text-[30rpx] text-muted-foreground">—</Text>

@@ -87,8 +87,6 @@ export const CARD_TYPE_TOOLTIPS: Record<string, string> = {
   freeCancelCount: '会员可免费取消预约的次数，0=无免费取消。',
   advanceBookingMinutes: '需提前多少分钟预约，0=随时可约。',
   availableWeekdays: '设置该卡种可约课的星期，默认全周可用。',
-  onlinePurchase: '开启后会员可在小程序端自行购买该卡种。',
-  studentIdentityLimit: '开启后仅限学生身份会员购买。',
   isGiftCard: '标记为赠卡后可用于活动赠送，不计入销售收入。',
   allowTransfer: '开启后允许会员将该卡转给他人。',
   usageLimit: '该卡最多可供几人使用，0=不限。',

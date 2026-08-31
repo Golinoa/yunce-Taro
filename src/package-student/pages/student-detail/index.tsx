@@ -262,7 +262,13 @@ const StudentDetail: React.FC = () => {
         studentService.getParents(studentId),
       ]);
       const txns = currentUserId
-        ? await packageService.getTransactions(currentUserId, studentId)
+        ? (
+            await packageService.getTransactions(currentUserId, {
+              studentId,
+              page: 1,
+              pageSize: 50,
+            })
+          ).list
         : [];
 
       if (!stu) {
@@ -757,22 +763,18 @@ const StudentDetail: React.FC = () => {
 
   return (
     <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
-      {/* ====== 渐变头部 ====== */}
+      {/* ====== 渐变头部（与「我的」页 ProfileHeader gradient 同款） ====== */}
       <View
-        className="bg-gradient-primary px-[40rpx] rounded-b-[48rpx] relative overflow-hidden pb-[72rpx]"
+        className="bg-gradient-diffuse-custom-nav px-[40rpx] relative overflow-hidden pb-[72rpx]"
         style={{ paddingTop: `${statusBarHeight + 8}px` }}
       >
-        {/* 装饰圆 */}
-        <View className="absolute -top-[60rpx] -right-[60rpx] w-[240rpx] h-[240rpx] rounded-full bg-primary-foreground/8" />
-        <View className="absolute bottom-[-40rpx] right-[100rpx] w-[160rpx] h-[160rpx] rounded-full bg-primary-foreground/6" />
-
         {/* 返回 */}
         <View className="relative z-1">
           <View
-            className="w-[64rpx] h-[64rpx] rounded-full bg-primary-foreground/20 center"
+            className="w-[64rpx] h-[64rpx] rounded-full bg-card/80 center shadow-soft"
             onClick={goBack}
           >
-            <Icon name="mdi-arrow-left" size="sm" color="hsl(var(--primary-foreground))" />
+            <Icon name="mdi-arrow-left" size="sm" color="foreground" />
           </View>
         </View>
 
@@ -782,54 +784,46 @@ const StudentDetail: React.FC = () => {
             name={student.name}
             src={student.avatar_url}
             size="xl"
-            className="border-[6rpx] border-white/40"
+            className="border-[4rpx] border-solid border-border bg-card"
           />
           <View className="flex-1 min-w-0">
             <View className="flex items-center gap-[12rpx]">
-              <Text className="text-[40rpx] font-bold text-primary-foreground leading-none">
+              <Text className="text-[40rpx] font-bold text-foreground leading-none">
                 {student.name}
               </Text>
               {student.gender && (
                 <Icon
                   name={student.gender === 'male' ? 'mdi-gender-male' : 'mdi-gender-female'}
                   size={24}
-                  color="hsl(var(--primary-foreground))"
+                  color="muted"
                 />
               )}
             </View>
             <View className="flex items-center gap-[16rpx] mt-[16rpx]">
               {student.phone && (
-                <Text className="text-[28rpx] text-primary-foreground font-medium">
+                <Text className="text-[28rpx] text-muted-foreground font-medium">
                   {student.phone}
                 </Text>
               )}
               {student.phone && (
                 <View className="flex items-center gap-[12rpx]">
                   <View
-                    className="w-[52rpx] h-[52rpx] rounded-full bg-primary-foreground/20 center press-scale"
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-card center press-scale shadow-soft"
                     onClick={handleCopyPhone}
                   >
-                    <Icon
-                      name="mdi-content-copy"
-                      size={20}
-                      color="hsl(var(--primary-foreground))"
-                    />
+                    <Icon name="mdi-content-copy" size={20} color="muted" />
                   </View>
                   <View
-                    className="w-[52rpx] h-[52rpx] rounded-full bg-primary-foreground/20 center press-scale"
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-card center press-scale shadow-soft"
                     onClick={handleCallPhone}
                   >
-                    <Icon name="mdi-phone" size={20} color="hsl(var(--primary-foreground))" />
+                    <Icon name="mdi-phone" size={20} color="muted" />
                   </View>
                   <View
-                    className="w-[52rpx] h-[52rpx] rounded-full bg-primary-foreground/20 center press-scale"
+                    className="w-[52rpx] h-[52rpx] rounded-full bg-card center press-scale shadow-soft"
                     onClick={handleSendMessage}
                   >
-                    <Icon
-                      name="mdi-message-text"
-                      size={20}
-                      color="hsl(var(--primary-foreground))"
-                    />
+                    <Icon name="mdi-message-text" size={20} color="muted" />
                   </View>
                 </View>
               )}

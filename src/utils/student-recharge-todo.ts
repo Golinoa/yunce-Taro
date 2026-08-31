@@ -1,6 +1,7 @@
 /**
- * 学员课时续费待办 — 统一标题与描述文案
+ * 学员课时续费待办 — 统一标题、描述、跳转与默认参与人
  */
+import { TODO_ALERT_RECHARGE_PREFIX } from '@/utils/todo-read';
 
 /** 待办标题：`「张三」课时续费提醒` */
 export function buildStudentRechargeTodoTitle(studentName: string): string {
@@ -32,4 +33,65 @@ export function normalizeStudentRechargeTodoDesc(info: string): string {
     return buildStudentRechargeTodoDesc(Number(match[1]));
   }
   return buildStudentRechargeTodoDesc();
+}
+
+/** 去处理 → 该学员详情页 */
+export function buildStudentRechargeTodoUrl(studentId: string): string {
+  return `/package-student/pages/student-detail/index?id=${encodeURIComponent(studentId)}`;
+}
+
+export function isStudentRechargeTodoId(todoId: string): boolean {
+  return Boolean(todoId) && todoId.startsWith(TODO_ALERT_RECHARGE_PREFIX);
+}
+
+export function parseStudentIdFromRechargeTodoId(todoId: string): string | null {
+  if (!isStudentRechargeTodoId(todoId)) return null;
+  const studentId = todoId.slice(TODO_ALERT_RECHARGE_PREFIX.length);
+  return studentId || null;
+}
+
+export interface RechargeAssigneeStaff {
+  id: string;
+  /** 教务身份：principal 视为校长 */
+  identity?: string | null;
+  /** 机构角色：admin=管理员，principal=校长 */
+  orgRole?: string | null;
+  campusIds?: string[];
+}
+
+/**
+ * 系统默认参与人：校长 + 管理员 + 学员负责老师（同校区优先）。
+ * 手动覆盖不走本函数（见 todo-assignee-override）。
+ */
+export function resolveDefaultRechargeAssigneeIds(input: {
+  responsibleTeacherId?: string | null;
+  staff: RechargeAssigneeStaff[];
+  campusId?: string;
+}): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (id?: string | null) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+
+  if (input.responsibleTeacherId) push(input.responsibleTeacherId);
+
+  for (const staff of input.staff) {
+    if (
+      input.campusId &&
+      staff.campusIds &&
+      staff.campusIds.length > 0 &&
+      !staff.campusIds.includes(input.campusId)
+    ) {
+      continue;
+    }
+    const isPrincipal = staff.orgRole === 'principal' || staff.identity === 'principal';
+    const isAdmin = staff.orgRole === 'admin';
+    if (isPrincipal || isAdmin) push(staff.id);
+  }
+
+  return ids;
 }

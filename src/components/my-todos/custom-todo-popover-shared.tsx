@@ -228,7 +228,7 @@ export const CustomTodoRemindSwitchRow: React.FC<CustomTodoRemindSwitchRowProps>
 
 export interface CustomTodoRemindDisplayRowProps {
   displayText: string | null;
-  onEdit: () => void;
+  onEdit?: () => void;
 }
 
 /** 详情态提醒行：展示时间 + 编辑入口 */
@@ -242,13 +242,15 @@ export const CustomTodoRemindDisplayRow: React.FC<CustomTodoRemindDisplayRowProp
     <Text className="min-w-0 flex-1 text-[26rpx] font-medium text-foreground">
       {displayText || '未设置'}
     </Text>
-    <View
-      className="shrink-0 flex flex-row items-center gap-[4rpx] rounded-full bg-muted px-[16rpx] py-[8rpx] press-scale"
-      onClick={onEdit}
-    >
-      <Icon name="mdi-pencil" size={16} color="primary" />
-      <Text className="text-[22rpx] font-medium text-primary">编辑</Text>
-    </View>
+    {onEdit ? (
+      <View
+        className="shrink-0 flex flex-row items-center gap-[4rpx] rounded-full bg-muted px-[16rpx] py-[8rpx] press-scale"
+        onClick={onEdit}
+      >
+        <Icon name="mdi-pencil" size={16} color="primary" />
+        <Text className="text-[22rpx] font-medium text-primary">编辑</Text>
+      </View>
+    ) : null}
   </View>
 );
 

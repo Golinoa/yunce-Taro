@@ -67,6 +67,12 @@ export interface CampusUIModel {
   businessCategories: SelectedBusinessCategory[];
   /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */
   tags?: string[];
+  /** 课时不足预警阈值（剩余课时 ≤ 该值触发黄标），默认 5 */
+  hoursAlertThreshold: number;
+  /** 剩余天数预警阈值，默认 7 */
+  daysAlertThreshold?: number;
+  /** 剩余金额预警阈值（元），默认 200 */
+  amountAlertThreshold?: number;
 }
 
 /** 校区统计数据 */
@@ -120,6 +126,12 @@ export interface CampusFormData {
   businessCategories?: SelectedBusinessCategory[];
   /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */
   tags?: string[];
+  /** 课时不足预警阈值 */
+  hoursAlertThreshold?: number;
+  /** 剩余天数预警阈值 */
+  daysAlertThreshold?: number;
+  /** 剩余金额预警阈值（元） */
+  amountAlertThreshold?: number;
 }
 
 // ============================================

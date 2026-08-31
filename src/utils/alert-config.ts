@@ -1,40 +1,112 @@
 /**
- * 运营预警「课时不足」阈值配置（用户口径 2026-08-22：做成可配置项）
- *
- * 使用场景：系统设置页可配置预警阈值，统计页运营预警按此阈值过滤学员。
- * 预警规则（用户确认）：
- * - 常规提醒：剩余课时 ≤ 阈值（默认 5）→ 提醒续费
- * - 强制提醒：剩余 0 课时（最后一节课用完）→ 无论阈值多少，始终提醒一次
- * 存储：本地 storage（mock 阶段）；联调后迁移到后端设置接口。
+ * 运营预警阈值（课时 / 天数 / 金额）
+ * 真源：校区字段；本地 storage 作缓存。系统设置入口已合并到「续费提醒」。
  */
 import Taro from '@tarojs/taro';
 
-const STORAGE_KEY = 'yunce-op-alert-threshold';
-/** 默认阈值（用户测试口径 2026-08-22：5 课时） */
+const STORAGE_KEY = 'yunce-op-alert-thresholds';
+
 export const DEFAULT_ALERT_THRESHOLD_HOURS = 5;
+export const DEFAULT_ALERT_THRESHOLD_DAYS = 7;
+export const DEFAULT_ALERT_THRESHOLD_AMOUNT = 200;
 
-/** 内存态：storage 不可用（如 Node 测试环境）时回退，保证读写一致 */
-let _threshold: number | null = null;
-
-/** 读取阈值：非法值回退默认 */
-export function getAlertThreshold(): number {
-  if (_threshold !== null) return _threshold;
-  try {
-    const raw = Taro.getStorageSync(STORAGE_KEY);
-    const v = typeof raw === 'number' ? raw : Number(raw);
-    _threshold = Number.isFinite(v) && v >= 0 ? v : DEFAULT_ALERT_THRESHOLD_HOURS;
-  } catch {
-    _threshold = DEFAULT_ALERT_THRESHOLD_HOURS;
-  }
-  return _threshold;
+export interface AlertThresholdConfig {
+  hours: number;
+  days: number;
+  /** 元 */
+  amount: number;
 }
 
-/** 写入阈值 */
-export function setAlertThreshold(hours: number): void {
-  _threshold = Number.isFinite(hours) && hours >= 0 ? hours : 0;
+let _config: AlertThresholdConfig | null = null;
+
+function normalizeHours(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_ALERT_THRESHOLD_HOURS;
+}
+
+function normalizeDays(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_ALERT_THRESHOLD_DAYS;
+}
+
+function normalizeAmount(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_ALERT_THRESHOLD_AMOUNT;
+}
+
+function readStorage(): AlertThresholdConfig {
   try {
-    Taro.setStorageSync(STORAGE_KEY, _threshold);
+    const raw = Taro.getStorageSync(STORAGE_KEY);
+    if (raw && typeof raw === 'object') {
+      return {
+        hours: normalizeHours((raw as AlertThresholdConfig).hours),
+        days: normalizeDays((raw as AlertThresholdConfig).days),
+        amount: normalizeAmount((raw as AlertThresholdConfig).amount),
+      };
+    }
+    // 兼容旧版仅存课时数字
+    if (raw !== '' && raw !== undefined && raw !== null) {
+      return {
+        hours: normalizeHours(raw),
+        days: DEFAULT_ALERT_THRESHOLD_DAYS,
+        amount: DEFAULT_ALERT_THRESHOLD_AMOUNT,
+      };
+    }
   } catch {
-    // storage 不可用时仅保留内存态（mock 阶段可接受）
+    // ignore
   }
+  return {
+    hours: DEFAULT_ALERT_THRESHOLD_HOURS,
+    days: DEFAULT_ALERT_THRESHOLD_DAYS,
+    amount: DEFAULT_ALERT_THRESHOLD_AMOUNT,
+  };
+}
+
+export function getAlertThresholdConfig(): AlertThresholdConfig {
+  if (_config) return _config;
+  _config = readStorage();
+  return _config;
+}
+
+/** 读取课时阈值（兼容旧调用方） */
+export function getAlertThreshold(): number {
+  return getAlertThresholdConfig().hours;
+}
+
+export function setAlertThresholdConfig(next: Partial<AlertThresholdConfig>): AlertThresholdConfig {
+  const cur = getAlertThresholdConfig();
+  _config = {
+    hours: next.hours !== undefined ? normalizeHours(next.hours) : cur.hours,
+    days: next.days !== undefined ? normalizeDays(next.days) : cur.days,
+    amount: next.amount !== undefined ? normalizeAmount(next.amount) : cur.amount,
+  };
+  try {
+    Taro.setStorageSync(STORAGE_KEY, _config);
+  } catch {
+    // ignore
+  }
+  return _config;
+}
+
+/** 兼容旧 API：只写课时 */
+export function setAlertThreshold(hours: number): void {
+  setAlertThresholdConfig({ hours });
+}
+
+/** 用校区字段同步（进入续费提醒 / 学员列表前调用） */
+export function syncAlertThresholdFromCampus(input?: {
+  hoursAlertThreshold?: number | null;
+  daysAlertThreshold?: number | null;
+  amountAlertThreshold?: number | null;
+} | number | null): AlertThresholdConfig {
+  if (input === undefined || input === null) return getAlertThresholdConfig();
+  if (typeof input === 'number') {
+    setAlertThreshold(input);
+    return getAlertThresholdConfig();
+  }
+  return setAlertThresholdConfig({
+    hours: input.hoursAlertThreshold ?? undefined,
+    days: input.daysAlertThreshold ?? undefined,
+    amount: input.amountAlertThreshold ?? undefined,
+  });
 }

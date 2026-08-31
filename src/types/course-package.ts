@@ -139,6 +139,8 @@ export interface PackageTransaction {
   type: PackageTransactionType;
   student_id: string;
   student_name: string;
+  /** 学员头像（引用学员 avatar，禁止用姓名首字冒充） */
+  student_avatar?: string;
   package_id?: string;
   package_name?: string;
   purchased_hours?: number;

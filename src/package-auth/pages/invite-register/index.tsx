@@ -203,7 +203,7 @@ const InviteRegisterPage: React.FC = () => {
         visible={showAgreement}
         onClose={() => setShowAgreement(false)}
         onConfirm={handleConfirmAgreement}
-        confirmText="???????"
+        confirmText="同意并继续"
       />
     </View>
   );

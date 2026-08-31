@@ -1,7 +1,7 @@
 import { View, Text } from '@tarojs/components';
 import React from 'react';
-import Avatar from '@/components/Avatar';
 import CircleCheckbox from '@/components/CircleCheckbox';
+import StudentAvatar from '@/components/student/StudentAvatar';
 
 /**
  * 选择器列表项 - 全局统一规格
@@ -75,10 +75,12 @@ const PickerItem: React.FC<PickerItemProps> = ({
   disabled = false,
   onClick,
 }) => {
-  // 渲染左侧图标
+  // 渲染左侧图标（学员头像统一走 StudentAvatar，与意向学员卡片一致）
   const renderIcon = () => {
     if (iconType === 'avatar') {
-      return <Avatar name={avatarChar || title} avatarUrl={avatarUrl} size="md" fallback="initial" />;
+      return (
+        <StudentAvatar name={avatarChar || title} src={avatarUrl} size="md" />
+      );
     }
     // icon 模式
     return (
@@ -131,11 +133,13 @@ const PickerItem: React.FC<PickerItemProps> = ({
     >
       {renderIcon()}
       <View className="flex-1 min-w-0">
-        <View className="flex items-center gap-[8rpx]">
-          <Text className="text-base font-medium text-foreground block">{title}</Text>
+        <View className="flex items-center gap-[8rpx] min-w-0">
+          <Text className="text-[32rpx] font-semibold text-foreground truncate">{title}</Text>
           {titleExtra}
         </View>
-        {subtitle && <Text className="text-sm text-muted-foreground block mt-0_5">{subtitle}</Text>}
+        {subtitle ? (
+          <Text className="text-[24rpx] text-muted-foreground block mt-[8rpx]">{subtitle}</Text>
+        ) : null}
       </View>
       {renderRight()}
     </View>

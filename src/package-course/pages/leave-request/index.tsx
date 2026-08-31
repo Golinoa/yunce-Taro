@@ -1,68 +1,103 @@
-import { View, Text, Picker, Textarea } from '@tarojs/components';
+import { View, Text, Textarea, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
+import Card from '@/components/Card';
 import Empty from '@/components/Empty';
-import Icon from '@/components/Icon';
+import FormRow from '@/components/FormRow';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
-import { studentService, leaveService } from '@/services';
+import { studentService, leaveService, classService, homeService, scheduleService, notificationService, makeupBookingService, teacherService } from '@/services';
+import type { Class } from '@/types/class';
 import type { LeaveRequest, LeaveType, LeaveStatus } from '@/types/leave-request';
+import type { Schedule } from '@/types/schedule';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import { isUseMock } from '@/utils/build-env';
 import { logError } from '@/utils/logger';
+import {
+  buildUpcomingFixedLessons,
+  buildMakeupTargetLessons,
+  formatLessonOptionLabel,
+  type UpcomingClassLesson,
+} from '@/utils/parent-leave-lessons';
 import { withRouteGuard } from '@/utils/route-guard';
-
-const USE_MOCK = isUseMock();
 
 /** 状态标签配置 */
 const STATUS_MAP: Record<LeaveStatus, { label: string; cls: string }> = {
   pending: { label: '待审批', cls: 'bg-amber-500/15 text-amber-500' },
-  approved: { label: '已同意', cls: 'bg-primary-10 text-primary' },
-  rejected: { label: '已拒绝', cls: 'bg-destructive-10 text-destructive' },
+  approved: { label: '已同意', cls: 'bg-primary/10 text-primary' },
+  rejected: { label: '已拒绝', cls: 'bg-destructive/10 text-destructive' },
 };
 
 /** 类型标签 */
 const TYPE_MAP: Record<LeaveType, { label: string; cls: string }> = {
-  leave: { label: '请假', cls: 'bg-destructive-10 text-destructive' },
-  reschedule: { label: '调课', cls: 'bg-primary-10 text-primary' },
+  leave: { label: '请假', cls: 'bg-destructive/10 text-destructive' },
+  reschedule: { label: '调课', cls: 'bg-primary/10 text-primary' },
 };
+
+/** mock 排课可能是 camelCase，统一成前端 Schedule */
+function normalizeRawSchedule(raw: Record<string, unknown>): Schedule {
+  if (typeof raw.day_of_week === 'number' && typeof raw.start_time === 'string') {
+    return raw as unknown as Schedule;
+  }
+  return {
+    id: String(raw.id || ''),
+    teacher_id: String(raw.teacherId || raw.teacher_id || ''),
+    class_id: (raw.classId || raw.class_id) as string | undefined,
+    day_of_week: Number(raw.dayOfWeek || raw.day_of_week || 1) as Schedule['day_of_week'],
+    start_time: String(raw.startTime || raw.start_time || ''),
+    end_time: String(raw.endTime || raw.end_time || ''),
+    room: (raw.room as string | undefined) || undefined,
+    note: (raw.note as string | undefined) || undefined,
+    created_at: '',
+    updated_at: '',
+  };
+}
 
 const LeaveRequestPage: React.FC = () => {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
   const userRole = profile?.currentContext?.role || 'teacher';
   const isTeacher = isStaffRole(userRole);
-  // 从路由获取可选的 requestId
   const requestId = useMemo(() => {
     const instance = Taro.getCurrentInstance();
     return decodeURIComponent(instance?.router?.params?.requestId || '');
   }, []);
+  const queryStudentId = useMemo(() => {
+    const instance = Taro.getCurrentInstance();
+    return decodeURIComponent(instance?.router?.params?.studentId || '');
+  }, []);
+  const queryLessonKey = useMemo(() => {
+    const instance = Taro.getCurrentInstance();
+    return decodeURIComponent(instance?.router?.params?.lessonKey || '');
+  }, []);
 
-  // ====== 教师视图状态 ======
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const { loading, setLoading } = useDelayedLoading();
   const [errorMsg, setErrorMsg] = useState('');
-  // 审批操作中状态：记录正在处理的请假 id 与动作
   const [processingId, setProcessingId] = useState<{
     id: string;
     action: 'approve' | 'reject';
   } | null>(null);
 
-  // ====== 家长视图状态 ======
   const [children, setChildren] = useState<Array<{ id: string; name: string }>>([]);
   const [studentId, setStudentId] = useState('');
-  const [childPickerVisible, setChildPickerVisible] = useState(false); // 选择孩子弹窗（PickerSheet）
+  const [childPickerVisible, setChildPickerVisible] = useState(false);
   const [leaveType, setLeaveType] = useState<LeaveType>('leave');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [newDate, setNewDate] = useState('');
+  const [lessons, setLessons] = useState<UpcomingClassLesson[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [studentClassIds, setStudentClassIds] = useState<string[]>([]);
+  const [campusClasses, setCampusClasses] = useState<Class[]>([]);
+  const [campusSchedules, setCampusSchedules] = useState<Schedule[]>([]);
+  const [selectedLessonKey, setSelectedLessonKey] = useState('');
+  const [targetLessonKey, setTargetLessonKey] = useState('');
+  const [lessonPickerVisible, setLessonPickerVisible] = useState(false);
+  const [targetPickerVisible, setTargetPickerVisible] = useState(false);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // 加载数据
   const loadData = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
@@ -71,10 +106,13 @@ const LeaveRequestPage: React.FC = () => {
         const list = await leaveService.getByTeacher(currentUserId);
         setLeaves(list);
       } else {
-        // 家长：获取孩子列表
         const kids = await studentService.getByParent(currentUserId);
         setChildren(kids);
-        if (kids.length > 0) setStudentId(kids[0].id);
+        if (kids.length > 0) {
+          const preferred =
+            (queryStudentId && kids.find((k) => k.id === queryStudentId)?.id) || kids[0].id;
+          setStudentId(preferred);
+        }
       }
     } catch (err) {
       logError('load leave data', err);
@@ -82,19 +120,121 @@ const LeaveRequestPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [isTeacher, currentUserId]);
+  }, [isTeacher, currentUserId, queryStudentId, setLoading]);
+
+  const loadLessons = useCallback(async (sid: string) => {
+    if (!sid) {
+      setLessons([]);
+      setStudentClassIds([]);
+      setCampusClasses([]);
+      setCampusSchedules([]);
+      return;
+    }
+    setLessonsLoading(true);
+    setSelectedLessonKey('');
+    setTargetLessonKey('');
+    try {
+      const student = await studentService.getById(sid);
+      const classIds = student?.class_ids || [];
+      setStudentClassIds(classIds);
+      const classResults = await Promise.all(classIds.map((id) => classService.getById(id)));
+      const classes = classResults.filter(Boolean) as Class[];
+      const rawList = (await homeService.getSchedulesByStudent(sid)) as unknown as Record<
+        string,
+        unknown
+      >[];
+      const schedules = (rawList || []).map(normalizeRawSchedule);
+      const upcoming = buildUpcomingFixedLessons({ schedules, classes, weeksAhead: 4 });
+      setLessons(upcoming);
+      if (queryLessonKey && upcoming.some((l) => l.key === queryLessonKey)) {
+        setSelectedLessonKey(queryLessonKey);
+      }
+
+      const campusId = student?.campus_id || classes[0]?.campus_id || '';
+      if (campusId) {
+        const [peerClasses, peerSchedules] = await Promise.all([
+          classService.getByCampus(campusId),
+          scheduleService.getByCampus(campusId),
+        ]);
+        setCampusClasses(peerClasses);
+        setCampusSchedules(peerSchedules);
+      } else {
+        setCampusClasses(classes);
+        setCampusSchedules(schedules);
+      }
+    } catch (err) {
+      logError('load leave lessons', err);
+      setLessons([]);
+      setCampusClasses([]);
+      setCampusSchedules([]);
+    } finally {
+      setLessonsLoading(false);
+    }
+  }, [queryLessonKey]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
-  // 如果有 requestId，教师查看单条详情
+  useEffect(() => {
+    if (!isTeacher && studentId) {
+      void loadLessons(studentId);
+    }
+  }, [isTeacher, studentId, loadLessons]);
+
+  useEffect(() => {
+    Taro.setNavigationBarTitle({ title: isTeacher ? '请假/调课审批' : '请假调课' });
+  }, [isTeacher]);
+
   const detailLeave = useMemo(() => {
     if (isTeacher && requestId) {
       return leaves.find((l) => l.id === requestId) || null;
     }
     return null;
   }, [isTeacher, requestId, leaves]);
+
+  const selectedLesson = useMemo(
+    () => lessons.find((l) => l.key === selectedLessonKey) || null,
+    [lessons, selectedLessonKey],
+  );
+
+  const targetLessonOptions = useMemo(() => {
+    if (!selectedLesson) return [];
+    const originalClass =
+      campusClasses.find((c) => c.id === selectedLesson.classId) ||
+      ({
+        id: selectedLesson.classId,
+        name: selectedLesson.className,
+        teacher_id: selectedLesson.teacherId,
+        subject_id: selectedLesson.subjectId,
+        campus_id: campusClasses[0]?.campus_id,
+        status: 'active',
+        type: 'unlimited',
+        color: 'primary',
+        used_lessons: 0,
+        student_count: 0,
+        created_at: '',
+        updated_at: '',
+      } as Class);
+
+    return buildMakeupTargetLessons({
+      schedules: campusSchedules,
+      classes: campusClasses.length > 0 ? campusClasses : [originalClass],
+      originalClass,
+      excludeClassIds: studentClassIds.length > 0 ? studentClassIds : [selectedLesson.classId],
+      weeksAhead: 1,
+    });
+  }, [selectedLesson, campusClasses, campusSchedules, studentClassIds]);
+
+  const targetLesson = useMemo(
+    () => targetLessonOptions.find((l) => l.key === targetLessonKey) || null,
+    [targetLessonOptions, targetLessonKey],
+  );
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    return dateStr.split('T')[0];
+  };
 
   const formatDateRange = useCallback((start: string, end?: string) => {
     if (!start) return '';
@@ -104,10 +244,8 @@ const LeaveRequestPage: React.FC = () => {
 
   const detailNotFound = isTeacher && Boolean(requestId) && !detailLeave && !loading && !errorMsg;
 
-  // 教师审批
   const handleApprove = useCallback(
     async (id: string) => {
-      // 防止重复点击
       if (processingId) return;
       const { confirm } = await Taro.showModal({
         title: '确认同意',
@@ -131,7 +269,6 @@ const LeaveRequestPage: React.FC = () => {
 
   const handleReject = useCallback(
     async (id: string) => {
-      // 防止重复点击
       if (processingId) return;
       const { confirm } = await Taro.showModal({
         title: '确认拒绝',
@@ -154,49 +291,89 @@ const LeaveRequestPage: React.FC = () => {
     [processingId],
   );
 
-  // 家长提交请假
   const handleSubmit = useCallback(async () => {
     if (!studentId) {
       Taro.showToast({ title: '请选择学生', icon: 'none' });
       return;
     }
-    if (!startDate) {
-      Taro.showToast({ title: '请选择开始日期', icon: 'none' });
+    if (!selectedLesson) {
+      Taro.showToast({ title: '请选择要请假/调课的课程', icon: 'none' });
       return;
     }
     if (!reason.trim()) {
       Taro.showToast({ title: '请输入原因', icon: 'none' });
       return;
     }
-    if (!USE_MOCK && leaveType === 'reschedule') {
-      Taro.showToast({ title: '当前真实联调阶段仅支持请假申请', icon: 'none' });
+    if (leaveType === 'reschedule' && !targetLesson) {
+      Taro.showToast({ title: '请选择调整到的课程', icon: 'none' });
       return;
     }
-    if (leaveType === 'reschedule' && !newDate) {
-      Taro.showToast({ title: '请选择调整后的日期', icon: 'none' });
-      return;
-    }
-    if (endDate && endDate < startDate) {
-      Taro.showToast({ title: '结束日期不能早于开始日期', icon: 'none' });
-      return;
-    }
-
-    const normalizedEndDate = endDate || startDate;
 
     setSubmitting(true);
     try {
+      const childName = children.find((c) => c.id === studentId)?.name || '学员';
       const created = await leaveService.create({
         parent_id: currentUserId,
         student_id: studentId,
-        teacher_id: '',
+        teacher_id: selectedLesson.teacherId,
         type: leaveType,
-        original_date: startDate,
-        end_date: normalizedEndDate,
-        new_date: leaveType === 'reschedule' && newDate ? newDate : undefined,
-        reason: reason.trim(),
+        original_date: selectedLesson.date,
+        end_date: selectedLesson.date,
+        new_date: leaveType === 'reschedule' && targetLesson ? targetLesson.date : undefined,
+        reason:
+          leaveType === 'reschedule' && targetLesson
+            ? `${reason.trim()}（补课至 ${formatLessonOptionLabel(targetLesson)}）`
+            : reason.trim(),
         status: 'pending',
       });
-      // 机构默认自动审批：提交后直接返回已通过；关闭自动审批时返回待校长审批
+
+      if (leaveType === 'reschedule' && targetLesson) {
+        await makeupBookingService.create({
+          studentId,
+          classId: targetLesson.classId,
+          lessonDate: targetLesson.date,
+          startTime: targetLesson.startTime,
+          endTime: targetLesson.endTime,
+          teacherId: targetLesson.teacherId,
+          teacherName: targetLesson.teacherName,
+          source: 'parent',
+          leaveRequestId: created.id,
+          originalClassId: selectedLesson.classId,
+          note: reason.trim(),
+          createdBy: currentUserId,
+        });
+
+        // 站内通知：原课老师、补课班老师、负责人（校长）
+        const receiverIds = new Set<string>();
+        if (selectedLesson.teacherId) receiverIds.add(selectedLesson.teacherId);
+        if (targetLesson.teacherId) receiverIds.add(targetLesson.teacherId);
+        try {
+          const teachers = await teacherService.getList();
+          teachers
+            .filter((t) => t.identity === 'principal')
+            .forEach((t) => receiverIds.add(t.id));
+        } catch (err) {
+          logError('load principals for makeup notify', err);
+        }
+
+        const notifyTitle = '补课申请';
+        const notifyContent = `「${childName}」申请将 ${formatLessonOptionLabel(selectedLesson)} 调至 ${formatLessonOptionLabel(targetLesson)} 补课。原因：${reason.trim()}`;
+        for (const receiverId of receiverIds) {
+          try {
+            await notificationService.send({
+              sender_id: currentUserId,
+              receiver_id: receiverId,
+              title: notifyTitle,
+              content: notifyContent,
+              related_id: created.id,
+              type: 'leave_request',
+            });
+          } catch (err) {
+            logError('notify makeup receivers', err);
+          }
+        }
+      }
+
       if (created.status === 'approved') {
         Taro.showToast({ title: '已自动审批通过', icon: 'success' });
       } else {
@@ -208,33 +385,34 @@ const LeaveRequestPage: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [studentId, leaveType, startDate, endDate, newDate, reason, currentUserId]);
-
-  // 格式化日期
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    return dateStr.split('T')[0];
-  };
+  }, [
+    studentId,
+    selectedLesson,
+    targetLesson,
+    leaveType,
+    reason,
+    currentUserId,
+    children,
+  ]);
 
   if (loading) {
     return (
       <PageContainer>
-        <View className="flex items-center justify-center pt-50">
+        <View className="flex items-center justify-center pt-[200rpx]">
           <Loading text="加载中..." />
         </View>
       </PageContainer>
     );
   }
 
-  // 错误态：加载失败且无缓存数据时展示重试入口
   if (errorMsg && leaves.length === 0 && isTeacher) {
     return (
       <PageContainer>
-        <View className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center gap-[32rpx] px-8">
+        <View className="min-h-screen flex flex-col items-center justify-center gap-[32rpx] px-[32rpx]">
           <Empty icon="mdi-alert-circle" description={errorMsg} />
           <View
-            className="bg-gradient-primary px-[48rpx] py-[16rpx] rounded-[16rpx] active:opacity-90"
-            onClick={() => loadData()}
+            className="bg-primary px-[48rpx] py-[16rpx] rounded-full active:opacity-90"
+            onClick={() => void loadData()}
           >
             <Text className="text-[28rpx] text-white font-medium">重新加载</Text>
           </View>
@@ -243,15 +421,14 @@ const LeaveRequestPage: React.FC = () => {
     );
   }
 
-  // 家长端：孩子信息加载失败
   if (errorMsg && !isTeacher && children.length === 0) {
     return (
       <PageContainer>
-        <View className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center gap-[32rpx] px-8">
+        <View className="min-h-screen flex flex-col items-center justify-center gap-[32rpx] px-[32rpx]">
           <Empty icon="mdi-alert-circle" description={errorMsg} />
           <View
-            className="bg-gradient-primary px-[48rpx] py-[16rpx] rounded-[16rpx] active:opacity-90"
-            onClick={() => loadData()}
+            className="bg-primary px-[48rpx] py-[16rpx] rounded-full active:opacity-90"
+            onClick={() => void loadData()}
           >
             <Text className="text-[28rpx] text-white font-medium">重新加载</Text>
           </View>
@@ -263,7 +440,7 @@ const LeaveRequestPage: React.FC = () => {
   if (detailNotFound) {
     return (
       <PageContainer>
-        <View className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center gap-[32rpx] px-8">
+        <View className="min-h-screen flex flex-col items-center justify-center gap-[32rpx] px-[32rpx]">
           <Empty
             icon="mdi-close"
             description="未找到对应的请假申请"
@@ -275,294 +452,310 @@ const LeaveRequestPage: React.FC = () => {
     );
   }
 
-  // ====== 教师单条详情视图 ======
   if (detailLeave) {
     const typeInfo = TYPE_MAP[detailLeave.type];
     const statusInfo = STATUS_MAP[detailLeave.status];
     return (
       <PageContainer safeBottom>
-        <View className="min-h-screen bg-gradient-subtle pb-50">
-          <View className="px-8 pt-8 pb-4">
-            <Text className="text-2xl font-bold text-foreground">处理申请</Text>
-          </View>
-          <View className="mx-8 bg-white rounded-3xl p-8 shadow-soft">
-            <View className="flex items-center gap-5 mb-6">
-              <View className="w-20 h-20 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
-                <Text className="text-white text-2xl font-bold">
-                  {detailLeave.student?.name?.[0] || '学'}
-                </Text>
-              </View>
-              <View className="flex items-center gap-3">
-                <Text className="text-xl font-medium text-foreground">
-                  {detailLeave.student?.name || '学生'}
-                </Text>
-                <View className={`py-1 px-4 rounded-2xl inline-flex items-center ${typeInfo.cls}`}>
-                  <Text className="text-xs font-medium">{typeInfo.label}</Text>
+        <ScrollView scrollY className="flex-1 min-h-0">
+          <View className="px-[32rpx] py-[24rpx] pb-[180rpx] flex flex-col gap-[24rpx]">
+            <Card className="p-[32rpx]">
+              <View className="flex items-center gap-[20rpx] mb-[8rpx]">
+                <View className="w-[72rpx] h-[72rpx] rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                  <Text className="text-primary text-[28rpx] font-bold">
+                    {detailLeave.student?.name?.[0] || '学'}
+                  </Text>
+                </View>
+                <View className="flex-1 min-w-0">
+                  <Text className="text-[30rpx] font-semibold text-foreground">
+                    {detailLeave.student?.name || '学生'}
+                  </Text>
+                </View>
+                <View className={`py-[6rpx] px-[16rpx] rounded-full ${typeInfo.cls}`}>
+                  <Text className="text-[22rpx] font-medium">{typeInfo.label}</Text>
                 </View>
               </View>
-            </View>
-            <View className="flex items-center justify-between py-4 border-b border-input">
-              <Text className="text-base text-muted-foreground">日期</Text>
-              <Text className="text-lg text-foreground">
-                {formatDateRange(detailLeave.original_date, detailLeave.end_date)}
+              <FormRow label="日期" border>
+                <Text className="text-[30rpx] text-foreground">
+                  {formatDateRange(detailLeave.original_date, detailLeave.end_date)}
+                </Text>
+              </FormRow>
+              {detailLeave.new_date ? (
+                <FormRow label="调整至" border>
+                  <Text className="text-[30rpx] text-foreground">
+                    {formatDate(detailLeave.new_date)}
+                  </Text>
+                </FormRow>
+              ) : null}
+              <FormRow label="原因" border>
+                <Text className="text-[30rpx] text-foreground text-right">
+                  {detailLeave.reason || '无'}
+                </Text>
+              </FormRow>
+              <FormRow label="状态" border={false}>
+                <View className={`py-[6rpx] px-[16rpx] rounded-full ${statusInfo.cls}`}>
+                  <Text className="text-[22rpx] font-medium">{statusInfo.label}</Text>
+                </View>
+              </FormRow>
+            </Card>
+          </View>
+        </ScrollView>
+        {detailLeave.status === 'pending' ? (
+          <View className="fixed bottom-0 left-0 right-0 flex gap-[24rpx] px-[32rpx] py-[24rpx] bg-card border-t border-border pb-safe">
+            <View
+              className={`flex-1 py-[24rpx] rounded-full border border-destructive bg-card flex items-center justify-center ${
+                processingId ? 'opacity-60' : 'active:opacity-90'
+              }`}
+              onClick={() => !processingId && void handleReject(detailLeave.id)}
+            >
+              <Text className="text-destructive text-[30rpx] font-semibold">
+                {processingId?.id === detailLeave.id && processingId.action === 'reject'
+                  ? '处理中...'
+                  : '拒绝'}
               </Text>
             </View>
-            {detailLeave.new_date && (
-              <View className="flex items-center justify-between py-4 border-b border-input">
-                <Text className="text-base text-muted-foreground">调整至</Text>
-                <Text className="text-lg text-foreground">{formatDate(detailLeave.new_date)}</Text>
-              </View>
-            )}
-            <View className="flex items-center justify-between py-4 border-b border-input">
-              <Text className="text-base text-muted-foreground">原因</Text>
-              <Text className="text-lg text-foreground">{detailLeave.reason || '无'}</Text>
-            </View>
-            <View className="flex items-center justify-between py-4">
-              <Text className="text-base text-muted-foreground">状态</Text>
-              <View className={`py-1 px-4 rounded-2xl inline-flex items-center ${statusInfo.cls}`}>
-                <Text className="text-xs font-medium">{statusInfo.label}</Text>
-              </View>
+            <View
+              className={`flex-1 py-[24rpx] rounded-full bg-primary flex items-center justify-center ${
+                processingId ? 'opacity-60' : 'active:opacity-90'
+              }`}
+              onClick={() => !processingId && void handleApprove(detailLeave.id)}
+            >
+              <Text className="text-white text-[30rpx] font-semibold">
+                {processingId?.id === detailLeave.id && processingId.action === 'approve'
+                  ? '处理中...'
+                  : '同意'}
+              </Text>
             </View>
           </View>
-          {detailLeave.status === 'pending' && (
-            <View className="flex gap-4 px-8">
-              <View
-                className={`flex-1 py-7 rounded-3xl bg-gradient-primary shadow-elegant flex items-center justify-center ${
-                  processingId ? 'opacity-60' : 'active:opacity-90'
-                }`}
-                onClick={() => !processingId && handleApprove(detailLeave.id)}
-              >
-                <Text className="text-white text-xl font-semibold">
-                  {processingId?.id === detailLeave.id && processingId.action === 'approve'
-                    ? '处理中...'
-                    : '同意'}
-                </Text>
-              </View>
-              <View
-                className={`flex-1 py-7 rounded-3xl bg-white border border-destructive shadow-soft flex items-center justify-center ${
-                  processingId ? 'opacity-60' : 'active:opacity-90'
-                }`}
-                onClick={() => !processingId && handleReject(detailLeave.id)}
-              >
-                <Text className="text-destructive text-xl font-semibold">
-                  {processingId?.id === detailLeave.id && processingId.action === 'reject'
-                    ? '处理中...'
-                    : '拒绝'}
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
+        ) : null}
       </PageContainer>
     );
   }
 
-  // ====== 教师列表视图 ======
   if (isTeacher) {
     return (
       <PageContainer>
-        <View className="min-h-screen bg-gradient-subtle pb-50">
-          <View className="px-8 pt-8 pb-4">
-            <Text className="text-2xl font-bold text-foreground">请假/调课申请</Text>
-          </View>
-          {leaves.length === 0 ? (
-            <Empty icon="mdi-clipboard-text" description="暂无请假申请" />
-          ) : (
-            <View className="px-8 flex flex-col gap-4">
-              {leaves.map((leave) => {
+        <ScrollView scrollY className="flex-1 min-h-0">
+          <View className="px-[32rpx] py-[24rpx] pb-[48rpx] flex flex-col gap-[24rpx]">
+            {leaves.length === 0 ? (
+              <Empty icon="mdi-clipboard-text" description="暂无请假申请" />
+            ) : (
+              leaves.map((leave) => {
                 const typeInfo = TYPE_MAP[leave.type];
                 const statusInfo = STATUS_MAP[leave.status];
                 return (
-                  <View key={leave.id} className="bg-white rounded-3xl p-6 shadow-soft">
-                    <View className="flex items-center justify-between mb-2">
-                      <Text className="text-lg font-medium text-foreground">
+                  <Card key={leave.id} className="p-[32rpx]">
+                    <View className="flex items-center justify-between mb-[12rpx]">
+                      <Text className="text-[30rpx] font-semibold text-foreground">
                         {leave.student?.name || '学生'}
                       </Text>
-                      <View
-                        className={`py-1 px-4 rounded-2xl inline-flex items-center ${typeInfo.cls}`}
-                      >
-                        <Text className="text-xs font-medium">{typeInfo.label}</Text>
+                      <View className={`py-[6rpx] px-[16rpx] rounded-full ${typeInfo.cls}`}>
+                        <Text className="text-[22rpx] font-medium">{typeInfo.label}</Text>
                       </View>
                     </View>
-                    <Text className="text-base text-muted-foreground block mb-1">
+                    <Text className="text-[26rpx] text-muted-foreground block mb-[8rpx]">
                       {leave.reason || '无原因'}
                     </Text>
-                    <Text className="text-sm text-muted-foreground block mb-3">
+                    <Text className="text-[24rpx] text-muted-foreground block mb-[16rpx]">
                       {formatDateRange(leave.original_date, leave.end_date)}
                     </Text>
                     <View className="flex items-center justify-between">
-                      <View
-                        className={`py-1 px-4 rounded-2xl inline-flex items-center ${statusInfo.cls}`}
-                      >
-                        <Text className="text-xs font-medium">{statusInfo.label}</Text>
+                      <View className={`py-[6rpx] px-[16rpx] rounded-full ${statusInfo.cls}`}>
+                        <Text className="text-[22rpx] font-medium">{statusInfo.label}</Text>
                       </View>
-                      {leave.status === 'pending' && (
-                        <View className="flex gap-3">
+                      {leave.status === 'pending' ? (
+                        <View className="flex gap-[16rpx]">
                           <View
-                            className={`py-3 px-6 rounded-2xl bg-gradient-primary ${
+                            className={`py-[12rpx] px-[28rpx] rounded-full bg-primary ${
                               processingId ? 'opacity-60' : 'active:opacity-90'
                             }`}
-                            onClick={() => !processingId && handleApprove(leave.id)}
+                            onClick={() => !processingId && void handleApprove(leave.id)}
                           >
-                            <Text className="text-white text-sm font-medium">
+                            <Text className="text-white text-[24rpx] font-medium">
                               {processingId?.id === leave.id && processingId.action === 'approve'
                                 ? '处理中...'
                                 : '同意'}
                             </Text>
                           </View>
                           <View
-                            className={`py-3 px-6 rounded-2xl border border-destructive bg-white ${
+                            className={`py-[12rpx] px-[28rpx] rounded-full border border-destructive bg-card ${
                               processingId ? 'opacity-60' : 'active:opacity-90'
                             }`}
-                            onClick={() => !processingId && handleReject(leave.id)}
+                            onClick={() => !processingId && void handleReject(leave.id)}
                           >
-                            <Text className="text-destructive text-sm font-medium">
+                            <Text className="text-destructive text-[24rpx] font-medium">
                               {processingId?.id === leave.id && processingId.action === 'reject'
                                 ? '处理中...'
                                 : '拒绝'}
                             </Text>
                           </View>
                         </View>
-                      )}
+                      ) : null}
                     </View>
-                  </View>
+                  </Card>
                 );
-              })}
-            </View>
-          )}
-        </View>
+              })
+            )}
+          </View>
+        </ScrollView>
       </PageContainer>
     );
   }
 
-  // ====== 家长提交视图 ======
-  const selectedChildIdx = children.findIndex((c) => c.id === studentId);
+  const selectedChild = children.find((c) => c.id === studentId);
+  const canOpenLessonPicker = !lessonsLoading && lessons.length > 0;
 
   return (
-    <PageContainer safeBottom>
-      <View className="min-h-screen bg-gradient-subtle pb-50">
-        <View className="px-8 pt-8 pb-4">
-          <Text className="text-2xl font-bold text-foreground">请假/调课</Text>
-        </View>
-
-        <View className="px-8">
-          {/* 选择学生 */}
-          {children.length > 1 && (
-            <View className="mb-7">
-              <Text className="text-lg text-foreground font-medium block mb-3">选择孩子</Text>
-              <View
-                className="flex items-center justify-between py-6 px-7 rounded-3xl border border-input bg-white shadow-soft press-scale"
-                onClick={() => setChildPickerVisible(true)}
-              >
-                <Text className="text-lg text-foreground">
-                  {selectedChildIdx >= 0 ? children[selectedChildIdx].name : '请选择'}
+    <PageContainer className="h-screen flex flex-col overflow-hidden">
+      <ScrollView scrollY className="flex-1 min-h-0">
+        <View className="px-[32rpx] py-[24rpx] pb-[180rpx] flex flex-col gap-[24rpx]">
+          <Card className="p-[32rpx]">
+            {children.length > 1 ? (
+              <FormRow label="选择孩子" required onClick={() => setChildPickerVisible(true)}>
+                <Text
+                  className={`text-[30rpx] ${selectedChild ? 'text-foreground' : 'text-muted-foreground'}`}
+                >
+                  {selectedChild?.name || '请选择'}
                 </Text>
-                <Text className="text-base text-muted-foreground">▼</Text>
-              </View>
-            </View>
-          )}
+              </FormRow>
+            ) : children.length === 1 ? (
+              <FormRow label="学员" border>
+                <Text className="text-[30rpx] text-foreground">{children[0].name}</Text>
+              </FormRow>
+            ) : null}
 
-          {/* 类型选择 */}
-          <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">申请类型</Text>
-            {!USE_MOCK && (
-              <View className="mb-3 py-3 px-4 rounded-[20rpx] bg-warning/10 border border-warning/30">
-                <Text className="text-sm text-warning">
-                  当前联调阶段真实接口仅支持请假申请，调课类型先保留为页面能力占位
-                </Text>
+            <FormRow label="申请类型" required border={false}>
+              <View className="flex flex-row gap-[16rpx]">
+                {((isUseMock() ? ['leave', 'reschedule'] : ['leave']) as LeaveType[]).map(
+                  (type) => {
+                  const active = leaveType === type;
+                  return (
+                    <View
+                      key={type}
+                      className={`px-[28rpx] py-[12rpx] rounded-full border ${
+                        active ? 'bg-primary border-primary' : 'bg-card border-border'
+                      }`}
+                      onClick={() => {
+                        if (type === 'reschedule' && !isUseMock()) {
+                          Taro.showToast({
+                            title: '真实联调阶段暂不支持调课申请',
+                            icon: 'none',
+                          });
+                          return;
+                        }
+                        setLeaveType(type);
+                        setTargetLessonKey('');
+                      }}
+                    >
+                      <Text
+                        className={`text-[26rpx] font-medium ${
+                          active ? 'text-white' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {TYPE_MAP[type].label}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
+            </FormRow>
+          </Card>
+
+          <View className="px-[8rpx]">
+            <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+              请假适用于班课固定排课；调课可选择同科目其他班级未来一周的课次去补课。团课、私教请到「我的约课」直接取消预约。
+            </Text>
+          </View>
+
+          <Card className="p-[32rpx]">
+            {lessonsLoading ? (
+              <View className="py-[40rpx] flex items-center justify-center">
+                <Loading text="加载课次..." />
+              </View>
+            ) : lessons.length === 0 ? (
+              <View className="py-[24rpx]">
+                <Empty icon="mdi-calendar-remove" description="没有要上的课" />
+              </View>
+            ) : (
+              <>
+                <FormRow
+                  label={leaveType === 'reschedule' ? '原课程' : '请假课程'}
+                  required
+                  onClick={() => {
+                    if (canOpenLessonPicker) setLessonPickerVisible(true);
+                  }}
+                >
+                  <Text
+                    className={`text-[28rpx] text-right max-w-[420rpx] ${
+                      selectedLesson ? 'text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {selectedLesson ? formatLessonOptionLabel(selectedLesson) : '请选择课程'}
+                  </Text>
+                </FormRow>
+                {leaveType === 'reschedule' ? (
+                  <FormRow
+                    label="调整至"
+                    required
+                    border={false}
+                    onClick={() => {
+                      if (!selectedLesson) {
+                        Taro.showToast({ title: '请先选择原课程', icon: 'none' });
+                        return;
+                      }
+                      if (targetLessonOptions.length === 0) {
+                        Taro.showToast({ title: '暂无同科目可补课次', icon: 'none' });
+                        return;
+                      }
+                      setTargetPickerVisible(true);
+                    }}
+                  >
+                    <Text
+                      className={`text-[28rpx] text-right max-w-[420rpx] ${
+                        targetLesson ? 'text-foreground' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {targetLesson ? formatLessonOptionLabel(targetLesson) : '请选择课程'}
+                    </Text>
+                  </FormRow>
+                ) : null}
+              </>
             )}
-            <View className="flex gap-4">
-              <View
-                className={`flex-1 py-6 rounded-3xl border-2 border-input bg-white flex items-center justify-center transition shadow-soft ${leaveType === 'leave' ? 'border-primary bg-gradient-primary shadow-elegant' : ''}`}
-                onClick={() => setLeaveType('leave')}
-              >
-                <Text
-                  className={`text-lg font-medium ${leaveType === 'leave' ? 'text-white' : 'text-muted-foreground'}`}
-                >
-                  请假
+          </Card>
+
+          {lessons.length > 0 ? (
+            <Card className="p-[32rpx]">
+              <View className="flex flex-col py-[8rpx]">
+                <Text className="text-[30rpx] text-foreground mb-[16rpx]">
+                  {leaveType === 'reschedule' ? '调课原因' : '请假原因'}
+                  <Text className="text-destructive"> *</Text>
                 </Text>
-              </View>
-              <View
-                className={`flex-1 py-6 rounded-3xl border-2 border-input bg-white flex items-center justify-center transition shadow-soft ${leaveType === 'reschedule' ? 'border-primary bg-gradient-primary shadow-elegant' : ''}`}
-                onClick={() => {
-                  if (!USE_MOCK) {
-                    Taro.showToast({ title: '真实联调阶段暂不支持调课申请', icon: 'none' });
-                    return;
-                  }
-                  setLeaveType('reschedule');
-                }}
-              >
-                <Text
-                  className={`text-lg font-medium ${leaveType === 'reschedule' ? 'text-white' : 'text-muted-foreground'}`}
-                >
-                  调课
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* 开始日期 */}
-          <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">开始日期</Text>
-            <Picker mode="date" value={startDate} onChange={(e) => setStartDate(e.detail.value)}>
-              <View className="flex items-center justify-between py-6 px-7 rounded-3xl border border-input bg-white shadow-soft">
-                <Text className="text-lg text-foreground">{startDate || '请选择日期'}</Text>
-                <Icon name="mdi-calendar" size="sm" color="muted" />
-              </View>
-            </Picker>
-          </View>
-
-          {/* 结束日期 */}
-          <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">结束日期</Text>
-            <Picker mode="date" value={endDate} onChange={(e) => setEndDate(e.detail.value)}>
-              <View className="flex items-center justify-between py-6 px-7 rounded-3xl border border-input bg-white shadow-soft">
-                <Text className="text-lg text-foreground">{endDate || '请选择日期（可选）'}</Text>
-                <Icon name="mdi-calendar" size="sm" color="muted" />
-              </View>
-            </Picker>
-          </View>
-
-          {/* 调课新日期 */}
-          {leaveType === 'reschedule' && (
-            <View className="mb-7">
-              <Text className="text-lg text-foreground font-medium block mb-3">期望调整至</Text>
-              <Picker mode="date" value={newDate} onChange={(e) => setNewDate(e.detail.value)}>
-                <View className="flex items-center justify-between py-6 px-7 rounded-3xl border border-input bg-white shadow-soft">
-                  <Text className="text-lg text-foreground">{newDate || '请选择新日期'}</Text>
-                  <Icon name="mdi-calendar" size="sm" color="muted" />
+                <View className="rounded-[16rpx] bg-muted/40 px-[20rpx] py-[16rpx] min-h-[160rpx]">
+                  <Textarea
+                    className="w-full text-[28rpx] text-foreground leading-relaxed min-h-[140rpx]"
+                    placeholder="请简要说明原因"
+                    value={reason}
+                    onInput={(e) => setReason(e.detail.value || '')}
+                    maxlength={200}
+                  />
                 </View>
-              </Picker>
-            </View>
-          )}
-
-          {/* 请假原因 */}
-          <View className="mb-7">
-            <Text className="text-lg text-foreground font-medium block mb-3">请假原因</Text>
-            <View className="border border-input rounded-3xl py-5 px-7 bg-white shadow-soft">
-              <Textarea
-                className="w-full text-lg text-foreground leading-relaxed min-h-40"
-                placeholder="请输入请假原因"
-                value={reason}
-                onInput={(e) => setReason(e.detail.value || '')}
-                maxlength={200}
-              />
-            </View>
-          </View>
+              </View>
+            </Card>
+          ) : null}
         </View>
+      </ScrollView>
 
-        {/* 底部提交按钮 */}
-        <View className="fixed bottom-0 left-0 right-0 py-6 px-8 bg-white/95 backdrop-blur-sm border-t border-input">
+      {lessons.length > 0 ? (
+        <View className="fixed bottom-0 left-0 right-0 px-[32rpx] py-[24rpx] bg-card border-t border-border pb-safe">
           <ActionButton
             text={submitting ? '提交中...' : '提交申请'}
-            onClick={handleSubmit}
+            onClick={() => void handleSubmit()}
             disabled={submitting}
+            fixed={false}
           />
         </View>
-      </View>
+      ) : null}
 
-      {/* 选择孩子（PickerSheet 标准组件） */}
       <PickerSheet
         visible={childPickerVisible}
         title="选择孩子"
@@ -570,6 +763,28 @@ const LeaveRequestPage: React.FC = () => {
         value={studentId}
         onClose={() => setChildPickerVisible(false)}
         onConfirm={(v) => setStudentId(v)}
+      />
+      <PickerSheet
+        visible={lessonPickerVisible}
+        title="选择课程"
+        options={lessons.map((l) => ({ label: formatLessonOptionLabel(l), value: l.key }))}
+        value={selectedLessonKey}
+        onClose={() => setLessonPickerVisible(false)}
+        onConfirm={(v) => {
+          setSelectedLessonKey(v);
+          setTargetLessonKey('');
+        }}
+      />
+      <PickerSheet
+        visible={targetPickerVisible}
+        title="调整至"
+        options={targetLessonOptions.map((l) => ({
+          label: formatLessonOptionLabel(l),
+          value: l.key,
+        }))}
+        value={targetLessonKey}
+        onClose={() => setTargetPickerVisible(false)}
+        onConfirm={(v) => setTargetLessonKey(v)}
       />
     </PageContainer>
   );

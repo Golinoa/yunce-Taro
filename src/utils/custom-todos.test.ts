@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro';
+import dayjs from 'dayjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   CUSTOM_TODOS_STORAGE_KEY,
@@ -94,7 +95,7 @@ describe('custom-todos', () => {
         id: 'c',
         userId: 'u',
         title: '今天',
-        remindDate: new Date().toISOString().slice(0, 10),
+        remindDate: dayjs().format('YYYY-MM-DD'),
         createdAt: '',
       },
     ]);

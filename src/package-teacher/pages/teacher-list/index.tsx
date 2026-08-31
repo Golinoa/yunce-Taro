@@ -43,7 +43,7 @@ const TeacherListPage: React.FC = () => {
   useCardNavigationBar();
   const { profile } = useAuth();
   const { activeTheme } = useThemeStore();
-  const { teachers, loading, error, fetchAll, resignTeacher, updateTeacher } = useTeacherStore();
+  const { teachers, loading, error, fetchAll, resignTeacher, restoreTeacher } = useTeacherStore();
   const [activeTab, setActiveTab] = useState<StatusTab>('active');
 
   // 左滑卡片互斥管理
@@ -85,6 +85,10 @@ const TeacherListPage: React.FC = () => {
 
   const handleAdd = useCallback(() => {
     Taro.navigateTo({ url: '/package-teacher/pages/teacher-form/index' });
+  }, []);
+
+  const handleInvite = useCallback(() => {
+    Taro.navigateTo({ url: '/package-teacher/pages/staff-invite/index' });
   }, []);
 
   const handleEdit = useCallback((id: string) => {
@@ -137,49 +141,37 @@ const TeacherListPage: React.FC = () => {
     [resignTarget, resignTeacher, profile],
   );
 
-  // 删除确认
+  // 删除确认 → 走 resign(dismiss)，禁止 update(status) 静默丢字段
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     setDeleteSubmitting(true);
     try {
-      // 将教师标记为已删除（通过 updateTeacher 将 status 设为 resigned 并添加备注）
-      // 当前 mock 无物理删除，采用"标记删除"策略：更新名称为"已删除"
-      await updateTeacher(deleteTarget.id, {
-        status: 'resigned',
-        resignType: 'dismiss',
-        resignReason: '管理员删除',
-        resignDate: new Date().toISOString().slice(0, 10),
-      });
+      await resignTeacher(deleteTarget.id, 'dismiss', '管理员删除');
       Taro.showToast({ title: '已删除', icon: 'success' });
       setDeleteTarget(null);
+      setActiveTab('resigned');
     } catch {
       Taro.showToast({ title: '删除失败', icon: 'none' });
     } finally {
       setDeleteSubmitting(false);
     }
-  }, [deleteTarget, updateTeacher]);
+  }, [deleteTarget, resignTeacher]);
 
-  // 恢复在职
+  // 恢复在职 → POST /teachers/:id/restore
   const handleRestoreConfirm = useCallback(async () => {
     if (!restoreTarget) return;
     setRestoreSubmitting(true);
     try {
-      await updateTeacher(restoreTarget.id, {
-        status: 'active',
-        resignType: undefined,
-        resignReason: undefined,
-        resignDate: undefined,
-      });
+      await restoreTeacher(restoreTarget.id);
       Taro.showToast({ title: '已恢复在职', icon: 'success' });
       setRestoreTarget(null);
-      // 切换到在职 Tab，避免已离职列表闪烁空态
       setActiveTab('active');
     } catch {
       Taro.showToast({ title: '恢复失败', icon: 'none' });
     } finally {
       setRestoreSubmitting(false);
     }
-  }, [restoreTarget, updateTeacher]);
+  }, [restoreTarget, restoreTeacher]);
 
   if (loading && !teachers.length) {
     return (
@@ -271,13 +263,22 @@ const TeacherListPage: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* 新增员工悬浮按钮 */}
-      <View
-        className="fixed right-[32rpx] bottom-[calc(64rpx+env(safe-area-inset-bottom))] flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-primary shadow-float press-scale"
-        onClick={handleAdd}
-      >
-        <Icon name="mdi-plus" size={28} color="hsl(var(--primary-foreground))" />
-        <Text className="text-[28rpx] font-medium text-primary-foreground">新增员工</Text>
+      {/* 邀请 / 新增员工 */}
+      <View className="fixed right-[32rpx] bottom-[calc(64rpx+env(safe-area-inset-bottom))] flex flex-col items-end gap-[16rpx]">
+        <View
+          className="flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-card border border-border shadow-float press-scale"
+          onClick={handleInvite}
+        >
+          <Icon name="mdi-link-variant" size={28} className="text-primary" />
+          <Text className="text-[28rpx] font-medium text-primary">邀请员工</Text>
+        </View>
+        <View
+          className="flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-primary shadow-float press-scale"
+          onClick={handleAdd}
+        >
+          <Icon name="mdi-plus" size={28} color="hsl(var(--primary-foreground))" />
+          <Text className="text-[28rpx] font-medium text-primary-foreground">新增员工</Text>
+        </View>
       </View>
 
       {/* 离职确认弹窗 */}

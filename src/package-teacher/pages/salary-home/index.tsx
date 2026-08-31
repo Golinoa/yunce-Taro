@@ -22,13 +22,14 @@ import { useCardNavigationBar } from '@/utils/navigation-bar';
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.salary;
 
 interface EntryItem {
-  key: 'payment' | 'settings' | 'template';
+  key: 'payment' | 'template';
   label: string;
   icon: string;
   url: string;
   desc?: string;
 }
 
+/** 生产可用入口；个人规则/模板套用后端未齐时不挂「薪资设置」 */
 const ENTRY_LIST: EntryItem[] = [
   {
     key: 'payment',
@@ -38,18 +39,11 @@ const ENTRY_LIST: EntryItem[] = [
     desc: '月度统计、核对、发放',
   },
   {
-    key: 'settings',
-    label: '薪资设置',
-    icon: 'mdi-cog',
-    url: '/package-teacher/pages/salary-settings/index',
-    desc: '员工薪资规则配置',
-  },
-  {
     key: 'template',
     label: '薪资模板',
     icon: 'mdi-file-document-outline',
     url: '/package-teacher/pages/salary-template/index',
-    desc: '模板管理、一键套用',
+    desc: '模板管理（套用待开通）',
   },
 ];
 
@@ -110,11 +104,11 @@ const SalaryHomePage: React.FC = () => {
         visible={introVisible}
         currentStep={6}
         totalSteps={6}
-        title="第 6 步：薪资规则"
-        description="为每位员工配置基础工资、课时费、提成规则，签到 / 退课时系统会自动结算。"
+        title="第 6 步：薪资发放"
+        description="先核对本月薪资，再一键发放；模板可在「薪资模板」中维护。"
         bulletPoints={[
           '进入并查看一次后即标记为「已了解」',
-          '具体规则可以稍后慢慢调整，不影响其它配置',
+          '个人规则配置暂未开通；模板套用待开通',
         ]}
         storageKey={INTRO_STORAGE_KEY}
         onClose={() => setIntroVisible(false)}

@@ -45,6 +45,7 @@ import '@/services/card-type';
 import '@/services/student';
 import '@/services/follow-record';
 import '@/components/student/StudentAvatar';
+import '@/components/student/StudentListCard';
 import '@/components/teacher/SalaryEditSheet';
 import '@/components/PageContainer';
 import './app.scss';

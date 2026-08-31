@@ -55,6 +55,7 @@ interface PackageTransactionRecord {
   type: 'recharge' | 'refund';
   studentId: string;
   studentName: string;
+  studentAvatar?: string;
   packageId?: string;
   packageName?: string;
   purchasedHours?: number;
@@ -78,12 +79,13 @@ function buildRechargeTransactionFromPackage(pkg: CoursePackage): PackageTransac
     type: 'recharge',
     studentId: pkg.studentId,
     studentName: student?.name || '学员',
+    studentAvatar: student?.avatar_url,
     packageId: pkg.id,
     packageName: pkg.name,
     purchasedHours: pkg.purchasedHours,
     giftHours: pkg.bonusHours,
-    feeAmount: pkg.totalAmount,
-    feeMethod: pkg.paymentMethod,
+    feeAmount: pkg.totalAmount ?? 0,
+    feeMethod: pkg.paymentMethod || 'other',
     note: pkg.note,
     purchasedRemainingSnapshot: pkg.purchasedHours,
     bonusRemainingSnapshot: pkg.bonusHours,
@@ -537,6 +539,13 @@ export const MOCK_CLASSES = DB_CLASSES;
 export async function mockGetScheduleByClassId(classId: string): Promise<typeof SCHEDULES> {
   await delay();
   return SCHEDULES.filter((s) => s.classId === classId);
+}
+
+/** 校区全部排课（家长调课补课目标用） */
+export async function mockGetSchedulesByCampus(campusId: string): Promise<typeof SCHEDULES> {
+  await delay();
+  if (!campusId) return [...SCHEDULES];
+  return SCHEDULES.filter((s) => s.campusId === campusId);
 }
 
 export async function mockGetScheduleByTeacherId(teacherId: string): Promise<typeof SCHEDULES> {
@@ -1431,6 +1440,9 @@ export async function mockCreateRecharge(data: any) {
       ? new Date(Date.now() + Number(data.valid_days) * 24 * 60 * 60 * 1000).toISOString()
       : undefined,
     note: data.note,
+    installmentEnabled: Boolean(data.installment_enabled),
+    installmentPeriod: data.installment_enabled ? Number(data.installment_period || 0) || undefined : undefined,
+    installmentSchedule: data.installment_enabled ? data.installment_schedule || [] : undefined,
   };
 
   DB_PACKAGES.unshift(createdPackage);
@@ -1471,12 +1483,13 @@ export async function mockCreateRefund(data: {
     type: 'refund',
     studentId: data.studentId,
     studentName: student.name,
+    studentAvatar: student.avatar_url,
     packageId: pkg.id,
     packageName: pkg.name,
     refundAmount: Number(data.refundAmount || 0),
     reason: data.reason,
     feeAmount: Number(data.refundAmount || 0),
-    feeMethod: pkg.paymentMethod,
+    feeMethod: pkg.paymentMethod || 'other',
     operatorId: data.operatorId,
     operatorName: data.operatorName,
     purchasedRemainingSnapshot:
@@ -1491,13 +1504,49 @@ export async function mockCreateRefund(data: {
   return refundRecord;
 }
 
-export async function mockGetPackageTransactions(teacherId: string, studentId?: string) {
+export interface MockPackageTransactionQuery {
+  studentId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/** 课包流水分页：默认按时间倒序；page/pageSize 切片，避免一次全量 */
+export async function mockGetPackageTransactions(
+  teacherId: string,
+  studentIdOrQuery?: string | MockPackageTransactionQuery,
+) {
   await delay();
+  const query: MockPackageTransactionQuery =
+    typeof studentIdOrQuery === 'string'
+      ? { studentId: studentIdOrQuery }
+      : studentIdOrQuery || {};
+  const page = Math.max(1, query.page || 1);
+  const pageSize = Math.max(1, query.pageSize || 30);
+
   let records = filterPackageTransactionsByActor(teacherId);
-  if (studentId) {
-    records = records.filter((item) => item.studentId === studentId);
+  if (query.studentId) {
+    records = records.filter((item) => item.studentId === query.studentId);
   }
-  return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  records = records
+    .map((item) => {
+      if (item.studentAvatar) return item;
+      const student = DB_STUDENTS.find((s) => s.id === item.studentId);
+      return { ...item, studentAvatar: student?.avatar_url };
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const total = records.length;
+  const start = (page - 1) * pageSize;
+  const list = records.slice(start, start + pageSize);
+  return {
+    list,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+  };
 }
 
 export function pickBestPackage(packages: any[], _hoursNeeded: number, _subjectId?: string) {

@@ -23,8 +23,13 @@ import type {
   CampusType,
   PartnerMode,
 } from '@/types/campus';
-import { get, put } from '@/utils/request';
-import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
+import { get, post, put } from '@/utils/request';
+import {
+  API_PAGE_SIZE_BATCH,
+  asPaginatedResponse,
+  fetchAllPages,
+  type PaginatedResponse,
+} from '@/utils/pagination';
 
 let campusMockMod: Awaited<ReturnType<typeof loadCampusMock>> | undefined;
 async function cm() {
@@ -91,6 +96,9 @@ interface BackendCampusItem {
   phone?: null | string;
   rentDueDay?: number;
   type?: string;
+  hoursAlertThreshold?: number;
+  daysAlertThreshold?: number;
+  amountAlertThreshold?: number;
 }
 
 function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
@@ -103,7 +111,7 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     type: campusType,
     phone: raw.phone || '',
     address: raw.address || '',
-    icon: raw.icon || '??',
+    icon: raw.icon || '🏫',
     iconGradient: raw.iconGradient || 'from-blue-400 to-blue-600',
     isMain: Boolean(raw.isMain),
     monthlyRent: raw.monthlyRent ?? 0,
@@ -112,6 +120,11 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
     businessCategories: [],
     tags: [],
+    hoursAlertThreshold:
+      typeof raw.hoursAlertThreshold === 'number' ? raw.hoursAlertThreshold : 5,
+    daysAlertThreshold: typeof raw.daysAlertThreshold === 'number' ? raw.daysAlertThreshold : 7,
+    amountAlertThreshold:
+      typeof raw.amountAlertThreshold === 'number' ? raw.amountAlertThreshold : 200,
   };
 }
 
@@ -119,29 +132,55 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
 // ?? Service
 // ============================================
 export const campusService = {
-  /** ?????? */
+  /** 校区列表（分批拉全） */
   getList: async (): Promise<CampusUIModel[]> => {
     if (isUseMock()) {
       return (await cm()).mockGetCampuses();
     }
 
-    const data = await get<PaginatedResponse<BackendCampusItem>>('/campuses', {
-      page: 1,
-      pageSize: 100,
-    });
-    return unwrapPaginatedList(data).map(mapBackendCampus);
+    const list = await fetchAllPages(async (page, pageSize) => {
+      const data = await get<PaginatedResponse<BackendCampusItem>>('/campuses', {
+        page,
+        pageSize,
+      });
+      return asPaginatedResponse(data, page, pageSize);
+    }, API_PAGE_SIZE_BATCH);
+    return list.map(mapBackendCampus);
   },
 
-  /** ?????? */
-  getById: async (id: string): Promise<CampusUIModel | null> =>
-    (await (await cm()).mockGetCampusById(id)) ?? null,
+  /** 按 ID 获取校区 */
+  getById: async (id: string): Promise<CampusUIModel | null> => {
+    if (isUseMock()) {
+      return (await (await cm()).mockGetCampusById(id)) ?? null;
+    }
+    try {
+      const raw = await get<BackendCampusItem>(`/campuses/${id}`);
+      return mapBackendCampus(raw);
+    } catch {
+      return null;
+    }
+  },
 
-  /** ???? */
-  add: async (data: CampusFormData): Promise<CampusUIModel> => (await cm()).mockAddCampus(data),
+  /** 新增校区 */
+  add: async (data: CampusFormData): Promise<CampusUIModel> => {
+    if (isUseMock()) return (await cm()).mockAddCampus(data);
+    const raw = await post<BackendCampusItem>('/campuses', {
+      ...data,
+      hoursAlertThreshold: data.hoursAlertThreshold ?? 5,
+      daysAlertThreshold: data.daysAlertThreshold ?? 7,
+      amountAlertThreshold: data.amountAlertThreshold ?? 200,
+    });
+    return mapBackendCampus(raw);
+  },
 
-  /** ???? */
-  update: async (id: string, data: Partial<CampusFormData>): Promise<CampusUIModel | null> =>
-    (await (await cm()).mockUpdateCampus(id, data)) ?? null,
+  /** 更新校区 */
+  update: async (id: string, data: Partial<CampusFormData>): Promise<CampusUIModel | null> => {
+    if (isUseMock()) {
+      return (await (await cm()).mockUpdateCampus(id, data)) ?? null;
+    }
+    const raw = await put<BackendCampusItem>(`/campuses/${id}`, data);
+    return mapBackendCampus(raw);
+  },
 
   /** ???? */
   delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteCampus(id),
@@ -185,18 +224,20 @@ export const payDaySettingsService = {
 // ??? Service
 // ============================================
 export const holidayService = {
-  /** ??????? */
   getList: async (): Promise<Holiday[]> => (await cm()).mockGetHolidays(),
 
-  /** ????? */
   add: async (holiday: Omit<Holiday, 'id'>): Promise<Holiday> => (await cm()).mockAddHoliday(holiday),
 
-  /** ????? */
   update: async (id: string, updates: Partial<Holiday>): Promise<Holiday | null> =>
     (await (await cm()).mockUpdateHoliday(id, updates)) ?? null,
 
-  /** ????? */
   delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteHoliday(id),
+
+  clearAll: async (): Promise<boolean> => (await cm()).mockClearHolidays(),
+
+  /** 生成法定节假日（逐日），返回新增条数 */
+  generateStatutory: async (year?: number): Promise<number> =>
+    (await cm()).mockGenerateStatutoryHolidays(year),
 };
 
 // ============================================

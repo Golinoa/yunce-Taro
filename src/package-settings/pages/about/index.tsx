@@ -13,10 +13,11 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components';
 import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import Icon, { IconName } from '@/components/Icon';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
 import { useThemeStore } from '@/stores/theme';
+import { useAuth } from '@/utils/auth';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -133,6 +134,12 @@ export const ABOUT_SHARE_SLOGAN = '告别 Excel 排课！5 分钟免费开通，
 const About: React.FC = () => {
   usePrimaryNavigationBar();
   const { activeTheme } = useThemeStore();
+  const { currentRole } = useAuth();
+  // 已登录的教师/家长不应再被引导去门店入驻（会被守卫拦回）
+  const showStoreEntry = useMemo(() => {
+    if (!currentRole) return true;
+    return currentRole === 'principal' || currentRole === 'admin';
+  }, [currentRole]);
 
   useShareAppMessage(() => ({
     title: ABOUT_SHARE_SLOGAN,
@@ -196,17 +203,22 @@ const About: React.FC = () => {
               <Text className="block">一套系统覆盖经营全流程，数据端到端加密</Text>
             </Text>
 
-            {/* Hero CTA：开通 + 邀请并排 */}
+            {/* Hero CTA：开通 + 邀请并排（已登录教师/家长不展示开通，避免无权限） */}
             <View className="mt-[44rpx] flex gap-[16rpx]">
-              <View
-                className="flex-1 h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg"
-                onClick={handleEntry}
-              >
-                <Text className="text-[28rpx] font-bold text-primary">免费开通门店</Text>
-              </View>
+              {showStoreEntry ? (
+                <View
+                  className="flex-1 h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg"
+                  onClick={handleEntry}
+                >
+                  <Text className="text-[28rpx] font-bold text-primary">免费开通门店</Text>
+                </View>
+              ) : null}
               <Button
                 openType="share"
-                className="flex-1 h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg m-0 p-0 leading-none after:border-none"
+                className={cn(
+                  'h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg m-0 p-0 leading-none after:border-none',
+                  showStoreEntry ? 'flex-1' : 'flex-1',
+                )}
               >
                 <Text className="text-[28rpx] font-bold text-primary">邀请朋友入驻</Text>
               </Button>
@@ -366,16 +378,18 @@ const About: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* ===== 底部悬浮入驻按钮（仅开通，分享入口在 Hero 区） ===== */}
-      <View className="fixed left-0 right-0 bottom-0 px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[16rpx] bg-gradient-to-t from-background via-background to-transparent z-50">
-        <View
-          className="h-[92rpx] rounded-[28rpx] bg-gradient-primary center shadow-lg press-scale"
-          onClick={handleEntry}
-        >
-          <Icon name="mdi-office-building" size={28} color="white" />
-          <Text className="text-[32rpx] font-bold text-white ml-[8rpx]">免费开通门店</Text>
+      {/* ===== 底部悬浮入驻按钮（仅开通；教师/家长隐藏） ===== */}
+      {showStoreEntry ? (
+        <View className="fixed left-0 right-0 bottom-0 px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[16rpx] bg-gradient-to-t from-background via-background to-transparent z-50">
+          <View
+            className="h-[92rpx] rounded-[28rpx] bg-gradient-primary center shadow-lg press-scale"
+            onClick={handleEntry}
+          >
+            <Icon name="mdi-office-building" size={28} color="white" />
+            <Text className="text-[32rpx] font-bold text-white ml-[8rpx]">免费开通门店</Text>
+          </View>
         </View>
-      </View>
+      ) : null}
     </View>
   );
 };

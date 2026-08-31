@@ -12,18 +12,19 @@ import dayjs from 'dayjs';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import ConvertSheet from '@/components/lead/ConvertSheet';
 import FollowUpSheet from '@/components/lead/FollowUpSheet';
 import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
-import { LEAD_SOURCE_META, FOLLOW_UP_ACTION_META, TRIAL_MODE_META } from '@/constants/lead';
-import { leadService } from '@/services';
+import { LEAD_SOURCE_META, FOLLOW_UP_ACTION_META, LEAD_BOOKING_STATUS_META, LEAD_BOOKING_MODE_BADGE_CLASS, getLeadBookingModeLabel } from '@/constants/lead';
+import { leadService, teacherService } from '@/services';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { auditLogService } from '@/services/audit-log';
 import { useLeadStore } from '@/stores/lead';
-import type { Lead, LeadFollowUp, LeadBooking } from '@/types/lead';
+import type { Lead, LeadFollowUp, LeadBooking, TrialMode } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -39,13 +40,20 @@ const LeadDetailPage: React.FC = () => {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
   const [showNoteEdit, setShowNoteEdit] = useState(false);
+  const [showProxyBook, setShowProxyBook] = useState(false);
+  const [proxyMode, setProxyMode] = useState<TrialMode>('group');
+  const [proxyDate, setProxyDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [proxyDatePickerVisible, setProxyDatePickerVisible] = useState(false);
   const [noteValue, setNoteValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusBarHeight, setStatusBarHeight] = useState(44);
+  const [leadId, setLeadId] = useState('');
+  const [teacherNameMap, setTeacherNameMap] = useState<Record<string, string>>({});
+  const [bookingActingId, setBookingActingId] = useState<string | null>(null);
 
-  let leadId = '';
   useLoad((options) => {
-    leadId = (options as Record<string, string>)?.id || '';
+    const id = (options as Record<string, string>)?.id || '';
+    setLeadId(id);
   });
 
   useEffect(() => {
@@ -53,15 +61,38 @@ const LeadDetailPage: React.FC = () => {
     setStatusBarHeight(windowInfo.statusBarHeight || 44);
   }, []);
 
-  useDidShow(() => {
-    if (leadId) {
-      loadData(leadId);
-    }
-  });
+  useEffect(() => {
+    void teacherService
+      .getList(profile?.currentContext?.campusId)
+      .then((list) => {
+        const map: Record<string, string> = {};
+        (list || []).forEach((t: { id: string; userId?: string; name: string }) => {
+          map[t.id] = t.name;
+          if (t.userId) map[t.userId] = t.name;
+        });
+        setTeacherNameMap(map);
+      })
+      .catch((err) => logError('lead-detail teachers', err));
+  }, [profile?.currentContext?.campusId]);
 
   const userId = session?.user.id;
 
+  const resolveTeacherName = useCallback(
+    (id?: string) => {
+      if (!id) return '未指定';
+      return teacherNameMap[id] || '老师';
+    },
+    [teacherNameMap],
+  );
+
   const loadData = useCallback(async (id: string) => {
+    if (!id) {
+      setLead(null);
+      setBookings([]);
+      setFollowUps([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [leadData, bookingList, followUpList] = await Promise.all([
@@ -69,13 +100,31 @@ const LeadDetailPage: React.FC = () => {
         leadService.getLeadBookings(id),
         leadService.getLeadFollowUps(id),
       ]);
-      if (leadData) setLead(leadData);
+      setLead(leadData);
       setBookings(bookingList);
       setFollowUps(followUpList);
+    } catch (err) {
+      logError('lead-detail load', err);
+      setLead(null);
+      setBookings([]);
+      setFollowUps([]);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // 路由参数就绪后拉数；守卫晚挂载时可能已错过 onShow
+  useEffect(() => {
+    if (leadId) {
+      void loadData(leadId);
+    }
+  }, [leadId, loadData]);
+
+  useDidShow(() => {
+    if (leadId) {
+      void loadData(leadId);
+    }
+  });
 
   const handleStatusChange = useCallback(
     async (status: Lead['status']) => {
@@ -201,9 +250,14 @@ const LeadDetailPage: React.FC = () => {
   );
 
   const handlePhone = useCallback(() => {
-    if (lead?.parent_phone) {
-      Taro.makePhoneCall({ phoneNumber: lead.parent_phone });
-    }
+    if (!lead?.parent_phone) return;
+    Taro.makePhoneCall({
+      phoneNumber: lead.parent_phone,
+      fail: (err) => {
+        if (String(err?.errMsg || '').includes('cancel')) return;
+        Taro.showToast({ title: '无法拨打电话', icon: 'none' });
+      },
+    });
   }, [lead]);
 
   const handleNoteSave = useCallback(async () => {
@@ -223,6 +277,101 @@ const LeadDetailPage: React.FC = () => {
     setNoteValue(lead?.notes || '');
     setShowNoteEdit(true);
   }, [lead]);
+
+  const openProxyBook = useCallback(() => {
+    setProxyMode('group');
+    setProxyDate(dayjs().format('YYYY-MM-DD'));
+    setShowProxyBook(true);
+  }, []);
+
+  const handleProxyBookConfirm = useCallback(() => {
+    if (!lead) return;
+    setShowProxyBook(false);
+    const mode = proxyMode === 'group' ? 'group' : 'private';
+    void Taro.navigateTo({
+      url:
+        `/package-lead/pages/trial-booking/index?leadId=${encodeURIComponent(lead.id)}` +
+        `&mode=${mode}&date=${encodeURIComponent(proxyDate)}`,
+    });
+  }, [lead, proxyMode, proxyDate]);
+
+  const handleBookingCheckIn = useCallback(
+    async (booking: LeadBooking) => {
+      if (bookingActingId) return;
+      // 班课签到走老师点名页
+      if (booking.trial_mode === 'group' && booking.class_id) {
+        void Taro.navigateTo({
+          url:
+            `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(booking.class_id)}` +
+            `&date=${encodeURIComponent(booking.lesson_date)}` +
+            `&leadBookingId=${encodeURIComponent(booking.id)}`,
+        });
+        return;
+      }
+      setBookingActingId(booking.id);
+      try {
+        const updated = await leadService.checkInPrivateLeadBooking(booking.id);
+        if (!updated) {
+          Taro.showToast({ title: '签到失败', icon: 'none' });
+          return;
+        }
+        Taro.showToast({ title: '已签到', icon: 'success' });
+        if (lead) void loadData(lead.id);
+      } catch (err) {
+        logError('lead-detail checkIn', err);
+        Taro.showToast({ title: '签到失败', icon: 'none' });
+      } finally {
+        setBookingActingId(null);
+      }
+    },
+    [bookingActingId, lead, loadData],
+  );
+
+  const handleBookingNoShow = useCallback(
+    async (booking: LeadBooking) => {
+      if (bookingActingId) return;
+      const confirm = await Taro.showModal({
+        title: '标记未到',
+        content: '确认将该试听预约标记为未到？',
+      });
+      if (!confirm.confirm) return;
+      setBookingActingId(booking.id);
+      try {
+        await leadService.markLeadBookingNoShow(booking.id);
+        Taro.showToast({ title: '已标记未到', icon: 'success' });
+        if (lead) void loadData(lead.id);
+      } catch (err) {
+        logError('lead-detail noShow', err);
+        Taro.showToast({ title: '操作失败', icon: 'none' });
+      } finally {
+        setBookingActingId(null);
+      }
+    },
+    [bookingActingId, lead, loadData],
+  );
+
+  const handleBookingCancel = useCallback(
+    async (booking: LeadBooking) => {
+      if (bookingActingId) return;
+      const confirm = await Taro.showModal({
+        title: '取消预约',
+        content: '确认取消该试听预约？',
+      });
+      if (!confirm.confirm) return;
+      setBookingActingId(booking.id);
+      try {
+        await leadService.cancelLeadBooking(booking.id);
+        Taro.showToast({ title: '已取消', icon: 'success' });
+        if (lead) void loadData(lead.id);
+      } catch (err) {
+        logError('lead-detail cancelBooking', err);
+        Taro.showToast({ title: '取消失败', icon: 'none' });
+      } finally {
+        setBookingActingId(null);
+      }
+    },
+    [bookingActingId, lead, loadData],
+  );
 
   // 底部操作按钮
   const bottomActions = useMemo(() => {
@@ -251,7 +400,7 @@ const LeadDetailPage: React.FC = () => {
     ];
   }, [lead, handleCloseLead, handleStatusChange]);
 
-  if (loading || !lead) {
+  if (loading) {
     return (
       <PageContainer>
         <View className="py-20 center">
@@ -261,8 +410,20 @@ const LeadDetailPage: React.FC = () => {
     );
   }
 
+  if (!lead) {
+    return (
+      <PageContainer>
+        <View className="py-20 center">
+          <Text className="text-[26rpx] text-muted-foreground">线索不存在或已删除</Text>
+        </View>
+      </PageContainer>
+    );
+  }
+
   const sourceMeta = LEAD_SOURCE_META[lead.source_type];
-  const visitCount = followUps.length + bookings.filter((b) => b.status !== 'cancelled').length;
+  const visitCount = lead.visit_count ?? 0;
+  const firstVisitAt = lead.first_touch_at || lead.created_at;
+  const lastVisitAt = lead.last_visit_at || lead.updated_at;
 
   // 计算未跟进天数：取最近一次跟进记录的下次跟进提醒时间
   const latestFollowUp = followUps.length > 0 ? followUps[followUps.length - 1] : undefined;
@@ -366,88 +527,110 @@ const LeadDetailPage: React.FC = () => {
                 `（${notFollowDays}天未跟进）`}
             </Text>
           </InfoRow>
-          <InfoRow label="推荐人" value={lead.first_invite_teacher_id ? '老师' : '#'} />
+          <InfoRow label="邀请人" value={resolveTeacherName(lead.first_invite_teacher_id)} />
+          <InfoRow label="负责人" value={resolveTeacherName(lead.owner_teacher_id)} />
           <InfoRow
             label="首次访问"
-            value={
-              lead.first_touch_at
-                ? dayjs(lead.first_touch_at).format('YYYY-MM-DD HH:mm')
-                : dayjs(lead.created_at).format('YYYY-MM-DD HH:mm')
-            }
+            value={firstVisitAt ? dayjs(firstVisitAt).format('YYYY-MM-DD HH:mm') : '暂无'}
           />
-          <InfoRow label="最近访问" value={dayjs(lead.updated_at).format('YYYY-MM-DD HH:mm')} />
+          <InfoRow
+            label="最近访问"
+            value={lastVisitAt ? dayjs(lastVisitAt).format('YYYY-MM-DD HH:mm') : '暂无'}
+          />
           <InfoRow label="访问次数" value={`${visitCount}次`} />
           <InfoRow label="来源" value={`#${sourceMeta.label}`} />
-          <InfoRow label="首次IP" value="暂无" />
-          <InfoRow label="地址" value="暂无" />
-          {/* 备注行：带编辑按钮 */}
+          <InfoRow label="首次IP" value={lead.first_ip || '暂无'} />
+          <InfoRow label="地址" value={lead.first_region || '暂无'} />
+          {/* 备注行：仅铅笔图标，无标签底 */}
           <View className="flex justify-between items-center py-[22rpx] border-b border-[#f3f2ed] last:border-b-0">
             <Text className="text-[30rpx] text-muted-foreground">备注</Text>
             <View className="flex items-center gap-2 flex-1 justify-end min-w-0">
               <Text className="text-[30rpx] text-foreground truncate">{lead.notes || '暂无'}</Text>
-              <View
-                className="w-[44rpx] h-[44rpx] rounded-full bg-primary/10 center flex-shrink-0"
-                onClick={openNoteEdit}
-              >
+              <View className="center flex-shrink-0 p-[4rpx]" onClick={openNoteEdit}>
                 <Icon name="mdi-pencil" size={20} className="text-primary" />
               </View>
             </View>
           </View>
         </View>
 
-        {/* 预约记录 */}
-        {bookings.length > 0 && (
-          <Card className="mx-page-padding mt-3 rounded-[24rpx]">
-            <Text className="text-[30rpx] font-bold text-foreground mb-3">试听预约</Text>
-            {bookings.map((booking) => (
-              <View
-                key={booking.id}
-                className="flex justify-between items-center py-3 border-b border-[#f3f2ed] last:border-b-0"
-              >
-                <View className="flex-1">
-                  <View className="flex items-center gap-2">
-                    <Text className="text-[28rpx] text-foreground">{booking.course_name}</Text>
-                    <Text
-                      className={cn(
-                        'px-[12rpx] py-[4rpx] rounded-full text-[20rpx]',
-                        TRIAL_MODE_META[booking.trial_mode].badgeClassName,
-                      )}
-                    >
-                      {TRIAL_MODE_META[booking.trial_mode].label}
-                    </Text>
-                  </View>
-                  <View className="flex items-center gap-2 mt-1">
-                    <Text className="text-[24rpx] text-muted-foreground">
-                      {dayjs(booking.lesson_date).format('MM/DD')} {booking.start_time}-
-                      {booking.end_time}
-                    </Text>
-                    {booking.class_name && (
-                      <Text className="text-[22rpx] text-muted-foreground">
-                        · {booking.class_name}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                <Text
-                  className={cn(
-                    'text-[22rpx]',
-                    booking.status === 'confirmed'
-                      ? 'text-success'
-                      : booking.status === 'cancelled'
-                        ? 'text-muted-foreground'
-                        : 'text-warning',
-                  )}
+        {/* 试听预约：始终展示，支持代预约 + 记录操作 */}
+        <Card className="mx-page-padding mt-3 rounded-[24rpx]">
+          <View className="mb-3 flex items-center justify-between">
+            <Text className="text-[30rpx] font-bold text-foreground">试听预约</Text>
+            <View
+              className="rounded-full bg-primary/10 px-[20rpx] py-[8rpx]"
+              onClick={openProxyBook}
+            >
+              <Text className="text-[24rpx] text-primary">代预约</Text>
+            </View>
+          </View>
+          {bookings.length === 0 ? (
+            <View className="py-8 center">
+              <Text className="text-[26rpx] text-muted-foreground">暂无试听预约</Text>
+            </View>
+          ) : (
+            bookings.map((booking) => {
+              const statusMeta =
+                LEAD_BOOKING_STATUS_META[booking.status] || LEAD_BOOKING_STATUS_META.pending;
+              const modeLabel = getLeadBookingModeLabel(booking);
+              const canOperate =
+                booking.status === 'pending' || booking.status === 'confirmed';
+              return (
+                <View
+                  key={booking.id}
+                  className="border-b border-[#f3f2ed] py-3 last:border-b-0"
                 >
-                  {booking.status === 'confirmed'
-                    ? '已确认'
-                    : booking.status === 'cancelled'
-                      ? '已取消'
-                      : '已完成'}
-                </Text>
-              </View>
-            ))}
-          </Card>
-        )}
+                  <View className="flex items-start justify-between gap-2">
+                    <View className="min-w-0 flex-1">
+                      <View className="flex items-center gap-2">
+                        <Text className="text-[28rpx] text-foreground">{booking.course_name}</Text>
+                        <View className={cn('shrink-0', LEAD_BOOKING_MODE_BADGE_CLASS)}>
+                          <Text className="text-[20rpx] text-muted-foreground">{modeLabel}</Text>
+                        </View>
+                      </View>
+                      <View className="mt-1 flex items-center gap-2">
+                        <Text className="text-[24rpx] text-muted-foreground">
+                          {dayjs(booking.lesson_date).format('MM/DD')} {booking.start_time}-
+                          {booking.end_time}
+                        </Text>
+                        {booking.class_name ? (
+                          <Text className="text-[22rpx] text-muted-foreground">
+                            · {booking.class_name}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', statusMeta.className)}>
+                      <Text className="text-[22rpx] font-bold">{statusMeta.label}</Text>
+                    </View>
+                  </View>
+                  {canOperate ? (
+                    <View className="mt-2 flex items-center justify-end gap-[16rpx]">
+                      <View
+                        className="rounded-full bg-success/10 px-[20rpx] py-[8rpx]"
+                        onClick={() => void handleBookingCheckIn(booking)}
+                      >
+                        <Text className="text-[22rpx] text-success">签到</Text>
+                      </View>
+                      <View
+                        className="rounded-full bg-warning/10 px-[20rpx] py-[8rpx]"
+                        onClick={() => void handleBookingNoShow(booking)}
+                      >
+                        <Text className="text-[22rpx] text-warning">未到</Text>
+                      </View>
+                      <View
+                        className="rounded-full bg-muted px-[20rpx] py-[8rpx]"
+                        onClick={() => void handleBookingCancel(booking)}
+                      >
+                        <Text className="text-[22rpx] text-muted-foreground">取消</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          )}
+        </Card>
 
         {/* 跟进记录（时间线样式） */}
         <Card className="mx-page-padding mt-3 rounded-[24rpx]">
@@ -572,6 +755,64 @@ const LeadDetailPage: React.FC = () => {
           </Text>
         </View>
       </BottomSheet>
+
+      {/* 代预约弹框：选班课/一对一 + 日期 */}
+      <BottomSheet
+        visible={showProxyBook}
+        title="代预约"
+        onClose={() => setShowProxyBook(false)}
+        className="px-[40rpx] pb-[60rpx] pt-[12rpx]"
+      >
+        <Text className="mb-[16rpx] block text-[26rpx] text-muted-foreground">预约类型</Text>
+        <View className="mb-[28rpx] flex gap-[16rpx]">
+          {(
+            [
+              { key: 'group' as const, label: '班课' },
+              { key: 'private' as const, label: '一对一' },
+            ] as const
+          ).map((item) => {
+            const active = proxyMode === item.key;
+            return (
+              <View
+                key={item.key}
+                className={cn(
+                  'flex-1 rounded-full py-[20rpx] center border',
+                  active ? 'border-primary bg-primary/10' : 'border-[#e8e8e8] bg-white',
+                )}
+                onClick={() => setProxyMode(item.key)}
+              >
+                <Text className={cn('text-[28rpx]', active ? 'text-primary font-medium' : 'text-foreground')}>
+                  {item.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        <Text className="mb-[16rpx] block text-[26rpx] text-muted-foreground">预约日期</Text>
+        <View
+          className="mb-[40rpx] flex items-center justify-between rounded-[16rpx] border border-[#e8e8e8] px-[24rpx] py-[22rpx]"
+          onClick={() => setProxyDatePickerVisible(true)}
+        >
+          <Text className="text-[28rpx] text-foreground">{proxyDate}</Text>
+          <Icon name="mdi-calendar" size={22} className="text-muted-foreground" />
+        </View>
+
+        <View className="rounded-full bg-gradient-primary py-[24rpx] center" onClick={handleProxyBookConfirm}>
+          <Text className="text-[28rpx] font-medium text-white">去预约</Text>
+        </View>
+      </BottomSheet>
+
+      <DatePickerSheet
+        visible={proxyDatePickerVisible}
+        title="选择预约日期"
+        value={proxyDate}
+        onClose={() => setProxyDatePickerVisible(false)}
+        onConfirm={(date) => {
+          setProxyDate(date);
+          setProxyDatePickerVisible(false);
+        }}
+      />
     </PageContainer>
   );
 };

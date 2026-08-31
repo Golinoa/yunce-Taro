@@ -59,6 +59,13 @@ export const CLASS_LEVEL_LABELS: Record<ClassLevel, string> = {
 };
 
 /**
+ * 课程难度标签样式（与课表卡片一致：muted 底 + muted 字）
+ * 新增课程 / CourseDisplayCard 等展示点统一用此 token，勿各自写 primary。
+ */
+export const CLASS_LEVEL_BADGE_WRAP = 'rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]';
+export const CLASS_LEVEL_BADGE_TEXT = 'text-[24rpx] font-medium leading-none text-muted-foreground';
+
+/**
  * 班级信息 (classes 表)
  */
 export interface Class {
@@ -101,6 +108,8 @@ export interface Class {
   subject_id?: string;
   /** 课程分类 ID（决定约课首页 Tab 归属） */
   category_id?: string;
+  /** 容纳人数；不填表示不限制 */
+  capacity?: number;
   /** 单次默认消耗课时（手动消课预填） */
   hours_per_lesson?: number;
   /** 单次授课扣费（元），消课预填 / 薪资展示用 */

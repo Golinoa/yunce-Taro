@@ -424,6 +424,59 @@ export async function wechatLogin(code: string): Promise<LoginResult> {
 }
 
 /**
+ * 发送绑定邮箱验证码（purpose=BIND）
+ */
+export async function sendBindEmailCode(email: string): Promise<{
+  error: { message: string } | null;
+  maskedEmail?: string;
+}> {
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return { error: { message: '请输入正确的邮箱' } };
+  }
+  if (isUseMock()) {
+    const { mockSendBindEmailCode } = await loadAuthMock();
+    return mockSendBindEmailCode(trimmed);
+  }
+  try {
+    await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'BIND' });
+    return { error: null, maskedEmail: maskEmailAddress(trimmed) };
+  } catch (error) {
+    return { error: { message: getErrorMessage(error, '验证码发送失败') } };
+  }
+}
+
+/**
+ * 已登录绑定邮箱：验证码 + 密码。
+ * 对接后端 POST /auth/wechat-bind { email, code, password }
+ */
+export async function bindAccountEmail(payload: {
+  email: string;
+  code: string;
+  password: string;
+}): Promise<LoginResult> {
+  if (isUseMock()) {
+    const { mockBindAccountEmail } = await loadAuthMock();
+    return mockBindAccountEmail(payload.email, payload.password, payload.code);
+  }
+  try {
+    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatBind, {
+      email: payload.email.trim().toLowerCase(),
+      code: payload.code.trim(),
+      password: payload.password,
+    });
+    const mapped = mapBackendAuthPayload(data);
+    return { session: mapped.session, profile: mapped.profile, error: null };
+  } catch (error) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: getErrorMessage(error, '绑定失败，请稍后重试') },
+    };
+  }
+}
+
+/**
  * 微信登录后绑定手机号 + 设置密码（无短信）。
  * 需已登录；成功后返回新 token / profile（可能发生账号合并）。
  */

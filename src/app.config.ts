@@ -43,6 +43,8 @@ export default defineAppConfig({
         'pages/child-detail/index',
         'pages/children/index',
         'pages/profile-edit/index',
+        'pages/attendance-anomaly/index',
+        'pages/renewal-reminder/index',
       ],
     },
     {
@@ -60,6 +62,8 @@ export default defineAppConfig({
         'pages/salary-form/index',
         'pages/salary-template/index',
         'pages/salary-template-form/index',
+        'pages/monthly-flow/index',
+        'pages/staff-invite/index',
       ],
     },
     {
@@ -89,6 +93,7 @@ export default defineAppConfig({
         'pages/records/index',
         'pages/recharge-records/index',
         'pages/leave-request/index',
+        'pages/parent-lesson-notes/index',
       ],
     },
     {

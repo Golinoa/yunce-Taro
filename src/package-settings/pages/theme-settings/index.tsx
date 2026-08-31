@@ -1,7 +1,8 @@
 /**
  * 主题颜色设置页
  *
- * 在系统设置中进入，支持切换 blue / coral / orange 三套主题，切换后即时生效并持久化。
+ * 全员个人偏好：切换 blue / coral / orange，即时生效并写入本地缓存（yunce:active-theme）。
+ * 当前库/校区无主题色字段，不做校区默认同步。
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -29,7 +30,10 @@ const ThemeSettings: React.FC = () => {
   return (
     <PageContainer safeBottom>
       <View className="px-[32rpx] pt-[32rpx]">
-        <Text className="mb-[32rpx] block text-[32rpx] font-bold text-foreground">选择主题色</Text>
+        <Text className="mb-[12rpx] block text-[32rpx] font-bold text-foreground">选择主题色</Text>
+        <Text className="mb-[32rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
+          仅影响本机显示，设置保存在本地
+        </Text>
 
         <View className="flex flex-col gap-[24rpx]">
           {THEME_KEYS.map((theme) => {

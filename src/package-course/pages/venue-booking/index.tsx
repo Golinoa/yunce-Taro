@@ -217,6 +217,7 @@ const VenueBookingPage: React.FC = () => {
       await venueBookingService.createBooking({
         userId: profile.id,
         userName: profile.name || '未知用户',
+        venueId: venue.venueId,
         roomId: venue.id,
         date: selectedSlot.date,
         startTime: selectedSlot.startTime,

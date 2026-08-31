@@ -23,14 +23,31 @@ import type {
   TeacherUIModel,
 } from '@/types/teacher';
 import { notWired } from '@/utils/not-wired';
-import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
+import { type PaginatedResponse, API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
 
 type RawRecord = Record<string, unknown>;
 
-async function fetchTeacherList(params: Record<string, unknown>) {
+async function fetchTeacherListPage(
+  params: Record<string, unknown>,
+): Promise<PaginatedResponse<RawRecord>> {
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.pageSize) || API_PAGE_SIZE_BATCH;
   const data = await get<PaginatedResponse<RawRecord>>('/teachers', params);
-  return unwrapPaginatedList(data);
+  return asPaginatedResponse(data, page, pageSize);
+}
+
+async function fetchSalaryTemplatesPage(
+  params: Record<string, unknown>,
+): Promise<PaginatedResponse<SalaryTemplate>> {
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.pageSize) || API_PAGE_SIZE_BATCH;
+  const data = await get<PaginatedResponse<RawRecord>>('/attendance/salary-templates', params);
+  const normalized = asPaginatedResponse(data, page, pageSize);
+  return {
+    list: normalized.list.map(mapBackendSalaryTemplate),
+    pagination: normalized.pagination,
+  };
 }
 
 function currentSalaryMonth(month?: string): string {
@@ -48,28 +65,39 @@ async function resolveSalaryRecordId(teacherId: string, month?: string): Promise
 }
 
 async function fetchSalaryTemplates(params: Record<string, unknown>) {
-  const data = await get<PaginatedResponse<RawRecord>>('/attendance/salary-templates', params);
-  return unwrapPaginatedList(data).map(mapBackendSalaryTemplate);
+  return fetchAllPages(
+    (page, pageSize) => fetchSalaryTemplatesPage({ ...params, page, pageSize }),
+    API_PAGE_SIZE_BATCH,
+  );
 }
 
 export const teacherService = {
+  /** 教师列表（分批拉全；校区人数通常不大但仍遵守上限） */
   getList: async (campusId?: string, month?: string) => {
     if (isUseMock()) { const { mockGetTeachers } = await loadTeacherMock(); return mockGetTeachers(campusId, month); }
-    const list = await fetchTeacherList({
-      page: 1,
-      pageSize: 100,
-      status: undefined,
-    });
+    const list = await fetchAllPages(
+      (page, pageSize) =>
+        fetchTeacherListPage({
+          page,
+          pageSize,
+          status: undefined,
+        }),
+      API_PAGE_SIZE_BATCH,
+    );
     return list.map((item, index) => mapBackendTeacherToUI(item, index));
   },
 
   getActiveList: async (campusId?: string) => {
     if (isUseMock()) { const { mockGetActiveTeachers } = await loadTeacherMock(); return mockGetActiveTeachers(campusId); }
-    const list = await fetchTeacherList({
-      page: 1,
-      pageSize: 100,
-      status: 'active',
-    });
+    const list = await fetchAllPages(
+      (page, pageSize) =>
+        fetchTeacherListPage({
+          page,
+          pageSize,
+          status: 'active',
+        }),
+      API_PAGE_SIZE_BATCH,
+    );
     return list.map((item, index) => mapBackendTeacherToUI(item, index));
   },
 
@@ -121,12 +149,30 @@ export const teacherService = {
 
   sendSalarySlip: async (ids: string[], remark?: string, month?: string) => {
     if (isUseMock()) { const { mockSendSalarySlip } = await loadTeacherMock(); return mockSendSalarySlip(ids, remark, month); }
-    return notWired('teacher.sendSalarySlip');
+    // 后端暂无独立「推送工资条」接口：与发放同源走 execute-pay，避免 notWired 空点
+    const ok = await teacherService.executePay(ids, remark, undefined, month);
+    return ok
+      ? { success: ids, failed: [] as string[] }
+      : { success: [] as string[], failed: ids };
   },
 
   resign: async (id: string, resignType: string, reason?: string) => {
     if (isUseMock()) { const { mockResignTeacher } = await loadTeacherMock(); return mockResignTeacher(id, resignType, reason); }
     await post(`/teachers/${id}/resign`, { resignType, reason });
+    return true;
+  },
+
+  restore: async (id: string) => {
+    if (isUseMock()) {
+      const { mockUpdateTeacher } = await loadTeacherMock();
+      return mockUpdateTeacher(id, {
+        status: 'active',
+        resignType: undefined,
+        resignReason: undefined,
+        resignDate: undefined,
+      });
+    }
+    await post(`/teachers/${id}/restore`);
     return true;
   },
 
@@ -225,12 +271,12 @@ export const teacherScheduleService = {
 export const salaryTemplateService = {
   getList: async () => {
     if (isUseMock()) { const { mockGetSalaryTemplates } = await loadTeacherMock(); return mockGetSalaryTemplates(); }
-    return fetchSalaryTemplates({ page: 1, pageSize: 100 });
+    return fetchSalaryTemplates({});
   },
 
   getById: async (id: string) => {
     if (isUseMock()) { const { mockGetSalaryTemplateById } = await loadTeacherMock(); return mockGetSalaryTemplateById(id); }
-    const list = await fetchSalaryTemplates({ page: 1, pageSize: 100 });
+    const list = await fetchSalaryTemplates({});
     return list.find((item) => item.id === id) ?? null;
   },
 
@@ -262,7 +308,8 @@ export const salaryTemplateService = {
 
   apply: async (templateId: string, teacherIds: string[]) => {
     if (isUseMock()) { const { mockApplySalaryTemplate } = await loadTeacherMock(); return mockApplySalaryTemplate(templateId, teacherIds); }
-    return notWired('salaryTemplate.apply');
+    // 后端暂无批量套用接口：明确失败，禁止假成功
+    throw new Error('模板套用尚未开通，请稍后或联系管理员');
   },
 
   createDefaultRule: () => createDefaultSalaryRule(),

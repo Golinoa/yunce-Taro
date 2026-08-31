@@ -73,6 +73,7 @@ export async function mockRemoveStudentFromClass(..._args: any[]): Promise<any> 
 export async function mockAddStudentsToClass(..._args: any[]): Promise<any> { return null; }
 export async function mockTransferStudent(..._args: any[]): Promise<any> { return null; }
 export async function mockEndClass(..._args: any[]): Promise<any> { return null; }
+export async function mockSetClassPaused(..._args: any[]): Promise<any> { return null; }
 export async function mockGetSchedulesByTeacher(..._args: any[]): Promise<any> { return null; }
 export async function mockGetScheduleById(..._args: any[]): Promise<any> { return null; }
 export async function mockCreateScheduleFull(..._args: any[]): Promise<any> { return null; }
@@ -83,6 +84,7 @@ export async function mockGetRechargeRecords(..._args: any[]): Promise<any> { re
 export async function mockCreateRefund(..._args: any[]): Promise<any> { return null; }
 export async function mockGetPackageTransactions(..._args: any[]): Promise<any> { return null; }
 export async function mockGetSchedulesByStudent(..._args: any[]): Promise<any> { return null; }
+export async function mockGetSchedulesByCampus(..._args: any[]): Promise<any> { return []; }
 export async function getActorScope(..._args: any[]): Promise<any> { return null; }
 export async function filterStudentsByActor(..._args: any[]): Promise<any> { return null; }
 export async function filterClassesByActor(..._args: any[]): Promise<any> { return null; }
@@ -91,6 +93,7 @@ export async function resolveMyTeacherIds(..._args: any[]): Promise<any> { retur
 export async function resolveMyTeachingActorIds(..._args: any[]): Promise<any> { return null; }
 export async function isMyTeachingSchedule(..._args: any[]): Promise<any> { return null; }
 export async function filterSchedulesForMyToday(..._args: any[]): Promise<any> { return null; }
+export async function filterSchedulesForCampusToday(..._args: any[]): Promise<any> { return null; }
 export async function filterLessonRecordsByActor(..._args: any[]): Promise<any> { return null; }
 export async function filterPackagesByActor(..._args: any[]): Promise<any> { return null; }
 export async function formatDateCN(..._args: any[]): Promise<any> { return null; }

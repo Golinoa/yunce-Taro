@@ -64,6 +64,31 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
     ? (raw.payHistory[0] as RawRecord | undefined)
     : undefined;
 
+  const payHistory = Array.isArray(raw.payHistory)
+    ? raw.payHistory.map((item) => {
+        const row = item as RawRecord;
+        return {
+          month: String(row.month ?? '').slice(0, 7),
+          amount: num(row.amount),
+          status: normalizeSalaryStatus(String(row.status ?? 'pending')),
+          remark: str(row.remark),
+          paidAt: str(row.paidAt ?? row.paid_at),
+          payMethod: row.payMethod as TeacherUIModel['payMethod'],
+          serialNo: str(row.serialNo ?? row.serial_no),
+        };
+      })
+    : undefined;
+
+  const promoImages = Array.isArray(raw.promoImages)
+    ? raw.promoImages.filter((item): item is string => typeof item === 'string')
+    : [];
+
+  const genderRaw = str(raw.gender);
+  const gender =
+    genderRaw === 'male' || genderRaw === 'female' || genderRaw === 'other'
+      ? genderRaw
+      : undefined;
+
   return {
     id: String(raw.id ?? ''),
     name,
@@ -75,9 +100,15 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
     accessScopeText: '本人',
     subject: String(raw.subject ?? ''),
     phone: String(raw.phone ?? ''),
+    gender,
+    birthday: str(raw.birthday) ?? undefined,
+    intro: str(raw.intro) ?? '',
+    promoImages,
+    showInPrivateList: Boolean(raw.showInPrivateList ?? false),
     hours: num(raw.hours),
     students: num(raw.students),
     classes: num(raw.classes),
+    lessonCount: num(raw.lessonCount),
     base: num(salaryModel?.base),
     rate: num(salaryModel?.rate),
     attend: num(salaryModel?.attend),
@@ -95,6 +126,7 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
     resignReason: str(raw.resignReason ?? raw.resign_reason),
     paidAt: str(latestPay?.paidAt ?? latestPay?.paid_at),
     serialNo: str(latestPay?.serialNo ?? latestPay?.serial_no),
+    payHistory,
   };
 }
 
@@ -120,6 +152,11 @@ export function mapUiTeacherToCreatePayload(teacher: TeacherUIModel) {
     subject: teacher.subject || undefined,
     institution: teacher.campus || undefined,
     color: teacher.color || undefined,
+    gender: teacher.gender,
+    birthday: teacher.birthday || undefined,
+    intro: teacher.intro?.trim() || undefined,
+    promoImages: teacher.promoImages || [],
+    showInPrivateList: teacher.showInPrivateList ?? false,
   };
 }
 
@@ -131,6 +168,11 @@ export function mapUiTeacherToUpdatePayload(updates: Partial<TeacherUIModel>) {
     institution: updates.campus,
     color: updates.color,
     payRemark: updates.payRemark,
+    gender: updates.gender,
+    birthday: updates.birthday || undefined,
+    intro: updates.intro,
+    promoImages: updates.promoImages,
+    showInPrivateList: updates.showInPrivateList,
   };
 }
 

@@ -17,10 +17,13 @@ export { courseTemplateService } from './course-template';
 export { cardTypeService } from './card-type';
 export type { FeeMethod } from './student';
 export { temporaryRescheduleService } from './temporary-reschedule';
+export { makeupBookingService } from './makeup-booking';
 export {
   login,
   wechatLogin,
   bindWechatCredentials,
+  bindAccountEmail,
+  sendBindEmailCode,
   phoneLogin,
   registerStep1,
   registerStep1ByEmail,
@@ -76,7 +79,17 @@ export { leadService } from './lead';
 export type { TrialCourseSlot } from './lead';
 export { classBookingService } from './class-booking';
 export { venueBookingService } from './venue-booking';
+export { opsAlertService } from './ops-alerts';
+export type { AttendanceAnomalyItem, RenewalReminderItem } from './ops-alerts';
 export type { BookableVenue, VenueBookingRecord, VenueBookingSlot } from '@/types/venue-booking';
+export { myBookingService, getMyRelatedBookings, sortMyBookingsNearToFar } from './my-booking';
+export type {
+  MyBookingCard,
+  MyBookingDateRange,
+  MyBookingNavigatePayload,
+  MyBookingSourceType,
+  MyBookingStatus,
+} from '@/types/my-booking';
 export { myCourseService } from './my-course';
 export type { MyCourseItem, MyCourseStatus } from './my-course';
 export { onboardingService } from './onboarding';

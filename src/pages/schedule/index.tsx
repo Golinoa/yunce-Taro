@@ -38,7 +38,7 @@ import { useCourseCategoryStore } from '@/stores/course-category';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { Class, ClassBookingSlot } from '@/types/class';
-import { CLASS_LEVEL_LABELS } from '@/types/class';
+import { CLASS_LEVEL_LABELS, CLASS_LEVEL_BADGE_WRAP, CLASS_LEVEL_BADGE_TEXT } from '@/types/class';
 import type { CourseCategoryMode } from '@/types/course-category';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
@@ -52,6 +52,7 @@ import {
   type LessonSharePayload,
 } from '@/utils/lesson-share';
 import { logError } from '@/utils/logger';
+import { upsertParentBooking, updateParentBookingStatus, readParentBookings } from '@/utils/parent-bookings';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
@@ -430,7 +431,7 @@ function isHistoricalClassCard(
   return status === 'done' || status === 'ended';
 }
 
-/** 未开课（未来或今日未开始）：可约试听 / 点名 / 编辑 */
+/** 未开课（未来或今日未开始）：可约试听/补课 / 点名 / 编辑 */
 function isUpcomingClassCard(status: ScheduleCardItem['status']): boolean {
   return status === 'upcoming' || status === 'urgent';
 }
@@ -491,6 +492,7 @@ function isBookingSchedule(schedule: Schedule): boolean {
 const SchedulePage: React.FC = () => {
   const { profile, currentRole } = useAuth();
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
+  const campuses = useCampusStore((state) => state.campuses);
   const themeStore = useThemeStore();
   const isParent = isParentRole(currentRole);
   /** 家长绑定孩子所在班级，用于班课只看自己的排班 */
@@ -742,8 +744,8 @@ const SchedulePage: React.FC = () => {
           return false;
         }
       }
-      // 家长 · 班课：只看绑定孩子所在班级的排班
-      if (isParent && activeTab.mode === 'class') {
+      // 家长：班课/团课都只看绑定孩子所在班级
+      if (isParent && (activeTab.mode === 'class' || activeTab.mode === 'group')) {
         return parentClassIds.has(cls.id);
       }
       return true;
@@ -969,12 +971,52 @@ const SchedulePage: React.FC = () => {
     }
     setLoading(true);
     try {
+      if (isParent) {
+        const kids = await studentService.getByParent(profile?.id || currentUserId);
+        const classIdSet = new Set<string>();
+        kids.forEach((kid) => {
+          (kid.class_ids || []).forEach((id) => classIdSet.add(id));
+        });
+        setParentClassIds(classIdSet);
+
+        const classList = (
+          await Promise.all([...classIdSet].map((id) => classService.getById(id)))
+        ).filter(Boolean) as Class[];
+        const scheduleList = await scheduleService.listForParent(
+          [...classIdSet],
+          currentCampusId,
+        );
+        const teacherList = await teacherService.getList(currentCampusId);
+
+        const classStudentsList = await Promise.all(
+          classList.map(async (classItem) => ({
+            classId: classItem.id,
+            students: kids.filter((kid) => (kid.class_ids || []).includes(classItem.id)),
+          })),
+        );
+        const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};
+        classStudentsList.forEach((item) => {
+          nextClassStudentAvatars[item.classId] = item.students.map((student) => ({
+            id: student.id,
+            name: student.name,
+            avatar: student.avatar_url,
+          }));
+        });
+
+        setSchedules(scheduleList);
+        setClasses(classList);
+        setTeachers(teacherList);
+        setClassStudentAvatars(nextClassStudentAvatars);
+        setTrialBookingKeys(new Set());
+        return;
+      }
+
       const [scheduleList, classList, teacherList, leadBookings] = await Promise.all([
         scheduleService.getByTeacher(currentUserId, currentCampusId),
         classService.getByTeacher(currentUserId, currentCampusId),
         teacherService.getList(currentCampusId),
         // 试听标签按「当天有效预约」判定，含 pending/confirmed（后端新建默认可为 pending）
-        leadService.getLeadBookingsByTeacher(currentUserId),
+        leadService.getLeadBookingsByTeacher(currentTeacherId),
         fetchCategories(),
       ]);
       await studentService.getByTeacher(currentUserId, currentCampusId);
@@ -1020,7 +1062,15 @@ const SchedulePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, currentCampusId, currentRole, fetchCategories]);
+  }, [
+    currentUserId,
+    currentTeacherId,
+    currentCampusId,
+    currentRole,
+    fetchCategories,
+    isParent,
+    profile?.id,
+  ]);
 
   const loadMonthRecords = useCallback(async () => {
     if (!currentUserId) {
@@ -2176,31 +2226,60 @@ const SchedulePage: React.FC = () => {
                               }
                         }
                         metaAction={
-                          isParent || item.status === 'cancelled'
-                            ? undefined
-                            : isHistoricalClassCard(item.status, date, currentTime) ? (
-                                canOperateHistoricalLesson(date, currentTime) ? (
-                                  <ScheduleActionButton
-                                    label="补录"
-                                    variant="neutral"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      runCardButtonAction(() => handleSupplement(item, date));
-                                    }}
-                                  />
-                                ) : undefined
-                              ) : (
+                          isParent
+                            ? item.status !== 'cancelled' && isUpcomingClassCard(item.status) ? (
                                 <ScheduleActionButton
-                                  label={item.status === 'urgent' ? '立即点名' : '点名'}
-                                  variant="attend"
+                                  label="请假"
+                                  variant="neutral"
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    runCardButtonAction(() => handleRollCall(item, date));
+                                    runCardButtonAction(() => {
+                                      const lessonKey = `${item.id}:${date.format('YYYY-MM-DD')}`;
+                                      const studentId = item.students?.[0]?.id || '';
+                                      const query = [
+                                        studentId
+                                          ? `studentId=${encodeURIComponent(studentId)}`
+                                          : '',
+                                        `lessonKey=${encodeURIComponent(lessonKey)}`,
+                                        item.classId
+                                          ? `classId=${encodeURIComponent(item.classId)}`
+                                          : '',
+                                      ]
+                                        .filter(Boolean)
+                                        .join('&');
+                                      void Taro.navigateTo({
+                                        url: `/package-course/pages/leave-request/index?${query}`,
+                                      });
+                                    });
                                   }}
                                 />
-                              )
+                              ) : undefined
+                            : item.status === 'cancelled'
+                              ? undefined
+                              : isHistoricalClassCard(item.status, date, currentTime) ? (
+                                  canOperateHistoricalLesson(date, currentTime) ? (
+                                    <ScheduleActionButton
+                                      label="补录"
+                                      variant="neutral"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        runCardButtonAction(() => handleSupplement(item, date));
+                                      }}
+                                    />
+                                  ) : undefined
+                                ) : (
+                                  <ScheduleActionButton
+                                    label={item.status === 'urgent' ? '立即点名' : '点名'}
+                                    variant="attend"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      runCardButtonAction(() => handleRollCall(item, date));
+                                    }}
+                                  />
+                                )
                         }
                         footerAction={
                           isParent || !isUpcomingClassCard(item.status) ? undefined : (
@@ -2212,7 +2291,7 @@ const SchedulePage: React.FC = () => {
                                 runCardButtonAction(() => handleOpenBookSheet(item));
                               }}
                             >
-                              <Text className="text-[24rpx] text-primary">约试听</Text>
+                              <Text className="text-[24rpx] text-primary">约试听/补课</Text>
                               <Text className="ml-[2rpx] text-[24rpx] text-primary">›</Text>
                             </View>
                           )
@@ -2227,8 +2306,27 @@ const SchedulePage: React.FC = () => {
                     );
 
                     if (isParent) {
+                      const openLeave = () => {
+                        if (item.status === 'cancelled') return;
+                        const lessonKey = `${item.id}:${date.format('YYYY-MM-DD')}`;
+                        const studentId = item.students?.[0]?.id || '';
+                        const query = [
+                          studentId ? `studentId=${encodeURIComponent(studentId)}` : '',
+                          `lessonKey=${encodeURIComponent(lessonKey)}`,
+                          item.classId ? `classId=${encodeURIComponent(item.classId)}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join('&');
+                        void Taro.navigateTo({
+                          url: `/package-course/pages/leave-request/index?${query}`,
+                        });
+                      };
                       return (
-                        <View key={item.id} className="rounded-[16rpx]">
+                        <View
+                          key={item.id}
+                          className="rounded-[16rpx]"
+                          onClick={openLeave}
+                        >
                           {cardBody}
                         </View>
                       );
@@ -2418,6 +2516,127 @@ const SchedulePage: React.FC = () => {
     });
   }, []);
 
+  /** 家长端：团课开放时段预约 */
+  const handleParentBookOpenSlot = useCallback(
+    async (slot: ClassBookingSlot) => {
+      if (!profile?.id) {
+        Taro.showToast({ title: '请先登录', icon: 'none' });
+        return;
+      }
+      if (slot.status === 'rest') {
+        Taro.showToast({ title: '该时段休息中', icon: 'none' });
+        return;
+      }
+      if (slot.status === 'full' || slot.current_count >= slot.max_count) {
+        Taro.showToast({ title: '名额已满', icon: 'none' });
+        return;
+      }
+
+      try {
+        const kids = await studentService.getByParent(profile.id);
+        if (kids.length === 0) {
+          Taro.showToast({ title: '暂无绑定学员', icon: 'none' });
+          return;
+        }
+
+        let student = kids[0];
+        if (kids.length > 1) {
+          const sheet = await Taro.showActionSheet({
+            itemList: kids.map((k) => k.name),
+          });
+          student = kids[sheet.tapIndex];
+        }
+
+        const alreadyBooked = (slot.booking_students || []).some((s) => s.id === student.id);
+        if (alreadyBooked) {
+          Taro.showToast({ title: '已预约该时段', icon: 'none' });
+          return;
+        }
+
+        const created = await classBookingService.addBookingRecord(slot.id, student.id);
+        // 本地仅缓存展示；真相源为 class-booking record id
+        upsertParentBooking({
+          id: created.id || `pb-${slot.id}-${student.id}`,
+          userId: profile.id,
+          studentId: student.id,
+          studentName: student.name,
+          occurrenceKey: `${slot.class_id}:${slot.lesson_date}:${slot.start_time}`,
+          courseId: slot.class_id,
+          courseName: slot.class_name || '团课',
+          courseType: 'group',
+          classId: slot.class_id,
+          campusId: slot.campus_id,
+          lessonDate: slot.lesson_date,
+          timeRange: `${slot.start_time}-${slot.end_time}`,
+          teacherName: slot.teacher_name || '老师',
+          deadline: dayjs(`${slot.lesson_date} ${slot.start_time}`).subtract(1, 'hour').toISOString(),
+          campusName:
+            campuses.find((c) => c.id === (slot.campus_id || currentCampusId))?.name || '校区',
+          room: slot.room,
+          status: 'booked',
+          createdAt: created.created_at || new Date().toISOString(),
+        });
+
+        await loadOpenClassSlots(dayjs(slot.lesson_date), true);
+        Taro.showToast({ title: '预约成功', icon: 'success' });
+      } catch (err) {
+        logError('parent book open slot', err);
+        Taro.showToast({ title: '预约失败', icon: 'none' });
+      }
+    },
+    [campuses, currentCampusId, loadOpenClassSlots, profile],
+  );
+
+  /** 家长端：取消团课预约 */
+  const handleParentCancelOpenSlot = useCallback(
+    async (slot: ClassBookingSlot) => {
+      if (!profile?.id) {
+        Taro.showToast({ title: '请先登录', icon: 'none' });
+        return;
+      }
+      try {
+        const kids = await studentService.getByParent(profile.id);
+        const kidIds = new Set(kids.map((k) => k.id));
+        const bookedKids = (slot.booking_students || []).filter((s) => kidIds.has(s.id));
+        if (bookedKids.length === 0) {
+          Taro.showToast({ title: '未预约该时段', icon: 'none' });
+          return;
+        }
+
+        let student = bookedKids[0];
+        if (bookedKids.length > 1) {
+          const sheet = await Taro.showActionSheet({
+            itemList: bookedKids.map((k) => k.name),
+          });
+          student = bookedKids[sheet.tapIndex];
+        }
+
+        const { confirm } = await Taro.showModal({
+          title: '取消预约',
+          content: `确认取消「${student.name}」该时段的预约？`,
+        });
+        if (!confirm) return;
+
+        const records = await classBookingService.getRecordsBySlot(slot.id);
+        const record = records.find(
+          (r) => r.student_id === student.id && r.status !== 'cancelled',
+        );
+        if (record) {
+          await classBookingService.removeBookingRecord(record.id);
+          updateParentBookingStatus(record.id, 'cancelled');
+        }
+        // 兼容旧本地草稿 id
+        updateParentBookingStatus(`pb-${slot.id}-${student.id}`, 'cancelled');
+
+        await loadOpenClassSlots(dayjs(slot.lesson_date), true);
+        Taro.showToast({ title: '已取消预约', icon: 'success' });
+      } catch (err) {
+        logError('parent cancel open slot', err);
+        Taro.showToast({ title: '取消失败', icon: 'none' });
+      }
+    },
+    [loadOpenClassSlots, profile],
+  );
   /** 开放预约：左滑取消 — 将活跃/已满时段设为休息 */
   const handleCancelOpenSlot = useCallback(async (slot: ClassBookingSlot) => {
     if (slot.status === 'rest') return;
@@ -2622,8 +2841,8 @@ const SchedulePage: React.FC = () => {
                                 </View>
                                 <View className="mt-[12rpx] flex flex-wrap items-center gap-[12rpx]">
                                   {cls?.level ? (
-                                    <View className="rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
-                                      <Text className="text-[24rpx] font-medium leading-none text-muted-foreground">
+                                    <View className={CLASS_LEVEL_BADGE_WRAP}>
+                                      <Text className={CLASS_LEVEL_BADGE_TEXT}>
                                         {CLASS_LEVEL_LABELS[cls.level]}
                                       </Text>
                                     </View>
@@ -2658,7 +2877,7 @@ const SchedulePage: React.FC = () => {
                             </View>
                           </View>
 
-                          {/* 底部：已约人数（家长只看可约名额） */}
+                          {/* 底部：已约人数 + 家长预约 */}
                           <View className="mt-[18rpx] flex items-center justify-between border-t border-border pt-[14rpx]">
                             <View className="flex flex-1 items-center min-w-0 overflow-hidden">
                               {(slot.booking_students || [])
@@ -2676,14 +2895,69 @@ const SchedulePage: React.FC = () => {
                                 ))}
                             </View>
 
-                            <Text className="ml-[24rpx] flex-shrink-0 text-[30rpx] font-semibold text-foreground">
-                              <Text className="text-[34rpx] font-bold text-foreground">
-                                {slot.current_count}
+                            <View className="ml-[16rpx] flex flex-shrink-0 items-center gap-[16rpx]">
+                              <Text className="text-[30rpx] font-semibold text-foreground">
+                                <Text className="text-[34rpx] font-bold text-foreground">
+                                  {slot.current_count}
+                                </Text>
+                                <Text className="text-[24rpx] font-medium text-muted-foreground">
+                                  /{slot.max_count}人
+                                </Text>
                               </Text>
-                              <Text className="text-[24rpx] font-medium text-muted-foreground">
-                                /{slot.max_count}人
-                              </Text>
-                            </Text>
+                              {(() => {
+                                const myKids = classStudentAvatars[slot.class_id] || [];
+                                const parentBooked = (slot.booking_students || []).some((s) =>
+                                  myKids.some((kid) => kid.id === s.id),
+                                );
+                                if (isRest) return null;
+                                if (parentBooked) {
+                                  return (
+                                    <View className="flex items-center gap-[12rpx]">
+                                      <View
+                                        className="center h-[56rpx] rounded-full bg-muted px-[24rpx] active:opacity-80"
+                                        onClick={() => {
+                                          const booking = readParentBookings(profile?.id || '').find(
+                                            (b) =>
+                                              b.classId === slot.class_id &&
+                                              b.lessonDate === slot.lesson_date &&
+                                              b.timeRange?.startsWith(slot.start_time) &&
+                                              b.status === 'booked',
+                                          );
+                                          if (booking) {
+                                            void Taro.navigateTo({
+                                              url: `/package-course/pages/booking-record-detail/index?id=${encodeURIComponent(booking.id)}`,
+                                            });
+                                          } else {
+                                            void handleParentCancelOpenSlot(slot);
+                                          }
+                                        }}
+                                      >
+                                        <Text className="text-[24rpx] font-medium text-foreground">
+                                          详情
+                                        </Text>
+                                      </View>
+                                      <View
+                                        className="center h-[56rpx] rounded-full border border-destructive/40 bg-destructive-5 px-[24rpx] active:opacity-80"
+                                        onClick={() => void handleParentCancelOpenSlot(slot)}
+                                      >
+                                        <Text className="text-[24rpx] font-medium text-destructive">
+                                          取消
+                                        </Text>
+                                      </View>
+                                    </View>
+                                  );
+                                }
+                                if (slot.status === 'full') return null;
+                                return (
+                                  <View
+                                    className="center h-[56rpx] rounded-full bg-primary px-[28rpx] active:opacity-80"
+                                    onClick={() => void handleParentBookOpenSlot(slot)}
+                                  >
+                                    <Text className="text-[24rpx] font-medium text-white">预约</Text>
+                                  </View>
+                                );
+                              })()}
+                            </View>
                           </View>
                       </View>
                     ) : (
@@ -2802,8 +3076,8 @@ const SchedulePage: React.FC = () => {
                                 </View>
                                 <View className="mt-[12rpx] flex flex-wrap items-center gap-[12rpx]">
                                   {cls?.level ? (
-                                    <View className="rounded-[10rpx] bg-muted px-[14rpx] py-[6rpx]">
-                                      <Text className="text-[24rpx] font-medium leading-none text-muted-foreground">
+                                    <View className={CLASS_LEVEL_BADGE_WRAP}>
+                                      <Text className={CLASS_LEVEL_BADGE_TEXT}>
                                         {CLASS_LEVEL_LABELS[cls.level]}
                                       </Text>
                                     </View>
@@ -2950,11 +3224,15 @@ const SchedulePage: React.FC = () => {
       handleSuspendOpenSlot,
       handleResumeClass,
       runCardButtonAction,
+      handleParentBookOpenSlot,
+      handleParentCancelOpenSlot,
       isParent,
       currentCampusId,
       currentTeacherId,
       currentUserId,
+      profile?.id,
       profile?.currentContext?.campusId,
+      classStudentAvatars,
     ],
   );
 
@@ -3312,6 +3590,7 @@ const SchedulePage: React.FC = () => {
         {activeTab?.mode === 'private' && activeTab?.type === 'category' && (
           <TrialBookingView
             className="min-h-0 flex-1"
+            isParent={isParent}
             onSuccess={() => {
               const firstClassTab = tabs.find((item) => item.mode === 'class');
               const targetKey = firstClassTab?.key || tabs[0]?.key || '';

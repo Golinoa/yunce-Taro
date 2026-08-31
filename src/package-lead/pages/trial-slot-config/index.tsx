@@ -19,7 +19,7 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
-import { leadService, teacherService } from '@/services';
+import { leadService, studentService, teacherService } from '@/services';
 import type { TrialSlotConfig } from '@/types/lead';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -29,10 +29,15 @@ import {
   writeTeacherBookingConfig,
   type TeacherBookingConfig,
 } from '@/utils/booking-one-on-one';
+import { logError } from '@/utils/logger';
+import { upsertParentBooking } from '@/utils/parent-bookings';
+import { privateBookingService } from '@/services/private-booking';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 interface PageParams {
   teacherId?: string;
+  /** parent=家长自约，隐藏代约/休息管理 */
+  from?: string;
 }
 
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
@@ -204,8 +209,10 @@ const TrialSlotConfigPage: React.FC = () => {
 
   useLoad((options) => {
     const opt = options as Record<string, string>;
-    setParams({ teacherId: opt.teacherId });
+    setParams({ teacherId: opt.teacherId, from: opt.from });
   });
+
+  const isParentMode = params.from === 'parent';
 
   const loadTeacher = useCallback(async () => {
     if (!params.teacherId) return;
@@ -248,13 +255,103 @@ const TrialSlotConfigPage: React.FC = () => {
     return slots.filter((s) => s.lesson_date === dateStr);
   }, [slots, selectedDate]);
 
-  /** 左侧按钮文字：有课=跟班试听，无课=代预约（单独试听） */
+  /** 左侧按钮文字：家长=预约；老师：有课=跟班试听，无课=代预约 */
   const leftBtnText = useMemo(() => {
+    if (isParentMode) return '预约';
     if (!isSingleSelected) return '代预约';
     const [time] = [...selectedSlots.keys()];
     const slotType = selectedSlots.get(time);
     return slotType === 'course' ? '跟班试听' : '代预约';
-  }, [isSingleSelected, selectedSlots]);
+  }, [isParentMode, isSingleSelected, selectedSlots]);
+
+  const handleLeftBtnClick = useCallback(async () => {
+    if (!isSingleSelected || !params.teacherId) {
+      return;
+    }
+    const [time] = [...selectedSlots.keys()];
+    const slotType = selectedSlots.get(time);
+    const dateStr = selectedDate.format('YYYY-MM-DD');
+
+    if (isParentMode) {
+      if (!profile?.id) {
+        Taro.showToast({ title: '请先登录', icon: 'none' });
+        return;
+      }
+      try {
+        const kids = await studentService.getByParent(profile.id);
+        if (kids.length === 0) {
+          Taro.showToast({ title: '暂无绑定学员', icon: 'none' });
+          return;
+        }
+        let student = kids[0];
+        if (kids.length > 1) {
+          const sheet = await Taro.showActionSheet({ itemList: kids.map((k) => k.name) });
+          student = kids[sheet.tapIndex];
+        }
+        const endTime =
+          TIME_OPTIONS[Math.min(TIME_OPTIONS.indexOf(time as (typeof TIME_OPTIONS)[number]) + 1, TIME_OPTIONS.length - 1)] ||
+          time;
+        const created = await privateBookingService.create({
+          teacherId: params.teacherId!,
+          studentId: student.id,
+          lessonDate: dateStr,
+          startTime: time,
+          endTime,
+          courseName: teacher?.subject ? `${teacher.subject}私教` : '私教课',
+          teacherName: teacher?.name || '老师',
+          campusId: profile.currentContext?.campusId,
+        });
+        // 本地镜像仅作离线展示草稿；真相源为后端 PrivateLessonBooking
+        upsertParentBooking({
+          id: created.id,
+          userId: profile.id,
+          studentId: student.id,
+          studentName: student.name,
+          occurrenceKey: `${params.teacherId}:${dateStr}:${time}`,
+          courseId: params.teacherId,
+          courseName: created.courseName || (teacher?.subject ? `${teacher.subject}私教` : '私教课'),
+          courseType: 'oneOnOne',
+          campusId: profile.currentContext?.campusId,
+          lessonDate: dateStr,
+          timeRange: `${time}-${endTime}`,
+          teacherName: teacher?.name || '老师',
+          deadline: dayjs(`${dateStr} ${time}`).subtract(1, 'hour').toISOString(),
+          campusName: '',
+          status: 'booked',
+          createdAt: created.createdAt || new Date().toISOString(),
+        });
+        Taro.showToast({ title: '预约成功', icon: 'success' });
+        setTimeout(() => {
+          void Taro.navigateBack();
+        }, 500);
+      } catch (err) {
+        logError('parent private book', err);
+        const msg = err instanceof Error ? err.message : '';
+        Taro.showToast({
+          title: msg.includes('已预约') || msg.includes('冲突') ? msg : '预约失败',
+          icon: 'none',
+        });
+      }
+      return;
+    }
+
+    const mode = slotType === 'course' ? 'group' : 'private';
+    void Taro.navigateTo({
+      url:
+        `/package-lead/pages/proxy-booking-form/index?teacherId=${encodeURIComponent(params.teacherId)}` +
+        `&date=${encodeURIComponent(dateStr)}` +
+        `&time=${encodeURIComponent(time)}&mode=${mode}`,
+    });
+  }, [
+    isParentMode,
+    isSingleSelected,
+    params.teacherId,
+    profile,
+    selectedDate,
+    selectedSlots,
+    teacher?.name,
+    teacher?.subject,
+  ]);
 
   /** 有课的时段（active 状态且有排课） */
   const courseTimeSet = useMemo(() => {
@@ -310,22 +407,8 @@ const TrialSlotConfigPage: React.FC = () => {
     [getSlotTag],
   );
 
-  const handleLeftBtnClick = useCallback(() => {
-    if (!isSingleSelected || !params.teacherId) {
-      return;
-    }
-    const [time] = [...selectedSlots.keys()];
-    const slotType = selectedSlots.get(time);
-    const mode = slotType === 'course' ? 'group' : 'private';
-    void Taro.navigateTo({
-      url:
-        `/package-lead/pages/proxy-booking-form/index?teacherId=${encodeURIComponent(params.teacherId)}` +
-        `&date=${encodeURIComponent(selectedDate.format('YYYY-MM-DD'))}` +
-        `&time=${encodeURIComponent(time)}&mode=${mode}`,
-    });
-  }, [isSingleSelected, params.teacherId, selectedDate, selectedSlots]);
-
   const handleRightBtnClick = useCallback(() => {
+    if (isParentMode) return;
     if (!isAnySelected) return;
     if (hasRestSelected) {
       // 取消休息：将选中的休标签移除
@@ -345,7 +428,7 @@ const TrialSlotConfigPage: React.FC = () => {
       });
     }
     setSelectedSlots(new Map());
-  }, [hasRestSelected, isAnySelected, selectedSlots]);
+  }, [hasRestSelected, isAnySelected, isParentMode, selectedSlots]);
 
   return (
     <View className="relative flex h-screen flex-col overflow-hidden bg-[linear-gradient(135deg,#ff8a4c_0%,#ffb347_100%)]">
@@ -575,7 +658,8 @@ const TrialSlotConfigPage: React.FC = () => {
               </View>
             </View>
 
-            {/* 预约设置：每周重复 + 每时段可约人数 */}
+            {/* 预约设置：每周重复 + 每时段可约人数（仅教师管理） */}
+            {!isParentMode ? (
             <View className="mt-[40rpx]">
               <Text className="text-[32rpx] font-semibold text-foreground">预约设置</Text>
               <View className="mt-[24rpx] rounded-[20rpx] bg-[#f8fafc] px-[24rpx] py-[20rpx]">
@@ -608,6 +692,7 @@ const TrialSlotConfigPage: React.FC = () => {
                 </View>
               </View>
             </View>
+            ) : null}
           </View>
         </ScrollView>
       </View>
@@ -628,19 +713,21 @@ const TrialSlotConfigPage: React.FC = () => {
               'flex h-[76rpx] flex-1 items-center justify-center rounded-full text-[30rpx] font-medium text-white transition-all',
               leftBtnActive ? 'bg-[#ff8a4c] active:scale-95 active:bg-[#e67a3e]' : 'bg-[#e0e0e0]',
             )}
-            onClick={handleLeftBtnClick}
+            onClick={() => void handleLeftBtnClick()}
           >
             {leftBtnText}
           </View>
-          <View
-            className={cn(
-              'flex h-[76rpx] flex-1 items-center justify-center rounded-full text-[30rpx] font-medium text-white transition-all',
-              rightBtnActive ? 'bg-[#ff8a4c] active:scale-95 active:bg-[#e67a3e]' : 'bg-[#e0e0e0]',
-            )}
-            onClick={handleRightBtnClick}
-          >
-            {isAllRest ? '取消休息' : '设为休息'}
-          </View>
+          {!isParentMode ? (
+            <View
+              className={cn(
+                'flex h-[76rpx] flex-1 items-center justify-center rounded-full text-[30rpx] font-medium text-white transition-all',
+                rightBtnActive ? 'bg-[#ff8a4c] active:scale-95 active:bg-[#e67a3e]' : 'bg-[#e0e0e0]',
+              )}
+              onClick={handleRightBtnClick}
+            >
+              {isAllRest ? '取消休息' : '设为休息'}
+            </View>
+          ) : null}
         </View>
       </View>
     </View>

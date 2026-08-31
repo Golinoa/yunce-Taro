@@ -6,14 +6,16 @@
  * - 绑定机构 → 输入学员邀请码绑定（package-auth/pages/parent-onboarding/index）
  *
  * pending 标记在目标页成功进入后再清除，避免目标页被守卫拦截时丢回流入口。
+ * 已是家长身份时仅保留「绑定机构」，避免点门店入驻后被权限拦回。
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import Icon from '@/components/Icon';
+import { isParentRole, useAuth } from '@/utils/auth';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
-const IDENTITY_OPTIONS = [
+const ALL_IDENTITY_OPTIONS = [
   {
     key: 'store-entry',
     title: '门店入驻',
@@ -32,6 +34,14 @@ const IDENTITY_OPTIONS = [
 
 const IdentitySelect: React.FC = () => {
   const navHeight = useNavSafeHeight();
+  const { currentRole } = useAuth();
+
+  const options = useMemo(() => {
+    if (isParentRole(currentRole)) {
+      return ALL_IDENTITY_OPTIONS.filter((item) => item.key === 'bind-org');
+    }
+    return [...ALL_IDENTITY_OPTIONS];
+  }, [currentRole]);
 
   const handleSelect = useCallback((url: string) => {
     Taro.navigateTo({ url });
@@ -54,12 +64,14 @@ const IdentitySelect: React.FC = () => {
             选择您的身份
           </Text>
           <Text className="text-[28rpx] text-muted-foreground">
-            选择进入方式，后续可在设置中调整
+            {isParentRole(currentRole)
+              ? '请使用机构提供的学员邀请码绑定孩子'
+              : '选择进入方式，后续可在设置中调整'}
           </Text>
         </View>
 
         <View className="space-y-[28rpx]">
-          {IDENTITY_OPTIONS.map((opt) => (
+          {options.map((opt) => (
             <View
               key={opt.key}
               className="flex items-center rounded-[32rpx] bg-card border-2 border-transparent p-[32rpx] shadow-soft active:scale-[0.99] transition-all duration-200"
@@ -82,7 +94,9 @@ const IdentitySelect: React.FC = () => {
         </View>
 
         <Text className="text-[24rpx] text-muted-foreground text-center block mt-[48rpx] leading-[1.7]">
-          门店入驻需提交资质审核；绑定机构需输入学员邀请码
+          {isParentRole(currentRole)
+            ? '绑定成功后可在「我的」查看孩子课表与课时'
+            : '门店入驻需提交资质审核；绑定机构需输入学员邀请码'}
         </Text>
       </View>
     </View>

@@ -61,38 +61,6 @@ function getStatusHintText(status: SalaryStatus): string {
   }
 }
 
-/** 生成本地模拟课时费流水 */
-function genMockLessonRecords(teacher: TeacherUIModel) {
-  const courses = teacher.subject
-    ? [`${teacher.subject}基础班`, `${teacher.subject}进阶班`, `${teacher.subject}小组课`]
-    : ['行政班', '值班', '前台班'];
-  return [
-    {
-      date: '08-01',
-      course: courses[0] ?? '基础班',
-      hours: 2,
-      amount: Math.round(teacher.rate * 2),
-    },
-    {
-      date: '08-05',
-      course: courses[1] ?? '进阶班',
-      hours: 1.5,
-      amount: Math.round(teacher.rate * 1.5),
-    },
-    { date: '08-12', course: courses[2] ?? '小组课', hours: 1, amount: Math.round(teacher.rate) },
-  ];
-}
-
-/** 生成本地模拟提成流水 */
-function genMockCommissionRecords(teacher: TeacherUIModel) {
-  const baseAmount = Math.max(100, Math.round((teacher.attend + teacher.perf) / 3));
-  return [
-    { name: '新生推荐奖', amount: baseAmount },
-    { name: '续费提成', amount: Math.round(baseAmount * 0.8) },
-    { name: '全勤奖励', amount: Math.round(baseAmount * 0.6) },
-  ];
-}
-
 /** 工资单状态说明弹窗 */
 const SalaryStatusExplainSheet: React.FC<{ visible: boolean; onClose: () => void }> = ({
   visible,
@@ -559,16 +527,22 @@ const SalaryPaymentPage: React.FC = () => {
                     className="mb-[20rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {genMockLessonRecords(t).map((rec, idx) => (
-                      <View key={idx} className="flex items-center justify-between py-[10rpx]">
-                        <Text className="text-[24rpx] text-muted-foreground">
-                          {rec.date} {rec.course} {rec.hours}课时
-                        </Text>
-                        <Text className="text-[24rpx] text-foreground">
-                          +{rec.amount.toFixed(2)}
-                        </Text>
-                      </View>
-                    ))}
+                    {(t.categoryLessonFees || []).length === 0 ? (
+                      <Text className="text-[24rpx] text-muted-foreground py-[10rpx]">
+                        暂无课时费明细
+                      </Text>
+                    ) : (
+                      (t.categoryLessonFees || []).map((item, idx) => (
+                        <View key={idx} className="flex items-center justify-between py-[10rpx]">
+                          <Text className="text-[24rpx] text-muted-foreground">
+                            {item.categoryName || '课时费'}
+                          </Text>
+                          <Text className="text-[24rpx] text-foreground">
+                            +{Number(item.amount ?? 0).toFixed(2)}
+                          </Text>
+                        </View>
+                      ))
+                    )}
                   </View>
                 )}
 
@@ -578,14 +552,26 @@ const SalaryPaymentPage: React.FC = () => {
                     className="mb-[20rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {genMockCommissionRecords(t).map((rec, idx) => (
-                      <View key={idx} className="flex items-center justify-between py-[10rpx]">
-                        <Text className="text-[24rpx] text-muted-foreground">{rec.name}</Text>
-                        <Text className="text-[24rpx] text-foreground">
-                          +{rec.amount.toFixed(2)}
-                        </Text>
-                      </View>
-                    ))}
+                    {[
+                      ...(t.attend > 0 ? [{ name: '全勤奖', amount: t.attend }] : []),
+                      ...(t.perf > 0 ? [{ name: '绩效提成', amount: t.perf }] : []),
+                    ].length === 0 ? (
+                      <Text className="text-[24rpx] text-muted-foreground py-[10rpx]">
+                        暂无提成明细
+                      </Text>
+                    ) : (
+                      [
+                        ...(t.attend > 0 ? [{ name: '全勤奖', amount: t.attend }] : []),
+                        ...(t.perf > 0 ? [{ name: '绩效提成', amount: t.perf }] : []),
+                      ].map((rec, idx) => (
+                        <View key={idx} className="flex items-center justify-between py-[10rpx]">
+                          <Text className="text-[24rpx] text-muted-foreground">{rec.name}</Text>
+                          <Text className="text-[24rpx] text-foreground">
+                            +{rec.amount.toFixed(2)}
+                          </Text>
+                        </View>
+                      ))
+                    )}
                   </View>
                 )}
 

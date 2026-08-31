@@ -19,38 +19,27 @@ const AgreementSheet: React.FC<AgreementSheetProps> = ({
   visible,
   onClose,
   onConfirm,
-  confirmText = '同意协议并继续',
+  confirmText = '同意并继续',
 }) => {
   const handleAgreement = () => {
     Taro.navigateTo({ url: '/package-settings/pages/agreement/index?type=user' });
   };
 
-  const handlePrivacy = () => {
-    Taro.navigateTo({ url: '/package-settings/pages/agreement/index?type=privacy' });
-  };
-
   return (
     <BottomSheet
       visible={visible}
-      title="服务协议及隐私保护"
+      title="用户协议"
       onClose={onClose}
       maxHeight="72vh"
       scrollable={false}
     >
       <View className="px-[40rpx] pt-[12rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))]">
-        <Text className="text-[28rpx] text-foreground leading-relaxed block mb-[32rpx]">
-          尊敬的用户，为了更好地保障您的合法权益，让您正常使用松果排课服务，我们需要依照相关法律法规收集并使用您的身份信息、联系方式等。
-        </Text>
-        <Text className="text-[28rpx] text-foreground leading-relaxed block mb-[48rpx]">
-          松果排课将严格保护您的个人信息，确保您的信息安全。请您务必审慎阅读并充分理解
+        <Text className="text-[28rpx] text-foreground leading-relaxed text-center block mb-[48rpx]">
+          请阅读并同意
           <Text className="text-primary" onClick={handleAgreement}>
             《用户协议》
           </Text>
-          和
-          <Text className="text-primary" onClick={handlePrivacy}>
-            《隐私政策》
-          </Text>
-          后进行操作。
+          后继续
         </Text>
 
         <View

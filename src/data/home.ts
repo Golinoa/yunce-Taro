@@ -18,7 +18,6 @@ import {
   type LessonRecord,
   type Schedule,
 } from './mock-database';
-import { COURSE_MANAGEMENT_CLASS_TAB_URL } from './course-category';
 import type { UserRole } from '@/types/profile';
 import {
   filterClassesByActor,
@@ -148,7 +147,7 @@ export interface HomeOperationContentData {
 
 export const HOME_QUICK_ENTRIES: QuickEntry[] = [
   {
-    label: '课时充值',
+    label: '充值发卡',
     icon: 'mdi-cash-plus',
     color: 'icon-glass-red',
     url: '/package-course/pages/package-form/index',
@@ -160,10 +159,10 @@ export const HOME_QUICK_ENTRIES: QuickEntry[] = [
     url: '/package-student/pages/student-form/index',
   },
   {
-    label: '考勤记录',
+    label: '上课记录',
     icon: 'mdi-clipboard-text',
     color: 'icon-glass-blue',
-    url: '/package-teacher/pages/attendance/index',
+    url: '/package-course/pages/records/index',
   },
   {
     label: '试听记录',
@@ -173,27 +172,27 @@ export const HOME_QUICK_ENTRIES: QuickEntry[] = [
   },
   {
     label: '充值记录',
-    icon: 'mdi-cash-multiple',
+    icon: 'mdi-history',
     color: 'icon-glass-red',
     url: '/package-course/pages/recharge-records/index',
   },
   {
-    label: '班级管理',
-    icon: 'mdi-school',
+    label: '考勤异常',
+    icon: 'mdi-shield-alert',
     color: 'icon-glass-blue',
-    url: COURSE_MANAGEMENT_CLASS_TAB_URL,
+    url: '/package-student/pages/attendance-anomaly/index',
   },
   {
-    label: '教师管理',
-    icon: 'mdi-account-supervisor',
+    label: '续费提醒',
+    icon: 'mdi-alarm',
     color: 'icon-glass-purple',
-    url: '/package-teacher/pages/teacher-list/index',
+    url: '/package-student/pages/renewal-reminder/index',
   },
   {
-    label: '校区设置',
-    icon: 'mdi-map-marker',
+    label: '意向学员',
+    icon: 'mdi-account-heart',
     color: 'icon-glass-violet',
-    url: '/package-settings/pages/campus-settings/index',
+    url: '/package-lead/pages/my-invite/index',
   },
 ];
 

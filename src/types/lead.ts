@@ -88,6 +88,14 @@ export interface Lead {
   status: LeadStatus;
   /** 首次触达时间 */
   first_touch_at?: string;
+  /** 落地页访问次数 */
+  visit_count?: number;
+  /** 首次访问客户端 IP */
+  first_ip?: string;
+  /** 首次访问地区/归属地 */
+  first_region?: string;
+  /** 最近一次落地页访问时间 */
+  last_visit_at?: string;
   /** 首次预约时间 */
   booked_at?: string;
   /** 转化时间 */
@@ -146,10 +154,14 @@ export interface LeadBooking {
   campus_id: string;
   /** 校区名称 */
   campus_name?: string;
-  /** 教师 ID（授课老师） */
+  /** 教师 ID（试听授课老师） */
   teacher_id: string;
-  /** 教师名称 */
+  /** 教师名称（试听授课老师） */
   teacher_name?: string;
+  /** 线索归属老师 ID（绑定老师，可由线索派生） */
+  owner_teacher_id?: string;
+  /** 线索归属老师名称 */
+  owner_teacher_name?: string;
   /** 预约日期 YYYY-MM-DD */
   lesson_date: string;
   /** 开始时间 HH:mm */
@@ -316,6 +328,7 @@ export interface LeadCardModel {
   trial_student_id: string;
   child_name: string;
   child_nickname?: string;
+  avatar_url?: string;
   parent_phone?: string;
   parent_name?: string;
   status: LeadStatus;

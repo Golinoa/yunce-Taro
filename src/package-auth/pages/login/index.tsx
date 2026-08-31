@@ -223,7 +223,7 @@ const Login: React.FC = () => {
         <View className="rotate-login-slogan">
           <View className="flex flex-row items-start gap-[16rpx]">
             <Text className="text-[64rpx] font-bold text-primary tracking-[4rpx] leading-[1.08]">
-              智能教务
+              智慧教务
             </Text>
             <View className="relative w-[72rpx] h-[72rpx] mt-[-6rpx] flex-shrink-0">
               <View className="absolute left-[8rpx] bottom-[-4rpx] w-[22rpx] h-[22rpx] bg-login-bubble rounded-[4rpx_0_16rpx_0] rotate-[28deg]" />
@@ -280,36 +280,27 @@ const Login: React.FC = () => {
         </View>
 
         <View
-          className="mb-[40rpx] flex flex-row items-start gap-[16rpx]"
+          className="mb-[32rpx] flex flex-row items-center gap-[12rpx]"
           onClick={() => setAgreed(!agreed)}
         >
           <View
             className={cn(
-              'mt-[4rpx] h-[32rpx] w-[32rpx] rounded-full border-[2rpx] flex items-center justify-center flex-shrink-0',
+              'h-[28rpx] w-[28rpx] rounded-full border-[2rpx] flex items-center justify-center flex-shrink-0',
               agreed ? 'border-primary bg-primary' : 'border-[#CFCFCF]',
             )}
           >
-            {agreed ? <Text className="text-[20rpx] text-white">✓</Text> : null}
+            {agreed ? <Text className="text-[18rpx] text-white">✓</Text> : null}
           </View>
-          <Text className="flex-1 text-[24rpx] leading-[36rpx] text-muted-foreground">
-            同意
+          <Text className="text-[22rpx] leading-[32rpx] text-muted-foreground">
+            我已阅读并同意
             <Text
               className="text-primary"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowAgreementDialog(true);
+                Taro.navigateTo({ url: '/package-settings/pages/agreement/index?type=user' });
               }}
             >
-              《服务协议》
-            </Text>
-            <Text
-              className="text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAgreementDialog(true);
-              }}
-            >
-              《隐私政策》
+              《用户协议》
             </Text>
           </Text>
         </View>
@@ -356,6 +347,9 @@ const Login: React.FC = () => {
 
       <AgreementDialog
         visible={showAgreementDialog}
+        variant="login-compact"
+        confirmText="同意"
+        cancelText="取消"
         onClose={() => {
           setShowAgreementDialog(false);
           setPendingAction(null);

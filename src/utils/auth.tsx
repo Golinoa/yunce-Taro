@@ -25,6 +25,8 @@ import {
   validateInviteCode as validateInviteCodeService,
   wechatLogin,
   bindWechatCredentials,
+  bindAccountEmail,
+  sendBindEmailCode,
 } from '@/services/auth';
 import type {
   AuthSession,
@@ -71,6 +73,16 @@ export interface AuthState {
     phone: string,
     password: string,
   ) => Promise<{ error: { message: string } | null }>;
+  /** 绑定邮箱 + 登录密码（需验证码） */
+  bindAccountEmail: (
+    email: string,
+    code: string,
+    password: string,
+  ) => Promise<{ error: { message: string } | null }>;
+  /** 发送绑定邮箱验证码 */
+  sendBindEmailCode: (
+    email: string,
+  ) => Promise<{ error: { message: string } | null; maskedEmail?: string }>;
   /** 手机号验证码登录 */
   signInWithPhone: (phone: string, code: string) => Promise<{ error: { message: string } | null }>;
   /** 邮箱验证码登录 */
@@ -355,6 +367,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [persistAuth, syncUserRole],
   );
 
+  // 绑定邮箱 + 登录密码（需验证码）
+  const bindAccountEmailFn = useCallback(
+    async (email: string, code: string, password: string) => {
+      const result = await bindAccountEmail({ email, code, password });
+      if (result.error) return { error: result.error };
+      setSession(result.session);
+      setProfile(result.profile);
+      persistAuth(result.profile, result.session);
+      syncUserRole(result.profile?.currentContext?.role || null);
+      return { error: null };
+    },
+    [persistAuth, syncUserRole],
+  );
+
+  const sendBindEmailCodeFn = useCallback(async (email: string) => {
+    return sendBindEmailCode(email);
+  }, []);
+
   // 登录：手机
   const signInWithPhone = useCallback(
     async (phone: string, code: string) => {
@@ -571,6 +601,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signInWithUsername,
       signInWithWechat,
       bindWechatPhone,
+      bindAccountEmail: bindAccountEmailFn,
+      sendBindEmailCode: sendBindEmailCodeFn,
       signInWithPhone,
       signInWithEmailCode,
       signUpStep1,
@@ -597,6 +629,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signInWithUsername,
       signInWithWechat,
       bindWechatPhone,
+      bindAccountEmailFn,
+      sendBindEmailCodeFn,
       signInWithPhone,
       signInWithEmailCode,
       signUpStep1,

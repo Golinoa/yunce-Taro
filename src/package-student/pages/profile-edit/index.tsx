@@ -14,7 +14,9 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useState } from 'react';
 import Avatar from '@/components/Avatar';
+import BindEmailSheet from '@/components/BindEmailSheet';
 import BottomSheet from '@/components/BottomSheet';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
@@ -97,9 +99,12 @@ function SelectValue({ value, placeholder }: { value?: string; placeholder: stri
 const ProfileEdit: React.FC = () => {
   useCardNavigationBar();
 
-  const { profile, getProfileExtra: fetchExtra, updateProfile: submitUpdate, signOut } = useAuth();
+  const { profile, getProfileExtra: fetchExtra, updateProfile: submitUpdate, signOut, bindAccountEmail, sendBindEmailCode } =
+    useAuth();
 
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
+  const [showBindEmail, setShowBindEmail] = useState(false);
+  const [bindingEmail, setBindingEmail] = useState(false);
 
   // ============================================
   // 个人资料表单
@@ -143,6 +148,26 @@ const ProfileEdit: React.FC = () => {
       setDraft((prev) => ({ ...prev, [key]: value }));
     },
     [],
+  );
+
+  const boundEmail = profile?.email?.trim() || '';
+  const handleBindEmail = useCallback(
+    async (payload: { email: string; code: string; password: string }) => {
+      if (bindingEmail) return;
+      setBindingEmail(true);
+      try {
+        const { error } = await bindAccountEmail(payload.email, payload.code, payload.password);
+        if (error) {
+          Taro.showToast({ title: error.message || '绑定失败', icon: 'none' });
+          return;
+        }
+        setShowBindEmail(false);
+        Taro.showToast({ title: '邮箱已绑定', icon: 'success' });
+      } finally {
+        setBindingEmail(false);
+      }
+    },
+    [bindAccountEmail, bindingEmail],
   );
 
   /** 个人头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与子女头像一致） */
@@ -304,6 +329,9 @@ const ProfileEdit: React.FC = () => {
     visible: boolean;
     type: 'gender' | 'relation' | 'childGender' | null;
   }>({ visible: false, type: null });
+  const [datePickerTarget, setDatePickerTarget] = useState<'birthday' | 'childBirthday' | null>(
+    null,
+  );
 
   /** 子女头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与个人头像一致） */
   const handleChildAvatarPick = useCallback(async () => {
@@ -360,43 +388,11 @@ const ProfileEdit: React.FC = () => {
     });
   }, []);
 
+  // 添加子女：家长不可自建档案，引导使用机构邀请码绑定
   const handleAddChild = useCallback(async () => {
-    if (!childForm.nickname.trim()) {
-      Taro.showToast({ title: '请填写昵称', icon: 'none' });
-      return;
-    }
-    if (!childForm.relation) {
-      Taro.showToast({ title: '请选择关系', icon: 'none' });
-      return;
-    }
-    if (!childForm.gender) {
-      Taro.showToast({ title: '请选择性别', icon: 'none' });
-      return;
-    }
-    setAdding(true);
-    try {
-      const created = await studentService.create({
-        name: childForm.nickname.trim(),
-        nickname: childForm.nickname.trim(),
-        relation: childForm.relation,
-        gender: childForm.gender as Gender,
-        birthday: childForm.birthday,
-        avatar_url: childForm.avatar_url.trim() || undefined,
-        parent_id: profile?.id,
-        teacher_id: '',
-        invite_code: `INV-${Date.now().toString().slice(-4).toUpperCase()}`,
-      });
-      setChildren((prev) => [created, ...prev]);
-      setChildStats((prev) => ({ ...prev, [created.id]: { lessonCount: 0, packageCount: 0 } }));
-      Taro.showToast({ title: '添加成功', icon: 'success' });
-      setShowAddSheet(false);
-      resetChildForm();
-    } catch {
-      Taro.showToast({ title: '添加失败，请重试', icon: 'none' });
-    } finally {
-      setAdding(false);
-    }
-  }, [childForm, resetChildForm, profile?.id]);
+    setShowAddSheet(false);
+    resetChildForm();
+  }, [resetChildForm]);
 
   return (
     <View className="min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]">
@@ -499,20 +495,29 @@ const ProfileEdit: React.FC = () => {
                 }
               />
               <FieldRow
-                label="生日"
+                label="绑定邮箱"
+                onClick={boundEmail ? undefined : () => setShowBindEmail(true)}
                 right={
-                  <Picker
-                    mode="date"
-                    start="1950-01-01"
-                    end={dayjs().format('YYYY-MM-DD')}
-                    value={draft.birthday}
-                    onChange={(e) => updateField('birthday', e.detail.value)}
-                  >
-                    <View className="flex items-center justify-end gap-[8rpx]">
-                      <SelectValue value={draft.birthday} placeholder="请选择生日" />
+                  boundEmail ? (
+                    <Text className="text-[30rpx] text-foreground truncate">{boundEmail}</Text>
+                  ) : (
+                    <View className="flex items-center gap-[8rpx]">
+                      <View className="rounded-full bg-primary/10 px-[24rpx] py-[8rpx]">
+                        <Text className="text-[26rpx] font-semibold text-primary">去绑定</Text>
+                      </View>
                       <RowArrow />
                     </View>
-                  </Picker>
+                  )
+                }
+              />
+              <FieldRow
+                label="生日"
+                onClick={() => setDatePickerTarget('birthday')}
+                right={
+                  <View className="flex items-center justify-end gap-[8rpx]">
+                    <SelectValue value={draft.birthday} placeholder="请选择生日" />
+                    <RowArrow />
+                  </View>
                 }
               />
               <FieldRow
@@ -662,7 +667,7 @@ const ProfileEdit: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* ====== 添加子女弹窗 ====== */}
+      {/* ====== 添加子女：引导邀请码绑定（禁止家长自建档案） ====== */}
       <BottomSheet
         visible={showAddSheet}
         title="添加子女"
@@ -671,113 +676,19 @@ const ProfileEdit: React.FC = () => {
         maxHeightLimit="75vh"
       >
         <View className="px-[32rpx] pb-[40rpx]">
-          {/* 头像：圆形上传元素（相册/拍照 1:1 裁剪，可重选/删除） */}
-          <FieldRow
-            label="头像"
-            onClick={handleChildAvatarClick}
-            right={
-              <View className="flex items-center gap-[8rpx]">
-                {childForm.avatar_url ? (
-                  <Avatar
-                    name={childForm.nickname || '子'}
-                    avatarUrl={childForm.avatar_url}
-                    size="md"
-                  />
-                ) : (
-                  <View className="w-[68rpx] h-[68rpx] rounded-full bg-primary-5 border-[2rpx] border-dashed border-primary/40 center">
-                    <Icon name="mdi-camera" size={28} color="primary" />
-                  </View>
-                )}
-                <RowArrow />
-              </View>
-            }
-          />
-          {/* 昵称 */}
-          <FieldRow
-            label={
-              <View className="flex items-center gap-[4rpx]">
-                <Text className="text-[28rpx] text-muted-foreground">昵称</Text>
-                <Text className="text-[28rpx] text-destructive">*</Text>
-              </View>
-            }
-            right={
-              <FormInput
-                variant="ghost"
-                placeholder="请输入"
-                value={childForm.nickname}
-                onInput={(e) =>
-                  setChildForm((prev) => ({ ...prev, nickname: e.detail.value || '' }))
-                }
-              />
-            }
-          />
-          {/* 关系 */}
-          <FieldRow
-            label={
-              <View className="flex items-center gap-[4rpx]">
-                <Text className="text-[28rpx] text-muted-foreground">关系</Text>
-                <Text className="text-[28rpx] text-destructive">*</Text>
-              </View>
-            }
-            right={
-              <View
-                className="flex items-center justify-end gap-[8rpx] press-scale"
-                onClick={() => setSelector({ visible: true, type: 'relation' })}
-              >
-                <SelectValue value={childForm.relation} placeholder="请选择" />
-                <RowArrow />
-              </View>
-            }
-          />
-          {/* 性别 */}
-          <FieldRow
-            label="性别"
-            right={
-              <View
-                className="flex items-center justify-end gap-[8rpx] press-scale"
-                onClick={() => setSelector({ visible: true, type: 'childGender' })}
-              >
-                <SelectValue
-                  value={childForm.gender ? GENDER_LABEL[childForm.gender] : undefined}
-                  placeholder="请选择"
-                />
-                <RowArrow />
-              </View>
-            }
-          />
-          {/* 生日 */}
-          <FieldRow
-            label="生日"
-            right={
-              <Picker
-                mode="date"
-                start="2000-01-01"
-                end={dayjs().format('YYYY-MM-DD')}
-                value={childForm.birthday}
-                onChange={(e) => setChildForm((prev) => ({ ...prev, birthday: e.detail.value }))}
-              >
-                <View className="flex items-center justify-end gap-[8rpx]">
-                  <SelectValue value={childForm.birthday} placeholder="请选择（选填）" />
-                  <RowArrow />
-                </View>
-              </Picker>
-            }
-          />
-
+          <Text className="text-[28rpx] text-muted-foreground leading-[1.6]">
+            添加孩子请向机构索取学员邀请码，在「我的」页使用邀请码绑定。家长不可自行建档。
+          </Text>
           <View
-            className={cn(
-              'h-[96rpx] rounded-2xl center press-scale mt-[24rpx]',
-              adding ? 'bg-muted' : 'bg-gradient-primary shadow-elegant',
-            )}
-            onClick={adding ? undefined : handleAddChild}
+            className="h-[96rpx] rounded-2xl center press-scale mt-[24rpx] bg-gradient-primary shadow-elegant"
+            onClick={() => void handleAddChild()}
           >
-            <Text className="text-[30rpx] font-semibold text-white">
-              {adding ? '添加中...' : '确认添加'}
-            </Text>
+            <Text className="text-[30rpx] font-semibold text-white">我知道了</Text>
           </View>
         </View>
       </BottomSheet>
 
+      {/* 统一弹窗选择器（PickerSheet 标准组件） */}
       {/* 统一弹窗选择器（PickerSheet 标准组件） */}
       <PickerSheet
         visible={selector.visible}
@@ -809,6 +720,33 @@ const ProfileEdit: React.FC = () => {
           }
           setSelector((prev) => ({ ...prev, visible: false }));
         }}
+      />
+
+      <DatePickerSheet
+        visible={Boolean(datePickerTarget)}
+        title="选择生日"
+        value={
+          datePickerTarget === 'childBirthday'
+            ? childForm.birthday || dayjs().format('YYYY-MM-DD')
+            : draft.birthday || dayjs().format('YYYY-MM-DD')
+        }
+        onClose={() => setDatePickerTarget(null)}
+        onConfirm={(date) => {
+          if (datePickerTarget === 'childBirthday') {
+            setChildForm((prev) => ({ ...prev, birthday: date }));
+          } else {
+            updateField('birthday', date);
+          }
+          setDatePickerTarget(null);
+        }}
+      />
+
+      <BindEmailSheet
+        visible={showBindEmail}
+        submitting={bindingEmail}
+        onClose={() => setShowBindEmail(false)}
+        onSendCode={sendBindEmailCode}
+        onSubmit={handleBindEmail}
       />
     </View>
   );

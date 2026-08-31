@@ -106,7 +106,7 @@ const Help: React.FC = () => {
           {/* 保留「还有疑问」提示 */}
           <View className="mt-[40rpx] flex flex-col items-center gap-[12rpx]">
             <Text className="text-[24rpx] text-muted-foreground leading-relaxed text-center whitespace-pre-line">
-              还有疑问？可联系你的门店，{'\n'}或到「我的 → 学员信箱」留言反馈
+              还有疑问？可联系你的门店反馈问题
             </Text>
             <View className="flex items-center gap-[8rpx] press-scale" onClick={handleFeedback}>
               <Icon name="mdi-message-plus-outline" size={28} color="primary" />

@@ -49,6 +49,8 @@ export interface TrialBookingViewProps {
   switchSheetVisible?: boolean;
   /** 关闭老师预约开关弹窗 */
   onSwitchSheetClose?: () => void;
+  /** 家长端：隐藏管理/代约/左滑，展示预约入口 */
+  isParent?: boolean;
 }
 
 type BookingTab = 'booking' | 'record';
@@ -147,8 +149,20 @@ const BookingRecordCard: React.FC<{
   cardId: string;
   openCardId?: string | null;
   onOpenChange?: (cardId: string | null) => void;
+  /** 家长端只读浏览，不展示代约与左滑操作 */
+  isParent?: boolean;
 }> = React.memo(
-  ({ booking, onProxy, onEdit, onCancel, onRestore, cardId, openCardId, onOpenChange }) => {
+  ({
+    booking,
+    onProxy,
+    onEdit,
+    onCancel,
+    onRestore,
+    cardId,
+    openCardId,
+    onOpenChange,
+    isParent = false,
+  }) => {
     const start = dayjs(`${booking.lesson_date} ${booking.start_time}`);
     const end = dayjs(`${booking.lesson_date} ${booking.end_time}`);
     const duration = end.diff(start, 'minute');
@@ -156,6 +170,87 @@ const BookingRecordCard: React.FC<{
     const statusMeta = BOOKING_STATUS_META[displayStatus];
     const difficultyMeta = DIFFICULTY_META[(booking.difficulty as DifficultyKey) || 'all'];
     const isCancelled = booking.status === 'cancelled';
+
+    const body = (
+      <View className="rounded-[24rpx] bg-white px-[28rpx] py-[24rpx] shadow-card">
+        <View className="flex items-center gap-[22rpx]">
+          <View className="flex flex-shrink-0 flex-col items-center gap-[16rpx]">
+            <ClassAvatar size="md" />
+            <Text className="text-[22rpx] text-muted-foreground">
+              {booking.teacher_name || '未分配老师'}
+            </Text>
+          </View>
+
+          <View className="min-w-0 flex-1">
+            <View className="flex items-center gap-[16rpx]">
+              <View className="title-divider-left" />
+              <Text className="flex-shrink-0 text-[34rpx] font-bold text-foreground">
+                {booking.course_name || '体验课'}
+              </Text>
+              <View className="title-divider-right" />
+            </View>
+
+            <View className="mt-[10rpx] flex items-center justify-center gap-[12rpx]">
+              <Text className="text-[26rpx] text-foreground">
+                {booking.start_time} - {booking.end_time}
+              </Text>
+              <Text className="text-[24rpx] text-muted-foreground">{duration}分钟</Text>
+              <View
+                className={cn(
+                  'center rounded-[8rpx] px-[12rpx] py-[4rpx]',
+                  difficultyMeta.badgeClassName,
+                )}
+              >
+                <Text className="text-center text-[20rpx] font-medium leading-none">
+                  {difficultyMeta.label}
+                </Text>
+              </View>
+            </View>
+
+            <View className="mt-[8rpx] flex justify-center">
+              <Text className={cn('text-[24rpx] font-medium', statusMeta.textClassName)}>
+                {statusMeta.label}
+              </Text>
+            </View>
+          </View>
+
+          {!isParent ? (
+            <View
+              className="flex flex-shrink-0 flex-col items-center justify-center gap-[6rpx]"
+              onClick={(e) => {
+                e.stopPropagation();
+                onProxy();
+              }}
+            >
+              <View className="center h-[68rpx] w-[68rpx] rounded-full bg-muted shadow-sm transition-all active:bg-muted-foreground/20">
+                <Icon name="mdi-plus" size={30} className="text-muted-foreground" />
+              </View>
+              <Text className="text-[20rpx] text-muted-foreground">代约</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
+
+    if (isParent) {
+      return (
+        <SwappableScheduleCard
+          radiusClassName="rounded-[24rpx]"
+          cardId={cardId}
+          openCardId={openCardId}
+          onOpenChange={onOpenChange}
+          actions={[
+            {
+              label: isCancelled ? '恢复' : '取消',
+              variant: isCancelled ? 'warning' : 'danger',
+              onClick: isCancelled ? onRestore : onCancel,
+            },
+          ]}
+        >
+          {body}
+        </SwappableScheduleCard>
+      );
+    }
 
     return (
       <SwappableScheduleCard
@@ -173,68 +268,7 @@ const BookingRecordCard: React.FC<{
           },
         ]}
       >
-        <View className="rounded-[24rpx] bg-white px-[28rpx] py-[24rpx] shadow-card">
-          <View className="flex items-center gap-[22rpx]">
-            {/* 左侧头像 + 老师名 */}
-            <View className="flex flex-shrink-0 flex-col items-center gap-[16rpx]">
-              <ClassAvatar size="md" />
-              <Text className="text-[22rpx] text-muted-foreground">
-                {booking.teacher_name || '未分配老师'}
-              </Text>
-            </View>
-
-            {/* 中间信息区 */}
-            <View className="min-w-0 flex-1">
-              {/* 课程标题居中，两侧渐变灰色横线 */}
-              <View className="flex items-center gap-[16rpx]">
-                <View className="title-divider-left" />
-                <Text className="flex-shrink-0 text-[34rpx] font-bold text-foreground">
-                  {booking.course_name || '体验课'}
-                </Text>
-                <View className="title-divider-right" />
-              </View>
-
-              {/* 时间、时长、难度居中 */}
-              <View className="mt-[10rpx] flex items-center justify-center gap-[12rpx]">
-                <Text className="text-[26rpx] text-foreground">
-                  {booking.start_time} - {booking.end_time}
-                </Text>
-                <Text className="text-[24rpx] text-muted-foreground">{duration}分钟</Text>
-                <View
-                  className={cn(
-                    'center rounded-[8rpx] px-[12rpx] py-[4rpx]',
-                    difficultyMeta.badgeClassName,
-                  )}
-                >
-                  <Text className="text-center text-[20rpx] font-medium leading-none">
-                    {difficultyMeta.label}
-                  </Text>
-                </View>
-              </View>
-
-              {/* 状态文字居中 */}
-              <View className="mt-[8rpx] flex justify-center">
-                <Text className={cn('text-[24rpx] font-medium', statusMeta.textClassName)}>
-                  {statusMeta.label}
-                </Text>
-              </View>
-            </View>
-
-            {/* 右侧代约按钮：灰色圆形底色 */}
-            <View
-              className="flex flex-shrink-0 flex-col items-center justify-center gap-[6rpx]"
-              onClick={(e) => {
-                e.stopPropagation();
-                onProxy();
-              }}
-            >
-              <View className="center h-[68rpx] w-[68rpx] rounded-full bg-muted shadow-sm transition-all active:bg-muted-foreground/20">
-                <Icon name="mdi-plus" size={30} className="text-muted-foreground" />
-              </View>
-              <Text className="text-[20rpx] text-muted-foreground">代约</Text>
-            </View>
-          </View>
-        </View>
+        {body}
       </SwappableScheduleCard>
     );
   },
@@ -247,6 +281,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
   refreshKey,
   switchSheetVisible = false,
   onSwitchSheetClose,
+  isParent = false,
 }) => {
   const { profile } = useAuth();
   const [selectedDate, setSelectedDate] = useState(initialDate ? dayjs(initialDate) : dayjs());
@@ -267,10 +302,13 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
     if (!campusId) return;
     setLoading(true);
     try {
+      const slotTeacherId = isParent ? undefined : initialTeacherId || currentUserId;
       const [teacherList, slotList, bookingList] = await Promise.all([
         teacherService.getList(),
-        leadService.getTrialSlotConfigs(initialTeacherId || currentUserId, campusId),
-        leadService.getLeadBookingsByTeacher(initialTeacherId || currentUserId),
+        leadService.getTrialSlotConfigs(slotTeacherId, campusId),
+        isParent
+          ? leadService.getLeadBookingsByCampus(campusId)
+          : leadService.getLeadBookingsByTeacher(initialTeacherId || currentUserId),
       ]);
       setTeachers(teacherList);
       setSlots(slotList);
@@ -295,7 +333,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [campusId, currentUserId, initialTeacherId]);
+  }, [campusId, currentUserId, initialTeacherId, isParent]);
 
   useEffect(() => {
     if (initialDate) {
@@ -368,6 +406,13 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
     // 进入老师时段管理页面（或底部弹窗），当前先跳转新建/编辑页
     void Taro.navigateTo({
       url: `/package-lead/pages/trial-slot-config/index?teacherId=${encodeURIComponent(teacherId)}`,
+    });
+  }, []);
+
+  const handleParentBookTeacher = useCallback((teacherId: string) => {
+    // 家长端进入同一时段页选时预约；不展示教师端管理入口文案
+    void Taro.navigateTo({
+      url: `/package-lead/pages/trial-slot-config/index?teacherId=${encodeURIComponent(teacherId)}&from=parent`,
     });
   }, []);
 
@@ -469,9 +514,15 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
                   <View className="flex items-center gap-[12rpx]">
                     <View
                       className="center h-[64rpx] rounded-full bg-primary px-[32rpx] active:opacity-80"
-                      onClick={() => handleManageTeacher(teacher.id)}
+                      onClick={() =>
+                        isParent
+                          ? handleParentBookTeacher(teacher.id)
+                          : handleManageTeacher(teacher.id)
+                      }
                     >
-                      <Text className="text-[26rpx] font-medium text-white">管理</Text>
+                      <Text className="text-[26rpx] font-medium text-white">
+                        {isParent ? '预约' : '管理'}
+                      </Text>
                     </View>
                     <Icon name="mdi-chevron-right" size={28} className="text-muted-foreground" />
                   </View>
@@ -482,7 +533,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
         </View>
       );
     },
-    [getTeachersWithSlots, handleManageTeacher, loading],
+    [getTeachersWithSlots, handleManageTeacher, handleParentBookTeacher, isParent, loading],
   );
 
   const renderRecordList = useCallback(
@@ -511,6 +562,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
               openCardId={openCardId}
               onOpenChange={setOpenCardId}
               booking={booking}
+              isParent={isParent}
               onProxy={() => handleProxyBooking(booking.id)}
               onEdit={() => handleEditBooking(booking.id)}
               onCancel={() => handleCancelBooking(booking.id)}
@@ -526,6 +578,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
       handleEditBooking,
       handleProxyBooking,
       handleRestoreBooking,
+      isParent,
       loading,
       openCardId,
     ],
@@ -554,13 +607,15 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
         )}
       </CalendarSwiper>
 
-      {/* 老师预约开关弹窗：直接复用本组件已加载的 teachers，保证数据来源统一 */}
-      <TeacherBookingSwitchSheet
-        visible={switchSheetVisible}
-        onClose={() => onSwitchSheetClose?.()}
-        teachers={teachers}
-        onChange={() => setSwitchVersion((v) => v + 1)}
-      />
+      {/* 老师预约开关弹窗：仅机构端 */}
+      {!isParent ? (
+        <TeacherBookingSwitchSheet
+          visible={switchSheetVisible}
+          onClose={() => onSwitchSheetClose?.()}
+          teachers={teachers}
+          onChange={() => setSwitchVersion((v) => v + 1)}
+        />
+      ) : null}
     </View>
   );
 };

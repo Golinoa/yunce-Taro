@@ -27,7 +27,7 @@
   "id": "alert-recharge-stu-001",
   "title": "「小明」课时续费提醒",
   "desc": "剩余 3 课时 · 请尽快跟进续费",
-  "url": "/package-course/pages/recharge-records/index",
+  "url": "/package-student/pages/student-detail/index?id=stu-001",
   "level": "urgent",
   "category": "studentRecharge",
   "actionLabel": "完成",
@@ -153,14 +153,21 @@ POST /todos
 
 → `data`: `TodoDto`（`sourceType=custom`）
 
-### 2.3 更新自定义待办
+### 2.3 更新待办
 
 ```
 PUT /todos/:todoId
 ```
 
-Body 同创建（部分字段）；仅 `custom-todo-*` 可改。  
+Body 同创建（部分字段）。
+
+- `custom-todo-*`：全量可改（仅创建者）。
+- `alert-recharge-{studentId}`：**仅** `collaboratorIds` / `collaborationMode` 可改（机构共享覆盖；系统漏拉参与人时可手动补齐）。
+- 其它系统待办：不可编辑。
+
 → `data`: `TodoDto`
+
+续费默认参与人：学员负责老师 + 校区校长 + 机构管理员；「去处理」`url` 为学员详情页。
 
 ### 2.4 删除自定义待办
 

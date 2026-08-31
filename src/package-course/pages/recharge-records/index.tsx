@@ -2,10 +2,11 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useLoad } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import StudentAvatar from '@/components/student/StudentAvatar';
+import { usePagedQuery } from '@/hooks/usePagedQuery';
 import { packageService } from '@/services';
 import type { PackageTransaction } from '@/types/course-package';
 import { useAuth } from '@/utils/auth';
@@ -20,6 +21,8 @@ const FEE_METHOD_LABEL: Record<string, string> = {
   other: '其他',
 };
 
+const PAGE_SIZE = 30;
+
 /** 格式化日期 */
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -28,6 +31,15 @@ function formatDate(dateStr: string): string {
   const hour = String(d.getHours()).padStart(2, '0');
   const minute = String(d.getMinutes()).padStart(2, '0');
   return `${month}-${day} ${hour}:${minute}`;
+}
+
+/** 金额最小为 0，不允许空 */
+function resolveAmount(record: PackageTransaction): number {
+  const raw =
+    record.type === 'refund'
+      ? record.refund_amount ?? record.fee_amount
+      : record.fee_amount ?? record.refund_amount;
+  return Math.max(0, Number(raw) || 0);
 }
 
 type TransactionFilterType = 'all' | 'recharge' | 'refund';
@@ -121,43 +133,58 @@ const LocalFilterBar: React.FC<LocalFilterBarProps> = ({
 /**
  * RechargeRecordsPage - 课包流水列表页
  *
- * 使用场景：查看所有学员的课包充值/退费流水
- * 功能：按时间倒序展示、按学员和类型筛选
+ * 首屏 30 条 + 触底/按钮续拉，避免一次拉全量给服务器带来压力。
  */
 const RechargeRecordsPage: React.FC = () => {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
 
-  const [records, setRecords] = useState<PackageTransaction[]>([]);
-  const { loading, setLoading } = useDelayedLoading();
   const [filterStudentId, setFilterStudentId] = useState('');
   const [typeFilter, setTypeFilter] = useState<TransactionFilterType>('all');
   const [routeStudentId, setRouteStudentId] = useState('');
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null);
+  const [studentOptions, setStudentOptions] = useState<Array<{ id: string; name: string }>>([]);
 
-  // 学员列表（从记录中提取去重）
-  const studentOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    records.forEach((r) => {
-      if (!map.has(r.student_id)) {
-        map.set(r.student_id, r.student_name);
+  const queryStudentId = routeStudentId || filterStudentId || undefined;
+
+  const fetcher = useCallback(
+    async (page: number, pageSize: number) => {
+      if (!currentUserId) {
+        return { list: [] as PackageTransaction[], pagination: { page, pageSize, total: 0, totalPages: 1 } };
       }
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [records]);
+      return packageService.getTransactions(currentUserId, {
+        studentId: queryStudentId,
+        page,
+        pageSize,
+      });
+    },
+    [currentUserId, queryStudentId],
+  );
 
-  // 筛选后的记录
+  const { list, total, loading, loadingMore, hasMore, reload, loadMore } =
+    usePagedQuery<PackageTransaction>({
+      pageSize: PAGE_SIZE,
+      fetcher,
+      enabled: Boolean(currentUserId),
+    });
+
+  // 累积学员筛选项（随分页追加）
+  useEffect(() => {
+    setStudentOptions((prev) => {
+      const map = new Map(prev.map((s) => [s.id, s.name]));
+      list.forEach((r) => {
+        if (!map.has(r.student_id)) {
+          map.set(r.student_id, r.student_name);
+        }
+      });
+      return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    });
+  }, [list]);
+
   const filteredRecords = useMemo(() => {
-    return records.filter((record) => {
-      if (filterStudentId && record.student_id !== filterStudentId) {
-        return false;
-      }
-      if (typeFilter !== 'all' && record.type !== typeFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [records, filterStudentId, typeFilter]);
+    if (typeFilter === 'all') return list;
+    return list.filter((record) => record.type === typeFilter);
+  }, [list, typeFilter]);
 
   const filterConfigs = useMemo(() => {
     const filters: Array<{
@@ -194,20 +221,6 @@ const RechargeRecordsPage: React.FC = () => {
     return filters;
   }, [filterStudentId, routeStudentId, studentOptions, typeFilter]);
 
-  // 加载数据
-  const fetchRecords = useCallback(async () => {
-    if (!currentUserId) return;
-    try {
-      setLoading(true);
-      const data = await packageService.getTransactions(currentUserId, routeStudentId || undefined);
-      setRecords(data);
-    } catch {
-      Taro.showToast({ title: '加载失败', icon: 'none' });
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUserId, routeStudentId]);
-
   useLoad(() => {
     const params = Taro.getCurrentInstance().router?.params || {};
     const studentId = decodeURIComponent(params.studentId || '');
@@ -216,8 +229,11 @@ const RechargeRecordsPage: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchRecords();
-  }, [fetchRecords]);
+    if (!currentUserId) return;
+    void reload().catch(() => {
+      Taro.showToast({ title: '加载失败', icon: 'none' });
+    });
+  }, [currentUserId, queryStudentId, reload]);
 
   const handleFilterToggle = useCallback((id: string) => {
     setActiveFilterId((prev) => (prev === id ? null : id));
@@ -227,15 +243,19 @@ const RechargeRecordsPage: React.FC = () => {
     if (id === 'student') {
       setFilterStudentId(value === 'all' ? '' : value);
     }
-
     if (id === 'type') {
       setTypeFilter(value as TransactionFilterType);
     }
-
     setActiveFilterId(null);
   }, []);
 
-  if (loading) {
+  const handleLoadMore = useCallback(() => {
+    void loadMore().catch(() => {
+      Taro.showToast({ title: '加载失败', icon: 'none' });
+    });
+  }, [loadMore]);
+
+  if (loading && list.length === 0) {
     return (
       <PageContainer>
         <View className="flex items-center justify-center pt-[200rpx]">
@@ -246,8 +266,7 @@ const RechargeRecordsPage: React.FC = () => {
   }
 
   return (
-    <View className="min-h-screen bg-f5faf8">
-      {/* 筛选栏 */}
+    <View className="min-h-screen bg-f5faf8 pb-[80rpx]">
       <View className="px-[32rpx] relative z-10 pt-[20rpx]">
         <LocalFilterBar
           filters={filterConfigs}
@@ -257,7 +276,6 @@ const RechargeRecordsPage: React.FC = () => {
         />
       </View>
 
-      {/* 记录列表 */}
       {filteredRecords.length === 0 ? (
         <View className="px-[32rpx] pt-[32rpx]">
           <Empty description="暂无课包流水" />
@@ -267,125 +285,132 @@ const RechargeRecordsPage: React.FC = () => {
           className="px-[32rpx] py-[24rpx] flex flex-col gap-[20rpx]"
           onClick={() => setActiveFilterId(null)}
         >
-          {filteredRecords.map((record) => (
-            <View
-              key={record.id}
-              className={cn(
-                'rounded-[24rpx] p-[32rpx] shadow-soft border',
-                record.type === 'refund'
-                  ? 'bg-[#f4f5f7] border-[#e5e7eb]'
-                  : 'bg-card border-transparent',
-              )}
-            >
-              {/* 顶部：学员名 + 时间 */}
-              <View className="flex items-center justify-between mb-[16rpx]">
-                <View className="flex items-center gap-[12rpx]">
-                  <View
-                    className={cn(
-                      'w-[48rpx] h-[48rpx] rounded-full flex items-center justify-center',
-                      record.type === 'refund' ? 'bg-[#e5e7eb]' : 'bg-primary-15',
-                    )}
-                  >
-                    <Text
-                      className={cn(
-                        'text-[24rpx] font-bold',
-                        record.type === 'refund' ? 'text-[#6b7280]' : 'text-primary',
-                      )}
-                    >
-                      {record.student_name[0]}
-                    </Text>
-                  </View>
-                  <Text
-                    className={cn(
-                      'text-[28rpx] font-semibold',
-                      record.type === 'refund' ? 'text-[#4b5563]' : 'text-foreground',
-                    )}
-                  >
-                    {record.student_name}
-                  </Text>
-                  <View
-                    className={cn(
-                      'rounded-full px-[16rpx] py-[6rpx]',
-                      record.type === 'refund' ? 'bg-[#e5e7eb]' : 'bg-primary-bg',
-                    )}
-                  >
-                    <Text
-                      className={cn(
-                        'text-[20rpx] font-semibold',
-                        record.type === 'refund' ? 'text-[#6b7280]' : 'text-primary',
-                      )}
-                    >
-                      {record.type === 'refund' ? '退费' : '充值'}
-                    </Text>
-                  </View>
-                </View>
-                <Text className="text-[22rpx] text-muted-foreground">
-                  {formatDate(record.created_at)}
-                </Text>
-              </View>
-
-              {/* 课包名 */}
-              <Text
+          {filteredRecords.map((record) => {
+            const amount = resolveAmount(record);
+            const methodKey = record.fee_method || 'other';
+            return (
+              <View
+                key={record.id}
                 className={cn(
-                  'text-[26rpx] block mb-[16rpx]',
-                  record.type === 'refund' ? 'text-[#6b7280]' : 'text-muted-foreground',
+                  'rounded-[24rpx] p-[32rpx] shadow-soft border press-scale',
+                  record.type === 'refund'
+                    ? 'bg-[#f4f5f7] border-[#e5e7eb]'
+                    : 'bg-card border-transparent',
                 )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!record.student_id) return;
+                  void Taro.navigateTo({
+                    url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(record.student_id)}`,
+                  });
+                }}
               >
-                {record.package_name}
-              </Text>
-
-              {/* 底部：课时 / 原因 + 金额 */}
-              <View className="flex items-start justify-between gap-[24rpx]">
-                <View className="flex flex-1 flex-wrap items-center gap-[16rpx]">
-                  {record.type === 'recharge' && (
-                    <>
-                      <View className="py-[6rpx] px-[20rpx] rounded-md bg-primary-15">
-                        <Text className="text-[22rpx] font-semibold text-primary">
-                          充值 {record.purchased_hours || 0}课时
-                        </Text>
-                      </View>
-                      {(record.gift_hours || 0) > 0 && (
-                        <View className="py-[6rpx] px-[20rpx] rounded-md bg-success-15">
-                          <Text className="text-[22rpx] font-semibold text-success">
-                            +{record.gift_hours}赠送
-                          </Text>
-                        </View>
+                <View className="flex items-center justify-between mb-[16rpx]">
+                  <View className="flex items-center gap-[12rpx] min-w-0">
+                    <StudentAvatar
+                      name={record.student_name}
+                      src={record.student_avatar}
+                      size="sm"
+                    />
+                    <Text
+                      className={cn(
+                        'text-[28rpx] font-semibold truncate',
+                        record.type === 'refund' ? 'text-[#4b5563]' : 'text-foreground',
                       )}
-                    </>
-                  )}
-                  {record.type === 'refund' && (
-                    <Text className="text-[24rpx] text-[#6b7280]">
-                      原因：{record.reason || '无'}
+                    >
+                      {record.student_name}
                     </Text>
-                  )}
-                </View>
-                <View className="flex items-center gap-[8rpx]">
-                  {(record.refund_amount != null || record.fee_amount != null) &&
-                    Number(record.refund_amount || record.fee_amount || 0) > 0 && (
+                    <View
+                      className={cn(
+                        'rounded-full px-[16rpx] py-[6rpx] flex-shrink-0',
+                        record.type === 'refund' ? 'bg-[#e5e7eb]' : 'bg-primary-bg',
+                      )}
+                    >
                       <Text
                         className={cn(
-                          'text-[30rpx] font-bold',
-                          record.type === 'refund' ? 'text-[#6b7280]' : 'text-foreground',
+                          'text-[20rpx] font-semibold',
+                          record.type === 'refund' ? 'text-[#6b7280]' : 'text-primary',
                         )}
                       >
-                        {record.type === 'refund' ? '-' : ''}¥
-                        {Number(record.refund_amount || record.fee_amount || 0)}
+                        {record.type === 'refund' ? '退费' : '充值'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="text-[22rpx] text-muted-foreground flex-shrink-0 ml-[12rpx]">
+                    {formatDate(record.created_at)}
+                  </Text>
+                </View>
+
+                <Text
+                  className={cn(
+                    'text-[26rpx] block mb-[16rpx]',
+                    record.type === 'refund' ? 'text-[#6b7280]' : 'text-muted-foreground',
+                  )}
+                >
+                  {record.package_name}
+                </Text>
+
+                <View className="flex items-start justify-between gap-[24rpx]">
+                  <View className="flex flex-1 flex-wrap items-center gap-[16rpx]">
+                    {record.type === 'recharge' && (
+                      <>
+                        <View className="py-[6rpx] px-[20rpx] rounded-md bg-primary-15">
+                          <Text className="text-[22rpx] font-semibold text-primary">
+                            充值 {record.purchased_hours || 0}课时
+                          </Text>
+                        </View>
+                        {(record.gift_hours || 0) > 0 && (
+                          <View className="py-[6rpx] px-[20rpx] rounded-md bg-success-15">
+                            <Text className="text-[22rpx] font-semibold text-success">
+                              +{record.gift_hours}赠送
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                    {record.type === 'refund' && (
+                      <Text className="text-[24rpx] text-[#6b7280]">
+                        原因：{record.reason || '无'}
                       </Text>
                     )}
-                  {record.fee_method && (
+                  </View>
+                  <View className="flex flex-col items-end gap-[4rpx] flex-shrink-0">
                     <Text className="text-[20rpx] text-muted-foreground">
-                      {FEE_METHOD_LABEL[record.fee_method] || record.fee_method}
+                      {FEE_METHOD_LABEL[methodKey] || methodKey}
                     </Text>
-                  )}
+                    <Text
+                      className={cn(
+                        'text-[30rpx] font-bold',
+                        record.type === 'refund' ? 'text-[#6b7280]' : 'text-foreground',
+                      )}
+                    >
+                      {record.type === 'refund' ? '-' : ''}¥{amount}
+                    </Text>
+                  </View>
                 </View>
+                {record.operator_name && (
+                  <Text className="mt-[16rpx] block text-[22rpx] text-muted-foreground">
+                    操作人：{record.operator_name}
+                  </Text>
+                )}
               </View>
-              {record.operator_name && (
-                <Text className="mt-[16rpx] block text-[22rpx] text-muted-foreground">
-                  操作人：{record.operator_name}
-                </Text>
-              )}
+            );
+          })}
+
+          {hasMore ? (
+            <View
+              className="mt-[8rpx] rounded-[18rpx] py-[20rpx] flex items-center justify-center bg-muted active:opacity-70"
+              onClick={handleLoadMore}
+            >
+              <Text className="text-[26rpx] text-muted-foreground">
+                {loadingMore ? '加载中...' : `加载更多（${list.length}/${total}）`}
+              </Text>
             </View>
-          ))}
+          ) : (
+            <View className="mt-[8rpx] flex items-center justify-center py-[12rpx]">
+              <Text className="text-[22rpx] text-muted-foreground">共 {total} 条流水</Text>
+            </View>
+          )}
         </View>
       )}
     </View>

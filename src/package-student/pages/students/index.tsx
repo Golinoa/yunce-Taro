@@ -9,12 +9,14 @@ import LeadCard from '@/components/lead/LeadCard';
 import MemberActionSheet from '@/components/student/MemberActionSheet';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
+import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
 import { useStudentStore } from '@/stores';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFilterTab } from '@/types/lead';
 import type { Student, StudentSort, PackageTag } from '@/types/student';
 import { SORT_OPTIONS } from '@/types/student';
+import { syncAlertThresholdFromCampus } from '@/utils/alert-config';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import {
   getStudentCardStatus,
@@ -25,8 +27,8 @@ import {
   generatePackageTags,
 } from '@/utils/hours-status';
 import { logError } from '@/utils/logger';
+import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
-import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 /** 顶部 Tab 类型 */
 type MainTab = 'member' | 'lead';
@@ -74,25 +76,11 @@ const Students: React.FC = () => {
   const { profile, session } = useAuth();
   const isTeacher = isStaffRole(profile?.currentContext?.role);
 
-  // ====== 导航栏高度 ======
-  const navSafeHeight = useNavSafeHeight();
-  const [statusBarHeight, setStatusBarHeight] = useState(44);
-  const [navPaddingRight, setNavPaddingRight] = useState(0);
-  useEffect(() => {
-    const windowInfo = Taro.getWindowInfo();
-    setStatusBarHeight(windowInfo.statusBarHeight || 44);
-    // 计算右侧留白：屏幕宽度 - 胶囊左边界 = 搜索框右侧需预留的空间
-    try {
-      const menuButton = Taro.getMenuButtonBoundingClientRect();
-      const screenWidth = windowInfo.windowWidth || 375;
-      const rightSpace = screenWidth - menuButton.left + 4; // 4px额外间距
-      setNavPaddingRight(Math.max(rightSpace, 0));
-    } catch {
-      setNavPaddingRight(0);
-    }
-  }, []);
-  const canGoBack = Taro.getCurrentPages().length > 1;
-  const NAV_BAR_HEIGHT = 40; // 紧凑导航栏高度
+  // 导航栏与「我的」/数据页同款弥散渐变顶部色无缝衔接
+  useThemedNavigationBar((themeHex) => ({
+    backgroundColor: themeHex.primarySoftBg,
+    frontColor: '#000000',
+  }));
 
   // ====== 主 Tab 状态 ======
   const [mainTab, setMainTab] = useState<MainTab>('member');
@@ -106,6 +94,24 @@ const Students: React.FC = () => {
   const [sortOpen, setSortOpen] = useState(false);
 
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
+
+  // 同步当前校区课时预警阈值（卡片黄标依赖）
+  useEffect(() => {
+    const campusId = profile?.currentContext?.campusId;
+    if (!campusId) return;
+    void campusService
+      .getById(campusId)
+      .then((campus) => {
+        if (campus) {
+          syncAlertThresholdFromCampus({
+            hoursAlertThreshold: campus.hoursAlertThreshold,
+            daysAlertThreshold: campus.daysAlertThreshold,
+            amountAlertThreshold: campus.amountAlertThreshold,
+          });
+        }
+      })
+      .catch((err) => logError('sync alert threshold', err));
+  }, [profile?.currentContext?.campusId]);
 
   // 加载学员列表
   const loadStudents = useCallback(async () => {
@@ -375,40 +381,11 @@ const Students: React.FC = () => {
   }, []);
 
   return (
-    <View className="min-h-screen bg-[#f3f2ed] flex flex-col">
-      {/* ====== 固定自定义导航栏（紧凑：仅返回 + 标题） ====== */}
-      <View
-        className="fixed top-0 left-0 right-0 z-50 bg-gradient-primary"
-        style={{ paddingTop: `${statusBarHeight}px` }}
-      >
-        <View
-          className="flex items-center justify-center relative"
-          style={{
-            height: `${NAV_BAR_HEIGHT}px`,
-            paddingRight: navPaddingRight ? `${navPaddingRight}px` : undefined,
-          }}
-        >
-          {/* 返回按钮 */}
-          {canGoBack && (
-            <View
-              className="absolute left-0 flex items-center justify-center w-[44px] h-full"
-              onClick={() => Taro.navigateBack()}
-            >
-              <Icon name="mdi-chevron-left" size={32} className="text-white" />
-            </View>
-          )}
-          <Text className="text-[32rpx] font-semibold text-white">会员</Text>
-        </View>
-      </View>
-
-      {/* ====== 渐变头部（仅搜索框 + 排序） ====== */}
-      <View
-        className="bg-gradient-primary px-[32rpx] py-[18rpx] flex-shrink-0"
-        style={{ paddingTop: `${navSafeHeight + NAV_BAR_HEIGHT + 18}px` }}
-      >
-        {/* 搜索框 + 排序按钮 */}
-        <View className="flex items-center gap-[16rpx]">
-          <View className="flex-1 rounded-full px-[24rpx] py-[12rpx] flex items-center gap-[10rpx] bg-white/90">
+    <View className="min-h-screen bg-background flex flex-col">
+      {/* ====== 搜索栏紧贴原生导航（同「我的」/数据页弥散渐变） ====== */}
+      <View className="bg-gradient-diffuse-top px-[32rpx] pt-[16rpx] pb-[20rpx] flex-shrink-0 relative overflow-hidden">
+        <View className="flex items-center gap-[16rpx] relative z-10">
+          <View className="flex-1 rounded-full px-[24rpx] py-[12rpx] flex items-center gap-[10rpx] bg-card/90 shadow-card">
             <Icon name="mdi-magnify" size={20} color="#9ca3af" />
             <Input
               className="flex-1 text-[26rpx] text-foreground"
@@ -431,15 +408,15 @@ const Students: React.FC = () => {
           <View className="relative flex-shrink-0">
             <View
               className={cn(
-                'flex items-center gap-[6rpx] px-[20rpx] py-[14rpx] rounded-full bg-white/20',
-                sortBy !== 'default' ? 'text-white font-semibold' : 'text-white/90',
+                'flex items-center gap-[6rpx] px-[20rpx] py-[14rpx] rounded-full bg-card/80 shadow-card',
+                sortBy !== 'default' ? 'text-primary font-semibold' : 'text-foreground-secondary',
               )}
               onClick={toggleSort}
             >
               <Text className="text-[24rpx]">
                 {SORT_OPTIONS.find((o) => o.value === sortBy)?.label || '排序'}
               </Text>
-              <Icon name="mdi-chevron-down" size={24} color="white" />
+              <Icon name="mdi-chevron-down" size={24} color="muted" />
             </View>
             {sortOpen && (
               <View className="absolute top-full right-0 mt-[12rpx] bg-white rounded-[24rpx] shadow-float py-[12rpx] min-w-[240rpx] z-100">
@@ -594,7 +571,6 @@ const Students: React.FC = () => {
                   key={student.id}
                   className={cn(
                     'bg-white rounded-[32rpx] p-[32rpx] shadow-soft mb-[24rpx] press-scale',
-                    'border-l-[6rpx] border-solid',
                     borderColorClass,
                   )}
                   onClick={() => goToDetail(student.id)}
@@ -602,11 +578,18 @@ const Students: React.FC = () => {
                   {/* 上部：头像 + 信息 + 课时 */}
                   <View className="flex items-center gap-[24rpx]">
                     {/* 头像 */}
-                    <StudentAvatar name={student.name} size="md" />
+                    <StudentAvatar name={student.name} src={student.avatar_url} size="md" />
                     {/* 信息 */}
                     <View className="flex-1 min-w-0">
-                      <Text className="text-[32rpx] font-bold text-foreground">{student.name}</Text>
+                      <Text className="text-[32rpx] font-semibold text-foreground">{student.name}</Text>
+                      {(student.nickname || student.phone || student.birthday) && (
                       <View className="flex items-center gap-[12rpx] mt-[4rpx]">
+                        {student.nickname ? (
+                          <Text className="text-[24rpx] text-muted-foreground">{student.nickname}</Text>
+                        ) : null}
+                        {student.nickname && student.phone ? (
+                          <View className="w-[6rpx] h-[6rpx] rounded-full bg-muted-foreground/40" />
+                        ) : null}
                         {student.phone && (
                           <>
                             <Text className="text-[24rpx] text-muted-foreground">
@@ -619,6 +602,7 @@ const Students: React.FC = () => {
                           {student.birthday || '暂无生日'}
                         </Text>
                       </View>
+                      )}
                     </View>
                     {/* 课时 */}
                     <View className="flex items-center gap-[16rpx] flex-shrink-0">
@@ -681,10 +665,18 @@ const Students: React.FC = () => {
                     </View>
                   )}
 
-                  {/* 课时不足/欠课 → 去充值 */}
-                  {(cardStatus === 'low' || cardStatus === 'owe') && (
+                  {/* 课时不足 / 无可用课包 → 去充值 */}
+                  {(cardStatus === 'low' ||
+                    cardStatus === 'expiring' ||
+                    cardStatus === 'expired' ||
+                    cardStatus === 'owe') && (
                     <View
-                      className="mt-[20rpx] flex items-center justify-between px-[20rpx] py-[16rpx] rounded-[16rpx] bg-warning/10"
+                      className={cn(
+                        'mt-[20rpx] flex items-center justify-between px-[20rpx] py-[16rpx] rounded-[16rpx]',
+                        cardStatus === 'expired' || cardStatus === 'owe'
+                          ? 'bg-destructive/10'
+                          : 'bg-warning/10',
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         Taro.navigateTo({
@@ -692,11 +684,40 @@ const Students: React.FC = () => {
                         });
                       }}
                     >
-                      <Text className="text-[24rpx] text-warning">
-                        {cardStatus === 'owe' ? '课时透支，请尽快充值' : '课时不足，建议充值'}
+                      <Text
+                        className={cn(
+                          'text-[24rpx]',
+                          cardStatus === 'expired' || cardStatus === 'owe'
+                            ? 'text-destructive'
+                            : 'text-warning',
+                        )}
+                      >
+                        {cardStatus === 'expired'
+                          ? '暂无可用课包，请尽快充值'
+                          : cardStatus === 'owe'
+                            ? '课时透支，请尽快充值'
+                            : cardStatus === 'expiring'
+                              ? '课包即将到期，建议续费'
+                              : '课时不足，建议充值'}
                       </Text>
-                      <View className="px-[20rpx] py-[8rpx] rounded-full bg-warning/20">
-                        <Text className="text-[24rpx] text-warning font-medium">去充值</Text>
+                      <View
+                        className={cn(
+                          'px-[20rpx] py-[8rpx] rounded-full',
+                          cardStatus === 'expired' || cardStatus === 'owe'
+                            ? 'bg-destructive/20'
+                            : 'bg-warning/20',
+                        )}
+                      >
+                        <Text
+                          className={cn(
+                            'text-[24rpx] font-medium',
+                            cardStatus === 'expired' || cardStatus === 'owe'
+                              ? 'text-destructive'
+                              : 'text-warning',
+                          )}
+                        >
+                          去充值
+                        </Text>
                       </View>
                     </View>
                   )}

@@ -149,7 +149,7 @@ const ForgotPasswordPage: React.FC = () => {
         <View className="rotate-login-slogan">
           <View className="flex flex-row items-start gap-[16rpx]">
             <Text className="text-[56rpx] font-bold text-primary tracking-[4rpx] leading-[1.08]">
-              智能教务
+              智慧教务
             </Text>
             <View className="relative w-[64rpx] h-[64rpx] mt-[-4rpx] flex-shrink-0">
               <View className="absolute left-[8rpx] bottom-[-4rpx] w-[20rpx] h-[20rpx] bg-login-bubble rounded-[4rpx_0_16rpx_0] rotate-[28deg]" />

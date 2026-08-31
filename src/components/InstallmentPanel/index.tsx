@@ -1,23 +1,31 @@
-import { View, Input } from '@tarojs/components';
+import { View, Input, Text } from '@tarojs/components';
+import dayjs from 'dayjs';
 import cn from 'classnames';
-import React, { useCallback } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import ChipPicker from '../ChipPicker';
+import {
+  buildInstallmentSchedule,
+  getPeriodOptions,
+  type ScheduleItem,
+} from './installment-utils';
+
+export type { ScheduleItem } from './installment-utils';
+export { buildInstallmentSchedule, getPeriodOptions } from './installment-utils';
 
 /**
- * InstallmentPanel - 分期付款面板组件
+ * InstallmentPanel - 分期付款面板
+ * 期数变更时按「今天 + (期号-1) 个月」自动填到期日；日期可点开底部选择器修改。
  *
- * 对齐设计稿分期详情：
- * - 三列摘要：总金额(primary-bg)、首笔金额(success-bg)、待付金额(warning-bg)
- * - 期数选择：ChipPicker
- * - 还款计划卡片：序号标签 + 金额/日期输入
+ * 注意：期数选项用 getter，useState 禁止数组解构——避免 Taro weapp 打包白屏。
  */
-
-export interface ScheduleItem {
-  period: number;
-  amount: string;
-  date: string;
-  reminder: boolean;
-}
 
 export interface InstallmentPanelProps {
   totalAmount: string;
@@ -30,12 +38,10 @@ export interface InstallmentPanelProps {
   className?: string;
 }
 
-const PERIOD_OPTIONS = [
-  { label: '2期', value: '2' },
-  { label: '3期', value: '3' },
-  { label: '6期', value: '6' },
-  { label: '12期', value: '12' },
-];
+function useStatePair<T>(initial: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {
+  const pair = useState(initial);
+  return [pair[0], pair[1]];
+}
 
 const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
   totalAmount,
@@ -51,24 +57,26 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
   const firstAmount = schedule.length > 0 ? parseFloat(schedule[0].amount) || 0 : 0;
   const allocatedAmount = schedule.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
   const remainAmount = total - allocatedAmount;
+  const seededRef = useRef(false);
+  const periodOptions = getPeriodOptions();
 
   const initSchedule = useCallback(
     (count: number) => {
-      const perPeriod = total > 0 ? Math.floor((total / count) * 100) / 100 : 0;
-      const lastAmount = total > 0 ? Math.round((total - perPeriod * (count - 1)) * 100) / 100 : 0;
-      const items: ScheduleItem[] = [];
-      for (let i = 0; i < count; i++) {
-        items.push({
-          period: i + 1,
-          amount: i === count - 1 ? String(lastAmount) : String(perPeriod),
-          date: '',
-          reminder: false,
-        });
-      }
-      onScheduleChange(items);
+      onScheduleChange(buildInstallmentSchedule(total, count));
     },
     [total, onScheduleChange],
   );
+
+  useEffect(() => {
+    if (!enabled) {
+      seededRef.current = false;
+      return;
+    }
+    if (schedule.length === 0 && !seededRef.current) {
+      seededRef.current = true;
+      initSchedule(periodCount || 2);
+    }
+  }, [enabled, schedule.length, periodCount, initSchedule]);
 
   const handlePeriodChange = useCallback(
     (val: string | string[]) => {
@@ -84,10 +92,8 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
       const next = [...schedule];
       next[index] = { ...next[index], [field]: val };
 
-      // 手动修改金额后，自动均分剩余金额到后续期数
       if (field === 'amount' && val !== '') {
         const changedAmount = parseFloat(String(val)) || 0;
-        // 计算已分配金额（含当前修改的期）
         const allocatedBefore = next
           .slice(0, index + 1)
           .reduce(
@@ -116,11 +122,14 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
     [schedule, onScheduleChange, total],
   );
 
+  const datePickerIndexPair = useStatePair<number | null>(null);
+  const datePickerIndex = datePickerIndexPair[0];
+  const setDatePickerIndex = datePickerIndexPair[1];
+
   if (!enabled) return null;
 
   return (
     <View className={cn('pt-[28rpx]', className)}>
-      {/* 分期摘要（对齐设计稿 .installment-summary 三列） */}
       <View className="flex flex-row gap-[16rpx] mb-[28rpx]">
         <View className="inst-summary-item bg-primary-bg">
           <View className="text-xs text-primary font-medium mb-[4rpx]">总金额</View>
@@ -143,30 +152,33 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
         </View>
       </View>
 
-      {/* 期数选择 */}
       <View className="mb-[28rpx]">
         <View className="text-sm text-muted-foreground font-medium mb-[12rpx]">分期期数</View>
         <ChipPicker
-          options={PERIOD_OPTIONS}
+          options={periodOptions}
           value={String(periodCount)}
           onChange={handlePeriodChange}
         />
       </View>
 
-      {/* 还款计划 */}
       <View>
-        <View className="text-sm font-semibold text-foreground mb-[16rpx]">还款计划</View>
+        <View className="text-sm font-semibold text-foreground mb-[8rpx]">还款计划</View>
+        <View className="text-xs text-muted-foreground mb-[16rpx]">
+          默认按今天起每期顺延一个月，可点日期单独修改
+        </View>
         <View className="flex flex-col gap-[20rpx]">
           {schedule.map((item, index) => (
             <View
               key={item.period}
-              className="bg-background rounded-[20rpx] p-[24rpx] border-[2rpx] border-solid border-border"
+              className="bg-muted/40 rounded-2xl p-[24rpx] border-[2rpx] border-solid border-border"
             >
-              <View className="flex flex-row items-center gap-[12rpx] mb-[16rpx]">
+              <View className="flex flex-row items-center gap-[16rpx] mb-[16rpx]">
                 <View
                   className={cn(
-                    'w-[40rpx] h-[40rpx] rounded-md flex items-center justify-center text-xs font-bold text-white',
-                    index === 0 ? 'bg-accent' : 'bg-primary',
+                    'w-[48rpx] h-[48rpx] rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                    index === 0
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted-foreground/20 text-muted-foreground',
                   )}
                 >
                   {item.period}
@@ -185,7 +197,6 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
                     value={item.amount}
                     onInput={(e) => {
                       const v = e.detail.value || '';
-                      // 禁止负数输入
                       const num = parseFloat(v);
                       if (v && (isNaN(num) || num < 0)) return;
                       handleScheduleUpdate(index, 'amount', v);
@@ -197,20 +208,23 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
                 <View className="text-xs text-muted-foreground/60 w-[104rpx] flex-shrink-0">
                   日期
                 </View>
-                <View className="flex-1 bg-white rounded-md border-[2rpx] border-solid border-border px-[18rpx] py-[14rpx]">
-                  <Input
-                    className="w-full text-sm text-foreground h-[40rpx] leading-[40rpx]"
-                    type="text"
-                    placeholder="选择日期"
-                    value={item.date}
-                    onInput={(e) => handleScheduleUpdate(index, 'date', e.detail.value || '')}
-                  />
+                <View
+                  className="flex-1 bg-white rounded-md border-[2rpx] border-solid border-border px-[18rpx] py-[14rpx]"
+                  onClick={() => setDatePickerIndex(index)}
+                >
+                  <Text
+                    className={cn(
+                      'text-sm h-[40rpx] leading-[40rpx]',
+                      item.date ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {item.date || '选择日期'}
+                  </Text>
                 </View>
               </View>
             </View>
           ))}
         </View>
-        {/* 剩余金额提示 */}
         {remainAmount !== 0 && (
           <View
             className={cn(
@@ -224,6 +238,22 @@ const InstallmentPanel: React.FC<InstallmentPanelProps> = ({
           </View>
         )}
       </View>
+
+      <DatePickerSheet
+        visible={datePickerIndex !== null}
+        title="选择日期"
+        value={
+          datePickerIndex !== null
+            ? schedule[datePickerIndex]?.date || dayjs().format('YYYY-MM-DD')
+            : dayjs().format('YYYY-MM-DD')
+        }
+        onClose={() => setDatePickerIndex(null)}
+        onConfirm={(date) => {
+          if (datePickerIndex === null) return;
+          handleScheduleUpdate(datePickerIndex, 'date', date);
+          setDatePickerIndex(null);
+        }}
+      />
     </View>
   );
 };

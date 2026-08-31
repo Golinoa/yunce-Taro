@@ -22,38 +22,6 @@ import {
 } from '@/types/teacher';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
-/** 生成本地模拟课时费流水 */
-function genMockLessonRecords(teacher: { subject: string; rate: number }) {
-  const courses = teacher.subject
-    ? [`${teacher.subject}基础班`, `${teacher.subject}进阶班`, `${teacher.subject}小组课`]
-    : ['行政班', '值班', '前台班'];
-  return [
-    {
-      date: '08-01',
-      course: courses[0] ?? '基础班',
-      hours: 2,
-      amount: Math.round(teacher.rate * 2),
-    },
-    {
-      date: '08-05',
-      course: courses[1] ?? '进阶班',
-      hours: 1.5,
-      amount: Math.round(teacher.rate * 1.5),
-    },
-    { date: '08-12', course: courses[2] ?? '小组课', hours: 1, amount: Math.round(teacher.rate) },
-  ];
-}
-
-/** 生成本地模拟提成流水 */
-function genMockCommissionRecords(teacher: { attend: number; perf: number }) {
-  const baseAmount = Math.max(100, Math.round((teacher.attend + teacher.perf) / 3));
-  return [
-    { name: '新生推荐奖', amount: baseAmount },
-    { name: '续费提成', amount: Math.round(baseAmount * 0.8) },
-    { name: '全勤奖励', amount: Math.round(baseAmount * 0.6) },
-  ];
-}
-
 /** 紧凑信息行：固定宽度标签 + 左对齐值 */
 const InfoRow: React.FC<{
   label: string;
@@ -169,11 +137,29 @@ const SalaryDetailPage: React.FC = () => {
   );
   const statusMeta = SALARY_STATUS_META[currentStatus];
 
-  const lessonRecords = useMemo(() => (teacher ? genMockLessonRecords(teacher) : []), [teacher]);
-  const commissionRecords = useMemo(
-    () => (teacher ? genMockCommissionRecords(teacher) : []),
-    [teacher],
-  );
+  const lessonRecords = useMemo(() => {
+    if (!teacher?.categoryLessonFees?.length) {
+      return [] as Array<{ date: string; course: string; hours: number; amount: number }>;
+    }
+    return teacher.categoryLessonFees.flatMap((item) =>
+      (item.records?.length
+        ? item.records
+        : [{ date: '', courseName: item.categoryName, hours: 0, amount: item.amount }]
+      ).map((rec) => ({
+        date: rec.date || '',
+        course: rec.courseName || item.categoryName || '课时费',
+        hours: Number(rec.hours ?? 0),
+        amount: Number(rec.amount ?? 0),
+      })),
+    );
+  }, [teacher]);
+  const commissionRecords = useMemo(() => {
+    if (!teacher) return [] as Array<{ name: string; amount: number }>;
+    const rows: Array<{ name: string; amount: number }> = [];
+    if (teacher.attend > 0) rows.push({ name: '全勤奖', amount: teacher.attend });
+    if (teacher.perf > 0) rows.push({ name: '绩效提成', amount: teacher.perf });
+    return rows;
+  }, [teacher]);
 
   const toggleSlipExpand = useCallback((key: 'lesson' | 'commission' | 'bonus' | 'deduct') => {
     setSlipExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -304,22 +290,30 @@ const SalaryDetailPage: React.FC = () => {
         {/* 课时费流水 */}
         {slipExpanded.lesson && (
           <View className="mt-[24rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]">
-            {lessonRecords.map((rec, idx) => (
-              <RecordRow
-                key={idx}
-                name={`${rec.date} ${rec.course} ${rec.hours}课时`}
-                amount={`+${rec.amount.toFixed(2)}`}
-              />
-            ))}
+            {lessonRecords.length === 0 ? (
+              <Text className="text-[24rpx] text-muted-foreground py-[12rpx]">暂无课时费明细</Text>
+            ) : (
+              lessonRecords.map((rec, idx) => (
+                <RecordRow
+                  key={idx}
+                  name={`${rec.date ? `${rec.date} ` : ''}${rec.course}${rec.hours ? ` ${rec.hours}课时` : ''}`}
+                  amount={`+${rec.amount.toFixed(2)}`}
+                />
+              ))
+            )}
           </View>
         )}
 
         {/* 提成流水 */}
         {slipExpanded.commission && (
           <View className="mt-[24rpx] py-[16rpx] px-[20rpx] bg-muted rounded-[16rpx]">
-            {commissionRecords.map((rec, idx) => (
-              <RecordRow key={idx} name={rec.name} amount={`+${rec.amount.toFixed(2)}`} />
-            ))}
+            {commissionRecords.length === 0 ? (
+              <Text className="text-[24rpx] text-muted-foreground py-[12rpx]">暂无提成明细</Text>
+            ) : (
+              commissionRecords.map((rec, idx) => (
+                <RecordRow key={idx} name={rec.name} amount={`+${rec.amount.toFixed(2)}`} />
+              ))
+            )}
           </View>
         )}
 

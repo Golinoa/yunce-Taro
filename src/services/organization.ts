@@ -128,15 +128,52 @@ export const organizationService = {
         organizationId: 'org-mock',
         organizationName: '松果排课',
         versionCode: 'FREE',
-        versionName: '免费版',
+        versionName: '众创版',
         expireAt: null,
         members: { current: 5, max: 40 },
         employees: { current: 1, max: 2 },
         campuses: { current: 1, max: 1 },
-        features: { leadTrace: false, batchImportExport: false },
+        features: { leadTrace: false, batchImportExport: false, marketing: false, multiCampus: false },
       };
     }
     return get<OrganizationQuotaUsage>('/organization/quota-usage');
+  },
+
+  /**
+   * 机构权益快照（配额 + features），供客户端按模块藏入口
+   * 生产：GET /organization/entitlements
+   */
+  getEntitlements: async (): Promise<OrganizationQuotaUsage> => {
+    if (isUseMock()) {
+      return organizationService.getQuotaUsage();
+    }
+    const data = await get<OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }>(
+      '/organization/entitlements',
+    );
+    const features = {
+      ...(data.features || {}),
+      ...(data.entitlements?.features || {}),
+    };
+    return { ...data, features };
+  },
+
+  /**
+   * 会员页营销话术（运营可覆盖）
+   * 生产：GET /organization/membership-tips
+   * mock / 失败：返回 null，页面用本地 DEFAULT_MEMBERSHIP_TIPS
+   */
+  getMembershipTips: async (): Promise<
+    import('@/constants/membership-tips').MembershipTipDef[] | null
+  > => {
+    if (isUseMock()) return null;
+    try {
+      const data = await get<{ tips?: import('@/constants/membership-tips').MembershipTipDef[] }>(
+        '/organization/membership-tips',
+      );
+      return Array.isArray(data?.tips) && data.tips.length > 0 ? data.tips : null;
+    } catch {
+      return null;
+    }
   },
 
   /**
@@ -174,6 +211,11 @@ export const organizationService = {
         versionName = '旗舰版';
         planName = '旗舰年卡';
         durationDays = 365;
+      } else if (trimmed.includes('BASIC')) {
+        versionCode = 'BASIC';
+        versionName = '基础版';
+        planName = '基础年卡';
+        durationDays = 365;
       } else if (trimmed.includes('STANDARD') || trimmed === 'HXK-DEMO-STANDARD') {
         versionCode = 'STANDARD';
         versionName = '标准版';
@@ -184,12 +226,9 @@ export const organizationService = {
         planName = '续费半年卡';
       } else if (!trimmed.startsWith('HXK-')) {
         return { error: { message: '激活码不存在' } };
-      } else {
-        // 通用 HXK-*：按标准版开通/续期
-        if (versionCode === 'FREE') {
-          versionCode = 'STANDARD';
-          versionName = '标准版';
-        }
+      } else if (versionCode === 'FREE' || versionCode === 'TRIAL') {
+        versionCode = 'STANDARD';
+        versionName = '标准版';
       }
 
       base.setDate(base.getDate() + durationDays);
@@ -201,19 +240,35 @@ export const organizationService = {
         expireAt,
         members: {
           ...current.members,
-          max: versionCode === 'FLAGSHIP' ? 500 : versionCode === 'STANDARD' ? 200 : 40,
+          max:
+            versionCode === 'FLAGSHIP'
+              ? -1
+              : versionCode === 'STANDARD'
+                ? 220
+                : versionCode === 'BASIC'
+                  ? 100
+                  : 40,
         },
         employees: {
           ...current.employees,
-          max: versionCode === 'FLAGSHIP' ? 50 : versionCode === 'STANDARD' ? 10 : 2,
+          max:
+            versionCode === 'FLAGSHIP'
+              ? -1
+              : versionCode === 'STANDARD'
+                ? 8
+                : versionCode === 'BASIC'
+                  ? 5
+                  : 2,
         },
         campuses: {
           ...current.campuses,
-          max: versionCode === 'FLAGSHIP' ? 10 : versionCode === 'STANDARD' ? 3 : 1,
+          max: versionCode === 'FLAGSHIP' ? 10 : 1,
         },
         features: {
-          leadTrace: versionCode !== 'FREE',
+          leadTrace: versionCode === 'STANDARD' || versionCode === 'FLAGSHIP',
           batchImportExport: versionCode === 'FLAGSHIP',
+          marketing: versionCode === 'STANDARD' || versionCode === 'FLAGSHIP',
+          multiCampus: versionCode === 'FLAGSHIP',
         },
       };
       try {
@@ -276,14 +331,14 @@ export interface OrganizationSettings {
 export interface OrganizationQuotaUsage {
   organizationId: string;
   organizationName: string;
-  versionCode: 'FREE' | 'TRIAL' | 'STANDARD' | 'FLAGSHIP';
+  versionCode: 'FREE' | 'TRIAL' | 'BASIC' | 'STANDARD' | 'FLAGSHIP';
   versionName: string;
   /** 会员到期时间；空表示未开通付费期 */
   expireAt?: string | null;
   members: { current: number; max: number };
   employees: { current: number; max: number };
   campuses: { current: number; max: number };
-  features: { leadTrace: boolean; batchImportExport: boolean };
+  features: { leadTrace: boolean; batchImportExport: boolean; marketing?: boolean; [key: string]: boolean | undefined };
 }
 
 export interface RedeemActivationResult {
@@ -304,8 +359,8 @@ export function isOrgMembershipActive(quota: OrganizationQuotaUsage | null | und
     const t = new Date(quota.expireAt).getTime();
     if (Number.isFinite(t) && t < Date.now()) return false;
   }
-  // 免费版视为未开通付费会员，引导兑换激活码
-  if (quota.versionCode === 'FREE') return false;
+  // 众创 / 试用视为未开通付费会员，引导兑换激活码
+  if (quota.versionCode === 'FREE' || quota.versionCode === 'TRIAL') return false;
   // 付费档：有到期日则需未过期；无到期日视为长期有效
   return true;
 }

@@ -75,7 +75,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ data, className }) => {
       onClick={handleTap}
     >
       {/* 左侧头像 */}
-      <StudentAvatar name={data.child_name} size="lg" />
+      <StudentAvatar name={data.child_name} src={data.avatar_url} size="lg" />
 
       {/* 中间信息 */}
       <View className="flex-1 min-w-0">
@@ -84,6 +84,11 @@ const LeadCard: React.FC<LeadCardProps> = ({ data, className }) => {
             <Text className="text-[32rpx] font-semibold text-foreground truncate">
               {data.child_name}
             </Text>
+            {data.child_nickname ? (
+              <Text className="text-[24rpx] text-muted-foreground truncate max-w-[160rpx]">
+                {data.child_nickname}
+              </Text>
+            ) : null}
             {statusMeta && (
               <View className={cn('px-[14rpx] py-[4rpx] rounded-full', statusMeta.className)}>
                 <Text className="text-[22rpx] font-bold">{statusMeta.label}</Text>
@@ -91,13 +96,13 @@ const LeadCard: React.FC<LeadCardProps> = ({ data, className }) => {
             )}
           </View>
 
-          {/* 右侧电话按钮 */}
+          {/* 右侧电话：纯图标，无底色 */}
           {data.parent_phone && (
             <View
-              className="w-[72rpx] h-[72rpx] rounded-full bg-primary center flex-shrink-0"
+              className="flex h-[56rpx] w-[56rpx] flex-shrink-0 items-center justify-center active:opacity-60"
               onClick={handlePhone}
             >
-              <Icon name="mdi-phone" size={24} color="white" />
+              <Icon name="mdi-phone" size={28} color="primary" />
             </View>
           )}
         </View>

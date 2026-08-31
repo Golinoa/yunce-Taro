@@ -1,5 +1,6 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
+import cn from 'classnames';
 import React from 'react';
 import Icon from '@/components/Icon';
 import { MDI_ICONS } from '@/components/Icon/icons';
@@ -8,21 +9,36 @@ import { reportLocalDebug } from '@/utils/local-debug';
 
 export interface KingKongSectionProps {
   entries: QuickEntry[];
+  /**
+   * staff：三卡片 + 图标网格（教师/校长）
+   * grid：仅图标网格（家长端）
+   */
+  variant?: 'staff' | 'grid';
+  /** 锚点跳转（url 以 # 开头时回调，如 #parent-schedule） */
+  onAnchor?: (anchor: string) => void;
 }
+
+/** TabBar 主包路径：需 switchTab */
+const TAB_PAGE_PATHS = new Set([
+  '/pages/home/index',
+  '/pages/schedule/index',
+  '/pages/statistics/index',
+  '/pages/profile/index',
+]);
 
 /**
  * 金刚区图标渐变配色方案（8 个不同方向的彩色渐变）
- * 模拟彩色立体图标效果，无需底色块
+ * 配合霜白玻璃底，图标本身为品牌色渐变
  */
 const HOME_GRID_GRADIENTS = [
-  { from: '#FF6B6B', to: '#FFA94D', deg: 135 }, // 课时充值 - 红橙
+  { from: '#FF6B6B', to: '#FFA94D', deg: 135 }, // 充值发卡 - 红橙
   { from: '#FF922B', to: '#FCC419', deg: 135 }, // 添加学员 - 橙黄
   { from: '#4DABF7', to: '#22B8CF', deg: 135 }, // 考勤管理 - 蓝青
   { from: '#845EF7', to: '#E64980', deg: 135 }, // 试听记录 - 紫粉
   { from: '#FA5252', to: '#F06595', deg: 135 }, // 充值记录 - 红粉
-  { from: '#4DABF7', to: '#845EF7', deg: 135 }, // 班级管理 - 蓝紫
-  { from: '#9775FA', to: '#4DABF7', deg: 135 }, // 教师管理 - 紫蓝
-  { from: '#22B8CF', to: '#51CF66', deg: 135 }, // 校区设置 - 青绿
+  { from: '#FF922B', to: '#FA5252', deg: 135 }, // 考勤异常 - 橙红警示
+  { from: '#9775FA', to: '#4DABF7', deg: 135 }, // 续费提醒 - 紫蓝
+  { from: '#E64980', to: '#9775FA', deg: 135 }, // 意向学员 - 粉紫（心形语义）
 ];
 
 /** 三卡片配置：快速消课 / 预约课程 / 学员管理 */
@@ -50,7 +66,7 @@ const TRIPLE_CARD_CONFIG = [
 
 /**
  * 渐变彩色图标渲染
- * 使用 backgroundImage + mask-image 实现渐变色图标，无需底色块
+ * 使用 backgroundImage + mask-image 实现品牌色渐变图标
  */
 const renderGradientIcon = (
   iconName: string,
@@ -60,7 +76,7 @@ const renderGradientIcon = (
   const svgPath = MDI_ICONS[iconName] || MDI_ICONS[`mdi-${iconName}`];
   if (!svgPath) return null;
 
-  const svgUrl = `data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='${svgPath}'/%3E%3C/svg%3E`;
+  const svgUrl = `data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='black' d='${svgPath}'/%3E%3C/svg%3E`;
 
   return (
     <View
@@ -83,10 +99,14 @@ const renderGradientIcon = (
  * KingKongSection - 金刚区 v14
  *
  * 对齐设计稿 index_v14.html kingkong-section：
- * - 三卡片布局：左侧大卡片（快速消课）+ 右侧两个小卡片（预约课程、学员管理）
- * - 底部图标网格：两行四列，彩色渐变图标（无底色块）
+ * - staff：三卡片 + 底部图标网格
+ * - grid：仅图标网格（家长端）
  */
-const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {
+const KingKongSection: React.FC<KingKongSectionProps> = ({
+  entries,
+  variant = 'staff',
+  onAnchor,
+}) => {
   // 数据未加载时不渲染
   if (!entries || entries.length === 0) return null;
 
@@ -94,6 +114,7 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {
   const tripleCards = TRIPLE_CARD_CONFIG;
   // 图标网格使用全部入口
   const gridEntries = entries.slice(0, 8);
+  const showTripleCards = variant === 'staff';
   const handleNavigate = (url: string, label: string) => {
     // #region debug-point H1:home-navigate-click
     reportLocalDebug({
@@ -106,12 +127,22 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {
       },
     });
     // #endregion
+    if (url.startsWith('#')) {
+      onAnchor?.(url.slice(1));
+      return;
+    }
+    const path = url.split('?')[0];
+    if (TAB_PAGE_PATHS.has(path)) {
+      Taro.switchTab({ url: path });
+      return;
+    }
     Taro.navigateTo({ url });
   };
 
   return (
     <View className="kingkong-section px-[24rpx] pb-[32rpx]">
-      {/* 三卡片布局 */}
+      {/* 三卡片布局（仅教师端） */}
+      {showTripleCards && (
       <View className="flex gap-0 mb-[40rpx] min-h-[320rpx] relative">
         {/* 左侧大卡片 - 快速消课 */}
         <View
@@ -195,9 +226,15 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {
           })}
         </View>
       </View>
+      )}
 
-      {/* 图标网格：两行四列，彩色渐变图标（无底色块） */}
-      <View className="grid grid-cols-4 gap-x-[16rpx] gap-y-[32rpx]">
+      {/* 图标网格：两行四列，霜白玻璃底 + 品牌色渐变图标 */}
+      <View
+        className={cn(
+          'grid grid-cols-4 gap-x-[16rpx] gap-y-[32rpx]',
+          !showTripleCards && 'pt-[8rpx]',
+        )}
+      >
         {gridEntries.map((entry, idx) => {
           const gradient = HOME_GRID_GRADIENTS[idx % HOME_GRID_GRADIENTS.length];
           return (
@@ -206,7 +243,9 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({ entries }) => {
               className="flex flex-col items-center gap-[12rpx] active:opacity-80 transition-opacity duration-200"
               onClick={() => handleNavigate(entry.url, entry.label)}
             >
-              {renderGradientIcon(entry.icon, gradient, 56)}
+              <View className="icon-glass flex h-[80rpx] w-[80rpx] items-center justify-center rounded-[24rpx]">
+                {renderGradientIcon(entry.icon, gradient, 48)}
+              </View>
               <Text className="text-[22rpx] text-foreground-secondary font-medium whitespace-nowrap">
                 {entry.label}
               </Text>

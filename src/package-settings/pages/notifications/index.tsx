@@ -1,12 +1,12 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import Icon from '@/components/Icon';
 import { calendarSyncService } from '@/services/calendar-sync';
 import { subscribeMessageService } from '@/services/subscribe-message';
-import { useAuth } from '@/utils/auth';
+import { isParentRole, isPrincipalOrAbove, useAuth } from '@/utils/auth';
 import {
   canUseCalendarSync,
   getCalendarSyncSettings,
@@ -27,12 +27,132 @@ interface NotifyGroup {
   items: NotifyItem[];
 }
 
+/** 家长：仅本人相关提醒偏好 */
+const PARENT_NOTIFY_GROUPS: NotifyGroup[] = [
+  {
+    title: '我的提醒',
+    items: [
+      {
+        id: 'student-class-one-day',
+        label: '上课前一天提醒',
+        sub: '上课前一天20:00点推送',
+        enabled: true,
+      },
+      {
+        id: 'student-class-same-day',
+        label: '上课当天提醒',
+        sub: '上课前30分钟推送',
+        enabled: true,
+      },
+      { id: 'student-checkin', label: '学员点名通知', sub: '显示剩余课时', enabled: true },
+      { id: 'student-comment', label: '课堂点评提醒', sub: '课后点评后通知', enabled: true },
+      {
+        id: 'student-renewal',
+        label: '课时不足续费提醒',
+        sub: '每天10点提醒一次（每7天提醒1次）',
+        enabled: true,
+      },
+      {
+        id: 'student-birthday',
+        label: '学员生日提醒',
+        sub: '生日快乐，天天开心！',
+        enabled: true,
+      },
+      {
+        id: 'student-schedule-change',
+        label: '调课通知',
+        sub: '课程调整、取消时通知',
+        enabled: true,
+      },
+    ],
+  },
+];
+
+/** 老师/前台：仅本人相关提醒偏好 */
+const TEACHER_NOTIFY_GROUPS: NotifyGroup[] = [
+  {
+    title: '我的提醒',
+    items: [
+      { id: 'teacher-class-remind', label: '上课提醒', sub: '开课前推送当日课程', enabled: true },
+      {
+        id: 'teacher-leave-audit',
+        label: '请假审核结果通知',
+        sub: '请假审批状态变更时通知',
+        enabled: true,
+      },
+      { id: 'teacher-salary', label: '薪资提醒', sub: '发薪日前推送课时报表', enabled: false },
+      { id: 'teacher-weekly', label: '周报推送', sub: '每周一推送上周数据汇总', enabled: false },
+    ],
+  },
+];
+
+/** 校长/管理员：可配置面向学员与老师的机构推送偏好 */
+const MANAGER_NOTIFY_GROUPS: NotifyGroup[] = [
+  {
+    title: '通知学员',
+    items: [
+      {
+        id: 'student-class-one-day',
+        label: '上课前一天提醒',
+        sub: '上课前一天20:00点推送',
+        enabled: true,
+      },
+      {
+        id: 'student-class-same-day',
+        label: '上课当天提醒',
+        sub: '上课前30分钟推送',
+        enabled: true,
+      },
+      { id: 'student-checkin', label: '学员点名通知', sub: '显示剩余课时', enabled: true },
+      { id: 'student-comment', label: '课堂点评提醒', sub: '课后点评后通知家长', enabled: true },
+      {
+        id: 'student-renewal',
+        label: '学员课时不足续费提醒',
+        sub: '每天10点提醒一次（每7天提醒1次）',
+        enabled: true,
+      },
+      {
+        id: 'student-birthday',
+        label: '学员生日提醒',
+        sub: '生日快乐，天天开心！',
+        enabled: true,
+      },
+      {
+        id: 'student-schedule-change',
+        label: '调课通知',
+        sub: '课程调整、取消时通知',
+        enabled: true,
+      },
+    ],
+  },
+  {
+    title: '通知老师',
+    items: [
+      { id: 'teacher-class-remind', label: '上课提醒', sub: '开课前推送当日课程', enabled: true },
+      {
+        id: 'teacher-leave-audit',
+        label: '请假审核结果通知',
+        sub: '请假审批状态变更时通知',
+        enabled: true,
+      },
+      { id: 'teacher-salary', label: '薪资提醒', sub: '发薪日前推送课时报表', enabled: false },
+      { id: 'teacher-weekly', label: '周报推送', sub: '每周一推送上周数据汇总', enabled: false },
+    ],
+  },
+];
+
+function getNotifyGroupsForRole(role: string | null | undefined): NotifyGroup[] {
+  if (isParentRole(role)) return PARENT_NOTIFY_GROUPS;
+  if (isPrincipalOrAbove(role)) return MANAGER_NOTIFY_GROUPS;
+  return TEACHER_NOTIFY_GROUPS;
+}
+
 /**
  * 消息通知页面
  * - 顶部总开关（默认开）
- * - 同步日历（默认关）
+ * - 同步日历（默认关，仅教职）
  * - 补充发送次数
- * - 分组业务提醒
+ * - 分组业务提醒（按角色过滤：老师/家长只看本人相关项）
  */
 const NotificationsPage: React.FC = () => {
   useCardNavigationBar();
@@ -48,6 +168,13 @@ const NotificationsPage: React.FC = () => {
   const [calendarBusy, setCalendarBusy] = useState(false);
   const showCalendarSwitch = canUseCalendarSync(currentRole);
 
+  const initialGroups = useMemo(() => getNotifyGroupsForRole(currentRole), [currentRole]);
+  const [groups, setGroups] = useState<NotifyGroup[]>(initialGroups);
+
+  useEffect(() => {
+    setGroups(getNotifyGroupsForRole(currentRole));
+  }, [currentRole]);
+
   useEffect(() => {
     if (!currentUserId || !showCalendarSwitch) {
       setCalendarEnabled(false);
@@ -55,60 +182,6 @@ const NotificationsPage: React.FC = () => {
     }
     setCalendarEnabled(getCalendarSyncSettings(currentUserId).enabled);
   }, [currentUserId, showCalendarSwitch]);
-
-  const [groups, setGroups] = useState<NotifyGroup[]>([
-    {
-      title: '通知学员',
-      items: [
-        {
-          id: 'student-class-one-day',
-          label: '上课前一天提醒',
-          sub: '上课前一天20:00点推送',
-          enabled: true,
-        },
-        {
-          id: 'student-class-same-day',
-          label: '上课当天提醒',
-          sub: '上课前30分钟推送',
-          enabled: true,
-        },
-        { id: 'student-checkin', label: '学员点名通知', sub: '显示剩余课时', enabled: true },
-        { id: 'student-comment', label: '课堂点评提醒', sub: '课后点评后通知家长', enabled: true },
-        {
-          id: 'student-renewal',
-          label: '学员课时不足续费提醒',
-          sub: '每天10点提醒一次（每7天提醒1次）',
-          enabled: true,
-        },
-        {
-          id: 'student-birthday',
-          label: '学员生日提醒',
-          sub: '生日快乐，天天开心！',
-          enabled: true,
-        },
-        {
-          id: 'student-schedule-change',
-          label: '调课通知',
-          sub: '课程调整、取消时通知',
-          enabled: true,
-        },
-      ],
-    },
-    {
-      title: '通知老师',
-      items: [
-        { id: 'teacher-class-remind', label: '上课提醒', sub: '开课前推送当日课程', enabled: true },
-        {
-          id: 'teacher-leave-audit',
-          label: '请假审核结果通知',
-          sub: '请假审批状态变更时通知',
-          enabled: true,
-        },
-        { id: 'teacher-salary', label: '薪资提醒', sub: '发薪日前推送课时报表', enabled: false },
-        { id: 'teacher-weekly', label: '周报推送', sub: '每周一推送上周数据汇总', enabled: false },
-      ],
-    },
-  ]);
 
   const handleToggle = useCallback(
     (groupIndex: number, itemIndex: number) => {
@@ -242,7 +315,7 @@ const NotificationsPage: React.FC = () => {
           </View>
 
           <Text className="block px-[8rpx] text-[24rpx] leading-relaxed text-muted-foreground">
-            以下开关控制各类业务提醒偏好；关闭后不影响首页「待办事项」内的页面提醒。总开关关闭时微信侧不再推送。
+            以下开关控制您本人的业务提醒偏好；关闭后不影响首页「待办事项」内的页面提醒。总开关关闭时微信侧不再推送。
           </Text>
 
           {groups.map((group, groupIndex) => (

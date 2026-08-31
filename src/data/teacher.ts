@@ -1387,7 +1387,7 @@ function createParttimeTemplate(): SalaryTemplate {
           courses: [
             {
               id: 'c1',
-              courseId: 'course-002',
+              courseId: 'cls-calligraphy-basic',
               courseName: '书法基础班',
               useRevenueShare: false,
               rate: 80,

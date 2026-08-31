@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   buildStudentRechargeTodoDesc,
   buildStudentRechargeTodoTitle,
+  buildStudentRechargeTodoUrl,
+  isStudentRechargeTodoId,
   normalizeStudentRechargeTodoDesc,
+  parseStudentIdFromRechargeTodoId,
+  resolveDefaultRechargeAssigneeIds,
 } from './student-recharge-todo';
 
 describe('student-recharge-todo', () => {
@@ -24,5 +28,41 @@ describe('student-recharge-todo', () => {
     expect(normalizeStudentRechargeTodoDesc('课时已用尽')).toBe(
       '课时已用尽 · 请尽快跟进续费',
     );
+  });
+
+  it('去处理跳转学员详情', () => {
+    expect(buildStudentRechargeTodoUrl('stu-027')).toBe(
+      '/package-student/pages/student-detail/index?id=stu-027',
+    );
+    expect(isStudentRechargeTodoId('alert-recharge-stu-027')).toBe(true);
+    expect(parseStudentIdFromRechargeTodoId('alert-recharge-stu-027')).toBe('stu-027');
+  });
+
+  it('默认参与人含校长、管理员、负责老师', () => {
+    const ids = resolveDefaultRechargeAssigneeIds({
+      responsibleTeacherId: 'teacher-002',
+      campusId: 'campus-center',
+      staff: [
+        {
+          id: 'teacher-principal-001',
+          identity: 'principal',
+          orgRole: 'admin',
+          campusIds: ['campus-center', 'campus-east'],
+        },
+        {
+          id: 'teacher-002',
+          identity: 'teacher',
+          orgRole: 'principal',
+          campusIds: ['campus-center'],
+        },
+        {
+          id: 'teacher-004',
+          identity: 'teacher',
+          orgRole: 'teacher',
+          campusIds: ['campus-west'],
+        },
+      ],
+    });
+    expect(ids).toEqual(['teacher-002', 'teacher-principal-001']);
   });
 });

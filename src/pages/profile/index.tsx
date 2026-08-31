@@ -28,7 +28,9 @@ import StoreOnboarding from '@/components/profile/StoreOnboarding';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { markStepVisited } from '@/utils/onboarding-storage';
-import { onboardingService, studentService } from '@/services';
+import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
+import { teacherService } from '@/services/teacher';
+import { resolveLifecycle } from '@/constants/membership-tips';
 import { organizationService, isOrgMembershipActive, type OrganizationQuotaUsage } from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
@@ -74,6 +76,18 @@ const Profile: React.FC = () => {
   const [activeStudentId, setActiveStudentId] = useState('');
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [teacherStatValues, setTeacherStatValues] = useState({
+    hours: 0,
+    lessonCount: 0,
+    students: 0,
+    classes: 0,
+  });
+  const [parentStatValues, setParentStatValues] = useState({
+    attendance: 0,
+    remainingTimes: 0,
+    remainingHours: 0,
+    remainingBalance: 0,
+  });
 
   // 弹窗控制
   const [showBindSheet, setShowBindSheet] = useState(false);
@@ -91,11 +105,13 @@ const Profile: React.FC = () => {
   const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
   const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
 
-  // 会员开通状态（免费版 / 已到期 → 立即开通；付费未过期 → 立即查看）
+  // 会员开通状态（众创/试用/已到期 → 开通或续费；付费未过期 → 立即查看）
   const isMembershipActive = useMemo(
     () => isOrgMembershipActive(quotaUsage),
     [quotaUsage],
   );
+  const membershipLifecycle = useMemo(() => resolveLifecycle(quotaUsage), [quotaUsage]);
+  const membershipExpired = membershipLifecycle === 'expired';
 
   const membershipExpireLabel = useMemo(
     () => formatMembershipExpire(quotaUsage?.expireAt),
@@ -113,14 +129,20 @@ const Profile: React.FC = () => {
   const loadQuotaUsage = useCallback(async () => {
     if (!isManagerRole) return;
     try {
-      const data = await organizationService.getQuotaUsage();
+      // entitlements 与 quota-usage 同源，多带 features 全量 map，便于藏入口
+      const data = await organizationService.getEntitlements();
       setQuotaUsage(data);
     } catch {
-      /* 非阻塞：会员到期信息加载失败不影响页面 */
+      try {
+        const data = await organizationService.getQuotaUsage();
+        setQuotaUsage(data);
+      } catch {
+        /* 非阻塞：会员到期信息加载失败不影响页面 */
+      }
     }
   }, [isManagerRole]);
 
-  // 加载家长绑定的学生
+  // 加载家长绑定的学生 + 四格聚合
   const loadStudents = useCallback(async () => {
     if (!profile?.id || isTeacher) return;
     setLoadingStudents(true);
@@ -131,12 +153,61 @@ const Profile: React.FC = () => {
       const stored = Taro.getStorageSync('activeStudentId') || '';
       const valid = list.find((s) => s.id === stored)?.id || list[0]?.id || '';
       setActiveStudentId(valid);
+
+      if (list.length === 0) {
+        setParentStatValues({
+          attendance: 0,
+          remainingTimes: 0,
+          remainingHours: 0,
+          remainingBalance: 0,
+        });
+      } else {
+        const [pkgGroups, recordGroups] = await Promise.all([
+          Promise.all(list.map((s) => packageService.getByStudent(s.id).catch(() => []))),
+          Promise.all(list.map((s) => lessonRecordService.getByStudent(s.id).catch(() => []))),
+        ]);
+        const packages = pkgGroups.flat();
+        const records = recordGroups.flat();
+        const remainingHours = packages.reduce(
+          (sum, pkg) => sum + Math.max(Number(pkg.remaining_hours ?? 0), 0),
+          0,
+        );
+        const remainingBalance = packages.reduce((sum, pkg) => {
+          const fee = Number((pkg as { fee_amount?: number }).fee_amount ?? 0);
+          const total = Math.max(Number(pkg.total_hours ?? 0), 0);
+          const remain = Math.max(Number(pkg.remaining_hours ?? 0), 0);
+          if (!fee || !total) return sum;
+          return sum + (fee * remain) / total;
+        }, 0);
+        setParentStatValues({
+          attendance: records.filter((r) => r.status !== 'cancelled').length,
+          remainingTimes: Math.round(remainingHours),
+          remainingHours: Math.round(remainingHours * 10) / 10,
+          remainingBalance: Math.round(remainingBalance),
+        });
+      }
     } catch {
       setErrorMsg('学生信息加载失败，请下拉刷新');
     } finally {
       setLoadingStudents(false);
     }
   }, [profile, isTeacher]);
+
+  // 教师四格：本月课时 / 消课次数 / 学员 / 班级
+  const loadTeacherStats = useCallback(async () => {
+    if (!profile?.id || !isTeacher) return;
+    try {
+      const teacher = await teacherService.getById(profile.id);
+      setTeacherStatValues({
+        hours: Number(teacher?.hours ?? 0),
+        lessonCount: Number(teacher?.lessonCount ?? 0),
+        students: Number(teacher?.students ?? 0),
+        classes: Number(teacher?.classes ?? 0),
+      });
+    } catch (error) {
+      logError('profile.loadTeacherStats', error);
+    }
+  }, [profile?.id, isTeacher]);
 
   // 读取本地存储的 onboarding 隐藏状态
   const loadStoreOnboardingHidden = useCallback(() => {
@@ -170,14 +241,16 @@ const Profile: React.FC = () => {
 
   React.useEffect(() => {
     loadStudents();
+    loadTeacherStats();
     loadStoreOnboardingHidden();
     loadStoreProgress();
     loadQuotaUsage();
-  }, [loadStudents, loadStoreOnboardingHidden, loadStoreProgress, loadQuotaUsage]);
+  }, [loadStudents, loadTeacherStats, loadStoreOnboardingHidden, loadStoreProgress, loadQuotaUsage]);
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
     loadStudents();
+    loadTeacherStats();
     loadStoreOnboardingHidden();
     loadStoreProgress();
     loadQuotaUsage();
@@ -188,7 +261,7 @@ const Profile: React.FC = () => {
     [students, activeStudentId],
   );
 
-  // 绑定学生
+  // 绑定学生（与 onboarding 同一真相源：organization/bind）
   const handleBind = useCallback(async () => {
     const code = inviteCode.trim();
     if (!code) {
@@ -198,23 +271,20 @@ const Profile: React.FC = () => {
     if (!profile?.id) return;
     setBinding(true);
     try {
-      const student = await studentService.findByInviteCode(code.toUpperCase());
-      if (!student) {
-        Taro.showToast({ title: '邀请码无效，请确认后重试', icon: 'none' });
-        return;
-      }
-      await studentService.bindParent(student.id, profile.id);
+      const result = await organizationService.bind(code.toUpperCase());
       Taro.showToast({ title: '绑定成功', icon: 'success' });
       setShowBindSheet(false);
       setInviteCode('');
       await loadStudents();
-      setActiveStudentId(student.id);
-      Taro.setStorageSync('activeStudentId', student.id);
+      if (result.studentId) {
+        setActiveStudentId(result.studentId);
+        Taro.setStorageSync('activeStudentId', result.studentId);
+      }
       try {
         Taro.hideToast();
         await subscribeMessageService.runFlow('E03', {
-          childName: student.name,
-          studentName: student.name,
+          childName: result.studentName,
+          studentName: result.studentName,
           role: profile.currentContext?.role,
           campusId: profile.currentContext?.campusId,
         });
@@ -225,8 +295,10 @@ const Profile: React.FC = () => {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('已绑定') || msg.includes('重复')) {
         Taro.showToast({ title: '该学生已绑定，无需重复操作', icon: 'none' });
+      } else if (msg.includes('邀请码') || msg.includes('不存在') || msg.includes('无效')) {
+        Taro.showToast({ title: '邀请码无效，请确认后重试', icon: 'none' });
       } else {
-        Taro.showToast({ title: '绑定失败，请重试', icon: 'none' });
+        Taro.showToast({ title: msg || '绑定失败，请重试', icon: 'none' });
       }
     } finally {
       setBinding(false);
@@ -294,10 +366,10 @@ const Profile: React.FC = () => {
     [handlePlaceholder],
   );
 
-  // 店铺管理 onboarding 非步骤入口点击
+  // 店铺管理 onboarding：停课放假 → 节假日设置
   const handleStoreExtraClick = useCallback(() => {
-    handlePlaceholder();
-  }, [handlePlaceholder]);
+    handleNavigate('/package-settings/pages/campus-settings/holidays');
+  }, [handleNavigate]);
 
   // 跳转到个人资料编辑页
   const handleProfile = useCallback(() => {
@@ -360,19 +432,28 @@ const Profile: React.FC = () => {
         onClick: handleCardManage,
       },
       {
+        label: '约课规则',
+        icon: 'mdi-calendar-check-outline' as const,
+        onClick: () => handleNavigate('/package-course/pages/booking-rule/index'),
+      },
+      {
+        label: '学员转校',
+        icon: 'mdi-swap-horizontal' as const,
+        onClick: () => handleNavigate('/package-student/pages/student-transfer/index'),
+      },
+      {
         label: '薪资管理',
         icon: 'mdi-wallet-outline' as const,
         onClick: () => handleNavigate('/package-teacher/pages/salary-home/index'),
       },
       {
-        label: '学员信箱',
-        icon: 'mdi-email-outline' as const,
-        onClick: handlePlaceholder,
+        label: '停课放假',
+        icon: 'mdi-calendar-remove' as const,
+        onClick: () => handleNavigate('/package-settings/pages/campus-settings/holidays'),
       },
     ],
     [
       handleNavigate,
-      handlePlaceholder,
       handleVenueManage,
       handleTeacherManage,
       handleCourseManage,
@@ -436,6 +517,11 @@ const Profile: React.FC = () => {
         icon: 'mdi-message-text-outline',
         onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
       },
+      {
+        label: '切换身份',
+        icon: 'mdi-account-switch-outline',
+        onClick: () => setShowRoleSheet(true),
+      },
     ];
     // 系统设置：所有角色可见，内部设置项按权限过滤
     items.push({
@@ -446,15 +532,43 @@ const Profile: React.FC = () => {
     return items;
   }, [handleNavigate]);
 
-  // 教师视图：4 列核心数据
+  // 教师视图：教学台账（课时流水 / 工资记录 / 我的预约）
+  // 上下班签到考勤 → 下个版本；课消请走「上课记录」
+  const teacherMonthlyFlowItems = useMemo(
+    () => [
+      {
+        label: '课时流水',
+        icon: 'mdi-clock-outline' as const,
+        onClick: () => handleNavigate('/package-teacher/pages/monthly-flow/index?tab=lessons'),
+      },
+      {
+        label: '工资记录',
+        icon: 'mdi-cash' as const,
+        onClick: () => handleNavigate('/package-teacher/pages/monthly-flow/index?tab=salary'),
+      },
+      {
+        label: '我的预约',
+        icon: 'mdi-calendar-clock-outline' as const,
+        onClick: () => handleNavigate('/package-course/pages/booking/index'),
+      },
+      {
+        label: '上课记录',
+        icon: 'mdi-clipboard-text-outline' as const,
+        onClick: () => handleNavigate('/package-course/pages/records/index'),
+      },
+    ],
+    [handleNavigate],
+  );
+
+  // 教师视图：4 列核心数据（本月真实聚合）
   const teacherStats = useMemo(
     () => [
-      { label: '累计出勤', value: 0, unit: '次' },
-      { label: '剩余次数', value: 0, unit: '次' },
-      { label: '剩余时长', value: 0, unit: '天' },
-      { label: '剩余储值', value: 0, unit: '元' },
+      { label: '本月课时', value: teacherStatValues.hours, unit: '节' },
+      { label: '本月消课', value: teacherStatValues.lessonCount, unit: '次' },
+      { label: '在读学员', value: teacherStatValues.students, unit: '人' },
+      { label: '授课班级', value: teacherStatValues.classes, unit: '个' },
     ],
-    [],
+    [teacherStatValues],
   );
 
   // ============================================
@@ -486,31 +600,30 @@ const Profile: React.FC = () => {
     [handleNavigate],
   );
 
-  // 家长视图：我的服务
+  // 家长视图：我的服务（卡包进子女详情；未上线入口不下发）
   const parentServiceItems = useMemo(
     () => [
       {
         label: '我的卡包',
         icon: 'mdi-package' as const,
-        onClick: () => handleNavigate('/package-course/pages/my-course/index'),
-      },
-      {
-        label: '排行榜',
-        icon: 'mdi-trophy-outline' as const,
-        onClick: handlePlaceholder,
+        onClick: () => {
+          const childId = activeStudentId || students[0]?.id;
+          if (!childId) {
+            Taro.showToast({ title: '请先绑定孩子', icon: 'none' });
+            return;
+          }
+          handleNavigate(
+            `/package-student/pages/child-detail/index?id=${encodeURIComponent(childId)}&tab=packages`,
+          );
+        },
       },
       {
         label: '课程足迹',
         icon: 'mdi-calendar-outline' as const,
         onClick: () => handleNavigate('/package-course/pages/records/index'),
       },
-      {
-        label: '积分中心',
-        icon: 'mdi-star-outline' as const,
-        onClick: handlePlaceholder,
-      },
     ],
-    [handleNavigate, handlePlaceholder],
+    [activeStudentId, handleNavigate, students],
   );
 
   // 家长视图：系统管理（不含机构配置 / 用户协议入口）
@@ -532,6 +645,11 @@ const Profile: React.FC = () => {
         onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
       },
       {
+        label: '切换身份',
+        icon: 'mdi-account-switch-outline' as const,
+        onClick: () => setShowRoleSheet(true),
+      },
+      {
         label: '账号设置',
         icon: 'mdi-cog-outline' as const,
         onClick: () => handleNavigate('/package-settings/pages/system-settings/index'),
@@ -540,15 +658,15 @@ const Profile: React.FC = () => {
     [handleNavigate],
   );
 
-  // 家长视图：4 列核心数据
+  // 家长视图：4 列核心数据（绑定孩子聚合）
   const parentStats = useMemo(
     () => [
-      { label: '累计出勤', value: 0, unit: '次' },
-      { label: '剩余次数', value: 0, unit: '次' },
-      { label: '剩余时长', value: 0, unit: '天' },
-      { label: '剩余储值', value: 0, unit: '元' },
+      { label: '累计出勤', value: parentStatValues.attendance, unit: '次' },
+      { label: '剩余次数', value: parentStatValues.remainingTimes, unit: '次' },
+      { label: '剩余课时', value: parentStatValues.remainingHours, unit: '节' },
+      { label: '剩余储值', value: parentStatValues.remainingBalance, unit: '元' },
     ],
-    [],
+    [parentStatValues],
   );
 
   return (
@@ -589,7 +707,9 @@ const Profile: React.FC = () => {
               <Text className="text-[24rpx] text-muted-foreground mt-[14rpx]">
                 {isMembershipActive
                   ? `${quotaUsage?.versionName || '会员'} · 有效期至 ${membershipExpireLabel}`
-                  : '兑换激活码，开通机构会员权益'}
+                  : membershipExpired
+                    ? '会员已到期，兑换激活码续费'
+                    : '兑换激活码，开通机构会员权益'}
               </Text>
             </View>
 
@@ -601,10 +721,14 @@ const Profile: React.FC = () => {
               }}
             >
               <Text className="text-[30rpx] font-bold text-primary-foreground">
-                {isMembershipActive ? '立即查看' : '立即开通'}
+                {isMembershipActive ? '立即查看' : membershipExpired ? '立即续费' : '立即开通'}
               </Text>
               <Text className="text-[20rpx] mt-[10rpx] text-primary-foreground/75">
-                {isMembershipActive ? `至 ${membershipExpireLabel}` : '激活码一键开通'}
+                {isMembershipActive
+                  ? `至 ${membershipExpireLabel}`
+                  : membershipExpired
+                    ? '激活码一键续费'
+                    : '激活码一键开通'}
               </Text>
             </View>
           </View>
@@ -626,6 +750,11 @@ const Profile: React.FC = () => {
         {/* ====== 教师视图 ====== */}
         {isTeacher && (
           <>
+            <ProfileGrid
+              className="mt-[24rpx]"
+              title="教学台账"
+              items={teacherMonthlyFlowItems}
+            />
             {/* 店铺管理：仅管理员/校长 */}
             {isManagerRole &&
               (storeProgress &&
@@ -640,7 +769,9 @@ const Profile: React.FC = () => {
               ) : (
                 <ProfileGrid className="mt-[24rpx]" title="店铺管理" items={teacherStoreItems} />
               ))}
-            <ProfileGrid className="mt-[24rpx]" title="营销活动" items={marketingItems} />
+            {isManagerRole && quotaUsage?.features?.marketing === true ? (
+              <ProfileGrid className="mt-[24rpx]" title="营销活动" items={marketingItems} />
+            ) : null}
             <ProfileGrid className="mt-[24rpx]" title="系统管理" items={teacherSystemItems} />
           </>
         )}

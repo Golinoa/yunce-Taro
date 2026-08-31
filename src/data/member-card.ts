@@ -30,8 +30,8 @@ const MOCK_MEMBER_CARDS: MemberCardDetail[] = [
     cardTypeKind: 'count',
     cardTypeCount: 40,
     cardTypeValidDays: 380,
-    cardTypeFreezeCount: 20,
-    cardTypeFreezeDays: 20,
+    cardTypeFreezeCount: 2,
+    cardTypeFreezeDays: 14,
     studentId: 'stu-001',
     studentName: '张小明',
     studentAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=张小明',
@@ -55,8 +55,8 @@ const MOCK_MEMBER_CARDS: MemberCardDetail[] = [
     cardTypeKind: 'count',
     cardTypeCount: 40,
     cardTypeValidDays: 380,
-    cardTypeFreezeCount: 20,
-    cardTypeFreezeDays: 20,
+    cardTypeFreezeCount: 2,
+    cardTypeFreezeDays: 14,
     studentId: 'stu-002',
     studentName: '赵小红',
     studentAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=赵小红',
@@ -236,8 +236,21 @@ function generateMemberCardId(): string {
   return `mc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** 生成可读会员卡号：MC + 年月日 + 6 位序列 */
+function generateCardNo(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const seq = String(Date.now()).slice(-6);
+  return `MC${y}${m}${d}${seq}`;
+}
+
 /** 根据卡种类型计算初始剩余值 */
-function getInitialRemaining(cardType: CardType): {
+function getInitialRemaining(
+  cardType: CardType,
+  purchasePrice: number,
+): {
   remainingCount?: number;
   remainingDays?: number;
   remainingAmount?: number;
@@ -248,7 +261,8 @@ function getInitialRemaining(cardType: CardType): {
   if (cardType.kind === 'time') {
     return { remainingDays: cardType.validDays };
   }
-  return {};
+  // 储值卡：余额按实付金额入账
+  return { remainingAmount: purchasePrice };
 }
 
 /**
@@ -269,7 +283,9 @@ export const mockIssueMemberCard = async (
     ? new Date(now.getTime() + cardType.validDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     : undefined;
 
-  const remaining = getInitialRemaining(cardType);
+  const purchasePrice = Math.max(0, Number(base.purchasePrice) || 0);
+  const remaining = getInitialRemaining(cardType, purchasePrice);
+  const cardNo = base.cardNo?.trim() || generateCardNo();
 
   const card: MemberCardDetail = {
     id: generateMemberCardId(),
@@ -286,6 +302,9 @@ export const mockIssueMemberCard = async (
     cardTypeFreezeDays: cardType.freezeDays,
     ...remaining,
     ...base,
+    purchasePrice,
+    cardNo,
+    ownerName: base.operatorName,
   };
 
   MOCK_MEMBER_CARDS.unshift(card);
@@ -300,14 +319,14 @@ export const mockIssueMemberCard = async (
       name: `${cardType.name}（会员卡）`,
       memberCardId: card.id,
       type: 'hour_package',
-      subjectId: '',
+      subjectId: cardType.subjectId || '',
       totalHours: count,
       purchasedHours: count,
       bonusHours: 0,
       usedHours: 0,
       remainingHours: count,
-      pricePerHour: cardType.price ? Math.round(cardType.price / count) : 0,
-      totalAmount: cardType.price || 0,
+      pricePerHour: count > 0 ? Math.round(purchasePrice / count) : 0,
+      totalAmount: purchasePrice,
       paymentMethod: 'wechat',
       status: 'active',
       purchaseDate: purchaseAt.split(' ')[0],

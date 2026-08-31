@@ -1,7 +1,7 @@
 ﻿import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React from 'react';
-import Avatar from '@/components/Avatar';
+import StudentAvatar from '@/components/student/StudentAvatar';
 import type { Student } from '@/types/student';
 
 interface StudentQuickListProps {
@@ -33,13 +33,15 @@ const StudentQuickList: React.FC<StudentQuickListProps> = ({ students }) => {
               })
             }
           >
-            <Avatar
-              name={student.name}
-              avatarUrl={student.avatar_url}
-              size="md"
-              className="shadow-soft"
-            />
-            <Text className="text-sm text-foreground max-w-12 truncate">{student.name}</Text>
+            <StudentAvatar name={student.name} src={student.avatar_url} size="md" />
+            <Text className="text-[22rpx] text-foreground truncate max-w-[96rpx] text-center">
+              {student.name}
+            </Text>
+            {student.nickname ? (
+              <Text className="text-[18rpx] text-muted-foreground truncate max-w-[96rpx] text-center">
+                {student.nickname}
+              </Text>
+            ) : null}
           </View>
         ))}
       </View>

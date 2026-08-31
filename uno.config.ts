@@ -225,6 +225,22 @@ export default defineConfig({
           'radial-gradient(ellipse 170% 150% at 24% -16%, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 40%, hsl(var(--primary-dark)) 88%)',
       },
     ],
+    // 首页头部无封面托底：F 风格主题渐变（杂志叠字排版用）
+    [
+      'bg-home-hero-brand',
+      {
+        background:
+          'linear-gradient(135deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 48%, hsl(var(--primary-dark)) 100%)',
+      },
+    ],
+    // 兼容旧类名（若别处仍引用）
+    [
+      'bg-home-hero-mesh',
+      {
+        background:
+          'linear-gradient(135deg, hsl(var(--primary-glow)) 0%, hsl(var(--primary)) 48%, hsl(var(--primary-dark)) 100%)',
+      },
+    ],
     [
       'bg-gradient-primary-dark',
       { background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-dark)))' },

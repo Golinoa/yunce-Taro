@@ -21,6 +21,7 @@ import {
   IDENTITIES,
   ORGANIZATIONS,
   CAMPUSES,
+  TEACHERS,
   type User,
   type Identity as DbIdentity,
 } from './mock-database';
@@ -149,11 +150,18 @@ function buildCurrentContext(identities: Identity[]): CurrentContext {
 
 function buildProfile(user: User): Profile {
   const identities = buildIdentities(user.id);
+  const teacher = TEACHERS.find((t) => t.userId === user.id);
   return {
     id: user.id,
     name: user.name,
     phone: user.phone,
     avatar_url: user.avatar,
+    teacher_profile: teacher
+      ? {
+          id: teacher.id,
+          institution: ORGANIZATIONS.find((o) => o.id === teacher.organizationId)?.name,
+        }
+      : undefined,
     identities,
     currentContext: buildCurrentContext(identities),
     created_at: user.createdAt,
@@ -551,6 +559,67 @@ export async function mockBindWechatCredentials(
   return { session: nextSession, profile: nextProfile, error: null };
 }
 
+/** 绑定邮箱验证码发送（Mock） */
+export async function mockSendBindEmailCode(email: string): Promise<{
+  error: { message: string } | null;
+  maskedEmail?: string;
+}> {
+  await delay(300);
+  const trimmed = email.trim().toLowerCase();
+  if (!isEmail(trimmed)) {
+    return { error: { message: '请输入正确的邮箱' } };
+  }
+  const [local = '', domain = ''] = trimmed.split('@');
+  const masked = `${local.slice(0, Math.min(2, local.length))}***@${domain}`;
+  return { error: null, maskedEmail: masked };
+}
+
+/** 绑定邮箱 + 登录密码（需验证码） */
+export async function mockBindAccountEmail(
+  email: string,
+  password: string,
+  code: string,
+): Promise<{
+  session: AuthSession | null;
+  profile: Profile | null;
+  error: { message: string } | null;
+}> {
+  await delay(400);
+  const trimmed = email.trim().toLowerCase();
+  if (!isEmail(trimmed)) {
+    return { session: null, profile: null, error: { message: '请输入正确的邮箱' } };
+  }
+  if (code.trim() !== '123456') {
+    return { session: null, profile: null, error: { message: '邮箱验证码错误或已过期' } };
+  }
+  if (!password || password.length < 6 || password.length > 20) {
+    return { session: null, profile: null, error: { message: '密码长度应为 6-20 位' } };
+  }
+
+  let session: AuthSession | null = null;
+  let profile: Profile | null = null;
+  try {
+    session = Taro.getStorageSync(AUTH_TOKEN_KEY) as AuthSession | null;
+    profile = Taro.getStorageSync(USER_PROFILE_KEY) as Profile | null;
+  } catch {
+    /* ignore */
+  }
+  if (!session || !profile) {
+    return { session: null, profile: null, error: { message: '请先登录后再绑定' } };
+  }
+
+  const nextProfile: Profile = { ...profile, email: trimmed };
+  const nextSession: AuthSession = {
+    ...session,
+    access_token: generateToken(),
+    refresh_token: generateToken(),
+    expires_at: Date.now() / 1000 + 3600,
+    user: { ...session.user, email: trimmed },
+  };
+  saveSession(nextSession, nextProfile);
+  return { session: nextSession, profile: nextProfile, error: null };
+}
+
 /** 手机号验证码登录 */
 export async function mockPhoneLogin(
   phone: string,
@@ -740,7 +809,24 @@ export async function mockGetSession(): Promise<{
   profile: Profile | null;
 }> {
   await delay(200);
-  return getStoredSession();
+  const stored = getStoredSession();
+  if (!stored.session || !stored.profile) return stored;
+
+  // 旧会话可能缺 teacher_profile，按用户补齐，避免「我的预约」等查空
+  if (!stored.profile.teacher_profile) {
+    const user = USERS.find((u) => u.id === stored.profile!.id);
+    if (user) {
+      const refreshed = buildProfile(user);
+      const merged: Profile = {
+        ...stored.profile,
+        teacher_profile: refreshed.teacher_profile,
+        name: stored.profile.name || refreshed.name,
+      };
+      saveSession(stored.session, merged);
+      return { session: stored.session, profile: merged };
+    }
+  }
+  return stored;
 }
 
 /** 切换当前身份 */

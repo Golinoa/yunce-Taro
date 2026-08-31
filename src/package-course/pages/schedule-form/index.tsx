@@ -905,8 +905,41 @@ const ScheduleForm: React.FC = () => {
         return '结束日期不能早于开始日期';
       }
       if (endMode === 'by_count' && endCount < 1) return '按次数至少为 1';
+      // 结束班级（limited）与排课时间限制联动
+      if (selectedClass?.type === 'limited') {
+        const total = selectedClass.total_lessons ?? 0;
+        const used = selectedClass.used_lessons ?? 0;
+        const remaining = Math.max(0, total - used);
+        if (remaining <= 0) return '该班级课时已用完，无法继续排课';
+        if (endMode === 'never') return '该班级已开启结束课时限制，请选择限日期或按次数';
+        if (endMode === 'by_count' && endCount > remaining) {
+          return `按次数不能超过剩余课时（剩余 ${remaining}）`;
+        }
+        if (endMode === 'by_date' && startDate && endDate && selectedDays.length > 0) {
+          let projected = 0;
+          let cursor = dayjs(startDate);
+          const end = dayjs(endDate);
+          const daySet = new Set(selectedDays);
+          while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
+            const appDay = (cursor.day() || 7) as DayOfWeek;
+            if (daySet.has(appDay)) projected += 1;
+            cursor = cursor.add(1, 'day');
+          }
+          if (projected > remaining) {
+            return `日期范围内预计 ${projected} 次课，超过剩余课时 ${remaining}`;
+          }
+        }
+      }
     } else if (freeDates.length === 0) {
       return '请选择上课日期';
+    } else if (selectedClass?.type === 'limited') {
+      const total = selectedClass.total_lessons ?? 0;
+      const used = selectedClass.used_lessons ?? 0;
+      const remaining = Math.max(0, total - used);
+      if (remaining <= 0) return '该班级课时已用完，无法继续排课';
+      if (freeDates.length > remaining) {
+        return `自由排课选了 ${freeDates.length} 天，超过剩余课时 ${remaining}`;
+      }
     }
     return '';
   }, [
@@ -921,8 +954,12 @@ const ScheduleForm: React.FC = () => {
     mode,
     repeatMode,
     schedulingMode,
+    selectedDays,
     selectedDays.length,
     selectedTeachingTeacherId,
+    selectedClass?.type,
+    selectedClass?.total_lessons,
+    selectedClass?.used_lessons,
     slotMaxCount,
     startDate,
     timeSlots,
@@ -1229,6 +1266,7 @@ const ScheduleForm: React.FC = () => {
             ignoreConflict?: boolean;
             start_date?: string;
             end_date?: string;
+            maxOccurrences?: number;
           } = {
             teacher_id: selectedTeachingTeacherId || currentUserId,
             assistant_teacher_id: selectedAssistantTeacherId || undefined,
@@ -1244,6 +1282,8 @@ const ScheduleForm: React.FC = () => {
             ignoreConflict,
             start_date: ruleStartDate || primary.dateHint,
             end_date: ruleEndDate,
+            maxOccurrences:
+              schedulingMode === 'rule' && endMode === 'by_count' ? endCount : undefined,
           };
           await scheduleService.update(scheduleId, data);
         } else {
@@ -1253,6 +1293,7 @@ const ScheduleForm: React.FC = () => {
               ignoreConflict?: boolean;
               start_date?: string;
               end_date?: string;
+              maxOccurrences?: number;
             } = {
               teacher_id: selectedTeachingTeacherId || currentUserId,
               assistant_teacher_id: selectedAssistantTeacherId || undefined,
@@ -1267,7 +1308,13 @@ const ScheduleForm: React.FC = () => {
               reminder_minutes: reminderMinutes,
               ignoreConflict,
               start_date: t.dateHint || ruleStartDate,
-              end_date: ruleEndDate,
+              end_date: ruleEndDate || (t.dateHint && selectedClass?.type === 'limited' ? t.dateHint : undefined),
+              maxOccurrences:
+                schedulingMode === 'rule' && endMode === 'by_count'
+                  ? endCount
+                  : schedulingMode === 'free' && selectedClass?.type === 'limited'
+                    ? 1
+                    : undefined,
             };
             await scheduleService.create(data);
           }
@@ -1485,7 +1532,7 @@ const ScheduleForm: React.FC = () => {
           className="flex min-h-[260rpx] flex-col items-center justify-center rounded-[16rpx] border-[2rpx] border-dashed border-border bg-muted/60"
           onClick={() => openTimePickerFlow()}
         >
-          <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-[#FF8A2A] shadow-md">
+          <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-primary shadow-md">
             <Icon name="mdi-plus" size={40} color="#ffffff" />
           </View>
           <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">添加上课时间</Text>

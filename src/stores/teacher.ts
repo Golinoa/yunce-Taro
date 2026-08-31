@@ -68,6 +68,7 @@ interface TeacherState {
   addTeacher: (teacher: TeacherUIModel) => Promise<void>;
   updateTeacher: (id: string, updates: Partial<TeacherUIModel>) => Promise<void>;
   resignTeacher: (id: string, resignType: string, reason?: string) => Promise<void>;
+  restoreTeacher: (id: string) => Promise<void>;
   addDeduction: (teacherId: string, deduction: Deduction) => Promise<void>;
   updateDeduction: (
     teacherId: string,
@@ -310,6 +311,18 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
     }
   },
 
+  restoreTeacher: async (id) => {
+    try {
+      await teacherService.restore(id);
+      const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      set({ teachers });
+    } catch (err) {
+      logError('teacherStore.restoreTeacher', err);
+      set({ error: '恢复在职失败，请重试' });
+      throw err;
+    }
+  },
+
   addDeduction: async (teacherId, deduction) => {
     try {
       await teacherService.addDeduction(teacherId, deduction);
@@ -389,15 +402,20 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   },
 
   applySalaryTemplate: async (templateId, teacherIds) => {
-    const result = await salaryTemplateService.apply(templateId, teacherIds);
-    if (result.success) {
-      const [teachers, salaryTemplates] = await Promise.all([
-        teacherService.getList(undefined, get().salaryMonth),
-        salaryTemplateService.getList(),
-      ]);
-      set({ teachers, salaryTemplates });
+    try {
+      const result = await salaryTemplateService.apply(templateId, teacherIds);
+      if (result.success) {
+        const [teachers, salaryTemplates] = await Promise.all([
+          teacherService.getList(undefined, get().salaryMonth),
+          salaryTemplateService.getList(),
+        ]);
+        set({ teachers, salaryTemplates });
+      }
+      return result.success;
+    } catch (err) {
+      logError('teacherStore.applySalaryTemplate', err);
+      return false;
     }
-    return result.success;
   },
 
   // ===== 教师薪资规则 =====
