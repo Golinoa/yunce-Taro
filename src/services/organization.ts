@@ -64,6 +64,11 @@ export const organizationService = {
     return post<BindOrganizationResult>('/organization/bind', { inviteCode });
   },
 
+  /** 家长邀请链接绑定（服务端 token，48h / 一次性） */
+  bindByParentLink: async (token: string): Promise<BindOrganizationResult> => {
+    return post<BindOrganizationResult>('/organization/bind-parent-link', { token });
+  },
+
   /** 保存关系确认（self / father / mother） */
   saveRelation: async (
     studentParentId: string,

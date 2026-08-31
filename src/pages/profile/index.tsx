@@ -28,6 +28,7 @@ import StoreOnboarding from '@/components/profile/StoreOnboarding';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { resolveLifecycle } from '@/constants/membership-tips';
+import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
 import {
@@ -698,6 +699,7 @@ const Profile: React.FC = () => {
         />
 
         <WechatBindReminder className="mx-[32rpx] mt-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
+        <EmailBindReminder className="mx-[32rpx] mt-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
 
         {/* ====== 会员权益卡片（仅管理员/校长） ====== */}
         {isManagerRole && (

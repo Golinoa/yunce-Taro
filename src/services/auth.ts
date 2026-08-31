@@ -184,14 +184,14 @@ function readClientRegisterDraft(): RegisterDraft | null {
 
 const buildOrganizationName = (user: BackendUserInfo, role: UserRole): string => {
   if (role === 'teacher') {
-    return user.teacher?.institution ?? '松果排课';
+    return user.teacher?.institution?.trim() || '';
   }
 
   if (role === 'principal') {
-    return user.principal?.institution ?? '松果排课';
+    return user.principal?.institution?.trim() || '';
   }
 
-  return user.parent?.student?.name ? `${user.parent.student.name}家长` : '松果排课';
+  return user.parent?.student?.name ? `${user.parent.student.name}家长` : '';
 };
 
 const mapBackendProfile = (user: BackendUserInfo): Profile => {

@@ -306,13 +306,31 @@ export function post<T = unknown>(
   return request<T>({ url, method: 'POST', data, skipAuth: options?.skipAuth });
 }
 
+/** Drop undefined/null/empty/"undefined" so MiniProgram does not send literal query junk */
+function sanitizeQueryParams(
+  params?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!params) return undefined;
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '' || value === 'undefined') continue;
+    cleaned[key] = value;
+  }
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
 /** GET 请求 */
 export function get<T = unknown>(
   url: string,
   params?: Record<string, unknown>,
   options?: { skipAuth?: boolean },
 ): Promise<T> {
-  return request<T>({ url, method: 'GET', data: params, skipAuth: options?.skipAuth });
+  return request<T>({
+    url,
+    method: 'GET',
+    data: sanitizeQueryParams(params),
+    skipAuth: options?.skipAuth,
+  });
 }
 
 /** PUT 请求 */

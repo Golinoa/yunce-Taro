@@ -1421,20 +1421,76 @@ export const packageService = {
 // 课包模板 Service
 // ============================================
 export const packageTemplateService = {
-  /** 获取教师的课包模板列表 */
-  getByTeacher: async (_teacherId: string): Promise<CoursePackageTemplate[]> =>
-    notWired('packageTemplate.getByTeacher'),
+  getByTeacher: async (_teacherId: string): Promise<CoursePackageTemplate[]> => {
+    const data = await get<unknown>('/package-templates');
+    const rows = Array.isArray(data)
+      ? data
+      : asPaginatedResponse<Record<string, unknown>>(
+          data as PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[] | null,
+          1,
+          100,
+        ).list;
+    return rows.map((raw) => {
+      const r = raw as Record<string, unknown>;
+      return {
+        id: String(r.id),
+        teacher_id: String(r.teacherId ?? r.teacher_id ?? ''),
+        name: String(r.name ?? ''),
+        type: (r.type as CoursePackageTemplate['type']) || 'hour_package',
+        price: Number(r.price ?? 0),
+        lesson_count: Number(r.lessonCount ?? r.lesson_count ?? 0),
+        duration: Number(r.duration ?? 45),
+        valid_days: r.validDays != null ? Number(r.validDays) : undefined,
+        subject_id: r.subjectId ? String(r.subjectId) : undefined,
+        description: r.description ? String(r.description) : undefined,
+        created_at: String(r.createdAt ?? r.created_at ?? ''),
+        updated_at: String(r.updatedAt ?? r.updated_at ?? ''),
+      };
+    });
+  },
 
-  /** 创建课包模板 */
-  create: async (_data: Omit<CoursePackageTemplate, 'id' | 'created_at' | 'updated_at'>) =>
-    notWired('packageTemplate.create'),
+  create: async (data: Omit<CoursePackageTemplate, 'id' | 'created_at' | 'updated_at'>) => {
+    const raw = await post<Record<string, unknown>>('/package-templates', {
+      name: data.name,
+      type: data.type,
+      price: data.price,
+      lessonCount: data.lesson_count,
+      duration: data.duration,
+      validDays: data.valid_days,
+      description: data.description,
+    });
+    return {
+      id: String(raw.id),
+      teacher_id: String(raw.teacherId ?? ''),
+      name: String(raw.name ?? data.name),
+      type: (raw.type as CoursePackageTemplate['type']) || data.type,
+      price: Number(raw.price ?? data.price),
+      lesson_count: Number(raw.lessonCount ?? data.lesson_count),
+      duration: Number(raw.duration ?? data.duration),
+      valid_days: raw.validDays != null ? Number(raw.validDays) : data.valid_days,
+      description: raw.description ? String(raw.description) : data.description,
+      created_at: String(raw.createdAt ?? ''),
+      updated_at: String(raw.updatedAt ?? ''),
+    } as CoursePackageTemplate;
+  },
 
-  /** 更新课包模板 */
-  update: async (_templateId: string, _data: Partial<CoursePackageTemplate>) =>
-    notWired('packageTemplate.update'),
+  update: async (templateId: string, data: Partial<CoursePackageTemplate>) => {
+    const body: Record<string, unknown> = {};
+    if (data.name !== undefined) body.name = data.name;
+    if (data.type !== undefined) body.type = data.type;
+    if (data.price !== undefined) body.price = data.price;
+    if (data.lesson_count !== undefined) body.lessonCount = data.lesson_count;
+    if (data.duration !== undefined) body.duration = data.duration;
+    if (data.valid_days !== undefined) body.validDays = data.valid_days;
+    if (data.description !== undefined) body.description = data.description;
+    await put(`/package-templates/${templateId}`, body);
+    const list = await packageTemplateService.getByTeacher('');
+    return list.find((t) => t.id === templateId) ?? null;
+  },
 
-  /** 删除课包模板 */
-  remove: async (_templateId: string) => notWired('packageTemplate.remove'),
+  remove: async (templateId: string) => {
+    await del(`/package-templates/${templateId}`);
+  },
 };
 
 // ============================================

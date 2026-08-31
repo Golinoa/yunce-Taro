@@ -78,7 +78,7 @@ export const teacherService = {
 // src/services/index.ts
 // 页面只从此文件导入，不直接引用 @/data/*
 
-export { teacherService, salaryModelService, salarySettingsService, teacherScheduleService } from './teacher';
+export { teacherService, salaryModelService, salarySettingsService } from './teacher';
 export { studentService, ... } from './student';
 export { authService } from './auth';
 export { homeService } from './home';

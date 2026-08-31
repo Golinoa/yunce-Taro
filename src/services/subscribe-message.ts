@@ -127,20 +127,37 @@ function resolveAuthEntries(groups: SubscribeTemplateGroup[]): SubscribeAuthEntr
 }
 
 export const subscribeMessageService = {
-  async bootstrap(role?: string, campusId?: string): Promise<SubscribeBootstrapDto> {
+  async bootstrap(
+    role?: string,
+    campusId?: string,
+    options?: { force?: boolean },
+  ): Promise<SubscribeBootstrapDto> {
     const userId = await resolveUserId();
     if (!userId) {
       return { templates: [], quotas: [], pendingPrompts: [], lowQuotaGroups: [] };
     }
 
+    if (options?.force) {
+      bootstrapCache = null;
+    }
+
     try {
-      bootstrapCache = await get<SubscribeBootstrapDto>('/subscribe-message/bootstrap', {
-        role,
-        campusId,
-      });
+      const params: Record<string, string> = {};
+      if (typeof role === 'string' && role.length > 0 && role !== 'undefined') {
+        params.role = role;
+      }
+      if (typeof campusId === 'string' && campusId.length > 0 && campusId !== 'undefined') {
+        params.campusId = campusId;
+      }
+      bootstrapCache = await get<SubscribeBootstrapDto>(
+        '/subscribe-message/bootstrap',
+        Object.keys(params).length > 0 ? params : undefined,
+      );
       return bootstrapCache;
     } catch (error) {
       logError('subscribe.bootstrap', error);
+      // Do not keep stale cache on failure — page should show empty/error, not old remains
+      bootstrapCache = null;
       return { templates: [], quotas: [], pendingPrompts: [], lowQuotaGroups: [] };
     }
   },
@@ -162,7 +179,7 @@ export const subscribeMessageService = {
       return result.quotas;
     } catch (error) {
       logError('subscribe.authReport', error);
-      return bootstrapCache?.quotas ?? [];
+      throw error;
     }
   },
 
@@ -196,31 +213,37 @@ export const subscribeMessageService = {
     return useSubscribeAuthStore.getState().openRenewSheet(input);
   },
 
+  /**
+   * Request WeChat subscribe auth for groups, report accepts, return updated quotas.
+   * `acceptedCount` is 0 when user rejects all / no tmpl / WeChat error — callers must not toast success.
+   */
   async requestAuthAndReport(
     groups: SubscribeTemplateGroup[],
     scene: string,
     meta?: { role?: string; campusId?: string },
-  ): Promise<SubscribeQuotaDto[]> {
-    if (!bootstrapCache) {
-      await this.bootstrap(meta?.role, meta?.campusId);
-    }
+  ): Promise<{ quotas: SubscribeQuotaDto[]; acceptedCount: number }> {
+    await this.bootstrap(meta?.role, meta?.campusId, { force: !bootstrapCache });
 
     const entries = resolveAuthEntries(groups);
 
     if (entries.length === 0) {
       logError('subscribe.requestAuth', new Error('无可授权模板（tmplId 未配置或未 enabled）'));
-      return bootstrapCache?.quotas ?? [];
+      return { quotas: bootstrapCache?.quotas ?? [], acceptedCount: 0 };
     }
 
     const items = await requestSubscribeMessageAuth(entries);
-    if (items.length === 0) return bootstrapCache?.quotas ?? [];
+    const acceptedCount = items.filter((item) => item.status === 'accept').length;
+    if (items.length === 0 || acceptedCount === 0) {
+      return { quotas: bootstrapCache?.quotas ?? [], acceptedCount: 0 };
+    }
 
-    return this.authReport({
+    const quotas = await this.authReport({
       scene,
       campusId: meta?.campusId,
       items,
       clientRequestId: createClientRequestId(),
     });
+    return { quotas, acceptedCount };
   },
 
   async openPromptFromPending(prompt: SubscribePendingPromptDto): Promise<void> {
@@ -539,10 +562,11 @@ export const subscribeMessageService = {
     }
 
     try {
-      return await this.requestAuthAndReport(LOGIN_OPT_IN_GROUPS, 'settings_toggle', {
+      const result = await this.requestAuthAndReport(LOGIN_OPT_IN_GROUPS, 'settings_toggle', {
         role: options?.role,
         campusId: options?.campusId,
       });
+      return result.quotas;
     } catch (error) {
       logError('subscribe.setMasterNotifyEnabled.auth', error);
       return bootstrapCache?.quotas ?? [];
@@ -588,10 +612,15 @@ export const subscribeMessageService = {
     if (userId) {
       markLoginOptInDone(userId);
     }
-    return this.requestAuthAndReport(LOGIN_OPT_IN_GROUPS, meta?.scene || 'login_opt_in', {
-      role: meta?.role,
-      campusId: meta?.campusId,
-    });
+    const result = await this.requestAuthAndReport(
+      LOGIN_OPT_IN_GROUPS,
+      meta?.scene || 'login_opt_in',
+      {
+        role: meta?.role,
+        campusId: meta?.campusId,
+      },
+    );
+    return result.quotas;
   },
 
   messageAuthPageUrl: MESSAGE_AUTH_PAGE,

@@ -298,7 +298,10 @@ async function main() {
   await check(suite, 'GET /students/ (bound children)', async () => {
     const data = await expectBizOk('GET', '/students/', parent.token, 'students');
     const list = data?.list || data;
-    return Array.isArray(list) ? `n=${list.length}` : 'ok';
+    if (!Array.isArray(list) || list.length < 1) {
+      throw new Error(`parent bound children empty (n=${Array.isArray(list) ? list.length : 0})`);
+    }
+    return `n=${list.length}`;
   });
   await check(suite, 'GET /class-booking/my-records', () =>
     expectBizOk('GET', '/class-booking/my-records', parent.token, 'my-records').catch(() =>

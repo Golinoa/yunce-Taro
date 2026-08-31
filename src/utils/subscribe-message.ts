@@ -1,25 +1,17 @@
 import Taro from '@tarojs/taro';
+import type { SubscribeAuthStatus, SubscribeTemplateGroup } from '@/types/subscribe-message';
+import { isDevApiEnv } from '@/utils/build-env';
 
 /**
- * 未点名提醒订阅消息（用户口径 2026-08-23）
- *
- * 流程：当天 20:00 后，今日课表中「下课未点名」的课程 → 微信订阅消息提醒老师补点名。
- *
- * 重要约束（微信官方）：
- * - 订阅消息的「发送」必须由【服务端】调用 subscribeMessage.send 完成，小程序端只能
- *   requestSubscribeMessage 申请一次性授权（用户同意一次，服务端可发一条）。
- * - 需要在小程序后台申请「未点名提醒」类模板，将模板 ID 填入 UNATTENDED_REMIND_TEMPLATE_ID。
- * - mock 阶段：前端模拟推送（本地记录已推送，避免重复），不真实发送；
- *   联调时由后端消费推送任务（每日 20:00 定时任务扫未点名课程 → send）。
+ * Unattended check-in reminder subscribe message helpers.
+ * Client only requests one-time auth; server sends via subscribeMessage.send.
  */
-import type { SubscribeAuthStatus, SubscribeTemplateGroup } from '@/types/subscribe-message';
-
-/** 未点名提醒订阅模板 ID（小程序后台「订阅消息」申请后替换） */
+/** Template id from MP admin (replace when configured). */
 export const UNATTENDED_REMIND_TEMPLATE_ID = '';
 
 const PUSH_STORAGE_KEY = 'yunce-unattended-push';
 
-/** 查询某天是否已推送过未点名提醒 */
+/** Whether an unattended reminder was already recorded for the date (local dedupe). */
 export function hasPushedUnattended(dateStr: string): boolean {
   try {
     const raw = Taro.getStorageSync(PUSH_STORAGE_KEY);
@@ -127,8 +119,8 @@ export async function requestSubscribeMessageAuth(
     return [];
   }
 
-  // Mock 模板 ID：开发态直接记 accept，避免非真机环境 requestSubscribeMessage 报错
-  if (tmplIds.every((id) => id.startsWith('mock-'))) {
+  // Dev-only: mock tmpl ids skip WeChat API. Never auto-accept in prod builds.
+  if (isDevApiEnv() && tmplIds.every((id) => id.startsWith('mock-'))) {
     return uniqueEntries.map((entry) => ({
       tmplId: entry.tmplId,
       group: entry.group,

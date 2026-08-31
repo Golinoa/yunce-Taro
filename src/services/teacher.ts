@@ -174,11 +174,12 @@ export const teacherService = {
     return true;
   },
 
-  addDeduction: async (teacherId: string, deduction: Deduction) => {
+  addDeduction: async (teacherId: string, deduction: Deduction & { month?: string }) => {
     const created = await post<RawRecord>(`/teachers/${teacherId}/deductions`, {
       reason: deduction.reason,
       amount: deduction.amount,
       type: deduction.type,
+      ...(deduction.month ? { month: deduction.month } : {}),
     });
     return mapBackendDeduction(created);
   },
@@ -188,11 +189,12 @@ export const teacherService = {
     _deductionId: string,
     _updates: Partial<Pick<Deduction, 'reason' | 'amount' | 'type'>>,
   ) => {
-    return notWired('teacher.updateDeduction');
+    // 产品：落库后不可改；草稿仅在提交前本地编辑
+    throw new Error('已落库的扣款不可修改');
   },
 
   deleteDeduction: async (_teacherId: string, _deductionId: string) => {
-    return notWired('teacher.deleteDeduction');
+    throw new Error('已落库的扣款不可删除');
   },
 };
 
@@ -250,12 +252,6 @@ export const salarySettingsService = {
   },
 };
 
-export const teacherScheduleService = {
-  getList: async () => {
-    return notWired('teacherSchedule.getList');
-  },
-};
-
 export const salaryTemplateService = {
   getList: async () => {
     return fetchSalaryTemplates({});
@@ -289,9 +285,11 @@ export const salaryTemplateService = {
     return true;
   },
 
-  apply: async (_templateId: string, _teacherIds: string[]): Promise<{ success: boolean }> => {
-    // 后端暂无批量套用接口：明确失败，禁止假成功
-    throw new Error('模板套用尚未开通，请稍后或联系管理员');
+  apply: async (templateId: string, teacherIds: string[]): Promise<{ success: boolean }> => {
+    await post(`/attendance/salary-templates/${encodeURIComponent(templateId)}/apply`, {
+      teacherIds,
+    });
+    return { success: true };
   },
 
   createDefaultRule: () => createDefaultSalaryRule(),

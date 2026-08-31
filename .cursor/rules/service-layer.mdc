@@ -44,7 +44,6 @@ src/services/
 export const teacherService = { ... };
 export const salaryModelService = { ... };
 export const salarySettingsService = { ... };
-export const teacherScheduleService = { ... };
 ```
 
 ## 3. Service 标准模板
@@ -150,7 +149,7 @@ export const teacherService = {
 // src/services/index.ts
 // 页面/Store 只从此文件导入
 
-export { teacherService, salaryModelService, salarySettingsService, teacherScheduleService } from './teacher';
+export { teacherService, salaryModelService, salarySettingsService } from './teacher';
 export { studentService, packageService, lessonRecordService, leaveService, classService, scheduleService, notificationService } from './student';
 export { campusService, salaryModelCampusService, payDaySettingsService, holidayService, businessHoursService, notifyService, campusDataService, subjectService } from './campus';
 export { authService } from './auth';

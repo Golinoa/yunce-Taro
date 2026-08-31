@@ -54,7 +54,22 @@ describe('auth-onboarding', () => {
     expect(needsProfileSetup(baseProfile({ name: '张老师', nickname: '张老师' }))).toBe(false);
   });
 
-  it('needsOnboarding 校长默认机构需入驻', () => {
+  it('needsOnboarding 校长无机构名需入驻', () => {
+    expect(
+      needsOnboarding(
+        baseProfile({
+          identities: [
+            {
+              id: 'identity-1',
+              role: 'principal',
+              organizationId: 'org-1',
+              organizationName: '',
+              isDefault: true,
+            },
+          ],
+        }),
+      ),
+    ).toBe(true);
     expect(needsOnboarding(baseProfile())).toBe(true);
     expect(
       needsOnboarding(

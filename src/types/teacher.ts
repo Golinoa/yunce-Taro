@@ -105,6 +105,8 @@ export interface Deduction {
   reason: string;
   amount: number;
   type: DeductionType;
+  /** 提交时可选：用于拦截已确认/已发薪月份 */
+  month?: string;
 }
 
 /** 班级计费覆盖 */

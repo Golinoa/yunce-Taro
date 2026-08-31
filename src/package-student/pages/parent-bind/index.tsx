@@ -16,12 +16,16 @@ import { withRouteGuard } from '@/utils/route-guard';
  */
 const ParentBind: React.FC = () => {
   const { profile } = useAuth();
-  const isParent = profile?.currentContext?.role === 'parent';
   const isLoggedIn = !!profile;
 
   const studentId = useMemo(() => {
     const instance = Taro.getCurrentInstance();
     return decodeURIComponent(instance?.router?.params?.studentId || '');
+  }, []);
+
+  const inviteToken = useMemo(() => {
+    const instance = Taro.getCurrentInstance();
+    return decodeURIComponent(instance?.router?.params?.token || '');
   }, []);
 
   const [student, setStudent] = useState<Student | null>(null);
@@ -54,7 +58,7 @@ const ParentBind: React.FC = () => {
       });
   }, [studentId]);
 
-  // 绑定操作：邀请码真源；无码引导去「我的」
+  // 绑定：优先服务端邀请链接 token；否则学员 invite_code
   const handleBind = useCallback(async () => {
     if (!isLoggedIn) {
       Taro.showToast({ title: '请先登录', icon: 'none' });
@@ -63,29 +67,28 @@ const ParentBind: React.FC = () => {
       }, 1500);
       return;
     }
-    if (!isParent) {
-      Taro.showToast({ title: '仅家长账号可绑定', icon: 'none' });
-      return;
-    }
     if (!studentId || !profile?.id) return;
-
-    const inviteCode = student?.invite_code?.trim();
-    if (!inviteCode || inviteCode === '请联系老师') {
-      const { confirm } = await Taro.showModal({
-        title: '请使用邀请码绑定',
-        content: '该分享链接无法直接绑定。请向机构索取学员邀请码，在「我的」页输入绑定。',
-        confirmText: '去绑定',
-        cancelText: '取消',
-      });
-      if (confirm) {
-        void Taro.switchTab({ url: '/pages/profile/index' });
-      }
-      return;
-    }
 
     setBinding(true);
     try {
-      await organizationService.bind(inviteCode.toUpperCase());
+      if (inviteToken) {
+        await organizationService.bindByParentLink(inviteToken);
+      } else {
+        const inviteCode = student?.invite_code?.trim();
+        if (!inviteCode || inviteCode === '请联系老师') {
+          const { confirm } = await Taro.showModal({
+            title: '请使用邀请码绑定',
+            content: '该分享链接无法直接绑定。请向机构索取学员邀请码，在「我的」页输入绑定。',
+            confirmText: '去绑定',
+            cancelText: '取消',
+          });
+          if (confirm) {
+            void Taro.switchTab({ url: '/pages/profile/index' });
+          }
+          return;
+        }
+        await organizationService.bind(inviteCode.toUpperCase());
+      }
       setBound(true);
       Taro.showToast({ title: '绑定成功', icon: 'success' });
     } catch (err: unknown) {
@@ -94,7 +97,7 @@ const ParentBind: React.FC = () => {
     } finally {
       setBinding(false);
     }
-  }, [isLoggedIn, isParent, studentId, profile?.id, student?.invite_code]);
+  }, [isLoggedIn, studentId, profile?.id, inviteToken, student?.invite_code]);
   // 返回首页
   const goHome = useCallback(() => {
     Taro.switchTab({ url: '/pages/home/index' });

@@ -198,7 +198,7 @@ const SalaryAdjustPage: React.FC = () => {
   useCardNavigationBar();
   const { activeTheme } = useThemeStore();
   const { id } = useRouter().params;
-  const { teachers, updateTeacher } = useTeacherStore();
+  const { teachers, addDeduction } = useTeacherStore();
 
   const teacher = useMemo(() => teachers.find((t) => t.id === id), [teachers, id]);
 
@@ -327,36 +327,32 @@ const SalaryAdjustPage: React.FC = () => {
     return Math.max(0, result);
   }, [teacher, form, customBonus, customDeduct]);
 
-  /** 保存调整 */
+  /** 保存调整：草稿仅提交新增扣款；已确认/已发薪由后端拦截 */
   const handleSave = useCallback(async () => {
     if (!teacher) return;
 
-    const deductions = form.deductions.map((d) => ({
-      id: d.id.startsWith('temp-')
-        ? `d${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        : d.id,
-      reason: d.reason.trim() || '自定义调整',
-      amount: parseAmount(d.amount),
-      type: d.type,
-    }));
+    const month = new Date().toISOString().slice(0, 7);
+    const newRows = form.deductions.filter((d) => d.id.startsWith('temp-'));
 
     try {
-      await updateTeacher(teacher.id, {
-        base: parseAmount(form.base),
-        lateFine: parseAmount(form.lateFine),
-        otherFine: parseAmount(form.otherFine),
-        bonusAmount: parseAmount(form.bonusAmount),
-        socialInsurance: parseAmount(form.socialInsurance),
-        deductions,
-      });
+      for (const d of newRows) {
+        await addDeduction(teacher.id, {
+          id: `temp-${Date.now()}`,
+          reason: d.reason.trim() || '自定义调整',
+          amount: parseAmount(d.amount),
+          type: d.type,
+          month,
+        });
+      }
+      // 非 temp 行视为已落库，本页不再调改删（产品：落库后不可改）
       Taro.showToast({ title: '保存成功', icon: 'success' });
       setTimeout(() => {
         void Taro.navigateBack();
       }, 500);
     } catch {
-      Taro.showToast({ title: '保存失败', icon: 'none' });
+      Taro.showToast({ title: '保存失败（可能该月已确认/已发薪）', icon: 'none' });
     }
-  }, [teacher, form, updateTeacher]);
+  }, [teacher, form, addDeduction]);
 
   if (!teacher) {
     return (

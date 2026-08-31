@@ -152,33 +152,37 @@ export function navigateAfterAuth(
   const isNewUser = Boolean(options?.isNewUser) || hasIdentitySelectionPending();
 
   if (needsProfileSetup(profile, options?.isNewUser)) {
+    // Keep identity-select pending across profile-setup (production funnel)
+    markIdentitySelectionPending();
     Taro.redirectTo({ url: '/package-auth/pages/profile-setup/index' });
     return;
   }
 
   if (isNewUser) {
-    // 携带员工邀请码分享上下文 → 归属流程已由注册/登录接口完成，直接进首页弹关系确认
+    // Share invite context already attached at login → home + relation confirm
     if (hasPendingInviteCode()) {
       consumePendingInviteCode();
       consumeIdentitySelectionPending();
       navigateAfterLogin(profile);
       return;
     }
-    // 普通新用户 → 选择身份页
+    // New user → identity-select (store entry | bind org). Same path as production.
     markIdentitySelectionPending();
     Taro.redirectTo({ url: '/package-auth/pages/identity-select/index' });
     return;
   }
 
   if (needsOnboarding(profile)) {
-    Taro.redirectTo({ url: '/package-auth/pages/onboarding/index' });
+    // Legacy onboarding page retired; reuse identity-select
+    markIdentitySelectionPending();
+    Taro.redirectTo({ url: '/package-auth/pages/identity-select/index' });
     return;
   }
 
   navigateAfterLogin(profile);
 }
 
-/** 完善资料后的下一步 */
+/** After profile-setup: continue production funnel via pending identity flag */
 export function navigateAfterProfileSetup(profile: Profile | null): void {
   navigateAfterAuth(profile, { isNewUser: false });
 }

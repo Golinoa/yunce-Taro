@@ -1,5 +1,5 @@
 import { View, Text } from '@tarojs/components';
-import Taro, { useLoad } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useRef, useState } from 'react';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -11,50 +11,70 @@ import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /**
- * 补充发送次数页
- *
- * 用途：微信订阅消息是「一次授权 = 可发一条」。本页用于查看剩余次数，并主动补充授权攒额度。
- * （不是总开关；总开关在「消息通知」页顶部。）
+ * Subscribe quota top-up page ("补充发送次数").
+ * One WeChat accept = one server send credit. Master toggle lives on notifications settings.
  */
 const MessageAuthPage: React.FC = () => {
   useCardNavigationBar();
-  const loadedRef = useRef(false);
+  const loadingRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [quotas, setQuotas] = useState<SubscribeQuotaDto[]>([]);
-  const [authLoadingGroup, setAuthLoadingGroup] = useState<SubscribeTemplateGroup | null>(null);
+  const [authLoadingGroup, setAuthLoadingGroup] = useState<SubscribeTemplateGroup | 'batch' | null>(
+    null,
+  );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    if (loadingRef.current) return;
+    const now = Date.now();
+    // Debounce re-entry jitter when navigating back within 1.5s
+    if (!force && now - lastLoadAtRef.current < 1500) return;
+    loadingRef.current = true;
+    lastLoadAtRef.current = now;
     setLoading(true);
     try {
-      const data = await subscribeMessageService.bootstrap();
+      const data = await subscribeMessageService.bootstrap(undefined, undefined, { force: true });
       setQuotas(data.quotas);
     } catch (err) {
       logError('message-auth.load', err);
       Taro.showToast({ title: '加载失败', icon: 'none' });
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
-  // 用 useLoad 替代 useDidShow，避免反复进栈/返回时重复 bootstrap 触发路由抖动
-  useLoad(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    void load();
+  useDidShow(() => {
+    void load(false);
   });
+
+  const applyAuthResult = (
+    result: { quotas: SubscribeQuotaDto[]; acceptedCount: number },
+    emptyHint: string,
+  ) => {
+    setQuotas(result.quotas);
+    if (result.acceptedCount > 0) {
+      Taro.showToast({
+        title: `已补充 ${result.acceptedCount} 次可发送额度`,
+        icon: 'none',
+      });
+      return;
+    }
+    Taro.showToast({ title: emptyHint, icon: 'none' });
+  };
 
   const handleAuthGroup = async (group: SubscribeTemplateGroup) => {
     if (authLoadingGroup) return;
     setAuthLoadingGroup(group);
     try {
-      const next = await subscribeMessageService.requestAuthAndReport(
+      const result = await subscribeMessageService.requestAuthAndReport(
         [group],
         'settings_message_auth',
       );
-      setQuotas(next);
-      Taro.showToast({ title: '已补充可发送次数', icon: 'none' });
+      applyAuthResult(result, '未获得授权，次数未变化');
     } catch {
-      Taro.showToast({ title: '授权未完成', icon: 'none' });
+      Taro.showToast({ title: '授权上报失败，请重试', icon: 'none' });
+      void load(true);
     } finally {
       setAuthLoadingGroup(null);
     }
@@ -68,16 +88,16 @@ const MessageAuthPage: React.FC = () => {
       'lesson_result',
       'todo_remind',
     ];
-    setAuthLoadingGroup('class_remind');
+    setAuthLoadingGroup('batch');
     try {
-      const next = await subscribeMessageService.requestAuthAndReport(
+      const result = await subscribeMessageService.requestAuthAndReport(
         core,
         'settings_message_auth_batch',
       );
-      setQuotas(next);
-      Taro.showToast({ title: '已补充可发送次数', icon: 'none' });
+      applyAuthResult(result, '未获得授权，次数未变化');
     } catch {
-      Taro.showToast({ title: '授权未完成', icon: 'none' });
+      Taro.showToast({ title: '授权上报失败，请重试', icon: 'none' });
+      void load(true);
     } finally {
       setAuthLoadingGroup(null);
     }
@@ -103,7 +123,7 @@ const MessageAuthPage: React.FC = () => {
             onClick={() => void handleAuthAllCore()}
           >
             <Text className="text-[24rpx] font-medium text-primary">
-              {authLoadingGroup === 'class_remind' ? '授权中…' : '一键补充'}
+              {authLoadingGroup === 'batch' ? '授权中…' : '一键补充'}
             </Text>
           </View>
         </View>
@@ -116,7 +136,7 @@ const MessageAuthPage: React.FC = () => {
               const q = quotaMap.get(group);
               const remain = q?.remain ?? 0;
               const enabled = Boolean(q?.tmplId);
-              const isLoading = authLoadingGroup === group;
+              const isLoading = authLoadingGroup === group || authLoadingGroup === 'batch';
 
               return (
                 <View

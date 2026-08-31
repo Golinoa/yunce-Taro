@@ -26,7 +26,7 @@ import {
   fetchAllPages,
   type PaginatedResponse,
 } from '@/utils/pagination';
-import { get, post, put } from '@/utils/request';
+import { del, get, post, put } from '@/utils/request';
 
 interface BackendNotifySettingItem {
   enabled: boolean;
@@ -90,6 +90,7 @@ interface BackendCampusItem {
   hoursAlertThreshold?: number;
   daysAlertThreshold?: number;
   amountAlertThreshold?: number;
+  businessHours?: string | null;
 }
 
 function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
@@ -115,6 +116,7 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     daysAlertThreshold: typeof raw.daysAlertThreshold === 'number' ? raw.daysAlertThreshold : 7,
     amountAlertThreshold:
       typeof raw.amountAlertThreshold === 'number' ? raw.amountAlertThreshold : 200,
+    businessHours: raw.businessHours || undefined,
   };
 }
 
@@ -162,48 +164,129 @@ export const campusService = {
   },
 
   /** 删除校区 */
-  delete: async (_id: string): Promise<boolean> => notWired('DELETE /campuses/:id'),
+  delete: async (id: string): Promise<boolean> => {
+    await del(`/campuses/${id}`);
+    return true;
+  },
 
   /** 设为主校区 */
-  setMain: async (_id: string): Promise<boolean> => notWired('POST /campuses/:id/set-main'),
+  setMain: async (id: string): Promise<boolean> => {
+    await put(`/campuses/${id}/set-main`);
+    return true;
+  },
 };
 
 // ============================================
-// ???? Service
+// Salary / holidays / business hours
 // ============================================
 export const salaryModelCampusService = {
-  getList: async (): Promise<SalaryModel[]> => [],
+  getList: async (): Promise<SalaryModel[]> => {
+    const list = await get<SalaryModel[]>('/teachers/salary-models');
+    return Array.isArray(list) ? list : [];
+  },
 
-  create: async (_model: Omit<SalaryModel, 'id' | 'teacherCount'>): Promise<SalaryModel> =>
-    notWired('POST /salary-models'),
+  create: async (model: Omit<SalaryModel, 'id' | 'teacherCount'>): Promise<SalaryModel> => {
+    return post<SalaryModel>('/teachers/salary-models', {
+      name: model.name,
+      type: model.type,
+      base: model.base,
+      rate: model.rate,
+      attend: model.attend,
+      perf: model.perf,
+      isDefault: model.isDefault ?? false,
+    });
+  },
 
-  update: async (_id: string, _updates: Partial<SalaryModel>): Promise<SalaryModel | null> =>
-    notWired('PUT /salary-models/:id'),
+  update: async (id: string, updates: Partial<SalaryModel>): Promise<SalaryModel | null> => {
+    return put<SalaryModel>(`/teachers/salary-models/${id}`, updates);
+  },
 
-  delete: async (_id: string): Promise<boolean> => notWired('DELETE /salary-models/:id'),
+  delete: async (id: string): Promise<boolean> => {
+    await del(`/teachers/salary-models/${id}`);
+    return true;
+  },
 };
 
 export const payDaySettingsService = {
-  get: async (): Promise<PayDaySettings> => notWired('GET /pay-day-settings'),
+  get: async (): Promise<PayDaySettings> => {
+    const raw = await get<{ payDay?: number }>('/statistics/pay-day-settings');
+    return {
+      mode: 'fixed',
+      fixedDay: Number(raw?.payDay ?? 15),
+    };
+  },
 
-  update: async (_updates: Partial<PayDaySettings>): Promise<PayDaySettings> =>
-    notWired('PUT /pay-day-settings'),
+  update: async (updates: Partial<PayDaySettings>): Promise<PayDaySettings> => {
+    const payDay = updates.fixedDay ?? 15;
+    await put('/statistics/pay-day-settings', { payDay });
+    return { mode: 'fixed', fixedDay: payDay };
+  },
 };
 
+function mapHoliday(raw: Record<string, unknown>): Holiday {
+  const statusRaw = String(raw.status ?? 'rest');
+  return {
+    id: String(raw.id),
+    name: String(raw.name ?? ''),
+    icon: String(raw.icon ?? '🎉'),
+    startDate: String(raw.startDate ?? raw.start_date ?? ''),
+    endDate: String(raw.endDate ?? raw.end_date ?? ''),
+    status: statusRaw === 'work' || statusRaw === 'adjust' ? 'adjust' : 'rest',
+  };
+}
+
 export const holidayService = {
-  getList: async (): Promise<Holiday[]> => [],
+  getList: async (): Promise<Holiday[]> => {
+    const data = await get<unknown>('/holidays', { page: 1, pageSize: 100 });
+    const page = asPaginatedResponse<Record<string, unknown>>(
+      data as PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[] | null,
+      1,
+      100,
+    );
+    if (page.list.length) return page.list.map(mapHoliday);
+    if (Array.isArray(data)) return (data as Record<string, unknown>[]).map(mapHoliday);
+    return [];
+  },
 
-  add: async (_holiday: Omit<Holiday, 'id'>): Promise<Holiday> => notWired('POST /holidays'),
+  add: async (holiday: Omit<Holiday, 'id'>): Promise<Holiday> => {
+    const raw = await post<Record<string, unknown>>('/holidays', {
+      name: holiday.name,
+      icon: holiday.icon || '🎉',
+      startDate: holiday.startDate,
+      endDate: holiday.endDate,
+      type: 'custom',
+      status: holiday.status === 'adjust' ? 'work' : 'rest',
+    });
+    return mapHoliday(raw);
+  },
 
-  update: async (_id: string, _updates: Partial<Holiday>): Promise<Holiday | null> =>
-    notWired('PUT /holidays/:id'),
+  update: async (id: string, updates: Partial<Holiday>): Promise<Holiday | null> => {
+    const body: Record<string, unknown> = {};
+    if (updates.name !== undefined) body.name = updates.name;
+    if (updates.icon !== undefined) body.icon = updates.icon;
+    if (updates.startDate !== undefined) body.startDate = updates.startDate;
+    if (updates.endDate !== undefined) body.endDate = updates.endDate;
+    if (updates.status !== undefined) body.status = updates.status === 'adjust' ? 'work' : 'rest';
+    const raw = await put<Record<string, unknown>>(`/holidays/${id}`, body);
+    return mapHoliday(raw);
+  },
 
-  delete: async (_id: string): Promise<boolean> => notWired('DELETE /holidays/:id'),
+  delete: async (id: string): Promise<boolean> => {
+    await del(`/holidays/${id}`);
+    return true;
+  },
 
-  clearAll: async (): Promise<boolean> => notWired('DELETE /holidays'),
+  clearAll: async (): Promise<boolean> => {
+    await del('/holidays');
+    return true;
+  },
 
-  generateStatutory: async (_year?: number): Promise<number> =>
-    notWired('POST /holidays/generate-statutory'),
+  generateStatutory: async (year?: number): Promise<number> => {
+    const raw = await post<{ created?: number }>('/holidays/generate-statutory', {
+      ...(year != null ? { year } : {}),
+    });
+    return Number(raw?.created ?? 0);
+  },
 };
 
 export const businessHoursService = {
@@ -247,28 +330,177 @@ export const campusDataService = {
 };
 
 export const subjectService = {
-  getList: async (): Promise<Subject[]> => [],
-  getById: async (_id: string): Promise<Subject | null> => null,
-  add: async (_data: SubjectFormData): Promise<Subject> => notWired('POST /subjects'),
-  update: async (_id: string, _data: Partial<SubjectFormData>): Promise<Subject | null> =>
-    notWired('PUT /subjects/:id'),
-  delete: async (_id: string): Promise<boolean> => notWired('DELETE /subjects/:id'),
+  getList: async (): Promise<Subject[]> => {
+    const data = await get<unknown>('/subjects');
+    if (Array.isArray(data)) return data as Subject[];
+    const page = asPaginatedResponse<Subject>(
+      data as PaginatedResponse<Subject> | Subject[] | null,
+      1,
+      100,
+    );
+    return page.list;
+  },
+  getById: async (id: string): Promise<Subject | null> => {
+    try {
+      return await get<Subject>(`/subjects/${id}`);
+    } catch {
+      return null;
+    }
+  },
+  add: async (data: SubjectFormData): Promise<Subject> => post<Subject>('/subjects', { ...data }),
+  update: async (id: string, data: Partial<SubjectFormData>): Promise<Subject | null> =>
+    put<Subject>(`/subjects/${id}`, data as Record<string, unknown>),
+  delete: async (id: string): Promise<boolean> => {
+    await del(`/subjects/${id}`);
+    return true;
+  },
 };
 
 export const venueService = {
-  getList: async (_campusId?: string): Promise<Venue[]> => [],
-  getById: async (_id: string): Promise<Venue | null> => null,
-  add: async (_data: VenueFormData): Promise<Venue> => notWired('POST /venues'),
-  update: async (_id: string, _data: Partial<VenueFormData>): Promise<Venue | null> =>
-    notWired('PUT /venues/:id'),
-  delete: async (_id: string): Promise<boolean> => notWired('DELETE /venues/:id'),
+  getList: async (campusId?: string): Promise<Venue[]> => {
+    const data = await get<unknown>('/venues', {
+      page: 1,
+      pageSize: 100,
+      ...(campusId ? { campusId } : {}),
+    });
+    const page = asPaginatedResponse<Record<string, unknown>>(
+      data as PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[] | null,
+      1,
+      100,
+    );
+    const rows = page.list.length
+      ? page.list
+      : Array.isArray(data)
+        ? (data as Record<string, unknown>[])
+        : [];
+    return rows.map((raw) => ({
+      id: String(raw.id),
+      campusId: String(raw.campusId ?? ''),
+      name: String(raw.name ?? ''),
+      address: raw.address ? String(raw.address) : undefined,
+      status: String(raw.status ?? 'ACTIVE').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+      createdAt: String(raw.createdAt ?? ''),
+      updatedAt: String(raw.updatedAt ?? ''),
+    })) as Venue[];
+  },
+  getById: async (id: string): Promise<Venue | null> => {
+    try {
+      const raw = await get<Record<string, unknown>>(`/venues/${id}`);
+      return {
+        id: String(raw.id),
+        campusId: String(raw.campusId ?? ''),
+        name: String(raw.name ?? ''),
+        address: raw.address ? String(raw.address) : undefined,
+        status: String(raw.status ?? 'ACTIVE').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+        createdAt: String(raw.createdAt ?? ''),
+        updatedAt: String(raw.updatedAt ?? ''),
+      } as Venue;
+    } catch {
+      return null;
+    }
+  },
+  add: async (data: VenueFormData): Promise<Venue> => {
+    const raw = await post<Record<string, unknown>>('/venues', {
+      campusId: data.campusId,
+      name: data.name,
+      address: data.address,
+    });
+    return {
+      id: String(raw.id),
+      campusId: String(raw.campusId ?? data.campusId),
+      name: String(raw.name ?? data.name),
+      address: raw.address ? String(raw.address) : data.address,
+      status: 'active',
+      createdAt: String(raw.createdAt ?? ''),
+      updatedAt: String(raw.updatedAt ?? ''),
+    } as Venue;
+  },
+  update: async (id: string, data: Partial<VenueFormData>): Promise<Venue | null> => {
+    const body: Record<string, unknown> = {};
+    if (data.name !== undefined) body.name = data.name;
+    if (data.address !== undefined) body.address = data.address;
+    if (data.status !== undefined) body.status = data.status === 'inactive' ? 'INACTIVE' : 'ACTIVE';
+    await put(`/venues/${id}`, body);
+    return venueService.getById(id);
+  },
+  delete: async (id: string): Promise<boolean> => {
+    await del(`/venues/${id}`);
+    return true;
+  },
 };
 
 export const roomService = {
-  getList: async (_options?: { campusId?: string; venueId?: string }): Promise<Room[]> => [],
-  getById: async (_id: string): Promise<Room | null> => null,
-  add: async (_data: RoomFormData): Promise<Room> => notWired('POST /rooms'),
-  update: async (_id: string, _data: Partial<RoomFormData>): Promise<Room | null> =>
-    notWired('PUT /rooms/:id'),
-  delete: async (_id: string): Promise<boolean> => notWired('DELETE /rooms/:id'),
+  getList: async (options?: { campusId?: string; venueId?: string }): Promise<Room[]> => {
+    const data = await get<unknown>('/venues/rooms', {
+      page: 1,
+      pageSize: 100,
+      ...(options?.venueId ? { venueId: options.venueId } : {}),
+    });
+    const page = asPaginatedResponse<Record<string, unknown>>(
+      data as PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[] | null,
+      1,
+      100,
+    );
+    const rows = page.list.length
+      ? page.list
+      : Array.isArray(data)
+        ? (data as Record<string, unknown>[])
+        : [];
+    return rows.map((raw) => ({
+      id: String(raw.id),
+      venueId: String(raw.venueId ?? ''),
+      campusId: String(raw.campusId ?? options?.campusId ?? ''),
+      name: String(raw.name ?? ''),
+      capacity: Number(raw.capacity ?? 0),
+      status: String(raw.status ?? 'ACTIVE').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+      createdAt: String(raw.createdAt ?? ''),
+      updatedAt: String(raw.updatedAt ?? ''),
+    })) as Room[];
+  },
+  getById: async (id: string): Promise<Room | null> => {
+    try {
+      const raw = await get<Record<string, unknown>>(`/venues/rooms/${id}`);
+      return {
+        id: String(raw.id),
+        venueId: String(raw.venueId ?? ''),
+        campusId: String(raw.campusId ?? ''),
+        name: String(raw.name ?? ''),
+        capacity: Number(raw.capacity ?? 0),
+        status: String(raw.status ?? 'ACTIVE').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+        createdAt: String(raw.createdAt ?? ''),
+        updatedAt: String(raw.updatedAt ?? ''),
+      } as Room;
+    } catch {
+      return null;
+    }
+  },
+  add: async (data: RoomFormData): Promise<Room> => {
+    const raw = await post<Record<string, unknown>>('/venues/rooms', {
+      venueId: data.venueId,
+      name: data.name,
+      capacity: data.capacity ?? 20,
+    });
+    return {
+      id: String(raw.id),
+      venueId: String(raw.venueId ?? data.venueId),
+      campusId: data.campusId,
+      name: String(raw.name ?? data.name),
+      capacity: Number(raw.capacity ?? data.capacity ?? 20),
+      status: 'active',
+      createdAt: String(raw.createdAt ?? ''),
+      updatedAt: String(raw.updatedAt ?? ''),
+    } as Room;
+  },
+  update: async (id: string, data: Partial<RoomFormData>): Promise<Room | null> => {
+    const body: Record<string, unknown> = {};
+    if (data.name !== undefined) body.name = data.name;
+    if (data.capacity !== undefined) body.capacity = data.capacity;
+    if (data.status !== undefined) body.status = data.status === 'inactive' ? 'INACTIVE' : 'ACTIVE';
+    await put(`/venues/rooms/${id}`, body);
+    return roomService.getById(id);
+  },
+  delete: async (id: string): Promise<boolean> => {
+    await del(`/venues/rooms/${id}`);
+    return true;
+  },
 };

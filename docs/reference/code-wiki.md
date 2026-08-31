@@ -396,7 +396,7 @@ export { feedbackService, uploadService, temporaryRescheduleService } from '...'
 |----------|----------|----------|
 | `auth.ts` | `login`, `wechatLogin`, `phoneLogin`, `registerStep1/2/3`, `getSession`, `switchIdentity`, `addIdentity`, `logout` | 认证全流程：多方式登录、分步注册、多身份切换、会话管理 |
 | `student.ts` | `studentService`, `packageService`, `lessonRecordService`, `leaveService`, `classService`, `scheduleService`, `notificationService` | 学员/套餐/消课/请假/班级/排课/通知 CRUD |
-| `teacher.ts` | `teacherService`, `salaryModelService`, `salarySettingsService`, `teacherScheduleService` | 教师 CRUD、薪资模型、发薪设置、排课 |
+| `teacher.ts` | `teacherService`, `salaryModelService`, `salarySettingsService` | 教师 CRUD、薪资模型、发薪设置 |
 | `campus.ts` | `campusService`, `salaryModelCampusService`, `payDaySettingsService`, `holidayService`, `businessHoursService`, `notifyService`, `campusDataService`, `subjectService` | 校区/薪资/发薪日/节假日/营业时间/通知/科目 |
 | `home.ts` | `homeService` | 首页统计、快捷入口、运营内容 |
 | `statistics.ts` | `statisticsService` | 多维度数据统计 |

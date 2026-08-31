@@ -55,12 +55,7 @@ export type { TodoListParams, TodoListView, TodoListItem } from './todo';
 export { feedbackService } from './feedback';
 export { uploadService } from './upload';
 export type { UploadResult, UploadType, UploadOptions } from './upload';
-export {
-  teacherService,
-  salaryModelService,
-  salarySettingsService,
-  teacherScheduleService,
-} from './teacher';
+export { teacherService, salaryModelService, salarySettingsService } from './teacher';
 export {
   campusService,
   salaryModelCampusService,
