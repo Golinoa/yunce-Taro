@@ -1,9 +1,9 @@
 import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
-import type { ITouchEvent } from '@tarojs/components';
 import Icon from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
+import type { ITouchEvent } from '@tarojs/components';
 
 export interface ScheduleActionButtonProps {
   label: string;

@@ -10,17 +10,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import { getSession } from '@/services/auth';
-import {
-  campusInviteService,
-  type CampusInvitePreview,
-} from '@/services/campus-invite';
+import { campusInviteService, type CampusInvitePreview } from '@/services/campus-invite';
 import { useAuth } from '@/utils/auth';
+import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import {
   consumePendingCampusInviteCode,
   storePendingCampusInviteCode,
 } from '@/utils/invite-staff-link';
 import { navigateAfterLogin } from '@/utils/route-guard';
-import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 function formatExpireAt(iso: string): string {
@@ -137,7 +134,11 @@ const CampusInviteLanding: React.FC = () => {
       <View className="min-h-screen bg-background px-[48rpx]">
         <View style={{ height: `${navHeight}px` }} />
         <View className="pt-[80rpx] flex flex-col items-center">
-          <Icon name="mdi-alert-circle-outline" size={80} className="text-muted-foreground mb-[24rpx]" />
+          <Icon
+            name="mdi-alert-circle-outline"
+            size={80}
+            className="text-muted-foreground mb-[24rpx]"
+          />
           <Text className="text-[32rpx] text-foreground text-center">{error || '????'}</Text>
           <Text
             className="text-[28rpx] text-primary mt-[48rpx]"
@@ -150,7 +151,8 @@ const CampusInviteLanding: React.FC = () => {
     );
   }
 
-  const isExpired = preview.status === 'EXPIRED' || new Date(preview.expireAt).getTime() <= Date.now();
+  const isExpired =
+    preview.status === 'EXPIRED' || new Date(preview.expireAt).getTime() <= Date.now();
   const isUsed = preview.status === 'USED';
   const canAccept = !isExpired && !isUsed && preview.status === 'PENDING';
 
@@ -175,9 +177,7 @@ const CampusInviteLanding: React.FC = () => {
         </View>
 
         {isUsed ? (
-          <Text className="text-[28rpx] text-muted-foreground text-center block">
-            ???????
-          </Text>
+          <Text className="text-[28rpx] text-muted-foreground text-center block">???????</Text>
         ) : null}
         {isExpired ? (
           <Text className="text-[28rpx] text-muted-foreground text-center block">

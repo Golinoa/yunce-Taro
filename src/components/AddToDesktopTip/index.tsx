@@ -48,10 +48,7 @@ function readTipLayout(): TipLayout {
     );
 
     const targetX = menu.left + menu.width * 0.28;
-    const arrowLeft = Math.min(
-      Math.max(targetX - preferredLeft - 4, 16),
-      TIP_WIDTH_PX - 24,
-    );
+    const arrowLeft = Math.min(Math.max(targetX - preferredLeft - 4, 16), TIP_WIDTH_PX - 24);
 
     return { top, left: preferredLeft, arrowLeft };
   } catch {
@@ -157,10 +154,7 @@ const AddToDesktopTip: React.FC = () => {
     <View className="add-to-desktop-tip" style={shellStyle}>
       <View className="add-to-desktop-tip__bounce" style={bounceStyle}>
         <View className="add-to-desktop-tip__panel">
-          <View
-            className="add-to-desktop-tip__arrow"
-            style={{ left: `${layout.arrowLeft}px` }}
-          />
+          <View className="add-to-desktop-tip__arrow" style={{ left: `${layout.arrowLeft}px` }} />
 
           <View className="add-to-desktop-tip__icons">
             <View className="add-to-desktop-tip__icon-phone">

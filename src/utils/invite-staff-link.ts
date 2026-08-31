@@ -1,6 +1,6 @@
 /**
- * 校区员工邀请链接工具（CampusInvite.inviteCode�?
- * 与家长绑定码、员工拉新码（Teacher.inviteCode）区分�?
+ * 校区员工邀请链接工具（CampusInvite.inviteCode�?
+ * 与家长绑定码、员工拉新码（Teacher.inviteCode）区分�?
  */
 import Taro from '@tarojs/taro';
 

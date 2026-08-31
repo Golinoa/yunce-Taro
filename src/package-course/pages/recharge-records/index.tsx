@@ -37,8 +37,8 @@ function formatDate(dateStr: string): string {
 function resolveAmount(record: PackageTransaction): number {
   const raw =
     record.type === 'refund'
-      ? record.refund_amount ?? record.fee_amount
-      : record.fee_amount ?? record.refund_amount;
+      ? (record.refund_amount ?? record.fee_amount)
+      : (record.fee_amount ?? record.refund_amount);
   return Math.max(0, Number(raw) || 0);
 }
 
@@ -150,7 +150,10 @@ const RechargeRecordsPage: React.FC = () => {
   const fetcher = useCallback(
     async (page: number, pageSize: number) => {
       if (!currentUserId) {
-        return { list: [] as PackageTransaction[], pagination: { page, pageSize, total: 0, totalPages: 1 } };
+        return {
+          list: [] as PackageTransaction[],
+          pagination: { page, pageSize, total: 0, totalPages: 1 },
+        };
       }
       return packageService.getTransactions(currentUserId, {
         studentId: queryStudentId,

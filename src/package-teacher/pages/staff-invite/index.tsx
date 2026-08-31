@@ -125,10 +125,7 @@ const StaffInvitePage: React.FC = () => {
 
   const displayCode = latest?.inviteCode;
 
-  const pendingHint = useMemo(
-    () => `????? ${invites.length} ?`,
-    [invites.length],
-  );
+  const pendingHint = useMemo(() => `????? ${invites.length} ?`, [invites.length]);
 
   return (
     <View className="min-h-screen bg-background flex flex-col">
@@ -158,7 +155,9 @@ const StaffInvitePage: React.FC = () => {
                 onClick={() => setRoleCode(opt.code)}
               >
                 <Text className="text-[30rpx] font-medium text-foreground block">{opt.label}</Text>
-                <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">{opt.desc}</Text>
+                <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
+                  {opt.desc}
+                </Text>
               </View>
             ))}
           </View>

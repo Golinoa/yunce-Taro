@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_MEMBERSHIP_TIPS,
   dismissMembershipTip,
@@ -42,24 +42,24 @@ describe('resolveLifecycle', () => {
   it('FREE / TRIAL 视为未开通；带过期日走 expired', () => {
     expect(resolveLifecycle(quota({ versionCode: 'FREE' }))).toBe('inactive');
     expect(resolveLifecycle(quota({ versionCode: 'TRIAL' }))).toBe('inactive');
-    expect(
-      resolveLifecycle(quota({ versionCode: 'FREE', expireAt: daysFromNow(-2) })),
-    ).toBe('expired');
+    expect(resolveLifecycle(quota({ versionCode: 'FREE', expireAt: daysFromNow(-2) }))).toBe(
+      'expired',
+    );
   });
 
   it('付费：过期 / ≤7 天 / ≤30 天 / 长期 / 无到期日', () => {
-    expect(
-      resolveLifecycle(quota({ versionCode: 'STANDARD', expireAt: daysFromNow(-1) })),
-    ).toBe('expired');
-    expect(
-      resolveLifecycle(quota({ versionCode: 'BASIC', expireAt: daysFromNow(3) })),
-    ).toBe('expiring_7');
-    expect(
-      resolveLifecycle(quota({ versionCode: 'BASIC', expireAt: daysFromNow(20) })),
-    ).toBe('expiring_30');
-    expect(
-      resolveLifecycle(quota({ versionCode: 'FLAGSHIP', expireAt: daysFromNow(90) })),
-    ).toBe('active');
+    expect(resolveLifecycle(quota({ versionCode: 'STANDARD', expireAt: daysFromNow(-1) }))).toBe(
+      'expired',
+    );
+    expect(resolveLifecycle(quota({ versionCode: 'BASIC', expireAt: daysFromNow(3) }))).toBe(
+      'expiring_7',
+    );
+    expect(resolveLifecycle(quota({ versionCode: 'BASIC', expireAt: daysFromNow(20) }))).toBe(
+      'expiring_30',
+    );
+    expect(resolveLifecycle(quota({ versionCode: 'FLAGSHIP', expireAt: daysFromNow(90) }))).toBe(
+      'active',
+    );
     expect(resolveLifecycle(quota({ versionCode: 'STANDARD', expireAt: null }))).toBe('active');
   });
 });
@@ -77,9 +77,7 @@ describe('matchMembershipTip', () => {
       matchMembershipTip(quota({ versionCode: 'STANDARD', expireAt: daysFromNow(-1) }))?.tipId,
     ).toBe('E-A');
 
-    const soon = matchMembershipTip(
-      quota({ versionCode: 'STANDARD', expireAt: daysFromNow(5) }),
-    );
+    const soon = matchMembershipTip(quota({ versionCode: 'STANDARD', expireAt: daysFromNow(5) }));
     expect(soon?.tipId).toBe('X-A');
     expect(soon?.title).toContain('5');
 
@@ -168,9 +166,13 @@ describe('matchMembershipTip', () => {
           employees: { current: 999, max: 99999 },
         }),
         DEFAULT_MEMBERSHIP_TIPS.filter((t) =>
-          ['members_full', 'employees_full', 'both_full', 'members_warn', 'employees_warn'].includes(
-            t.trigger,
-          ),
+          [
+            'members_full',
+            'employees_full',
+            'both_full',
+            'members_warn',
+            'employees_warn',
+          ].includes(t.trigger),
         ),
       ),
     ).toBeNull();
@@ -228,8 +230,8 @@ describe('matchMembershipTip', () => {
           members: { current: 1, max: 0 },
           employees: { current: 0, max: 0 },
         }),
-        DEFAULT_MEMBERSHIP_TIPS.filter((t) =>
-          t.trigger === 'members_warn' || t.trigger === 'employees_warn',
+        DEFAULT_MEMBERSHIP_TIPS.filter(
+          (t) => t.trigger === 'members_warn' || t.trigger === 'employees_warn',
         ),
       ),
     ).toBeNull();
@@ -287,10 +289,7 @@ describe('dismissMembershipTip / loadDismissedTipIds', () => {
     expect(loadDismissedTipIds()).toContain('E-A');
 
     const stale = Date.now() - 8 * 24 * 60 * 60 * 1000;
-    Taro.setStorageSync(
-      DISMISS_KEY,
-      JSON.stringify({ 'E-A': stale, 'X-A': Date.now() }),
-    );
+    Taro.setStorageSync(DISMISS_KEY, JSON.stringify({ 'E-A': stale, 'X-A': Date.now() }));
     const ids = loadDismissedTipIds();
     expect(ids).toContain('X-A');
     expect(ids).not.toContain('E-A');

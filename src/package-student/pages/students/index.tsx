@@ -581,27 +581,31 @@ const Students: React.FC = () => {
                     <StudentAvatar name={student.name} src={student.avatar_url} size="md" />
                     {/* 信息 */}
                     <View className="flex-1 min-w-0">
-                      <Text className="text-[32rpx] font-semibold text-foreground">{student.name}</Text>
+                      <Text className="text-[32rpx] font-semibold text-foreground">
+                        {student.name}
+                      </Text>
                       {(student.nickname || student.phone || student.birthday) && (
-                      <View className="flex items-center gap-[12rpx] mt-[4rpx]">
-                        {student.nickname ? (
-                          <Text className="text-[24rpx] text-muted-foreground">{student.nickname}</Text>
-                        ) : null}
-                        {student.nickname && student.phone ? (
-                          <View className="w-[6rpx] h-[6rpx] rounded-full bg-muted-foreground/40" />
-                        ) : null}
-                        {student.phone && (
-                          <>
+                        <View className="flex items-center gap-[12rpx] mt-[4rpx]">
+                          {student.nickname ? (
                             <Text className="text-[24rpx] text-muted-foreground">
-                              {student.phone}
+                              {student.nickname}
                             </Text>
+                          ) : null}
+                          {student.nickname && student.phone ? (
                             <View className="w-[6rpx] h-[6rpx] rounded-full bg-muted-foreground/40" />
-                          </>
-                        )}
-                        <Text className="text-[24rpx] text-muted-foreground">
-                          {student.birthday || '暂无生日'}
-                        </Text>
-                      </View>
+                          ) : null}
+                          {student.phone && (
+                            <>
+                              <Text className="text-[24rpx] text-muted-foreground">
+                                {student.phone}
+                              </Text>
+                              <View className="w-[6rpx] h-[6rpx] rounded-full bg-muted-foreground/40" />
+                            </>
+                          )}
+                          <Text className="text-[24rpx] text-muted-foreground">
+                            {student.birthday || '暂无生日'}
+                          </Text>
+                        </View>
                       )}
                     </View>
                     {/* 课时 */}

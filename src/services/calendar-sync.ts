@@ -7,9 +7,9 @@ import dayjs from 'dayjs';
 import { classService, scheduleService, temporaryRescheduleService } from '@/services';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { Class } from '@/types/class';
+import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
-import type { UserRole } from '@/types/profile';
 import {
   CALENDAR_SYNC_MAX_DAYS,
   canUseCalendarSync,
@@ -25,7 +25,6 @@ import {
   shouldShowCalendarSyncPrompt,
 } from '@/utils/calendar-sync-settings';
 import { logError } from '@/utils/logger';
-
 import { addPhoneCalendarEvent, isAddPhoneCalendarSupported } from '@/utils/phone-calendar';
 import { post } from '@/utils/request';
 
@@ -150,7 +149,11 @@ export function expandScheduleOccurrences(
     visibleSchedules.forEach((schedule) => {
       const classInfo = schedule.class_id ? classById[schedule.class_id] : undefined;
       const className =
-        classInfo?.name || schedule.class_info?.name || schedule.student?.name || schedule.note || '课程';
+        classInfo?.name ||
+        schedule.class_info?.name ||
+        schedule.student?.name ||
+        schedule.note ||
+        '课程';
       const title = schedule.student?.name && !schedule.class_id ? `${className} 私教` : className;
       occurrences.push({
         scheduleId: schedule.id,
@@ -186,7 +189,7 @@ async function reportCalendarSync(
   if (items.length === 0) {
     return;
   }
-    try {
+  try {
     await post('/calendar-sync/report', { action, items });
   } catch (error) {
     logError('calendarSync.report', error);
@@ -324,7 +327,13 @@ export const calendarSyncService = {
       Taro.showToast({ title: '部分课程未能写入日历', icon: 'none' });
     }
 
-    return { added, skipped, failed, windowStart: emptyResult.windowStart, windowEnd: emptyResult.windowEnd };
+    return {
+      added,
+      skipped,
+      failed,
+      windowStart: emptyResult.windowStart,
+      windowEnd: emptyResult.windowEnd,
+    };
   },
 
   async enableAndSync(params: {

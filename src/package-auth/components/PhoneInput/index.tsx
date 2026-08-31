@@ -2,10 +2,10 @@
  * PhoneInput - 带国际区号前缀的手机号输入（auth 分包�?
  */
 import { View, Text, Input, Picker } from '@tarojs/components';
-import type { InputProps } from '@tarojs/components';
 import cn from 'classnames';
 import React, { useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
+import type { InputProps } from '@tarojs/components';
 
 export interface CountryDialOption {
   label: string;

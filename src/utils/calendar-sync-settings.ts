@@ -41,7 +41,9 @@ export function getCalendarSyncSettings(userId: string): CalendarSyncSettings {
     return { ...DEFAULT_SETTINGS };
   }
   try {
-    const stored = Taro.getStorageSync(storageKey(userId)) as Partial<CalendarSyncSettings> | undefined;
+    const stored = Taro.getStorageSync(storageKey(userId)) as
+      | Partial<CalendarSyncSettings>
+      | undefined;
     if (!stored || typeof stored !== 'object') {
       return { ...DEFAULT_SETTINGS };
     }

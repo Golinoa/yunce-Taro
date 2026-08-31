@@ -1,14 +1,13 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import type { Class, Schedule, TemporaryReschedule } from '@/types';
-
-import { get, post } from '@/utils/request';
 import {
   API_PAGE_SIZE_BATCH,
   asPaginatedResponse,
   fetchAllPages,
   type PaginatedResponse,
 } from '@/utils/pagination';
+import { get, post } from '@/utils/request';
 
 const STORAGE_KEY = 'yunce-temporary-reschedules';
 
@@ -48,16 +47,6 @@ interface BackendTemporaryRescheduleItem {
   targetDate: string;
   teacherId: string;
   updatedAt: string;
-}
-
-interface BackendTemporaryRescheduleListResponse {
-  list: BackendTemporaryRescheduleItem[];
-  pagination?: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
 }
 
 interface BackendTemporaryRescheduleBatchResponse {
@@ -152,19 +141,18 @@ export const temporaryRescheduleService = {
     startDate: string,
     endDate: string,
   ): Promise<TemporaryReschedule[]> => {
-    
-      const list = await fetchAllPages(async (page, pageSize) => {
-        const response = await get<
-          PaginatedResponse<BackendTemporaryRescheduleItem> | BackendTemporaryRescheduleItem[]
-        >(
-          `/temporary-reschedules?page=${page}&pageSize=${pageSize}&teacherId=${encodeURIComponent(
-            teacherId,
-          )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
-        );
-        return asPaginatedResponse(response, page, pageSize);
-      }, API_PAGE_SIZE_BATCH);
-      return list.map(mapBackendTemporaryReschedule);
-        return readStorage()
+    const list = await fetchAllPages(async (page, pageSize) => {
+      const response = await get<
+        PaginatedResponse<BackendTemporaryRescheduleItem> | BackendTemporaryRescheduleItem[]
+      >(
+        `/temporary-reschedules?page=${page}&pageSize=${pageSize}&teacherId=${encodeURIComponent(
+          teacherId,
+        )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+      );
+      return asPaginatedResponse(response, page, pageSize);
+    }, API_PAGE_SIZE_BATCH);
+    return list.map(mapBackendTemporaryReschedule);
+    return readStorage()
       .filter((item) => item.teacher_id === teacherId)
       .filter((item) => {
         const inSourceRange = item.source_date >= startDate && item.source_date <= endDate;
@@ -184,23 +172,22 @@ export const temporaryRescheduleService = {
     targetDate,
     schedules,
   }: SaveBatchParams): Promise<TemporaryReschedule[]> => {
-    
-      const response = await post<
-        BackendTemporaryRescheduleBatchResponse | BackendTemporaryRescheduleItem[]
-      >('/temporary-reschedules/batch', {
-        teacherId,
-        sourceDate,
-        targetDate,
-        items: schedules.map((schedule) => ({
-          classId: schedule.class_id || '',
-          scheduleId: schedule.id,
-          startTime: schedule.start_time,
-          endTime: schedule.end_time,
-        })),
-      });
-      const list = Array.isArray(response) ? response : response.items || [];
-      return list.map(mapBackendTemporaryReschedule);
-        const now = new Date().toISOString();
+    const response = await post<
+      BackendTemporaryRescheduleBatchResponse | BackendTemporaryRescheduleItem[]
+    >('/temporary-reschedules/batch', {
+      teacherId,
+      sourceDate,
+      targetDate,
+      items: schedules.map((schedule) => ({
+        classId: schedule.class_id || '',
+        scheduleId: schedule.id,
+        startTime: schedule.start_time,
+        endTime: schedule.end_time,
+      })),
+    });
+    const list = Array.isArray(response) ? response : response.items || [];
+    return list.map(mapBackendTemporaryReschedule);
+    const now = new Date().toISOString();
     const nextItems = schedules.map<TemporaryReschedule>((schedule) => ({
       id: `tmp-reschedule-${schedule.id}-${sourceDate}`,
       teacher_id: teacherId,

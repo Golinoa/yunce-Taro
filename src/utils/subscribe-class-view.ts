@@ -50,7 +50,11 @@ function writeRenew(record: ClassViewRenewRecord): void {
 /** E02-A/B 用户点「订阅提醒」或「查看班级」后标记 */
 export function markClassAssignPromptConsumed(userId: string, classId: string): void {
   if (!userId || !classId) return;
-  Taro.setStorageSync(PROMPT_KEY, { userId, classId, at: Date.now() } satisfies ClassAssignPromptRecord);
+  Taro.setStorageSync(PROMPT_KEY, {
+    userId,
+    classId,
+    at: Date.now(),
+  } satisfies ClassAssignPromptRecord);
 }
 
 export function clearClassAssignPromptConsumed(): void {

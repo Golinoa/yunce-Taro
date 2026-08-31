@@ -66,10 +66,7 @@ export function buildPostInviteBookingUrl(params: {
   end?: string;
 }): string {
   const base = '/package-lead/pages/trial-booking/index';
-  const q = [
-    `teacherId=${enc(params.teacherId)}`,
-    `campusId=${enc(params.campusId)}`,
-  ];
+  const q = [`teacherId=${enc(params.teacherId)}`, `campusId=${enc(params.campusId)}`];
   if (params.classId) q.push(`classId=${enc(params.classId)}`);
   if (params.className) q.push(`className=${enc(params.className)}`);
   if (params.date) q.push(`date=${enc(params.date)}`);

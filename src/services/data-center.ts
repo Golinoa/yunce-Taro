@@ -208,8 +208,8 @@ export const dataCenterService = {
   /** 获取财务详情 */
   getFinanceDetail: async (params: FinanceDetailQueryParams): Promise<FinanceDetailType> =>
     get<FinanceDetailType>(
-          `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
-        ),
+      `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
+    ),
 
   // ---------- 会员数据 ----------
   /** 获取会员数据卡片 */
@@ -219,19 +219,18 @@ export const dataCenterService = {
   /** 获取会员详情 */
   getMemberDetail: async (params: MemberDetailQueryParams): Promise<MemberDetailType> =>
     get<MemberDetailType>(
-          `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-        ),
+      `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
+    ),
 
   // ---------- 卡项数据 ----------
   /** 获取卡项数据卡片 */
-  getCardData: async (): Promise<CardDataType> =>
-    get<BackendCardDataResponse>('/data-center/card'),
+  getCardData: async (): Promise<CardDataType> => get<BackendCardDataResponse>('/data-center/card'),
 
   /** 获取卡项详情 */
   getCardDetail: async (params: CardDetailQueryParams): Promise<CardDetailType> =>
     get<CardDetailType>(
-          `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-        ),
+      `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
+    ),
 
   // ---------- 薪资数据 ----------
   /** 获取薪资数据卡片 */
@@ -241,8 +240,8 @@ export const dataCenterService = {
   /** 获取薪资详情 */
   getSalaryDetail: async (params: SalaryDetailQueryParams): Promise<SalaryDetailType> =>
     get<SalaryDetailType>(
-          `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-        ),
+      `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
+    ),
 
   // ---------- 记一笔 ----------
   /** 获取支出分类列表 */
@@ -256,9 +255,9 @@ export const dataCenterService = {
   /** 创建交易记录（记一笔） */
   createTransaction: async (data: CreateTransactionParams): Promise<{ success: boolean }> =>
     post<{ success: boolean }>(
-          '/data-center/transaction',
-          data as unknown as Record<string, unknown>,
-        ),
+      '/data-center/transaction',
+      data as unknown as Record<string, unknown>,
+    ),
 
   // ---------- 同步 Fallback ----------
   getVenueOverviewFallback,

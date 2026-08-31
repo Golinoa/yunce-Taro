@@ -172,8 +172,7 @@ export function updateCustomTodo(
   if (index < 0) return null;
 
   const current = list[index];
-  const nextTitle =
-    input.title !== undefined ? input.title.trim() : current.title;
+  const nextTitle = input.title !== undefined ? input.title.trim() : current.title;
   if (!nextTitle) return null;
 
   const remindEnabled =
@@ -190,10 +189,7 @@ export function updateCustomTodo(
   const next: CustomTodoRecord = {
     ...current,
     title: nextTitle,
-    note:
-      input.note !== undefined
-        ? input.note.trim() || undefined
-        : current.note,
+    note: input.note !== undefined ? input.note.trim() || undefined : current.note,
     remindEnabled,
     remindDate: remindEnabled
       ? input.remindDate !== undefined
@@ -206,8 +202,7 @@ export function updateCustomTodo(
         : current.remindTime || '09:00'
       : undefined,
     quadrant: input.quadrant !== undefined ? input.quadrant : current.quadrant,
-    categoryId:
-      input.categoryId !== undefined ? input.categoryId : current.categoryId,
+    categoryId: input.categoryId !== undefined ? input.categoryId : current.categoryId,
     collaboratorIds,
     collaborationMode:
       collaboratorIds && collaboratorIds.length > 0
@@ -216,9 +211,7 @@ export function updateCustomTodo(
           : current.collaborationMode || 'collaborative'
         : undefined,
     memberCompletions:
-      collaboratorIds && collaboratorIds.length > 0
-        ? current.memberCompletions
-        : undefined,
+      collaboratorIds && collaboratorIds.length > 0 ? current.memberCompletions : undefined,
   };
 
   list[index] = next;

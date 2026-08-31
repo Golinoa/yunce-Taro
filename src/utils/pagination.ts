@@ -14,9 +14,7 @@ export const API_PAGE_SIZE_MAX = 100;
 /** 需要「分类/教师下全量」时的分批页大小（≤ max） */
 export const API_PAGE_SIZE_BATCH = 50;
 
-export function unwrapPaginatedList<T>(
-  data: PaginatedResponse<T> | T[] | null | undefined,
-): T[] {
+export function unwrapPaginatedList<T>(data: PaginatedResponse<T> | T[] | null | undefined): T[] {
   if (!data) return [];
   if (Array.isArray(data)) return data;
   return data.list ?? [];

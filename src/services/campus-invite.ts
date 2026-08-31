@@ -9,8 +9,6 @@
  * - POST /campus-invites/:id/cancel         取消邀�?
  */
 import Taro from '@tarojs/taro';
-
-
 import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
 import { get, post } from '@/utils/request';
 
@@ -112,7 +110,7 @@ function persistTokens(token: string, refreshToken: string, expiresIn: number): 
 
 export const campusInviteService = {
   preview: async (inviteCode: string): Promise<CampusInvitePreview> => {
-        const data = await get<CampusInvitePreview>(
+    const data = await get<CampusInvitePreview>(
       `/campus-invites/code/${encodeURIComponent(inviteCode.trim().toUpperCase())}`,
       undefined,
       { skipAuth: true },
@@ -124,12 +122,12 @@ export const campusInviteService = {
   },
 
   create: async (input: CreateCampusInviteInput): Promise<CreateCampusInviteResult> => {
-        const data = await post<CampusInviteItem>('/campus-invites', { ...input });
+    const data = await post<CampusInviteItem>('/campus-invites', { ...input });
     return enrichInviteItem(data);
   },
 
   list: async (query?: ListCampusInvitesQuery): Promise<CampusInviteItem[]> => {
-        const data = await get<PaginatedResponse<CampusInviteItem>>('/campus-invites', {
+    const data = await get<PaginatedResponse<CampusInviteItem>>('/campus-invites', {
       page: query?.page ?? 1,
       pageSize: query?.pageSize ?? 20,
       status: query?.status,
@@ -140,7 +138,7 @@ export const campusInviteService = {
   },
 
   accept: async (inviteCode: string): Promise<AcceptCampusInviteResult> => {
-        const data = await post<AcceptCampusInviteResult>(
+    const data = await post<AcceptCampusInviteResult>(
       `/campus-invites/${encodeURIComponent(inviteCode.trim().toUpperCase())}/accept`,
     );
     if (data.token && data.refreshToken && data.expiresIn) {
@@ -150,6 +148,6 @@ export const campusInviteService = {
   },
 
   cancel: async (id: string, reason?: string): Promise<void> => {
-        await post(`/campus-invites/${encodeURIComponent(id)}/cancel`, reason ? { reason } : undefined);
+    await post(`/campus-invites/${encodeURIComponent(id)}/cancel`, reason ? { reason } : undefined);
   },
 };

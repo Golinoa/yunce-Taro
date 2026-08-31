@@ -1,7 +1,6 @@
 import { View, Text, Textarea, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import Card from '@/components/Card';
 import Empty from '@/components/Empty';
@@ -9,7 +8,17 @@ import FormRow from '@/components/FormRow';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
-import { studentService, leaveService, classService, homeService, scheduleService, notificationService, makeupBookingService, teacherService } from '@/services';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import {
+  studentService,
+  leaveService,
+  classService,
+  homeService,
+  scheduleService,
+  notificationService,
+  makeupBookingService,
+  teacherService,
+} from '@/services';
 import type { Class } from '@/types/class';
 import type { LeaveRequest, LeaveType, LeaveStatus } from '@/types/leave-request';
 import type { Schedule } from '@/types/schedule';
@@ -121,55 +130,58 @@ const LeaveRequestPage: React.FC = () => {
     }
   }, [isTeacher, currentUserId, queryStudentId, setLoading]);
 
-  const loadLessons = useCallback(async (sid: string) => {
-    if (!sid) {
-      setLessons([]);
-      setStudentClassIds([]);
-      setCampusClasses([]);
-      setCampusSchedules([]);
-      return;
-    }
-    setLessonsLoading(true);
-    setSelectedLessonKey('');
-    setTargetLessonKey('');
-    try {
-      const student = await studentService.getById(sid);
-      const classIds = student?.class_ids || [];
-      setStudentClassIds(classIds);
-      const classResults = await Promise.all(classIds.map((id) => classService.getById(id)));
-      const classes = classResults.filter(Boolean) as Class[];
-      const rawList = (await homeService.getSchedulesByStudent(sid)) as unknown as Record<
-        string,
-        unknown
-      >[];
-      const schedules = (rawList || []).map(normalizeRawSchedule);
-      const upcoming = buildUpcomingFixedLessons({ schedules, classes, weeksAhead: 4 });
-      setLessons(upcoming);
-      if (queryLessonKey && upcoming.some((l) => l.key === queryLessonKey)) {
-        setSelectedLessonKey(queryLessonKey);
+  const loadLessons = useCallback(
+    async (sid: string) => {
+      if (!sid) {
+        setLessons([]);
+        setStudentClassIds([]);
+        setCampusClasses([]);
+        setCampusSchedules([]);
+        return;
       }
+      setLessonsLoading(true);
+      setSelectedLessonKey('');
+      setTargetLessonKey('');
+      try {
+        const student = await studentService.getById(sid);
+        const classIds = student?.class_ids || [];
+        setStudentClassIds(classIds);
+        const classResults = await Promise.all(classIds.map((id) => classService.getById(id)));
+        const classes = classResults.filter(Boolean) as Class[];
+        const rawList = (await homeService.getSchedulesByStudent(sid)) as unknown as Record<
+          string,
+          unknown
+        >[];
+        const schedules = (rawList || []).map(normalizeRawSchedule);
+        const upcoming = buildUpcomingFixedLessons({ schedules, classes, weeksAhead: 4 });
+        setLessons(upcoming);
+        if (queryLessonKey && upcoming.some((l) => l.key === queryLessonKey)) {
+          setSelectedLessonKey(queryLessonKey);
+        }
 
-      const campusId = student?.campus_id || classes[0]?.campus_id || '';
-      if (campusId) {
-        const [peerClasses, peerSchedules] = await Promise.all([
-          classService.getByCampus(campusId),
-          scheduleService.getByCampus(campusId),
-        ]);
-        setCampusClasses(peerClasses);
-        setCampusSchedules(peerSchedules);
-      } else {
-        setCampusClasses(classes);
-        setCampusSchedules(schedules);
+        const campusId = student?.campus_id || classes[0]?.campus_id || '';
+        if (campusId) {
+          const [peerClasses, peerSchedules] = await Promise.all([
+            classService.getByCampus(campusId),
+            scheduleService.getByCampus(campusId),
+          ]);
+          setCampusClasses(peerClasses);
+          setCampusSchedules(peerSchedules);
+        } else {
+          setCampusClasses(classes);
+          setCampusSchedules(schedules);
+        }
+      } catch (err) {
+        logError('load leave lessons', err);
+        setLessons([]);
+        setCampusClasses([]);
+        setCampusSchedules([]);
+      } finally {
+        setLessonsLoading(false);
       }
-    } catch (err) {
-      logError('load leave lessons', err);
-      setLessons([]);
-      setCampusClasses([]);
-      setCampusSchedules([]);
-    } finally {
-      setLessonsLoading(false);
-    }
-  }, [queryLessonKey]);
+    },
+    [queryLessonKey],
+  );
 
   useEffect(() => {
     void loadData();
@@ -348,9 +360,7 @@ const LeaveRequestPage: React.FC = () => {
         if (targetLesson.teacherId) receiverIds.add(targetLesson.teacherId);
         try {
           const teachers = await teacherService.getList();
-          teachers
-            .filter((t) => t.identity === 'principal')
-            .forEach((t) => receiverIds.add(t.id));
+          teachers.filter((t) => t.identity === 'principal').forEach((t) => receiverIds.add(t.id));
         } catch (err) {
           logError('load principals for makeup notify', err);
         }
@@ -384,15 +394,7 @@ const LeaveRequestPage: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [
-    studentId,
-    selectedLesson,
-    targetLesson,
-    leaveType,
-    reason,
-    currentUserId,
-    children,
-  ]);
+  }, [studentId, selectedLesson, targetLesson, leaveType, reason, currentUserId, children]);
 
   if (loading) {
     return (

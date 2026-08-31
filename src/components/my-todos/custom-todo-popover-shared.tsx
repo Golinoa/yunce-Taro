@@ -14,8 +14,8 @@ import TodoQuadrantIcon from '@/components/TodoQuadrantIcon';
 import type { TodoCollaborationMode } from '@/types/home-todo';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { TODO_QUADRANT_META } from '@/types/todo-quadrant';
-import type { CollaboratorSummary } from '@/utils/todo-collaborator-select';
 import type { TodoCategoryTab } from '@/utils/todo-categories';
+import type { CollaboratorSummary } from '@/utils/todo-collaborator-select';
 
 export const COLLABORATION_MODE_OPTIONS: {
   value: TodoCollaborationMode;
@@ -334,10 +334,7 @@ export const CustomTodoCollaboratorsSection: React.FC<CustomTodoCollaboratorsSec
       <View className="flex flex-row items-center">
         <View className="flex shrink-0 flex-row items-center">
           {selectedCollaborators.slice(0, 4).map((teacher, index) => (
-            <View
-              key={teacher.id}
-              className={cn('relative shrink-0', index > 0 && '-ml-[12rpx]')}
-            >
+            <View key={teacher.id} className={cn('relative shrink-0', index > 0 && '-ml-[12rpx]')}>
               <Avatar
                 name={teacher.name}
                 avatarUrl={teacher.avatar}
@@ -394,9 +391,7 @@ export const CustomTodoCollaborationModeSection: React.FC<
             <View
               className={cn(
                 'mt-[4rpx] flex h-[36rpx] w-[36rpx] shrink-0 items-center justify-center rounded-full border-[3rpx] border-solid',
-                active
-                  ? 'border-primary bg-primary'
-                  : 'border-mutedForeground bg-card shadow-soft',
+                active ? 'border-primary bg-primary' : 'border-mutedForeground bg-card shadow-soft',
               )}
             >
               {active ? <Icon name="mdi-check" size={18} color="white" /> : null}

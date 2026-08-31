@@ -5,8 +5,8 @@
  * 可能撞名，把 hook/导出覆盖成字符串导致课时充值页白屏。
  * 约定：constants / 选项列表一律用 getter；hook 内用 pair[0]/pair[1] 取状态。
  */
-import { describe, expect, it } from 'vitest';
 import dayjs from 'dayjs';
+import { describe, expect, it } from 'vitest';
 import {
   DATE_PICKER_YEAR_START,
   datePickerYearIndex,

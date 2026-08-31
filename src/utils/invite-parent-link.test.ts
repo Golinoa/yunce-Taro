@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { copyParentInviteLink } from './invite-parent-link';
 
 const { setClipboardData, showToast } = vi.hoisted(() => ({
   setClipboardData: vi.fn().mockResolvedValue({}),
@@ -11,8 +12,6 @@ vi.mock('@tarojs/taro', () => ({
     showToast,
   },
 }));
-
-import { copyParentInviteLink } from './invite-parent-link';
 
 describe('invite-parent-link', () => {
   beforeEach(() => {

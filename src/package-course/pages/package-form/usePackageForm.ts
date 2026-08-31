@@ -1,9 +1,21 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import { useState, useCallback, useMemo, useEffect, type Dispatch, type SetStateAction } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { type ScheduleItem, buildInstallmentSchedule } from '@/components/InstallmentPanel';
-import { studentService, packageService, subjectService, subscribeMessageService } from '@/services';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import {
+  studentService,
+  packageService,
+  subjectService,
+  subscribeMessageService,
+} from '@/services';
 import { useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { Subject } from '@/types/campus';
 import type { CoursePackageTemplate, FeeMethod } from '@/types/course-package';
@@ -590,18 +602,21 @@ export function usePackageForm() {
     profile?.currentContext?.role,
   ]);
 
-  const handleRechargeModeChange = useCallback((mode: RechargeMode) => {
-    setRechargeMode(mode);
-    if (mode === 'direct') {
-      setIsCustomPackage(true);
-      setSelectedTemplate(null);
-      setCustomName('课时充值');
-      if (totalHours <= 0) setTotalHours(10);
-    } else {
-      setIsCustomPackage(false);
-      setCustomName('');
-    }
-  }, [totalHours]);
+  const handleRechargeModeChange = useCallback(
+    (mode: RechargeMode) => {
+      setRechargeMode(mode);
+      if (mode === 'direct') {
+        setIsCustomPackage(true);
+        setSelectedTemplate(null);
+        setCustomName('课时充值');
+        if (totalHours <= 0) setTotalHours(10);
+      } else {
+        setIsCustomPackage(false);
+        setCustomName('');
+      }
+    },
+    [totalHours],
+  );
 
   const handleInstallmentToggle = useCallback(
     (on: boolean) => {

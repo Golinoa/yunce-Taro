@@ -11,13 +11,13 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import RegisterStepper from '@/components/RegisterStepper';
 import { authCapabilities } from '@/services/auth';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import type { ParentRoleInfo, PrincipalRoleInfo, TeacherRoleInfo, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
-import { subscribeMessageService } from '@/services/subscribe-message';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
-import { logError } from '@/utils/logger';
 
 /** 角色头部配置 */
 const ROLE_HEADER_META: Record<

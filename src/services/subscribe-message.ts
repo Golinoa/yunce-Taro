@@ -8,8 +8,8 @@ import {
   getFlowPresetId,
   getPromptPreset,
   getRenewPreset,
-  MOCK_TMPL_IDS,
 } from '@/constants/subscribe-presets';
+import { getSession } from '@/services/auth';
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
 import type {
   OpenPromptInput,
@@ -25,15 +25,6 @@ import type {
   SubscribeSheetAction,
   SubscribeTemplateGroup,
 } from '@/types/subscribe-message';
-import { getSession } from '@/services/auth';
-import { get, post } from '@/utils/request';
-import { createClientRequestId, requestSubscribeMessageAuth } from '@/utils/subscribe-message';
-import type { SubscribeAuthEntry } from '@/utils/subscribe-message';
-import {
-  canRunClassViewRenew,
-  markClassAssignPromptConsumed,
-  markClassViewRenewShown,
-} from '@/utils/subscribe-class-view';
 import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { logError } from '@/utils/logger';
 import {
@@ -44,6 +35,14 @@ import {
   markLoginOptInDone,
   setNotifyMasterEnabled,
 } from '@/utils/notify-master-settings';
+import { get, post } from '@/utils/request';
+import {
+  canRunClassViewRenew,
+  markClassAssignPromptConsumed,
+  markClassViewRenewShown,
+} from '@/utils/subscribe-class-view';
+import { createClientRequestId, requestSubscribeMessageAuth } from '@/utils/subscribe-message';
+import type { SubscribeAuthEntry } from '@/utils/subscribe-message';
 
 const MESSAGE_AUTH_PAGE = '/package-settings/pages/message-auth/index';
 const LOGIN_OPT_IN_GROUPS: SubscribeTemplateGroup[] = [
@@ -127,12 +126,6 @@ function resolveAuthEntries(groups: SubscribeTemplateGroup[]): SubscribeAuthEntr
   return entries.slice(0, 5);
 }
 
-function resolveMockAuthEntries(groups: SubscribeTemplateGroup[]): SubscribeAuthEntry[] {
-  return Array.from(new Set(groups))
-    .slice(0, 5)
-    .map((group) => ({ group, tmplId: MOCK_TMPL_IDS[group] }));
-}
-
 export const subscribeMessageService = {
   async bootstrap(role?: string, campusId?: string): Promise<SubscribeBootstrapDto> {
     const userId = await resolveUserId();
@@ -140,7 +133,6 @@ export const subscribeMessageService = {
       return { templates: [], quotas: [], pendingPrompts: [], lowQuotaGroups: [] };
     }
 
-    
     try {
       bootstrapCache = await get<SubscribeBootstrapDto>('/subscribe-message/bootstrap', {
         role,
@@ -157,19 +149,13 @@ export const subscribeMessageService = {
     const userId = await resolveUserId();
     if (!userId) return [];
 
-    const payload: SubscribeAuthReportBody = { ...body, userId };
-
-    
     try {
-      const result = await post<{ quotas: SubscribeQuotaDto[] }>(
-        '/subscribe-message/auth-report',
-        {
-          scene: body.scene,
-          campusId: body.campusId,
-          items: body.items,
-          clientRequestId: body.clientRequestId,
-        },
-      );
+      const result = await post<{ quotas: SubscribeQuotaDto[] }>('/subscribe-message/auth-report', {
+        scene: body.scene,
+        campusId: body.campusId,
+        items: body.items,
+        clientRequestId: body.clientRequestId,
+      });
       if (bootstrapCache) {
         bootstrapCache = { ...bootstrapCache, quotas: result.quotas };
       }
@@ -195,7 +181,6 @@ export const subscribeMessageService = {
     const userId = await resolveUserId();
     if (!userId) return;
 
-    
     try {
       await post(`/subscribe-message/prompts/${encodeURIComponent(promptId)}/dismiss`);
     } catch (error) {
@@ -223,9 +208,8 @@ export const subscribeMessageService = {
     const entries = resolveAuthEntries(groups);
 
     if (entries.length === 0) {
-      
-        logError('subscribe.requestAuth', new Error('无可授权模板（tmplId 未配置或未 enabled）'));
-            return bootstrapCache?.quotas ?? [];
+      logError('subscribe.requestAuth', new Error('无可授权模板（tmplId 未配置或未 enabled）'));
+      return bootstrapCache?.quotas ?? [];
     }
 
     const items = await requestSubscribeMessageAuth(entries);
@@ -265,10 +249,15 @@ export const subscribeMessageService = {
       } else if (preset.primaryAction === 'navigate' && navigateUrl) {
         Taro.navigateTo({ url: navigateUrl });
       }
-      await markClassAssignIfNeeded(undefined, prompt.presetId, {
-        classId: variables.classId,
-        navigateUrl,
-      }, action);
+      await markClassAssignIfNeeded(
+        undefined,
+        prompt.presetId,
+        {
+          classId: variables.classId,
+          navigateUrl,
+        },
+        action,
+      );
       await this.dismissPending(prompt.id);
       return;
     }
@@ -277,10 +266,15 @@ export const subscribeMessageService = {
       if (navigateUrl) {
         Taro.navigateTo({ url: navigateUrl });
       }
-      await markClassAssignIfNeeded(undefined, prompt.presetId, {
-        classId: variables.classId,
-        navigateUrl,
-      }, action);
+      await markClassAssignIfNeeded(
+        undefined,
+        prompt.presetId,
+        {
+          classId: variables.classId,
+          navigateUrl,
+        },
+        action,
+      );
       await this.dismissPending(prompt.id);
       return;
     }
@@ -441,7 +435,10 @@ export const subscribeMessageService = {
   },
 
   /** E11-C：发送工资单后可选订阅 */
-  async runSalarySlipSendPrompt(count: number, meta?: { role?: string; campusId?: string }): Promise<void> {
+  async runSalarySlipSendPrompt(
+    count: number,
+    meta?: { role?: string; campusId?: string },
+  ): Promise<void> {
     try {
       const action = await this.openPrompt({
         presetId: 'salary_slip_send',
@@ -479,7 +476,10 @@ export const subscribeMessageService = {
     return bootstrapCache;
   },
 
-  formatPresetBody(presetId: OpenPromptInput['presetId'], variables: Record<string, string>): {
+  formatPresetBody(
+    presetId: OpenPromptInput['presetId'],
+    variables: Record<string, string>,
+  ): {
     title: string;
     body: string;
     primaryText: string;
@@ -588,11 +588,10 @@ export const subscribeMessageService = {
     if (userId) {
       markLoginOptInDone(userId);
     }
-    return this.requestAuthAndReport(
-      LOGIN_OPT_IN_GROUPS,
-      meta?.scene || 'login_opt_in',
-      { role: meta?.role, campusId: meta?.campusId },
-    );
+    return this.requestAuthAndReport(LOGIN_OPT_IN_GROUPS, meta?.scene || 'login_opt_in', {
+      role: meta?.role,
+      campusId: meta?.campusId,
+    });
   },
 
   messageAuthPageUrl: MESSAGE_AUTH_PAGE,
@@ -611,7 +610,6 @@ export const subscribeMessageService = {
     const { receiverUserId, bizKey, className, changeTime, changeReason } = params;
     if (!receiverUserId) return;
 
-    
     try {
       await post('/subscribe-message/send', {
         group: 'schedule_change',

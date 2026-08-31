@@ -12,10 +12,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import StudentListCard from '@/components/student/StudentListCard';
 import { campusService } from '@/services/campus';
-import {
-  opsAlertService,
-  type RenewalReminderItem,
-} from '@/services/ops-alerts';
+import { opsAlertService, type RenewalReminderItem } from '@/services/ops-alerts';
 import {
   getAlertThresholdConfig,
   setAlertThresholdConfig,

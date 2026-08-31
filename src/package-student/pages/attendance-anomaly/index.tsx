@@ -162,7 +162,9 @@ const AttendanceAnomalyPage: React.FC = () => {
                   subtitle={item.subtitle}
                   onClick={() => openStudent(item.studentId)}
                   badge={
-                    <View className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', badgeStyle.bg)}>
+                    <View
+                      className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', badgeStyle.bg)}
+                    >
                       <Text className={cn('text-[20rpx] font-bold', badgeStyle.text)}>
                         {item.kindLabel}
                       </Text>

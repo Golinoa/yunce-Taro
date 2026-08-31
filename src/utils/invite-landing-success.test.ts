@@ -1,4 +1,11 @@
+import Taro from '@tarojs/taro';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import {
+  buildInviteLessonKey,
+  findInviteLandingSuccess,
+  isInviteLessonKeyComplete,
+  saveInviteLandingSuccess,
+} from './invite-landing-success';
 
 vi.mock('@tarojs/taro', () => {
   const store = new Map<string, unknown>();
@@ -12,14 +19,6 @@ vi.mock('@tarojs/taro', () => {
     },
   };
 });
-
-import Taro from '@tarojs/taro';
-import {
-  buildInviteLessonKey,
-  findInviteLandingSuccess,
-  isInviteLessonKeyComplete,
-  saveInviteLandingSuccess,
-} from './invite-landing-success';
 
 describe('invite-landing-success lesson scope', () => {
   beforeEach(() => {

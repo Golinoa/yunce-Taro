@@ -20,7 +20,10 @@ import type { PaginatedResponse } from '@/utils/pagination';
 export interface UsePagedQueryOptions<T> {
   pageSize?: number;
   /** 拉取某一页；page 从 1 开始 */
-  fetcher: (page: number, pageSize: number) => Promise<PaginatedResponse<T> | { list: T[]; total: number }>;
+  fetcher: (
+    page: number,
+    pageSize: number,
+  ) => Promise<PaginatedResponse<T> | { list: T[]; total: number }>;
   /** 为 false 时不自动请求（例如缺 userId） */
   enabled?: boolean;
 }
@@ -37,9 +40,10 @@ export interface UsePagedQueryResult<T> {
   setList: Dispatch<SetStateAction<T[]>>;
 }
 
-function normalizeResult<T>(
-  res: PaginatedResponse<T> | { list: T[]; total: number },
-): { list: T[]; total: number } {
+function normalizeResult<T>(res: PaginatedResponse<T> | { list: T[]; total: number }): {
+  list: T[];
+  total: number;
+} {
   if ('pagination' in res && res.pagination) {
     return {
       list: res.list || [],
@@ -48,7 +52,7 @@ function normalizeResult<T>(
   }
   return {
     list: res.list || [],
-    total: 'total' in res ? res.total : res.list?.length ?? 0,
+    total: 'total' in res ? res.total : (res.list?.length ?? 0),
   };
 }
 

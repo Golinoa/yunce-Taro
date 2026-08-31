@@ -13,12 +13,7 @@ export type MyBookingSourceType =
   | 'venue';
 
 /** 统一状态枚举（与试听状态口径对齐，其他业务映射进来） */
-export type MyBookingStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'completed'
-  | 'no_show'
-  | 'cancelled';
+export type MyBookingStatus = 'pending' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
 
 /** 跳转详情所需载荷 */
 export interface MyBookingNavigatePayload {

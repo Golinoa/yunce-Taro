@@ -27,19 +27,23 @@ import ProfileStats from '@/components/profile/ProfileStats';
 import StoreOnboarding from '@/components/profile/StoreOnboarding';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
-import { markStepVisited } from '@/utils/onboarding-storage';
-import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
-import { teacherService } from '@/services/teacher';
 import { resolveLifecycle } from '@/constants/membership-tips';
-import { organizationService, isOrgMembershipActive, type OrganizationQuotaUsage } from '@/services/organization';
+import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
+import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
+import {
+  organizationService,
+  isOrgMembershipActive,
+  type OrganizationQuotaUsage,
+} from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
+import { teacherService } from '@/services/teacher';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
 import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { markStepVisited } from '@/utils/onboarding-storage';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
-import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 
 // ============================================
 // 角色标签映射
@@ -106,10 +110,7 @@ const Profile: React.FC = () => {
   const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
 
   // 会员开通状态（众创/试用/已到期 → 开通或续费；付费未过期 → 立即查看）
-  const isMembershipActive = useMemo(
-    () => isOrgMembershipActive(quotaUsage),
-    [quotaUsage],
-  );
+  const isMembershipActive = useMemo(() => isOrgMembershipActive(quotaUsage), [quotaUsage]);
   const membershipLifecycle = useMemo(() => resolveLifecycle(quotaUsage), [quotaUsage]);
   const membershipExpired = membershipLifecycle === 'expired';
 
@@ -245,7 +246,13 @@ const Profile: React.FC = () => {
     loadStoreOnboardingHidden();
     loadStoreProgress();
     loadQuotaUsage();
-  }, [loadStudents, loadTeacherStats, loadStoreOnboardingHidden, loadStoreProgress, loadQuotaUsage]);
+  }, [
+    loadStudents,
+    loadTeacherStats,
+    loadStoreOnboardingHidden,
+    loadStoreProgress,
+    loadQuotaUsage,
+  ]);
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
@@ -750,11 +757,7 @@ const Profile: React.FC = () => {
         {/* ====== 教师视图 ====== */}
         {isTeacher && (
           <>
-            <ProfileGrid
-              className="mt-[24rpx]"
-              title="教学台账"
-              items={teacherMonthlyFlowItems}
-            />
+            <ProfileGrid className="mt-[24rpx]" title="教学台账" items={teacherMonthlyFlowItems} />
             {/* 店铺管理：仅管理员/校长 */}
             {isManagerRole &&
               (storeProgress &&

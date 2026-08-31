@@ -514,7 +514,8 @@ const MembershipPage: React.FC = () => {
       >
         <View className="px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))]">
           <Text className="text-[26rpx] text-muted-foreground mb-[24rpx] block leading-[40rpx]">
-            请输入运营发放的激活码（形如 HXK-xxxx-xxxxxxxx）。兑换成功后将更新机构会员有效期与套餐档位。
+            请输入运营发放的激活码（形如
+            HXK-xxxx-xxxxxxxx）。兑换成功后将更新机构会员有效期与套餐档位。
           </Text>
           <FormInput
             variant="capsule"

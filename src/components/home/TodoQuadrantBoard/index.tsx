@@ -6,20 +6,24 @@
  * 经 todoService.updateQuadrant 持久化事态等级。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import type { ITouchEvent } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import TodoQuadrantIcon from '@/components/TodoQuadrantIcon';
-import type { TodoItem } from '@/types/home-todo';
-import { buildRemindMetaFromAt } from '@/utils/custom-todos';
-import type { TodoQuadrant } from '@/types/todo-quadrant';
-import { TODO_QUADRANT_META, TODO_QUADRANT_ORDER, resolveTodoQuadrant } from '@/types/todo-quadrant';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
+import type { TodoItem } from '@/types/home-todo';
+import type { TodoQuadrant } from '@/types/todo-quadrant';
+import {
+  TODO_QUADRANT_META,
+  TODO_QUADRANT_ORDER,
+  resolveTodoQuadrant,
+} from '@/types/todo-quadrant';
+import { buildRemindMetaFromAt } from '@/utils/custom-todos';
 import { buildTimelineEntries } from '@/utils/todo-timeline';
+import type { ITouchEvent } from '@tarojs/components';
 
 export interface TodoQuadrantBoardProps {
   items: TodoItem[];
@@ -428,9 +432,7 @@ const TodoQuadrantBoard: React.FC<TodoQuadrantBoardProps> = ({
   const renderTaskRow = (item: TodoItem, quadrant: TodoQuadrant) => {
     const isDone = Boolean(item.completed || item.completion);
     const remindMeta =
-      hasScheduledReminder(item) && item.remindAt
-        ? buildRemindMetaFromAt(item.remindAt)
-        : null;
+      hasScheduledReminder(item) && item.remindAt ? buildRemindMetaFromAt(item.remindAt) : null;
     const isDraggingThis = dragging?.item.id === item.id;
     const canDrag = !isDone;
 
@@ -444,7 +446,9 @@ const TodoQuadrantBoard: React.FC<TodoQuadrantBoardProps> = ({
         )}
         catchMove={canDrag}
         onClick={() => handleCardNavigate(item)}
-        onTouchStart={(event) => handleRowTouchStart(item, quadrant, event as unknown as RowTouchEvent)}
+        onTouchStart={(event) =>
+          handleRowTouchStart(item, quadrant, event as unknown as RowTouchEvent)
+        }
         onTouchMove={(event) => handleRowTouchMove(item, event as unknown as RowTouchEvent)}
         onTouchEnd={(event) => void handleRowTouchEnd(item, event as unknown as RowTouchEvent)}
         onTouchCancel={(event) => void handleRowTouchEnd(item, event as unknown as RowTouchEvent)}
@@ -530,11 +534,7 @@ const TodoQuadrantBoard: React.FC<TodoQuadrantBoardProps> = ({
                   className="flex h-[52rpx] w-[52rpx] shrink-0 items-center justify-center press-scale"
                   onClick={() => onAddQuadrant?.(quadrant)}
                 >
-                  <Icon
-                    name="mdi-plus"
-                    size="lg"
-                    color={quadrantPlusColor[quadrant]}
-                  />
+                  <Icon name="mdi-plus" size="lg" color={quadrantPlusColor[quadrant]} />
                 </View>
               </View>
 
@@ -544,7 +544,10 @@ const TodoQuadrantBoard: React.FC<TodoQuadrantBoardProps> = ({
                   enhanced
                   showScrollbar
                   className="min-h-0 flex-1"
-                  style={{ height: `${CARD_BODY_HEIGHT_RPX}rpx`, maxHeight: `${CARD_BODY_HEIGHT_RPX}rpx` }}
+                  style={{
+                    height: `${CARD_BODY_HEIGHT_RPX}rpx`,
+                    maxHeight: `${CARD_BODY_HEIGHT_RPX}rpx`,
+                  }}
                 >
                   {list.length === 0 ? (
                     <Text className="text-[22rpx] text-muted-foreground">暂无待办</Text>

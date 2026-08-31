@@ -143,9 +143,7 @@ export async function requestSubscribeMessageAuth(
     return uniqueEntries.map((entry) => {
       const raw = res?.[entry.tmplId];
       const status: SubscribeAuthStatus =
-        raw === 'accept' || raw === 'reject' || raw === 'ban' || raw === 'filter'
-          ? raw
-          : 'reject';
+        raw === 'accept' || raw === 'reject' || raw === 'ban' || raw === 'filter' ? raw : 'reject';
       return { tmplId: entry.tmplId, group: entry.group, status };
     });
   } catch {

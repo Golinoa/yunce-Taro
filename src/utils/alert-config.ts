@@ -94,11 +94,16 @@ export function setAlertThreshold(hours: number): void {
 }
 
 /** 用校区字段同步（进入续费提醒 / 学员列表前调用） */
-export function syncAlertThresholdFromCampus(input?: {
-  hoursAlertThreshold?: number | null;
-  daysAlertThreshold?: number | null;
-  amountAlertThreshold?: number | null;
-} | number | null): AlertThresholdConfig {
+export function syncAlertThresholdFromCampus(
+  input?:
+    | {
+        hoursAlertThreshold?: number | null;
+        daysAlertThreshold?: number | null;
+        amountAlertThreshold?: number | null;
+      }
+    | number
+    | null,
+): AlertThresholdConfig {
   if (input === undefined || input === null) return getAlertThresholdConfig();
   if (typeof input === 'number') {
     setAlertThreshold(input);

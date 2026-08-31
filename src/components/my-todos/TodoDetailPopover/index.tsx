@@ -50,6 +50,7 @@ import {
   mergeCollaboratorSummaries,
   type CollaboratorSummary,
 } from '@/utils/todo-collaborator-select';
+
 export interface TodoDetailSavePayload {
   title: string;
   note?: string;
@@ -451,16 +452,16 @@ function TodoDetailPopover({
                 categoryMenuOpen={isCustom ? categoryMenuOpen : false}
                 categoryOptions={isCustom ? categoryOptions : []}
                 categoryId={categoryId}
-                onToggleMenu={isCustom ? () => setCategoryMenuOpen((open) => !open) : () => undefined}
+                onToggleMenu={
+                  isCustom ? () => setCategoryMenuOpen((open) => !open) : () => undefined
+                }
                 onCloseMenu={() => setCategoryMenuOpen(false)}
                 onSelectCategory={(id) => {
                   if (!isCustom) return;
                   setCategoryId(id);
                   setCategoryMenuOpen(false);
                 }}
-                onCreateCategory={
-                  isCustom && onCreateCategory ? handleOpenAddCategory : undefined
-                }
+                onCreateCategory={isCustom && onCreateCategory ? handleOpenAddCategory : undefined}
                 onClosePopover={onClose}
               />
 

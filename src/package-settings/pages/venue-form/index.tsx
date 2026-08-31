@@ -206,8 +206,7 @@ const VenueFormPage: React.FC = () => {
   );
 
   const managerText = useMemo(
-    () =>
-      managerOptions.find((opt) => opt.value === form.managerUserId)?.label || '机构管理员',
+    () => managerOptions.find((opt) => opt.value === form.managerUserId)?.label || '机构管理员',
     [form.managerUserId, managerOptions],
   );
 

@@ -1,19 +1,17 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
-import Icon from '@/components/Icon';
 import { calendarSyncService } from '@/services/calendar-sync';
 import { subscribeMessageService } from '@/services/subscribe-message';
+import type { UserRole } from '@/types/profile';
 import { isParentRole, isPrincipalOrAbove, useAuth } from '@/utils/auth';
-import {
-  canUseCalendarSync,
-  getCalendarSyncSettings,
-} from '@/utils/calendar-sync-settings';
+import { canUseCalendarSync, getCalendarSyncSettings } from '@/utils/calendar-sync-settings';
+import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
-import { logError } from '@/utils/logger';
 
 interface NotifyItem {
   id: string;
@@ -141,7 +139,7 @@ const MANAGER_NOTIFY_GROUPS: NotifyGroup[] = [
   },
 ];
 
-function getNotifyGroupsForRole(role: string | null | undefined): NotifyGroup[] {
+function getNotifyGroupsForRole(role: UserRole | null | undefined): NotifyGroup[] {
   if (isParentRole(role)) return PARENT_NOTIFY_GROUPS;
   if (isPrincipalOrAbove(role)) return MANAGER_NOTIFY_GROUPS;
   return TEACHER_NOTIFY_GROUPS;

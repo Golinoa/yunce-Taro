@@ -11,6 +11,9 @@ import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import type { DataModule } from '@/types/permission';
 import { canAccessModule } from '@/types/permission';
+import { useAuth } from '@/utils/auth';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 import {
   DEFAULT_TODO_SETTINGS,
   type TodoReminderKey,
@@ -18,9 +21,6 @@ import {
   getTodoSettings,
   setTodoSettingKey,
 } from '@/utils/todo-settings';
-import { useAuth } from '@/utils/auth';
-import { useCardNavigationBar } from '@/utils/navigation-bar';
-import { withRouteGuard } from '@/utils/route-guard';
 
 interface SettingRow {
   key: TodoReminderKey | 'showTabBadge';
@@ -174,10 +174,7 @@ const TodoSettingsPage: React.FC = () => {
                         </Text>
                       )}
                     </View>
-                    <Switch
-                      checked={settings[item.key]}
-                      onChange={() => handleToggle(item.key)}
-                    />
+                    <Switch checked={settings[item.key]} onChange={() => handleToggle(item.key)} />
                   </View>
                 ))}
               </View>

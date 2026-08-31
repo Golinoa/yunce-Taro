@@ -5,13 +5,17 @@ import React, { useMemo } from 'react';
 import TodoCard from '@/components/TodoCard';
 import type { TodoItem } from '@/types/home-todo';
 import {
+  hasTodoDisplayTime,
+  shouldShowTodoCardScheduleRow,
+  buildTodoCardDomId,
+} from '@/utils/todo-card-meta';
+import {
   buildTimelineEntries,
   formatTimelineClock,
   resolveTimelineAt,
   shouldShowNowMarker,
   TODO_TIMELINE_EMBEDDED_LAYOUT,
 } from '@/utils/todo-timeline';
-import { hasTodoDisplayTime, shouldShowTodoCardScheduleRow, buildTodoCardDomId } from '@/utils/todo-card-meta';
 
 export type { TodoItem };
 
@@ -207,9 +211,7 @@ const TodoList: React.FC<TodoListProps> = ({
             }}
           />
         ) : null}
-        <View
-          className={cn('relative flex', chronological ? 'flex-col' : 'flex-col-reverse')}
-        >
+        <View className={cn('relative flex', chronological ? 'flex-col' : 'flex-col-reverse')}>
           {rows}
         </View>
       </View>

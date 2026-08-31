@@ -81,8 +81,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
 }) => {
   const isActive = item.status === 'active';
   const students = item.students || [];
-  const shouldShowStudentRow =
-    showStudentRow ?? (Boolean(footerAction) || students.length > 0);
+  const shouldShowStudentRow = showStudentRow ?? (Boolean(footerAction) || students.length > 0);
   const teacherLabel = item.assistantTeacherName
     ? `${item.leadTeacherName} / ${item.assistantTeacherName}`
     : item.leadTeacherName;
@@ -119,11 +118,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
                 onSharePrepare?.(item);
               }}
             >
-              <Icon
-                name="mdi-share-variant"
-                size={28}
-                color="hsl(var(--muted-foreground))"
-              />
+              <Icon name="mdi-share-variant" size={28} color="hsl(var(--muted-foreground))" />
             </Button>
           ) : null}
         </View>
@@ -166,14 +161,18 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
       <View className="mt-[16rpx] flex items-center justify-between gap-[12rpx]">
         <View className="flex min-w-0 flex-1 items-center overflow-hidden">
           <Icon name="mdi-account-outline" size="xs" color="mutedForeground" />
-          <Text className="ml-[6rpx] truncate text-[26rpx] text-muted-foreground">{teacherLabel}</Text>
+          <Text className="ml-[6rpx] truncate text-[26rpx] text-muted-foreground">
+            {teacherLabel}
+          </Text>
           <Text className="ml-[10rpx] shrink-0 text-[26rpx] tabular-nums text-muted-foreground">
             {countLabel}
           </Text>
           {item.room ? (
             <View className="ml-[12rpx] flex min-w-0 shrink items-center overflow-hidden">
               <Icon name="mdi-map-marker" size="xs" color="mutedForeground" />
-              <Text className="ml-[4rpx] truncate text-[26rpx] text-muted-foreground">{item.room}</Text>
+              <Text className="ml-[4rpx] truncate text-[26rpx] text-muted-foreground">
+                {item.room}
+              </Text>
             </View>
           ) : null}
         </View>

@@ -317,12 +317,11 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     if (profile) {
       const required = PAGE_ROLE_REQUIREMENTS[normPath];
       if (required && !requireRole(required, profile)) {
-        const reason =
-          required.every((r) => r === 'admin' || r === 'principal')
-            ? 'manager'
-            : required.every((r) => r === 'parent')
-              ? 'parent'
-              : 'staff';
+        const reason = required.every((r) => r === 'admin' || r === 'principal')
+          ? 'manager'
+          : required.every((r) => r === 'parent')
+            ? 'parent'
+            : 'staff';
         redirectToForbidden(reason);
         setAuthorized(false);
         return;

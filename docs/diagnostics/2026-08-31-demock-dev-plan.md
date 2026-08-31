@@ -194,11 +194,11 @@
 | D | 完成 | 种子含开放时段 + 私教预约 |
 | E | 完成 | DEV 切换器 + 邮箱密码切会话（常量列表） |
 | F | 完成（运行时） | 服务层 `isUseMock` 分支已拆；`isUseMock()` 废弃恒 false；`*:mock` 脚本硬失败；`src/data/*` 仍保留供 stub/历史 |
-| G | 部分完成 | FE vitest **172/172**；API 三角色冒烟见下 |
+| G | 部分完成 → **第三次走查已跑** | FE vitest **132/132**；测环境 E2E **42/42**（`e2e-regression-dev.mjs`）；详表 `2026-08-31-third-walkthrough-e2e.md`；**生产上线仍 NO-GO**（BE test:ci 红等） |
 
 ### G 冒烟（本机 API）
 
-脚本：`yunceTaro/scripts/smoke-demock-api.mjs`
+脚本：`yunceTaro/scripts/smoke-demock-api.mjs`（轻量）+ `scripts/e2e-regression-dev.mjs`（全量）
 
 账号：`*@yunce.com` / `123456`
 
@@ -207,10 +207,11 @@
 | health | PASS |
 | 校长 students / home/teacher / teachers/me | PASS |
 | 教师 teachers/me / students | PASS |
-| 家长 home/parent / students | PASS（home 已按 profileId/userUuid 解析） |
+| 家长 home/parent / students | PASS（home 已按 profileId/userUuid 解析；**students 列表 n=0 待查 W3-03**） |
 | class-booking list + batch | PASS |
+| 校长 course-packages + data-center/finance | PASS（本轮修 W3-01/W3-02） |
 
-FE：`npm test -- --run` → 37 files / 172 tests PASS
+FE：`npm test -- --run` → 27 files / **132** tests PASS
 
 ---
 
@@ -222,8 +223,9 @@ FE：`npm test -- --run` → 37 files / 172 tests PASS
    - 保持：本机 API + `cloudflared tunnel run yunce-dev`  
    - 执行：`cd yunceTaro && npm run dev:weapp:dev`  
    - 打开 `dist`，合法域名含 `dev.chancore.cn`  
-   - 用左上角 **DEV** 切换校长/教师/家长，过一遍绑定→约课→台账
+   - 用左上角 **DEV** 切换校长/教师/家长，过一遍绑定→约课→台账（见 third-walkthrough §5）
 
 2. ~~是否删光 `src/data/*`~~：**已删**（含 mock-stub / mock-loaders）；类型迁到 `src/types/*`  
-3. ~~是否 git commit~~：见本轮备份提交  
-4. （可选）`GET /dev/switchable-users` 仍可后续做
+3. ~~是否 git commit~~：见本轮备份提交；**W3-01/W3-02 BE 修复尚未单独提交**  
+4. （可选）`GET /dev/switchable-users` 仍可后续做  
+5. **上线拍板**：当前判定 **生产 NO-GO**；是否先只把测环境当日常开发真相源

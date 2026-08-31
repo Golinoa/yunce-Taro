@@ -117,11 +117,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       <DatePickerSheet
         visible={Boolean(datePickerField)}
         title={datePickerField === 'end' ? '选择结束日期' : '选择开始日期'}
-        value={
-          datePickerField === 'end'
-            ? endDate || todayStr
-            : startDate || todayStr
-        }
+        value={datePickerField === 'end' ? endDate || todayStr : startDate || todayStr}
         onClose={() => setDatePickerField(null)}
         onConfirm={(date) => {
           if (datePickerField === 'end') onEndChange(date);

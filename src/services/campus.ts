@@ -19,7 +19,6 @@ import type {
   CampusType,
   PartnerMode,
 } from '@/types/campus';
-import { get, post, put } from '@/utils/request';
 import { notWired } from '@/utils/not-wired';
 import {
   API_PAGE_SIZE_BATCH,
@@ -27,6 +26,7 @@ import {
   fetchAllPages,
   type PaginatedResponse,
 } from '@/utils/pagination';
+import { get, post, put } from '@/utils/request';
 
 interface BackendNotifySettingItem {
   enabled: boolean;
@@ -111,8 +111,7 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
     businessCategories: [],
     tags: [],
-    hoursAlertThreshold:
-      typeof raw.hoursAlertThreshold === 'number' ? raw.hoursAlertThreshold : 5,
+    hoursAlertThreshold: typeof raw.hoursAlertThreshold === 'number' ? raw.hoursAlertThreshold : 5,
     daysAlertThreshold: typeof raw.daysAlertThreshold === 'number' ? raw.daysAlertThreshold : 7,
     amountAlertThreshold:
       typeof raw.amountAlertThreshold === 'number' ? raw.amountAlertThreshold : 200,
@@ -125,7 +124,6 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
 export const campusService = {
   /** 校区列表（分批拉全） */
   getList: async (): Promise<CampusUIModel[]> => {
-    
     const list = await fetchAllPages(async (page, pageSize) => {
       const data = await get<PaginatedResponse<BackendCampusItem>>('/campuses', {
         page,
@@ -138,7 +136,7 @@ export const campusService = {
 
   /** 按 ID 获取校区 */
   getById: async (id: string): Promise<CampusUIModel | null> => {
-        try {
+    try {
       const raw = await get<BackendCampusItem>(`/campuses/${id}`);
       return mapBackendCampus(raw);
     } catch {
@@ -159,7 +157,7 @@ export const campusService = {
 
   /** 更新校区 */
   update: async (id: string, data: Partial<CampusFormData>): Promise<CampusUIModel | null> => {
-        const raw = await put<BackendCampusItem>(`/campuses/${id}`, data);
+    const raw = await put<BackendCampusItem>(`/campuses/${id}`, data);
     return mapBackendCampus(raw);
   },
 
@@ -204,7 +202,8 @@ export const holidayService = {
 
   clearAll: async (): Promise<boolean> => notWired('DELETE /holidays'),
 
-  generateStatutory: async (_year?: number): Promise<number> => notWired('POST /holidays/generate-statutory'),
+  generateStatutory: async (_year?: number): Promise<number> =>
+    notWired('POST /holidays/generate-statutory'),
 };
 
 export const businessHoursService = {
@@ -220,28 +219,24 @@ export const businessHoursService = {
 export const notifyService = {
   /** ?????? */
   getList: async (): Promise<NotifyGroup[]> => {
-    
-      const list = await get<BackendNotifySettingItem[]>('/notify-settings');
-      return mapBackendNotifySettings(list);
-      },
+    const list = await get<BackendNotifySettingItem[]>('/notify-settings');
+    return mapBackendNotifySettings(list);
+  },
 
   /** ??????? */
   toggle: async (itemId: string): Promise<NotifyGroup[]> => {
-    
-      const currentGroups = await notifyService.getList();
-      const target = currentGroups
-        .flatMap((group) => group.items)
-        .find((item) => item.id === itemId);
-      if (!target) {
-        throw new Error('???????');
-      }
+    const currentGroups = await notifyService.getList();
+    const target = currentGroups.flatMap((group) => group.items).find((item) => item.id === itemId);
+    if (!target) {
+      throw new Error('???????');
+    }
 
-      await put(`/notify-settings/${itemId}`, {
-        enabled: !target.enabled,
-      });
+    await put(`/notify-settings/${itemId}`, {
+      enabled: !target.enabled,
+    });
 
-      return notifyService.getList();
-      },
+    return notifyService.getList();
+  },
 };
 
 // ============================================
@@ -277,4 +272,3 @@ export const roomService = {
     notWired('PUT /rooms/:id'),
   delete: async (_id: string): Promise<boolean> => notWired('DELETE /rooms/:id'),
 };
-

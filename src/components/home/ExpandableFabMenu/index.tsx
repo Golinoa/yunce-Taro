@@ -5,10 +5,10 @@
  * actions 数组自上而下对应展开菜单（首项在最上）。
  */
 import { View, Text } from '@tarojs/components';
-import type { ITouchEvent } from '@tarojs/components';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
+import type { ITouchEvent } from '@tarojs/components';
 
 export interface ExpandableFabMenuAction {
   key: string;

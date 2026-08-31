@@ -5,9 +5,9 @@ import PrivacyPopup from '@/components/PrivacyPopup';
 import { SubscribeAuthHost } from '@/components/subscribe';
 import { scheduleDeferredAppStartup } from '@/utils/app-startup';
 import { AuthProvider } from '@/utils/auth';
+import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import { logError } from '@/utils/logger';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
-import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import 'uno.css';
 /**
  * 跨分包共享模块必须被主包引用，否则 Taro MiniSplitChunksPlugin
@@ -39,7 +39,7 @@ import '@/components/campus/CampusSwitcher';
 import '@/components/campus/CampusTrigger';
 import '@/stores/campus';
 import '@/stores/subscribe-auth';
-import '@/components/subscribe';
+
 import '@/services/member-card';
 import '@/services/card-type';
 import '@/services/student';

@@ -85,9 +85,7 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
 
   const genderRaw = str(raw.gender);
   const gender =
-    genderRaw === 'male' || genderRaw === 'female' || genderRaw === 'other'
-      ? genderRaw
-      : undefined;
+    genderRaw === 'male' || genderRaw === 'female' || genderRaw === 'other' ? genderRaw : undefined;
 
   return {
     id: String(raw.id ?? ''),

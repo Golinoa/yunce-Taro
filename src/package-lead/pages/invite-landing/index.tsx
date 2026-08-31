@@ -20,10 +20,7 @@ import { subscribeMessageService } from '@/services/subscribe-message';
 import { useAgreementStore } from '@/stores/agreement';
 import type { CampusUIModel } from '@/types/campus';
 import { isStaffRole, useAuth } from '@/utils/auth';
-import {
-  clearIdentitySelectionPending,
-  markOnboardingSkipped,
-} from '@/utils/auth-onboarding';
+import { clearIdentitySelectionPending, markOnboardingSkipped } from '@/utils/auth-onboarding';
 import { isCampusOpen, parseBusinessHours } from '@/utils/campus';
 import {
   buildInviteLessonKey,
@@ -113,7 +110,12 @@ const InviteLandingPage: React.FC = () => {
       c: decodeParam(opt.c),
       course: decodeParam(opt.course || opt.classId),
       st: opt.st === 'qr' ? 'qr' : 'share_link',
-      type: typeRaw === 'group_slot' ? 'group_slot' : typeRaw === 'class_lesson' ? 'class_lesson' : undefined,
+      type:
+        typeRaw === 'group_slot'
+          ? 'group_slot'
+          : typeRaw === 'class_lesson'
+            ? 'class_lesson'
+            : undefined,
       classId: decodeParam(opt.classId || opt.course),
       className: decodeParam(opt.className),
       scheduleId: decodeParam(opt.scheduleId),
@@ -182,7 +184,9 @@ const InviteLandingPage: React.FC = () => {
     if (record) {
       setChildName(record.childName);
       setChildAge(record.childAge);
-      setChildGender(record.childGender === 'male' || record.childGender === 'female' ? record.childGender : '');
+      setChildGender(
+        record.childGender === 'male' || record.childGender === 'female' ? record.childGender : '',
+      );
       setParentPhone(record.parentPhone);
       setClaimed(true);
       setShowVoucher(false);
@@ -314,8 +318,7 @@ const InviteLandingPage: React.FC = () => {
 
   const courseTitle = params.className || (isGroupBook ? '团课' : '班课试听');
   const dateLabel = formatDateLabel(params.date);
-  const timeLabel =
-    params.start && params.end ? `${params.start}–${params.end}` : '';
+  const timeLabel = params.start && params.end ? `${params.start}–${params.end}` : '';
 
   const ensureSubscribe = useCallback(async () => {
     if (subscribedRef.current) return;
@@ -448,7 +451,17 @@ const InviteLandingPage: React.FC = () => {
         bookedAt: dayjs().toISOString(),
       });
     },
-    [courseTitle, lessonKey, params.c, params.date, params.end, params.start, params.t, params.type, session?.user.id],
+    [
+      courseTitle,
+      lessonKey,
+      params.c,
+      params.date,
+      params.end,
+      params.start,
+      params.t,
+      params.type,
+      session?.user.id,
+    ],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -612,11 +625,7 @@ const InviteLandingPage: React.FC = () => {
   if (success) {
     return (
       <PageContainer className="invite-landing">
-        <View
-          className="invite-home-btn"
-          style={{ top: `${homeBtnTop}px` }}
-          onClick={handleDone}
-        >
+        <View className="invite-home-btn" style={{ top: `${homeBtnTop}px` }} onClick={handleDone}>
           <Icon name="mdi-home" size={36} color="foreground" />
         </View>
 
@@ -817,9 +826,7 @@ const InviteLandingPage: React.FC = () => {
               <Text className="block text-[30rpx] font-bold text-foreground">
                 {campus?.name || '校区'}
               </Text>
-              <Text className="block text-[22rpx] text-muted-foreground">
-                老师分享邀请
-              </Text>
+              <Text className="block text-[22rpx] text-muted-foreground">老师分享邀请</Text>
             </View>
           </View>
 
@@ -875,9 +882,7 @@ const InviteLandingPage: React.FC = () => {
           <View className="mx-[28rpx] mt-[24rpx] rounded-[28rpx] border border-border bg-card p-[28rpx]">
             {isLoggedIn ? (
               <View className="mb-[20rpx] flex items-center justify-center rounded-full bg-success/10 px-[24rpx] py-[12rpx]">
-                <Text className="text-[22rpx] font-semibold text-success">
-                  ✓ 已微信登录
-                </Text>
+                <Text className="text-[22rpx] font-semibold text-success">✓ 已微信登录</Text>
               </View>
             ) : null}
             <Text className="block text-[30rpx] font-bold text-foreground">
@@ -951,11 +956,15 @@ const InviteLandingPage: React.FC = () => {
               <View className="grid grid-cols-2 gap-[16rpx]">
                 <View>
                   <Text className="block text-[22rpx] text-muted-foreground">日期</Text>
-                  <Text className="mt-[4rpx] block text-[26rpx] font-semibold">{dateLabel || '—'}</Text>
+                  <Text className="mt-[4rpx] block text-[26rpx] font-semibold">
+                    {dateLabel || '—'}
+                  </Text>
                 </View>
                 <View>
                   <Text className="block text-[22rpx] text-muted-foreground">时段</Text>
-                  <Text className="mt-[4rpx] block text-[26rpx] font-semibold">{timeLabel || '—'}</Text>
+                  <Text className="mt-[4rpx] block text-[26rpx] font-semibold">
+                    {timeLabel || '—'}
+                  </Text>
                 </View>
               </View>
             </View>

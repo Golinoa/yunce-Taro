@@ -7,10 +7,9 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
-import { APP_VERSION } from '@/constants/version';
 import { SUBSCRIBE_GROUP_LABELS, SUBSCRIBE_TEMPLATE_GROUPS } from '@/constants/subscribe-presets';
+import { APP_VERSION } from '@/constants/version';
 import { subscribeMessageService } from '@/services/subscribe-message';
-import { chooseImageTemp, uploadImage } from '@/utils/image-upload';
 import type { SubscribeFlowId, SubscribeRenewPresetId } from '@/types/subscribe-message';
 import { useAuth } from '@/utils/auth';
 import { getApiBaseUrl, isDevApiEnv } from '@/utils/build-env';
@@ -23,13 +22,14 @@ import {
   setDeveloperModeUnlocked,
   verifyDeveloperModePassword,
 } from '@/utils/developer-mode';
-import { showInputModal } from '@/utils/modal';
-import { useCardNavigationBar } from '@/utils/navigation-bar';
-import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
+import { chooseImageTemp, uploadImage } from '@/utils/image-upload';
 import {
   buildMockClassTrialInvitePath,
   buildMockGroupSlotInvitePath,
 } from '@/utils/mock-share-demo';
+import { showInputModal } from '@/utils/modal';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 
 const API_BASE = getApiBaseUrl();
 const IS_DEV_API = isDevApiEnv();
@@ -141,29 +141,48 @@ const DeveloperMode: React.FC = () => {
     [currentRole, profile?.currentContext?.campusId],
   );
 
-  const runAction = useCallback(async (action: DevAction) => {
-    if (runningId) return;
-    if (leaveIfExpired()) return;
-    setRunningId(action.id);
-    try {
-      await action.run();
-    } catch {
-      Taro.showToast({ title: '执行失败', icon: 'none' });
-    } finally {
-      setRunningId(null);
-    }
-  }, [leaveIfExpired, runningId]);
+  const runAction = useCallback(
+    async (action: DevAction) => {
+      if (runningId) return;
+      if (leaveIfExpired()) return;
+      setRunningId(action.id);
+      try {
+        await action.run();
+      } catch {
+        Taro.showToast({ title: '执行失败', icon: 'none' });
+      } finally {
+        setRunningId(null);
+      }
+    },
+    [leaveIfExpired, runningId],
+  );
 
   const sections: DevSection[] = useMemo(() => {
-    const subscribeFlows: Array<{ id: SubscribeFlowId; label: string; ctx?: Record<string, string> }> = [
+    const subscribeFlows: Array<{
+      id: SubscribeFlowId;
+      label: string;
+      ctx?: Record<string, string>;
+    }> = [
       { id: 'E01', label: 'E01 学员建档成功', ctx: { studentName: MOCK_CTX.studentName } },
-      { id: 'E02A', label: 'E02A 学员入班（操作人）', ctx: { className: MOCK_CTX.className, navigateUrl: MOCK_CTX.navigateUrl } },
+      {
+        id: 'E02A',
+        label: 'E02A 学员入班（操作人）',
+        ctx: { className: MOCK_CTX.className, navigateUrl: MOCK_CTX.navigateUrl },
+      },
       { id: 'E03', label: 'E03 家长绑定孩子', ctx: { childName: MOCK_CTX.childName } },
       { id: 'E05', label: 'E05 点名后 Renew', ctx: {} },
       { id: 'E06', label: 'E06 新建班级', ctx: { className: MOCK_CTX.className } },
       { id: 'E07', label: 'E07 排课保存 Renew', ctx: {} },
-      { id: 'E08', label: 'E08 续费成功', ctx: { studentName: MOCK_CTX.studentName, studentId: MOCK_CTX.studentId } },
-      { id: 'E09', label: 'E09 开卡成功', ctx: { studentName: MOCK_CTX.studentName, studentId: MOCK_CTX.studentId } },
+      {
+        id: 'E08',
+        label: 'E08 续费成功',
+        ctx: { studentName: MOCK_CTX.studentName, studentId: MOCK_CTX.studentId },
+      },
+      {
+        id: 'E09',
+        label: 'E09 开卡成功',
+        ctx: { studentName: MOCK_CTX.studentName, studentId: MOCK_CTX.studentId },
+      },
       { id: 'E10', label: 'E10 新建线索', ctx: { title: MOCK_CTX.title } },
       { id: 'E11', label: 'E11 新增教师', ctx: { teacherName: MOCK_CTX.teacherName } },
       { id: 'E12', label: 'E12 自定义待办（直调微信）', ctx: {} },
@@ -181,7 +200,11 @@ const DeveloperMode: React.FC = () => {
       { id: 'class_view_renew', label: 'Renew · 班级页补充', scene: 'dev_class_view_renew' },
       { id: 'post_class_renew', label: 'Renew · 课后补充', scene: 'dev_post_class_renew' },
       { id: 'lead_follow_renew', label: 'Renew · 线索跟进补充', scene: 'dev_lead_follow_renew' },
-      { id: 'salary_confirm_renew', label: 'Renew · 薪资核对补充', scene: 'dev_salary_confirm_renew' },
+      {
+        id: 'salary_confirm_renew',
+        label: 'Renew · 薪资核对补充',
+        scene: 'dev_salary_confirm_renew',
+      },
     ];
 
     return [

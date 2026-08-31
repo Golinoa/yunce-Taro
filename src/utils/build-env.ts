@@ -26,7 +26,9 @@ export function getApiBaseUrl(): string {
 export function isDevApiEnv(): boolean {
   if (process.env.TARO_ENABLE_LOCAL_DEBUG === 'true') return true;
   const base = getApiBaseUrl();
-  return base.includes('dev.chancore.cn') || base.includes('127.0.0.1') || base.includes('localhost');
+  return (
+    base.includes('dev.chancore.cn') || base.includes('127.0.0.1') || base.includes('localhost')
+  );
 }
 
 /** @deprecated 使用 getApiBaseUrl()；保留别名供逐步迁移 */

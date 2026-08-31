@@ -16,10 +16,7 @@ export const courseTemplateService = {
   },
 
   /** 更新课程模板 */
-  update: async (
-    _id: string,
-    _data: Partial<CourseTemplateFormData>,
-  ): Promise<CourseTemplate> => {
+  update: async (_id: string, _data: Partial<CourseTemplateFormData>): Promise<CourseTemplate> => {
     throw new Error('课程模板 API 暂未接通');
   },
 

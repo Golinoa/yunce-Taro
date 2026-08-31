@@ -8,13 +8,13 @@ import { ScrollView, View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import FormInput from '@/components/FormInput';
 import FormRow from '@/components/FormRow';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { SUBJECT_ICONS } from '@/constants/campus-ui';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
 import type { SubjectFormData } from '@/types/campus';
 

@@ -10,8 +10,8 @@ import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
 import type { TeacherIdentity } from '@/types/teacher';
-import { useMiniProgramNavBarLayout } from '@/utils/use-nav-safe-height';
 import type { CollaboratorSummary } from '@/utils/todo-collaborator-select';
+import { useMiniProgramNavBarLayout } from '@/utils/use-nav-safe-height';
 
 const DEFAULT_IDENTITY: TeacherIdentity = 'teacher';
 
@@ -25,7 +25,9 @@ export interface CollaboratorDisplayInfo {
   roleText?: string;
 }
 
-export function collaboratorSummaryToDisplay(summary: CollaboratorSummary): CollaboratorDisplayInfo {
+export function collaboratorSummaryToDisplay(
+  summary: CollaboratorSummary,
+): CollaboratorDisplayInfo {
   return {
     id: summary.id,
     name: summary.name,
@@ -168,7 +170,9 @@ export const TodoCollaboratorSelectRow: React.FC<TodoCollaboratorSelectRowProps>
           </Text>
         ) : null}
       </View>
-      <View className={cn('ml-[12rpx] shrink-0 rounded-tag px-[12rpx] py-[4rpx]', identityMeta.tag.bg)}>
+      <View
+        className={cn('ml-[12rpx] shrink-0 rounded-tag px-[12rpx] py-[4rpx]', identityMeta.tag.bg)}
+      >
         <Text className={cn('text-[22rpx] font-medium', identityMeta.tag.text)}>
           {identityMeta.label}
         </Text>

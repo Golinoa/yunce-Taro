@@ -1,8 +1,8 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useMemo } from 'react';
-import Icon from '@/components/Icon';
 import ParentGlassShell from '@/components/home/ParentGlassShell';
+import Icon from '@/components/Icon';
 import type { Schedule } from '@/types/schedule';
 
 const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
@@ -99,8 +99,13 @@ const ParentScheduleSection: React.FC<ParentScheduleSectionProps> = ({
             );
           })}
           {hasMore ? (
-            <View className="flex items-center justify-center py-[4rpx] press-scale" onClick={handleGo}>
-              <Text className="text-[22rpx] text-primary">还有 {sorted.length - HOME_VISIBLE_COUNT} 节 · 查看全部</Text>
+            <View
+              className="flex items-center justify-center py-[4rpx] press-scale"
+              onClick={handleGo}
+            >
+              <Text className="text-[22rpx] text-primary">
+                还有 {sorted.length - HOME_VISIBLE_COUNT} 节 · 查看全部
+              </Text>
             </View>
           ) : null}
         </View>

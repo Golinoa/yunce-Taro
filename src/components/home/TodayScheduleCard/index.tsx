@@ -305,11 +305,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
                           ? ''
                           : TIME_AREA_STYLE.text;
                   const timeTextStyle =
-                    status === 'urgent'
-                      ? undefined
-                      : colorKey
-                        ? { color: colorHex }
-                        : undefined;
+                    status === 'urgent' ? undefined : colorKey ? { color: colorHex } : undefined;
                   return (
                     <View
                       className={cn(
@@ -371,11 +367,16 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
                           <Text className="text-[20rpx] font-medium">{categoryLabel}</Text>
                         </View>
                       )}
-                      {!isDone && !isEnded && !isUnattended && !isActive && !categoryLabel && item.tag && (
-                        <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
-                          <Text className="text-[20rpx] font-medium">{item.tag}</Text>
-                        </View>
-                      )}
+                      {!isDone &&
+                        !isEnded &&
+                        !isUnattended &&
+                        !isActive &&
+                        !categoryLabel &&
+                        item.tag && (
+                          <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                            <Text className="text-[20rpx] font-medium">{item.tag}</Text>
+                          </View>
+                        )}
                       {isEnded && categoryLabel && (
                         <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
                           <Text className="text-[20rpx] font-medium">{categoryLabel}</Text>

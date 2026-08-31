@@ -72,9 +72,7 @@ const Holidays: React.FC = () => {
   }, []);
 
   const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
 
   const handleOpenAdd = useCallback(() => {
@@ -240,19 +238,13 @@ const Holidays: React.FC = () => {
       {/* 顶栏操作 — 对齐设计稿右上：全部删除 / 生成法定节假日 */}
       <View className="flex items-center justify-end gap-[28rpx] bg-white px-[32rpx] py-[20rpx]">
         <Text
-          className={cn(
-            'text-[28rpx] text-primary active:opacity-70',
-            busy && 'opacity-50',
-          )}
+          className={cn('text-[28rpx] text-primary active:opacity-70', busy && 'opacity-50')}
           onClick={busy ? undefined : () => void handleDeleteAll()}
         >
           {selectedIds.length > 0 ? `删除所选(${selectedIds.length})` : '全部删除'}
         </Text>
         <Text
-          className={cn(
-            'text-[28rpx] text-primary active:opacity-70',
-            busy && 'opacity-50',
-          )}
+          className={cn('text-[28rpx] text-primary active:opacity-70', busy && 'opacity-50')}
           onClick={busy ? undefined : () => void handleGenerate()}
         >
           生成法定节假日
@@ -383,9 +375,7 @@ const Holidays: React.FC = () => {
               'flex items-center justify-center rounded-[24rpx] py-[28rpx]',
               !submitBlockedReason && !saving ? 'bg-primary' : 'bg-muted',
             )}
-            onClick={
-              !submitBlockedReason && !saving ? () => void handleSave() : undefined
-            }
+            onClick={!submitBlockedReason && !saving ? () => void handleSave() : undefined}
           >
             <Text
               className={cn(

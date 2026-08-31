@@ -4,15 +4,11 @@ import { createClientRequestId, requestSubscribeMessageAuth } from './subscribe-
 describe('subscribe-message utils', () => {
   it('createClientRequestId 为 uuid 格式', () => {
     const id = createClientRequestId();
-    expect(id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    );
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
 
   it('requestSubscribeMessageAuth：空 tmplId 不调微信', async () => {
-    const items = await requestSubscribeMessageAuth([
-      { group: 'todo_remind', tmplId: '' },
-    ]);
+    const items = await requestSubscribeMessageAuth([{ group: 'todo_remind', tmplId: '' }]);
     expect(items).toEqual([]);
   });
 

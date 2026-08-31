@@ -5,11 +5,11 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import ActionButton from '@/components/ActionButton';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
+import DatePickerSheet from '@/components/DatePickerSheet';
 import FormRow from '@/components/FormRow';
 import Icon from '@/components/Icon';
 import ClassSelector from '@/components/lesson/ClassSelector';
 import PageContainer from '@/components/PageContainer';
-import DatePickerSheet from '@/components/DatePickerSheet';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import StarRating from '@/components/StarRating';
 import Stepper from '@/components/Stepper';
@@ -33,6 +33,8 @@ import { auditLogService } from '@/services/audit-log';
 import { campusService, roomService } from '@/services/campus';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
+import { useThemeStore } from '@/stores/theme';
+import { getThemeHexColors } from '@/theme';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
@@ -44,8 +46,6 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
-import { useThemeStore } from '@/stores/theme';
-import { getThemeHexColors } from '@/theme';
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -209,11 +209,7 @@ const CheckinCard: React.FC<{
   const rightActive = status === 'leave' || status === 'absent';
   const rightActiveBg = status === 'leave' ? 'bg-destructive' : 'bg-warning';
 
-  const cornerBadgeLeft = highlight
-    ? isMakeup || isTrial
-      ? 'left-[72rpx]'
-      : 'left-0'
-    : 'left-0';
+  const cornerBadgeLeft = highlight ? (isMakeup || isTrial ? 'left-[72rpx]' : 'left-0') : 'left-0';
   const secondBadgeLeft = highlight ? 'left-[144rpx]' : 'left-[56rpx]';
 
   return (
@@ -882,8 +878,7 @@ const LessonForm: React.FC = () => {
         setRecordByStudentId(nextRecordMap);
         setSupplementStudentIds(new Set());
         // 超时 / viewOnly：即使未点名也只读；窗口内未点名可正常提交
-        const canOperate =
-          !viewOnlyParam && isWithinLessonOperateWindow(lessonDate);
+        const canOperate = !viewOnlyParam && isWithinLessonOperateWindow(lessonDate);
         setAttendanceMode(hasRecords || !canOperate ? 'view' : 'normal');
 
         // 为每个学员匹配课包
@@ -1124,9 +1119,7 @@ const LessonForm: React.FC = () => {
       }
       setClasses((prev) =>
         prev.map((item) =>
-          item.id === selectedClassId
-            ? { ...item, status: pausing ? 'paused' : 'active' }
-            : item,
+          item.id === selectedClassId ? { ...item, status: pausing ? 'paused' : 'active' } : item,
         ),
       );
       Taro.showToast({ title: pausing ? '已停课' : '已恢复上课', icon: 'success' });
@@ -1753,8 +1746,7 @@ const LessonForm: React.FC = () => {
           ...basePayload,
           package_id: pkg.id,
           hours_used: hoursUsed,
-          status:
-            options.isSupplement || makeupStudentIds.has(student.id) ? 'makeup' : 'normal',
+          status: options.isSupplement || makeupStudentIds.has(student.id) ? 'makeup' : 'normal',
           is_cross_subject: isCrossSubject || undefined,
           package_subject: isCrossSubject ? pkg.name : undefined,
           class_subject: isCrossSubject ? studentSubject?.name : undefined,
@@ -2617,7 +2609,12 @@ const LessonForm: React.FC = () => {
           <View className="px-[32rpx] py-[24rpx] pb-[32rpx] flex flex-col gap-[24rpx]">
             {/* 选择学员 */}
             <Card className="p-[32rpx]" marginBottom={false}>
-              <FormRow label="选择学员" required border={false} onClick={() => void handleOpenStudentPicker()}>
+              <FormRow
+                label="选择学员"
+                required
+                border={false}
+                onClick={() => void handleOpenStudentPicker()}
+              >
                 {selectedStudent ? (
                   <View className="flex flex-row items-center gap-[12rpx] min-w-0">
                     <StudentAvatar
@@ -2689,11 +2686,7 @@ const LessonForm: React.FC = () => {
                     <Stepper value={hoursUsed} min={0.5} step={0.5} onChange={setHoursUsed} />
                   </FormRow>
 
-                  <FormRow
-                    label="上课日期"
-                    border
-                    onClick={() => setLessonDatePickerVisible(true)}
-                  >
+                  <FormRow label="上课日期" border onClick={() => setLessonDatePickerVisible(true)}>
                     <View className="flex flex-row items-center gap-[8rpx]">
                       <Text className="text-[30rpx] text-foreground">{lessonDate}</Text>
                       <Icon name="mdi-calendar" size="sm" color="muted" />
@@ -2856,9 +2849,7 @@ const LessonForm: React.FC = () => {
                       <View
                         className={cn(
                           'flex items-center justify-center rounded-[12rpx] px-[28rpx] py-[12rpx]',
-                          isClassPaused
-                            ? 'bg-primary'
-                            : 'border border-warning/30 bg-warning/10',
+                          isClassPaused ? 'bg-primary' : 'border border-warning/30 bg-warning/10',
                         )}
                         onClick={() => void handleToggleClassPause()}
                       >
@@ -3189,7 +3180,9 @@ const LessonForm: React.FC = () => {
                       className="rounded-[48rpx] bg-primary px-[36rpx] py-[22rpx]"
                       onClick={handleEnterEditMode}
                     >
-                      <Text className="text-center text-[28rpx] font-medium text-primary-foreground">修改</Text>
+                      <Text className="text-center text-[28rpx] font-medium text-primary-foreground">
+                        修改
+                      </Text>
                     </View>
                   </View>
                 ) : (

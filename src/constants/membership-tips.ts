@@ -8,12 +8,7 @@ import type { OrganizationQuotaUsage } from '@/services/organization';
 
 export type MembershipTipTone = 'up' | 'warn' | 'urgent' | 'ok';
 
-export type MembershipLifecycle =
-  | 'inactive'
-  | 'active'
-  | 'expiring_30'
-  | 'expiring_7'
-  | 'expired';
+export type MembershipLifecycle = 'inactive' | 'active' | 'expiring_30' | 'expiring_7' | 'expired';
 
 export type MembershipTipTrigger =
   | 'always'
@@ -245,10 +240,7 @@ function matchTrigger(tip: MembershipTipDef, quota: OrganizationQuotaUsage): boo
   }
 }
 
-function fillTemplate(
-  text: string,
-  ctx: { n?: number; used?: number; max?: number },
-): string {
+function fillTemplate(text: string, ctx: { n?: number; used?: number; max?: number }): string {
   return text
     .replace(/\{n\}/g, ctx.n === undefined ? '' : String(ctx.n))
     .replace(/\{used\}/g, ctx.used === undefined ? '' : String(ctx.used))

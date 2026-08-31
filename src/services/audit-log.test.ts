@@ -52,10 +52,7 @@ describe('auditLogService 可见范围', () => {
       pagination: { page: 1, pageSize: 20, total: 0 },
     });
     const { auditLogService } = await import('@/services/audit-log');
-    await auditLogService.query(
-      { id: 'u-teacher', isManager: false },
-      { operatorId: 'u-admin' },
-    );
+    await auditLogService.query({ id: 'u-teacher', isManager: false }, { operatorId: 'u-admin' });
     expect(getMock).toHaveBeenCalledWith(
       '/audit-logs',
       expect.objectContaining({ userId: 'u-teacher' }),

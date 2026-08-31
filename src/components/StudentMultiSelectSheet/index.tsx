@@ -89,7 +89,9 @@ const StudentRow: React.FC<{
       {/* 学员信息（会员卡 + 课时，精简） */}
       <View className="flex-1 min-w-0 flex flex-col gap-[10rpx]">
         <View className="flex flex-row items-center gap-[12rpx]">
-          <Text className="text-[32rpx] font-semibold text-foreground truncate">{student.name}</Text>
+          <Text className="text-[32rpx] font-semibold text-foreground truncate">
+            {student.name}
+          </Text>
           {student.nickname && (
             <Text className="text-[24rpx] text-muted-foreground truncate max-w-[200rpx]">
               {student.nickname}

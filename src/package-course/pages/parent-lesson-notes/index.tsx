@@ -59,7 +59,9 @@ const ParentLessonNotesPage: React.FC = () => {
       );
       const all = groups.flat().sort((a, b) => b.lesson_date.localeCompare(a.lesson_date));
       const filtered = all.filter((item) =>
-        noteType === 'homework' ? Boolean(item.homework?.trim()) : Boolean(item.performance?.trim()),
+        noteType === 'homework'
+          ? Boolean(item.homework?.trim())
+          : Boolean(item.performance?.trim()),
       );
       setRecords(filtered);
     } catch (err) {
@@ -85,13 +87,17 @@ const ParentLessonNotesPage: React.FC = () => {
   return (
     <PageContainer className="bg-background min-h-screen">
       <View className="px-[28rpx] pb-[48rpx] pt-[16rpx]">
-        <Text className="mb-[24rpx] block text-[34rpx] font-bold text-foreground">{meta.title}</Text>
+        <Text className="mb-[24rpx] block text-[34rpx] font-bold text-foreground">
+          {meta.title}
+        </Text>
 
         {loading ? (
           <Loading text="加载中..." />
         ) : records.length === 0 ? (
           <Empty
-            icon={noteType === 'homework' ? 'mdi-notebook-edit-outline' : 'mdi-message-text-outline'}
+            icon={
+              noteType === 'homework' ? 'mdi-notebook-edit-outline' : 'mdi-message-text-outline'
+            }
             description={meta.empty}
           />
         ) : (

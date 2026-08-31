@@ -179,8 +179,7 @@ export function resolveMyBookingActions(
 
   if (card.sourceType === 'trial_private' || card.sourceType === 'trial_group') {
     const isTeacherOrOperator = relation === 'teacher' || relation === 'operator';
-    const canMutate =
-      relation === 'teacher' || relation === 'operator' || relation === 'owner';
+    const canMutate = relation === 'teacher' || relation === 'operator' || relation === 'owner';
     return {
       canCheckIn: active && isTeacherOrOperator,
       canCancel: active && canMutate,

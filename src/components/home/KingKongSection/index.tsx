@@ -143,89 +143,91 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({
     <View className="kingkong-section px-[24rpx] pb-[32rpx]">
       {/* 三卡片布局（仅教师端） */}
       {showTripleCards && (
-      <View className="flex gap-0 mb-[40rpx] min-h-[320rpx] relative">
-        {/* 左侧大卡片 - 快速消课 */}
-        <View
-          className="flex-[1.35] rounded-[40rpx] overflow-hidden relative mr-[-16rpx]"
-          onClick={() => handleNavigate(tripleCards[0].url, tripleCards[0].label)}
-        >
+        <View className="flex gap-0 mb-[40rpx] min-h-[320rpx] relative">
+          {/* 左侧大卡片 - 快速消课 */}
           <View
-            className="absolute inset-0"
-            style={{
-              background:
-                'linear-gradient(135deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary-glow) / 0.15) 40%, hsl(var(--primary) / 0.3) 100%)',
-              clipPath: 'polygon(0 0, 100% 0, calc(100% - 32rpx) 100%, 0 100%)',
-            }}
-          />
-          <View className="relative z-10 p-[36rpx] h-full flex flex-col">
-            <View className="flex items-center gap-[12rpx] flex-wrap">
-              <Text className="text-[36rpx] font-extrabold text-foreground">
-                {tripleCards[0].label}
-              </Text>
-              {tripleCards[0].badge && (
-                <View className="bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(var(--destructive)/0.7)] px-[12rpx] py-[4rpx] rounded-[8rpx]">
-                  <Text className="text-[20rpx] font-bold text-white">{tripleCards[0].badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text className="text-[24rpx] text-[hsl(var(--warning))] mt-[8rpx]">
-              {tripleCards[0].subLabel}
-            </Text>
-            <View className="mt-auto flex items-end justify-between">
-              <View className="bg-card px-[44rpx] py-[16rpx] rounded-full shadow-card">
-                <Text className="text-[28rpx] font-bold text-[hsl(var(--warning))]">Go</Text>
+            className="flex-[1.35] rounded-[40rpx] overflow-hidden relative mr-[-16rpx]"
+            onClick={() => handleNavigate(tripleCards[0].url, tripleCards[0].label)}
+          >
+            <View
+              className="absolute inset-0"
+              style={{
+                background:
+                  'linear-gradient(135deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary-glow) / 0.15) 40%, hsl(var(--primary) / 0.3) 100%)',
+                clipPath: 'polygon(0 0, 100% 0, calc(100% - 32rpx) 100%, 0 100%)',
+              }}
+            />
+            <View className="relative z-10 p-[36rpx] h-full flex flex-col">
+              <View className="flex items-center gap-[12rpx] flex-wrap">
+                <Text className="text-[36rpx] font-extrabold text-foreground">
+                  {tripleCards[0].label}
+                </Text>
+                {tripleCards[0].badge && (
+                  <View className="bg-gradient-to-r from-[hsl(var(--destructive))] to-[hsl(var(--destructive)/0.7)] px-[12rpx] py-[4rpx] rounded-[8rpx]">
+                    <Text className="text-[20rpx] font-bold text-white">
+                      {tripleCards[0].badge}
+                    </Text>
+                  </View>
+                )}
               </View>
-              <View
-                className="w-[88rpx] h-[88rpx] rounded-[24rpx] opacity-60 flex items-center justify-center"
-                style={{
-                  background:
-                    'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7))',
-                }}
-              >
-                <Icon name="mdi-check" size="lg" color="white" />
+              <Text className="text-[24rpx] text-[hsl(var(--warning))] mt-[8rpx]">
+                {tripleCards[0].subLabel}
+              </Text>
+              <View className="mt-auto flex items-end justify-between">
+                <View className="bg-card px-[44rpx] py-[16rpx] rounded-full shadow-card">
+                  <Text className="text-[28rpx] font-bold text-[hsl(var(--warning))]">Go</Text>
+                </View>
+                <View
+                  className="w-[88rpx] h-[88rpx] rounded-[24rpx] opacity-60 flex items-center justify-center"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, hsl(var(--warning)), hsl(var(--warning) / 0.7))',
+                  }}
+                >
+                  <Icon name="mdi-check" size="lg" color="white" />
+                </View>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* 右侧两个小卡片 */}
-        <View className="flex-1 flex flex-col gap-[16rpx]">
-          {tripleCards.slice(1).map((entry, idx) => {
-            const isBlue = idx === 0;
-            const bgColor = isBlue ? 'hsl(var(--primary) / 0.08)' : 'hsl(var(--accent) / 0.08)';
-            const clipPath = isBlue
-              ? 'polygon(32rpx 0, 100% 0, 100% 100%, 16rpx 100%)'
-              : 'polygon(16rpx 0, 100% 0, 100% 100%, 0 100%)';
-            const iconBg = isBlue
-              ? 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))'
-              : 'linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-glow)))';
-            const subColor = isBlue ? 'hsl(var(--primary))' : 'hsl(var(--accent))';
+          {/* 右侧两个小卡片 */}
+          <View className="flex-1 flex flex-col gap-[16rpx]">
+            {tripleCards.slice(1).map((entry, idx) => {
+              const isBlue = idx === 0;
+              const bgColor = isBlue ? 'hsl(var(--primary) / 0.08)' : 'hsl(var(--accent) / 0.08)';
+              const clipPath = isBlue
+                ? 'polygon(32rpx 0, 100% 0, 100% 100%, 16rpx 100%)'
+                : 'polygon(16rpx 0, 100% 0, 100% 100%, 0 100%)';
+              const iconBg = isBlue
+                ? 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))'
+                : 'linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-glow)))';
+              const subColor = isBlue ? 'hsl(var(--primary))' : 'hsl(var(--accent))';
 
-            return (
-              <View
-                key={entry.label}
-                className="flex-1 rounded-0 overflow-hidden relative"
-                style={{ clipPath }}
-                onClick={() => handleNavigate(entry.url, entry.label)}
-              >
-                <View className="absolute inset-0" style={{ background: bgColor }} />
-                <View className="relative z-10 p-[20rpx] pl-[44rpx] h-full flex flex-col justify-center">
-                  <View
-                    className="absolute top-[16rpx] right-[16rpx] w-[52rpx] h-[52rpx] rounded-[16rpx] flex items-center justify-center"
-                    style={{ background: iconBg }}
-                  >
-                    <Icon name={entry.icon} size="xs" color="white" />
+              return (
+                <View
+                  key={entry.label}
+                  className="flex-1 rounded-0 overflow-hidden relative"
+                  style={{ clipPath }}
+                  onClick={() => handleNavigate(entry.url, entry.label)}
+                >
+                  <View className="absolute inset-0" style={{ background: bgColor }} />
+                  <View className="relative z-10 p-[20rpx] pl-[44rpx] h-full flex flex-col justify-center">
+                    <View
+                      className="absolute top-[16rpx] right-[16rpx] w-[52rpx] h-[52rpx] rounded-[16rpx] flex items-center justify-center"
+                      style={{ background: iconBg }}
+                    >
+                      <Icon name={entry.icon} size="xs" color="white" />
+                    </View>
+                    <Text className="text-[26rpx] font-bold text-foreground">{entry.label}</Text>
+                    <Text className="text-[22rpx] font-semibold" style={{ color: subColor }}>
+                      {entry.subLabel}
+                    </Text>
                   </View>
-                  <Text className="text-[26rpx] font-bold text-foreground">{entry.label}</Text>
-                  <Text className="text-[22rpx] font-semibold" style={{ color: subColor }}>
-                    {entry.subLabel}
-                  </Text>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
-      </View>
       )}
 
       {/* 图标网格：两行四列，霜白玻璃底 + 品牌色渐变图标 */}

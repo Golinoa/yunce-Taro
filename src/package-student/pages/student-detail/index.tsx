@@ -7,12 +7,12 @@ import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
-import Loading from '@/components/Loading';
-import StudentAvatar from '@/components/student/StudentAvatar';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
   navigateToLessonDetail,
 } from '@/components/lesson/LessonConsumptionList';
+import Loading from '@/components/Loading';
+import StudentAvatar from '@/components/student/StudentAvatar';
 import { studentService, packageService, lessonRecordService, leaveService } from '@/services';
 import { followRecordService } from '@/services/follow-record';
 import { memberCardService } from '@/services/member-card';

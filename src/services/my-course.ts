@@ -4,16 +4,14 @@
  * 家长端「我的约课」：生产读 class-booking + private-bookings；本地仅作离线缓存。
  */
 
-
-
+import { classBookingService } from '@/services/class-booking';
+import { privateBookingService } from '@/services/private-booking';
+import { logError } from '@/utils/logger';
 import {
   readParentBookings,
   updateParentBookingStatus,
   type ParentBookingItem,
 } from '@/utils/parent-bookings';
-import { privateBookingService } from '@/services/private-booking';
-import { classBookingService } from '@/services/class-booking';
-import { logError } from '@/utils/logger';
 
 export type MyCourseStatus = 'booked' | 'waiting' | 'pending_evaluate' | 'cancelled';
 
@@ -73,7 +71,7 @@ function mapClassStatus(status: string): MyCourseStatus {
 export const myCourseService = {
   /** 获取我的课程列表 */
   getList: async (userId?: string): Promise<MyCourseItem[]> => {
-        if (!userId) return [];
+    if (!userId) return [];
 
     const [privateResult, classResult] = await Promise.allSettled([
       privateBookingService.listMine(),
@@ -130,7 +128,7 @@ export const myCourseService = {
 
   /** 取消预约/排队 */
   cancel: async (bookingId: string): Promise<void> => {
-        let cancelledOnServer = false;
+    let cancelledOnServer = false;
     try {
       await privateBookingService.cancel(bookingId);
       cancelledOnServer = true;

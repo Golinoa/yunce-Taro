@@ -2,11 +2,14 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import SegmentedControl from '@/components/SegmentedControl';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import { dataCenterService } from '@/services/data-center';
+import { useCampusStore } from '@/stores/campus';
+import { useThemeStore } from '@/stores/theme';
 import type {
   VenueOverviewType,
   RevenueTrendType,
@@ -15,9 +18,6 @@ import type {
   CardDataType,
   SalaryDataType,
 } from '@/types/data-center';
-import { dataCenterService } from '@/services/data-center';
-import { useCampusStore } from '@/stores/campus';
-import { useThemeStore } from '@/stores/theme';
 import { useAuth } from '@/utils/auth';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -224,9 +224,7 @@ const DataCenter: React.FC = () => {
             onClick={goHome}
           >
             <Icon name="mdi-office-building-outline" size={20} color="primary" />
-            <Text className="text-[26rpx] text-foreground font-medium">
-              {campusName}
-            </Text>
+            <Text className="text-[26rpx] text-foreground font-medium">{campusName}</Text>
             <Icon name="mdi-chevron-down" size={20} color="muted" />
           </View>
         </View>

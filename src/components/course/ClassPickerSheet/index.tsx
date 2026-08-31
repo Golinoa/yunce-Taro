@@ -58,10 +58,7 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
   const [draftId, setDraftId] = useState(value || '');
 
   const scheduledSet = useMemo(
-    () =>
-      scheduledClassIds instanceof Set
-        ? scheduledClassIds
-        : new Set(scheduledClassIds || []),
+    () => (scheduledClassIds instanceof Set ? scheduledClassIds : new Set(scheduledClassIds || [])),
     [scheduledClassIds],
   );
 
@@ -74,7 +71,10 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
   }, [categoriesProp, courseMode, storeCategories]);
 
   const categoryTabs = useMemo(
-    () => [{ id: 'all', label: '全部' }, ...classCategories.map((c) => ({ id: c.id, label: c.name }))],
+    () => [
+      { id: 'all', label: '全部' },
+      ...classCategories.map((c) => ({ id: c.id, label: c.name })),
+    ],
     [classCategories],
   );
 
@@ -125,10 +125,7 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
     >
       <View className="flex h-full flex-col bg-white px-[24rpx] pb-[24rpx] pt-[28rpx]">
         <View className="mb-[16rpx] flex shrink-0 items-center justify-between">
-          <Text
-            className="text-[28rpx] text-muted-foreground active:opacity-70"
-            onClick={onClose}
-          >
+          <Text className="text-[28rpx] text-muted-foreground active:opacity-70" onClick={onClose}>
             取消
           </Text>
           <Text className="text-[32rpx] font-semibold text-foreground">{title}</Text>
@@ -178,9 +175,7 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
                 key={item.key}
                 className={cn(
                   'rounded-full border px-[22rpx] py-[10rpx]',
-                  active
-                    ? 'border-primary/30 bg-primary/10'
-                    : 'border-transparent bg-muted/70',
+                  active ? 'border-primary/30 bg-primary/10' : 'border-transparent bg-muted/70',
                 )}
                 onClick={() => setScheduleFilter(item.key)}
               >
@@ -203,9 +198,7 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
             <View className="py-[80rpx]">
               <Empty
                 icon="mdi-school-outline"
-                description={
-                  courseMode === 'group' ? '该分类下暂无团课班级' : '该分类下暂无班级'
-                }
+                description={courseMode === 'group' ? '该分类下暂无团课班级' : '该分类下暂无班级'}
               />
             </View>
           ) : (
@@ -220,9 +213,7 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
                     key={cls.id}
                     className={cn(
                       'flex flex-row items-center justify-between rounded-[20rpx] border-[2rpx] bg-muted/50 px-[24rpx] py-[24rpx] active:opacity-85',
-                      selected
-                        ? 'border-primary/40 bg-primary/8'
-                        : 'border-transparent',
+                      selected ? 'border-primary/40 bg-primary/8' : 'border-transparent',
                     )}
                     onClick={() => {
                       setDraftId(cls.id);

@@ -1,5 +1,3 @@
-
-
 import type {
   AttendanceAnomalyItem,
   AttendanceAnomalyKind,
@@ -43,21 +41,19 @@ function mapRenewalItem(raw: Record<string, unknown>): RenewalReminderItem {
 
 export const opsAlertService = {
   listAttendanceAnomalies: async (campusId?: string): Promise<AttendanceAnomalyItem[]> => {
-    
-      const data = await get<Record<string, unknown>[]>('/ops-alerts/attendance-anomalies', {
-        campusId,
-      });
-      return (Array.isArray(data) ? data : []).map(mapAnomalyItem);
-      },
+    const data = await get<Record<string, unknown>[]>('/ops-alerts/attendance-anomalies', {
+      campusId,
+    });
+    return (Array.isArray(data) ? data : []).map(mapAnomalyItem);
+  },
 
   listRenewalReminders: async (params?: {
     campusId?: string;
     includeMuted?: boolean;
   }): Promise<RenewalReminderItem[]> => {
-    
-      const data = await get<Record<string, unknown>[]>('/ops-alerts/renewal-reminders', params);
-      return (Array.isArray(data) ? data : []).map(mapRenewalItem);
-      },
+    const data = await get<Record<string, unknown>[]>('/ops-alerts/renewal-reminders', params);
+    return (Array.isArray(data) ? data : []).map(mapRenewalItem);
+  },
 
   muteRenewal: async (studentId: string, campusId?: string): Promise<void> => {
     await post('/ops-alerts/renewal-mutes', { studentId, campusId });

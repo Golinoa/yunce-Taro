@@ -19,10 +19,7 @@ import {
   markLastLoginAsNewUser,
   navigateAfterAuth,
 } from '@/utils/auth-onboarding';
-import {
-  normalizeInviteCodeParam,
-  storePendingInviteCode,
-} from '@/utils/invite-parent-link';
+import { normalizeInviteCodeParam, storePendingInviteCode } from '@/utils/invite-parent-link';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const InviteRegisterPage: React.FC = () => {
@@ -143,9 +140,7 @@ const InviteRegisterPage: React.FC = () => {
     return (
       <View className="min-h-screen flex flex-col items-center justify-center bg-background px-page-padding">
         <Icon name="mdi-alert-circle-outline" size={64} className="text-destructive mb-4" />
-        <Text className="text-[28rpx] text-muted-foreground text-center">
-          {error || '?????'}
-        </Text>
+        <Text className="text-[28rpx] text-muted-foreground text-center">{error || '?????'}</Text>
       </View>
     );
   }

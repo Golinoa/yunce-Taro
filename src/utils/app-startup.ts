@@ -8,10 +8,7 @@
 import Taro from '@tarojs/taro';
 import { useThemeStore } from '@/stores/theme';
 import { ADD_TO_DESKTOP_DISMISSED_KEY } from '@/utils/add-to-desktop';
-import {
-  COLD_START_GRACE_MS,
-  isShortcutEntryLaunch,
-} from '@/utils/launch-scene';
+import { COLD_START_GRACE_MS, isShortcutEntryLaunch } from '@/utils/launch-scene';
 import { initPrivacy } from '@/utils/privacy';
 
 let scheduled = false;

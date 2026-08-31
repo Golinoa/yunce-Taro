@@ -11,7 +11,6 @@ import type { FinanceKpiItem } from '@/components/statistics/FinanceKpi';
 import type { OperationKpiItem } from '@/components/statistics/OperationKpi';
 import { get } from '@/utils/request';
 
-
 // ============================================
 // 类型定义（接口契约）
 // ============================================
@@ -237,11 +236,15 @@ function getFinanceAnalysisComputedFallback() {
     profitMargin: '0%',
     expenseTrend: '+0%',
     incomeComposition: [] as { label: string; amount: string; percent: number; barClass: string }[],
-    expenseComposition: [] as { label: string; amount: string; percent: number; barClass: string }[],
+    expenseComposition: [] as {
+      label: string;
+      amount: string;
+      percent: number;
+      barClass: string;
+    }[],
     compare: getCompareFallback(),
   };
 }
-
 
 // ============================================
 // 接口契约（联调时替换 mock 为 request 调用）
@@ -279,14 +282,14 @@ export const statisticsService = {
     year?: number;
   }): Promise<{ label: string; value: number; unit: string }[]> =>
     get<BackendLessonRankItem[]>(
-          `/statistics/lesson-rank?${buildStatisticsQuery(params || {})}`,
-        ).then((list) =>
-          list.map((item) => ({
-            label: item.studentName,
-            value: item.totalMinutes,
-            unit: '分钟',
-          })),
-        ),
+      `/statistics/lesson-rank?${buildStatisticsQuery(params || {})}`,
+    ).then((list) =>
+      list.map((item) => ({
+        label: item.studentName,
+        value: item.totalMinutes,
+        unit: '分钟',
+      })),
+    ),
   /** 收费方式收入排行 */
   getPaymentRank: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
@@ -294,14 +297,14 @@ export const statisticsService = {
     year?: number;
   }): Promise<{ label: string; value: number; unit: string }[]> =>
     get<BackendPaymentRankItem[]>(
-          `/statistics/payment-rank?${buildStatisticsQuery(params || {})}`,
-        ).then((list) =>
-          list.map((item) => ({
-            label: item.method,
-            value: item.amount,
-            unit: '元',
-          })),
-        ),
+      `/statistics/payment-rank?${buildStatisticsQuery(params || {})}`,
+    ).then((list) =>
+      list.map((item) => ({
+        label: item.method,
+        value: item.amount,
+        unit: '元',
+      })),
+    ),
 
   // ---------- 财务数据 ----------
   /** 支出比例配置 */
@@ -311,19 +314,19 @@ export const statisticsService = {
     year?: number;
   }): Promise<{ label: string; ratio: number; barClass: string }[]> =>
     get<BackendExpenseRatioResponse>(
-          `/statistics/expense-ratios?${buildStatisticsQuery(params || {})}`,
-        ).then((result) =>
-          result.breakdown.map((item, index) => ({
-            label: item.category,
-            ratio: item.ratio / 100,
-            barClass: [
-              'bg-progress-primary',
-              'bg-progress-purple',
-              'bg-progress-warning',
-              'bg-progress-info',
-            ][index % 4],
-          })),
-        ),
+      `/statistics/expense-ratios?${buildStatisticsQuery(params || {})}`,
+    ).then((result) =>
+      result.breakdown.map((item, index) => ({
+        label: item.category,
+        ratio: item.ratio / 100,
+        barClass: [
+          'bg-progress-primary',
+          'bg-progress-purple',
+          'bg-progress-warning',
+          'bg-progress-info',
+        ][index % 4],
+      })),
+    ),
 
   // ---------- 预警数据（后端 cron 计算） ----------
   /**
@@ -332,7 +335,6 @@ export const statisticsService = {
    * @param params 视图类型 + 时间范围
    */
   getAlerts: async (params: AlertQueryParams): Promise<AlertItem[]> => {
-    
     return get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery(params)}`).then((alerts) =>
       alerts.map(mapBackendAlertItem),
     );
@@ -343,7 +345,6 @@ export const statisticsService = {
    * 详情页统一走 Service，避免页面直接依赖 @/data/statistics
    */
   getAlertById: async (alertId: string): Promise<AlertItem | null> => {
-    
     try {
       const alert = await get<BackendAlertItem>(
         `/statistics/alerts/${encodeURIComponent(alertId)}`,
@@ -352,18 +353,22 @@ export const statisticsService = {
     } catch {
       // 单条接口未就绪时回退列表查找
       const [op, fin] = await Promise.all([
-        get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery({
-          viewType: 'operation',
-          year: new Date().getFullYear(),
-          month: new Date().getMonth() + 1,
-          filterMode: 'month',
-        })}`).catch(() => [] as BackendAlertItem[]),
-        get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery({
-          viewType: 'finance',
-          year: new Date().getFullYear(),
-          month: new Date().getMonth() + 1,
-          filterMode: 'month',
-        })}`).catch(() => [] as BackendAlertItem[]),
+        get<BackendAlertItem[]>(
+          `/statistics/alerts?${buildAlertQuery({
+            viewType: 'operation',
+            year: new Date().getFullYear(),
+            month: new Date().getMonth() + 1,
+            filterMode: 'month',
+          })}`,
+        ).catch(() => [] as BackendAlertItem[]),
+        get<BackendAlertItem[]>(
+          `/statistics/alerts?${buildAlertQuery({
+            viewType: 'finance',
+            year: new Date().getFullYear(),
+            month: new Date().getMonth() + 1,
+            filterMode: 'month',
+          })}`,
+        ).catch(() => [] as BackendAlertItem[]),
       ]);
       const found = [...op, ...fin]
         .map(mapBackendAlertItem)

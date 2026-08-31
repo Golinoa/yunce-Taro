@@ -25,10 +25,7 @@ export interface MembershipPlan {
   sort: number;
 }
 
-export type MembershipFeatureKey =
-  | keyof MembershipPlanFeatures
-  | 'members'
-  | 'employees';
+export type MembershipFeatureKey = keyof MembershipPlanFeatures | 'members' | 'employees';
 
 /** 不限额度哨兵 */
 export const UNLIMITED_QUOTA = -1;

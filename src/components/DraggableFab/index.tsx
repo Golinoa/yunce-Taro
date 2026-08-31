@@ -235,7 +235,15 @@ const DraggableFab: React.FC<DraggableFabProps> = ({
         })
         .exec();
     },
-    [applyPosition, containerSelector, defaultBottomPx, defaultRightPx, size.height, size.width, storageKey],
+    [
+      applyPosition,
+      containerSelector,
+      defaultBottomPx,
+      defaultRightPx,
+      size.height,
+      size.width,
+      storageKey,
+    ],
   );
 
   useEffect(() => {
@@ -374,9 +382,7 @@ const DraggableFab: React.FC<DraggableFabProps> = ({
     return null;
   }
 
-  const face = (
-    <FabFace variant={variant} label={label} buttonClassName={buttonClassName} />
-  );
+  const face = <FabFace variant={variant} label={label} buttonClassName={buttonClassName} />;
 
   if (isWeapp) {
     return (

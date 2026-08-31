@@ -8,11 +8,11 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
 import type { Subject } from '@/types/campus';
 

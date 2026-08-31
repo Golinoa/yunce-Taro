@@ -64,7 +64,10 @@ const WechatBindDialog: React.FC<WechatBindDialogProps> = ({
       Taro.showToast({ title: '请设置登录密码', icon: 'none' });
       return;
     }
-    if (trimmedPassword.length < MIN_PASSWORD_LENGTH || trimmedPassword.length > MAX_PASSWORD_LENGTH) {
+    if (
+      trimmedPassword.length < MIN_PASSWORD_LENGTH ||
+      trimmedPassword.length > MAX_PASSWORD_LENGTH
+    ) {
       Taro.showToast({
         title: `密码长度应为${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH}位`,
         icon: 'none',

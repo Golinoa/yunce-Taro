@@ -4,12 +4,8 @@
  * - 写入：后端暂无接口，本地合成条目（不落库、不依赖 mock data）
  */
 import type { AuditLogEntry, AuditLogPage, AuditLogQuery } from '@/types/audit-log';
+import { type PaginatedResponse, formatApiDateTime, unwrapPaginatedList } from '@/utils/pagination';
 import { get } from '@/utils/request';
-import {
-  type PaginatedResponse,
-  formatApiDateTime,
-  unwrapPaginatedList,
-} from '@/utils/pagination';
 
 export interface AuditLogInput {
   action: AuditLogEntry['action'];

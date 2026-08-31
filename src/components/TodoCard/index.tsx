@@ -14,10 +14,7 @@ import { useTeacherNames } from '@/hooks/useTeacherNames';
 import type { TodoItem } from '@/types/home-todo';
 import { resolveTodoQuadrant } from '@/types/todo-quadrant';
 import { buildRemindMetaFromAt } from '@/utils/custom-todos';
-import {
-  hasTodoDisplayTime,
-  resolveTodoCardAccentClass,
-} from '@/utils/todo-card-meta';
+import { hasTodoDisplayTime, resolveTodoCardAccentClass } from '@/utils/todo-card-meta';
 import { resolveTimelineAt } from '@/utils/todo-timeline';
 
 export interface TodoCardProps {

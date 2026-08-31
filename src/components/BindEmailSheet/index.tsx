@@ -19,12 +19,10 @@ export interface BindEmailSheetProps {
   submitting?: boolean;
   onClose: () => void;
   /** 发送绑定验证码 */
-  onSendCode: (email: string) => Promise<{ error: { message: string } | null; maskedEmail?: string }>;
-  onSubmit: (payload: {
-    email: string;
-    code: string;
-    password: string;
-  }) => void | Promise<void>;
+  onSendCode: (
+    email: string,
+  ) => Promise<{ error: { message: string } | null; maskedEmail?: string }>;
+  onSubmit: (payload: { email: string; code: string; password: string }) => void | Promise<void>;
 }
 
 const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
@@ -123,7 +121,11 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
       Taro.showToast({ title: '请输入 6 位验证码', icon: 'none' });
       return;
     }
-    if (!password || password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+    if (
+      !password ||
+      password.length < MIN_PASSWORD_LENGTH ||
+      password.length > MAX_PASSWORD_LENGTH
+    ) {
       Taro.showToast({
         title: `密码长度应为 ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} 位`,
         icon: 'none',

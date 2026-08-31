@@ -2,20 +2,13 @@
  * 教师端「教学台账」数据服务
  * mock 仅开发；生产接消课 by-month，工资取本人薪资流水（无则空态）
  */
-import dayjs from 'dayjs';
 import { lessonRecordService } from '@/services';
 import { teacherService } from '@/services/teacher';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { PayHistoryRecord } from '@/types/teacher';
-
 import { logError } from '@/utils/logger';
 
-export type TeacherMonthlyFlowTab =
-  | 'attendance'
-  | 'lessons'
-  | 'salary'
-  | 'bookings'
-  | 'reviews';
+export type TeacherMonthlyFlowTab = 'attendance' | 'lessons' | 'salary' | 'bookings' | 'reviews';
 
 export type TeacherSalaryStatus = 'draft' | 'paid';
 
@@ -141,71 +134,6 @@ function emptyBundle(month: string): TeacherMonthlyFlowBundle {
   };
 }
 
-function buildMockBundle(month: string): TeacherMonthlyFlowBundle {
-  const base = dayjs(`${month}-01`);
-  const d = (day: number) => base.date(day).format('MM-DD');
-  const currentMonth = dayjs().format('YYYY-MM');
-  const salaryStatus: TeacherSalaryStatus =
-    month === currentMonth || month === dayjs().subtract(1, 'month').format('YYYY-MM')
-      ? 'paid'
-      : 'draft';
-
-  const lessons: TeacherLessonItem[] = [
-    {
-      id: 'les-1',
-      date: d(3),
-      courseName: '少儿体能',
-      studentCount: 8,
-      hours: 2,
-      consumeAmount: 320,
-    },
-    {
-      id: 'les-2',
-      date: d(5),
-      courseName: '游泳启蒙',
-      studentCount: 6,
-      hours: 1.5,
-      consumeAmount: 240,
-    },
-  ];
-
-  const salary: TeacherSalaryItem[] = [
-    { id: 'sal-1', title: '基本工资', amount: 4000, type: 'base', direction: 'earn', date: d(1) },
-    {
-      id: 'sal-2',
-      title: '课时费结算',
-      amount: 1860,
-      type: 'lesson',
-      direction: 'earn',
-      date: d(28),
-      remark: '本月课时 3.5 节',
-    },
-  ];
-
-  const lessonHours = lessons.reduce((sum, item) => sum + item.hours, 0);
-  const payableAmount = salary.reduce((sum, item) => sum + salaryLineSigned(item), 0);
-  const paidAmount = salaryStatus === 'paid' ? payableAmount : 0;
-
-  return {
-    summary: {
-      month,
-      attendanceCount: 0,
-      lessonHours,
-      salaryAmount: payableAmount,
-      payableAmount,
-      paidAmount,
-      salaryStatus,
-      bookingCount: 0,
-      reviewCount: 0,
-    },
-    attendance: [],
-    lessons,
-    salary,
-    bookings: [],
-    reviews: [],
-  };
-}
-
 function mapLessonRecords(records: LessonRecord[]): TeacherLessonItem[] {
   const groups = new Map<string, TeacherLessonItem>();
 
@@ -237,7 +165,10 @@ function mapLessonRecords(records: LessonRecord[]): TeacherLessonItem[] {
   return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-async function buildLiveBundle(month: string, teacherId: string): Promise<TeacherMonthlyFlowBundle> {
+async function buildLiveBundle(
+  month: string,
+  teacherId: string,
+): Promise<TeacherMonthlyFlowBundle> {
   const bundle = emptyBundle(month);
   if (!teacherId) return bundle;
 
@@ -273,7 +204,7 @@ async function buildLiveBundle(month: string, teacherId: string): Promise<Teache
         };
       });
       const payableAmount = bundle.salary.reduce((sum, item) => sum + salaryLineSigned(item), 0);
-      const paid = monthRows.some((row) => row.status === 'paid');
+      const paid = monthRows.some((row) => row.status === 'archived');
       bundle.summary.payableAmount = payableAmount;
       bundle.summary.salaryAmount = payableAmount;
       bundle.summary.salaryStatus = paid ? 'paid' : 'draft';
@@ -289,8 +220,17 @@ async function buildLiveBundle(month: string, teacherId: string): Promise<Teache
 export const teacherMonthlyFlowService = {
   /** 获取指定月份的月流水聚合数据 */
   getMonthlyFlow: async (month: string, teacherId?: string): Promise<TeacherMonthlyFlowBundle> => {
-        if (!teacherId) return emptyBundle(month);
-    return buildLiveBundle(month, teacherId);
+    let resolvedTeacherId = teacherId;
+    if (!resolvedTeacherId) {
+      try {
+        const me = await teacherService.getMe();
+        resolvedTeacherId = me?.id;
+      } catch (error) {
+        logError('teacherMonthlyFlow.getMe', error);
+      }
+    }
+    if (!resolvedTeacherId) return emptyBundle(month);
+    return buildLiveBundle(month, resolvedTeacherId);
   },
 };
 

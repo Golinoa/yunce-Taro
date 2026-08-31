@@ -13,7 +13,7 @@ const AttendancePage: React.FC = () => {
     void Taro.redirectTo({ url: '/package-course/pages/records/index' });
   });
 
-  return <PageContainer />;
+  return <PageContainer>{null}</PageContainer>;
 };
 
 export default withRouteGuard(AttendancePage);

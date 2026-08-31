@@ -108,7 +108,9 @@ const MyTodoDateGroups: React.FC<MyTodoDateGroupsProps> = ({
                     {group.parts.date}
                   </Text>
                 ) : (
-                  <Text className="text-[26rpx] font-medium text-foreground">{group.parts.prefix}</Text>
+                  <Text className="text-[26rpx] font-medium text-foreground">
+                    {group.parts.prefix}
+                  </Text>
                 )}
                 <Text className="text-[22rpx] text-muted-foreground">{group.items.length} 项</Text>
               </View>

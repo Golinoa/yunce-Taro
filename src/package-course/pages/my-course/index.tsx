@@ -18,12 +18,12 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import SegmentedControl from '@/components/SegmentedControl';
 import { myCourseService } from '@/services';
-import { subscribeMessageService } from '@/services/subscribe-message';
 import type { MyCourseItem, MyCourseStatus } from '@/services/my-course';
+import { subscribeMessageService } from '@/services/subscribe-message';
+import { useThemeStore } from '@/stores/theme';
 import { useAuth } from '@/utils/auth';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
-import { useThemeStore } from '@/stores/theme';
 
 /** 从路由参数读取目标 Tab（兼容首次进入与栈内复用再次进入） */
 function readTabFromRouter(): MyCourseStatus | undefined {

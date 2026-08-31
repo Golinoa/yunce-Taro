@@ -9,9 +9,7 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import BottomSheet from '@/components/BottomSheet';
-import CalendarWeekSelector, {
-  type CalendarDotType,
-} from '@/components/CalendarWeekSelector';
+import CalendarWeekSelector, { type CalendarDotType } from '@/components/CalendarWeekSelector';
 
 interface CalendarMonthSheetProps {
   visible: boolean;
@@ -63,9 +61,7 @@ const CalendarMonthSheet: React.FC<CalendarMonthSheetProps> = ({
   const handleConfirm = useCallback(() => {
     if (multiSelect) {
       if (draftDates.length === 0) return;
-      onSelectMulti?.(
-        [...draftDates].sort((a, b) => (dayjs(a).isBefore(dayjs(b)) ? -1 : 1)),
-      );
+      onSelectMulti?.([...draftDates].sort((a, b) => (dayjs(a).isBefore(dayjs(b)) ? -1 : 1)));
       onClose();
       return;
     }

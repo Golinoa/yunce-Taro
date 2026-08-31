@@ -8,7 +8,6 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
 import FormInput from '@/components/FormInput';
@@ -24,6 +23,7 @@ import {
   CATEGORY_TIME_OPTIONS,
   formatCategoryTime,
 } from '@/constants/course-category-ui';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { courseCategoryService } from '@/services/course-category';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';

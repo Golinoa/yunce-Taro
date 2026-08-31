@@ -31,7 +31,10 @@ const TodoQuadrantIcon: React.FC<TodoQuadrantIconProps> = ({
     )}
   >
     {CELL_INDEXES.map((index) => (
-      <View key={index} className={cn('todo-quadrant-icon__cell', `todo-quadrant-icon__cell--${index}`)} />
+      <View
+        key={index}
+        className={cn('todo-quadrant-icon__cell', `todo-quadrant-icon__cell--${index}`)}
+      />
     ))}
   </View>
 );

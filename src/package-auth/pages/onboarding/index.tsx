@@ -5,9 +5,9 @@ import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback } from 'react';
 import Icon from '@/components/Icon';
+import { useAuth } from '@/utils/auth';
 import { markOnboardingSkipped } from '@/utils/auth-onboarding';
 import { navigateAfterLogin } from '@/utils/route-guard';
-import { useAuth } from '@/utils/auth';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const Onboarding: React.FC = () => {
@@ -78,7 +78,10 @@ const Onboarding: React.FC = () => {
       </View>
 
       <View className="px-[48rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))]">
-        <Text className="text-[28rpx] text-primary text-center block py-[24rpx]" onClick={handleSkip}>
+        <Text
+          className="text-[28rpx] text-primary text-center block py-[24rpx]"
+          onClick={handleSkip}
+        >
           稍后再说
         </Text>
       </View>

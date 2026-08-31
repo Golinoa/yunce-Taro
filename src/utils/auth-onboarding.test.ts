@@ -1,10 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('@/utils/route-guard', () => ({
-  navigateAfterLogin: vi.fn(),
-}));
-
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/types/profile';
 import {
   consumeLastLoginIsNewUser,
@@ -15,6 +10,10 @@ import {
   needsProfileSetup,
   ONBOARDING_SKIPPED_KEY,
 } from '@/utils/auth-onboarding';
+
+vi.mock('@/utils/route-guard', () => ({
+  navigateAfterLogin: vi.fn(),
+}));
 
 const baseProfile = (patch: Partial<Profile> = {}): Profile => ({
   id: 'profile-1',

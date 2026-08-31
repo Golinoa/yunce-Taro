@@ -100,8 +100,6 @@ export const LEAD_BOOKING_STATUS_META: Record<
 export const LEAD_BOOKING_MODE_BADGE_CLASS = 'rounded-full bg-muted px-[12rpx] py-[4rpx]';
 
 /** 仅两种形态：一对一 / 跟班试听 */
-export function getLeadBookingModeLabel(
-  item: Pick<LeadBooking, 'trial_mode'>,
-): string {
+export function getLeadBookingModeLabel(item: Pick<LeadBooking, 'trial_mode'>): string {
   return item.trial_mode === 'private' ? '一对一' : '跟班试听';
 }

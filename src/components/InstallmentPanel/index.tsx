@@ -1,6 +1,6 @@
 import { View, Input, Text } from '@tarojs/components';
-import dayjs from 'dayjs';
 import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, {
   useCallback,
   useEffect,
@@ -11,11 +11,7 @@ import React, {
 } from 'react';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import ChipPicker from '../ChipPicker';
-import {
-  buildInstallmentSchedule,
-  getPeriodOptions,
-  type ScheduleItem,
-} from './installment-utils';
+import { buildInstallmentSchedule, getPeriodOptions, type ScheduleItem } from './installment-utils';
 
 export type { ScheduleItem } from './installment-utils';
 export { buildInstallmentSchedule, getPeriodOptions } from './installment-utils';

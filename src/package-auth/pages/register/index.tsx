@@ -9,8 +9,8 @@ import AgreementDialog from '@/components/AgreementDialog';
 import { BRAND_LOGO } from '@/constants/brand';
 import { prepareEmailLogin } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
-import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useAuth } from '@/utils/auth';
+import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

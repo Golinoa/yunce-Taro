@@ -18,10 +18,10 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import ClassPickerSheet from '@/components/course/ClassPickerSheet';
-import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
+import ClassPickerSheet from '@/components/course/ClassPickerSheet';
+import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -30,7 +30,6 @@ import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import ScheduleConflictDialog from '@/components/schedule/ScheduleConflictDialog';
 import Stepper from '@/components/Stepper';
 import TimePickerSheet from '@/components/TimePickerSheet';
-import type { ScheduleConflictResult } from '@/types/schedule-conflict';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
@@ -44,13 +43,14 @@ import {
   subscribeMessageService,
   calendarSyncService,
 } from '@/services';
+import { subjectService } from '@/services/campus';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
-import { subjectService } from '@/services/campus';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class, ClassLevel } from '@/types/class';
 import { CLASS_LEVEL_LABELS } from '@/types/class';
 import type { Schedule, ScheduleColor, DayOfWeek } from '@/types/schedule';
+import type { ScheduleConflictResult } from '@/types/schedule-conflict';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -114,7 +114,9 @@ const YesNoToggle: React.FC<{
       )}
       onClick={() => onChange(true)}
     >
-      <Text className={cn('text-[24rpx] font-medium', value ? 'text-white' : 'text-muted-foreground')}>
+      <Text
+        className={cn('text-[24rpx] font-medium', value ? 'text-white' : 'text-muted-foreground')}
+      >
         是
       </Text>
     </View>
@@ -406,8 +408,7 @@ const ScheduleForm: React.FC = () => {
         if (noteAuto?.[1]) setAutoOpenType(noteAuto[1] as AutoOpenType);
         const noteMax = rawNote.match(/每时段可约:(\d+)/);
         if (noteMax?.[1]) setSlotMaxCount(Math.max(1, Number(noteMax[1]) || 6));
-        const noteMin =
-          rawNote.match(/最少开班:(\d+)/) || rawNote.match(/满人开课人数:(\d+)/);
+        const noteMin = rawNote.match(/最少开班:(\d+)/) || rawNote.match(/满人开课人数:(\d+)/);
         if (noteMin?.[1]) setMinOpenCount(Math.max(1, Number(noteMin[1]) || 5));
         // 备注只回填用户原文，去掉系统拼接的元数据行
         setNote(
@@ -444,7 +445,15 @@ const ScheduleForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, currentCampusId, isEdit, isRescheduleMode, lessonDateParam, scheduleId, sourceMode]);
+  }, [
+    currentUserId,
+    currentCampusId,
+    isEdit,
+    isRescheduleMode,
+    lessonDateParam,
+    scheduleId,
+    sourceMode,
+  ]);
 
   useEffect(() => {
     void loadFormData();
@@ -501,10 +510,7 @@ const ScheduleForm: React.FC = () => {
     [classId, classes],
   );
 
-  const classLevelLabel = useMemo(
-    () => CLASS_LEVEL_LABELS[courseLevel] || '所有人',
-    [courseLevel],
-  );
+  const classLevelLabel = useMemo(() => CLASS_LEVEL_LABELS[courseLevel] || '所有人', [courseLevel]);
 
   /* 班级切换 → 同步难度 */
   useEffect(() => {
@@ -517,13 +523,16 @@ const ScheduleForm: React.FC = () => {
   useEffect(() => {
     if (!isGroupMode || !selectedClass) return;
     setAutoOpenType(selectedClass.auto_open_type || 'full');
-    const max =
-      selectedClass.student_count > 0 ? selectedClass.student_count : 6;
+    const max = selectedClass.student_count > 0 ? selectedClass.student_count : 6;
     setSlotMaxCount(max);
-    setMinOpenCount(
-      selectedClass.min_open_count || selectedClass.student_count || 5,
-    );
-  }, [isGroupMode, selectedClass?.id, selectedClass?.auto_open_type, selectedClass?.min_open_count, selectedClass?.student_count]);
+    setMinOpenCount(selectedClass.min_open_count || selectedClass.student_count || 5);
+  }, [
+    isGroupMode,
+    selectedClass?.id,
+    selectedClass?.auto_open_type,
+    selectedClass?.min_open_count,
+    selectedClass?.student_count,
+  ]);
 
   const selectedRoomName = useMemo(
     () => rooms.find((r) => r.id === room || r.name === room)?.name || room || '',
@@ -531,8 +540,7 @@ const ScheduleForm: React.FC = () => {
   );
 
   const timeDisplayDateLabel = useMemo(() => {
-    const raw =
-      schedulingMode === 'free' && freeDates.length > 0 ? freeDates[0] : startDate;
+    const raw = schedulingMode === 'free' && freeDates.length > 0 ? freeDates[0] : startDate;
     if (!raw || !dayjs(raw).isValid()) return '请选择日期';
     const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
     const d = dayjs(raw);
@@ -762,10 +770,7 @@ const ScheduleForm: React.FC = () => {
           ),
         );
       } else {
-        setTimeSlots((prev) => [
-          ...prev,
-          { id: Date.now(), start: draftStartTime, end: time },
-        ]);
+        setTimeSlots((prev) => [...prev, { id: Date.now(), start: draftStartTime, end: time }]);
       }
       setEditingSlotId(null);
       setTimePickerPhase('start');
@@ -867,7 +872,14 @@ const ScheduleForm: React.FC = () => {
         Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
       }
     },
-    [classId, classStudents, currentUserId, invalidateStudents, selectedClass?.name, profile?.currentContext?.role],
+    [
+      classId,
+      classStudents,
+      currentUserId,
+      invalidateStudents,
+      selectedClass?.name,
+      profile?.currentContext?.role,
+    ],
   );
 
   /** 调整授课老师 */
@@ -1105,8 +1117,7 @@ const ScheduleForm: React.FC = () => {
     /* 创建/编辑排课 */
     const buildRuleNote = () => {
       const userNote = note.trim();
-      const needFull =
-        autoOpenType === 'full' || autoOpenType === 'full_or_time';
+      const needFull = autoOpenType === 'full' || autoOpenType === 'full_or_time';
       const meta = [
         isGroupMode ? '类型:团课' : '类型:班课',
         isGroupMode
@@ -1114,9 +1125,7 @@ const ScheduleForm: React.FC = () => {
               `自动开班:${autoOpenType}`,
               `每时段可约:${slotMaxCount}`,
               `最少开班:${Math.max(1, minOpenCount)}`,
-              needFull
-                ? `满人开课:是 | 满人开课人数:${Math.max(1, minOpenCount)}`
-                : '满人开课:否',
+              needFull ? `满人开课:是 | 满人开课人数:${Math.max(1, minOpenCount)}` : '满人开课:否',
             ].join(' | ')
           : null,
         schedulingMode === 'rule' ? `规则:${repeatMode}` : null,
@@ -1132,13 +1141,10 @@ const ScheduleForm: React.FC = () => {
       return userNote ? `${userNote}\n${meta}` : meta;
     };
 
-    const targets: { dayOfWeek: DayOfWeek; start: string; end: string; dateHint?: string }[] =
-      [];
+    const targets: { dayOfWeek: DayOfWeek; start: string; end: string; dateHint?: string }[] = [];
     if (schedulingMode === 'rule') {
       const days =
-        repeatMode === 'alternate'
-          ? [((dayjs(startDate).day() || 7) as DayOfWeek)]
-          : selectedDays;
+        repeatMode === 'alternate' ? [(dayjs(startDate).day() || 7) as DayOfWeek] : selectedDays;
       for (const dow of days) {
         for (const ts of timeSlots) {
           targets.push({ dayOfWeek: dow, start: ts.start, end: ts.end });
@@ -1177,9 +1183,7 @@ const ScheduleForm: React.FC = () => {
           classId: mode === 'class' ? classId : undefined,
           room: roomName,
           excludeId: isEdit ? scheduleId : undefined,
-          dateHint:
-            t.dateHint ||
-            (schedulingMode === 'rule' ? startDate : undefined),
+          dateHint: t.dateHint || (schedulingMode === 'rule' ? startDate : undefined),
         });
         if (!result.hasConflict) continue;
         merged.hasConflict = true;
@@ -1305,7 +1309,9 @@ const ScheduleForm: React.FC = () => {
               reminder_minutes: reminderMinutes,
               ignoreConflict,
               start_date: t.dateHint || ruleStartDate,
-              end_date: ruleEndDate || (t.dateHint && selectedClass?.type === 'limited' ? t.dateHint : undefined),
+              end_date:
+                ruleEndDate ||
+                (t.dateHint && selectedClass?.type === 'limited' ? t.dateHint : undefined),
               maxOccurrences:
                 schedulingMode === 'rule' && endMode === 'by_count'
                   ? endCount
@@ -1490,7 +1496,7 @@ const ScheduleForm: React.FC = () => {
                     {timeSlots.length > 1 ? `时间${index + 1}` : '时间'}
                   </Text>
                 </View>
-                  <View className="flex items-center gap-[12rpx]">
+                <View className="flex items-center gap-[12rpx]">
                   <View
                     className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]"
                     onClick={() => openTimePickerFlow(ts.id)}
@@ -1676,9 +1682,7 @@ const ScheduleForm: React.FC = () => {
             {isGroupMode ? (
               <>
                 <View className="border-b border-border/60 px-[32rpx] py-[20rpx]">
-                  <Text className="block text-[28rpx] font-medium text-foreground">
-                    预约设置
-                  </Text>
+                  <Text className="block text-[28rpx] font-medium text-foreground">预约设置</Text>
                   <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
                     与时段配置同步，保存后两边一致
                   </Text>
@@ -1728,9 +1732,7 @@ const ScheduleForm: React.FC = () => {
                 <View
                   className="flex items-center justify-between px-[32rpx] py-[24rpx] active:opacity-70"
                   onClick={() => {
-                    const options = Array.from({ length: slotMaxCount }, (_, i) =>
-                      String(i + 1),
-                    );
+                    const options = Array.from({ length: slotMaxCount }, (_, i) => String(i + 1));
                     void Taro.showActionSheet({ itemList: options })
                       .then((result) => {
                         const num = Number(options[result.tapIndex]);
@@ -1991,7 +1993,9 @@ const ScheduleForm: React.FC = () => {
           <Text
             className={cn(
               'text-[30rpx] font-medium',
-              !canSubmit || saving || deleting ? 'text-muted-foreground' : 'text-primary-foreground',
+              !canSubmit || saving || deleting
+                ? 'text-muted-foreground'
+                : 'text-primary-foreground',
             )}
           >
             {saving ? '保存中...' : isEdit ? (isRescheduleMode ? '确认调课' : '保存修改') : '保存'}

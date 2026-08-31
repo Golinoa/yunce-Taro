@@ -5,10 +5,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import type { FinanceDetailType, RevenueTrendItem } from '@/types/data-center';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
+import type { FinanceDetailType, RevenueTrendItem } from '@/types/data-center';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 

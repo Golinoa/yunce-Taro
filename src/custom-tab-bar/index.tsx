@@ -132,11 +132,7 @@ export default class CustomTabBar extends Component<object, CustomTabBarState> {
               className="custom-tab-bar__item"
               onClick={() => this.handleSwitch(item)}
             >
-              <Icon
-                name={selected ? item.iconActive : item.icon}
-                size={44}
-                color={tint}
-              />
+              <Icon name={selected ? item.iconActive : item.icon} size={44} color={tint} />
               <Text className="custom-tab-bar__text" style={{ color: tint }}>
                 {item.text}
               </Text>

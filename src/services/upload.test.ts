@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { post } from '@/utils/request';
-import { uploadService } from '@/services/upload';
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { uploadService } from '@/services/upload';
+import { post } from '@/utils/request';
 
 vi.mock('@/utils/request', () => ({
   post: vi.fn(),

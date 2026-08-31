@@ -423,7 +423,16 @@ const CourseFormPage: React.FC = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, [courseId, isEdit, isClassEdit, fetchList, formStorageScope, fillClassForm, routeCategoryId, setLoading]);
+  }, [
+    courseId,
+    isEdit,
+    isClassEdit,
+    fetchList,
+    formStorageScope,
+    fillClassForm,
+    routeCategoryId,
+    setLoading,
+  ]);
 
   // 班课模式：高级设置默认展开（新建与编辑保持一致；团课/私教保持收起）
   useEffect(() => {
@@ -869,7 +878,18 @@ const CourseFormPage: React.FC = () => {
     }
     setErrors(nextErrors);
     return nextErrors;
-  }, [name, categoryId, subjectId, duration, capacity, endClassEnabled, maxLessons, isClassMode, experiencePrice, price]);
+  }, [
+    name,
+    categoryId,
+    subjectId,
+    duration,
+    capacity,
+    endClassEnabled,
+    maxLessons,
+    isClassMode,
+    experiencePrice,
+    price,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     const errorsResult = validate();
@@ -1521,73 +1541,71 @@ const CourseFormPage: React.FC = () => {
 
               {/* 6. 课程图片：背景图整宽上传框 + 封面左文字右方框 */}
               <Card className="p-[32rpx]">
-                  <SectionTitle title="课程图片" />
-                  <View className="flex flex-col gap-[40rpx]">
-                    {/* 课程背景图：班课/团课均展示，暂未开通上传 → 敬请期待（勿删上传组件，仅禁用交互） */}
-                    <View className="flex flex-col gap-[16rpx]">
-                      <View className="flex flex-row items-center gap-[12rpx]">
-                        <Text className="text-[30rpx] font-medium text-foreground">课程背景图</Text>
-                        <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
-                          <Text className="text-[22rpx] text-primary font-medium">约课首页</Text>
-                        </View>
-                        <View className="px-[16rpx] py-[6rpx] rounded-full bg-muted">
-                          <Text className="text-[22rpx] font-medium text-muted-foreground">
-                            敬请期待
-                          </Text>
-                        </View>
+                <SectionTitle title="课程图片" />
+                <View className="flex flex-col gap-[40rpx]">
+                  {/* 课程背景图：班课/团课均展示，暂未开通上传 → 敬请期待（勿删上传组件，仅禁用交互） */}
+                  <View className="flex flex-col gap-[16rpx]">
+                    <View className="flex flex-row items-center gap-[12rpx]">
+                      <Text className="text-[30rpx] font-medium text-foreground">课程背景图</Text>
+                      <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
+                        <Text className="text-[22rpx] text-primary font-medium">约课首页</Text>
                       </View>
-                      <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-                        显示在首页课程卡底尾。建议使用 405×190 横图，未上传将使用默认背景。
-                      </Text>
-                      <View className="relative opacity-55">
-                        <CourseImageUploader
-                          value={backgroundImage}
-                          onChange={() => undefined}
-                          title="上传背景图"
-                          subtitle="功能即将开放"
-                          layout="fullWidth"
-                          scrollTopRef={scrollTopRef}
-                          onScrollRestore={(t) => setScrollTop(t)}
-                        />
-                        {/* 遮罩拦截点击，避免误传图 */}
-                        <View
-                          className="absolute inset-0 z-10"
-                          onClick={() =>
-                            Taro.showToast({ title: '敬请期待', icon: 'none' })
-                          }
-                        />
+                      <View className="px-[16rpx] py-[6rpx] rounded-full bg-muted">
+                        <Text className="text-[22rpx] font-medium text-muted-foreground">
+                          敬请期待
+                        </Text>
                       </View>
                     </View>
-
-                    <View className="h-[1rpx] bg-border/30" />
-
-                    {/* 课程封面：左文字说明 + 右方形上传框（卡片内嵌两栏） */}
-                    <View className="flex flex-col gap-[16rpx]">
-                      <View className="flex flex-row items-center gap-[12rpx]">
-                        <Text className="text-[30rpx] font-medium text-foreground">课程封面</Text>
-                        <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
-                          <Text className="text-[22rpx] text-primary font-medium">分享使用</Text>
-                        </View>
-                      </View>
-                      <View className="flex flex-row items-start gap-[24rpx]">
-                        <View className="flex-1 min-w-0">
-                          <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-                            用于分享课程、生成课表推荐等场景，推荐清晰方图。未上传不影响首页背景图。
-                          </Text>
-                        </View>
-                        <CourseImageUploader
-                          value={homeImage}
-                          onChange={(v) => setHomeImage(v ?? '')}
-                          title="上传封面"
-                          layout="square"
-                          squareSizeRpx={200}
-                          scrollTopRef={scrollTopRef}
-                          onScrollRestore={(t) => setScrollTop(t)}
-                        />
-                      </View>
+                    <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+                      显示在首页课程卡底尾。建议使用 405×190 横图，未上传将使用默认背景。
+                    </Text>
+                    <View className="relative opacity-55">
+                      <CourseImageUploader
+                        value={backgroundImage}
+                        onChange={() => undefined}
+                        title="上传背景图"
+                        subtitle="功能即将开放"
+                        layout="fullWidth"
+                        scrollTopRef={scrollTopRef}
+                        onScrollRestore={(t) => setScrollTop(t)}
+                      />
+                      {/* 遮罩拦截点击，避免误传图 */}
+                      <View
+                        className="absolute inset-0 z-10"
+                        onClick={() => Taro.showToast({ title: '敬请期待', icon: 'none' })}
+                      />
                     </View>
                   </View>
-                </Card>
+
+                  <View className="h-[1rpx] bg-border/30" />
+
+                  {/* 课程封面：左文字说明 + 右方形上传框（卡片内嵌两栏） */}
+                  <View className="flex flex-col gap-[16rpx]">
+                    <View className="flex flex-row items-center gap-[12rpx]">
+                      <Text className="text-[30rpx] font-medium text-foreground">课程封面</Text>
+                      <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
+                        <Text className="text-[22rpx] text-primary font-medium">分享使用</Text>
+                      </View>
+                    </View>
+                    <View className="flex flex-row items-start gap-[24rpx]">
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+                          用于分享课程、生成课表推荐等场景，推荐清晰方图。未上传不影响首页背景图。
+                        </Text>
+                      </View>
+                      <CourseImageUploader
+                        value={homeImage}
+                        onChange={(v) => setHomeImage(v ?? '')}
+                        title="上传封面"
+                        layout="square"
+                        squareSizeRpx={200}
+                        scrollTopRef={scrollTopRef}
+                        onScrollRestore={(t) => setScrollTop(t)}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </Card>
             </View>
           )}
         </View>

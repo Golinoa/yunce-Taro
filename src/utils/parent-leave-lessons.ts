@@ -86,9 +86,7 @@ export function buildUpcomingFixedLessons(params: {
     });
   }
 
-  return results.sort((a, b) =>
-    `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`),
-  );
+  return results.sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
 }
 
 /**

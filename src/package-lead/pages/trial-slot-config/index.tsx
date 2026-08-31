@@ -20,6 +20,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
 import { leadService, studentService, teacherService } from '@/services';
+import { privateBookingService } from '@/services/private-booking';
 import type { TrialSlotConfig } from '@/types/lead';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -31,7 +32,6 @@ import {
 } from '@/utils/booking-one-on-one';
 import { logError } from '@/utils/logger';
 import { upsertParentBooking } from '@/utils/parent-bookings';
-import { privateBookingService } from '@/services/private-booking';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 interface PageParams {
@@ -289,8 +289,12 @@ const TrialSlotConfigPage: React.FC = () => {
           student = kids[sheet.tapIndex];
         }
         const endTime =
-          TIME_OPTIONS[Math.min(TIME_OPTIONS.indexOf(time as (typeof TIME_OPTIONS)[number]) + 1, TIME_OPTIONS.length - 1)] ||
-          time;
+          TIME_OPTIONS[
+            Math.min(
+              TIME_OPTIONS.indexOf(time as (typeof TIME_OPTIONS)[number]) + 1,
+              TIME_OPTIONS.length - 1,
+            )
+          ] || time;
         const created = await privateBookingService.create({
           teacherId: params.teacherId!,
           studentId: student.id,
@@ -309,7 +313,8 @@ const TrialSlotConfigPage: React.FC = () => {
           studentName: student.name,
           occurrenceKey: `${params.teacherId}:${dateStr}:${time}`,
           courseId: params.teacherId,
-          courseName: created.courseName || (teacher?.subject ? `${teacher.subject}私教` : '私教课'),
+          courseName:
+            created.courseName || (teacher?.subject ? `${teacher.subject}私教` : '私教课'),
           courseType: 'oneOnOne',
           campusId: profile.currentContext?.campusId,
           lessonDate: dateStr,
@@ -660,38 +665,38 @@ const TrialSlotConfigPage: React.FC = () => {
 
             {/* 预约设置：每周重复 + 每时段可约人数（仅教师管理） */}
             {!isParentMode ? (
-            <View className="mt-[40rpx]">
-              <Text className="text-[32rpx] font-semibold text-foreground">预约设置</Text>
-              <View className="mt-[24rpx] rounded-[20rpx] bg-[#f8fafc] px-[24rpx] py-[20rpx]">
-                {/* 每周重复开关 */}
-                <View className="flex items-center justify-between border-b border-[#eef2f7] pb-[20rpx]">
-                  <View className="flex-1 pr-[20rpx]">
-                    <Text className="text-[28rpx] text-foreground">每周重复</Text>
-                    <Text className="mt-[6rpx] block text-[22rpx] text-[#999999]">
-                      开启后当前时段配置按周自动重复
-                    </Text>
+              <View className="mt-[40rpx]">
+                <Text className="text-[32rpx] font-semibold text-foreground">预约设置</Text>
+                <View className="mt-[24rpx] rounded-[20rpx] bg-[#f8fafc] px-[24rpx] py-[20rpx]">
+                  {/* 每周重复开关 */}
+                  <View className="flex items-center justify-between border-b border-[#eef2f7] pb-[20rpx]">
+                    <View className="flex-1 pr-[20rpx]">
+                      <Text className="text-[28rpx] text-foreground">每周重复</Text>
+                      <Text className="mt-[6rpx] block text-[22rpx] text-[#999999]">
+                        开启后当前时段配置按周自动重复
+                      </Text>
+                    </View>
+                    <Switch
+                      checked={bookingConfig?.weeklyRepeat ?? false}
+                      color="#ff8a4c"
+                      onChange={(e) => handleToggleWeeklyRepeat(e.detail.value)}
+                    />
                   </View>
-                  <Switch
-                    checked={bookingConfig?.weeklyRepeat ?? false}
-                    color="#ff8a4c"
-                    onChange={(e) => handleToggleWeeklyRepeat(e.detail.value)}
-                  />
-                </View>
-                {/* 每时段可约人数 */}
-                <View
-                  className="flex items-center justify-between pt-[20rpx] active:opacity-70"
-                  onClick={() => void handleChangeCapacity()}
-                >
-                  <Text className="text-[28rpx] text-foreground">每时段可约人数</Text>
-                  <View className="flex items-center gap-[10rpx]">
-                    <Text className="text-[26rpx] text-[#999999]">
-                      {bookingConfig?.capacityPerSlot ?? 1} 人
-                    </Text>
-                    <Icon name="mdi-chevron-right" size={20} color="#999999" />
+                  {/* 每时段可约人数 */}
+                  <View
+                    className="flex items-center justify-between pt-[20rpx] active:opacity-70"
+                    onClick={() => void handleChangeCapacity()}
+                  >
+                    <Text className="text-[28rpx] text-foreground">每时段可约人数</Text>
+                    <View className="flex items-center gap-[10rpx]">
+                      <Text className="text-[26rpx] text-[#999999]">
+                        {bookingConfig?.capacityPerSlot ?? 1} 人
+                      </Text>
+                      <Icon name="mdi-chevron-right" size={20} color="#999999" />
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
             ) : null}
           </View>
         </ScrollView>
@@ -721,7 +726,9 @@ const TrialSlotConfigPage: React.FC = () => {
             <View
               className={cn(
                 'flex h-[76rpx] flex-1 items-center justify-center rounded-full text-[30rpx] font-medium text-white transition-all',
-                rightBtnActive ? 'bg-[#ff8a4c] active:scale-95 active:bg-[#e67a3e]' : 'bg-[#e0e0e0]',
+                rightBtnActive
+                  ? 'bg-[#ff8a4c] active:scale-95 active:bg-[#e67a3e]'
+                  : 'bg-[#e0e0e0]',
               )}
               onClick={handleRightBtnClick}
             >

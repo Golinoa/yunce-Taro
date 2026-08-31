@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   __resetCalendarSyncSettingsForTest,
   CALENDAR_SYNC_MAX_DAYS,

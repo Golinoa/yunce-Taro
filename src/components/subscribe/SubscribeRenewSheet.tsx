@@ -38,7 +38,12 @@ const SubscribeRenewSheet: React.FC<SubscribeRenewSheetProps> = ({
   const busy = loading || submitting;
 
   return (
-    <BottomSheet visible={visible} title={title} onClose={busy ? undefined : onSecondary} height="auto">
+    <BottomSheet
+      visible={visible}
+      title={title}
+      onClose={busy ? undefined : onSecondary}
+      height="auto"
+    >
       <View className="px-[32rpx] pb-[48rpx]">
         <Text className="block text-[28rpx] leading-[44rpx] text-foreground-secondary">{body}</Text>
         <View className="mt-[32rpx] flex gap-[16rpx]">

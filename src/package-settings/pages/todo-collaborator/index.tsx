@@ -49,11 +49,7 @@ const TodoCollaboratorPage: React.FC = () => {
   const teacherMapRef = useRef<Record<string, TeacherUIModel>>({});
 
   const applySelection = useCallback((ids: string[], summaries: CollaboratorSummary[]) => {
-    const merged = mergeCollaboratorSummaries(
-      ids,
-      summaries,
-      Object.values(teacherMapRef.current),
-    );
+    const merged = mergeCollaboratorSummaries(ids, summaries, Object.values(teacherMapRef.current));
     selectedIdsRef.current = ids;
     summaryMetaRef.current = merged;
     setSelectedIds(ids);

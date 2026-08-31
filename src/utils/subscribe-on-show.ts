@@ -3,10 +3,11 @@
  */
 import Taro from '@tarojs/taro';
 import { SUBSCRIBE_GROUP_LABELS } from '@/constants/subscribe-presets';
+import { getSession } from '@/services/auth';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
 import type { SubscribeTemplateGroup } from '@/types/subscribe-message';
-import { getSession } from '@/services/auth';
+import { logError } from '@/utils/logger';
 import {
   canShowDepletedPrompt,
   canShowLowQuotaBanner,
@@ -15,7 +16,6 @@ import {
   markLowQuotaBannerShown,
   markReactivatePromptShown,
 } from '@/utils/subscribe-freq';
-import { logError } from '@/utils/logger';
 
 let consuming = false;
 

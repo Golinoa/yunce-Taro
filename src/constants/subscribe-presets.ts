@@ -325,10 +325,7 @@ export function getFlowPresetId(flowId: string): SubscribePromptPresetId | undef
 }
 
 /** 将 preset body 中的 {key} 替换为变量 */
-export function formatPresetText(
-  template: string,
-  variables: Record<string, string> = {},
-): string {
+export function formatPresetText(template: string, variables: Record<string, string> = {}): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => variables[key] ?? `{${key}}`);
 }
 

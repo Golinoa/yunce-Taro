@@ -23,17 +23,15 @@ import type {
   LeadStatus,
   LeadSummary,
   TrialSlotConfig,
+  TrialCourseSlot,
 } from '@/types/lead';
-import type { TrialCourseSlot } from '@/types/lead';
-
-
-import { del, get, patch, post, put } from '@/utils/request';
 import {
   API_PAGE_SIZE_BATCH,
   asPaginatedResponse,
   fetchAllPages,
   type PaginatedResponse,
 } from '@/utils/pagination';
+import { del, get, patch, post, put } from '@/utils/request';
 
 async function fetchLeadListPage(
   params: Record<string, unknown>,
@@ -88,14 +86,14 @@ async function fetchTrialSlotListPage(
 }
 
 export async function getLeadsByTeacher(teacherId: string): Promise<Lead[]> {
-    return fetchAllPages(
+  return fetchAllPages(
     (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
 }
 
 export async function getLeadById(leadId: string): Promise<Lead | null> {
-    const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
+  const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
   if (!detail) return null;
   return mapBackendLead(detail);
 }
@@ -104,7 +102,7 @@ export async function getLeadCards(
   teacherId: string,
   filterTab?: LeadFilterTab,
 ): Promise<LeadCardModel[]> {
-    const leads = await fetchAllPages(
+  const leads = await fetchAllPages(
     (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize, filterTab }),
     API_PAGE_SIZE_BATCH,
   );
@@ -131,12 +129,12 @@ export async function getLeadCards(
 }
 
 export async function getLeadSummary(teacherId: string): Promise<LeadSummary> {
-    const summary = await get<Record<string, unknown>>('/leads/summary', { teacherId });
+  const summary = await get<Record<string, unknown>>('/leads/summary', { teacherId });
   return mapBackendLeadSummary(summary);
 }
 
-export async function createLead(data: LeadFormData, teacherId: string): Promise<Lead> {
-    const created = await post<Record<string, unknown>>('/leads', {
+export async function createLead(data: LeadFormData, _teacherId: string): Promise<Lead> {
+  const created = await post<Record<string, unknown>>('/leads', {
     childName: data.child_name,
     childNickname: data.child_nickname,
     childGender: data.child_gender,
@@ -166,7 +164,7 @@ export async function createLeadFromInvite(params: {
   sourceCourseId?: string;
   visitorKey?: string;
 }): Promise<Lead> {
-    const created = await post<Record<string, unknown>>('/leads', {
+  const created = await post<Record<string, unknown>>('/leads', {
     childName: params.childName,
     childNickname: params.childNickname,
     childGender: params.childGender,
@@ -217,7 +215,7 @@ export async function submitInviteLanding(params: {
   lesson_expired: boolean;
   booked: boolean;
 }> {
-    return post(
+  return post(
     '/leads/landing/submit',
     {
       teacherId: params.teacherId,
@@ -274,21 +272,25 @@ export async function trackLandingVisit(params: {
     already_notified: boolean;
   };
 }> {
-    return post('/leads/landing/visit', {
-    teacherId: params.teacherId,
-    campusId: params.campusId,
-    sourceType: params.sourceType,
-    parentUserId: params.parentUserId,
-    visitorKey: params.visitorKey,
-    leadId: params.leadId,
-    inviteCode: params.inviteCode,
-    lessonExpired: params.lessonExpired,
-    lessonKey: params.lessonKey,
-    className: params.className,
-    date: params.date,
-    start: params.start,
-    end: params.end,
-  }, { skipAuth: true });
+  return post(
+    '/leads/landing/visit',
+    {
+      teacherId: params.teacherId,
+      campusId: params.campusId,
+      sourceType: params.sourceType,
+      parentUserId: params.parentUserId,
+      visitorKey: params.visitorKey,
+      leadId: params.leadId,
+      inviteCode: params.inviteCode,
+      lessonExpired: params.lessonExpired,
+      lessonKey: params.lessonKey,
+      className: params.className,
+      date: params.date,
+      start: params.start,
+      end: params.end,
+    },
+    { skipAuth: true },
+  );
 }
 
 export async function updateLeadStatus(
@@ -296,7 +298,7 @@ export async function updateLeadStatus(
   status: LeadStatus,
   extra?: { closed_reason?: string },
 ): Promise<Lead | null> {
-    await patch<Record<string, unknown>>(`/leads/${leadId}/status`, {
+  await patch<Record<string, unknown>>(`/leads/${leadId}/status`, {
     status,
     closedReason: extra?.closed_reason,
   });
@@ -306,9 +308,9 @@ export async function updateLeadStatus(
 export async function updateLead(
   leadId: string,
   data: Partial<Lead>,
-  options?: { forceReassign?: boolean },
+  _options?: { forceReassign?: boolean },
 ): Promise<Lead | null> {
-    await put<Record<string, unknown>>(`/leads/${leadId}`, {
+  await put<Record<string, unknown>>(`/leads/${leadId}`, {
     childName: data.child_name,
     childNickname: data.child_nickname,
     childGender: data.child_gender,
@@ -326,9 +328,9 @@ export async function reassignLead(
   leadId: string,
   newOwnerId: string,
   reason: string,
-  opts?: { forceReassign?: boolean; operatorId?: string },
+  _opts?: { forceReassign?: boolean; operatorId?: string },
 ): Promise<Lead | null> {
-    await post<Record<string, unknown>>(`/leads/${leadId}/reassign`, {
+  await post<Record<string, unknown>>(`/leads/${leadId}/reassign`, {
     ownerTeacherId: newOwnerId,
     reason,
   });
@@ -336,7 +338,7 @@ export async function reassignLead(
 }
 
 export async function deleteLead(leadId: string): Promise<boolean> {
-    await del(`/leads/${leadId}`);
+  await del(`/leads/${leadId}`);
   return true;
 }
 
@@ -363,7 +365,7 @@ export async function createLeadBooking(params: {
   operatorId?: string;
   note?: string;
 }): Promise<LeadBooking> {
-    const created = await post<Record<string, unknown>>('/leads/bookings', {
+  const created = await post<Record<string, unknown>>('/leads/bookings', {
     leadId: params.leadId,
     trialMode: params.trialMode ?? 'group',
     referenceScheduleId: params.referenceScheduleId,
@@ -402,7 +404,7 @@ export async function bookTrialByClass(params: {
   operatorId?: string;
   note?: string;
 }): Promise<LeadBooking> {
-    return createLeadBooking({
+  return createLeadBooking({
     leadId: params.leadId,
     classId: params.classId,
     className: params.className,
@@ -421,7 +423,7 @@ export async function bookTrialByClass(params: {
 }
 
 export async function getLeadBookings(leadId: string): Promise<LeadBooking[]> {
-    return fetchAllPages(
+  return fetchAllPages(
     (page, pageSize) => fetchLeadBookingsPage({ leadId, page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
@@ -431,7 +433,7 @@ export async function getLeadBookingsByTeacher(
   teacherId: string,
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
-    return fetchAllPages(
+  return fetchAllPages(
     (page, pageSize) =>
       fetchLeadBookingsPage({
         teacherId,
@@ -450,7 +452,7 @@ export async function getLeadBookingsByCampus(
   campusId?: string,
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
-    return fetchAllPages(
+  return fetchAllPages(
     (page, pageSize) =>
       fetchLeadBookingsPage({
         campusId,
@@ -464,32 +466,28 @@ export async function getLeadBookingsByCampus(
   );
 }
 
-export async function checkInPrivateLeadBooking(
-  bookingId: string,
-): Promise<LeadBooking | null> {
-    const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+export async function checkInPrivateLeadBooking(bookingId: string): Promise<LeadBooking | null> {
+  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     status: 'completed',
   });
   return mapBackendLeadBooking(updated);
 }
 
 /** 手动标记试听未到 */
-export async function markLeadBookingNoShow(
-  bookingId: string,
-): Promise<LeadBooking | null> {
-    const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+export async function markLeadBookingNoShow(bookingId: string): Promise<LeadBooking | null> {
+  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     status: 'no_show',
   });
   return mapBackendLeadBooking(updated);
 }
 
 export async function cancelLeadBooking(bookingId: string): Promise<LeadBooking | null> {
-    const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/cancel`);
+  const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/cancel`);
   return mapBackendLeadBooking(updated);
 }
 
 export async function restoreLeadBooking(bookingId: string): Promise<LeadBooking | null> {
-    const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/restore`);
+  const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/restore`);
   return mapBackendLeadBooking(updated);
 }
 
@@ -508,7 +506,7 @@ export async function updateLeadBooking(
     trialMode?: LeadBooking['trial_mode'];
   },
 ): Promise<LeadBooking | null> {
-    const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     lessonDate: data.lessonDate,
     startTime: data.startTime,
     endTime: data.endTime,
@@ -524,7 +522,7 @@ export async function updateLeadBooking(
 }
 
 export async function getLeadFollowUps(leadId: string): Promise<LeadFollowUp[]> {
-    return fetchAllPages(
+  return fetchAllPages(
     (page, pageSize) => fetchLeadFollowUpsPage({ leadId, page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
@@ -539,7 +537,7 @@ export async function createFollowUp(params: {
   operatorId: string;
   operatorName?: string;
 }): Promise<LeadFollowUp> {
-    const created = await post<Record<string, unknown>>('/leads/follow-ups', {
+  const created = await post<Record<string, unknown>>('/leads/follow-ups', {
     leadId: params.leadId,
     action: params.action,
     intentLevel: params.intentLevel,
@@ -550,7 +548,7 @@ export async function createFollowUp(params: {
 }
 
 export async function getLeadConversions(leadId: string): Promise<LeadConversion[]> {
-    const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
+  const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
   const conversions = Array.isArray(detail.conversions) ? detail.conversions : [];
   return conversions.map((item) => mapBackendLeadConversion(item as Record<string, unknown>));
 }
@@ -563,7 +561,7 @@ export async function createConversion(params: {
   operatorId: string;
   note?: string;
 }): Promise<LeadConversion> {
-    const created = await post<Record<string, unknown>>('/leads/conversions', {
+  const created = await post<Record<string, unknown>>('/leads/conversions', {
     leadId: params.leadId,
     conversionType: params.conversionType,
     studentId: params.studentId,
@@ -574,7 +572,7 @@ export async function createConversion(params: {
 }
 
 export async function getTrialCourseSlots(campusId?: string): Promise<TrialCourseSlot[]> {
-    const slots = await fetchAllPages(
+  const slots = await fetchAllPages(
     (page, pageSize) =>
       fetchTrialSlotListPage({
         campusId,
@@ -591,7 +589,7 @@ export async function getTrialSlotConfigs(
   teacherId?: string,
   campusId?: string,
 ): Promise<TrialSlotConfig[]> {
-    return fetchAllPages(
+  return fetchAllPages(
     (page, pageSize) =>
       fetchTrialSlotListPage({
         teacherId,
@@ -604,7 +602,7 @@ export async function getTrialSlotConfigs(
 }
 
 export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfig | null> {
-    const list = await fetchAllPages(
+  const list = await fetchAllPages(
     (page, pageSize) => fetchTrialSlotListPage({ page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
@@ -614,7 +612,7 @@ export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfi
 export async function createTrialSlotConfig(
   data: Omit<TrialSlotConfig, 'id' | 'current_count' | 'created_at' | 'updated_at'>,
 ): Promise<TrialSlotConfig> {
-    const created = await post<Record<string, unknown>>('/leads/trial-slots', {
+  const created = await post<Record<string, unknown>>('/leads/trial-slots', {
     courseId: data.course_id,
     courseName: data.course_name,
     subjectId: data.subject_id,
@@ -637,7 +635,7 @@ export async function updateTrialSlotConfig(
   id: string,
   data: Partial<TrialSlotConfig>,
 ): Promise<TrialSlotConfig | null> {
-    const updated = await put<Record<string, unknown>>(`/leads/trial-slots/${id}`, {
+  const updated = await put<Record<string, unknown>>(`/leads/trial-slots/${id}`, {
     courseName: data.course_name,
     subjectName: data.subject_name,
     lessonDate: data.lesson_date,
@@ -652,7 +650,7 @@ export async function updateTrialSlotConfig(
 }
 
 export async function deleteTrialSlotConfig(id: string): Promise<boolean> {
-    await del(`/leads/trial-slots/${id}`);
+  await del(`/leads/trial-slots/${id}`);
   return true;
 }
 
@@ -672,7 +670,7 @@ export async function batchCreateProxyBookings(params: {
   operatorId?: string;
   note?: string;
 }): Promise<LeadBooking[]> {
-    const results: LeadBooking[] = [];
+  const results: LeadBooking[] = [];
   for (const leadId of params.leadIds) {
     results.push(
       await createLeadBooking({

@@ -9,12 +9,9 @@ import { View, Text, ScrollView, RootPortal } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  DEV_SWITCH_ACCOUNTS,
-  formatMockSwitchLabel,
-} from '@/constants/dev-switch-accounts';
-import { isDevApiEnv } from '@/utils/build-env';
+import { DEV_SWITCH_ACCOUNTS, formatMockSwitchLabel } from '@/constants/dev-switch-accounts';
 import { useAuth } from '@/utils/auth';
+import { isDevApiEnv } from '@/utils/build-env';
 import './index.scss';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -100,8 +97,7 @@ const MockIdentitySwitcher: React.FC = () => {
               <Text className="mock-id-panel__title">快速切换身份（测环境）</Text>
               <ScrollView scrollY className="mock-id-panel__scroll" showScrollbar={false}>
                 {DEV_SWITCH_ACCOUNTS.map((item) => {
-                  const isCurrent =
-                    profile?.id === item.userId || profile?.email === item.email;
+                  const isCurrent = profile?.id === item.userId || profile?.email === item.email;
                   const label = formatMockSwitchLabel(item.name, item.roleLabel);
 
                   return (

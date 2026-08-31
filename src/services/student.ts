@@ -17,11 +17,11 @@ import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Notification, NotificationType } from '@/types/notification';
 import type { Schedule } from '@/types/schedule';
-import type { Student } from '@/types/student';
+import type { Student, StudentParent } from '@/types/student';
+import { notWired } from '@/utils/not-wired';
 import type { PaginatedResponse } from '@/utils/pagination';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
-import { notWired } from '@/utils/not-wired';
 
 interface BackendStudentListItem {
   avatar?: null | string;
@@ -638,12 +638,7 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
 
 function mapBackendClassListItem(item: BackendClassListItem): Class {
   const ended = item.status === 'DISBANDED';
-  const type =
-    ended
-      ? 'ended'
-      : item.type === 'limited'
-        ? 'limited'
-        : 'unlimited';
+  const type = ended ? 'ended' : item.type === 'limited' ? 'limited' : 'unlimited';
   return {
     id: item.id,
     name: item.name,
@@ -666,12 +661,7 @@ function mapBackendClassListItem(item: BackendClassListItem): Class {
 
 function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
   const ended = item.status === 'DISBANDED';
-  const type =
-    ended
-      ? 'ended'
-      : item.type === 'limited'
-        ? 'limited'
-        : 'unlimited';
+  const type = ended ? 'ended' : item.type === 'limited' ? 'limited' : 'unlimited';
   return {
     id: item.id,
     name: item.name,
@@ -940,10 +930,16 @@ function enrichConflictDisplay(
       result.conflictSummary ||
       (result.hasConflict
         ? [...new Set(result.conflicts.flatMap((c) => c.conflictTypes))]
-            .map((t) =>
-              ({ time: '时间冲突', teacher: '老师冲突', room: '教室冲突', class: '班级冲突' } as const)[
-                t
-              ],
+            .map(
+              (t) =>
+                (
+                  ({
+                    time: '时间冲突',
+                    teacher: '老师冲突',
+                    room: '教室冲突',
+                    class: '班级冲突',
+                  }) as const
+                )[t],
             )
             .join('、')
         : ''),
@@ -1225,7 +1221,8 @@ export const studentService = {
   },
 
   /** 获取学员的绑定家长 */
-  getParents: async (_studentId: string) => notWired('student.getParents'),
+  getParents: async (_studentId: string): Promise<StudentParent[]> =>
+    notWired('student.getParents'),
 
   /** 解绑家长 */
   removeParent: async (_bindingId: string) => notWired('student.removeParent'),
@@ -1249,9 +1246,7 @@ export const packageService = {
         pageSize: String(pageSize),
         studentId,
       });
-      const data = await get<BackendPackageListResponse>(
-        `/course-packages?${params.toString()}`,
-      );
+      const data = await get<BackendPackageListResponse>(`/course-packages?${params.toString()}`);
       return asPaginatedResponse(data, page, pageSize);
     }, API_PAGE_SIZE_BATCH);
     return list.map(mapBackendPackage);
@@ -1307,17 +1302,17 @@ export const packageService = {
     hours: number,
   ): Promise<{ pkg: CoursePackage; deduct: DeductResult }> =>
     post<BackendPackageMutationResponse>(`/course-packages/${packageId}/deduct`, {
-          hours,
-        }).then((pkg) => ({
-          pkg: mapBackendPackage(pkg),
-          deduct: {
-            purchased_deduct: hours,
-            bonus_deduct: 0,
-            purchased_remaining: Math.max(pkg.remainingHours, 0),
-            bonus_remaining: 0,
-            remaining_hours: Math.max(pkg.remainingHours, 0),
-          },
-        })),
+      hours,
+    }).then((pkg) => ({
+      pkg: mapBackendPackage(pkg),
+      deduct: {
+        purchased_deduct: hours,
+        bonus_deduct: 0,
+        purchased_remaining: Math.max(pkg.remainingHours, 0),
+        bonus_remaining: 0,
+        remaining_hours: Math.max(pkg.remainingHours, 0),
+      },
+    })),
 
   /** 获取学员的活跃课包 */
   getActiveByStudent: async (studentId: string): Promise<CoursePackage[]> => {
@@ -1328,23 +1323,20 @@ export const packageService = {
   },
 
   /** 自动匹配最优课包 */
-  pickBest: async (
-    _packages: CoursePackage[],
-    _hoursNeeded: number,
-    _subjectId?: string,
-  ) => notWired('student.pickBest'),
+  pickBest: async (_packages: CoursePackage[], _hoursNeeded: number, _subjectId?: string) =>
+    notWired('student.pickBest'),
 
   /** 课时充值（含赠送课时+分期） */
   createRecharge: async (data: RechargeFormData): Promise<CoursePackage> =>
     post<BackendPackageMutationResponse>('/course-packages', {
-          studentId: data.student_id,
-          name: data.name,
-          totalHours: data.total_hours + (data.gift_hours || 0),
-          giftHours: data.gift_hours,
-          feeAmount: data.fee_amount,
-          feeMethod: data.fee_method,
-          note: data.note,
-        }).then(mapBackendPackage),
+      studentId: data.student_id,
+      name: data.name,
+      totalHours: data.total_hours + (data.gift_hours || 0),
+      giftHours: data.gift_hours,
+      feeAmount: data.fee_amount,
+      feeMethod: data.fee_method,
+      note: data.note,
+    }).then(mapBackendPackage),
 
   /** 提交退费记录 */
   createRefund: async (data: RefundFormData): Promise<PackageTransaction> => {
@@ -1438,10 +1430,8 @@ export const packageTemplateService = {
     notWired('packageTemplate.create'),
 
   /** 更新课包模板 */
-  update: async (
-    _templateId: string,
-    _data: Partial<CoursePackageTemplate>,
-  ) => notWired('packageTemplate.update'),
+  update: async (_templateId: string, _data: Partial<CoursePackageTemplate>) =>
+    notWired('packageTemplate.update'),
 
   /** 删除课包模板 */
   remove: async (_templateId: string) => notWired('packageTemplate.remove'),
@@ -1524,7 +1514,7 @@ export const lessonRecordService = {
 
   /** 按月份获取教师的消课记录 */
   getByTeacherAndMonth: async (
-     _teacherId: string,
+    _teacherId: string,
     year: number,
     month: number,
     campusId?: string,
@@ -1539,7 +1529,7 @@ export const lessonRecordService = {
 
   /** 按日期范围获取教师的消课记录 */
   getByTeacherAndRange: async (
-     _teacherId: string,
+    _teacherId: string,
     startDate: string,
     endDate: string,
     campusId?: string,
@@ -1651,9 +1641,7 @@ export const leaveService = {
       startDate: data.original_date,
       endDate: data.end_date || data.original_date,
       reason: data.reason || '',
-      ...(data.type === 'reschedule'
-        ? { type: 'reschedule', newDate: data.new_date }
-        : {}),
+      ...(data.type === 'reschedule' ? { type: 'reschedule', newDate: data.new_date } : {}),
     });
     return {
       ...mapBackendLeave(created),
@@ -1800,8 +1788,7 @@ export const classService = {
     });
     return withPackages(mapped);
   },
-  getStudentCount: async (classId: string) =>
-    (await classService.getStudents(classId)).length,
+  getStudentCount: async (classId: string) => (await classService.getStudents(classId)).length,
   /**
    * 获取所有"已排课"的班级 id 列表（用于课程管理·班课列表区分已/未排课）
    * 真实后端：联调时按 teacher/admin 权限返回
@@ -1825,8 +1812,9 @@ export const classService = {
     }, API_PAGE_SIZE_BATCH);
     const ids = new Set<string>();
     for (const item of list) {
-      const classId = (item as { classId?: string; class_id?: string }).classId
-        ?? (item as { class_id?: string }).class_id;
+      const classId =
+        (item as { classId?: string; class_id?: string }).classId ??
+        (item as { class_id?: string }).class_id;
       if (classId) ids.add(classId);
     }
     return Array.from(ids);
@@ -1961,7 +1949,9 @@ export const scheduleService = {
         },
       };
     }, API_PAGE_SIZE_BATCH);
-    return list.map(mapBackendSchedule).filter((item) => item.class_id && allowed.has(item.class_id));
+    return list
+      .map(mapBackendSchedule)
+      .filter((item) => item.class_id && allowed.has(item.class_id));
   },
 
   getById: async (scheduleId: string): Promise<Schedule | null> => {
@@ -2034,7 +2024,6 @@ export const scheduleService = {
   }): Promise<import('@/types/schedule-conflict').ScheduleConflictResult> => {
     const { teacherId, dayOfWeek, startTime, endTime, classId, room, excludeId, dateHint } = params;
 
-    
     const qs = new URLSearchParams({
       dayOfWeek: String(mapFrontendDayOfWeek(dayOfWeek)),
       startTime,
@@ -2045,7 +2034,9 @@ export const scheduleService = {
     if (room) qs.set('room', room);
     if (excludeId) qs.set('excludeScheduleId', excludeId);
 
-    const result = await get<BackendScheduleConflictResponse>(`/schedules/check-conflict?${qs.toString()}`);
+    const result = await get<BackendScheduleConflictResponse>(
+      `/schedules/check-conflict?${qs.toString()}`,
+    );
     return enrichConflictDisplay(
       {
         hasConflict: result.hasConflict,

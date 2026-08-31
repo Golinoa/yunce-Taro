@@ -2,9 +2,9 @@ import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
+import { TODO_LEVEL_BAR_COLOR } from '@/components/AccentBarCard';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
-import { TODO_LEVEL_BAR_COLOR } from '@/components/AccentBarCard';
 import type { LessonRecord } from '@/types/lesson-record';
 
 export interface LessonConsumptionDetailItem {
@@ -203,8 +203,7 @@ function mapRecordToDetail(
     packageTagText,
     packageTagClassName: getPackageTagClass(packageTagText),
     // 课程内容优先；无内容时用课包/班级名。不展示「个人消课/班级消课」这类注释性占位文案。
-    description:
-      record.content?.trim() || record.course_package?.name || record.class_name || '',
+    description: record.content?.trim() || record.course_package?.name || record.class_name || '',
   };
 }
 
@@ -445,7 +444,11 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
 
   if (cardCount === 0) {
     if (embedded) {
-      return <Text className="text-[24rpx] text-muted-foreground text-center py-[24rpx]">{emptyText}</Text>;
+      return (
+        <Text className="text-[24rpx] text-muted-foreground text-center py-[24rpx]">
+          {emptyText}
+        </Text>
+      );
     }
     return (
       <View className="bg-card rounded-[28rpx] shadow-card px-[28rpx] py-[60rpx] text-center">
@@ -464,7 +467,9 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                 <Text className="text-[32rpx] font-semibold text-foreground">
                   {formatDateLabel(section.date)}
                 </Text>
-                <Text className="text-[22rpx] text-muted-foreground">{getWeekDay(section.date)}</Text>
+                <Text className="text-[22rpx] text-muted-foreground">
+                  {getWeekDay(section.date)}
+                </Text>
               </View>
               <Text className="text-[22rpx] text-muted-foreground">
                 {section.totalHours}课时 / {section.studentCount}人

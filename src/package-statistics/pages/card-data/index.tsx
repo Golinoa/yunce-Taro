@@ -1,13 +1,13 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
-import type { CardDetailType } from '@/types/data-center';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
+import type { CardDetailType } from '@/types/data-center';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 

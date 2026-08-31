@@ -73,7 +73,10 @@ export function getStudentCardStatus(
   // 没有任何可用课包/会员卡 → 红
   if (usable.length === 0) {
     if (packages.length === 0) return 'expired';
-    if (packages.some((p) => p.status === 'expired') || packages.every((p) => p.remaining_hours <= 0)) {
+    if (
+      packages.some((p) => p.status === 'expired') ||
+      packages.every((p) => p.remaining_hours <= 0)
+    ) {
       return 'expired';
     }
     return 'expired';

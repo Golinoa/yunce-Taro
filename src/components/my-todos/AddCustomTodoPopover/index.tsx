@@ -9,6 +9,7 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DatePickerSheet from '@/components/DatePickerSheet';
+import AddTodoCategorySheet from '@/components/my-todos/AddTodoCategorySheet';
 import {
   CustomTodoCategoryHeader,
   CustomTodoTitleNoteFields,
@@ -19,25 +20,24 @@ import {
   POPOVER_MASK_STYLE,
   POPOVER_PANEL_STYLE,
 } from '@/components/my-todos/custom-todo-popover-shared';
-import AddTodoCategorySheet from '@/components/my-todos/AddTodoCategorySheet';
 import TimePickerSheet from '@/components/TimePickerSheet';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { subscribeMessageService } from '@/services';
 import { useTeacherStore } from '@/stores';
 import type { TodoCollaborationMode } from '@/types/home-todo';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
+import { logError } from '@/utils/logger';
+import {
+  TODO_CATEGORY_ALL_ID,
+  TODO_CATEGORY_INBOX_ID,
+  type TodoCategoryTab,
+} from '@/utils/todo-categories';
 import {
   openTodoCollaboratorAddPage,
   openTodoCollaboratorViewPage,
   mergeCollaboratorSummaries,
   type CollaboratorSummary,
 } from '@/utils/todo-collaborator-select';
-import {
-  TODO_CATEGORY_ALL_ID,
-  TODO_CATEGORY_INBOX_ID,
-  type TodoCategoryTab,
-} from '@/utils/todo-categories';
-import { subscribeMessageService } from '@/services';
-import { logError } from '@/utils/logger';
 
 export interface AddCustomTodoPopoverProps {
   visible: boolean;
@@ -81,7 +81,8 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
   const [quadrant, setQuadrant] = useState<TodoQuadrant>('q4');
   const [categoryId, setCategoryId] = useState(TODO_CATEGORY_INBOX_ID);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
-  const [collaborationMode, setCollaborationMode] = useState<TodoCollaborationMode>('collaborative');
+  const [collaborationMode, setCollaborationMode] =
+    useState<TodoCollaborationMode>('collaborative');
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);

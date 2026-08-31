@@ -18,9 +18,10 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import { APP_VERSION } from '@/constants/version';
+import { calendarSyncService } from '@/services/calendar-sync';
+import { campusService } from '@/services/campus';
 import { clearVisitedMap } from '@/services/onboarding';
 import { organizationService } from '@/services/organization';
-import { campusService } from '@/services/campus';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { getAlertThreshold, syncAlertThresholdFromCampus } from '@/utils/alert-config';
@@ -30,9 +31,6 @@ import {
   getCalendarSyncSettings,
   isCalendarSyncEnabled,
 } from '@/utils/calendar-sync-settings';
-import { useCardNavigationBar } from '@/utils/navigation-bar';
-import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
-import { calendarSyncService } from '@/services/calendar-sync';
 import {
   getDeveloperModeRemainingMs,
   handleVersionNumberTap,
@@ -42,6 +40,8 @@ import {
   verifyDeveloperModePassword,
 } from '@/utils/developer-mode';
 import { showInputModal } from '@/utils/modal';
+import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 
 /** 设置项配置 */
 interface SettingItem {

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetUnlockSequenceForTest,
   DEVELOPER_MODE_EXPIRES_AT_KEY,

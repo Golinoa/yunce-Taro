@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSession } from '@/services/auth';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
-import {
-  __resetConsumeSubscribeOnShowForTest,
-  consumeSubscribeOnShow,
-} from './subscribe-on-show';
+import { __resetConsumeSubscribeOnShowForTest, consumeSubscribeOnShow } from './subscribe-on-show';
 
 vi.mock('@/services/auth', () => ({
   getSession: vi.fn(),
@@ -103,8 +100,6 @@ describe('consumeSubscribeOnShow', () => {
 
     await consumeSubscribeOnShow();
 
-    expect(openSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ presetId: 'quota_reactivate' }),
-    );
+    expect(openSpy).toHaveBeenCalledWith(expect.objectContaining({ presetId: 'quota_reactivate' }));
   });
 });

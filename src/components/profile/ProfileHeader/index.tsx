@@ -10,7 +10,6 @@ import cn from 'classnames';
 import React from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
-
 import { BRAND_LOGO } from '@/constants/brand';
 
 export type ProfileHeaderVariant = 'default' | 'gradient';

@@ -24,8 +24,7 @@ export function buildInstallmentSchedule(totalAmount: number, count: number): Sc
   const total = Math.max(0, totalAmount);
   const safeCount = Math.max(1, count);
   const perPeriod = total > 0 ? Math.floor((total / safeCount) * 100) / 100 : 0;
-  const lastAmount =
-    total > 0 ? Math.round((total - perPeriod * (safeCount - 1)) * 100) / 100 : 0;
+  const lastAmount = total > 0 ? Math.round((total - perPeriod * (safeCount - 1)) * 100) / 100 : 0;
   const base = dayjs().startOf('day');
   const items: ScheduleItem[] = [];
   for (let i = 0; i < safeCount; i += 1) {

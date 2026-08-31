@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/utils/request', () => ({
   post: vi.fn(),

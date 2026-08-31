@@ -12,8 +12,8 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useState } from 'react';
-import Icon from '@/components/Icon';
 import Dialog from '@/components/Dialog';
+import Icon from '@/components/Icon';
 import { useThemeStore } from '@/stores/theme';
 
 const CUSTOMER_WECHAT = 'by3737337';

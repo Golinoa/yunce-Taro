@@ -3,6 +3,7 @@
  * 所有认证相关请求统一通过此处，真实 API 联调时只改此处即可
  */
 import Taro from '@tarojs/taro';
+import { resolveDevLoginEmail } from '@/constants/dev-switch-accounts';
 import type {
   AuthSession,
   Profile,
@@ -13,7 +14,6 @@ import type {
   TeacherRoleInfo,
 } from '@/types/profile';
 import { isDevApiEnv } from '@/utils/build-env';
-import { resolveDevLoginEmail } from '@/constants/dev-switch-accounts';
 import { get, post, put } from '@/utils/request';
 
 export interface TestAccount {
@@ -426,7 +426,7 @@ export async function login(username: string, password: string): Promise<LoginRe
 }
 
 export async function wechatLogin(code: string): Promise<LoginResult> {
-    try {
+  try {
     const data = await post<BackendAuthPayload>(
       AUTH_ENDPOINTS.wechatLogin,
       { code },
@@ -459,7 +459,7 @@ export async function sendBindEmailCode(email: string): Promise<{
   if (!EMAIL_PATTERN.test(trimmed)) {
     return { error: { message: '请输入正确的邮箱' } };
   }
-    try {
+  try {
     await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'BIND' });
     return { error: null, maskedEmail: maskEmailAddress(trimmed) };
   } catch (error) {
@@ -476,7 +476,7 @@ export async function bindAccountEmail(payload: {
   code: string;
   password: string;
 }): Promise<LoginResult> {
-    try {
+  try {
     const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatBind, {
       email: payload.email.trim().toLowerCase(),
       code: payload.code.trim(),
@@ -501,7 +501,7 @@ export async function bindWechatCredentials(payload: {
   phone: string;
   password: string;
 }): Promise<LoginResult> {
-    try {
+  try {
     const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatBind, {
       phone: payload.phone.trim(),
       password: payload.password,
@@ -518,7 +518,7 @@ export async function bindWechatCredentials(payload: {
 }
 
 export async function sendSmsCode(phone: string): Promise<{ error: { message: string } | null }> {
-    try {
+  try {
     await post(AUTH_ENDPOINTS.smsCode, { phone }, { skipAuth: true });
     return { error: null };
   } catch (error) {
@@ -527,7 +527,7 @@ export async function sendSmsCode(phone: string): Promise<{ error: { message: st
 }
 
 export async function phoneLogin(phone: string, code: string): Promise<LoginResult> {
-    try {
+  try {
     const data = await post<BackendAuthPayload>(
       AUTH_ENDPOINTS.phoneLogin,
       { phone, code },
@@ -545,7 +545,7 @@ export async function phoneLogin(phone: string, code: string): Promise<LoginResu
 }
 
 export async function checkLoginAccount(account: string): Promise<LoginAccountCheckResult> {
-    return {
+  return {
     exists: false,
     account: account.trim(),
     hasBoundEmail: false,
@@ -557,7 +557,6 @@ export async function prepareEmailLogin(
   identifier: string,
   mode: 'account' | 'email',
 ): Promise<EmailLoginPrepareResult> {
-  
   const trimmed = identifier.trim();
   if (mode !== 'email') {
     return {
@@ -573,11 +572,7 @@ export async function prepareEmailLogin(
   }
 
   try {
-    await post(
-      AUTH_ENDPOINTS.emailCode,
-      { email: trimmed, purpose: 'LOGIN' },
-      { skipAuth: true },
-    );
+    await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'LOGIN' }, { skipAuth: true });
     return {
       status: 'ready',
       email: trimmed,
@@ -593,7 +588,6 @@ export async function prepareEmailLogin(
 }
 
 export async function loginByEmailCode(email: string, code: string): Promise<LoginResult> {
-  
   try {
     const data = await post<BackendAuthPayload>(
       AUTH_ENDPOINTS.emailLogin,
@@ -616,25 +610,26 @@ export async function loginByEmailCode(email: string, code: string): Promise<Log
   }
 }
 
-export async function prepareAccountRecovery(email: string): Promise<AccountRecoveryPrepareResult> {
-    return {
+export async function prepareAccountRecovery(
+  _email: string,
+): Promise<AccountRecoveryPrepareResult> {
+  return {
     status: 'email_not_found',
     error: { message: '账号找回服务暂未接通，请稍后再试' },
   };
 }
 
 export async function recoverAccountByEmailCode(
-  email: string,
-  code: string,
+  _email: string,
+  _code: string,
 ): Promise<AccountRecoveryResult> {
-    return {
+  return {
     account: null,
     error: { message: '账号找回服务暂未接通，请稍后再试' },
   };
 }
 
 export async function preparePasswordReset(account: string): Promise<PasswordResetPrepareResult> {
-  
   const trimmed = account.trim();
   // 生产端按邮箱发码（purpose=RESET）；账号体系未接通时要求直接填邮箱
   if (!EMAIL_PATTERN.test(trimmed)) {
@@ -645,11 +640,7 @@ export async function preparePasswordReset(account: string): Promise<PasswordRes
   }
 
   try {
-    await post(
-      AUTH_ENDPOINTS.emailCode,
-      { email: trimmed, purpose: 'RESET' },
-      { skipAuth: true },
-    );
+    await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'RESET' }, { skipAuth: true });
     return {
       status: 'ready',
       account: trimmed,
@@ -670,7 +661,6 @@ export async function resetPasswordByEmailCode(
   code: string,
   newPassword: string,
 ): Promise<{ error: { message: string } | null }> {
-  
   const email = account.trim();
   if (!EMAIL_PATTERN.test(email)) {
     return { error: { message: '请输入正确的邮箱地址' } };
@@ -698,24 +688,23 @@ export interface RegisterStep1Result {
 }
 
 export async function registerStep1(
-  username: string,
-  password: string,
-  inviteCode?: string,
+  _username: string,
+  _password: string,
+  _inviteCode?: string,
 ): Promise<RegisterStep1Result> {
-    return { tempToken: null, error: { message: '请使用邮箱注册' } };
+  return { tempToken: null, error: { message: '请使用邮箱注册' } };
 }
 
 /** 邮箱注册 Step1：校验邮箱格式并写入本地草稿（角色在后续步骤选择） */
 export async function registerStep1ByEmail(
   email: string,
-  password = '',
+  _password = '',
 ): Promise<RegisterStep1Result> {
   const normalized = email.trim();
   if (!EMAIL_PATTERN.test(normalized)) {
     return { tempToken: null, error: { message: '请输入正确的邮箱地址' } };
   }
 
-  
   return {
     tempToken: `email-register:${normalized}`,
     error: null,
@@ -724,14 +713,13 @@ export async function registerStep1ByEmail(
 
 export async function registerStep1ByPhone(
   phone: string,
-  password: string,
+  _password: string,
 ): Promise<RegisterStep1Result> {
   const normalized = phone.trim();
   if (!/^1[3-9]\d{9}$/.test(normalized)) {
     return { tempToken: null, error: { message: '请输入正确的手机号' } };
   }
 
-  
   return {
     tempToken: null,
     error: { message: '请使用邮箱注册' },
@@ -742,7 +730,7 @@ export async function registerStep2(
   tempToken: string,
   role: UserRole,
 ): Promise<RegisterStep1Result> {
-    if (!tempToken) {
+  if (!tempToken) {
     return { tempToken: null, error: { message: '注册已过期，请重新填写' } };
   }
   if (!['teacher', 'principal', 'parent'].includes(role)) {
@@ -755,7 +743,6 @@ export async function registerStep3(
   tempToken: string,
   roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo,
 ): Promise<LoginResult> {
-  
   const draft = readClientRegisterDraft();
   const email =
     draft?.email?.trim() ||
@@ -778,8 +765,7 @@ export async function registerStep3(
 
   try {
     const backendRole = mapUserRoleToBackend(draft.role);
-    const principalInfo =
-      draft.role === 'principal' ? (roleInfo as PrincipalRoleInfo) : undefined;
+    const principalInfo = draft.role === 'principal' ? (roleInfo as PrincipalRoleInfo) : undefined;
     const body: Record<string, unknown> = {
       email,
       role: backendRole,
@@ -806,16 +792,16 @@ export async function registerStep3(
 // 验证码/邀请码验证
 // ============================================
 
-export async function verifyCampusCode(code: string) {
-    return { valid: false };
+export async function verifyCampusCode(_code: string) {
+  return { valid: false };
 }
 
-export async function verifyStudentCode(code: string) {
-    return { valid: false };
+export async function verifyStudentCode(_code: string) {
+  return { valid: false };
 }
 
 export async function validateInviteCode(code: string) {
-    try {
+  try {
     const data = await get<{ valid: boolean; student?: { id: string; name: string } }>(
       `/auth/invite-code/${encodeURIComponent(code)}/validate`,
       undefined,
@@ -840,7 +826,7 @@ export async function getSession(): Promise<{
   session: AuthSession | null;
   profile: Profile | null;
 }> {
-    try {
+  try {
     const storedSession = readStoredSession();
     if (!storedSession) {
       return { session: null, profile: null };
@@ -875,11 +861,11 @@ export async function getSession(): Promise<{
   }
 }
 
-export async function switchIdentity(identityId: string): Promise<{
+export async function switchIdentity(_identityId: string): Promise<{
   profile: Profile | null;
   error: { message: string } | null;
 }> {
-    return { profile: null, error: { message: '真实后端联调阶段暂未开放多身份切换' } };
+  return { profile: null, error: { message: '真实后端联调阶段暂未开放多身份切换' } };
 }
 
 /**
@@ -896,7 +882,7 @@ export async function updateProfile(
     address?: string;
   },
 ): Promise<{ profile: Profile | null; error: { message: string } | null }> {
-    try {
+  try {
     const updated = await put<BackendUserInfo>(
       AUTH_ENDPOINTS.profile,
       patch as Record<string, unknown>,
@@ -912,14 +898,14 @@ export async function updateProfile(
 }
 
 /** 获取用户扩展资料（性别/生日等） */
-export async function getProfileExtra(userId: string): Promise<{
+export async function getProfileExtra(_userId: string): Promise<{
   gender?: 'male' | 'female' | 'other';
   birthday?: string;
   id_card?: string;
   region?: string;
   address?: string;
 }> {
-    // 真实接口暂未独立暴露，从 profile 中按需取
+  // 真实接口暂未独立暴露，从 profile 中按需取
   try {
     const data = await get<{
       gender?: string;
@@ -943,10 +929,10 @@ export async function getProfileExtra(userId: string): Promise<{
 }
 
 export async function addIdentity(
-  role: UserRole,
-  roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo,
+  _role: UserRole,
+  _roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo,
 ): Promise<{ profile: Profile | null; error: { message: string } | null }> {
-    return { profile: null, error: { message: '真实后端联调阶段暂未开放新增身份' } };
+  return { profile: null, error: { message: '真实后端联调阶段暂未开放新增身份' } };
 }
 
 export function restoreRegisterDrafts(): void {
@@ -954,7 +940,7 @@ export function restoreRegisterDrafts(): void {
 }
 
 export async function logout(): Promise<void> {
-    const storedSession = readStoredSession();
+  const storedSession = readStoredSession();
   try {
     await post(
       AUTH_ENDPOINTS.logout,

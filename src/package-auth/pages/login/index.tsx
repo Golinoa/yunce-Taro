@@ -10,8 +10,8 @@ import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
 import { authCapabilities, prepareEmailLogin } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
-import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useAuth } from '@/utils/auth';
+import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -173,14 +173,7 @@ const Login: React.FC = () => {
     }
     if (!ensureAgreement('email')) return;
     void executeEmailLogin();
-  }, [
-    code,
-    email,
-    emailSubmitting,
-    ensureAgreement,
-    executeEmailLogin,
-    wechatSubmitting,
-  ]);
+  }, [code, email, emailSubmitting, ensureAgreement, executeEmailLogin, wechatSubmitting]);
 
   const handleWechatLogin = useCallback(() => {
     if (wechatSubmitting || emailSubmitting) return;

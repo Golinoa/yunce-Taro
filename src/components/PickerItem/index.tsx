@@ -78,9 +78,7 @@ const PickerItem: React.FC<PickerItemProps> = ({
   // 渲染左侧图标（学员头像统一走 StudentAvatar，与意向学员卡片一致）
   const renderIcon = () => {
     if (iconType === 'avatar') {
-      return (
-        <StudentAvatar name={avatarChar || title} src={avatarUrl} size="md" />
-      );
+      return <StudentAvatar name={avatarChar || title} src={avatarUrl} size="md" />;
     }
     // icon 模式
     return (

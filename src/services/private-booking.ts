@@ -1,7 +1,7 @@
 /**
  * 家长私教自约 Service — 对齐后端 /private-bookings
  */
-import { del, get, post } from '@/utils/request';
+import { get, post } from '@/utils/request';
 
 export interface PrivateBookingItem {
   id: string;
@@ -29,7 +29,7 @@ export const privateBookingService = {
     teacherName?: string;
     campusId?: string;
   }): Promise<PrivateBookingItem> => {
-        return post<PrivateBookingItem>('/private-bookings', payload);
+    return post<PrivateBookingItem>('/private-bookings', payload);
   },
 
   listMine: async (): Promise<PrivateBookingItem[]> => {
@@ -38,6 +38,6 @@ export const privateBookingService = {
   },
 
   cancel: async (id: string): Promise<PrivateBookingItem> => {
-        return post<PrivateBookingItem>(`/private-bookings/${id}/cancel`);
+    return post<PrivateBookingItem>(`/private-bookings/${id}/cancel`);
   },
 };

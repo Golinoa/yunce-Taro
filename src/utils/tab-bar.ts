@@ -15,11 +15,7 @@ export function isFinanceTabRole(role?: UserRole | null): boolean {
 export interface CustomTabBarBridge {
   setSelectedByPath?: (pagePath: string) => void;
   refreshByRole?: (role?: UserRole | null) => void;
-  setColors?: (colors: {
-    color: string;
-    selectedColor: string;
-    backgroundColor: string;
-  }) => void;
+  setColors?: (colors: { color: string; selectedColor: string; backgroundColor: string }) => void;
 }
 
 function getCurrentPagePath(): string {

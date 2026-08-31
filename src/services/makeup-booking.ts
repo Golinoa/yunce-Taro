@@ -22,7 +22,6 @@ export async function createMakeupBooking(params: {
   note?: string;
   createdBy: string;
 }): Promise<MakeupBooking> {
-  
   // 真实联调阶段：本地暂存，点名页可读；后端表就绪后改走 API
   const booking: MakeupBooking = {
     id: `makeup-local-${Date.now()}`,
@@ -60,7 +59,7 @@ export async function getMakeupBookingsByClassDate(params: {
   classId: string;
   lessonDate: string;
 }): Promise<MakeupBooking[]> {
-    try {
+  try {
     const raw = Taro.getStorageSync(storageKey(params.classId, params.lessonDate));
     const list: MakeupBooking[] = raw ? JSON.parse(String(raw)) : [];
     return list.filter((b) => b.status === 'confirmed');

@@ -8,7 +8,6 @@ import { ScrollView, View, Text, InputProps } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import Card from '@/components/Card';
 import CategoryMultiSheet from '@/components/course/CategoryMultiSheet';
 import FormInput from '@/components/FormInput';
@@ -26,6 +25,7 @@ import {
   COMMISSION_OPTIONS,
   WEEKDAY_OPTIONS,
 } from '@/constants/card-type-ui';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
 import { cardTypeService } from '@/services/card-type';
 import { useCourseCategoryStore } from '@/stores/course-category';

@@ -50,10 +50,18 @@ const CompleteTodoSheet: React.FC<CompleteTodoSheetProps> = ({
   }, [note, onClose, onSubmit, requireNote]);
 
   return (
-    <BottomSheet visible={visible} title="完成待办" onClose={onClose} height="auto" scrollable={false}>
+    <BottomSheet
+      visible={visible}
+      title="完成待办"
+      onClose={onClose}
+      height="auto"
+      scrollable={false}
+    >
       <View className="px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))]">
         {item && (
-          <Text className="text-[28rpx] text-foreground font-medium block mb-[16rpx]">{item.title}</Text>
+          <Text className="text-[28rpx] text-foreground font-medium block mb-[16rpx]">
+            {item.title}
+          </Text>
         )}
         <Text className="text-[24rpx] text-muted-foreground block mb-[12rpx]">
           {requireNote ? '处理备注（必填，同步给管理员/校长）' : '处理备注（选填）'}
@@ -69,7 +77,9 @@ const CompleteTodoSheet: React.FC<CompleteTodoSheetProps> = ({
           className="mt-[24rpx] rounded-full bg-primary py-[22rpx] center press-scale"
           onClick={submitting ? undefined : handleSubmit}
         >
-          <Text className="text-[28rpx] font-medium text-white">{submitting ? '提交中…' : '确认完成'}</Text>
+          <Text className="text-[28rpx] font-medium text-white">
+            {submitting ? '提交中…' : '确认完成'}
+          </Text>
         </View>
       </View>
     </BottomSheet>

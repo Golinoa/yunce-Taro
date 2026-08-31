@@ -1,5 +1,5 @@
 /**
- * QrCanvas - 小程�?Canvas 二维码（前端自生成）
+ * QrCanvas - 小程�?Canvas 二维码（前端自生成）
  */
 import { Canvas, View } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -8,16 +8,21 @@ import React, { useCallback, useEffect, useId, useState } from 'react';
 import UQRCode from 'uqrcodejs';
 
 export interface QrCanvasProps {
-  /** 二维码编码内�?*/
+  /** 二维码编码内�?*/
   value: string;
-  /** 边长（px�?*/
+  /** 边长（px�?*/
   size?: number;
-  /** 指定 canvasId（用于导出图片，需唯一�?*/
+  /** 指定 canvasId（用于导出图片，需唯一�?*/
   canvasId?: string;
   className?: string;
 }
 
-const QrCanvas: React.FC<QrCanvasProps> = ({ value, size = 200, canvasId: canvasIdProp, className }) => {
+const QrCanvas: React.FC<QrCanvasProps> = ({
+  value,
+  size = 200,
+  canvasId: canvasIdProp,
+  className,
+}) => {
   const reactId = useId();
   const canvasId = canvasIdProp || `qr-${reactId.replace(/:/g, '')}`;
   const [ready, setReady] = useState(false);
@@ -57,7 +62,7 @@ const QrCanvas: React.FC<QrCanvasProps> = ({ value, size = 200, canvasId: canvas
           className="absolute inset-0 center bg-muted rounded-[16rpx]"
           style={{ width: size, height: size }}
         >
-          <View className="text-[24rpx] text-muted-foreground">生成�?..</View>
+          <View className="text-[24rpx] text-muted-foreground">生成�?..</View>
         </View>
       )}
     </View>

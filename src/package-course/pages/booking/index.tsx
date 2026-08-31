@@ -21,10 +21,7 @@ import { leadService, myBookingService, venueBookingService } from '@/services';
 import type { MyBookingCard, MyBookingStatus } from '@/types/my-booking';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
-import {
-  canAccessMyBookings,
-  resolveMyBookingActions,
-} from '@/utils/related-booking-scope';
+import { canAccessMyBookings, resolveMyBookingActions } from '@/utils/related-booking-scope';
 import { withRouteGuard } from '@/utils/route-guard';
 
 type StatusTab = 'all' | MyBookingStatus;
@@ -55,10 +52,7 @@ function MyBookingCardView({
 
   return (
     <View className="rounded-[24rpx] bg-card px-[28rpx] py-[24rpx] shadow-soft">
-      <View
-        className="flex items-start gap-[16rpx] active:opacity-90"
-        onClick={() => onOpen(item)}
-      >
+      <View className="flex items-start gap-[16rpx] active:opacity-90" onClick={() => onOpen(item)}>
         <Avatar name={item.title || '约'} size="md" fallback="initial" />
         <View className="min-w-0 flex-1">
           <View className="flex items-center justify-between gap-[12rpx]">
@@ -66,7 +60,9 @@ function MyBookingCardView({
               <Text className="truncate text-[30rpx] font-semibold text-foreground">
                 {item.title}
               </Text>
-              <View className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', statusMeta.className)}>
+              <View
+                className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', statusMeta.className)}
+              >
                 <Text className="text-[22rpx] font-bold">{statusMeta.label}</Text>
               </View>
             </View>

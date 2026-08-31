@@ -99,8 +99,14 @@ function SelectValue({ value, placeholder }: { value?: string; placeholder: stri
 const ProfileEdit: React.FC = () => {
   useCardNavigationBar();
 
-  const { profile, getProfileExtra: fetchExtra, updateProfile: submitUpdate, signOut, bindAccountEmail, sendBindEmailCode } =
-    useAuth();
+  const {
+    profile,
+    getProfileExtra: fetchExtra,
+    updateProfile: submitUpdate,
+    signOut,
+    bindAccountEmail,
+    sendBindEmailCode,
+  } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
   const [showBindEmail, setShowBindEmail] = useState(false);
@@ -323,8 +329,6 @@ const ProfileEdit: React.FC = () => {
     birthday: '',
     avatar_url: '',
   });
-  const [adding, setAdding] = useState(false);
-  /** 统一弹窗选择器（PickerSheet 标准组件）：gender/relation/childGender */
   const [selector, setSelector] = useState<{
     visible: boolean;
     type: 'gender' | 'relation' | 'childGender' | null;
@@ -332,50 +336,6 @@ const ProfileEdit: React.FC = () => {
   const [datePickerTarget, setDatePickerTarget] = useState<'birthday' | 'childBirthday' | null>(
     null,
   );
-
-  /** 子女头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与个人头像一致） */
-  const handleChildAvatarPick = useCallback(async () => {
-    try {
-      const tempPath = await chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' });
-      // 替换图片：删掉旧的本地临时文件，避免本地存储累积
-      if (isTempImagePath(childForm.avatar_url)) deleteTempImage(childForm.avatar_url);
-      setChildForm((prev) => ({ ...prev, avatar_url: tempPath }));
-    } catch (err) {
-      if (isImageCancelError(err)) return;
-      const message = err instanceof Error ? err.message : '选择图片失败';
-      if (message.includes('超过') || message.includes('限制')) {
-        void Taro.showModal({
-          title: '图片过大',
-          content: message,
-          showCancel: false,
-          confirmText: '知道了',
-        });
-      } else {
-        Taro.showToast({ title: message, icon: 'none' });
-      }
-    }
-  }, [childForm.avatar_url]);
-
-  /** 子女头像点击：未选→直接选相册；已选→弹「查看图片/重新选择/删除头像」 */
-  const handleChildAvatarClick = useCallback(() => {
-    if (!childForm.avatar_url) {
-      void handleChildAvatarPick();
-      return;
-    }
-    void Taro.showActionSheet({
-      itemList: ['查看图片', '重新选择', '删除头像'],
-      success: (res) => {
-        if (res.tapIndex === 0) {
-          void Taro.previewImage({ current: childForm.avatar_url, urls: [childForm.avatar_url] });
-        } else if (res.tapIndex === 1) {
-          void handleChildAvatarPick();
-        } else if (res.tapIndex === 2) {
-          if (isTempImagePath(childForm.avatar_url)) deleteTempImage(childForm.avatar_url);
-          setChildForm((prev) => ({ ...prev, avatar_url: '' }));
-        }
-      },
-    });
-  }, [childForm.avatar_url, handleChildAvatarPick]);
 
   const resetChildForm = useCallback(() => {
     setChildForm({

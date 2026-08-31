@@ -308,7 +308,9 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                     <Icon name="mdi-plus" size={36} className="text-primary" />
                   </View>
                   <Text className="text-[28rpx] font-medium text-foreground">选择已有学员</Text>
-                  <Text className="text-[24rpx] text-muted-foreground">点击从学员库中选择来补课</Text>
+                  <Text className="text-[24rpx] text-muted-foreground">
+                    点击从学员库中选择来补课
+                  </Text>
                 </View>
               ) : (
                 <View className="flex flex-col gap-3">
@@ -318,8 +320,9 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                     avatarChar={selectedStudent.name?.[0]}
                     title={selectedStudent.name}
                     subtitle={
-                      [selectedStudent.phone, selectedStudent.nickname].filter(Boolean).join(' · ') ||
-                      '正式学员'
+                      [selectedStudent.phone, selectedStudent.nickname]
+                        .filter(Boolean)
+                        .join(' · ') || '正式学员'
                     }
                     selected
                     right={{
@@ -353,11 +356,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                     avatarChar={selectedLead.child_name[0]}
                     title={selectedLead.child_name}
                     subtitle={
-                      [
-                        selectedLead.parent_name,
-                        selectedLead.parent_phone,
-                        selectedLead.child_age,
-                      ]
+                      [selectedLead.parent_name, selectedLead.parent_phone, selectedLead.child_age]
                         .filter(Boolean)
                         .join(' · ') || '暂无更多资料'
                     }
@@ -523,8 +522,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           ) : (
             filteredStudents.map((stu) => {
               const isSelected = selectedStudent?.id === stu.id;
-              const subtitle =
-                [stu.phone, stu.nickname].filter(Boolean).join(' · ') || '正式学员';
+              const subtitle = [stu.phone, stu.nickname].filter(Boolean).join(' · ') || '正式学员';
               return (
                 <View
                   key={stu.id}

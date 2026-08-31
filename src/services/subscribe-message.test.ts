@@ -1,23 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('@/utils/invite-parent-link', () => ({
-  copyParentInviteLink: vi.fn().mockResolvedValue(undefined),
-}));
-
 import Taro from '@tarojs/taro';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MOCK_TMPL_IDS } from '@/constants/subscribe-presets';
+import { getSession } from '@/services/auth';
 import {
   __resetSubscribeServiceForTest,
   subscribeMessageService,
 } from '@/services/subscribe-message';
+import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
+import type { SubscribeBootstrapDto, SubscribeTemplateGroup } from '@/types/subscribe-message';
+import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import {
   __resetSubscribeClassViewForTest,
   canRunClassViewRenew,
   markClassAssignPromptConsumed,
 } from '@/utils/subscribe-class-view';
-import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
-import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { requestSubscribeMessageAuth } from '@/utils/subscribe-message';
-import type { SubscribeBootstrapDto, SubscribeTemplateGroup } from '@/types/subscribe-message';
+
+vi.mock('@/utils/invite-parent-link', () => ({
+  copyParentInviteLink: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/services/auth', () => ({
   getSession: vi.fn(),
@@ -46,32 +47,35 @@ function mockBootstrap(remain = 0): SubscribeBootstrapDto {
       tmplId: MOCK_TMPL_IDS[group],
       remain,
       lowThreshold: 1,
+      notifyEnabled: true,
     })),
     pendingPrompts: [],
     lowQuotaGroups: [],
   };
 }
 
-const getMock = vi.fn(async () => mockBootstrap(0));
-const postMock = vi.fn(async (_url: string, body?: { items?: Array<{ group: string; status: string }> }) => {
-  const boot = mockBootstrap(0);
-  const accepted = new Set((body?.items || []).filter((i) => i.status === 'accept').map((i) => i.group));
-  return {
-    quotas: boot.quotas.map((q) => ({
-      ...q,
-      remain: accepted.has(q.group) ? q.remain + 1 : q.remain,
-    })),
-  };
-});
+const getMock = vi.fn(async (..._args: unknown[]) => mockBootstrap(0));
+const postMock = vi.fn(
+  async (_url: string, body?: { items?: Array<{ group: string; status: string }> }) => {
+    const boot = mockBootstrap(0);
+    const accepted = new Set(
+      (body?.items || []).filter((i) => i.status === 'accept').map((i) => i.group),
+    );
+    return {
+      quotas: boot.quotas.map((q) => ({
+        ...q,
+        remain: accepted.has(q.group) ? q.remain + 1 : q.remain,
+      })),
+    };
+  },
+);
 
 vi.mock('@/utils/request', () => ({
   get: (...args: unknown[]) => getMock(...args),
-  post: (...args: unknown[]) => postMock(...(args as [string, unknown?])),
+  post: (...args: [string, { items?: { group: string; status: string }[] }?]) => postMock(...args),
   put: vi.fn(),
   del: vi.fn(),
 }));
-
-import { getSession } from '@/services/auth';
 
 const USER = 'service-test-user';
 

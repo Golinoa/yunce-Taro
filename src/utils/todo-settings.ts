@@ -79,9 +79,7 @@ export function getTodoShowTabBadge(): boolean {
 }
 
 /** 按用户开关过滤待办列表 */
-export function filterTodosBySettings<T extends { category?: TodoItemCategory }>(
-  items: T[],
-): T[] {
+export function filterTodosBySettings<T extends { category?: TodoItemCategory }>(items: T[]): T[] {
   const settings = getTodoSettings();
   return items.filter((item) => {
     if (item.category === 'custom') return true;

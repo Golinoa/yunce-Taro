@@ -19,7 +19,6 @@ import type {
   IncomeCategoryType,
   TransactionRecordType,
 } from '@/types/data-center';
-
 import { get, post } from '@/utils/request';
 
 // ============================================
@@ -200,14 +199,16 @@ export const dataCenterService = {
   // ---------- 场馆概览 ----------
   /** 获取场馆经营概览 */
   getVenueOverview: (params?: DataCenterScopeParams): Promise<VenueOverviewType> =>
-    get<BackendVenueOverviewResponse>(appendCampusQuery('/data-center/venue-overview', params?.campusId)),
+    get<BackendVenueOverviewResponse>(
+      appendCampusQuery('/data-center/venue-overview', params?.campusId),
+    ),
 
   // ---------- 营收趋势 ----------
   /** 获取营收趋势 */
   getRevenueTrend: (params: RevenueTrendQueryParams): Promise<RevenueTrendType> =>
     get<BackendRevenueTrendResponse>(
-          appendCampusQuery(`/data-center/revenue-trend?period=${params.period}`, params.campusId),
-        ),
+      appendCampusQuery(`/data-center/revenue-trend?period=${params.period}`, params.campusId),
+    ),
 
   // ---------- 财务数据 ----------
   /** 获取财务数据卡片 */
@@ -217,11 +218,11 @@ export const dataCenterService = {
   /** 获取财务详情 */
   getFinanceDetail: (params: FinanceDetailQueryParams): Promise<FinanceDetailType> =>
     get<FinanceDetailType>(
-          appendCampusQuery(
-            `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
-            params.campusId,
-          ),
-        ),
+      appendCampusQuery(
+        `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
+        params.campusId,
+      ),
+    ),
 
   // ---------- 会员数据 ----------
   /** 获取会员数据卡片 */
@@ -231,11 +232,11 @@ export const dataCenterService = {
   /** 获取会员详情 */
   getMemberDetail: (params: MemberDetailQueryParams): Promise<MemberDetailType> =>
     get<MemberDetailType>(
-          appendCampusQuery(
-            `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-            params.campusId,
-          ),
-        ),
+      appendCampusQuery(
+        `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
+        params.campusId,
+      ),
+    ),
 
   // ---------- 卡项数据 ----------
   /** 获取卡项数据卡片 */
@@ -245,11 +246,11 @@ export const dataCenterService = {
   /** 获取卡项详情 */
   getCardDetail: (params: CardDetailQueryParams): Promise<CardDetailType> =>
     get<CardDetailType>(
-          appendCampusQuery(
-            `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-            params.campusId,
-          ),
-        ),
+      appendCampusQuery(
+        `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
+        params.campusId,
+      ),
+    ),
 
   // ---------- 薪资数据 ----------
   /** 获取薪资数据卡片 */
@@ -259,11 +260,11 @@ export const dataCenterService = {
   /** 获取薪资详情 */
   getSalaryDetail: (params: SalaryDetailQueryParams): Promise<SalaryDetailType> =>
     get<SalaryDetailType>(
-          appendCampusQuery(
-            `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-            params.campusId,
-          ),
-        ),
+      appendCampusQuery(
+        `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
+        params.campusId,
+      ),
+    ),
 
   // ---------- 记一�?----------
   /** 获取支出分类列表 */
@@ -280,16 +281,16 @@ export const dataCenterService = {
     name: string;
   }): Promise<ExpenseCategoryType | IncomeCategoryType> =>
     post<ExpenseCategoryType | IncomeCategoryType>(
-          '/data-center/categories',
-          input as unknown as Record<string, unknown>,
-        ),
+      '/data-center/categories',
+      input as unknown as Record<string, unknown>,
+    ),
 
   /** 创建交易记录（记一笔） */
   createTransaction: (data: CreateTransactionParams): Promise<{ success: boolean }> =>
     post<{ success: boolean }>(
-          '/data-center/transaction',
-          data as unknown as Record<string, unknown>,
-        ),
+      '/data-center/transaction',
+      data as unknown as Record<string, unknown>,
+    ),
 
   // ---------- 同步 Fallback ----------
   getVenueOverviewFallback,

@@ -7,8 +7,8 @@ import type {
   LeadFollowUp,
   LeadSummary,
   TrialSlotConfig,
+  TrialCourseSlot,
 } from '@/types/lead';
-import type { TrialCourseSlot } from '@/types/lead';
 import { formatApiDate, formatApiDateTime } from '@/utils/pagination';
 
 type RawRecord = Record<string, unknown>;
@@ -43,7 +43,9 @@ export function mapBackendLead(raw: RawRecord): Lead {
     source_course_id: str(raw.source_course_id ?? raw.sourceCourseId),
     booking_course_id: str(raw.booking_course_id ?? raw.bookingCourseId),
     source_channel: str(raw.source_channel ?? raw.sourceChannel),
-    owner_lock_status: (raw.owner_lock_status ?? raw.ownerLockStatus ?? 'weak') as Lead['owner_lock_status'],
+    owner_lock_status: (raw.owner_lock_status ??
+      raw.ownerLockStatus ??
+      'weak') as Lead['owner_lock_status'],
     owner_lock_reason: raw.owner_lock_reason as Lead['owner_lock_reason'],
     reassign_reason: str(raw.reassign_reason ?? raw.reassignReason),
     status: (raw.status ?? 'new') as Lead['status'],
@@ -118,7 +120,9 @@ export function mapBackendLeadConversion(raw: RawRecord): LeadConversion {
   return {
     id: String(raw.id ?? ''),
     lead_id: String(raw.lead_id ?? raw.leadId ?? ''),
-    conversion_type: (raw.conversion_type ?? raw.conversionType ?? 'new_student') as LeadConversion['conversion_type'],
+    conversion_type: (raw.conversion_type ??
+      raw.conversionType ??
+      'new_student') as LeadConversion['conversion_type'],
     student_id: String(raw.student_id ?? raw.studentId ?? ''),
     merge_to_student_id: str(raw.merge_to_student_id ?? raw.mergeToStudentId),
     operator_id: String(raw.operator_id ?? raw.operatorId ?? ''),
@@ -165,10 +169,7 @@ export function mapBackendLeadSummary(raw: RawRecord): LeadSummary {
   };
 }
 
-export function mapBackendLeadCard(
-  raw: RawRecord,
-  viewerTeacherId?: string,
-): LeadCardModel {
+export function mapBackendLeadCard(raw: RawRecord, viewerTeacherId?: string): LeadCardModel {
   const ownerTeacherId = str(raw.owner_teacher_id ?? raw.ownerTeacherId);
   return {
     id: String(raw.id ?? ''),
@@ -183,7 +184,9 @@ export function mapBackendLeadCard(
     booking_course_name: str(raw.booking_course_name ?? raw.bookingCourseName),
     owner_teacher_name:
       ownerTeacherId && viewerTeacherId && ownerTeacherId === viewerTeacherId ? '我' : undefined,
-    owner_lock_status: (raw.owner_lock_status ?? raw.ownerLockStatus ?? 'weak') as LeadCardModel['owner_lock_status'],
+    owner_lock_status: (raw.owner_lock_status ??
+      raw.ownerLockStatus ??
+      'weak') as LeadCardModel['owner_lock_status'],
     latest_follow_up_at: str(raw.latest_follow_up_at ?? raw.latestFollowUpAt),
     next_follow_up_at: str(raw.next_follow_up_at ?? raw.nextFollowUpAt),
     created_at: formatApiDateTime(raw.created_at ?? raw.createdAt),

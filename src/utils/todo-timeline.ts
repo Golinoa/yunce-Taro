@@ -46,11 +46,7 @@ export function resolveSystemTodoTimelineAt(
 ): Dayjs {
   const pushed = dayjs(pushedAt);
   const anchorDay = displayDay || resolveSystemTodoDisplayDay(pushedAt, completedAt, now);
-  return dayjs(anchorDay)
-    .hour(pushed.hour())
-    .minute(pushed.minute())
-    .second(0)
-    .millisecond(0);
+  return dayjs(anchorDay).hour(pushed.hour()).minute(pushed.minute()).second(0).millisecond(0);
 }
 
 /**
@@ -95,11 +91,7 @@ export function isSystemTodoVisibleOnDate(
 }
 
 /** 首页时间轴 / 日历：指定日期是否展示该待办 */
-export function isTodoVisibleOnDate(
-  item: TodoItem,
-  date: string,
-  now: Dayjs = dayjs(),
-): boolean {
+export function isTodoVisibleOnDate(item: TodoItem, date: string, now: Dayjs = dayjs()): boolean {
   if (item.displayDay) {
     return item.displayDay === date;
   }
@@ -228,7 +220,11 @@ export function collectTodoDateKeys(items: TodoItem[]): Set<string> {
 }
 
 /** 按日期过滤待办 */
-export function filterTodosByDate(items: TodoItem[], date: string, now: Dayjs = dayjs()): TodoItem[] {
+export function filterTodosByDate(
+  items: TodoItem[],
+  date: string,
+  now: Dayjs = dayjs(),
+): TodoItem[] {
   return items.filter((item) => isTodoVisibleOnDate(item, date, now));
 }
 
@@ -251,7 +247,10 @@ export function resolveTodoGroupDateKey(item: TodoItem, now: Dayjs = dayjs()): s
 
 /** 分组标题排序：按日期降序，无提醒置底 */
 export function sortTodoGroupDateKeys(keys: string[]): string[] {
-  const dated = keys.filter((key) => key !== 'inbox').sort().reverse();
+  const dated = keys
+    .filter((key) => key !== 'inbox')
+    .sort()
+    .reverse();
   if (keys.includes('inbox')) dated.push('inbox');
   return dated;
 }

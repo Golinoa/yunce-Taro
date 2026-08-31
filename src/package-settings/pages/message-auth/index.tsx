@@ -1,17 +1,14 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useLoad } from '@tarojs/taro';
 import React, { useCallback, useRef, useState } from 'react';
-import PageContainer from '@/components/PageContainer';
 import Loading from '@/components/Loading';
-import {
-  SUBSCRIBE_GROUP_LABELS,
-  SUBSCRIBE_TEMPLATE_GROUPS,
-} from '@/constants/subscribe-presets';
+import PageContainer from '@/components/PageContainer';
+import { SUBSCRIBE_GROUP_LABELS, SUBSCRIBE_TEMPLATE_GROUPS } from '@/constants/subscribe-presets';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { SubscribeQuotaDto, SubscribeTemplateGroup } from '@/types/subscribe-message';
+import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
-import { logError } from '@/utils/logger';
 
 /**
  * 补充发送次数页
@@ -95,7 +92,8 @@ const MessageAuthPage: React.FC = () => {
           补充发送次数
         </Text>
         <Text className="mb-[24rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
-          微信规定：每同意一次订阅，服务端可发 1 条对应提醒。本页用于查看剩余次数并主动补充授权；总开关请在「消息通知」页设置。
+          微信规定：每同意一次订阅，服务端可发 1
+          条对应提醒。本页用于查看剩余次数并主动补充授权；总开关请在「消息通知」页设置。
         </Text>
 
         <View className="mb-[24rpx] flex flex-row items-center justify-between">
@@ -124,18 +122,14 @@ const MessageAuthPage: React.FC = () => {
                 <View
                   key={group}
                   className="flex flex-row items-center justify-between rounded-[20rpx] bg-card px-[28rpx] py-[28rpx]"
-                  onClick={
-                    enabled && !isLoading ? () => void handleAuthGroup(group) : undefined
-                  }
+                  onClick={enabled && !isLoading ? () => void handleAuthGroup(group) : undefined}
                 >
                   <View className="min-w-0 flex-1 pr-[16rpx]">
                     <Text className="block text-[28rpx] font-medium text-foreground">
                       {SUBSCRIBE_GROUP_LABELS[group]}
                     </Text>
                     <Text className="mt-[8rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
-                      {enabled
-                        ? `剩余可发送 ${remain} 次`
-                        : '后端未配置模板，暂不可授权'}
+                      {enabled ? `剩余可发送 ${remain} 次` : '后端未配置模板，暂不可授权'}
                     </Text>
                   </View>
                   {enabled ? (

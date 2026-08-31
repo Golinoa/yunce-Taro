@@ -90,8 +90,7 @@ export function saveInviteLandingSuccess(record: InviteLandingSuccessRecord): vo
   const all = readAll().filter((item) => {
     const sameLesson = item.lessonKey === record.lessonKey;
     const sameVisitor = item.visitorKey === record.visitorKey;
-    const sameParent =
-      Boolean(record.parentUserId) && item.parentUserId === record.parentUserId;
+    const sameParent = Boolean(record.parentUserId) && item.parentUserId === record.parentUserId;
     return !(sameLesson && (sameVisitor || sameParent));
   });
   all.unshift(record);

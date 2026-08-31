@@ -13,6 +13,7 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import SegmentedControl from '@/components/SegmentedControl';
+import { teacherService } from '@/services/teacher';
 import {
   SALARY_TYPE_LABEL,
   salaryLineSigned,
@@ -20,10 +21,8 @@ import {
   type TeacherMonthlyFlowBundle,
   type TeacherMonthlyFlowTab,
 } from '@/services/teacher-monthly-flow';
-import { teacherService } from '@/services/teacher';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
-import { useAuth } from '@/utils/auth';
 
 const TABS: { key: TeacherMonthlyFlowTab; label: string }[] = [
   { key: 'lessons', label: '课时流水' },
@@ -46,7 +45,6 @@ function formatMoney(amount: number): string {
 
 const MonthlyFlowPage: React.FC = () => {
   useCardNavigationBar();
-  const { profile } = useAuth();
 
   const [month, setMonth] = useState(() => dayjs().format('YYYY-MM'));
   const [activeTab, setActiveTab] = useState<TeacherMonthlyFlowTab>(

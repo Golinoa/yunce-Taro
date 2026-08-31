@@ -15,11 +15,11 @@ import InstallmentPanel, {
   type ScheduleItem,
 } from '@/components/InstallmentPanel';
 import Switch from '@/components/Switch';
+import { subscribeMessageService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { cardTypeService } from '@/services/card-type';
 import { lessonDebtService } from '@/services/lesson-debt';
 import { memberCardService } from '@/services/member-card';
-import { subscribeMessageService } from '@/services';
 import type { CardType, CardTypeKind } from '@/types/card-type';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -352,11 +352,7 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
       ) : null}
 
       <View className="bg-white rounded-[24rpx] p-[28rpx] shadow-soft mt-[20rpx]">
-        <FormRow
-          label="分期付款"
-          border={installmentEnabled}
-          helperText="选填，开启后按期还款"
-        >
+        <FormRow label="分期付款" border={installmentEnabled} helperText="选填，开启后按期还款">
           <Switch checked={installmentEnabled} onChange={handleToggleInstallment} />
         </FormRow>
         {installmentEnabled ? (

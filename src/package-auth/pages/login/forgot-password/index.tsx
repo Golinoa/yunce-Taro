@@ -172,7 +172,9 @@ const ForgotPasswordPage: React.FC = () => {
 
         {resetSuccess ? (
           <>
-            <Text className="mb-[12rpx] text-[30rpx] font-semibold text-foreground">密码已重置</Text>
+            <Text className="mb-[12rpx] text-[30rpx] font-semibold text-foreground">
+              密码已重置
+            </Text>
             <Text className="mb-[40rpx] text-[24rpx] leading-[36rpx] text-muted-foreground">
               新密码已生效，请返回登录页使用新密码登录
             </Text>

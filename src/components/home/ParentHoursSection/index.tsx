@@ -1,8 +1,8 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React from 'react';
-import Icon from '@/components/Icon';
 import ParentGlassShell from '@/components/home/ParentGlassShell';
+import Icon from '@/components/Icon';
 
 export interface ParentHourPackageCard {
   id: string;
@@ -75,7 +75,9 @@ const ParentHoursSection: React.FC<ParentHoursSectionProps> = ({
             className="mt-[24rpx] w-full rounded-[20rpx] bg-primary py-[22rpx] press-scale"
             onClick={goBilling}
           >
-            <Text className="block text-center text-[28rpx] font-semibold text-white">查看卡包</Text>
+            <Text className="block text-center text-[28rpx] font-semibold text-white">
+              查看卡包
+            </Text>
           </View>
         </View>
       ) : (

@@ -19,17 +19,18 @@ import TodoList from '@/components/home/TodoList';
 import TodoQuadrantBoard from '@/components/home/TodoQuadrantBoard';
 import TodoToolbar, { type TodoViewMode } from '@/components/home/TodoToolbar';
 import Icon from '@/components/Icon';
-import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
   navigateToLessonDetail,
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
+import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
 import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import RelationConfirmSheet from '@/components/RelationConfirmSheet';
 import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
+import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import { lessonRecordService, todoService } from '@/services';
 import { homeService } from '@/services/home';
 import type { QuickEntry, ParentHomePackageCard } from '@/services/home';
@@ -53,9 +54,8 @@ import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
-import { buildTodoCardDomId } from '@/utils/todo-card-meta';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
-import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
+import { buildTodoCardDomId } from '@/utils/todo-card-meta';
 import {
   TODO_CATEGORY_INBOX_ID,
   addTodoCategory,
@@ -819,9 +819,7 @@ const Home: React.FC = () => {
           <HomeHeroBanner
             unreadCount={unreadCount}
             bellTopPx={navSafeHeight - 4}
-            onNotify={() =>
-              Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })
-            }
+            onNotify={() => Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })}
           />
 
           {/* 校区卡片 */}

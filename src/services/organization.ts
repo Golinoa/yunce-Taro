@@ -10,9 +10,6 @@
 import Taro from '@tarojs/taro';
 import { get, post, put } from '@/utils/request';
 
-/** mock 会员状态本地缓存（演示开通/续费） */
-const MOCK_MEMBERSHIP_KEY = 'yunce:mock-org-membership';
-
 /** 与学员的关系（后端 Zod 常量校验，不建枚举列） */
 export type StudentParentRelation = 'self' | 'father' | 'mother';
 
@@ -64,7 +61,6 @@ export interface ShareContext {
 export const organizationService = {
   /** 绑定机构（学员邀请码 → 自动创建子女 + 机构用户 MEMBER） */
   bind: async (inviteCode: string): Promise<BindOrganizationResult> => {
-    
     return post<BindOrganizationResult>('/organization/bind', { inviteCode });
   },
 
@@ -73,7 +69,6 @@ export const organizationService = {
     studentParentId: string,
     relation: StudentParentRelation,
   ): Promise<{ studentParentId: string; relation: StudentParentRelation }> => {
-    
     return post(`/organization/bindings/${encodeURIComponent(studentParentId)}/relation`, {
       relation,
     });
@@ -81,29 +76,27 @@ export const organizationService = {
 
   /** 我的机构状态 + 待确认关系（首页 useDidShow 调用） */
   getMyOrganization: async (): Promise<MyOrganizationResult> => {
-    
     return get<MyOrganizationResult>('/organization/me');
   },
 
   /** 分享上下文（分享落地页展示「xx 邀请你」） */
   getShareContext: async (inviteCode: string): Promise<ShareContext> => {
-    
     return get<ShareContext>('/share/context', { inviteCode });
   },
 
   /** 读取机构设置（校长/管理员，请假自动审批开关等） */
   getSettings: async (): Promise<OrganizationSettings> => {
-        return get<OrganizationSettings>('/organization/settings');
+    return get<OrganizationSettings>('/organization/settings');
   },
 
   /** 更新机构设置（校长/管理员） */
   updateSettings: async (input: { leaveAutoApprove?: boolean }): Promise<OrganizationSettings> => {
-        return put<OrganizationSettings>('/organization/settings', input);
+    return put<OrganizationSettings>('/organization/settings', input);
   },
 
   /** 机构配额使用率（校长/管理员，P1） */
   getQuotaUsage: async (): Promise<OrganizationQuotaUsage> => {
-        return get<OrganizationQuotaUsage>('/organization/quota-usage');
+    return get<OrganizationQuotaUsage>('/organization/quota-usage');
   },
 
   /**
@@ -111,9 +104,9 @@ export const organizationService = {
    * 生产：GET /organization/entitlements
    */
   getEntitlements: async (): Promise<OrganizationQuotaUsage> => {
-        const data = await get<OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }>(
-      '/organization/entitlements',
-    );
+    const data = await get<
+      OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }
+    >('/organization/entitlements');
     const features = {
       ...(data.features || {}),
       ...(data.entitlements?.features || {}),
@@ -144,9 +137,7 @@ export const organizationService = {
    * 生产：POST /organization/redeem-activation-code
    * mock：演示码 HXK-DEMO-STANDARD / HXK-DEMO-FLAGSHIP / HXK-DEMO-RENEW
    */
-  redeemActivationCode: async (
-    code: string,
-  ): Promise<RedeemActivationResult> => {
+  redeemActivationCode: async (code: string): Promise<RedeemActivationResult> => {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) {
       return { error: { message: '请输入激活码' } };
@@ -155,7 +146,6 @@ export const organizationService = {
       return { error: { message: '激活码格式不正确' } };
     }
 
-    
     try {
       const data = await post<{
         expireAt?: string | null;
@@ -201,7 +191,12 @@ export interface OrganizationQuotaUsage {
   members: { current: number; max: number };
   employees: { current: number; max: number };
   campuses: { current: number; max: number };
-  features: { leadTrace: boolean; batchImportExport: boolean; marketing?: boolean; [key: string]: boolean | undefined };
+  features: {
+    leadTrace: boolean;
+    batchImportExport: boolean;
+    marketing?: boolean;
+    [key: string]: boolean | undefined;
+  };
 }
 
 export interface RedeemActivationResult {

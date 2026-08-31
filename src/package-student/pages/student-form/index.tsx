@@ -16,8 +16,8 @@ import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import SegmentedControl from '@/components/SegmentedControl';
 import Switch from '@/components/Switch';
-import { withRouteGuard } from '@/utils/route-guard';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { withRouteGuard } from '@/utils/route-guard';
 import { useStudentForm, FEE_METHOD_OPTIONS } from './useStudentForm';
 import type { StudentType } from './useStudentForm';
 
@@ -131,8 +131,7 @@ const StudentForm: React.FC = () => {
     );
   }, [birthday, datePickerTarget, legacyPackages]);
 
-  const datePickerTitle =
-    datePickerTarget?.kind === 'expire' ? '选择到期日期' : '选择出生日期';
+  const datePickerTitle = datePickerTarget?.kind === 'expire' ? '选择到期日期' : '选择出生日期';
 
   if (loading) {
     return (
@@ -218,9 +217,7 @@ const StudentForm: React.FC = () => {
                     key={g}
                     className={cn(
                       'px-[28rpx] py-[10rpx] rounded-[12rpx] border-[2rpx] border-solid press-scale',
-                      gender === g
-                        ? 'border-primary bg-primary-5'
-                        : 'border-border bg-background',
+                      gender === g ? 'border-primary bg-primary-5' : 'border-border bg-background',
                     )}
                     onClick={() => setGender(gender === g ? '' : g)}
                   >
@@ -387,7 +384,11 @@ const StudentForm: React.FC = () => {
                             onClick={() => openSelector('subject', pkg.id)}
                           >
                             <View className="flex items-center gap-[12rpx]">
-                              <Icon name="mdi-book-open-variant" size={28} color="mutedForeground" />
+                              <Icon
+                                name="mdi-book-open-variant"
+                                size={28}
+                                color="mutedForeground"
+                              />
                               <Text className="text-[28rpx] text-foreground">科目</Text>
                             </View>
                             <View className="flex items-center gap-[12rpx]">

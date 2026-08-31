@@ -939,21 +939,13 @@ button.privacy-agree-btn:active {
   );
 }
 .todo-quadrant-icon--q2 .todo-quadrant-icon__cell {
-  background-image: linear-gradient(
-    225deg,
-    hsl(var(--todo-q2) / 0.55),
-    hsl(var(--todo-q2) / 0.16)
-  );
+  background-image: linear-gradient(225deg, hsl(var(--todo-q2) / 0.55), hsl(var(--todo-q2) / 0.16));
 }
 .todo-quadrant-icon--q3 .todo-quadrant-icon__cell {
   background-image: linear-gradient(45deg, hsl(var(--todo-q3) / 0.48), hsl(var(--todo-q3) / 0.14));
 }
 .todo-quadrant-icon--q4 .todo-quadrant-icon__cell {
-  background-image: linear-gradient(
-    315deg,
-    hsl(var(--todo-q4) / 0.5),
-    hsl(var(--todo-q4) / 0.14)
-  );
+  background-image: linear-gradient(315deg, hsl(var(--todo-q4) / 0.5), hsl(var(--todo-q4) / 0.14));
 }
 
 /* 四象限看板：标题色与图标一致 */

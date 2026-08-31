@@ -8,19 +8,20 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
-import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
-import MyTodoDateGroups from '@/components/my-todos/MyTodoDateGroups';
+import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
 import AddTodoCategorySheet from '@/components/my-todos/AddTodoCategorySheet';
+import MyTodoDateGroups from '@/components/my-todos/MyTodoDateGroups';
+import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import MonthPickerSheet from '@/components/teacher/MonthPickerSheet';
+import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import { homeService, todoService } from '@/services';
 import { useCampusStore } from '@/stores';
-import type { TodoItem } from '@/types/home-todo';
-import type { TodoCollaborationMode } from '@/types/home-todo';
+import type { TodoItem, TodoCollaborationMode } from '@/types/home-todo';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import {
   TODO_QUADRANT_META,
@@ -29,10 +30,10 @@ import {
 } from '@/types/todo-quadrant';
 import { useAuth } from '@/utils/auth';
 import { sortHomeTodosByMode, type CustomTodoSortMode } from '@/utils/custom-todos';
-import { buildTodoCardDomId } from '@/utils/todo-card-meta';
-import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
+import { scrollIntoViewProps } from '@/utils/scroll-view-props';
+import { buildTodoCardDomId } from '@/utils/todo-card-meta';
 import {
   TODO_CATEGORY_ALL_ID,
   addTodoCategory,
@@ -40,7 +41,10 @@ import {
   matchHomeTodoCategoryTab,
   type TodoCategoryTab,
 } from '@/utils/todo-categories';
-import { consumeTodoCollaboratorResult, type CollaboratorSummary } from '@/utils/todo-collaborator-select';
+import {
+  consumeTodoCollaboratorResult,
+  type CollaboratorSummary,
+} from '@/utils/todo-collaborator-select';
 import {
   buildDefaultExpandedTodoDates,
   formatTodoMonthLabel,
@@ -48,8 +52,6 @@ import {
   resolveTodoGroupDateKey,
 } from '@/utils/todo-timeline';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
-import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
-import dayjs from 'dayjs';
 
 type ScopeFilter = 'today' | 'all';
 type StatusFilter = 'pending' | 'done';
@@ -94,7 +96,9 @@ const MyTodos: React.FC = () => {
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [addPopoverVisible, setAddPopoverVisible] = useState(false);
   const [addCollaboratorIds, setAddCollaboratorIds] = useState<string[]>([]);
-  const [addCollaboratorSummaries, setAddCollaboratorSummaries] = useState<CollaboratorSummary[]>([]);
+  const [addCollaboratorSummaries, setAddCollaboratorSummaries] = useState<CollaboratorSummary[]>(
+    [],
+  );
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
   /** 分类过多时把加号钉在右侧；否则跟在最后一个分类后面 */
   const [pinCategoryPlus, setPinCategoryPlus] = useState(false);
@@ -510,262 +514,262 @@ const MyTodos: React.FC = () => {
   return (
     <>
       <View className="flex h-screen flex-col bg-muted pb-safe-bottom">
-      {/* 自定义导航：渐变仅覆盖导航栏高度（同我的页） */}
-      <View
-        className="relative shrink-0 overflow-hidden bg-gradient-diffuse-custom-nav"
-        style={{ height: `${navSafeHeight}px` }}
-      >
-        <View className="relative flex h-full flex-row items-end px-[12rpx] pb-[12rpx]">
-          <View className="z-10 flex min-w-0 flex-1 flex-row items-center">
-            <View
-              className="mr-[8rpx] flex h-[56rpx] w-[56rpx] shrink-0 items-center justify-center rounded-full border border-white/60 bg-white/90 shadow-soft press-scale"
-              onClick={handleBack}
-            >
-              <Icon name="mdi-chevron-left" size="lg" color="foreground" />
-            </View>
-            <View className="flex shrink-0 flex-row items-center rounded-full border border-white/60 bg-white/90 p-[4rpx] shadow-soft">
-              {(
-                [
-                  { key: 'today' as const, label: '今日' },
-                  { key: 'all' as const, label: '全部' },
-                ] as const
-              ).map((item) => {
-                const active = scopeFilter === item.key;
-                return (
-                  <View
-                    key={item.key}
-                    className={cn(
-                      'rounded-full px-[20rpx] py-[8rpx] press-scale',
-                      active ? 'bg-primary' : 'bg-transparent',
-                    )}
-                    onClick={() => setScopeFilter(item.key)}
-                  >
-                    <Text
-                      className={cn(
-                        'text-[24rpx] font-semibold',
-                        active ? 'text-white' : 'text-foreground-secondary',
-                      )}
-                    >
-                      {item.label}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-          <View className="pointer-events-none absolute inset-x-0 bottom-[12rpx] flex h-[56rpx] items-center justify-center">
-            <Text className="text-[34rpx] font-semibold text-foreground">我的待办</Text>
-          </View>
-          <View className="w-[180rpx] shrink-0" />
-        </View>
-      </View>
-
-      {/* 分类：加号默认跟在末尾；超出最大宽度后钉在右侧；溢出可横滑并 scroll-into-view */}
-      <View
-        id="my-todo-cat-row"
-        className="flex shrink-0 flex-row items-center bg-muted px-[24rpx] pt-[8rpx] pb-[4rpx]"
-      >
-        <ScrollView
-          scrollX
-          enhanced
-          enableFlex
-          showScrollbar={false}
-          className="h-[72rpx] min-w-0 flex-1 overflow-hidden"
-          {...scrollIntoViewProps(categoryScrollIntoView)}
+        {/* 自定义导航：渐变仅覆盖导航栏高度（同我的页） */}
+        <View
+          className="relative shrink-0 overflow-hidden bg-gradient-diffuse-custom-nav"
+          style={{ height: `${navSafeHeight}px` }}
         >
-          <View className="inline-flex h-[72rpx] flex-row items-center whitespace-nowrap">
-            <View id="my-todo-cat-tabs" className="inline-flex flex-row items-center">
-              {categoryTabs.map((tab) => (
-                <View
-                  key={tab.id}
-                  id={`cat-tab-${tab.id}`}
-                  className={cn(
-                    'mr-[8rpx] shrink-0',
-                    categoryTabId === tab.id ? 'tab-item-v14 active' : 'tab-item-v14',
-                  )}
-                  onClick={() => handleSelectCategory(tab.id)}
-                >
-                  <Text className="tab-item-v14__label">{tab.name}</Text>
-                </View>
-              ))}
-            </View>
-            {!pinCategoryPlus ? renderCategoryPlus(false) : null}
-          </View>
-        </ScrollView>
-        {pinCategoryPlus ? renderCategoryPlus(true) : null}
-      </View>
-
-      {/* 状态下拉 + 四象限多选 */}
-      <View className="relative z-30 flex shrink-0 flex-row flex-nowrap items-center gap-[10rpx] px-[24rpx] pt-[8rpx] pb-[8rpx]">
-        <View className="relative shrink-0">
-          <View
-            className="flex flex-row items-center gap-[4rpx] rounded-full bg-card px-[18rpx] py-[12rpx] press-scale"
-            onClick={() => setStatusMenuOpen((open) => !open)}
-          >
-            <Text className="text-[24rpx] font-medium text-foreground">{statusLabel}</Text>
-            <Icon
-              name={statusMenuOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'}
-              size="sm"
-              color="muted"
-            />
-          </View>
-          {statusMenuOpen ? (
-            <>
+          <View className="relative flex h-full flex-row items-end px-[12rpx] pb-[12rpx]">
+            <View className="z-10 flex min-w-0 flex-1 flex-row items-center">
               <View
-                className="fixed inset-0 z-40"
-                onClick={() => setStatusMenuOpen(false)}
-                catchMove
-              />
-              <View className="absolute left-0 top-full z-50 mt-[8rpx] min-w-[200rpx] overflow-hidden rounded-[16rpx] border border-border bg-card shadow-float">
-                {STATUS_OPTIONS.map((option) => {
-                  const active = statusFilter === option.key;
-                  return (
-                    <View
-                      key={option.key}
-                      className={cn(
-                        'flex flex-row items-center justify-between px-[24rpx] py-[20rpx] press-bg',
-                        active && 'bg-primary-10',
-                      )}
-                      onClick={() => {
-                        setStatusFilter(option.key);
-                        setStatusMenuOpen(false);
-                      }}
-                    >
-                      <Text
-                        className={cn(
-                          'text-[28rpx]',
-                          active ? 'font-semibold text-primary' : 'text-foreground',
-                        )}
-                      >
-                        {option.label}
-                      </Text>
-                      {active ? <Icon name="mdi-check" size="sm" color="primary" /> : null}
-                    </View>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-        </View>
-
-        {QUADRANT_FILTERS.map((item) => {
-          const active = quadrantKeys.includes(item.key);
-          return (
-            <View
-              key={item.key}
-              className={cn(
-                'min-w-0 flex-1 flex items-center justify-center rounded-full px-[8rpx] py-[12rpx] press-scale',
-                active ? 'bg-primary' : 'bg-card',
-              )}
-              onClick={() => handleToggleQuadrant(item.key)}
-            >
-              <Text
-                className={cn(
-                  'text-[24rpx] leading-none',
-                  active ? 'font-semibold text-white' : 'font-medium text-muted-foreground',
-                )}
+                className="mr-[8rpx] flex h-[56rpx] w-[56rpx] shrink-0 items-center justify-center rounded-full border border-white/60 bg-white/90 shadow-soft press-scale"
+                onClick={handleBack}
               >
-                {item.label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-
-      <View className="flex shrink-0 flex-row items-center justify-between border-t border-border bg-muted px-[24rpx] py-[14rpx]">
-        <View className="flex min-w-0 flex-1 flex-row items-center gap-[12rpx]">
-          <Text className="shrink-0 text-[24rpx] text-muted-foreground">
-            {filteredTodos.length} 个待办
-          </Text>
-          <View className="h-[20rpx] w-[2rpx] shrink-0 bg-border" />
-          <View
-            className="flex min-w-0 flex-row items-center gap-[4rpx] press-scale"
-            onClick={() => setMonthPickerVisible(true)}
-          >
-            <Text className="text-[24rpx] font-medium text-foreground">{monthLabel}</Text>
-            <Icon name="mdi-chevron-down" size="sm" color="muted" />
-          </View>
-        </View>
-        <View className="relative shrink-0">
-          <View
-            className="ml-[12rpx] flex shrink-0 flex-row items-center gap-[4rpx] press-scale"
-            onClick={() => setSortMenuOpen((open) => !open)}
-          >
-            <Text className="text-[24rpx] text-primary">{sortLabel}</Text>
-            <Icon
-              name={sortMenuOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'}
-              size="sm"
-              color="primary"
-            />
-          </View>
-          {sortMenuOpen ? (
-            <>
-              <View
-                className="fixed inset-0 z-40"
-                onClick={() => setSortMenuOpen(false)}
-                catchMove
-              />
-              <View className="absolute right-0 top-full z-50 mt-[8rpx] min-w-[240rpx] overflow-hidden rounded-[16rpx] border border-border bg-card shadow-float">
-                {SORT_OPTIONS.map((option) => {
-                  const active = sortMode === option.key;
+                <Icon name="mdi-chevron-left" size="lg" color="foreground" />
+              </View>
+              <View className="flex shrink-0 flex-row items-center rounded-full border border-white/60 bg-white/90 p-[4rpx] shadow-soft">
+                {(
+                  [
+                    { key: 'today' as const, label: '今日' },
+                    { key: 'all' as const, label: '全部' },
+                  ] as const
+                ).map((item) => {
+                  const active = scopeFilter === item.key;
                   return (
                     <View
-                      key={option.key}
+                      key={item.key}
                       className={cn(
-                        'flex flex-row items-center justify-between px-[24rpx] py-[20rpx] press-bg',
-                        active && 'bg-primary-10',
+                        'rounded-full px-[20rpx] py-[8rpx] press-scale',
+                        active ? 'bg-primary' : 'bg-transparent',
                       )}
-                      onClick={() => handleSelectSort(option.key)}
+                      onClick={() => setScopeFilter(item.key)}
                     >
                       <Text
                         className={cn(
-                          'text-[26rpx]',
-                          active ? 'font-semibold text-primary' : 'text-foreground',
+                          'text-[24rpx] font-semibold',
+                          active ? 'text-white' : 'text-foreground-secondary',
                         )}
                       >
-                        {option.label}
+                        {item.label}
                       </Text>
-                      {active ? <Icon name="mdi-check" size="sm" color="primary" /> : null}
                     </View>
                   );
                 })}
               </View>
-            </>
-          ) : null}
+            </View>
+            <View className="pointer-events-none absolute inset-x-0 bottom-[12rpx] flex h-[56rpx] items-center justify-center">
+              <Text className="text-[34rpx] font-semibold text-foreground">我的待办</Text>
+            </View>
+            <View className="w-[180rpx] shrink-0" />
+          </View>
         </View>
-      </View>
 
-      <ScrollView
-        id="my-todos-list-scroll"
-        scrollY
-        showScrollbar={false}
-        scrollWithAnimation={false}
-        className="box-border min-h-0 flex-1 bg-muted"
-        {...scrollIntoViewProps(listScrollIntoView)}
-        {...listScrollFreezeProps}
-        onScroll={onListScrollTrack}
-      >
-        {listLoading && todos.length === 0 ? (
-          <View className="flex items-center justify-center pt-[120rpx]">
-            <Loading size="small" delayMs={0} title="加载待办" text="正在同步待办列表" />
+        {/* 分类：加号默认跟在末尾；超出最大宽度后钉在右侧；溢出可横滑并 scroll-into-view */}
+        <View
+          id="my-todo-cat-row"
+          className="flex shrink-0 flex-row items-center bg-muted px-[24rpx] pt-[8rpx] pb-[4rpx]"
+        >
+          <ScrollView
+            scrollX
+            enhanced
+            enableFlex
+            showScrollbar={false}
+            className="h-[72rpx] min-w-0 flex-1 overflow-hidden"
+            {...scrollIntoViewProps(categoryScrollIntoView)}
+          >
+            <View className="inline-flex h-[72rpx] flex-row items-center whitespace-nowrap">
+              <View id="my-todo-cat-tabs" className="inline-flex flex-row items-center">
+                {categoryTabs.map((tab) => (
+                  <View
+                    key={tab.id}
+                    id={`cat-tab-${tab.id}`}
+                    className={cn(
+                      'mr-[8rpx] shrink-0',
+                      categoryTabId === tab.id ? 'tab-item-v14 active' : 'tab-item-v14',
+                    )}
+                    onClick={() => handleSelectCategory(tab.id)}
+                  >
+                    <Text className="tab-item-v14__label">{tab.name}</Text>
+                  </View>
+                ))}
+              </View>
+              {!pinCategoryPlus ? renderCategoryPlus(false) : null}
+            </View>
+          </ScrollView>
+          {pinCategoryPlus ? renderCategoryPlus(true) : null}
+        </View>
+
+        {/* 状态下拉 + 四象限多选 */}
+        <View className="relative z-30 flex shrink-0 flex-row flex-nowrap items-center gap-[10rpx] px-[24rpx] pt-[8rpx] pb-[8rpx]">
+          <View className="relative shrink-0">
+            <View
+              className="flex flex-row items-center gap-[4rpx] rounded-full bg-card px-[18rpx] py-[12rpx] press-scale"
+              onClick={() => setStatusMenuOpen((open) => !open)}
+            >
+              <Text className="text-[24rpx] font-medium text-foreground">{statusLabel}</Text>
+              <Icon
+                name={statusMenuOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'}
+                size="sm"
+                color="muted"
+              />
+            </View>
+            {statusMenuOpen ? (
+              <>
+                <View
+                  className="fixed inset-0 z-40"
+                  onClick={() => setStatusMenuOpen(false)}
+                  catchMove
+                />
+                <View className="absolute left-0 top-full z-50 mt-[8rpx] min-w-[200rpx] overflow-hidden rounded-[16rpx] border border-border bg-card shadow-float">
+                  {STATUS_OPTIONS.map((option) => {
+                    const active = statusFilter === option.key;
+                    return (
+                      <View
+                        key={option.key}
+                        className={cn(
+                          'flex flex-row items-center justify-between px-[24rpx] py-[20rpx] press-bg',
+                          active && 'bg-primary-10',
+                        )}
+                        onClick={() => {
+                          setStatusFilter(option.key);
+                          setStatusMenuOpen(false);
+                        }}
+                      >
+                        <Text
+                          className={cn(
+                            'text-[28rpx]',
+                            active ? 'font-semibold text-primary' : 'text-foreground',
+                          )}
+                        >
+                          {option.label}
+                        </Text>
+                        {active ? <Icon name="mdi-check" size="sm" color="primary" /> : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
           </View>
-        ) : filteredTodos.length === 0 ? (
-          <View className="px-[24rpx] pt-[48rpx]">
-            <Empty icon="mdi-clipboard-text" description={emptyDescription} />
+
+          {QUADRANT_FILTERS.map((item) => {
+            const active = quadrantKeys.includes(item.key);
+            return (
+              <View
+                key={item.key}
+                className={cn(
+                  'min-w-0 flex-1 flex items-center justify-center rounded-full px-[8rpx] py-[12rpx] press-scale',
+                  active ? 'bg-primary' : 'bg-card',
+                )}
+                onClick={() => handleToggleQuadrant(item.key)}
+              >
+                <Text
+                  className={cn(
+                    'text-[24rpx] leading-none',
+                    active ? 'font-semibold text-white' : 'font-medium text-muted-foreground',
+                  )}
+                >
+                  {item.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        <View className="flex shrink-0 flex-row items-center justify-between border-t border-border bg-muted px-[24rpx] py-[14rpx]">
+          <View className="flex min-w-0 flex-1 flex-row items-center gap-[12rpx]">
+            <Text className="shrink-0 text-[24rpx] text-muted-foreground">
+              {filteredTodos.length} 个待办
+            </Text>
+            <View className="h-[20rpx] w-[2rpx] shrink-0 bg-border" />
+            <View
+              className="flex min-w-0 flex-row items-center gap-[4rpx] press-scale"
+              onClick={() => setMonthPickerVisible(true)}
+            >
+              <Text className="text-[24rpx] font-medium text-foreground">{monthLabel}</Text>
+              <Icon name="mdi-chevron-down" size="sm" color="muted" />
+            </View>
           </View>
-        ) : (
-          <View className="px-[24rpx] pb-[32rpx] pt-[8rpx]">
-            <MyTodoDateGroups
-              items={filteredTodos}
-              scope={scopeFilter}
-              expandedDates={expandedDates}
-              onToggleDate={handleToggleDateSection}
-              onToggleComplete={(item) => void handleToggleComplete(item)}
-              onPress={handleOpenTodoDetail}
-            />
+          <View className="relative shrink-0">
+            <View
+              className="ml-[12rpx] flex shrink-0 flex-row items-center gap-[4rpx] press-scale"
+              onClick={() => setSortMenuOpen((open) => !open)}
+            >
+              <Text className="text-[24rpx] text-primary">{sortLabel}</Text>
+              <Icon
+                name={sortMenuOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'}
+                size="sm"
+                color="primary"
+              />
+            </View>
+            {sortMenuOpen ? (
+              <>
+                <View
+                  className="fixed inset-0 z-40"
+                  onClick={() => setSortMenuOpen(false)}
+                  catchMove
+                />
+                <View className="absolute right-0 top-full z-50 mt-[8rpx] min-w-[240rpx] overflow-hidden rounded-[16rpx] border border-border bg-card shadow-float">
+                  {SORT_OPTIONS.map((option) => {
+                    const active = sortMode === option.key;
+                    return (
+                      <View
+                        key={option.key}
+                        className={cn(
+                          'flex flex-row items-center justify-between px-[24rpx] py-[20rpx] press-bg',
+                          active && 'bg-primary-10',
+                        )}
+                        onClick={() => handleSelectSort(option.key)}
+                      >
+                        <Text
+                          className={cn(
+                            'text-[26rpx]',
+                            active ? 'font-semibold text-primary' : 'text-foreground',
+                          )}
+                        >
+                          {option.label}
+                        </Text>
+                        {active ? <Icon name="mdi-check" size="sm" color="primary" /> : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
           </View>
-        )}
-      </ScrollView>
+        </View>
+
+        <ScrollView
+          id="my-todos-list-scroll"
+          scrollY
+          showScrollbar={false}
+          scrollWithAnimation={false}
+          className="box-border min-h-0 flex-1 bg-muted"
+          {...scrollIntoViewProps(listScrollIntoView)}
+          {...listScrollFreezeProps}
+          onScroll={onListScrollTrack}
+        >
+          {listLoading && todos.length === 0 ? (
+            <View className="flex items-center justify-center pt-[120rpx]">
+              <Loading size="small" delayMs={0} title="加载待办" text="正在同步待办列表" />
+            </View>
+          ) : filteredTodos.length === 0 ? (
+            <View className="px-[24rpx] pt-[48rpx]">
+              <Empty icon="mdi-clipboard-text" description={emptyDescription} />
+            </View>
+          ) : (
+            <View className="px-[24rpx] pb-[32rpx] pt-[8rpx]">
+              <MyTodoDateGroups
+                items={filteredTodos}
+                scope={scopeFilter}
+                expandedDates={expandedDates}
+                onToggleDate={handleToggleDateSection}
+                onToggleComplete={(item) => void handleToggleComplete(item)}
+                onPress={handleOpenTodoDetail}
+              />
+            </View>
+          )}
+        </ScrollView>
       </View>
 
       <View

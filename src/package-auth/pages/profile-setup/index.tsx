@@ -9,9 +9,9 @@ import React, { useCallback, useState } from 'react';
 import Icon from '@/components/Icon';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { getSession } from '@/services/auth';
-import { uploadImage, isTempImagePath } from '@/utils/image-upload';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterProfileSetup } from '@/utils/auth-onboarding';
+import { uploadImage, isTempImagePath } from '@/utils/image-upload';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const ProfileSetup: React.FC = () => {

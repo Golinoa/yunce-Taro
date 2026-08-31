@@ -69,7 +69,8 @@ const CopyToTeachersSheet: React.FC<CopyToTeachersSheetProps> = ({
   }, [visible, value, fetchTeachers]);
 
   const activeTeachers = useMemo(
-    () => teachers.filter((teacher) => teacher.status === 'active' && teacher.id !== excludeTeacherId),
+    () =>
+      teachers.filter((teacher) => teacher.status === 'active' && teacher.id !== excludeTeacherId),
     [teachers, excludeTeacherId],
   );
 
@@ -81,10 +82,13 @@ const CopyToTeachersSheet: React.FC<CopyToTeachersSheetProps> = ({
     );
   }, [activeTeachers, keyword]);
 
-  const allSelected = filtered.length > 0 && filtered.every((teacher) => selectedIds.includes(teacher.id));
+  const allSelected =
+    filtered.length > 0 && filtered.every((teacher) => selectedIds.includes(teacher.id));
 
   const handleToggleOne = useCallback((id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   }, []);
 
   const handleToggleAll = useCallback(() => {
@@ -92,7 +96,9 @@ const CopyToTeachersSheet: React.FC<CopyToTeachersSheetProps> = ({
       setSelectedIds((prev) => prev.filter((id) => !filtered.some((teacher) => teacher.id === id)));
       return;
     }
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...filtered.map((teacher) => teacher.id)])));
+    setSelectedIds((prev) =>
+      Array.from(new Set([...prev, ...filtered.map((teacher) => teacher.id)])),
+    );
   }, [allSelected, filtered]);
 
   const handleConfirm = useCallback(() => {
@@ -125,7 +131,9 @@ const CopyToTeachersSheet: React.FC<CopyToTeachersSheetProps> = ({
       <View className="flex h-full flex-col px-[32rpx]">
         {description ? (
           <View className="shrink-0 pb-[16rpx]">
-            <Text className="text-[24rpx] text-muted-foreground leading-relaxed">{description}</Text>
+            <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+              {description}
+            </Text>
           </View>
         ) : null}
 
@@ -177,9 +185,13 @@ const CopyToTeachersSheet: React.FC<CopyToTeachersSheetProps> = ({
                   >
                     <Avatar name={teacher.name} avatarUrl={teacher.avatar} size="sm" />
                     <View className="ml-[16rpx] min-w-0 flex-1">
-                      <Text className="text-[30rpx] font-medium text-foreground">{teacher.name}</Text>
+                      <Text className="text-[30rpx] font-medium text-foreground">
+                        {teacher.name}
+                      </Text>
                       {teacher.subject ? (
-                        <Text className="text-[24rpx] text-muted-foreground">{teacher.subject}</Text>
+                        <Text className="text-[24rpx] text-muted-foreground">
+                          {teacher.subject}
+                        </Text>
                       ) : null}
                     </View>
                     <View

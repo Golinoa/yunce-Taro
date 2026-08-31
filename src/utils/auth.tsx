@@ -5,7 +5,6 @@
  */
 import Taro from '@tarojs/taro';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { markLastLoginAsNewUser } from '@/utils/auth-onboarding';
 import {
   addIdentity as addIdentityService,
   getProfileExtra,
@@ -38,6 +37,7 @@ import type {
   TeacherRoleInfo,
   UserRole,
 } from '@/types/profile';
+import { markLastLoginAsNewUser } from '@/utils/auth-onboarding';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 
 // ============================================

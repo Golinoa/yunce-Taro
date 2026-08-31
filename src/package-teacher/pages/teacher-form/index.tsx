@@ -14,6 +14,7 @@ import Taro, { useRouter } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import BindEmailSheet from '@/components/BindEmailSheet';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import FormCell from '@/components/FormCell';
 import FormInput from '@/components/FormInput';
@@ -21,7 +22,6 @@ import ImageUploaderList from '@/components/ImageUploaderList';
 import Loading from '@/components/Loading';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import PickerSheet from '@/components/PickerSheet';
-import BindEmailSheet from '@/components/BindEmailSheet';
 import { BRAND_LOGO } from '@/constants/brand';
 import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
 import { auditLogService } from '@/services/audit-log';
@@ -302,163 +302,159 @@ const TeacherFormPage: React.FC = () => {
         </View>
 
         <View className="px-[32rpx]">
-        {/* 基础信息 */}
-        <View className="bg-card rounded-[32rpx] px-[32rpx] mb-[24rpx]">
-          <FormCell
-            label="身份"
-            divider
-            showArrow
-            onClick={() => setPicker({ type: 'identity', visible: true })}
-          >
-            <Text
-              className={cn(
-                'text-[30rpx]',
-                form.identity ? 'text-foreground' : 'text-muted-foreground',
-              )}
+          {/* 基础信息 */}
+          <View className="bg-card rounded-[32rpx] px-[32rpx] mb-[24rpx]">
+            <FormCell
+              label="身份"
+              divider
+              showArrow
+              onClick={() => setPicker({ type: 'identity', visible: true })}
             >
-              {displayIdentity}
-            </Text>
-          </FormCell>
-
-          <View>
-            <FormCell label="姓名" divider>
-              <FormInput
-                variant="ghost"
-                placeholder="必填项"
-                value={form.name}
-                onInput={(e) => updateField('name', e.detail.value)}
-                maxlength={20}
-              />
-            </FormCell>
-            {errors.name && (
-              <Text className="text-[24rpx] text-destructive mt-[8rpx] ml-[2rpx]">
-                {errors.name}
-              </Text>
-            )}
-          </View>
-
-          <View>
-            <FormCell label="手机" divider>
-              <FormInput
-                variant="ghost"
-                placeholder="必填项"
-                value={form.phone}
-                type="number"
-                maxlength={11}
-                onInput={(e) => updateField('phone', e.detail.value)}
-              />
-            </FormCell>
-            {errors.phone && (
-              <Text className="text-[24rpx] text-destructive mt-[8rpx] ml-[2rpx]">
-                {errors.phone}
-              </Text>
-            )}
-          </View>
-
-          <FormCell
-            label="绑定邮箱"
-            divider
-            showArrow={!boundEmail}
-            onClick={boundEmail ? undefined : () => setShowBindEmail(true)}
-          >
-            {boundEmail ? (
-              <Text className="text-[30rpx] text-foreground">{boundEmail}</Text>
-            ) : (
-              <View
-                className="rounded-full bg-primary/10 px-[24rpx] py-[8rpx] active:opacity-80"
-                onClick={(e) => {
-                  e.stopPropagation?.();
-                  setShowBindEmail(true);
-                }}
+              <Text
+                className={cn(
+                  'text-[30rpx]',
+                  form.identity ? 'text-foreground' : 'text-muted-foreground',
+                )}
               >
-                <Text className="text-[26rpx] font-semibold text-primary">去绑定</Text>
-              </View>
-            )}
-          </FormCell>
+                {displayIdentity}
+              </Text>
+            </FormCell>
 
-          <FormCell
-            label="性别"
-            divider
-            showArrow
-            onClick={() => setPicker({ type: 'gender', visible: true })}
-          >
-            <Text
-              className={cn(
-                'text-[30rpx]',
-                form.gender ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              {displayGender}
-            </Text>
-          </FormCell>
-
-          <FormCell
-            label="生日"
-            divider={false}
-            onClick={() => setBirthdayPickerVisible(true)}
-          >
-            <Text
-              className={cn(
-                'text-[30rpx]',
-                form.birthday ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              {form.birthday || '选填项'}
-            </Text>
-          </FormCell>
-        </View>
-
-        {/* 老师简介 */}
-        <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx] flex flex-col gap-[20rpx]">
-          <Text className="text-[30rpx] font-medium text-foreground">老师简介</Text>
-          <FormInput
-            multiline
-            placeholder="暂无"
-            value={form.intro}
-            onInput={(e) => updateField('intro', e.detail.value)}
-            minHeight="160rpx"
-            inputClassName="text-[28rpx] leading-relaxed"
-          />
-        </View>
-
-        {/* 教师宣传图 */}
-        <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx]">
-          <View className="flex flex-row items-center justify-between mb-[20rpx]">
-            <Text className="text-[30rpx] font-medium text-foreground">教师宣传图</Text>
-          </View>
-          <ImageUploaderList
-            value={form.promoImages}
-            onChange={(value) => updateField('promoImages', value)}
-            maxCount={5}
-            maxSizeMB={5}
-            placeholder="上传"
-          />
-        </View>
-
-        {/* 私教设置 — 信息分层：标题 + 状态指示 + 补充说明 */}
-        <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx]">
-          <View className="flex flex-row items-start justify-between gap-[24rpx]">
-            <View className="flex-1 flex flex-col gap-[8rpx]">
-              {/* 主标题 */}
-              <Text className="text-[30rpx] font-medium text-foreground">展示在私教老师列表</Text>
-              {/* 开启状态补充说明 */}
-              {form.showInPrivateList ? (
-                <Text className="text-[24rpx] text-primary leading-relaxed">
-                  开启后，该老师会出现在首页私教课程的可选老师列表
-                </Text>
-              ) : (
-                <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
-                  关闭后，该老师将不会出现在首页私教课程的老师列表
+            <View>
+              <FormCell label="姓名" divider>
+                <FormInput
+                  variant="ghost"
+                  placeholder="必填项"
+                  value={form.name}
+                  onInput={(e) => updateField('name', e.detail.value)}
+                  maxlength={20}
+                />
+              </FormCell>
+              {errors.name && (
+                <Text className="text-[24rpx] text-destructive mt-[8rpx] ml-[2rpx]">
+                  {errors.name}
                 </Text>
               )}
             </View>
-            <Switch
-              checked={form.showInPrivateList}
-              onChange={(e) => updateField('showInPrivateList', e.detail.value)}
-              color={getThemeHexColors(activeTheme).primary}
+
+            <View>
+              <FormCell label="手机" divider>
+                <FormInput
+                  variant="ghost"
+                  placeholder="必填项"
+                  value={form.phone}
+                  type="number"
+                  maxlength={11}
+                  onInput={(e) => updateField('phone', e.detail.value)}
+                />
+              </FormCell>
+              {errors.phone && (
+                <Text className="text-[24rpx] text-destructive mt-[8rpx] ml-[2rpx]">
+                  {errors.phone}
+                </Text>
+              )}
+            </View>
+
+            <FormCell
+              label="绑定邮箱"
+              divider
+              showArrow={!boundEmail}
+              onClick={boundEmail ? undefined : () => setShowBindEmail(true)}
+            >
+              {boundEmail ? (
+                <Text className="text-[30rpx] text-foreground">{boundEmail}</Text>
+              ) : (
+                <View
+                  className="rounded-full bg-primary/10 px-[24rpx] py-[8rpx] active:opacity-80"
+                  onClick={(e) => {
+                    e.stopPropagation?.();
+                    setShowBindEmail(true);
+                  }}
+                >
+                  <Text className="text-[26rpx] font-semibold text-primary">去绑定</Text>
+                </View>
+              )}
+            </FormCell>
+
+            <FormCell
+              label="性别"
+              divider
+              showArrow
+              onClick={() => setPicker({ type: 'gender', visible: true })}
+            >
+              <Text
+                className={cn(
+                  'text-[30rpx]',
+                  form.gender ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {displayGender}
+              </Text>
+            </FormCell>
+
+            <FormCell label="生日" divider={false} onClick={() => setBirthdayPickerVisible(true)}>
+              <Text
+                className={cn(
+                  'text-[30rpx]',
+                  form.birthday ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {form.birthday || '选填项'}
+              </Text>
+            </FormCell>
+          </View>
+
+          {/* 老师简介 */}
+          <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx] flex flex-col gap-[20rpx]">
+            <Text className="text-[30rpx] font-medium text-foreground">老师简介</Text>
+            <FormInput
+              multiline
+              placeholder="暂无"
+              value={form.intro}
+              onInput={(e) => updateField('intro', e.detail.value)}
+              minHeight="160rpx"
+              inputClassName="text-[28rpx] leading-relaxed"
             />
           </View>
-        </View>
+
+          {/* 教师宣传图 */}
+          <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx]">
+            <View className="flex flex-row items-center justify-between mb-[20rpx]">
+              <Text className="text-[30rpx] font-medium text-foreground">教师宣传图</Text>
+            </View>
+            <ImageUploaderList
+              value={form.promoImages}
+              onChange={(value) => updateField('promoImages', value)}
+              maxCount={5}
+              maxSizeMB={5}
+              placeholder="上传"
+            />
+          </View>
+
+          {/* 私教设置 — 信息分层：标题 + 状态指示 + 补充说明 */}
+          <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx]">
+            <View className="flex flex-row items-start justify-between gap-[24rpx]">
+              <View className="flex-1 flex flex-col gap-[8rpx]">
+                {/* 主标题 */}
+                <Text className="text-[30rpx] font-medium text-foreground">展示在私教老师列表</Text>
+                {/* 开启状态补充说明 */}
+                {form.showInPrivateList ? (
+                  <Text className="text-[24rpx] text-primary leading-relaxed">
+                    开启后，该老师会出现在首页私教课程的可选老师列表
+                  </Text>
+                ) : (
+                  <Text className="text-[24rpx] text-muted-foreground leading-relaxed">
+                    关闭后，该老师将不会出现在首页私教课程的老师列表
+                  </Text>
+                )}
+              </View>
+              <Switch
+                checked={form.showInPrivateList}
+                onChange={(e) => updateField('showInPrivateList', e.detail.value)}
+                color={getThemeHexColors(activeTheme).primary}
+              />
+            </View>
+          </View>
         </View>
       </ScrollView>
 

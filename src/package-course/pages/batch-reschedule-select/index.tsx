@@ -2,7 +2,6 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import ActionButton from '@/components/ActionButton';
 import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
@@ -11,6 +10,7 @@ import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
+import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
   scheduleService,

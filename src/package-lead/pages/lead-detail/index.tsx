@@ -19,10 +19,16 @@ import ConvertSheet from '@/components/lead/ConvertSheet';
 import FollowUpSheet from '@/components/lead/FollowUpSheet';
 import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
-import { LEAD_SOURCE_META, FOLLOW_UP_ACTION_META, LEAD_BOOKING_STATUS_META, LEAD_BOOKING_MODE_BADGE_CLASS, getLeadBookingModeLabel } from '@/constants/lead';
+import {
+  LEAD_SOURCE_META,
+  FOLLOW_UP_ACTION_META,
+  LEAD_BOOKING_STATUS_META,
+  LEAD_BOOKING_MODE_BADGE_CLASS,
+  getLeadBookingModeLabel,
+} from '@/constants/lead';
 import { leadService, teacherService } from '@/services';
-import { subscribeMessageService } from '@/services/subscribe-message';
 import { auditLogService } from '@/services/audit-log';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { useLeadStore } from '@/stores/lead';
 import type { Lead, LeadFollowUp, LeadBooking, TrialMode } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
@@ -573,13 +579,9 @@ const LeadDetailPage: React.FC = () => {
               const statusMeta =
                 LEAD_BOOKING_STATUS_META[booking.status] || LEAD_BOOKING_STATUS_META.pending;
               const modeLabel = getLeadBookingModeLabel(booking);
-              const canOperate =
-                booking.status === 'pending' || booking.status === 'confirmed';
+              const canOperate = booking.status === 'pending' || booking.status === 'confirmed';
               return (
-                <View
-                  key={booking.id}
-                  className="border-b border-[#f3f2ed] py-3 last:border-b-0"
-                >
+                <View key={booking.id} className="border-b border-[#f3f2ed] py-3 last:border-b-0">
                   <View className="flex items-start justify-between gap-2">
                     <View className="min-w-0 flex-1">
                       <View className="flex items-center gap-2">
@@ -600,7 +602,12 @@ const LeadDetailPage: React.FC = () => {
                         ) : null}
                       </View>
                     </View>
-                    <View className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', statusMeta.className)}>
+                    <View
+                      className={cn(
+                        'shrink-0 rounded-full px-[14rpx] py-[4rpx]',
+                        statusMeta.className,
+                      )}
+                    >
                       <Text className="text-[22rpx] font-bold">{statusMeta.label}</Text>
                     </View>
                   </View>
@@ -781,7 +788,12 @@ const LeadDetailPage: React.FC = () => {
                 )}
                 onClick={() => setProxyMode(item.key)}
               >
-                <Text className={cn('text-[28rpx]', active ? 'text-primary font-medium' : 'text-foreground')}>
+                <Text
+                  className={cn(
+                    'text-[28rpx]',
+                    active ? 'text-primary font-medium' : 'text-foreground',
+                  )}
+                >
                   {item.label}
                 </Text>
               </View>
@@ -798,7 +810,10 @@ const LeadDetailPage: React.FC = () => {
           <Icon name="mdi-calendar" size={22} className="text-muted-foreground" />
         </View>
 
-        <View className="rounded-full bg-gradient-primary py-[24rpx] center" onClick={handleProxyBookConfirm}>
+        <View
+          className="rounded-full bg-gradient-primary py-[24rpx] center"
+          onClick={handleProxyBookConfirm}
+        >
           <Text className="text-[28rpx] font-medium text-white">去预约</Text>
         </View>
       </BottomSheet>

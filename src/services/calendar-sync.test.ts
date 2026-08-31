@@ -1,18 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import dayjs from 'dayjs';
 import Taro from '@tarojs/taro';
+import dayjs from 'dayjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetCalendarSyncEventMapForTest,
   calendarSyncService,
   expandScheduleOccurrences,
 } from '@/services/calendar-sync';
+import type { Schedule } from '@/types/schedule';
+import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import {
   __resetCalendarSyncSettingsForTest,
   getCalendarSyncSettings,
   saveCalendarSyncSettings,
 } from '@/utils/calendar-sync-settings';
-import type { Schedule } from '@/types/schedule';
-import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 
 vi.mock('@/services', () => ({
   classService: { getByTeacher: vi.fn().mockResolvedValue([]) },
