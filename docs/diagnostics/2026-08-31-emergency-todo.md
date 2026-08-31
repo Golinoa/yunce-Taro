@@ -34,8 +34,10 @@
 
 ## 备份记录
 
-| 端 | 仓库 | 备份说明 |
-|----|------|----------|
-| 小程序 | `yunceTaro` | `chore: backup 2026-08-31 dual-app WIP + emergency backlog` |
-| 后端 API | `yunce-back/yunce-backend` | `chore: backup 2026-08-31 dual-app BE WIP + emergency backlog` |
-| 运营端 monorepo | `yunce-back`（含 admin + submodule 指针） | `chore: backup 2026-08-31 admin + backend pointer` |
+| 端 | 仓库 | 提交 | 说明 |
+|----|------|------|------|
+| 小程序 | `yunceTaro` | `c6543f3` | `chore: backup 2026-08-31 dual-app WIP + emergency backlog`（未 push，ahead 2） |
+| 后端 API | `yunce-back/yunce-backend` | `08e831c` | `chore: backup 2026-08-31 dual-app BE WIP + emergency backlog`（未 push，ahead 2） |
+| 运营端 monorepo | `yunce-back` | `d4fa92a` | admin SES WIP + submodule → `08e831c`（未 push，ahead 2） |
+
+> 注意：后端备份提交中误入 2 个路径异常的 `*-audit.json`（Windows 路径乱码）；**勿 push 到公开远程前先清掉**。未包含 `coverage/`、`.workbuddy` 记忆文件。
