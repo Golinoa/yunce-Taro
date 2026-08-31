@@ -197,7 +197,7 @@ const Profile: React.FC = () => {
   const loadTeacherStats = useCallback(async () => {
     if (!profile?.id || !isTeacher) return;
     try {
-      const teacher = await teacherService.getById(profile.id);
+      const teacher = await teacherService.getMe();
       setTeacherStatValues({
         hours: Number(teacher?.hours ?? 0),
         lessonCount: Number(teacher?.lessonCount ?? 0),

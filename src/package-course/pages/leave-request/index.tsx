@@ -14,7 +14,6 @@ import type { Class } from '@/types/class';
 import type { LeaveRequest, LeaveType, LeaveStatus } from '@/types/leave-request';
 import type { Schedule } from '@/types/schedule';
 import { isStaffRole, useAuth } from '@/utils/auth';
-import { isUseMock } from '@/utils/build-env';
 import { logError } from '@/utils/logger';
 import {
   buildUpcomingFixedLessons,
@@ -626,8 +625,7 @@ const LeaveRequestPage: React.FC = () => {
 
             <FormRow label="申请类型" required border={false}>
               <View className="flex flex-row gap-[16rpx]">
-                {((isUseMock() ? ['leave', 'reschedule'] : ['leave']) as LeaveType[]).map(
-                  (type) => {
+                {(['leave'] as LeaveType[]).map((type) => {
                   const active = leaveType === type;
                   return (
                     <View
@@ -636,13 +634,6 @@ const LeaveRequestPage: React.FC = () => {
                         active ? 'bg-primary border-primary' : 'bg-card border-border'
                       }`}
                       onClick={() => {
-                        if (type === 'reschedule' && !isUseMock()) {
-                          Taro.showToast({
-                            title: '真实联调阶段暂不支持调课申请',
-                            icon: 'none',
-                          });
-                          return;
-                        }
                         setLeaveType(type);
                         setTargetLessonKey('');
                       }}

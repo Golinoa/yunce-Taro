@@ -21,15 +21,6 @@ import type {
   IncomeCategoryType,
   TransactionRecordType,
 } from '@/types/data-center';
-import { loadDataCenterMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
-
-let dcMockMod: Awaited<ReturnType<typeof loadDataCenterMock>> | undefined;
-async function dc() {
-  dcMockMod ??= await loadDataCenterMock();
-  return dcMockMod;
-}
-
 import { get, post } from '@/utils/request';
 
 // ============================================
@@ -202,87 +193,69 @@ export const dataCenterService = {
   // ---------- 场馆概览 ----------
   /** 获取场馆经营概览 */
   getVenueOverview: async (): Promise<VenueOverviewType> =>
-    isUseMock()
-      ? (await dc()).mockGetVenueOverview()
-      : get<BackendVenueOverviewResponse>('/data-center/venue-overview'),
+    get<BackendVenueOverviewResponse>('/data-center/venue-overview'),
 
   // ---------- 营收趋势 ----------
   /** 获取营收趋势 */
   getRevenueTrend: async (params: RevenueTrendQueryParams): Promise<RevenueTrendType> =>
-    isUseMock()
-      ? (await dc()).mockGetRevenueTrend(params.period)
-      : get<BackendRevenueTrendResponse>(`/data-center/revenue-trend?period=${params.period}`),
+    get<BackendRevenueTrendResponse>(`/data-center/revenue-trend?period=${params.period}`),
 
   // ---------- 财务数据 ----------
   /** 获取财务数据卡片 */
   getFinanceData: async (): Promise<FinanceDataType> =>
-    isUseMock() ? (await dc()).mockGetFinanceData() : get<BackendFinanceDataResponse>('/data-center/finance'),
+    get<BackendFinanceDataResponse>('/data-center/finance'),
 
   /** 获取财务详情 */
   getFinanceDetail: async (params: FinanceDetailQueryParams): Promise<FinanceDetailType> =>
-    isUseMock()
-      ? (await dc()).mockGetFinanceDetail(params)
-      : get<FinanceDetailType>(
+    get<FinanceDetailType>(
           `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
         ),
 
   // ---------- 会员数据 ----------
   /** 获取会员数据卡片 */
   getMemberData: async (): Promise<MemberDataType> =>
-    isUseMock() ? (await dc()).mockGetMemberData() : get<BackendMemberDataResponse>('/data-center/member'),
+    get<BackendMemberDataResponse>('/data-center/member'),
 
   /** 获取会员详情 */
   getMemberDetail: async (params: MemberDetailQueryParams): Promise<MemberDetailType> =>
-    isUseMock()
-      ? (await dc()).mockGetMemberDetail(params)
-      : get<MemberDetailType>(
+    get<MemberDetailType>(
           `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
         ),
 
   // ---------- 卡项数据 ----------
   /** 获取卡项数据卡片 */
   getCardData: async (): Promise<CardDataType> =>
-    isUseMock() ? (await dc()).mockGetCardData() : get<BackendCardDataResponse>('/data-center/card'),
+    get<BackendCardDataResponse>('/data-center/card'),
 
   /** 获取卡项详情 */
   getCardDetail: async (params: CardDetailQueryParams): Promise<CardDetailType> =>
-    isUseMock()
-      ? (await dc()).mockGetCardDetail(params)
-      : get<CardDetailType>(
+    get<CardDetailType>(
           `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
         ),
 
   // ---------- 薪资数据 ----------
   /** 获取薪资数据卡片 */
   getSalaryData: async (): Promise<SalaryDataType> =>
-    isUseMock() ? (await dc()).mockGetSalaryData() : get<BackendSalaryDataResponse>('/data-center/salary'),
+    get<BackendSalaryDataResponse>('/data-center/salary'),
 
   /** 获取薪资详情 */
   getSalaryDetail: async (params: SalaryDetailQueryParams): Promise<SalaryDetailType> =>
-    isUseMock()
-      ? (await dc()).mockGetSalaryDetail(params)
-      : get<SalaryDetailType>(
+    get<SalaryDetailType>(
           `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
         ),
 
   // ---------- 记一笔 ----------
   /** 获取支出分类列表 */
   getExpenseCategories: async (): Promise<ExpenseCategoryType[]> =>
-    isUseMock()
-      ? (await dc()).mockGetExpenseCategories()
-      : get<ExpenseCategoryType[]>('/data-center/expense-categories'),
+    get<ExpenseCategoryType[]>('/data-center/expense-categories'),
 
   /** 获取收入分类列表 */
   getIncomeCategories: async (): Promise<IncomeCategoryType[]> =>
-    isUseMock()
-      ? (await dc()).mockGetIncomeCategories()
-      : get<IncomeCategoryType[]>('/data-center/income-categories'),
+    get<IncomeCategoryType[]>('/data-center/income-categories'),
 
   /** 创建交易记录（记一笔） */
   createTransaction: async (data: CreateTransactionParams): Promise<{ success: boolean }> =>
-    isUseMock()
-      ? (await dc()).mockCreateTransaction(data)
-      : post<{ success: boolean }>(
+    post<{ success: boolean }>(
           '/data-center/transaction',
           data as unknown as Record<string, unknown>,
         ),

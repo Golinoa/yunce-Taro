@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import Taro from '@tarojs/taro';
 import { post } from '@/utils/request';
 import { uploadService } from '@/services/upload';
+import Taro from '@tarojs/taro';
 
 vi.mock('@/utils/request', () => ({
   post: vi.fn(),
@@ -19,17 +19,7 @@ beforeEach(() => {
 });
 
 describe('uploadService', () => {
-  it('mock 模式返回本地路径', async () => {
-    const localPath = 'wxfile://usr/uploads/test.jpg';
-    const result = await uploadService.upload(localPath, { type: 'avatar' });
-    expect(result.url).toBe(localPath);
-    expect(mockedPost).not.toHaveBeenCalled();
-  });
-
   it('真实模式：先拿 token 再直传七牛', async () => {
-    const originalEnv = process.env.VITE_USE_MOCK;
-    process.env.VITE_USE_MOCK = 'false';
-
     mockedPost.mockResolvedValue({
       token: 'qiniu-token',
       uploadUrl: 'https://upload.qiniu.com',
@@ -66,14 +56,9 @@ describe('uploadService', () => {
     });
     expect(result.url).toBe('https://res.example.com/avatar/20260827/abcd_avatar.jpg');
     expect(result.filename).toBe('photo.jpg');
-
-    process.env.VITE_USE_MOCK = originalEnv;
   });
 
   it('七牛上传失败时抛出错误', async () => {
-    const originalEnv = process.env.VITE_USE_MOCK;
-    process.env.VITE_USE_MOCK = 'false';
-
     mockedPost.mockResolvedValue({
       token: 'qiniu-token',
       uploadUrl: 'https://upload.qiniu.com',
@@ -90,7 +75,5 @@ describe('uploadService', () => {
     });
 
     await expect(uploadService.upload('wxfile://tmp/a.jpg')).rejects.toThrow('network error');
-
-    process.env.VITE_USE_MOCK = originalEnv;
   });
 });

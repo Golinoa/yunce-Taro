@@ -19,7 +19,6 @@ import { dataCenterService } from '@/services/data-center';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import { useAuth } from '@/utils/auth';
-import { isUseMock } from '@/utils/build-env';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
@@ -561,7 +560,7 @@ const DataCenter: React.FC = () => {
         </View>
       </View>
 
-      {isUseMock() ? <MockIdentitySwitcher /> : null}
+      <MockIdentitySwitcher />
     </View>
   );
 };

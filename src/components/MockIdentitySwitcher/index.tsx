@@ -1,5 +1,5 @@
 /**
- * MockIdentitySwitcher — 仅 mock 包显示的左上角身份下拉
+ * DevIdentitySwitcher — 仅测环境包（isDevApiEnv）显示的左上角身份下拉
  * 用于快速切换管理员 / 校长 / 教师 / 家长，方便对照各端 UI。
  *
  * 必须用 RootPortal：App 根上的 fixed 在微信里常被页面层盖住，刷新也看不见。
@@ -10,10 +10,10 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  MOCK_SWITCH_ACCOUNTS,
+  DEV_SWITCH_ACCOUNTS,
   formatMockSwitchLabel,
-} from '@/constants/mock-switch-accounts';
-import { isUseMock } from '@/utils/build-env';
+} from '@/constants/dev-switch-accounts';
+import { isDevApiEnv } from '@/utils/build-env';
 import { useAuth } from '@/utils/auth';
 import './index.scss';
 
@@ -46,14 +46,16 @@ const MockIdentitySwitcher: React.FC = () => {
   const [switching, setSwitching] = useState(false);
 
   const currentLabel = useMemo(() => {
-    const matched = MOCK_SWITCH_ACCOUNTS.find((item) => item.userId === profile?.id);
+    const matched = DEV_SWITCH_ACCOUNTS.find(
+      (item) => item.userId === profile?.id || item.email === profile?.email,
+    );
     if (matched) {
       return formatMockSwitchLabel(matched.name, matched.roleLabel);
     }
     const name = profile?.name || '未登录';
     const role = currentRole ? ROLE_LABELS[currentRole] || currentRole : '游客';
     return formatMockSwitchLabel(name, role);
-  }, [currentRole, profile?.id, profile?.name]);
+  }, [currentRole, profile?.email, profile?.id, profile?.name]);
 
   const handlePick = useCallback(
     async (username: string, password: string) => {
@@ -77,7 +79,7 @@ const MockIdentitySwitcher: React.FC = () => {
     [signInWithUsername, switching],
   );
 
-  if (!isUseMock()) return null;
+  if (!isDevApiEnv()) return null;
 
   return (
     <RootPortal>
@@ -86,7 +88,7 @@ const MockIdentitySwitcher: React.FC = () => {
           className={cn('mock-id-trigger', open && 'mock-id-trigger--open')}
           onClick={() => setOpen((v) => !v)}
         >
-          <Text className="mock-id-trigger__badge">MOCK</Text>
+          <Text className="mock-id-trigger__badge">DEV</Text>
           <Text className="mock-id-trigger__text">{currentLabel}</Text>
           <Text className="mock-id-trigger__caret">{open ? '▴' : '▾'}</Text>
         </View>
@@ -95,10 +97,11 @@ const MockIdentitySwitcher: React.FC = () => {
           <>
             <View className="mock-id-mask" onClick={() => setOpen(false)} catchMove />
             <View className="mock-id-panel">
-              <Text className="mock-id-panel__title">快速切换身份（仅 Mock）</Text>
+              <Text className="mock-id-panel__title">快速切换身份（测环境）</Text>
               <ScrollView scrollY className="mock-id-panel__scroll" showScrollbar={false}>
-                {MOCK_SWITCH_ACCOUNTS.map((item) => {
-                  const isCurrent = profile?.id === item.userId;
+                {DEV_SWITCH_ACCOUNTS.map((item) => {
+                  const isCurrent =
+                    profile?.id === item.userId || profile?.email === item.email;
                   const label = formatMockSwitchLabel(item.name, item.roleLabel);
 
                   return (

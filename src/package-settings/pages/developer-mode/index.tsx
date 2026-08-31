@@ -13,7 +13,7 @@ import { subscribeMessageService } from '@/services/subscribe-message';
 import { chooseImageTemp, uploadImage } from '@/utils/image-upload';
 import type { SubscribeFlowId, SubscribeRenewPresetId } from '@/types/subscribe-message';
 import { useAuth } from '@/utils/auth';
-import { getApiBaseUrl, isUseMock } from '@/utils/build-env';
+import { getApiBaseUrl, isDevApiEnv } from '@/utils/build-env';
 import {
   clearDeveloperModeSession,
   getDeveloperModeRemainingMs,
@@ -31,8 +31,8 @@ import {
   buildMockGroupSlotInvitePath,
 } from '@/utils/mock-share-demo';
 
-const USE_MOCK = isUseMock();
 const API_BASE = getApiBaseUrl();
+const IS_DEV_API = isDevApiEnv();
 
 interface DevAction {
   id: string;
@@ -189,13 +189,13 @@ const DeveloperMode: React.FC = () => {
         title: '环境信息',
         actions: [
           {
-            id: 'env-mock',
-            label: `Mock 模式：${USE_MOCK ? '开启' : '关闭'}`,
+            id: 'env-api',
+            label: `API 环境：${IS_DEV_API ? '测环境' : '生产'}`,
             hint: API_BASE,
             run: () => {
               Taro.showModal({
                 title: '运行环境',
-                content: `Mock: ${USE_MOCK ? '是' : '否'}\nAPI: ${API_BASE}\n版本: v${APP_VERSION}`,
+                content: `测环境: ${IS_DEV_API ? '是' : '否'}\nAPI: ${API_BASE}\n版本: v${APP_VERSION}`,
                 showCancel: false,
               });
             },

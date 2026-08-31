@@ -5,7 +5,6 @@
  * 真实：POST /upload/token 拿凭证 → 直传七牛 → 返回 CDN url。
  */
 import Taro from '@tarojs/taro';
-import { isUseMock } from '@/utils/build-env';
 import { post } from '@/utils/request';
 
 /** 与后端 upload-token 一致的类型 */
@@ -36,21 +35,8 @@ interface UploadTokenPayload {
   url: string;
 }
 
-function isMockMode(): boolean {
-  return isUseMock();
-}
-
 function resolveFilename(filePath: string, filename?: string): string {
   return filename || filePath.split('/').pop() || 'unknown.jpg';
-}
-
-/**
- * mock 上传：直接把本地文件路径作为占位 URL 返回
- * 保证「选图预览」与「再次进入回填显示」在 mock 下都能看到图片。
- */
-async function mockUploadFile(filePath: string, filename: string): Promise<UploadResult> {
-  await new Promise((r) => setTimeout(r, 500));
-  return { url: filePath, filename };
 }
 
 async function fetchUploadToken(type: UploadType, filename: string): Promise<UploadTokenPayload> {
@@ -112,11 +98,6 @@ export const uploadService = {
   upload: (filePath: string, options: UploadOptions = {}): Promise<UploadResult> => {
     const type = options.type ?? 'common';
     const filename = resolveFilename(filePath, options.filename);
-
-    if (isMockMode()) {
-      return mockUploadFile(filePath, filename);
-    }
-
     return realUploadFile(filePath, type, filename);
   },
 

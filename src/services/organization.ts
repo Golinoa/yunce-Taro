@@ -8,8 +8,6 @@
  * - GET  /share/context?inviteCode=xxx         分享上下文（落地页展示邀请人）
  */
 import Taro from '@tarojs/taro';
-import { isUseMock } from '@/utils/build-env';
-import { loadOrganizationMock } from '@/utils/mock-loaders';
 import { get, post, put } from '@/utils/request';
 
 /** mock 会员状态本地缓存（演示开通/续费） */
@@ -66,8 +64,7 @@ export interface ShareContext {
 export const organizationService = {
   /** 绑定机构（学员邀请码 → 自动创建子女 + 机构用户 MEMBER） */
   bind: async (inviteCode: string): Promise<BindOrganizationResult> => {
-    if (isUseMock()) { const { mockBindOrganization } = await loadOrganizationMock(); return mockBindOrganization(inviteCode); }
-
+    
     return post<BindOrganizationResult>('/organization/bind', { inviteCode });
   },
 
@@ -76,8 +73,7 @@ export const organizationService = {
     studentParentId: string,
     relation: StudentParentRelation,
   ): Promise<{ studentParentId: string; relation: StudentParentRelation }> => {
-    if (isUseMock()) { const { mockSaveRelation } = await loadOrganizationMock(); return mockSaveRelation(studentParentId, relation); }
-
+    
     return post(`/organization/bindings/${encodeURIComponent(studentParentId)}/relation`, {
       relation,
     });
@@ -85,58 +81,29 @@ export const organizationService = {
 
   /** 我的机构状态 + 待确认关系（首页 useDidShow 调用） */
   getMyOrganization: async (): Promise<MyOrganizationResult> => {
-    if (isUseMock()) { const { mockGetMyOrganization } = await loadOrganizationMock(); return mockGetMyOrganization(); }
-
+    
     return get<MyOrganizationResult>('/organization/me');
   },
 
   /** 分享上下文（分享落地页展示「xx 邀请你」） */
   getShareContext: async (inviteCode: string): Promise<ShareContext> => {
-    if (isUseMock()) { const { mockGetShareContext } = await loadOrganizationMock(); return mockGetShareContext(inviteCode); }
-
+    
     return get<ShareContext>('/share/context', { inviteCode });
   },
 
   /** 读取机构设置（校长/管理员，请假自动审批开关等） */
   getSettings: async (): Promise<OrganizationSettings> => {
-    if (isUseMock()) {
-      return { leaveAutoApprove: true };
-    }
-    return get<OrganizationSettings>('/organization/settings');
+        return get<OrganizationSettings>('/organization/settings');
   },
 
   /** 更新机构设置（校长/管理员） */
   updateSettings: async (input: { leaveAutoApprove?: boolean }): Promise<OrganizationSettings> => {
-    if (isUseMock()) {
-      return { leaveAutoApprove: input.leaveAutoApprove ?? true };
-    }
-    return put<OrganizationSettings>('/organization/settings', input);
+        return put<OrganizationSettings>('/organization/settings', input);
   },
 
   /** 机构配额使用率（校长/管理员，P1） */
   getQuotaUsage: async (): Promise<OrganizationQuotaUsage> => {
-    if (isUseMock()) {
-      try {
-        const raw = Taro.getStorageSync(MOCK_MEMBERSHIP_KEY);
-        if (raw) {
-          return JSON.parse(String(raw)) as OrganizationQuotaUsage;
-        }
-      } catch {
-        /* ignore */
-      }
-      return {
-        organizationId: 'org-mock',
-        organizationName: '松果排课',
-        versionCode: 'FREE',
-        versionName: '众创版',
-        expireAt: null,
-        members: { current: 5, max: 40 },
-        employees: { current: 1, max: 2 },
-        campuses: { current: 1, max: 1 },
-        features: { leadTrace: false, batchImportExport: false, marketing: false, multiCampus: false },
-      };
-    }
-    return get<OrganizationQuotaUsage>('/organization/quota-usage');
+        return get<OrganizationQuotaUsage>('/organization/quota-usage');
   },
 
   /**
@@ -144,10 +111,7 @@ export const organizationService = {
    * 生产：GET /organization/entitlements
    */
   getEntitlements: async (): Promise<OrganizationQuotaUsage> => {
-    if (isUseMock()) {
-      return organizationService.getQuotaUsage();
-    }
-    const data = await get<OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }>(
+        const data = await get<OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }>(
       '/organization/entitlements',
     );
     const features = {
@@ -165,7 +129,6 @@ export const organizationService = {
   getMembershipTips: async (): Promise<
     import('@/constants/membership-tips').MembershipTipDef[] | null
   > => {
-    if (isUseMock()) return null;
     try {
       const data = await get<{ tips?: import('@/constants/membership-tips').MembershipTipDef[] }>(
         '/organization/membership-tips',
@@ -192,107 +155,7 @@ export const organizationService = {
       return { error: { message: '激活码格式不正确' } };
     }
 
-    if (isUseMock()) {
-      await new Promise((r) => setTimeout(r, 450));
-      const current = await organizationService.getQuotaUsage();
-      const now = new Date();
-      const base =
-        current.expireAt && new Date(current.expireAt).getTime() > now.getTime()
-          ? new Date(current.expireAt)
-          : now;
-
-      let versionCode: OrganizationQuotaUsage['versionCode'] = current.versionCode;
-      let versionName = current.versionName;
-      let durationDays = 365;
-      let planName = '标准年卡';
-
-      if (trimmed.includes('FLAGSHIP')) {
-        versionCode = 'FLAGSHIP';
-        versionName = '旗舰版';
-        planName = '旗舰年卡';
-        durationDays = 365;
-      } else if (trimmed.includes('BASIC')) {
-        versionCode = 'BASIC';
-        versionName = '基础版';
-        planName = '基础年卡';
-        durationDays = 365;
-      } else if (trimmed.includes('STANDARD') || trimmed === 'HXK-DEMO-STANDARD') {
-        versionCode = 'STANDARD';
-        versionName = '标准版';
-        planName = '标准年卡';
-        durationDays = 365;
-      } else if (trimmed.includes('RENEW')) {
-        durationDays = 180;
-        planName = '续费半年卡';
-      } else if (!trimmed.startsWith('HXK-')) {
-        return { error: { message: '激活码不存在' } };
-      } else if (versionCode === 'FREE' || versionCode === 'TRIAL') {
-        versionCode = 'STANDARD';
-        versionName = '标准版';
-      }
-
-      base.setDate(base.getDate() + durationDays);
-      const expireAt = base.toISOString();
-      const next: OrganizationQuotaUsage = {
-        ...current,
-        versionCode,
-        versionName,
-        expireAt,
-        members: {
-          ...current.members,
-          max:
-            versionCode === 'FLAGSHIP'
-              ? -1
-              : versionCode === 'STANDARD'
-                ? 220
-                : versionCode === 'BASIC'
-                  ? 100
-                  : 40,
-        },
-        employees: {
-          ...current.employees,
-          max:
-            versionCode === 'FLAGSHIP'
-              ? -1
-              : versionCode === 'STANDARD'
-                ? 8
-                : versionCode === 'BASIC'
-                  ? 5
-                  : 2,
-        },
-        campuses: {
-          ...current.campuses,
-          max: versionCode === 'FLAGSHIP' ? 10 : 1,
-        },
-        features: {
-          leadTrace: versionCode === 'STANDARD' || versionCode === 'FLAGSHIP',
-          batchImportExport: versionCode === 'FLAGSHIP',
-          marketing: versionCode === 'STANDARD' || versionCode === 'FLAGSHIP',
-          multiCampus: versionCode === 'FLAGSHIP',
-        },
-      };
-      try {
-        Taro.setStorageSync(MOCK_MEMBERSHIP_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-
-      const validUntil = expireAt.slice(0, 10);
-      const upgraded = versionCode !== current.versionCode;
-      return {
-        expireAt,
-        versionCode,
-        versionName,
-        planName,
-        durationDays,
-        versionUpgraded: upgraded,
-        message: upgraded
-          ? `已开通${versionName}，有效期至 ${validUntil}`
-          : `续费成功，有效期至 ${validUntil}`,
-        error: null,
-      };
-    }
-
+    
     try {
       const data = await post<{
         expireAt?: string | null;

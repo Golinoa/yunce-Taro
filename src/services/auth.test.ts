@@ -1,39 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Taro from '@tarojs/taro';
 
-const mockLogin = vi.fn();
-const mockGetSession = vi.fn();
-
-vi.mock('@/utils/mock-loaders', () => ({
-  loadAuthMock: vi.fn(async () => ({
-    mockLogin,
-    mockGetSession,
-    mockWechatLogin: vi.fn(),
-    mockBindWechatCredentials: vi.fn(),
-    mockPhoneLogin: vi.fn(),
-    mockCheckLoginAccount: vi.fn(),
-    mockPrepareEmailLogin: vi.fn(),
-    mockLoginByEmailCode: vi.fn(),
-    mockPrepareAccountRecovery: vi.fn(),
-    mockRecoverAccountByEmailCode: vi.fn(),
-    mockPreparePasswordReset: vi.fn(),
-    mockResetPasswordByEmailCode: vi.fn(),
-    mockRegisterStep1: vi.fn(),
-    mockRegisterStep1ByPhone: vi.fn(),
-    mockRegisterStep2: vi.fn(),
-    mockRegisterStep3: vi.fn(),
-    mockVerifyCampusCode: vi.fn(),
-    mockVerifyStudentCode: vi.fn(),
-    mockValidateInviteCode: vi.fn(),
-    mockSwitchIdentity: vi.fn(),
-    mockUpdateProfile: vi.fn(),
-    mockGetProfileExtra: vi.fn(),
-    mockAddIdentity: vi.fn(),
-    mockRestoreRegisterDrafts: vi.fn(),
-    mockLogout: vi.fn(),
-  })),
-}));
-
 vi.mock('@/utils/request', () => ({
   post: vi.fn(),
   get: vi.fn(),
@@ -47,16 +14,25 @@ vi.mock('@/services/campus-invite', () => ({
   },
 }));
 
+vi.mock('@/utils/build-env', () => ({
+  isUseMock: () => false,
+  isDevApiEnv: () => true,
+  getApiBaseUrl: () => 'https://dev.chancore.cn/api/app/v1',
+  PROD_API_BASE_URL: 'https://api.chancore.cn/api/app/v1',
+  API_BASE_URL: 'https://dev.chancore.cn/api/app/v1',
+}));
+
 describe('auth service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('VITE_USE_MOCK', 'false');
+    vi.resetModules();
     Taro.setStorageSync('yunce-edu-register-draft-local', '');
   });
 
-  it('真实模式下支持邮箱验证码登录能力', async () => {
+  it('测环境支持账号密码与邮箱验证码登录能力', async () => {
     const { authCapabilities } = await import('@/services/auth');
     expect(authCapabilities.supportsEmailCodeLogin).toBe(true);
+    expect(authCapabilities.supportsAccountPasswordLogin).toBe(true);
     expect(authCapabilities.usesMockRegister).toBe(false);
   });
 
@@ -74,25 +50,35 @@ describe('auth service', () => {
     expect(invalid.error?.message).toContain('手机号');
   });
 
-  it('mock 模式下 login 动态加载 auth mock', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true');
-    vi.resetModules();
-    mockLogin.mockResolvedValueOnce({
-      session: { access_token: 't' },
-      profile: { id: '1' },
-      error: null,
+  it('login 走 /auth/password-login（短用户名映射邮箱）', async () => {
+    const { post } = await import('@/utils/request');
+    vi.mocked(post).mockResolvedValueOnce({
+      token: 'tok',
+      refreshToken: 'rt',
+      expiresIn: 3600,
+      user: {
+        id: 'user-principal-001',
+        profileId: 'profile-user-principal-001',
+        nickname: '万老师',
+        role: 'PRINCIPAL',
+        avatar: null,
+        phone: '13800000001',
+      },
     });
 
     const { login } = await import('@/services/auth');
-    const { loadAuthMock } = await import('@/utils/mock-loaders');
+    const result = await login('principal1', '123456');
 
-    await login('principal1', '123456');
-
-    expect(loadAuthMock).toHaveBeenCalled();
-    expect(mockLogin).toHaveBeenCalledWith('principal1', '123456');
+    expect(post).toHaveBeenCalledWith(
+      '/auth/password-login',
+      { email: 'principal1@yunce.com', password: '123456' },
+      { skipAuth: true },
+    );
+    expect(result.error).toBeNull();
+    expect(result.session?.access_token).toBe('tok');
   });
 
-  it('getTestAccounts 在非 mock 模式返回空数组', async () => {
+  it('getTestAccounts 在真链路返回空数组', async () => {
     const { getTestAccounts, getTestPassword } = await import('@/services/auth');
     await expect(getTestAccounts()).resolves.toEqual([]);
     await expect(getTestPassword()).resolves.toBe('');

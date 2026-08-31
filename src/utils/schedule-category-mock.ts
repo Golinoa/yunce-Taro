@@ -1,15 +1,10 @@
 /**
- * Mock 专用：课表分类名解析（生产构建时由 webpack 替换为 stub）
+ * 课表分类名解析（真链路：无本地 mock 班级表时返回 undefined，由调用方按 mode 回退）
  */
-import { listCourseCategoriesSync } from '@/data/course-category';
-import { CLASSES } from '@/data/mock-database';
-
-export function resolveCategoryLabelByClassIdImpl(classId: string): string | undefined {
-  const cls = CLASSES.find((item) => item.id === classId);
-  if (!cls?.categoryId) return undefined;
-  return listCourseCategoriesSync().find((item) => item.id === cls.categoryId)?.name;
+export function resolveCategoryLabelByClassIdImpl(_classId: string): string | undefined {
+  return undefined;
 }
 
-export function resolveCategoryLabelByCategoryIdImpl(categoryId: string): string | undefined {
-  return listCourseCategoriesSync().find((item) => item.id === categoryId)?.name;
+export function resolveCategoryLabelByCategoryIdImpl(_categoryId: string): string | undefined {
+  return undefined;
 }

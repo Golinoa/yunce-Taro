@@ -7,7 +7,7 @@ import { lessonRecordService } from '@/services';
 import { teacherService } from '@/services/teacher';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { PayHistoryRecord } from '@/types/teacher';
-import { isUseMock } from '@/utils/build-env';
+
 import { logError } from '@/utils/logger';
 
 export type TeacherMonthlyFlowTab =
@@ -289,11 +289,7 @@ async function buildLiveBundle(month: string, teacherId: string): Promise<Teache
 export const teacherMonthlyFlowService = {
   /** 获取指定月份的月流水聚合数据 */
   getMonthlyFlow: async (month: string, teacherId?: string): Promise<TeacherMonthlyFlowBundle> => {
-    if (isUseMock()) {
-      await new Promise((r) => setTimeout(r, 120));
-      return buildMockBundle(month);
-    }
-    if (!teacherId) return emptyBundle(month);
+        if (!teacherId) return emptyBundle(month);
     return buildLiveBundle(month, teacherId);
   },
 };

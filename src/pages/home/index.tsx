@@ -48,7 +48,6 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
-import { isUseMock } from '@/utils/build-env';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -1081,7 +1080,7 @@ const Home: React.FC = () => {
         onClose={() => setCampusGuideVisible(false)}
       />
 
-      {isUseMock() ? <MockIdentitySwitcher /> : null}
+      <MockIdentitySwitcher />
     </>
   );
 };

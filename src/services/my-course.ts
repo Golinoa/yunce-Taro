@@ -4,8 +4,8 @@
  * 家长端「我的约课」：生产读 class-booking + private-bookings；本地仅作离线缓存。
  */
 
-import { loadMyCourseMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
+
+
 import {
   readParentBookings,
   updateParentBookingStatus,
@@ -73,11 +73,7 @@ function mapClassStatus(status: string): MyCourseStatus {
 export const myCourseService = {
   /** 获取我的课程列表 */
   getList: async (userId?: string): Promise<MyCourseItem[]> => {
-    if (isUseMock()) {
-      const { mockGetMyCourseList } = await loadMyCourseMock();
-      return mockGetMyCourseList();
-    }
-    if (!userId) return [];
+        if (!userId) return [];
 
     const [privateResult, classResult] = await Promise.allSettled([
       privateBookingService.listMine(),
@@ -134,11 +130,7 @@ export const myCourseService = {
 
   /** 取消预约/排队 */
   cancel: async (bookingId: string): Promise<void> => {
-    if (isUseMock()) {
-      const { mockCancelMyCourse } = await loadMyCourseMock();
-      return mockCancelMyCourse(bookingId);
-    }
-    let cancelledOnServer = false;
+        let cancelledOnServer = false;
     try {
       await privateBookingService.cancel(bookingId);
       cancelledOnServer = true;

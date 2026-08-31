@@ -5,18 +5,16 @@
  */
 import type { RecentGroup, RecentStudent } from '@/components/home/RecentLessonList';
 import { HOME_QUICK_ENTRIES, PARENT_HOME_QUICK_ENTRIES, TEACHER_HOME_QUICK_ENTRIES } from '@/constants/home-ui';
-import { loadHomeMock, loadMockDatabase } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
+
 import type {
   StatsPeriod,
   StatsData,
   QuickEntry,
-  RecentGroupData,
   HomeOperationContentData,
   OperationActionConfigData,
   OperationActivityItemData,
   OperationBannerItemData,
-} from '@/data/home';
+} from '@/types/home-ui';
 import type { TodoItem } from '@/types/home-todo';
 import type { UserRole } from '@/types/profile';
 import type { Schedule, ScheduleColor } from '@/types/schedule';
@@ -38,19 +36,6 @@ type RawHomeTeacher = {
   monthHours?: number;
   pendingSalary?: number;
 };
-type HomeMockDb = Awaited<ReturnType<typeof loadMockDatabase>>;
-type MockLessonRecord = HomeMockDb['LESSON_RECORDS'][number];
-let homeMockDb: HomeMockDb | null = null;
-
-async function ensureHomeMockDb(): Promise<HomeMockDb> {
-  homeMockDb ??= await loadMockDatabase();
-  return homeMockDb;
-}
-
-function db(): HomeMockDb {
-  if (!homeMockDb) throw new Error('home mock db not loaded');
-  return homeMockDb;
-}
 
 /** 合法卡片颜色集合（与 ScheduleColor 对齐），非法值落 undefined 防止脏数据透传 */
 const SCHEDULE_COLORS: readonly ScheduleColor[] = [
@@ -926,12 +911,7 @@ export const homeService = {
     userId: string,
     role?: UserRole | null,
   ): Promise<HomeTeacherSummary | null> => {
-    if (isUseMock()) {
-      const { mockGetTeacher } = await loadHomeMock();
-      const teacher = await mockGetTeacher(userId);
-      return teacher ? mapTeacher(teacher) : null;
-    }
-
+    
     if (role === 'teacher') {
       try {
         const aggregate = await get<BackendTeacherHomeResponse>('/home/teacher');
@@ -949,7 +929,10 @@ export const homeService = {
   },
 
   /** 获取教师的学生列表 */
-  getStudents: async (teacherId: string, limit?: number) => (await loadHomeMock()).mockGetStudents(teacherId, limit),
+  getStudents: async (_teacherId: string, _limit?: number) => {
+    // 首页学员列表请走 studentService；此处保留兼容空实现
+    return [];
+  },
 
   /** 获取今日排课（校长/管理员看校区全员，老师/助教看本人相关） */
   getTodaySchedules: async (
@@ -957,12 +940,7 @@ export const homeService = {
     role?: UserRole | null,
     campusId?: string,
   ): Promise<HomeScheduleItem[]> => {
-    if (isUseMock()) {
-      await ensureHomeMockDb();
-      const { mockGetTodaySchedules } = await loadHomeMock();
-      return (await mockGetTodaySchedules(teacherId, campusId, role)).map(mapTodaySchedule);
-    }
-
+    
     if (!isStaffHomeRole(role)) {
       return [];
     }
@@ -975,22 +953,17 @@ export const homeService = {
   },
 
   /** 获取最近消课记录 */
-  getRecentRecords: async (teacherId: string, limit?: number, campusId?: string) =>
-    (await loadHomeMock()).mockGetRecentRecords(teacherId, limit, campusId),
+  getRecentRecords: async (_teacherId: string, _limit?: number, _campusId?: string) => [],
 
   /** 获取学生的课时套餐 */
-  getStudentPackages: async (studentId: string) => (await loadHomeMock()).mockGetStudentPackages(studentId),
+  getStudentPackages: async (_studentId: string) => [],
 
   /** 获取教师所有学生的剩余课时总数 */
-  getTotalRemainingHours: async (teacherId: string) => (await loadHomeMock()).mockGetTotalRemainingHours(teacherId),
+  getTotalRemainingHours: async (_teacherId: string) => 0,
 
   /** 获取未读通知数 */
   getUnreadCount: async (userId: string, role?: UserRole | null) => {
-    if (isUseMock()) {
-      const { mockGetUnreadCount } = await loadHomeMock();
-      return mockGetUnreadCount(userId);
-    }
-
+    
     if (role === 'teacher' || role === 'parent' || isPrincipalLikeRole(role)) {
       try {
         const data = await get<BackendUnreadCountResponse>('/home/notifications/unread-count');
@@ -1004,12 +977,11 @@ export const homeService = {
   },
 
   /** 获取今日已消课数 */
-  getTodayRecordCount: async (teacherId: string, campusId?: string) =>
-    (await loadHomeMock()).mockGetTodayRecordCount(teacherId, campusId),
+  getTodayRecordCount: async (_teacherId: string, _campusId?: string) => 0,
 
   /** 按时段获取统计数据 */
   getStatsByPeriod: async (teacherId: string, period: StatsPeriod, campusId?: string) => {
-    if (!isUseMock()) {
+    
       const backendPeriod = period === 'today' ? 'week' : period === 'lastWeek' ? 'week' : period;
       try {
         const params = new URLSearchParams({ period: backendPeriod });
@@ -1031,10 +1003,7 @@ export const homeService = {
           lessonAmount: 0,
         };
       }
-    }
-
-    return (await loadHomeMock()).mockGetStatsByPeriod(teacherId, period, campusId);
-  },
+      },
 
   /** 获取首页快捷入口配置 */
   getQuickEntries: (role?: UserRole | null): QuickEntry[] => {
@@ -1052,103 +1021,7 @@ export const homeService = {
    * 对接 GET /home/parent；Mock 用本地学员/排课/课包拼装
    */
   getParent: async (profileId: string): Promise<ParentHomeData | null> => {
-    if (isUseMock()) {
-      await ensureHomeMockDb();
-      const { mockGetStudentsByParent, mockGetPackagesByStudent } = await loadHomeMock();
-      const rawStudents = await mockGetStudentsByParent(profileId);
-      const todayWeekday = (new Date().getDay() || 7) as Schedule['day_of_week'];
-
-      const students: ParentHomeStudent[] = [];
-      const packageCards: ParentHomePackageCard[] = [];
-      const scheduleMap = new Map<string, HomeScheduleItem>();
-
-      for (const raw of rawStudents) {
-        const packages = await mockGetPackagesByStudent(raw.id);
-        const mappedPackages = packages.map((pkg) => {
-          const remaining = pkg.remainingHours ?? 0;
-          const total = pkg.totalHours ?? 0;
-          const used = Math.max(total - remaining, 0);
-          const card: ParentHomePackageCard = {
-            id: pkg.id,
-            name: pkg.name,
-            remainingHours: remaining,
-            usedHours: used,
-            totalHours: total,
-            studentId: raw.id,
-          };
-          packageCards.push(card);
-          return card;
-        });
-
-        students.push({
-          id: raw.id,
-          name: raw.name,
-          avatar: raw.avatar_url,
-          remainingHours: mappedPackages.reduce((sum, p) => sum + p.remainingHours, 0),
-          packages: mappedPackages,
-        });
-
-        const classIds: string[] = raw.classIds || [];
-        const todaySchedules = db().SCHEDULES.filter(
-          (s) => s.dayOfWeek === todayWeekday && classIds.includes(s.classId || ''),
-        );
-        for (const schedule of todaySchedules) {
-          if (!scheduleMap.has(schedule.id)) {
-            scheduleMap.set(schedule.id, mapTodaySchedule(schedule as RawHomeSchedule));
-          }
-        }
-      }
-
-      // 家长今日约课（团课/私教种子）并入「我的课表」，便于赵小红妈妈一眼看到全类型
-      try {
-        const { getMockParentBookingsByUser } = await import('@/data/my-booking-seed');
-        const todayStr = getTodayDateString();
-        getMockParentBookingsByUser(profileId)
-          .filter((item) => item.lessonDate === todayStr && item.status === 'booked')
-          .forEach((item) => {
-            if (scheduleMap.has(item.id)) return;
-            const [start = '00:00', end = '00:00'] = (item.timeRange || '').split('-');
-            scheduleMap.set(item.id, {
-              id: item.id,
-              teacher_id: 'teacher-001',
-              class_id: item.classId,
-              day_of_week: todayWeekday,
-              start_time: start,
-              end_time: end,
-              room: item.room,
-              color: 'primary',
-              status: 'upcoming',
-              created_at: item.createdAt,
-              updated_at: item.createdAt,
-              note: item.courseName,
-              class_info: { name: item.courseName },
-              checked_count: 0,
-              absent_count: 0,
-              leave_count: 0,
-              total_count: 1,
-              teacher_name: item.teacherName,
-              category_label: item.courseType === 'oneOnOne' ? '私教' : '团课',
-              schedule_kind: 'booking',
-            });
-          });
-      } catch {
-        // mock 种子可选
-      }
-
-      const activePackages = packageCards
-        .filter((p) => p.remainingHours > 0)
-        .sort((a, b) => a.remainingHours - b.remainingHours);
-
-      return {
-        students,
-        todaySchedules: Array.from(scheduleMap.values()).sort((a, b) =>
-          a.start_time.localeCompare(b.start_time),
-        ),
-        packages: (activePackages.length > 0 ? activePackages : packageCards).slice(0, 2),
-        unreadCount: 0,
-      };
-    }
-
+    
     try {
       const data = await get<BackendParentHomeResponse>('/home/parent');
       return mapBackendParentHome(data);
@@ -1159,7 +1032,7 @@ export const homeService = {
 
   /** 获取首页运营位内容 */
   getOperationContent: async (role?: UserRole | null): Promise<HomeOperationContent> => {
-    if (!isUseMock()) {
+    
       try {
         const data = await get<BackendHomeOperationResponse>('/home/operations');
         return mapBackendOperationContent(data);
@@ -1175,10 +1048,7 @@ export const homeService = {
           updatedAt: '',
         };
       }
-    }
-
-    return (await loadHomeMock()).mockGetOperationContent(role);
-  },
+      },
 
   /**
    * @deprecated 请使用 todoService.getList({ view: 'home', ... })
@@ -1301,12 +1171,7 @@ export const homeService = {
     role?: UserRole | null,
     campusId?: string,
   ): Promise<HomeRecentGroup[]> => {
-    if (isUseMock()) {
-      await ensureHomeMockDb();
-      const { mockGetRecentGroups } = await loadHomeMock();
-      return (await mockGetRecentGroups(teacherId, campusId)).map(mapRecentGroup);
-    }
-
+    
     if (role === 'teacher') {
       try {
         const params = new URLSearchParams();
@@ -1325,16 +1190,12 @@ export const homeService = {
   },
 
   // 家长端
-  getStudentsByParent: async (parentId: string) => (await loadHomeMock()).mockGetStudentsByParent(parentId),
+  getStudentsByParent: async (_parentId: string) => [],
   getSchedulesByStudent: async (studentId: string) => {
-    if (!isUseMock()) {
-      const student = await studentService.getById(studentId);
-      const classIds = student?.class_ids || [];
-      return scheduleService.listForParent(classIds);
-    }
-    return (await loadHomeMock()).mockGetSchedulesByStudent(studentId);
+    const student = await studentService.getById(studentId);
+    const classIds = student?.class_ids || [];
+    return scheduleService.listForParent(classIds);
   },
-  getRecordsByStudent: async (studentId: string, limit?: number) =>
-    (await loadHomeMock()).mockGetRecordsByStudent(studentId, limit),
-  getPackagesByStudent: async (studentId: string) => (await loadHomeMock()).mockGetPackagesByStudent(studentId),
+  getRecordsByStudent: async (_studentId: string, _limit?: number) => [],
+  getPackagesByStudent: async (_studentId: string) => [],
 };

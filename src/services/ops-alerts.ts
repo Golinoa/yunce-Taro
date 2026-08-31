@@ -1,10 +1,10 @@
-import { loadOpsAlertsMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
+
+
 import type {
   AttendanceAnomalyItem,
   AttendanceAnomalyKind,
   RenewalReminderItem,
-} from '@/data/ops-alerts';
+} from '@/types/ops-alerts';
 import { get, post, del } from '@/utils/request';
 
 export type { AttendanceAnomalyItem, RenewalReminderItem, AttendanceAnomalyKind };
@@ -43,45 +43,29 @@ function mapRenewalItem(raw: Record<string, unknown>): RenewalReminderItem {
 
 export const opsAlertService = {
   listAttendanceAnomalies: async (campusId?: string): Promise<AttendanceAnomalyItem[]> => {
-    if (!isUseMock()) {
+    
       const data = await get<Record<string, unknown>[]>('/ops-alerts/attendance-anomalies', {
         campusId,
       });
       return (Array.isArray(data) ? data : []).map(mapAnomalyItem);
-    }
-    const { mockListAttendanceAnomalies } = await loadOpsAlertsMock();
-    return mockListAttendanceAnomalies(campusId);
-  },
+      },
 
   listRenewalReminders: async (params?: {
     campusId?: string;
     includeMuted?: boolean;
   }): Promise<RenewalReminderItem[]> => {
-    if (!isUseMock()) {
+    
       const data = await get<Record<string, unknown>[]>('/ops-alerts/renewal-reminders', params);
       return (Array.isArray(data) ? data : []).map(mapRenewalItem);
-    }
-    const { mockListRenewalReminders } = await loadOpsAlertsMock();
-    return mockListRenewalReminders(params);
-  },
+      },
 
   muteRenewal: async (studentId: string, campusId?: string): Promise<void> => {
-    if (!isUseMock()) {
-      await post('/ops-alerts/renewal-mutes', { studentId, campusId });
-      return;
-    }
-    const { muteRenewalStudent } = await import('@/utils/renewal-mute');
-    muteRenewalStudent(studentId);
+    await post('/ops-alerts/renewal-mutes', { studentId, campusId });
   },
 
   unmuteRenewal: async (studentId: string, campusId?: string): Promise<void> => {
-    if (!isUseMock()) {
-      await del(`/ops-alerts/renewal-mutes/${encodeURIComponent(studentId)}`, {
-        campusId,
-      });
-      return;
-    }
-    const { unmuteRenewalStudent } = await import('@/utils/renewal-mute');
-    unmuteRenewalStudent(studentId);
+    await del(`/ops-alerts/renewal-mutes/${encodeURIComponent(studentId)}`, {
+      campusId,
+    });
   },
 };

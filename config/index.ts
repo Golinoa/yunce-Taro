@@ -12,8 +12,8 @@ const PROD_API_BASE_URL = 'https://api.chancore.cn/api/app/v1';
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
-  // 默认生产模式：Mock 关、API 指向线上。显式 VITE_USE_MOCK=true 才启用 mock（dev:weapp:mock / build:weapp:mock）。
-  // 生产构建若误带 VITE_USE_MOCK=true 会被强制关闭并告警（G-01 守卫）。
+  // 默认生产模式：Mock 关、API 指向线上。测环境用 build:weapp:dev / dev:weapp:dev。
+  // *:weapp:mock 脚本已移除；生产构建若误带 VITE_USE_MOCK=true 会被强制关闭并告警（G-01 守卫）。
   let useMock = process.env.VITE_USE_MOCK ?? 'false';
   // G-01 守卫：生产环境默认禁止携带 mock（线上安全）。
   // 本地演示/联调确需在产物中保留 mock 时，显式设置 TARO_ALLOW_MOCK_PROD=1 可豁免（受控通道，默认不生效）。

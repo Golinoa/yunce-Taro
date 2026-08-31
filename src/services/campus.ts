@@ -1,10 +1,6 @@
 /**
- * Service ? ? ???? API
- * ?????????? mock ????????? request ??
- * ???????? Promise<T>????????????
+ * Service 层 — 校区相关 API
  */
-import { loadCampusMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
 import type {
   CampusUIModel,
   CampusFormData,
@@ -24,18 +20,13 @@ import type {
   PartnerMode,
 } from '@/types/campus';
 import { get, post, put } from '@/utils/request';
+import { notWired } from '@/utils/not-wired';
 import {
   API_PAGE_SIZE_BATCH,
   asPaginatedResponse,
   fetchAllPages,
   type PaginatedResponse,
 } from '@/utils/pagination';
-
-let campusMockMod: Awaited<ReturnType<typeof loadCampusMock>> | undefined;
-async function cm() {
-  campusMockMod ??= await loadCampusMock();
-  return campusMockMod;
-}
 
 interface BackendNotifySettingItem {
   enabled: boolean;
@@ -134,10 +125,7 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
 export const campusService = {
   /** 校区列表（分批拉全） */
   getList: async (): Promise<CampusUIModel[]> => {
-    if (isUseMock()) {
-      return (await cm()).mockGetCampuses();
-    }
-
+    
     const list = await fetchAllPages(async (page, pageSize) => {
       const data = await get<PaginatedResponse<BackendCampusItem>>('/campuses', {
         page,
@@ -150,10 +138,7 @@ export const campusService = {
 
   /** 按 ID 获取校区 */
   getById: async (id: string): Promise<CampusUIModel | null> => {
-    if (isUseMock()) {
-      return (await (await cm()).mockGetCampusById(id)) ?? null;
-    }
-    try {
+        try {
       const raw = await get<BackendCampusItem>(`/campuses/${id}`);
       return mapBackendCampus(raw);
     } catch {
@@ -163,7 +148,6 @@ export const campusService = {
 
   /** 新增校区 */
   add: async (data: CampusFormData): Promise<CampusUIModel> => {
-    if (isUseMock()) return (await cm()).mockAddCampus(data);
     const raw = await post<BackendCampusItem>('/campuses', {
       ...data,
       hoursAlertThreshold: data.hoursAlertThreshold ?? 5,
@@ -175,81 +159,59 @@ export const campusService = {
 
   /** 更新校区 */
   update: async (id: string, data: Partial<CampusFormData>): Promise<CampusUIModel | null> => {
-    if (isUseMock()) {
-      return (await (await cm()).mockUpdateCampus(id, data)) ?? null;
-    }
-    const raw = await put<BackendCampusItem>(`/campuses/${id}`, data);
+        const raw = await put<BackendCampusItem>(`/campuses/${id}`, data);
     return mapBackendCampus(raw);
   },
 
-  /** ???? */
-  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteCampus(id),
+  /** 删除校区 */
+  delete: async (_id: string): Promise<boolean> => notWired('DELETE /campuses/:id'),
 
-  /** ????? */
-  setMain: async (id: string): Promise<boolean> => (await cm()).mockSetMainCampus(id),
+  /** 设为主校区 */
+  setMain: async (_id: string): Promise<boolean> => notWired('POST /campuses/:id/set-main'),
 };
 
 // ============================================
 // ???? Service
 // ============================================
 export const salaryModelCampusService = {
-  /** ???????? */
-  getList: async (): Promise<SalaryModel[]> => (await cm()).mockGetSalaryModels(),
+  getList: async (): Promise<SalaryModel[]> => [],
 
-  /** ?????? */
-  create: async (model: Omit<SalaryModel, 'id' | 'teacherCount'>): Promise<SalaryModel> =>
-    (await cm()).mockCreateSalaryModel(model),
+  create: async (_model: Omit<SalaryModel, 'id' | 'teacherCount'>): Promise<SalaryModel> =>
+    notWired('POST /salary-models'),
 
-  /** ?????? */
-  update: async (id: string, updates: Partial<SalaryModel>): Promise<SalaryModel | null> =>
-    (await (await cm()).mockUpdateSalaryModel(id, updates)) ?? null,
+  update: async (_id: string, _updates: Partial<SalaryModel>): Promise<SalaryModel | null> =>
+    notWired('PUT /salary-models/:id'),
 
-  /** ?????? */
-  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteSalaryModel(id),
+  delete: async (_id: string): Promise<boolean> => notWired('DELETE /salary-models/:id'),
 };
 
-// ============================================
-// ????? Service
-// ============================================
 export const payDaySettingsService = {
-  /** ??????? */
-  get: async (): Promise<PayDaySettings> => (await cm()).mockGetPayDaySettings(),
+  get: async (): Promise<PayDaySettings> => notWired('GET /pay-day-settings'),
 
-  /** ??????? */
-  update: async (updates: Partial<PayDaySettings>): Promise<PayDaySettings> =>
-    (await cm()).mockUpdatePayDaySettings(updates),
+  update: async (_updates: Partial<PayDaySettings>): Promise<PayDaySettings> =>
+    notWired('PUT /pay-day-settings'),
 };
 
-// ============================================
-// ??? Service
-// ============================================
 export const holidayService = {
-  getList: async (): Promise<Holiday[]> => (await cm()).mockGetHolidays(),
+  getList: async (): Promise<Holiday[]> => [],
 
-  add: async (holiday: Omit<Holiday, 'id'>): Promise<Holiday> => (await cm()).mockAddHoliday(holiday),
+  add: async (_holiday: Omit<Holiday, 'id'>): Promise<Holiday> => notWired('POST /holidays'),
 
-  update: async (id: string, updates: Partial<Holiday>): Promise<Holiday | null> =>
-    (await (await cm()).mockUpdateHoliday(id, updates)) ?? null,
+  update: async (_id: string, _updates: Partial<Holiday>): Promise<Holiday | null> =>
+    notWired('PUT /holidays/:id'),
 
-  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteHoliday(id),
+  delete: async (_id: string): Promise<boolean> => notWired('DELETE /holidays/:id'),
 
-  clearAll: async (): Promise<boolean> => (await cm()).mockClearHolidays(),
+  clearAll: async (): Promise<boolean> => notWired('DELETE /holidays'),
 
-  /** 生成法定节假日（逐日），返回新增条数 */
-  generateStatutory: async (year?: number): Promise<number> =>
-    (await cm()).mockGenerateStatutoryHolidays(year),
+  generateStatutory: async (_year?: number): Promise<number> => notWired('POST /holidays/generate-statutory'),
 };
 
-// ============================================
-// ???? Service
-// ============================================
 export const businessHoursService = {
-  /** ?????? */
-  get: async (): Promise<BusinessHours> => (await cm()).mockGetBusinessHours(),
+  get: async (): Promise<BusinessHours> => notWired('GET /business-hours'),
 
-  /** ?????? */
-  update: async (updates: Partial<BusinessHours>): Promise<BusinessHours> =>
-    (await cm()).mockUpdateBusinessHours(updates),
+  update: async (_updates: Partial<BusinessHours>): Promise<BusinessHours> =>
+    notWired('PUT /business-hours'),
 };
 
 // ============================================
@@ -258,17 +220,14 @@ export const businessHoursService = {
 export const notifyService = {
   /** ?????? */
   getList: async (): Promise<NotifyGroup[]> => {
-    if (!isUseMock()) {
+    
       const list = await get<BackendNotifySettingItem[]>('/notify-settings');
       return mapBackendNotifySettings(list);
-    }
-
-    return (await cm()).mockGetNotifySettings();
-  },
+      },
 
   /** ??????? */
   toggle: async (itemId: string): Promise<NotifyGroup[]> => {
-    if (!isUseMock()) {
+    
       const currentGroups = await notifyService.getList();
       const target = currentGroups
         .flatMap((group) => group.items)
@@ -282,82 +241,40 @@ export const notifyService = {
       });
 
       return notifyService.getList();
-    }
-
-    return (await cm()).mockToggleNotify(itemId);
-  },
+      },
 };
 
 // ============================================
 // ???? Service
 // ============================================
 export const campusDataService = {
-  /** ???????? */
-  get: async (campusId: string): Promise<CampusOperationalData | null> => (await cm()).mockGetCampusData(campusId),
-  // ??????:
-  // get: (campusId: string) => get<CampusOperationalData>(`/api/campus-data/${campusId}`),
+  get: async (_campusId: string): Promise<CampusOperationalData | null> => null,
 };
 
-// ============================================
-// ?? Service
-// ============================================
 export const subjectService = {
-  /** ?????? */
-  getList: async (): Promise<Subject[]> => (await cm()).mockGetSubjects(),
-
-  /** ?????? */
-  getById: async (id: string): Promise<Subject | null> => (await (await cm()).mockGetSubjectById(id)) ?? null,
-
-  /** ???? */
-  add: async (data: SubjectFormData): Promise<Subject> => (await cm()).mockAddSubject(data),
-
-  /** ???? */
-  update: async (id: string, data: Partial<SubjectFormData>): Promise<Subject | null> =>
-    (await (await cm()).mockUpdateSubject(id, data)) ?? null,
-
-  /** ???? */
-  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteSubject(id),
+  getList: async (): Promise<Subject[]> => [],
+  getById: async (_id: string): Promise<Subject | null> => null,
+  add: async (_data: SubjectFormData): Promise<Subject> => notWired('POST /subjects'),
+  update: async (_id: string, _data: Partial<SubjectFormData>): Promise<Subject | null> =>
+    notWired('PUT /subjects/:id'),
+  delete: async (_id: string): Promise<boolean> => notWired('DELETE /subjects/:id'),
 };
 
-// ============================================
-// ?? Service
-// ============================================
 export const venueService = {
-  /** ?????????????? */
-  getList: async (campusId?: string): Promise<Venue[]> => (await cm()).mockGetVenues(campusId),
-
-  /** ?????? */
-  getById: async (id: string): Promise<Venue | null> => (await (await cm()).mockGetVenueById(id)) ?? null,
-
-  /** ???? */
-  add: async (data: VenueFormData): Promise<Venue> => (await cm()).mockAddVenue(data),
-
-  /** ???? */
-  update: async (id: string, data: Partial<VenueFormData>): Promise<Venue | null> =>
-    (await (await cm()).mockUpdateVenue(id, data)) ?? null,
-
-  /** ???????????????? */
-  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteVenue(id),
+  getList: async (_campusId?: string): Promise<Venue[]> => [],
+  getById: async (_id: string): Promise<Venue | null> => null,
+  add: async (_data: VenueFormData): Promise<Venue> => notWired('POST /venues'),
+  update: async (_id: string, _data: Partial<VenueFormData>): Promise<Venue | null> =>
+    notWired('PUT /venues/:id'),
+  delete: async (_id: string): Promise<boolean> => notWired('DELETE /venues/:id'),
 };
 
-// ============================================
-// ?? Service
-// ============================================
 export const roomService = {
-  /** ???????????/????? */
-  getList: async (options?: { campusId?: string; venueId?: string }): Promise<Room[]> =>
-    (await cm()).mockGetRooms(options),
-
-  /** ?????? */
-  getById: async (id: string): Promise<Room | null> => (await (await cm()).mockGetRoomById(id)) ?? null,
-
-  /** ???? */
-  add: async (data: RoomFormData): Promise<Room> => (await cm()).mockAddRoom(data),
-
-  /** ???? */
-  update: async (id: string, data: Partial<RoomFormData>): Promise<Room | null> =>
-    (await (await cm()).mockUpdateRoom(id, data)) ?? null,
-
-  /** ???? */
-  delete: async (id: string): Promise<boolean> => (await cm()).mockDeleteRoom(id),
+  getList: async (_options?: { campusId?: string; venueId?: string }): Promise<Room[]> => [],
+  getById: async (_id: string): Promise<Room | null> => null,
+  add: async (_data: RoomFormData): Promise<Room> => notWired('POST /rooms'),
+  update: async (_id: string, _data: Partial<RoomFormData>): Promise<Room | null> =>
+    notWired('PUT /rooms/:id'),
+  delete: async (_id: string): Promise<boolean> => notWired('DELETE /rooms/:id'),
 };
+

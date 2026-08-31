@@ -5,7 +5,6 @@
 import type { LeadBooking, LeadBookingStatus, TrialMode } from '@/types/lead';
 import type { Profile } from '@/types/profile';
 import { isPrincipalOrAbove, isStaffRole, isTeachingRole } from '@/utils/auth';
-import { isUseMock } from '@/utils/build-env';
 import {
   getProfileActorIds,
   isLeadBookingRelated,
@@ -98,15 +97,12 @@ export function filterLeadBookingsByScope(
   return [];
 }
 
-/** Mock 下校长/管理员按校区拉全量试听预约 */
+/** 校长/管理员按校区拉试听预约（已切真 API 时由 leadService 承接；此处不再回落 mock） */
 export async function loadMockCampusLeadBookings(
-  campusId?: string,
-  params?: { startDate?: string; endDate?: string; status?: LeadBookingStatus },
+  _campusId?: string,
+  _params?: { startDate?: string; endDate?: string; status?: LeadBookingStatus },
 ): Promise<LeadBooking[]> {
-  if (!isUseMock()) return [];
-  const { loadLeadMock } = await import('@/utils/mock-loaders');
-  const { mockListLeadBookingsByCampus } = await loadLeadMock();
-  return mockListLeadBookingsByCampus(campusId, params);
+  return [];
 }
 
 export function sortLeadBookingsDesc(list: LeadBooking[]): LeadBooking[] {

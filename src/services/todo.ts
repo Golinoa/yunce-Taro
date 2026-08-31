@@ -6,9 +6,7 @@
  */
 import dayjs from 'dayjs';
 import type { AlertItem } from '@/components/statistics/AlertSheet';
-import { loadCustomTodosMock, loadHomeMock, loadStudentsMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
-import type { TodoItemData } from '@/data/home';
+import type { TodoItemData } from '@/types/home-ui';
 import type {
   TodoCollaborationMode,
   TodoCompletion,
@@ -138,10 +136,8 @@ const TODO_TYPE_QUADRANT: Record<TodoItemData['type'], TodoQuadrant> = {
   meeting: 'q4',
 };
 
-async function ensureMockCustomTodoSeeds(userId: string): Promise<void> {
-  if (!userId || !isUseMock()) return;
-  const { ensureMockCustomTodoSeedsForUser } = await loadCustomTodosMock();
-  ensureMockCustomTodoSeedsForUser(userId);
+async function ensureMockCustomTodoSeeds(_userId: string): Promise<void> {
+  // no-op：自定义待办种子仅 Mock 需要；真 API 由后端返回
 }
 
 function buildRemindAtFromTodoTime(time: string): string {
@@ -332,64 +328,12 @@ function mapOperationAlertToStudentTodos(alert: {
   return todos;
 }
 
-/** Mock：校长/管理员/负责老师 → 默认参与人；手动覆盖优先 */
+/** 真 API 下续费待办指派人由后端返回；本地不再拼 mock 教师名单 */
 async function attachMockRechargeAssignees(
   todos: TodoItem[],
-  campusId?: string,
+  _campusId?: string,
 ): Promise<TodoItem[]> {
-  const need = todos.filter((todo) => isStudentRechargeTodoId(todo.id));
-  if (need.length === 0) return todos;
-
-  const [{ mockGetStudentById, mockGetTeachers }, { IDENTITIES }] = await Promise.all([
-    loadStudentsMock(),
-    import('@/data/mock-database'),
-  ]);
-  const teachers = await mockGetTeachers();
-  const roleByUserId = new Map(IDENTITIES.map((identity) => [identity.userId, identity.role]));
-
-  const staff = teachers.map((teacher) => ({
-    id: teacher.id,
-    identity: teacher.id === 'teacher-principal-001' ? 'principal' : undefined,
-    orgRole: roleByUserId.get(teacher.userId) || null,
-    campusIds: teacher.campusIds,
-  }));
-
-  const assigneeByTodoId = new Map<string, string[]>();
-  await Promise.all(
-    need.map(async (todo) => {
-      const override = getTodoAssigneeOverride(todo.id);
-      if (override) {
-        assigneeByTodoId.set(todo.id, override);
-        return;
-      }
-      const studentId = todo.refId || parseStudentIdFromRechargeTodoId(todo.id);
-      if (!studentId) {
-        assigneeByTodoId.set(todo.id, []);
-        return;
-      }
-      const student = await mockGetStudentById(studentId);
-      const responsibleTeacherId = student?.teacherId || null;
-      const studentCampusId = campusId || student?.campusId;
-      assigneeByTodoId.set(
-        todo.id,
-        resolveDefaultRechargeAssigneeIds({
-          responsibleTeacherId,
-          staff,
-          campusId: studentCampusId,
-        }),
-      );
-    }),
-  );
-
-  return todos.map((todo) => {
-    const assignees = assigneeByTodoId.get(todo.id);
-    if (!assignees) return todo;
-    return {
-      ...todo,
-      assigneeTeacherIds: assignees,
-      collaborationMode: todo.collaborationMode || 'collaborative',
-    };
-  });
+  return todos;
 }
 
 function dedupeTodosById(items: TodoItem[]): TodoItem[] {
@@ -417,69 +361,12 @@ function buildListQuery(params: TodoListParams, monthKey: string): string {
 }
 
 /**
- * Mock 聚合：自定义 + 预警 + 系统固定项。
- * 续费只走 alert-recharge-*（预警优先，mockGetTodoItems 同 id 去重）。
+ * 本地聚合（历史 mock 路径，已停用；保留结构便于对照 API 字段）。
+ * 现网请走 getListFromApi。
  */
 async function getListFromMock(params: TodoListParams): Promise<TodoItem[]> {
-  const { teacherId, userId, role, campusId, userName, view, month } = params;
-  const monthKey = month || dayjs().format('YYYY-MM');
-
-  await ensureMockCustomTodoSeeds(userId);
-
-  const includeNoRemind = view === 'all';
-  const customTodoItems = sortCustomTodos(getCustomTodos(userId))
-    .filter((record) => {
-      const hasRemind = record.remindEnabled !== false && Boolean(record.remindDate);
-      return includeNoRemind ? true : hasRemind;
-    })
-    .map((record) => enrichTodoItem(mapCustomTodoToHomeItem(record, userName), userId));
-
-  const canShared = role === 'admin' || role === 'principal' || role === 'teacher';
-
-  const [operationAlertList, financeAlertList] = await Promise.all([
-    statisticsService
-      .getAlerts(getCurrentAlertQueryParams('operation'))
-      .catch((): AlertItem[] => []),
-    statisticsService.getAlerts(getCurrentAlertQueryParams('finance')).catch((): AlertItem[] => []),
-  ]);
-
-  const operationTodos = await attachMockRechargeAssignees(
-    operationAlertList
-      .flatMap(mapOperationAlertToStudentTodos)
-      .filter((todo) => canShared || todo.sharedScope !== 'campus_ops'),
-    campusId,
-  );
-  // 经营预警详情页仅校长/管理员可进；教师不下发该类待办，避免点进无权限
-  const financeTodos =
-    role === 'admin' || role === 'principal'
-      ? financeAlertList
-          .filter((alert) => alert.id !== 'fin-stable')
-          .map(mapAlertToTodoItem)
-          .map((todo) =>
-            enrichTodoItem(
-              { ...todo, sourceType: 'system', pushedAt: new Date().toISOString() },
-              userId,
-            ),
-          )
-      : [];
-  const alertTodoItems = [...operationTodos, ...financeTodos].map((todo) =>
-    enrichTodoItem(todo, userId),
-  );
-
-  const { mockGetTodoItems } = await loadHomeMock();
-  const fixedTodos = await attachMockRechargeAssignees(
-    (await mockGetTodoItems(teacherId || '', campusId)).map(mapTodoItem),
-    campusId,
-  ).then((items) => items.map((todo) => enrichTodoItem(todo, userId)));
-
-  // 预警续费优先：同 id 时保留先出现的 alert 项
-  const result = filterTodosBySettings(
-    dedupeTodosById([...customTodoItems, ...alertTodoItems, ...fixedTodos]),
-  );
-  if (view === 'all') {
-    return result.filter((item) => isTodoInMonth(item, monthKey));
-  }
-  return result;
+  void params;
+  return [];
 }
 
 async function getListFromApi(params: TodoListParams): Promise<TodoItem[]> {
@@ -497,7 +384,6 @@ async function getListFromApi(params: TodoListParams): Promise<TodoItem[]> {
 
 async function getList(params: TodoListParams): Promise<TodoItem[]> {
   if (!params.userId) return [];
-  if (isUseMock()) return getListFromMock(params);
   return getListFromApi(params);
 }
 
@@ -512,20 +398,7 @@ async function completeTodoItem(
     note: payload.note?.trim() || undefined,
   };
 
-  if (isUseMock()) {
-    if (isCustomTodoId(todoId)) {
-      completeCustomTodo(payload.userId, todoId, {
-        note: payload.note,
-        memberId: payload.memberId || payload.userId,
-        memberName: payload.userName,
-      });
-      return;
-    }
-    saveTodoCompletion(todoId, completion);
-    markTodoRead(todoId);
-    return;
-  }
-
+  
   const data = await post<BackendTodoMutationResponse>(
     `/todos/${encodeURIComponent(todoId)}/complete`,
     {
@@ -569,11 +442,7 @@ export const todoService = {
 
   /** 添加自定义待办 */
   add: async (userId: string, input: AddCustomTodoInput): Promise<TodoItem> => {
-    if (isUseMock()) {
-      const record = addCustomTodo(userId, input);
-      return mapCustomTodoToHomeItem(record);
-    }
-    const created = await post<TodoItem>('/todos', {
+        const created = await post<TodoItem>('/todos', {
       title: input.title,
       note: input.note,
       remindEnabled: input.remindEnabled,
@@ -591,19 +460,13 @@ export const todoService = {
   listCustomRecords: async (userId: string): Promise<CustomTodoRecord[]> => {
     if (!userId) return [];
     await ensureMockCustomTodoSeeds(userId);
-    if (isUseMock()) {
-      return sortCustomTodosByMode(getCustomTodos(userId), 'deadline');
-    }
-    // 真模式：自定义记录已含在 GET /todos；本方法仅 Mock/调试保留本地副本
+        // 真模式：自定义记录已含在 GET /todos；本方法仅 Mock/调试保留本地副本
     return sortCustomTodosByMode(getCustomTodos(userId), 'deadline');
   },
 
   /** 删除自定义待办 */
   remove: async (userId: string, todoId: string): Promise<boolean> => {
-    if (isUseMock()) {
-      return removeCustomTodo(userId, todoId);
-    }
-    await del<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}`);
+        await del<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}`);
     removeCustomTodo(userId, todoId);
     return true;
   },
@@ -623,7 +486,7 @@ export const todoService = {
       if (input.quadrant) {
         saveTodoQuadrantOverride(userId, todoId, input.quadrant);
       }
-      if (!isUseMock()) {
+      
         try {
           await put<TodoItem>(`/todos/${encodeURIComponent(todoId)}`, {
             collaboratorIds: input.collaboratorIds,
@@ -633,8 +496,7 @@ export const todoService = {
         } catch {
           // 后端暂未支持系统待办编辑时，保留本地覆盖
         }
-      }
-      const studentId = parseStudentIdFromRechargeTodoId(todoId) || '';
+            const studentId = parseStudentIdFromRechargeTodoId(todoId) || '';
       const assignees =
         input.collaboratorIds !== undefined
           ? input.collaboratorIds
@@ -662,11 +524,7 @@ export const todoService = {
     }
 
     if (!isCustomTodoId(todoId)) return null;
-    if (isUseMock()) {
-      const record = updateCustomTodo(userId, todoId, input);
-      return record ? mapCustomTodoToHomeItem(record) : null;
-    }
-    const updated = await put<TodoItem>(`/todos/${encodeURIComponent(todoId)}`, {
+        const updated = await put<TodoItem>(`/todos/${encodeURIComponent(todoId)}`, {
       title: input.title,
       note: input.note,
       remindEnabled: input.remindEnabled,
@@ -684,15 +542,7 @@ export const todoService = {
   /** 重新打开待办 */
   reopen: async (userId: string, todoId: string): Promise<boolean> => {
     if (!userId || !todoId) return false;
-    if (isUseMock()) {
-      if (isCustomTodoId(todoId)) {
-        return reopenCustomTodo(userId, todoId);
-      }
-      clearTodoCompletion(todoId);
-      clearTodoRead(todoId);
-      return true;
-    }
-    await post<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}/reopen`);
+        await post<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}/reopen`);
     if (isCustomTodoId(todoId)) {
       reopenCustomTodo(userId, todoId);
     }
@@ -709,14 +559,7 @@ export const todoService = {
   ): Promise<boolean> => {
     if (!userId || !todoId) return false;
 
-    if (isUseMock()) {
-      if (isCustomTodoId(todoId)) {
-        if (!updateCustomTodoQuadrant(userId, todoId, quadrant)) return false;
-      }
-      saveTodoQuadrantOverride(userId, todoId, quadrant);
-      return true;
-    }
-
+    
     try {
       await put<BackendTodoMutationResponse>(`/todos/${encodeURIComponent(todoId)}/quadrant`, {
         quadrant,

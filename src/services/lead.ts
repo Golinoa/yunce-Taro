@@ -24,9 +24,9 @@ import type {
   LeadSummary,
   TrialSlotConfig,
 } from '@/types/lead';
-import type { TrialCourseSlot } from '@/data/lead';
-import { isUseMock } from '@/utils/build-env';
-import { loadLeadMock } from '@/utils/mock-loaders';
+import type { TrialCourseSlot } from '@/types/lead';
+
+
 import { del, get, patch, post, put } from '@/utils/request';
 import {
   API_PAGE_SIZE_BATCH,
@@ -88,16 +88,14 @@ async function fetchTrialSlotListPage(
 }
 
 export async function getLeadsByTeacher(teacherId: string): Promise<Lead[]> {
-  if (isUseMock()) { const { mockGetLeadsByTeacher } = await loadLeadMock(); return mockGetLeadsByTeacher(teacherId); }
-  return fetchAllPages(
+    return fetchAllPages(
     (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
 }
 
 export async function getLeadById(leadId: string): Promise<Lead | null> {
-  if (isUseMock()) { const { mockGetLeadById } = await loadLeadMock(); return mockGetLeadById(leadId); }
-  const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
+    const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
   if (!detail) return null;
   return mapBackendLead(detail);
 }
@@ -106,8 +104,7 @@ export async function getLeadCards(
   teacherId: string,
   filterTab?: LeadFilterTab,
 ): Promise<LeadCardModel[]> {
-  if (isUseMock()) { const { mockGetLeadCardsByTeacher } = await loadLeadMock(); return mockGetLeadCardsByTeacher(teacherId, filterTab); }
-  const leads = await fetchAllPages(
+    const leads = await fetchAllPages(
     (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize, filterTab }),
     API_PAGE_SIZE_BATCH,
   );
@@ -134,14 +131,12 @@ export async function getLeadCards(
 }
 
 export async function getLeadSummary(teacherId: string): Promise<LeadSummary> {
-  if (isUseMock()) { const { mockGetLeadSummary } = await loadLeadMock(); return mockGetLeadSummary(teacherId); }
-  const summary = await get<Record<string, unknown>>('/leads/summary', { teacherId });
+    const summary = await get<Record<string, unknown>>('/leads/summary', { teacherId });
   return mapBackendLeadSummary(summary);
 }
 
 export async function createLead(data: LeadFormData, teacherId: string): Promise<Lead> {
-  if (isUseMock()) { const { mockCreateLead } = await loadLeadMock(); return mockCreateLead(data, teacherId); }
-  const created = await post<Record<string, unknown>>('/leads', {
+    const created = await post<Record<string, unknown>>('/leads', {
     childName: data.child_name,
     childNickname: data.child_nickname,
     childGender: data.child_gender,
@@ -171,8 +166,7 @@ export async function createLeadFromInvite(params: {
   sourceCourseId?: string;
   visitorKey?: string;
 }): Promise<Lead> {
-  if (isUseMock()) { const { mockCreateLeadFromInvite } = await loadLeadMock(); return mockCreateLeadFromInvite(params); }
-  const created = await post<Record<string, unknown>>('/leads', {
+    const created = await post<Record<string, unknown>>('/leads', {
     childName: params.childName,
     childNickname: params.childNickname,
     childGender: params.childGender,
@@ -223,11 +217,7 @@ export async function submitInviteLanding(params: {
   lesson_expired: boolean;
   booked: boolean;
 }> {
-  if (isUseMock()) {
-    const { mockSubmitInviteLanding } = await loadLeadMock();
-    return mockSubmitInviteLanding(params);
-  }
-  return post(
+    return post(
     '/leads/landing/submit',
     {
       teacherId: params.teacherId,
@@ -284,11 +274,7 @@ export async function trackLandingVisit(params: {
     already_notified: boolean;
   };
 }> {
-  if (isUseMock()) {
-    const { mockTrackLandingVisit } = await loadLeadMock();
-    return mockTrackLandingVisit(params);
-  }
-  return post('/leads/landing/visit', {
+    return post('/leads/landing/visit', {
     teacherId: params.teacherId,
     campusId: params.campusId,
     sourceType: params.sourceType,
@@ -310,8 +296,7 @@ export async function updateLeadStatus(
   status: LeadStatus,
   extra?: { closed_reason?: string },
 ): Promise<Lead | null> {
-  if (isUseMock()) { const { mockUpdateLeadStatus } = await loadLeadMock(); return mockUpdateLeadStatus(leadId, status, extra); }
-  await patch<Record<string, unknown>>(`/leads/${leadId}/status`, {
+    await patch<Record<string, unknown>>(`/leads/${leadId}/status`, {
     status,
     closedReason: extra?.closed_reason,
   });
@@ -323,8 +308,7 @@ export async function updateLead(
   data: Partial<Lead>,
   options?: { forceReassign?: boolean },
 ): Promise<Lead | null> {
-  if (isUseMock()) { const { mockUpdateLead } = await loadLeadMock(); return mockUpdateLead(leadId, data, options); }
-  await put<Record<string, unknown>>(`/leads/${leadId}`, {
+    await put<Record<string, unknown>>(`/leads/${leadId}`, {
     childName: data.child_name,
     childNickname: data.child_nickname,
     childGender: data.child_gender,
@@ -344,11 +328,7 @@ export async function reassignLead(
   reason: string,
   opts?: { forceReassign?: boolean; operatorId?: string },
 ): Promise<Lead | null> {
-  if (isUseMock()) {
-    const { mockReassignLead } = await loadLeadMock();
-    return mockReassignLead(leadId, newOwnerId, reason, opts);
-  }
-  await post<Record<string, unknown>>(`/leads/${leadId}/reassign`, {
+    await post<Record<string, unknown>>(`/leads/${leadId}/reassign`, {
     ownerTeacherId: newOwnerId,
     reason,
   });
@@ -356,8 +336,7 @@ export async function reassignLead(
 }
 
 export async function deleteLead(leadId: string): Promise<boolean> {
-  if (isUseMock()) { const { mockDeleteLead } = await loadLeadMock(); return mockDeleteLead(leadId); }
-  await del(`/leads/${leadId}`);
+    await del(`/leads/${leadId}`);
   return true;
 }
 
@@ -384,8 +363,7 @@ export async function createLeadBooking(params: {
   operatorId?: string;
   note?: string;
 }): Promise<LeadBooking> {
-  if (isUseMock()) { const { mockCreateLeadBooking } = await loadLeadMock(); return mockCreateLeadBooking(params); }
-  const created = await post<Record<string, unknown>>('/leads/bookings', {
+    const created = await post<Record<string, unknown>>('/leads/bookings', {
     leadId: params.leadId,
     trialMode: params.trialMode ?? 'group',
     referenceScheduleId: params.referenceScheduleId,
@@ -424,8 +402,7 @@ export async function bookTrialByClass(params: {
   operatorId?: string;
   note?: string;
 }): Promise<LeadBooking> {
-  if (isUseMock()) { const { mockBookTrialByClass } = await loadLeadMock(); return mockBookTrialByClass(params); }
-  return createLeadBooking({
+    return createLeadBooking({
     leadId: params.leadId,
     classId: params.classId,
     className: params.className,
@@ -444,8 +421,7 @@ export async function bookTrialByClass(params: {
 }
 
 export async function getLeadBookings(leadId: string): Promise<LeadBooking[]> {
-  if (isUseMock()) { const { mockGetLeadBookings } = await loadLeadMock(); return mockGetLeadBookings(leadId); }
-  return fetchAllPages(
+    return fetchAllPages(
     (page, pageSize) => fetchLeadBookingsPage({ leadId, page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
@@ -455,8 +431,7 @@ export async function getLeadBookingsByTeacher(
   teacherId: string,
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
-  if (isUseMock()) { const { mockGetLeadBookingsByTeacher } = await loadLeadMock(); return mockGetLeadBookingsByTeacher(teacherId, params); }
-  return fetchAllPages(
+    return fetchAllPages(
     (page, pageSize) =>
       fetchLeadBookingsPage({
         teacherId,
@@ -475,11 +450,7 @@ export async function getLeadBookingsByCampus(
   campusId?: string,
   params?: { startDate?: string; endDate?: string; status?: LeadBooking['status'] },
 ): Promise<LeadBooking[]> {
-  if (isUseMock()) {
-    const { mockListLeadBookingsByCampus } = await loadLeadMock();
-    return mockListLeadBookingsByCampus(campusId, params);
-  }
-  return fetchAllPages(
+    return fetchAllPages(
     (page, pageSize) =>
       fetchLeadBookingsPage({
         campusId,
@@ -496,8 +467,7 @@ export async function getLeadBookingsByCampus(
 export async function checkInPrivateLeadBooking(
   bookingId: string,
 ): Promise<LeadBooking | null> {
-  if (isUseMock()) { const { mockCheckInPrivateLeadBooking } = await loadLeadMock(); return mockCheckInPrivateLeadBooking(bookingId); }
-  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+    const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     status: 'completed',
   });
   return mapBackendLeadBooking(updated);
@@ -507,25 +477,19 @@ export async function checkInPrivateLeadBooking(
 export async function markLeadBookingNoShow(
   bookingId: string,
 ): Promise<LeadBooking | null> {
-  if (isUseMock()) {
-    const { mockMarkLeadBookingNoShow } = await loadLeadMock();
-    return mockMarkLeadBookingNoShow(bookingId);
-  }
-  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+    const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     status: 'no_show',
   });
   return mapBackendLeadBooking(updated);
 }
 
 export async function cancelLeadBooking(bookingId: string): Promise<LeadBooking | null> {
-  if (isUseMock()) { const { mockCancelLeadBooking } = await loadLeadMock(); return mockCancelLeadBooking(bookingId); }
-  const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/cancel`);
+    const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/cancel`);
   return mapBackendLeadBooking(updated);
 }
 
 export async function restoreLeadBooking(bookingId: string): Promise<LeadBooking | null> {
-  if (isUseMock()) { const { mockRestoreLeadBooking } = await loadLeadMock(); return mockRestoreLeadBooking(bookingId); }
-  const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/restore`);
+    const updated = await post<Record<string, unknown>>(`/leads/bookings/${bookingId}/restore`);
   return mapBackendLeadBooking(updated);
 }
 
@@ -544,8 +508,7 @@ export async function updateLeadBooking(
     trialMode?: LeadBooking['trial_mode'];
   },
 ): Promise<LeadBooking | null> {
-  if (isUseMock()) { const { mockUpdateLeadBooking } = await loadLeadMock(); return mockUpdateLeadBooking(bookingId, data); }
-  const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
+    const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
     lessonDate: data.lessonDate,
     startTime: data.startTime,
     endTime: data.endTime,
@@ -561,8 +524,7 @@ export async function updateLeadBooking(
 }
 
 export async function getLeadFollowUps(leadId: string): Promise<LeadFollowUp[]> {
-  if (isUseMock()) { const { mockGetLeadFollowUps } = await loadLeadMock(); return mockGetLeadFollowUps(leadId); }
-  return fetchAllPages(
+    return fetchAllPages(
     (page, pageSize) => fetchLeadFollowUpsPage({ leadId, page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
@@ -577,8 +539,7 @@ export async function createFollowUp(params: {
   operatorId: string;
   operatorName?: string;
 }): Promise<LeadFollowUp> {
-  if (isUseMock()) { const { mockCreateFollowUp } = await loadLeadMock(); return mockCreateFollowUp(params); }
-  const created = await post<Record<string, unknown>>('/leads/follow-ups', {
+    const created = await post<Record<string, unknown>>('/leads/follow-ups', {
     leadId: params.leadId,
     action: params.action,
     intentLevel: params.intentLevel,
@@ -589,8 +550,7 @@ export async function createFollowUp(params: {
 }
 
 export async function getLeadConversions(leadId: string): Promise<LeadConversion[]> {
-  if (isUseMock()) { const { mockGetLeadConversions } = await loadLeadMock(); return mockGetLeadConversions(leadId); }
-  const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
+    const detail = await get<Record<string, unknown>>(`/leads/${leadId}`);
   const conversions = Array.isArray(detail.conversions) ? detail.conversions : [];
   return conversions.map((item) => mapBackendLeadConversion(item as Record<string, unknown>));
 }
@@ -603,8 +563,7 @@ export async function createConversion(params: {
   operatorId: string;
   note?: string;
 }): Promise<LeadConversion> {
-  if (isUseMock()) { const { mockCreateConversion } = await loadLeadMock(); return mockCreateConversion(params); }
-  const created = await post<Record<string, unknown>>('/leads/conversions', {
+    const created = await post<Record<string, unknown>>('/leads/conversions', {
     leadId: params.leadId,
     conversionType: params.conversionType,
     studentId: params.studentId,
@@ -615,8 +574,7 @@ export async function createConversion(params: {
 }
 
 export async function getTrialCourseSlots(campusId?: string): Promise<TrialCourseSlot[]> {
-  if (isUseMock()) { const { mockGetTrialCourseSlots } = await loadLeadMock(); return mockGetTrialCourseSlots(campusId); }
-  const slots = await fetchAllPages(
+    const slots = await fetchAllPages(
     (page, pageSize) =>
       fetchTrialSlotListPage({
         campusId,
@@ -633,8 +591,7 @@ export async function getTrialSlotConfigs(
   teacherId?: string,
   campusId?: string,
 ): Promise<TrialSlotConfig[]> {
-  if (isUseMock()) { const { mockGetTrialSlotConfigs } = await loadLeadMock(); return mockGetTrialSlotConfigs(teacherId, campusId); }
-  return fetchAllPages(
+    return fetchAllPages(
     (page, pageSize) =>
       fetchTrialSlotListPage({
         teacherId,
@@ -647,8 +604,7 @@ export async function getTrialSlotConfigs(
 }
 
 export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfig | null> {
-  if (isUseMock()) { const { mockGetTrialSlotConfigById } = await loadLeadMock(); return mockGetTrialSlotConfigById(id); }
-  const list = await fetchAllPages(
+    const list = await fetchAllPages(
     (page, pageSize) => fetchTrialSlotListPage({ page, pageSize }),
     API_PAGE_SIZE_BATCH,
   );
@@ -658,8 +614,7 @@ export async function getTrialSlotConfigById(id: string): Promise<TrialSlotConfi
 export async function createTrialSlotConfig(
   data: Omit<TrialSlotConfig, 'id' | 'current_count' | 'created_at' | 'updated_at'>,
 ): Promise<TrialSlotConfig> {
-  if (isUseMock()) { const { mockCreateTrialSlotConfig } = await loadLeadMock(); return mockCreateTrialSlotConfig(data); }
-  const created = await post<Record<string, unknown>>('/leads/trial-slots', {
+    const created = await post<Record<string, unknown>>('/leads/trial-slots', {
     courseId: data.course_id,
     courseName: data.course_name,
     subjectId: data.subject_id,
@@ -682,8 +637,7 @@ export async function updateTrialSlotConfig(
   id: string,
   data: Partial<TrialSlotConfig>,
 ): Promise<TrialSlotConfig | null> {
-  if (isUseMock()) { const { mockUpdateTrialSlotConfig } = await loadLeadMock(); return mockUpdateTrialSlotConfig(id, data); }
-  const updated = await put<Record<string, unknown>>(`/leads/trial-slots/${id}`, {
+    const updated = await put<Record<string, unknown>>(`/leads/trial-slots/${id}`, {
     courseName: data.course_name,
     subjectName: data.subject_name,
     lessonDate: data.lesson_date,
@@ -698,8 +652,7 @@ export async function updateTrialSlotConfig(
 }
 
 export async function deleteTrialSlotConfig(id: string): Promise<boolean> {
-  if (isUseMock()) { const { mockDeleteTrialSlotConfig } = await loadLeadMock(); return mockDeleteTrialSlotConfig(id); }
-  await del(`/leads/trial-slots/${id}`);
+    await del(`/leads/trial-slots/${id}`);
   return true;
 }
 
@@ -719,8 +672,7 @@ export async function batchCreateProxyBookings(params: {
   operatorId?: string;
   note?: string;
 }): Promise<LeadBooking[]> {
-  if (isUseMock()) { const { mockBatchCreateProxyBookings } = await loadLeadMock(); return mockBatchCreateProxyBookings(params); }
-  const results: LeadBooking[] = [];
+    const results: LeadBooking[] = [];
   for (const leadId of params.leadIds) {
     results.push(
       await createLeadBooking({

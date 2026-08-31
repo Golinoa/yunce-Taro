@@ -1,6 +1,6 @@
 /**
  * 开发模式编译微信小程序（默认生产联调：Mock 关 + 线上 API）
- * Mock 演示请用 npm run dev:weapp:mock
+ * 测环境请用 npm run dev:weapp:dev
  */
 import { spawn } from 'node:child_process';
 import path from 'node:path';

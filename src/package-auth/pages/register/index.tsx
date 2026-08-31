@@ -9,15 +9,12 @@ import AgreementDialog from '@/components/AgreementDialog';
 import { BRAND_LOGO } from '@/constants/brand';
 import { prepareEmailLogin } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
-import { isUseMock } from '@/utils/build-env';
 import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useAuth } from '@/utils/auth';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_COUNTDOWN_SEC = 60;
-const DEMO_CODE_HINT = '演示环境验证码为 123456';
-
 const Register: React.FC = () => {
   const { profile, signInWithEmailCode } = useAuth();
   const { agreed, setAgreed } = useAgreementStore();
@@ -112,10 +109,11 @@ const Register: React.FC = () => {
     }
 
     startCountdown();
-    const tip = isUseMock()
-      ? DEMO_CODE_HINT
-      : `验证码已发送至${result.maskedEmail || result.email || ''}`;
-    Taro.showToast({ title: tip, icon: 'none', duration: 2500 });
+    Taro.showToast({
+      title: `验证码已发送至${result.maskedEmail || result.email || ''}`,
+      icon: 'none',
+      duration: 2500,
+    });
   }, [countdown, email, sendingCode, startCountdown]);
 
   const handleRegister = useCallback(() => {

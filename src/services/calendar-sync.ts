@@ -25,7 +25,7 @@ import {
   shouldShowCalendarSyncPrompt,
 } from '@/utils/calendar-sync-settings';
 import { logError } from '@/utils/logger';
-import { isUseMock } from '@/utils/build-env';
+
 import { addPhoneCalendarEvent, isAddPhoneCalendarSupported } from '@/utils/phone-calendar';
 import { post } from '@/utils/request';
 
@@ -186,10 +186,7 @@ async function reportCalendarSync(
   if (items.length === 0) {
     return;
   }
-  if (isUseMock()) {
-    return;
-  }
-  try {
+    try {
     await post('/calendar-sync/report', { action, items });
   } catch (error) {
     logError('calendarSync.report', error);

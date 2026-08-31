@@ -10,8 +10,6 @@ import {
   getRenewPreset,
   MOCK_TMPL_IDS,
 } from '@/constants/subscribe-presets';
-import { loadSubscribeMessageMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
 import type {
   OpenPromptInput,
@@ -142,11 +140,7 @@ export const subscribeMessageService = {
       return { templates: [], quotas: [], pendingPrompts: [], lowQuotaGroups: [] };
     }
 
-    if (isUseMock()) {
-      bootstrapCache = await (await loadSubscribeMessageMock()).mockGetBootstrap(userId);
-      return bootstrapCache;
-    }
-
+    
     try {
       bootstrapCache = await get<SubscribeBootstrapDto>('/subscribe-message/bootstrap', {
         role,
@@ -165,14 +159,7 @@ export const subscribeMessageService = {
 
     const payload: SubscribeAuthReportBody = { ...body, userId };
 
-    if (isUseMock()) {
-      const result = await (await loadSubscribeMessageMock()).mockReportAuth(userId, payload);
-      bootstrapCache = bootstrapCache
-        ? { ...bootstrapCache, quotas: result.quotas }
-        : await (await loadSubscribeMessageMock()).mockGetBootstrap(userId);
-      return result.quotas;
-    }
-
+    
     try {
       const result = await post<{ quotas: SubscribeQuotaDto[] }>(
         '/subscribe-message/auth-report',
@@ -197,8 +184,6 @@ export const subscribeMessageService = {
     const userId = await resolveUserId();
     if (!userId) return;
 
-    if (isUseMock()) return;
-
     try {
       await post(`/subscribe-message/prompts/${encodeURIComponent(promptId)}/consume`);
     } catch (error) {
@@ -210,17 +195,7 @@ export const subscribeMessageService = {
     const userId = await resolveUserId();
     if (!userId) return;
 
-    if (isUseMock()) {
-      await (await loadSubscribeMessageMock()).mockDismissPending(userId, promptId);
-      if (bootstrapCache) {
-        bootstrapCache = {
-          ...bootstrapCache,
-          pendingPrompts: bootstrapCache.pendingPrompts.filter((p) => p.id !== promptId),
-        };
-      }
-      return;
-    }
-
+    
     try {
       await post(`/subscribe-message/prompts/${encodeURIComponent(promptId)}/dismiss`);
     } catch (error) {
@@ -241,19 +216,16 @@ export const subscribeMessageService = {
     scene: string,
     meta?: { role?: string; campusId?: string },
   ): Promise<SubscribeQuotaDto[]> {
-    if (!isUseMock() && !bootstrapCache) {
+    if (!bootstrapCache) {
       await this.bootstrap(meta?.role, meta?.campusId);
     }
 
-    const entries = isUseMock()
-      ? resolveMockAuthEntries(groups)
-      : resolveAuthEntries(groups);
+    const entries = resolveAuthEntries(groups);
 
     if (entries.length === 0) {
-      if (!isUseMock()) {
+      
         logError('subscribe.requestAuth', new Error('无可授权模板（tmplId 未配置或未 enabled）'));
-      }
-      return bootstrapCache?.quotas ?? [];
+            return bootstrapCache?.quotas ?? [];
     }
 
     const items = await requestSubscribeMessageAuth(entries);
@@ -556,15 +528,7 @@ export const subscribeMessageService = {
     setNotifyMasterEnabled(enabled);
 
     const userId = await resolveUserId();
-    if (isUseMock() && userId) {
-      const quotas = await (await loadSubscribeMessageMock()).mockSetMasterNotifyEnabled(
-        userId,
-        enabled,
-      );
-      if (bootstrapCache) {
-        bootstrapCache = { ...bootstrapCache, quotas };
-      }
-    }
+    void userId;
 
     if (!enabled) {
       return bootstrapCache?.quotas ?? [];
@@ -647,18 +611,7 @@ export const subscribeMessageService = {
     const { receiverUserId, bizKey, className, changeTime, changeReason } = params;
     if (!receiverUserId) return;
 
-    if (isUseMock()) {
-      try {
-        await (await loadSubscribeMessageMock()).mockConsumeQuota(
-          receiverUserId,
-          'schedule_change',
-        );
-      } catch (error) {
-        logError('subscribe.sendScheduleChange.mock', error);
-      }
-      return;
-    }
-
+    
     try {
       await post('/subscribe-message/send', {
         group: 'schedule_change',

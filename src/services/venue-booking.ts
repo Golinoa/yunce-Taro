@@ -3,8 +3,8 @@
  * 契约对齐后端 `/venues/*`；mock 仅开发开关开启时使用
  */
 import type { BookableVenue, VenueBookingRecord, VenueBookingSlot } from '@/types/venue-booking';
-import { loadVenueBookingMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
+
+
 import { del, get, post } from '@/utils/request';
 
 type RawRecord = Record<string, unknown>;
@@ -91,7 +91,7 @@ const mapBooking = (item: BackendVenueBooking): VenueBookingRecord => ({
 export const venueBookingService = {
   /** 获取可预约场地列表（可按校区过滤；后端教室列表） */
   getBookableVenues: async (campusId?: string): Promise<BookableVenue[]> => {
-    if (!isUseMock()) {
+    
       // 先按校区取场馆，再拉教室；无校区则直接拉教室列表
       if (campusId) {
         const venues = await get<{ list?: Array<{ id: string }> } | Array<{ id: string }>>(
@@ -119,24 +119,18 @@ export const venueBookingService = {
       );
       const list = Array.isArray(data) ? data : data.list || [];
       return list.map(mapRoomToBookable);
-    }
-    const { mockGetBookableVenues } = await loadVenueBookingMock();
-    return mockGetBookableVenues(campusId);
-  },
+      },
 
   /** 获取可预约场地详情（教室） */
   getBookableVenueById: async (id: string): Promise<BookableVenue | null> => {
-    if (!isUseMock()) {
+    
       const room = await get<BackendRoomItem>(`/venues/rooms/${id}`);
       return room ? mapRoomToBookable(room) : null;
-    }
-    const { mockGetBookableVenueById } = await loadVenueBookingMock();
-    return (await mockGetBookableVenueById(id)) ?? null;
-  },
+      },
 
   /** 获取某日期教室可预约时段 */
   getSlots: async (roomId: string, date: string): Promise<VenueBookingSlot[]> => {
-    if (!isUseMock()) {
+    
       const room = await get<BackendRoomItem>(`/venues/rooms/${roomId}`);
       if (!room?.venueId) return [];
       const available = await get<{ slots?: BackendAvailableSlot[] } | BackendAvailableSlot[]>(
@@ -158,16 +152,13 @@ export const venueBookingService = {
           price: 0,
         };
       });
-    }
-    const { mockGetVenueSlots } = await loadVenueBookingMock();
-    return mockGetVenueSlots(roomId, date);
-  },
+      },
 
   /** 创建场地预约（对齐 BE: venueId/roomId/date/start/end） */
   createBooking: async (
     record: Omit<VenueBookingRecord, 'id' | 'createdAt'> & { venueId?: string },
   ): Promise<VenueBookingRecord> => {
-    if (!isUseMock()) {
+    
       let venueId = record.venueId;
       if (!venueId) {
         const room = await get<BackendRoomItem>(`/venues/rooms/${record.roomId}`);
@@ -194,66 +185,48 @@ export const venueBookingService = {
         unitPrice: record.unitPrice,
         totalPrice: record.totalPrice,
       };
-    }
-    const { mockCreateVenueBooking } = await loadVenueBookingMock();
-    return mockCreateVenueBooking(record);
-  },
+      },
 
   /** 取消场地预约 */
   cancelBooking: async (bookingId: string): Promise<VenueBookingRecord> => {
-    if (!isUseMock()) {
+    
       const updated = await post<BackendVenueBooking>(`/venues/bookings/${bookingId}/cancel`);
       return mapBooking(updated);
-    }
-    const { mockCancelVenueBooking } = await loadVenueBookingMock();
-    return mockCancelVenueBooking(bookingId);
-  },
+      },
 
   /** 获取我的场地预约记录 */
   getMyBookings: async (userId?: string): Promise<VenueBookingRecord[]> => {
-    if (!isUseMock()) {
+    
       const list = await get<BackendVenueBooking[]>('/venues/bookings/my');
       return (list || []).map(mapBooking);
-    }
-    const { mockGetMyVenueBookings } = await loadVenueBookingMock();
-    return mockGetMyVenueBookings(userId);
-  },
+      },
 
   /** 与我相关的场地预约（负责人或预约人）——后端无 related 时降级为我的预约 */
   listRelatedBookings: async (
     actorIds: string[],
     params?: { startDate?: string; endDate?: string },
   ): Promise<VenueBookingRecord[]> => {
-    if (!isUseMock()) {
+    
       const mine = await venueBookingService.getMyBookings();
       return mine.filter((item) => {
         if (params?.startDate && item.date < params.startDate) return false;
         if (params?.endDate && item.date > params.endDate) return false;
         return actorIds.length === 0 || actorIds.includes(item.userId);
       });
-    }
-    const { mockListRelatedVenueBookings } = await loadVenueBookingMock();
-    return mockListRelatedVenueBookings(actorIds, params);
-  },
+      },
 
   /** 场地预约确认到场（负责人操作） */
   checkInBooking: async (bookingId: string): Promise<VenueBookingRecord | null> => {
-    if (!isUseMock()) {
+    
       const updated = await post<BackendVenueBooking>(`/venues/bookings/${bookingId}/check-in`);
       return mapBooking(updated);
-    }
-    const { mockCheckInVenueBooking } = await loadVenueBookingMock();
-    return mockCheckInVenueBooking(bookingId);
-  },
+      },
 
   /** 删除场地预约记录 */
   deleteBooking: async (bookingId: string): Promise<boolean> => {
-    if (!isUseMock()) {
+    
       await del(`/venues/bookings/${bookingId}`);
       return true;
-    }
-    const { mockCancelVenueBooking } = await loadVenueBookingMock();
-    const cancelled = await mockCancelVenueBooking(bookingId);
-    return !!cancelled;
+        return !!cancelled;
   },
 };

@@ -253,3 +253,5 @@ flowchart LR
 **二次走查（2026-08-31 下午）**：见 `2026-08-31-dual-app-secondary-walkthrough.md` — 残余 P0：校长教务角色缺口、教师本人薪资读权限、开放约 batch 未实装。
 
 **紧急待办**：见 `2026-08-31-emergency-todo.md`（E1–E4 + 迁移 D1/D2）。**仅部署不通**，须先改代码。
+
+**关 Mock / 双环境计划（待审阅）**：见 `2026-08-31-demock-dev-plan.md`。

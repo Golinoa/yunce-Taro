@@ -11,14 +11,6 @@ import type { FinanceKpiItem } from '@/components/statistics/FinanceKpi';
 import type { OperationKpiItem } from '@/components/statistics/OperationKpi';
 import { get } from '@/utils/request';
 
-import { loadStatisticsMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
-
-let statsMockMod: Awaited<ReturnType<typeof loadStatisticsMock>> | undefined;
-async function sm() {
-  statsMockMod ??= await loadStatisticsMock();
-  return statsMockMod;
-}
 
 // ============================================
 // 类型定义（接口契约）
@@ -180,11 +172,11 @@ function getExpenseRatiosFallback(): { label: string; ratio: number; barClass: s
 }
 
 async function getOperationAlertsFallback(): Promise<AlertItem[]> {
-  return (await (await sm()).mockGetOperationAlerts()).map(normalizeAlertItem);
+  return [];
 }
 
 async function getFinanceAlertsFallback(): Promise<AlertItem[]> {
-  return (await (await sm()).mockGetFinanceAlerts()).map(normalizeAlertItem);
+  return [];
 }
 
 function getOperationKpiFallback(): OperationKpiItem {
@@ -263,27 +255,21 @@ export const statisticsService = {
     month?: number;
     year?: number;
   }): Promise<ChartDataItem[]> =>
-    isUseMock()
-      ? (await sm()).mockGetLessonTrend()
-      : get<ChartDataItem[]>(`/statistics/lesson-trend?${buildStatisticsQuery(params || {})}`),
+    get<ChartDataItem[]>(`/statistics/lesson-trend?${buildStatisticsQuery(params || {})}`),
   /** 收入趋势（近12个月） */
   getIncomeTrend: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<ChartDataItem[]> =>
-    isUseMock()
-      ? (await sm()).mockGetIncomeTrend()
-      : get<ChartDataItem[]>(`/statistics/income-trend?${buildStatisticsQuery(params || {})}`),
+    get<ChartDataItem[]>(`/statistics/income-trend?${buildStatisticsQuery(params || {})}`),
   /** 家长端课时趋势 */
   getParentTrend: async (params?: {
     filterMode?: 'custom' | 'month' | 'quarter' | 'year';
     month?: number;
     year?: number;
   }): Promise<ChartDataItem[]> =>
-    isUseMock()
-      ? (await sm()).mockGetParentTrend()
-      : get<ChartDataItem[]>(`/statistics/parent-trend?${buildStatisticsQuery(params || {})}`),
+    get<ChartDataItem[]>(`/statistics/parent-trend?${buildStatisticsQuery(params || {})}`),
 
   // ---------- 排行数据 ----------
   /** 学员课时消耗排行 */
@@ -292,9 +278,7 @@ export const statisticsService = {
     month?: number;
     year?: number;
   }): Promise<{ label: string; value: number; unit: string }[]> =>
-    isUseMock()
-      ? (await sm()).mockGetLessonRank()
-      : get<BackendLessonRankItem[]>(
+    get<BackendLessonRankItem[]>(
           `/statistics/lesson-rank?${buildStatisticsQuery(params || {})}`,
         ).then((list) =>
           list.map((item) => ({
@@ -309,9 +293,7 @@ export const statisticsService = {
     month?: number;
     year?: number;
   }): Promise<{ label: string; value: number; unit: string }[]> =>
-    isUseMock()
-      ? (await sm()).mockGetPaymentRank()
-      : get<BackendPaymentRankItem[]>(
+    get<BackendPaymentRankItem[]>(
           `/statistics/payment-rank?${buildStatisticsQuery(params || {})}`,
         ).then((list) =>
           list.map((item) => ({
@@ -328,9 +310,7 @@ export const statisticsService = {
     month?: number;
     year?: number;
   }): Promise<{ label: string; ratio: number; barClass: string }[]> =>
-    isUseMock()
-      ? (await sm()).mockGetExpenseRatios()
-      : get<BackendExpenseRatioResponse>(
+    get<BackendExpenseRatioResponse>(
           `/statistics/expense-ratios?${buildStatisticsQuery(params || {})}`,
         ).then((result) =>
           result.breakdown.map((item, index) => ({
@@ -352,13 +332,7 @@ export const statisticsService = {
    * @param params 视图类型 + 时间范围
    */
   getAlerts: async (params: AlertQueryParams): Promise<AlertItem[]> => {
-    if (isUseMock()) {
-      if (params.viewType === 'finance') {
-        return (await sm()).mockGetFinanceAlerts().then((alerts) => alerts.map(normalizeAlertItem));
-      }
-      return (await sm()).mockGetOperationAlerts().then((alerts) => alerts.map(normalizeAlertItem));
-    }
-
+    
     return get<BackendAlertItem[]>(`/statistics/alerts?${buildAlertQuery(params)}`).then((alerts) =>
       alerts.map(mapBackendAlertItem),
     );
@@ -369,12 +343,7 @@ export const statisticsService = {
    * 详情页统一走 Service，避免页面直接依赖 @/data/statistics
    */
   getAlertById: async (alertId: string): Promise<AlertItem | null> => {
-    if (isUseMock()) {
-      const [op, fin] = await Promise.all([(await sm()).mockGetOperationAlerts(), (await sm()).mockGetFinanceAlerts()]);
-      const alert = [...op, ...fin].map(normalizeAlertItem).find((item) => item.id === alertId);
-      return alert || null;
-    }
-
+    
     try {
       const alert = await get<BackendAlertItem>(
         `/statistics/alerts/${encodeURIComponent(alertId)}`,

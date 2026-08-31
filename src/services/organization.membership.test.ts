@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrganizationQuotaUsage } from '@/services/organization';
 
+const getMock = vi.fn();
+const postMock = vi.fn();
+
 vi.mock('@/utils/request', () => ({
-  get: vi.fn(),
-  post: vi.fn(),
+  get: (...args: unknown[]) => getMock(...args),
+  post: (...args: unknown[]) => postMock(...args),
   put: vi.fn(),
 }));
 
@@ -54,10 +57,11 @@ describe('isOrgMembershipActive', () => {
   });
 });
 
-describe('organizationService mock 兑换配额', () => {
+describe('organizationService.redeemActivationCode', () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.stubEnv('VITE_USE_MOCK', 'true');
+    getMock.mockReset();
+    postMock.mockReset();
   });
 
   it('校验空码与过短码', async () => {
@@ -68,64 +72,41 @@ describe('organizationService mock 兑换配额', () => {
     expect(await organizationService.redeemActivationCode('HXK-1')).toEqual({
       error: { message: '激活码格式不正确' },
     });
+    expect(postMock).not.toHaveBeenCalled();
   });
 
-  it('BASIC / FLAGSHIP / 非法前缀配额与文案正确', async () => {
-    vi.useFakeTimers();
-    const Taro = (await import('@tarojs/taro')).default;
-    Taro.removeStorageSync('yunce:mock-org-membership');
-
+  it('成功兑换走 POST /organization/redeem-activation-code', async () => {
+    postMock.mockResolvedValueOnce({
+      versionCode: 'BASIC',
+      versionName: '基础版',
+      versionUpgraded: true,
+      message: '兑换成功',
+    });
     const { organizationService } = await import('@/services/organization');
-
-    const basicP = organizationService.redeemActivationCode('HXK-DEMO-BASIC-XXXX');
-    await vi.advanceTimersByTimeAsync(500);
-    const basic = await basicP;
+    const basic = await organizationService.redeemActivationCode('HXK-DEMO-BASIC-XXXX');
+    expect(postMock).toHaveBeenCalledWith('/organization/redeem-activation-code', {
+      code: 'HXK-DEMO-BASIC-XXXX',
+    });
     expect(basic.error).toBeNull();
     expect(basic.versionCode).toBe('BASIC');
     expect(basic.versionUpgraded).toBe(true);
+  });
 
-    let stored = JSON.parse(
-      String(Taro.getStorageSync('yunce:mock-org-membership')),
-    ) as OrganizationQuotaUsage;
-    expect(stored.members.max).toBe(100);
-    expect(stored.employees.max).toBe(5);
-
-    const flagP = organizationService.redeemActivationCode('HXK-DEMO-FLAGSHIP');
-    await vi.advanceTimersByTimeAsync(500);
-    const flag = await flagP;
-    expect(flag.versionCode).toBe('FLAGSHIP');
-    stored = JSON.parse(
-      String(Taro.getStorageSync('yunce:mock-org-membership')),
-    ) as OrganizationQuotaUsage;
-    expect(stored.members.max).toBe(-1);
-    expect(stored.employees.max).toBe(-1);
-    expect(stored.campuses.max).toBe(10);
-    expect(stored.features.batchImportExport).toBe(true);
-
-    const badP = organizationService.redeemActivationCode('BADCODE99');
-    await vi.advanceTimersByTimeAsync(500);
-    expect(await badP).toEqual({ error: { message: '激活码不存在' } });
-
-    vi.useRealTimers();
+  it('后端失败映射为 error.message', async () => {
+    postMock.mockRejectedValueOnce(new Error('激活码不存在'));
+    const { organizationService } = await import('@/services/organization');
+    const bad = await organizationService.redeemActivationCode('BADCODE99XX');
+    expect(bad.error?.message).toContain('激活码不存在');
   });
 });
 
 describe('organizationService.getMembershipTips', () => {
   beforeEach(() => {
     vi.resetModules();
+    getMock.mockReset();
   });
 
-  it('mock 模式直接返回 null', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true');
-    const { organizationService } = await import('@/services/organization');
-    expect(await organizationService.getMembershipTips()).toBeNull();
-  });
-
-  it('真实模式合并远端 tips；失败降级 null', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'false');
-    const { get } = await import('@/utils/request');
-    const getMock = get as unknown as ReturnType<typeof vi.fn>;
-
+  it('合并远端 tips；空/失败降级 null', async () => {
     getMock.mockResolvedValueOnce({ tips: [{ tipId: 'E-A', title: '远端' }] });
     let { organizationService } = await import('@/services/organization');
     expect(await organizationService.getMembershipTips()).toEqual([
@@ -133,16 +114,12 @@ describe('organizationService.getMembershipTips', () => {
     ]);
 
     vi.resetModules();
-    vi.stubEnv('VITE_USE_MOCK', 'false');
-    const req = await import('@/utils/request');
-    (req.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ tips: [] });
+    getMock.mockResolvedValueOnce({ tips: [] });
     ({ organizationService } = await import('@/services/organization'));
     expect(await organizationService.getMembershipTips()).toBeNull();
 
     vi.resetModules();
-    vi.stubEnv('VITE_USE_MOCK', 'false');
-    const req2 = await import('@/utils/request');
-    (req2.get as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('network'));
+    getMock.mockRejectedValueOnce(new Error('network'));
     ({ organizationService } = await import('@/services/organization'));
     expect(await organizationService.getMembershipTips()).toBeNull();
   });

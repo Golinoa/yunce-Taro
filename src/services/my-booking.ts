@@ -3,7 +3,6 @@
  * 并行拉取试听 / 场地 / 班课开放约 / 团课·私教约课，映射为 MyBookingCard。
  */
 import dayjs from 'dayjs';
-import { getMockTeacherParentBookings } from '@/data/my-booking-seed';
 import { classBookingService } from '@/services/class-booking';
 import { leadService } from '@/services/lead';
 import { venueBookingService } from '@/services/venue-booking';
@@ -16,7 +15,6 @@ import type {
 } from '@/types/my-booking';
 import type { Profile } from '@/types/profile';
 import type { VenueBookingRecord } from '@/types/venue-booking';
-import { isUseMock } from '@/utils/build-env';
 import { readAllParentBookings, type ParentBookingItem } from '@/utils/parent-bookings';
 import {
   BOOKING_RELATION_LABEL,
@@ -189,9 +187,7 @@ function collectParentBookings(
   const fromStorage = readAllParentBookings().filter((item) =>
     isParentBookingRelated(item, profile),
   );
-  const fromSeed = isUseMock()
-    ? getMockTeacherParentBookings().filter((item) => isParentBookingRelated(item, profile))
-    : [];
+  const fromSeed: ParentBookingItem[] = [];
 
   const map = new Map<string, ParentBookingItem>();
   [...fromSeed, ...fromStorage].forEach((item) => {

@@ -5,8 +5,6 @@ vi.mock('@/utils/invite-parent-link', () => ({
 
 import Taro from '@tarojs/taro';
 import { MOCK_TMPL_IDS } from '@/constants/subscribe-presets';
-import { mockResetState } from '@/data/subscribe-message';
-import { getSession } from '@/services/auth';
 import {
   __resetSubscribeServiceForTest,
   subscribeMessageService,
@@ -19,6 +17,7 @@ import {
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
 import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { requestSubscribeMessageAuth } from '@/utils/subscribe-message';
+import type { SubscribeBootstrapDto, SubscribeTemplateGroup } from '@/types/subscribe-message';
 
 vi.mock('@/services/auth', () => ({
   getSession: vi.fn(),
@@ -32,6 +31,48 @@ vi.mock('@/utils/subscribe-message', async (importOriginal) => {
   };
 });
 
+const GROUPS = Object.keys(MOCK_TMPL_IDS) as SubscribeTemplateGroup[];
+
+function mockBootstrap(remain = 0): SubscribeBootstrapDto {
+  return {
+    templates: GROUPS.map((group) => ({
+      group,
+      tmplId: MOCK_TMPL_IDS[group],
+      enabled: true,
+      title: group,
+    })),
+    quotas: GROUPS.map((group) => ({
+      group,
+      tmplId: MOCK_TMPL_IDS[group],
+      remain,
+      lowThreshold: 1,
+    })),
+    pendingPrompts: [],
+    lowQuotaGroups: [],
+  };
+}
+
+const getMock = vi.fn(async () => mockBootstrap(0));
+const postMock = vi.fn(async (_url: string, body?: { items?: Array<{ group: string; status: string }> }) => {
+  const boot = mockBootstrap(0);
+  const accepted = new Set((body?.items || []).filter((i) => i.status === 'accept').map((i) => i.group));
+  return {
+    quotas: boot.quotas.map((q) => ({
+      ...q,
+      remain: accepted.has(q.group) ? q.remain + 1 : q.remain,
+    })),
+  };
+});
+
+vi.mock('@/utils/request', () => ({
+  get: (...args: unknown[]) => getMock(...args),
+  post: (...args: unknown[]) => postMock(...(args as [string, unknown?])),
+  put: vi.fn(),
+  del: vi.fn(),
+}));
+
+import { getSession } from '@/services/auth';
+
 const USER = 'service-test-user';
 
 function resetStore() {
@@ -44,10 +85,12 @@ function resetStore() {
 
 describe('subscribeMessageService', () => {
   beforeEach(() => {
-    mockResetState();
     __resetSubscribeServiceForTest();
     __resetSubscribeClassViewForTest();
     resetStore();
+    getMock.mockReset();
+    getMock.mockImplementation(async () => mockBootstrap(0));
+    postMock.mockClear();
     vi.mocked(getSession).mockResolvedValue({
       profile: { id: USER } as never,
       session: null,

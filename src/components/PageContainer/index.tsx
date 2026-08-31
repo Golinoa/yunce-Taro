@@ -2,7 +2,6 @@ import { View } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
 import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
-import { isUseMock } from '@/utils/build-env';
 import { useThemeStore } from '@/stores/theme';
 
 interface PageContainerProps {
@@ -31,7 +30,7 @@ const PageContainer: React.FC<PageContainerProps> = ({
       )}
     >
       {children}
-      {isUseMock() ? <MockIdentitySwitcher /> : null}
+      <MockIdentitySwitcher />
     </View>
   );
 };

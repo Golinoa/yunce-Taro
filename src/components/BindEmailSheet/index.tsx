@@ -9,12 +9,10 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
-import { isUseMock } from '@/utils/build-env';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_PASSWORD_LENGTH = 20;
-const DEMO_CODE_HINT = '演示环境验证码为 123456';
 
 export interface BindEmailSheetProps {
   visible: boolean;
@@ -107,9 +105,7 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
       const hint = result.maskedEmail || trimmed;
       setMaskedHint(hint);
       Taro.showToast({
-        title: isUseMock()
-          ? DEMO_CODE_HINT
-          : `验证码已发送至${hint}`,
+        title: `验证码已发送至${hint}`,
         icon: 'none',
       });
     } finally {
@@ -175,11 +171,7 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
           />
           <View className="mt-[12rpx] flex items-center justify-between">
             <Text className="text-[22rpx] text-muted-foreground">
-              {maskedHint
-                ? `已发送至 ${maskedHint}${isUseMock() ? `，${DEMO_CODE_HINT}` : ''}`
-                : isUseMock()
-                  ? DEMO_CODE_HINT
-                  : '验证码 5 分钟内有效'}
+              {maskedHint ? `已发送至 ${maskedHint}` : '验证码 5 分钟内有效'}
             </Text>
             <Text
               className={cn(

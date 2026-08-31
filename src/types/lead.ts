@@ -355,3 +355,22 @@ export interface LeadFormData {
   source_type?: string;
   notes?: string;
 }
+
+/** 试听可预约课程时段 */
+export interface TrialCourseSlot {
+  id: string;
+  courseId: string;
+  courseName: string;
+  subjectId?: string;
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  campusId: string;
+  campusName: string;
+  lessonDate: string;
+  startTime: string;
+  endTime: string;
+  room?: string;
+  availableSlots: number;
+  totalSlots: number;
+}

@@ -2,8 +2,8 @@
  * Service 层 — 店铺配置引导 API
  */
 import type { StoreOnboardingProgress } from '@/types/onboarding';
-import { isUseMock } from '@/utils/build-env';
-import { loadOnboardingMock } from '@/utils/mock-loaders';
+
+
 import {
   buildStoreProgressFromVisited,
   clearVisitedMap,
@@ -13,11 +13,7 @@ import {
 export const onboardingService = {
   /** 获取教师视图店铺管理配置进度 */
   getStoreProgress: async (): Promise<StoreOnboardingProgress> => {
-    if (isUseMock()) {
-      const { mockGetStoreProgress } = await loadOnboardingMock();
-      return mockGetStoreProgress();
-    }
-    const { steps, completedCount, totalCount } = buildStoreProgressFromVisited();
+        const { steps, completedCount, totalCount } = buildStoreProgressFromVisited();
     return { steps, completed: completedCount, total: totalCount };
   },
 };

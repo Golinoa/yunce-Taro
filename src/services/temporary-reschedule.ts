@@ -1,7 +1,7 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import type { Class, Schedule, TemporaryReschedule } from '@/types';
-import { isUseMock } from '@/utils/build-env';
+
 import { get, post } from '@/utils/request';
 import {
   API_PAGE_SIZE_BATCH,
@@ -152,7 +152,7 @@ export const temporaryRescheduleService = {
     startDate: string,
     endDate: string,
   ): Promise<TemporaryReschedule[]> => {
-    if (!isUseMock()) {
+    
       const list = await fetchAllPages(async (page, pageSize) => {
         const response = await get<
           PaginatedResponse<BackendTemporaryRescheduleItem> | BackendTemporaryRescheduleItem[]
@@ -164,9 +164,7 @@ export const temporaryRescheduleService = {
         return asPaginatedResponse(response, page, pageSize);
       }, API_PAGE_SIZE_BATCH);
       return list.map(mapBackendTemporaryReschedule);
-    }
-
-    return readStorage()
+        return readStorage()
       .filter((item) => item.teacher_id === teacherId)
       .filter((item) => {
         const inSourceRange = item.source_date >= startDate && item.source_date <= endDate;
@@ -186,7 +184,7 @@ export const temporaryRescheduleService = {
     targetDate,
     schedules,
   }: SaveBatchParams): Promise<TemporaryReschedule[]> => {
-    if (!isUseMock()) {
+    
       const response = await post<
         BackendTemporaryRescheduleBatchResponse | BackendTemporaryRescheduleItem[]
       >('/temporary-reschedules/batch', {
@@ -202,9 +200,7 @@ export const temporaryRescheduleService = {
       });
       const list = Array.isArray(response) ? response : response.items || [];
       return list.map(mapBackendTemporaryReschedule);
-    }
-
-    const now = new Date().toISOString();
+        const now = new Date().toISOString();
     const nextItems = schedules.map<TemporaryReschedule>((schedule) => ({
       id: `tmp-reschedule-${schedule.id}-${sourceDate}`,
       teacher_id: teacherId,

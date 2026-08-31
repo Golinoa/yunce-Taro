@@ -54,7 +54,6 @@ import type { Schedule, ScheduleColor, DayOfWeek } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
-import { isUseMock } from '@/utils/build-env';
 import { logError } from '@/utils/logger';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -101,8 +100,6 @@ const END_MODE_OPTIONS: { label: string; value: EndMode }[] = [
   { label: '限日期', value: 'by_date' },
   { label: '按次数', value: 'by_count' },
 ];
-
-const USE_MOCK = isUseMock();
 
 /** 是/否分段开关（节假日是否排课） */
 const YesNoToggle: React.FC<{
@@ -375,7 +372,7 @@ const ScheduleForm: React.FC = () => {
           }
         }
         setOriginalSchedule(sch);
-        setMode(!USE_MOCK || sch.class_id ? 'class' : 'student');
+        setMode('class');
         if (sch.student_id) setStudentId(sch.student_id);
         if (sch.class_id) setClassId(sch.class_id);
         setDayOfWeek(
@@ -435,7 +432,7 @@ const ScheduleForm: React.FC = () => {
         setOriginalSchedule(null);
         if (stuList.length > 0) setStudentId(stuList[0].id);
         // 班级名称不默认选中；进页后自动弹出选择班级（见下方 effect）
-        if (!USE_MOCK) setMode('class');
+        setMode('class');
         setSelectedDateValue(dayjs().format('YYYY-MM-DD'));
         setStartDate(dayjs().format('YYYY-MM-DD'));
         setSelectedTeachingTeacherId(currentUserId);
@@ -879,7 +876,7 @@ const ScheduleForm: React.FC = () => {
   /* ---- 提交校验 ---- */
   const submitBlockedReason = useMemo(() => {
     if (!currentUserId) return '未获取到登录信息';
-    if (mode === 'student' && !USE_MOCK) return '真实联调仅支持班级排课';
+    if (mode === 'student') return '真实联调仅支持班级排课';
     if (mode === 'class' && !classId) return '请选择班级';
     if (!selectedTeachingTeacherId) return '请选择主讲老师';
     if (isGroupMode) {

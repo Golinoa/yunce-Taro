@@ -19,6 +19,11 @@ import { logError } from '@/utils/logger';
 
 let consuming = false;
 
+/** 单测重置 onShow 消费锁 */
+export function __resetConsumeSubscribeOnShowForTest(): void {
+  consuming = false;
+}
+
 export async function consumeSubscribeOnShow(options?: {
   role?: string;
   campusId?: string;

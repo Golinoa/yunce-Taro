@@ -19,18 +19,8 @@ import type {
   IncomeCategoryType,
   TransactionRecordType,
 } from '@/types/data-center';
-import { isUseMock } from '@/utils/build-env';
+
 import { get, post } from '@/utils/request';
-
-type DataCenterMockModule = typeof import('../data/data-center-mock');
-let dataCenterMockPromise: Promise<DataCenterMockModule> | null = null;
-
-function loadDataCenterMock(): Promise<DataCenterMockModule> {
-  if (!dataCenterMockPromise) {
-    dataCenterMockPromise = import('../data/data-center-mock');
-  }
-  return dataCenterMockPromise;
-}
 
 // ============================================
 // 类型定义（接口契约）
@@ -210,31 +200,23 @@ export const dataCenterService = {
   // ---------- 场馆概览 ----------
   /** 获取场馆经营概览 */
   getVenueOverview: (params?: DataCenterScopeParams): Promise<VenueOverviewType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetVenueOverview(params?.campusId))
-      : get<BackendVenueOverviewResponse>(appendCampusQuery('/data-center/venue-overview', params?.campusId)),
+    get<BackendVenueOverviewResponse>(appendCampusQuery('/data-center/venue-overview', params?.campusId)),
 
   // ---------- 营收趋势 ----------
   /** 获取营收趋势 */
   getRevenueTrend: (params: RevenueTrendQueryParams): Promise<RevenueTrendType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetRevenueTrend(params.period, params.campusId))
-      : get<BackendRevenueTrendResponse>(
+    get<BackendRevenueTrendResponse>(
           appendCampusQuery(`/data-center/revenue-trend?period=${params.period}`, params.campusId),
         ),
 
   // ---------- 财务数据 ----------
   /** 获取财务数据卡片 */
   getFinanceData: (params?: DataCenterScopeParams): Promise<FinanceDataType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetFinanceData(params?.campusId))
-      : get<BackendFinanceDataResponse>(appendCampusQuery('/data-center/finance', params?.campusId)),
+    get<BackendFinanceDataResponse>(appendCampusQuery('/data-center/finance', params?.campusId)),
 
   /** 获取财务详情 */
   getFinanceDetail: (params: FinanceDetailQueryParams): Promise<FinanceDetailType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetFinanceDetail(params))
-      : get<FinanceDetailType>(
+    get<FinanceDetailType>(
           appendCampusQuery(
             `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
             params.campusId,
@@ -244,15 +226,11 @@ export const dataCenterService = {
   // ---------- 会员数据 ----------
   /** 获取会员数据卡片 */
   getMemberData: (params?: DataCenterScopeParams): Promise<MemberDataType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetMemberData(params?.campusId))
-      : get<BackendMemberDataResponse>(appendCampusQuery('/data-center/member', params?.campusId)),
+    get<BackendMemberDataResponse>(appendCampusQuery('/data-center/member', params?.campusId)),
 
   /** 获取会员详情 */
   getMemberDetail: (params: MemberDetailQueryParams): Promise<MemberDetailType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetMemberDetail(params))
-      : get<MemberDetailType>(
+    get<MemberDetailType>(
           appendCampusQuery(
             `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
             params.campusId,
@@ -262,15 +240,11 @@ export const dataCenterService = {
   // ---------- 卡项数据 ----------
   /** 获取卡项数据卡片 */
   getCardData: (params?: DataCenterScopeParams): Promise<CardDataType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetCardData(params?.campusId))
-      : get<BackendCardDataResponse>(appendCampusQuery('/data-center/card', params?.campusId)),
+    get<BackendCardDataResponse>(appendCampusQuery('/data-center/card', params?.campusId)),
 
   /** 获取卡项详情 */
   getCardDetail: (params: CardDetailQueryParams): Promise<CardDetailType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetCardDetail(params))
-      : get<CardDetailType>(
+    get<CardDetailType>(
           appendCampusQuery(
             `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
             params.campusId,
@@ -280,15 +254,11 @@ export const dataCenterService = {
   // ---------- 薪资数据 ----------
   /** 获取薪资数据卡片 */
   getSalaryData: (params?: DataCenterScopeParams): Promise<SalaryDataType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetSalaryData(params?.campusId))
-      : get<BackendSalaryDataResponse>(appendCampusQuery('/data-center/salary', params?.campusId)),
+    get<BackendSalaryDataResponse>(appendCampusQuery('/data-center/salary', params?.campusId)),
 
   /** 获取薪资详情 */
   getSalaryDetail: (params: SalaryDetailQueryParams): Promise<SalaryDetailType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetSalaryDetail(params))
-      : get<SalaryDetailType>(
+    get<SalaryDetailType>(
           appendCampusQuery(
             `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
             params.campusId,
@@ -298,33 +268,25 @@ export const dataCenterService = {
   // ---------- 记一�?----------
   /** 获取支出分类列表 */
   getExpenseCategories: (): Promise<ExpenseCategoryType[]> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetExpenseCategories())
-      : get<ExpenseCategoryType[]>('/data-center/expense-categories'),
+    get<ExpenseCategoryType[]>('/data-center/expense-categories'),
 
   /** 获取收入分类列表 */
   getIncomeCategories: (): Promise<IncomeCategoryType[]> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockGetIncomeCategories())
-      : get<IncomeCategoryType[]>('/data-center/income-categories'),
+    get<IncomeCategoryType[]>('/data-center/income-categories'),
 
   /** 创建自定义记账分�?*/
   createLedgerCategory: (input: {
     type: 'expense' | 'income';
     name: string;
   }): Promise<ExpenseCategoryType | IncomeCategoryType> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockCreateLedgerCategory(input))
-      : post<ExpenseCategoryType | IncomeCategoryType>(
+    post<ExpenseCategoryType | IncomeCategoryType>(
           '/data-center/categories',
           input as unknown as Record<string, unknown>,
         ),
 
   /** 创建交易记录（记一笔） */
   createTransaction: (data: CreateTransactionParams): Promise<{ success: boolean }> =>
-    isUseMock()
-      ? loadDataCenterMock().then((m) => m.mockCreateTransaction(data))
-      : post<{ success: boolean }>(
+    post<{ success: boolean }>(
           '/data-center/transaction',
           data as unknown as Record<string, unknown>,
         ),

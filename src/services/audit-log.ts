@@ -1,11 +1,9 @@
 /**
  * 操作日志 Service 层（审计日志）
  * - 查询走 GET /audit-logs
- * - 写入仍由前端 mock 层 append（后端暂未提供写入接口）
+ * - 写入：后端暂无接口，本地合成条目（不落库、不依赖 mock data）
  */
 import type { AuditLogEntry, AuditLogPage, AuditLogQuery } from '@/types/audit-log';
-import { loadAuditLogMock } from '@/utils/mock-loaders';
-import { isUseMock } from '@/utils/build-env';
 import { get } from '@/utils/request';
 import {
   type PaginatedResponse,
@@ -51,8 +49,20 @@ function mapBackendAuditLog(raw: Record<string, unknown>): AuditLogEntry {
 
 export const auditLogService = {
   record: async (input: AuditLogInput): Promise<AuditLogEntry> => {
-    const { addAuditLog } = await loadAuditLogMock();
-    return addAuditLog(input);
+    // 后端暂无写入接口；返回本地合成条目供调用方展示
+    return {
+      id: `local-audit-${Date.now()}`,
+      action: input.action,
+      actionLabel: input.action,
+      operatorId: input.operatorId,
+      operatorName: input.operatorName,
+      operatorRole: input.operatorRole,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      detail: input.detail,
+      meta: input.meta,
+      createdAt: new Date().toISOString(),
+    };
   },
 
   query: async (viewer: AuditLogViewer, query?: AuditLogQuery): Promise<AuditLogPage> => {
@@ -60,11 +70,6 @@ export const auditLogService = {
       ...query,
       operatorId: viewer.isManager ? query?.operatorId : viewer.id,
     };
-
-    if (isUseMock()) {
-      const { queryAuditLogs } = await loadAuditLogMock();
-      return queryAuditLogs(safeQuery);
-    }
 
     const data = await get<PaginatedResponse<Record<string, unknown>>>('/audit-logs', {
       page: safeQuery.page ?? 1,

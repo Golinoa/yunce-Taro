@@ -8,7 +8,7 @@ import type {
   LeadSummary,
   TrialSlotConfig,
 } from '@/types/lead';
-import type { TrialCourseSlot } from '@/data/lead';
+import type { TrialCourseSlot } from '@/types/lead';
 import { formatApiDate, formatApiDateTime } from '@/utils/pagination';
 
 type RawRecord = Record<string, unknown>;

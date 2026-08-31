@@ -7,12 +7,10 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BRAND_LOGO } from '@/constants/brand';
 import { preparePasswordReset, resetPasswordByEmailCode } from '@/services/auth';
-import { isUseMock } from '@/utils/build-env';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const MIN_PASSWORD_LENGTH = 6;
 const CODE_COUNTDOWN_SEC = 60;
-const DEMO_CODE_HINT = '演示环境验证码为 123456';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ForgotPasswordPage: React.FC = () => {
@@ -81,9 +79,7 @@ const ForgotPasswordPage: React.FC = () => {
     setResetSuccess(false);
     startCountdown();
     Taro.showToast({
-      title: isUseMock()
-        ? DEMO_CODE_HINT
-        : `验证码已发送至${result.maskedEmail || result.email || ''}`,
+      title: `验证码已发送至${result.maskedEmail || result.email || ''}`,
       icon: 'none',
       duration: 2500,
     });

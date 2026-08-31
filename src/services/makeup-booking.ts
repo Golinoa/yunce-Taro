@@ -3,11 +3,6 @@
  */
 import Taro from '@tarojs/taro';
 import type { MakeupBooking } from '@/types/makeup-booking';
-import { isUseMock } from '@/utils/build-env';
-
-async function loadMakeupMock() {
-  return import('@/data/makeup-booking');
-}
 
 function storageKey(classId: string, lessonDate: string) {
   return `yunce:makeup:${classId}:${lessonDate}`;
@@ -27,11 +22,7 @@ export async function createMakeupBooking(params: {
   note?: string;
   createdBy: string;
 }): Promise<MakeupBooking> {
-  if (isUseMock()) {
-    const mod = await loadMakeupMock();
-    return mod.mockCreateMakeupBooking(params);
-  }
-
+  
   // 真实联调阶段：本地暂存，点名页可读；后端表就绪后改走 API
   const booking: MakeupBooking = {
     id: `makeup-local-${Date.now()}`,
@@ -69,11 +60,7 @@ export async function getMakeupBookingsByClassDate(params: {
   classId: string;
   lessonDate: string;
 }): Promise<MakeupBooking[]> {
-  if (isUseMock()) {
-    const mod = await loadMakeupMock();
-    return mod.mockGetMakeupBookingsByClassDate(params);
-  }
-  try {
+    try {
     const raw = Taro.getStorageSync(storageKey(params.classId, params.lessonDate));
     const list: MakeupBooking[] = raw ? JSON.parse(String(raw)) : [];
     return list.filter((b) => b.status === 'confirmed');

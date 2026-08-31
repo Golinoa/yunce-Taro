@@ -20,6 +20,7 @@ import {
   type TeacherMonthlyFlowBundle,
   type TeacherMonthlyFlowTab,
 } from '@/services/teacher-monthly-flow';
+import { teacherService } from '@/services/teacher';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useAuth } from '@/utils/auth';
@@ -62,7 +63,8 @@ const MonthlyFlowPage: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await teacherMonthlyFlowService.getMonthlyFlow(month, profile?.id);
+      // 不传 profile.id：校长 JWT 的 profile.id ≠ Teacher.id，由服务走 /teachers/me
+      const data = await teacherMonthlyFlowService.getMonthlyFlow(month);
       setBundle(data);
     } catch {
       Taro.showToast({ title: '加载失败', icon: 'none' });
@@ -70,7 +72,7 @@ const MonthlyFlowPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [month, profile?.id]);
+  }, [month]);
 
   useEffect(() => {
     void loadData();
@@ -90,15 +92,22 @@ const MonthlyFlowPage: React.FC = () => {
   }, [month]);
 
   const handleOpenSalarySlip = useCallback(() => {
-    const teacherId = profile?.id;
-    if (!teacherId) {
-      Taro.showToast({ title: '无法识别教师身份', icon: 'none' });
-      return;
-    }
-    void Taro.navigateTo({
-      url: `/package-teacher/pages/salary-detail/index?id=${encodeURIComponent(teacherId)}&mode=slip&month=${encodeURIComponent(month)}`,
-    });
-  }, [month, profile?.id]);
+    void (async () => {
+      try {
+        const me = await teacherService.getMe();
+        const teacherId = me?.id;
+        if (!teacherId) {
+          Taro.showToast({ title: '无法识别教师身份', icon: 'none' });
+          return;
+        }
+        await Taro.navigateTo({
+          url: `/package-teacher/pages/salary-detail/index?id=${encodeURIComponent(teacherId)}&mode=slip&month=${encodeURIComponent(month)}`,
+        });
+      } catch {
+        Taro.showToast({ title: '无法识别教师身份', icon: 'none' });
+      }
+    })();
+  }, [month]);
 
   const monthLabel = useMemo(() => dayjs(`${month}-01`).format('YYYY年M月'), [month]);
 
