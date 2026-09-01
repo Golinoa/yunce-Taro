@@ -48,10 +48,6 @@ export type {
   StatsPeriod,
   StatsData,
   QuickEntry,
-  HomeOperationContent,
-  OperationActionConfig,
-  OperationActivityItem,
-  OperationBannerItem,
 } from './home';
 export { todoService, clearStudentRechargeTodoState } from './todo';
 export type { TodoListParams, TodoListView, TodoListItem } from './todo';

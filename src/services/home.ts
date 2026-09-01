@@ -15,10 +15,6 @@ import type {
   StatsPeriod,
   StatsData,
   QuickEntry,
-  HomeOperationContentData,
-  OperationActionConfigData,
-  OperationActivityItemData,
-  OperationBannerItemData,
 } from '@/types/home-ui';
 import type { UserRole } from '@/types/profile';
 import type { Schedule, ScheduleColor } from '@/types/schedule';
@@ -215,39 +211,6 @@ interface BackendUnreadCountResponse {
   count: number;
 }
 
-interface BackendOperationActionConfig {
-  appId?: null | string;
-  path?: null | string;
-  type?: null | string;
-  url?: null | string;
-}
-
-interface BackendOperationDisplayConfig {
-  badgeText?: null | string;
-  theme?: null | string;
-}
-
-interface BackendOperationItem {
-  actionConfig?: BackendOperationActionConfig | null;
-  content?: null | string;
-  coverImageUrl?: null | string;
-  displayConfig?: BackendOperationDisplayConfig | null;
-  id: string;
-  imageUrl?: null | string;
-  summary?: null | string;
-  title?: null | string;
-}
-
-interface BackendHomeOperationResponse {
-  placements?: {
-    banners?: BackendOperationItem[] | null;
-    cards?: BackendOperationItem[] | null;
-    floatings?: BackendOperationItem[] | null;
-    notices?: BackendOperationItem[] | null;
-    popups?: BackendOperationItem[] | null;
-  } | null;
-  updatedAt?: null | string;
-}
 
 export interface HomeTeacherSummary {
   id: string;
@@ -263,10 +226,6 @@ export interface HomeTeacherSummary {
 export type HomeTodoItem = TodoItem;
 export type HomeRecentGroup = RecentGroup;
 export type HomeScheduleItem = Schedule;
-export type HomeOperationContent = HomeOperationContentData;
-export type OperationActionConfig = OperationActionConfigData;
-export type OperationActivityItem = OperationActivityItemData;
-export type OperationBannerItem = OperationBannerItemData;
 
 export interface ParentHomePackageCard {
   id: string;
@@ -506,98 +465,6 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
   };
 }
 
-function normalizeOperationActionType(type?: null | string): OperationActionConfig['type'] {
-  switch ((type || '').toUpperCase()) {
-    case 'PAGE':
-    case 'TAB':
-    case 'WEBVIEW':
-    case 'ACTIVITY':
-    case 'MINI_PROGRAM':
-      return type!.toUpperCase() as OperationActionConfig['type'];
-    default:
-      return 'NONE';
-  }
-}
-
-function mapOperationActionConfig(
-  actionConfig?: BackendOperationActionConfig | null,
-): OperationActionConfig | undefined {
-  if (!actionConfig) {
-    return undefined;
-  }
-
-  return {
-    type: normalizeOperationActionType(actionConfig.type),
-    path: actionConfig.path || undefined,
-    url: actionConfig.url || undefined,
-    appId: actionConfig.appId || undefined,
-  };
-}
-
-function mapOperationActivityItem(item: BackendOperationItem): OperationActivityItem {
-  return {
-    id: item.id,
-    title: item.title || '未命名运营位',
-    summary: item.summary || undefined,
-    content: item.content || undefined,
-    coverImageUrl: item.coverImageUrl || undefined,
-    actionConfig: mapOperationActionConfig(item.actionConfig),
-    displayConfig: item.displayConfig
-      ? {
-          badgeText: item.displayConfig.badgeText || undefined,
-          theme:
-            item.displayConfig.theme === 'dark' ||
-            item.displayConfig.theme === 'light' ||
-            item.displayConfig.theme === 'primary'
-              ? item.displayConfig.theme
-              : undefined,
-        }
-      : undefined,
-  };
-}
-
-function mapOperationBannerItem(item: BackendOperationItem): OperationBannerItem | null {
-  if (!item.imageUrl) {
-    return null;
-  }
-
-  return {
-    id: item.id,
-    title: item.title || '未命名 Banner',
-    imageUrl: item.imageUrl,
-    summary: item.summary || undefined,
-    content: item.content || undefined,
-    actionConfig: mapOperationActionConfig(item.actionConfig),
-    displayConfig: item.displayConfig
-      ? {
-          badgeText: item.displayConfig.badgeText || undefined,
-          theme:
-            item.displayConfig.theme === 'dark' ||
-            item.displayConfig.theme === 'light' ||
-            item.displayConfig.theme === 'primary'
-              ? item.displayConfig.theme
-              : undefined,
-        }
-      : undefined,
-  };
-}
-
-function mapBackendOperationContent(data: BackendHomeOperationResponse): HomeOperationContent {
-  const placements = data.placements || {};
-
-  return {
-    placements: {
-      banners: (placements.banners || [])
-        .map(mapOperationBannerItem)
-        .filter((item): item is OperationBannerItem => Boolean(item)),
-      cards: (placements.cards || []).map(mapOperationActivityItem),
-      floatings: (placements.floatings || []).map(mapOperationActivityItem),
-      notices: (placements.notices || []).map(mapOperationActivityItem),
-      popups: (placements.popups || []).map(mapOperationActivityItem),
-    },
-    updatedAt: data.updatedAt || '',
-  };
-}
 
 export const homeService = {
   /** 获取教师信息 */
@@ -720,24 +587,7 @@ export const homeService = {
   },
 
   /** 获取首页运营位内容 */
-  getOperationContent: async (_role?: UserRole | null): Promise<HomeOperationContent> => {
-    try {
-      const data = await get<BackendHomeOperationResponse>('/home/operations');
-      return mapBackendOperationContent(data);
-    } catch {
-      return {
-        placements: {
-          banners: [],
-          cards: [],
-          floatings: [],
-          notices: [],
-          popups: [],
-        },
-        updatedAt: '',
-      };
-    }
-  },
-
+  
   /**
    * @deprecated 请使用 todoService.getList({ view: 'home', ... })
    */
