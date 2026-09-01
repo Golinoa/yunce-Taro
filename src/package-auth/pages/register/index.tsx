@@ -1,5 +1,5 @@
 /**
- * 注册页 — 对齐登录页视觉：邮箱验证码注册（未注册邮箱会创建账号）
+ * 注册页 — 邮箱 + 验证码 + 密码 + 确认密码 → 落库并进入 onboarding
  */
 import { View, Text, Image, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -7,34 +7,30 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import { BRAND_LOGO } from '@/constants/brand';
-import { prepareEmailLogin } from '@/services/auth';
+import { prepareEmailRegister } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import { useAuth } from '@/utils/auth';
-import { consumeLastLoginIsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
+import { navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_COUNTDOWN_SEC = 60;
+
 const Register: React.FC = () => {
-  const { profile, signInWithEmailCode } = useAuth();
+  const { signUpWithEmailPassword } = useAuth();
   const { agreed, setAgreed } = useAgreementStore();
   const navHeight = useNavSafeHeight();
 
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showAgreementDialog, setShowAgreementDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [pendingRegister, setPendingRegister] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (profile) {
-      const isNewUser = consumeLastLoginIsNewUser();
-      navigateAfterAuth(profile, isNewUser ? { isNewUser: true } : undefined);
-    }
-  }, [profile]);
 
   useEffect(() => {
     return () => {
@@ -70,14 +66,18 @@ const Register: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { error, isNewUser } = await signInWithEmailCode(trimmedEmail, trimmedCode);
+      const { error, profile: nextProfile } = await signUpWithEmailPassword(
+        trimmedEmail,
+        trimmedCode,
+        password,
+      );
       if (error) {
         Taro.showToast({ title: error.message || '注册失败', icon: 'none' });
         return;
       }
       Taro.setStorageSync('justLoggedIn', 'true');
-      if (!isNewUser) {
-        Taro.showToast({ title: '该邮箱已注册，已为您登录', icon: 'none' });
+      if (nextProfile) {
+        navigateAfterAuth(nextProfile, { isNewUser: true });
       }
     } catch {
       Taro.showToast({ title: '注册失败', icon: 'none' });
@@ -85,7 +85,7 @@ const Register: React.FC = () => {
       setSubmitting(false);
       setPendingRegister(false);
     }
-  }, [code, email, signInWithEmailCode, submitting]);
+  }, [code, email, password, signUpWithEmailPassword, submitting]);
 
   const handleSendCode = useCallback(async () => {
     if (sendingCode || countdown > 0) return;
@@ -100,17 +100,22 @@ const Register: React.FC = () => {
     }
 
     setSendingCode(true);
-    const result = await prepareEmailLogin(trimmedEmail, 'email');
+    startCountdown();
+    const result = await prepareEmailRegister(trimmedEmail);
     setSendingCode(false);
 
     if (result.error || result.status !== 'ready') {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      setCountdown(0);
       Taro.showToast({ title: result.error?.message || '验证码发送失败', icon: 'none' });
       return;
     }
 
-    startCountdown();
     Taro.showToast({
-      title: `验证码已发送至${result.maskedEmail || result.email || ''}`,
+      title: `验证码已受理，请查收 ${result.maskedEmail || result.email || ''}`,
       icon: 'none',
       duration: 2500,
     });
@@ -128,12 +133,16 @@ const Register: React.FC = () => {
       Taro.showToast({ title: '请输入正确的邮箱地址', icon: 'none' });
       return;
     }
-    if (!trimmedCode) {
-      Taro.showToast({ title: '请输入验证码', icon: 'none' });
+    if (!trimmedCode || trimmedCode.length < 4) {
+      Taro.showToast({ title: '请输入正确的验证码', icon: 'none' });
       return;
     }
-    if (trimmedCode.length < 4) {
-      Taro.showToast({ title: '请输入正确的验证码', icon: 'none' });
+    if (password.length < 6 || password.length > 20) {
+      Taro.showToast({ title: '密码须为 6–20 位', icon: 'none' });
+      return;
+    }
+    if (password !== confirmPassword) {
+      Taro.showToast({ title: '两次密码不一致', icon: 'none' });
       return;
     }
     if (!agreed) {
@@ -142,7 +151,7 @@ const Register: React.FC = () => {
       return;
     }
     void executeRegister();
-  }, [agreed, code, email, executeRegister, submitting]);
+  }, [agreed, code, confirmPassword, email, executeRegister, password, submitting]);
 
   const handleAgreementConfirm = useCallback(() => {
     setAgreed(true);
@@ -164,7 +173,7 @@ const Register: React.FC = () => {
     <View className="min-h-screen flex flex-col relative overflow-hidden bg-login-page">
       <View style={{ height: `${navHeight}px` }} className="relative z-10 flex-shrink-0" />
 
-      <View className="relative z-10 h-[280rpx] flex items-end justify-center px-[56rpx] pb-[36rpx]">
+      <View className="relative z-10 h-[240rpx] flex items-end justify-center px-[56rpx] pb-[36rpx]">
         <View className="rotate-login-slogan">
           <View className="flex flex-row items-start gap-[16rpx]">
             <Text className="text-[64rpx] font-bold text-primary tracking-[4rpx] leading-[1.08]">
@@ -187,10 +196,10 @@ const Register: React.FC = () => {
         </View>
       </View>
 
-      <View className="relative z-10 flex-1 flex flex-col px-[56rpx] pt-[48rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))] shadow-login-sheet bg-white rounded-t-[72rpx]">
-        <Text className="mb-[32rpx] text-[32rpx] font-semibold text-foreground">邮箱注册</Text>
+      <View className="relative z-10 flex-1 flex flex-col px-[56rpx] pt-[40rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))] shadow-login-sheet bg-white rounded-t-[72rpx]">
+        <Text className="mb-[28rpx] text-[32rpx] font-semibold text-foreground">注册账号</Text>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="text"
@@ -202,7 +211,7 @@ const Register: React.FC = () => {
           />
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="number"
@@ -225,8 +234,32 @@ const Register: React.FC = () => {
           </Text>
         </View>
 
+        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
+          <Input
+            className="flex-1 text-[32rpx] font-semibold text-foreground"
+            password
+            placeholder="设置密码（6–20 位）"
+            placeholderClass="text-muted-foreground font-normal"
+            value={password}
+            maxlength={20}
+            onInput={(e) => setPassword(e.detail.value)}
+          />
+        </View>
+
+        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
+          <Input
+            className="flex-1 text-[32rpx] font-semibold text-foreground"
+            password
+            placeholder="确认密码"
+            placeholderClass="text-muted-foreground font-normal"
+            value={confirmPassword}
+            maxlength={20}
+            onInput={(e) => setConfirmPassword(e.detail.value)}
+          />
+        </View>
+
         <View
-          className="mb-[40rpx] flex flex-row items-start gap-[16rpx]"
+          className="mb-[32rpx] flex flex-row items-start gap-[16rpx]"
           onClick={() => setAgreed(!agreed)}
         >
           <View
@@ -238,7 +271,7 @@ const Register: React.FC = () => {
             {agreed ? <Text className="text-[20rpx] text-white">✓</Text> : null}
           </View>
           <Text className="flex-1 text-[24rpx] leading-[36rpx] text-muted-foreground">
-            我已阅读并同意
+            注册即表示已阅读并同意
             <Text
               className="text-primary"
               onClick={(e) => {
@@ -263,7 +296,7 @@ const Register: React.FC = () => {
           </Text>
         </View>
 
-        <View className="mt-[56rpx] flex flex-row items-center justify-center">
+        <View className="mt-[48rpx] flex flex-row items-center justify-center">
           <Text className="text-[28rpx] text-muted-foreground font-medium" onClick={goLogin}>
             已有账号？去登录
           </Text>

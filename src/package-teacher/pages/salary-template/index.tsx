@@ -12,6 +12,7 @@ import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
+import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import ApplyTeacherSheet from '@/components/teacher/ApplyTeacherSheet';
 import ApplyTemplateConfirmDialog from '@/components/teacher/ApplyTemplateConfirmDialog';
@@ -128,59 +129,59 @@ const SalaryTemplateListPage: React.FC = () => {
     <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background pb-safe-bar')}>
       {/* 模板列表 */}
       <View className="px-[32rpx] pt-[24rpx] flex flex-col gap-[24rpx]">
-        {sortedTemplates.map((tpl) => (
-          <View key={tpl.id} className="bg-card rounded-[28rpx] p-[28rpx] shadow-card">
-            {/* 顶部：名称 + 默认标签 + 在用人数 */}
-            <View className="flex items-start justify-between mb-[16rpx]">
-              <View className="flex-1 min-w-0 flex items-center gap-[12rpx] flex-wrap">
-                <Text className="text-[32rpx] font-bold text-foreground">{tpl.name}</Text>
-                {tpl.isDefault && (
-                  <View className="px-[14rpx] py-[4rpx] rounded-[10rpx] bg-warning/15 text-warning text-[20rpx] font-semibold">
-                    默认
-                  </View>
-                )}
-              </View>
-              <Text className="text-[24rpx] text-muted-foreground shrink-0">
-                {tpl.teacherCount ?? 0} 位在用
-              </Text>
-            </View>
-
-            {/* 摘要 */}
-            {tpl.summary && (
-              <Text className="text-[26rpx] text-muted-foreground block mb-[20rpx]">
-                {tpl.summary}
-              </Text>
-            )}
-            {!tpl.summary && <View className="h-[28rpx] mb-[20rpx]" />}
-
-            {/* 分割线 */}
-            <View className="h-[2rpx] bg-border mb-[20rpx]" />
-
-            {/* 操作按钮 */}
-            <View className="flex items-center justify-end gap-[40rpx]">
-              <Text
-                className="text-[28rpx] font-medium text-primary press-bg px-[12rpx] py-[6rpx] rounded-[12rpx]"
-                onClick={() => handleApplyClick(tpl)}
-              >
-                套用到教练
-              </Text>
-              <Text
-                className="text-[28rpx] font-medium text-foreground press-bg px-[12rpx] py-[6rpx] rounded-[12rpx]"
-                onClick={() => handleEdit(tpl)}
-              >
-                编辑
-              </Text>
-              <Text
-                className="text-[28rpx] font-medium text-destructive press-bg px-[12rpx] py-[6rpx] rounded-[12rpx]"
-                onClick={() => handleDelete(tpl)}
-              >
-                删除
-              </Text>
-            </View>
+        {sortedTemplates.length === 0 ? (
+          <View className="pt-[120rpx]">
+            <Empty icon="mdi-file-document-outline" description="暂无薪资模板，点击右下角新建" />
           </View>
-        ))}
+        ) : (
+          sortedTemplates.map((tpl) => (
+            <View key={tpl.id} className="bg-card rounded-[28rpx] p-[28rpx] shadow-card">
+              <View className="flex items-start justify-between mb-[16rpx]">
+                <View className="flex-1 min-w-0 flex items-center gap-[12rpx] flex-wrap">
+                  <Text className="text-[32rpx] font-bold text-foreground">{tpl.name}</Text>
+                  {tpl.isDefault && (
+                    <View className="px-[14rpx] py-[4rpx] rounded-[10rpx] bg-warning/15 text-warning text-[20rpx] font-semibold">
+                      默认
+                    </View>
+                  )}
+                </View>
+                <Text className="text-[24rpx] text-muted-foreground shrink-0">
+                  {tpl.teacherCount ?? 0} 位在用
+                </Text>
+              </View>
 
-        {/* 空状态占位（列表本身有 mock 数据，这里仅保留扩展性） */}
+              {tpl.summary && (
+                <Text className="text-[26rpx] text-muted-foreground block mb-[20rpx]">
+                  {tpl.summary}
+                </Text>
+              )}
+              {!tpl.summary && <View className="h-[28rpx] mb-[20rpx]" />}
+
+              <View className="h-[2rpx] bg-border mb-[20rpx]" />
+
+              <View className="flex items-center justify-end gap-[40rpx]">
+                <Text
+                  className="text-[28rpx] font-medium text-primary press-bg px-[12rpx] py-[6rpx] rounded-[12rpx]"
+                  onClick={() => handleApplyClick(tpl)}
+                >
+                  套用到教练
+                </Text>
+                <Text
+                  className="text-[28rpx] font-medium text-foreground press-bg px-[12rpx] py-[6rpx] rounded-[12rpx]"
+                  onClick={() => handleEdit(tpl)}
+                >
+                  编辑
+                </Text>
+                <Text
+                  className="text-[28rpx] font-medium text-destructive press-bg px-[12rpx] py-[6rpx] rounded-[12rpx]"
+                  onClick={() => handleDelete(tpl)}
+                >
+                  删除
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* 悬浮 新建按钮 */}

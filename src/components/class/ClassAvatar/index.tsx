@@ -28,7 +28,14 @@ const SIZE_MAP = {
   lg: 'w-[100rpx] h-[100rpx]',
 } as const;
 
-const ClassAvatar: React.FC<ClassAvatarProps> = ({ size = 'md', src = BRAND_LOGO, className }) => {
+const ClassAvatar: React.FC<ClassAvatarProps> = ({ size = 'md', src, className }) => {
+  const preferred = src?.trim() ? src.trim() : BRAND_LOGO;
+  const [imageSrc, setImageSrc] = React.useState(preferred);
+
+  React.useEffect(() => {
+    setImageSrc(src?.trim() ? src.trim() : BRAND_LOGO);
+  }, [src]);
+
   return (
     <View
       className={cn(
@@ -38,7 +45,14 @@ const ClassAvatar: React.FC<ClassAvatarProps> = ({ size = 'md', src = BRAND_LOGO
       )}
     >
       {/* aspectFit 保持比例完整显示 Logo，避免文字被圆形裁剪 */}
-      <Image src={src} mode="aspectFit" className="h-full w-full" />
+      <Image
+        src={imageSrc}
+        mode="aspectFit"
+        className="h-full w-full"
+        onError={() => {
+          if (imageSrc !== BRAND_LOGO) setImageSrc(BRAND_LOGO);
+        }}
+      />
     </View>
   );
 };

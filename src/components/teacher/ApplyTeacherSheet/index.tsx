@@ -140,7 +140,7 @@ const ApplyTeacherSheet: React.FC<ApplyTeacherSheetProps> = ({
                 className="flex items-center px-[16rpx] py-[20rpx] press-bg rounded-[20rpx]"
                 onClick={() => handleToggleOne(t.id)}
               >
-                <Avatar name={t.name} size="sm" />
+                <Avatar name={t.name} avatarUrl={t.avatar} size="sm" />
                 <View className="flex-1 ml-[16rpx]">
                   <Text className="text-[30rpx] font-medium text-foreground">{t.name}</Text>
                 </View>

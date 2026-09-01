@@ -1,12 +1,12 @@
 /**
- * 校区员工邀�?Service
+ * 校区员工邀请 Service
  *
  * 契约（baseURL 已含 /api/app/v1）：
- * - GET  /campus-invites/code/:inviteCode   预览（无需登录�?
+ * - GET  /campus-invites/code/:inviteCode   预览（无需登录）
  * - GET  /campus-invites                    列表
- * - POST /campus-invites                    生成邀�?
- * - POST /campus-invites/:inviteCode/accept 接受邀请（返回�?token�?
- * - POST /campus-invites/:id/cancel         取消邀�?
+ * - POST /campus-invites                    生成邀请（可带 targetTeacherId 点对点绑微信）
+ * - POST /campus-invites/:inviteCode/accept 接受邀请（返回新 token）
+ * - POST /campus-invites/:id/cancel         取消邀请
  */
 import Taro from '@tarojs/taro';
 import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
@@ -43,12 +43,15 @@ export interface CampusInviteItem {
   expireAt: string;
   usedAt?: string | null;
   createdAt: string;
+  targetTeacherId?: string | null;
   roleLabel?: string;
 }
 
 export interface CreateCampusInviteInput {
   campusId: string;
   roleCode: CampusInviteRoleCode;
+  /** 点对点：绑定到已创建的员工 */
+  targetTeacherId?: string;
   expireMinutes?: number;
   expireDays?: number;
 }
@@ -106,6 +109,21 @@ function persistTokens(token: string, refreshToken: string, expiresIn: number): 
   } catch {
     /* ignore */
   }
+}
+
+/** 组装点对点邀请请求体（供单测断言） */
+export function buildPointToPointInvitePayload(input: {
+  campusId: string;
+  teacherId: string;
+  roleCode?: CampusInviteRoleCode;
+  expireMinutes?: number;
+}): CreateCampusInviteInput {
+  return {
+    campusId: input.campusId,
+    targetTeacherId: input.teacherId,
+    roleCode: input.roleCode ?? 'campus_teacher',
+    expireMinutes: input.expireMinutes ?? 60,
+  };
 }
 
 export const campusInviteService = {

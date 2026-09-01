@@ -75,7 +75,7 @@ const SalaryItem: React.FC<SalaryItemProps> = ({
 
       {/* 顶部：头像 + 信息 + 金额 */}
       <View className={cn('flex items-center gap-3', selectable && 'pl-[52rpx]')}>
-        <Avatar name={teacher.name} size="md" />
+        <Avatar name={teacher.name} avatarUrl={teacher.avatar} size="md" />
         <View className="flex-1 min-w-0">
           <View className="flex items-center gap-2 flex-wrap">
             <Text className="text-base font-bold text-foreground truncate">{teacher.name}</Text>

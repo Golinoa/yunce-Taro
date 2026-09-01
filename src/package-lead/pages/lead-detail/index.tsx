@@ -473,7 +473,7 @@ const LeadDetailPage: React.FC = () => {
         {/* 主题色头部区域 */}
         <View className="bg-primary px-page-padding py-[18rpx]">
           <View className="flex items-center gap-[20rpx]">
-            <StudentAvatar name={lead.child_name} size="lg" />
+            <StudentAvatar name={lead.child_name} src={lead.avatar_url} size="lg" />
             <View className="flex-1 min-w-0">
               <View className="flex items-center gap-[10rpx]">
                 <Text className="text-[32rpx] font-bold text-white truncate">

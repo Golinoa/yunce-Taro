@@ -6,12 +6,14 @@
 import Taro from '@tarojs/taro';
 import { getApiBaseUrl } from '@/utils/build-env';
 import { reportLocalDebug } from '@/utils/local-debug';
+import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
 // 必须用 getApiBaseUrl()：小程序运行时通常没有 process，
 // 若写成「有 process 才用绝对地址、否则 /api/app/v1」会打到相对路径 → 一律「网络异常」。
 const BASE_URL = getApiBaseUrl().replace(/\/+$/, '');
 const TIMEOUT = 10000;
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
+const USER_PROFILE_KEY = 'yunce-edu-user-profile';
 const buildRequestUrl = (url: string): string => {
   const normalizedPath = url.startsWith('/') ? url : `/${url}`;
   return `${BASE_URL}${normalizedPath}`;
@@ -67,6 +69,49 @@ function readRefreshToken(): string | null {
   }
 }
 
+/**
+ * 静默 refresh 换 token 后，把 Profile.currentContext.organizationId 与 JWT 对齐。
+ * 禁止只换 token 不改 Profile（否则假 orgId / 批后无 org 会继续联调假绿）。
+ */
+function syncProfileTenantFromAccessToken(accessToken: string): void {
+  try {
+    const claims = decodeAccessTokenClaims(accessToken);
+    const organizationId = pickRealTenantId([claims.organizationId]);
+    const campusId = pickRealTenantId([claims.campusId]) || undefined;
+    const raw = Taro.getStorageSync(USER_PROFILE_KEY);
+    if (!raw) return;
+    const prev = JSON.parse(raw) as {
+      identities?: Array<Record<string, unknown>>;
+      currentContext?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    if (!prev?.currentContext) return;
+    const next = {
+      ...prev,
+      identities: (prev.identities || []).map((identity, index) => {
+        if (index !== 0) return identity;
+        const { campusIds: _prevCampusIds, ...restIdentity } = identity;
+        return {
+          ...restIdentity,
+          organizationId,
+          ...(campusId ? { campusIds: [campusId] } : {}),
+        };
+      }),
+      currentContext: (() => {
+        const { campusId: _prevCampusId, ...restContext } = prev.currentContext || {};
+        return {
+          ...restContext,
+          organizationId,
+          ...(campusId ? { campusId } : {}),
+        };
+      })(),
+    };
+    Taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
 function persistRefreshedSession(token: string, refreshToken: string, expiresIn: number): void {
   try {
     const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
@@ -78,6 +123,7 @@ function persistRefreshedSession(token: string, refreshToken: string, expiresIn:
       expires_at: Math.floor(Date.now() / 1000) + expiresIn,
     };
     Taro.setStorageSync(AUTH_TOKEN_KEY, JSON.stringify(next));
+    syncProfileTenantFromAccessToken(token);
   } catch {
     /* ignore */
   }
@@ -155,11 +201,13 @@ interface RequestOptions {
   header?: Record<string, string>;
   /** 是否跳过自动 token 注入 */
   skipAuth?: boolean;
+  /** 单请求超时（ms）；默认 TIMEOUT。发码等路径可单独放宽作兜底，不可替代后端异步 */
+  timeout?: number;
 }
 
 /** 核心请求函数 */
 export async function request<T = unknown>(options: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header = {}, skipAuth = false } = options;
+  const { url, method = 'GET', data, header = {}, skipAuth = false, timeout = TIMEOUT } = options;
   const startAt = Date.now();
 
   // 注入 token（过期时尝试 refresh）
@@ -179,7 +227,7 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
         'Content-Type': 'application/json',
         ...header,
       },
-      timeout: TIMEOUT,
+      timeout,
     });
 
     // #region debug-point H1:request-success
@@ -205,8 +253,11 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
           return body.data;
         }
         if (body.code === 401) {
-          clearAuthSession();
-          redirectToLogin();
+          // 登录/注册等 skipAuth：透传「邮箱或密码错误」，禁止当成会话过期
+          if (!skipAuth) {
+            clearAuthSession();
+            redirectToLogin();
+          }
         }
         if (isQuotaExceededMessage(body.message)) {
           handleQuotaExceeded(body.message);
@@ -217,11 +268,16 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
       return res.data as T;
     }
 
-    // 401 未授权 → 跳转登录
+    // 401：鉴权失败
     if (res.statusCode === 401) {
+      const message = extractErrorMessage(res);
+      if (skipAuth) {
+        // password-login / register 等：后端已有「邮箱或密码错误」，勿改成「登录已过期」
+        throw new ApiError(401, message || '邮箱或密码错误');
+      }
       clearAuthSession();
       redirectToLogin();
-      throw new ApiError(401, '登录已过期，请重新登录');
+      throw new ApiError(401, message?.includes('过期') ? message : '登录已过期，请重新登录');
     }
 
     // 统一解析后端错误消息（修复 422 等丢失 message 的问题）
@@ -301,9 +357,15 @@ function extractErrorMessage(res: { statusCode: number; data: unknown }): string
 export function post<T = unknown>(
   url: string,
   data?: Record<string, unknown>,
-  options?: { skipAuth?: boolean },
+  options?: { skipAuth?: boolean; timeout?: number },
 ): Promise<T> {
-  return request<T>({ url, method: 'POST', data, skipAuth: options?.skipAuth });
+  return request<T>({
+    url,
+    method: 'POST',
+    data,
+    skipAuth: options?.skipAuth,
+    timeout: options?.timeout,
+  });
 }
 
 /** Drop undefined/null/empty/"undefined" so MiniProgram does not send literal query junk */

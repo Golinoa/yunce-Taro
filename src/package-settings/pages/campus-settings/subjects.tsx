@@ -235,8 +235,6 @@ const Subjects: React.FC = () => {
           <Empty
             icon="mdi-book-education-outline"
             description="暂无科目，点击右上角添加科目"
-            actionText="添加科目"
-            onAction={handleOpenAdd}
           />
         </View>
       )}

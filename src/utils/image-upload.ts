@@ -44,11 +44,37 @@ export function isImageCancelError(err: unknown): err is ImageCancelError {
 
 /**
  * 判断是否为需要上传的本地文件路径（微信临时文件或本地持久化文件）。
- * 远程 URL（http/https）与 base64（data:）已经可直接使用，不算。
+ * 远程 CDN/公网 URL 与 base64 不算。
+ *
+ * 注意：USER_DATA_PATH 在部分机型是 `http://usr/...`，绝不能当成公网 http 跳过上传。
  */
-export function isTempImagePath(url?: string): boolean {
+export function isLocalWechatFilePath(url?: string): boolean {
   if (!url) return false;
-  return url.startsWith('wxfile://') || url.startsWith('http://tmp/') || url.startsWith('file://');
+  const value = url.trim();
+  if (!value) return false;
+  if (value.startsWith('data:')) return false;
+  if (value.startsWith('wxfile://') || value.startsWith('file://')) return true;
+  // 微信沙箱：临时目录 / 用户目录（ios/android/devtools 前缀略有差异）
+  if (/^https?:\/\/(tmp|usr)\b/i.test(value)) return true;
+  if (value.includes('://tmp/') || value.includes('://usr/')) return true;
+  // 无 scheme 的沙箱绝对路径（少见）
+  if (value.startsWith('/tmp') || value.startsWith('/usr') || value.startsWith('/data/')) return true;
+  return false;
+}
+
+/** @deprecated 使用 isLocalWechatFilePath；保留别名避免大面积改动 */
+export function isTempImagePath(url?: string): boolean {
+  return isLocalWechatFilePath(url);
+}
+
+/**
+ * 是否为可直接落库的公网 URL（已上传 CDN）。
+ */
+export function isRemotePublicUrl(url?: string): boolean {
+  if (!url) return false;
+  const value = url.trim();
+  if (!/^https?:\/\//i.test(value)) return false;
+  return !isLocalWechatFilePath(value);
 }
 
 /**
@@ -394,9 +420,9 @@ function delay(ms: number): Promise<void> {
  * （不影响业务，最坏只是留下一个临时文件）。
  */
 export function deleteTempImage(path?: string): void {
-  if (!path || !isTempImagePath(path)) return;
-  // 远程 URL / data URL 不属于本地临时文件，跳过
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+  if (!path || !isLocalWechatFilePath(path)) return;
+  // 公网 URL / data URL 不属于本地临时文件，跳过
+  if (isRemotePublicUrl(path) || path.startsWith('data:')) {
     return;
   }
   try {
@@ -421,13 +447,9 @@ export function deleteTempImage(path?: string): void {
  */
 export async function uploadImage(filePath: string, type: UploadType = 'common'): Promise<string> {
   if (!filePath) return filePath;
-  if (
-    filePath.startsWith('http://') ||
-    filePath.startsWith('https://') ||
-    filePath.startsWith('data:')
-  ) {
-    return filePath;
-  }
+  if (filePath.startsWith('data:')) return filePath;
+  // 已是公网 URL 才跳过；http://usr / http://tmp 必须继续上传
+  if (isRemotePublicUrl(filePath)) return filePath;
   const res = await uploadService.upload(filePath, { type });
   return res.url;
 }

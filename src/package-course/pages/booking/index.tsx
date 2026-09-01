@@ -53,7 +53,7 @@ function MyBookingCardView({
   return (
     <View className="rounded-[24rpx] bg-card px-[28rpx] py-[24rpx] shadow-soft">
       <View className="flex items-start gap-[16rpx] active:opacity-90" onClick={() => onOpen(item)}>
-        <Avatar name={item.title || '约'} size="md" fallback="initial" />
+        <Avatar name={item.title || '约'} size="md" />
         <View className="min-w-0 flex-1">
           <View className="flex items-center justify-between gap-[12rpx]">
             <View className="min-w-0 flex flex-row items-center gap-[12rpx]">

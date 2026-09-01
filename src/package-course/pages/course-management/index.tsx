@@ -86,13 +86,11 @@ const CourseManagementPage: React.FC = () => {
       .getScheduledClassIds()
       .then((ids) => setScheduledClassIds(new Set(ids)))
       .catch(() => setScheduledClassIds(new Set()));
-    // 排课中的活跃班级（班课 tab 展示，链路打通）
-    if (currentTeacherId) {
-      void classService
-        .getByTeacher(currentTeacherId)
-        .then((list) => setActiveClasses(list.filter((c) => c.status === 'active')))
-        .catch(() => setActiveClasses([]));
-    }
+    // 排课中的活跃班级（班课 tab；管理员走机构全量 /classes）
+    void classService
+      .getByTeacher(currentTeacherId || 'self')
+      .then((list) => setActiveClasses(list.filter((c) => c.status === 'active')))
+      .catch(() => setActiveClasses([]));
     void fetchList().then(() => {
       const { categories: latestCategories, activeCategoryId: currentId } =
         useCourseCategoryStore.getState();

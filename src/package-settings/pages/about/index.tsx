@@ -4,8 +4,9 @@
  * 门店入驻引导页（品牌介绍落地页），从「我的」页「关于松果排课」按钮进入。
  * 分区顺序（对齐优化版设计稿）：
  *  Hero(蓝渐变 + 安全保障标签) → 数据背书(2×2) → 痛点共鸣 → 安全保障 →
- *  核心功能(6) → 为什么选择我们(2) → 入驻流程(纵向三步) → 底部悬浮「免费开通门店」长按钮。
- * Hero 区 CTA 为「免费开通门店」+「邀请朋友入驻」并排；分享仅保留在 Hero 与右上角菜单。
+ *  核心功能(6) → 为什么选择我们(2) → 入驻流程(纵向三步) → 底部悬浮「申请门店入驻」长按钮。
+ * Hero 区 CTA 为「申请门店入驻」+「邀请朋友入驻」并排；分享仅保留在 Hero 与右上角菜单。
+ * 产品：门店入驻须运营审核，无免审直开；获批后申请人 = 管理员（OWNER）。
  *
  * 技术约束：UnoCSS Token + rpx，随主题色(blue/coral/orange)联动；无 SCSS、无内联 style；
  * 图标统一走 @/components/Icon（仅支持 MDI_ICONS 表内名称）。
@@ -16,6 +17,7 @@ import cn from 'classnames';
 import React, { useCallback, useMemo } from 'react';
 import Icon, { IconName } from '@/components/Icon';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
+import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
 import { useThemeStore } from '@/stores/theme';
 import { useAuth } from '@/utils/auth';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
@@ -119,8 +121,8 @@ const WHY_CHOOSE: InfoItem[] = [
 /** 入驻流程 */
 const STEPS: { step: string; title: string; desc: string }[] = [
   { step: '01', title: '填写申请', desc: '提交机构基本信息' },
-  { step: '02', title: '专人对接', desc: '顾问 1 对 1 协助你完成配置' },
-  { step: '03', title: '开通使用', desc: '配置完成，即刻上手' },
+  { step: '02', title: '运营审核', desc: '平台审核通过后开通机构' },
+  { step: '03', title: '开通使用', desc: '以管理员身份进入机构端管理' },
 ];
 
 /** 门店入驻引导页分享路径（分包完整路径，确保被分享者直达落地页） */
@@ -129,7 +131,7 @@ export const ABOUT_SHARE_PATH = '/package-settings/pages/about/index';
 /**
  * 好友转发 / 朋友圈分享文案（不含小程序名，卡片已展示品牌）
  */
-export const ABOUT_SHARE_SLOGAN = '告别 Excel 排课！5 分钟免费开通，馆长都在用';
+export const ABOUT_SHARE_SLOGAN = STORE_ENTRY_IDENTITY_COPY.aboutShareSlogan;
 
 const About: React.FC = () => {
   usePrimaryNavigationBar();
@@ -210,7 +212,9 @@ const About: React.FC = () => {
                   className="flex-1 h-[92rpx] rounded-[28rpx] bg-white center press-scale shadow-lg"
                   onClick={handleEntry}
                 >
-                  <Text className="text-[28rpx] font-bold text-primary">免费开通门店</Text>
+                  <Text className="text-[28rpx] font-bold text-primary">
+                    {STORE_ENTRY_IDENTITY_COPY.aboutCta}
+                  </Text>
                 </View>
               ) : null}
               <Button
@@ -386,7 +390,9 @@ const About: React.FC = () => {
             onClick={handleEntry}
           >
             <Icon name="mdi-office-building" size={28} color="white" />
-            <Text className="text-[32rpx] font-bold text-white ml-[8rpx]">免费开通门店</Text>
+            <Text className="text-[32rpx] font-bold text-white ml-[8rpx]">
+              {STORE_ENTRY_IDENTITY_COPY.aboutCta}
+            </Text>
           </View>
         </View>
       ) : null}

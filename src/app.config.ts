@@ -23,6 +23,7 @@ export default defineAppConfig({
         'pages/onboarding/index',
         'pages/identity-select/index',
         'pages/parent-onboarding/index',
+        'pages/campus-invite-landing/index',
         'pages/role-switch/index',
         'pages/role-switch/add-role',
       ],
@@ -165,7 +166,16 @@ export default defineAppConfig({
     },
   ],
   /** 隐私受限接口声明（微信隐私合规强制要求，未声明会 101 失败） */
-  requiredPrivateInfos: ['chooseLocation'],
+  requiredPrivateInfos: ['chooseLocation', 'getLocation'],
+  /**
+   * 位置权限用途说明（chooseLocation 选门店地址前系统弹窗文案）
+   * 未声明时真机常出现：无授权弹窗、地图空白、接口静默失败
+   */
+  permission: {
+    'scope.userLocation': {
+      desc: '你的位置信息将用于选择门店地址',
+    },
+  },
   /**
    * Privacy authorization gate (WeChat).
    * true: privacy-restricted APIs (chooseMedia / chooseLocation, etc.) are blocked

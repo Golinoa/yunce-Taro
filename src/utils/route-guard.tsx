@@ -10,6 +10,10 @@ import { getPermissionConfig } from '@/services/permission';
 import { defaultRoleGrant, type DataModule } from '@/types/permission';
 import type { Profile, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
+import {
+  IDENTITY_SELECT_PENDING_KEY,
+  isIdentityOnboardingAllowlistedPath,
+} from '@/utils/identity-path-allowlist';
 import { isColdStartGracePeriod } from '@/utils/launch-scene';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
@@ -26,19 +30,29 @@ const PUBLIC_PAGES = [
   '/package-settings/pages/agreement/index',
   '/package-settings/pages/about/index',
   '/package-settings/pages/feedback/index',
+  /**
+   * 门店入驻填表页：未登录可预览/填表（产品真源）。
+   * 角色矩阵 PAGE_ROLE_REQUIREMENTS 仅在已登录时生效，勿误伤未登录预览；
+   * 已登录非管理员（教师/家长）仍会被拦。提交强制登录在页内处理。
+   */
+  '/package-settings/pages/store-entry/index',
   '/package-student/pages/parent-bind/index',
   /** 课表分享落地：页内微信登录门禁，登录后查看内容 */
   '/package-lead/pages/invite-landing/index',
+  /** 校区员工邀请落地：可未登录预览，接受时再登录 */
+  '/package-auth/pages/campus-invite-landing/index',
 ];
 const LOGIN_PAGE = '/package-auth/pages/login/index';
-const REDIRECT_KEY = 'loginRedirectPath';
+const IDENTITY_SELECT_PAGE = '/package-auth/pages/identity-select/index';
+export const LOGIN_REDIRECT_KEY = 'loginRedirectPath';
+const REDIRECT_KEY = LOGIN_REDIRECT_KEY;
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 
 // ============================================
 // C-01 角色 / 权限守卫基础设施
 // ============================================
 
-/** 管理角色：机构创建者 admin / 校长 principal，拥有校区全量数据查看权限 */
+/** 管理角色：机构创建者 admin / 管理员 principal（校区岗「校长」另见 CampusRole） */
 const MANAGER_ROLES: UserRole[] = ['admin', 'principal'];
 /** 机构端角色：管理 + 教学（teacher/assistant 默认仅本人名下数据，由数据层按 scope 过滤） */
 const STAFF_ROLES: UserRole[] = ['admin', 'principal', 'teacher', 'assistant'];
@@ -101,7 +115,7 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-settings/pages/threshold-config/index': ['admin'],
   // 主题颜色：全员个人偏好（本地缓存），不限制角色
   'package-settings/pages/todo-settings/index': MANAGER_ROLES,
-  // —— 门店入驻（仅 admin/principal） ——
+  // —— 门店入驻（仅 admin/principal；UI 称管理员，库角色仍为 principal） ——
   'package-settings/pages/store-entry/index': MANAGER_ROLES,
   'package-settings/pages/store-entry/pending/index': MANAGER_ROLES,
   // —— 机构会员权益（仅 admin/principal） ——
@@ -154,7 +168,7 @@ const PAGE_MODULE_MAP: Record<string, DataModule> = {
   'package-statistics/pages/alert-detail/index': 'finance',
   'package-settings/pages/permission-settings/index': 'settings',
   'package-settings/pages/threshold-config/index': 'settings',
-  // 门店入驻属于新用户入驻流程，不能挂 settings：校长默认无 settings 模块，
+  // 门店入驻属于新用户入驻流程，不能挂 settings：管理员（principal）默认无 settings 模块，
   // 会导致身份选择点「门店入驻」被守卫踢回首页（表现为「直接进主页」）。
 };
 
@@ -192,7 +206,7 @@ function redirectToForbidden(reason?: 'manager' | 'staff' | 'parent' | 'generic'
   isRedirectingForbidden = true;
   const title =
     reason === 'manager'
-      ? '该功能需校长处理'
+      ? '该功能需管理员处理'
       : reason === 'parent'
         ? '该页面仅家长可用'
         : reason === 'staff'
@@ -202,6 +216,22 @@ function redirectToForbidden(reason?: 'manager' | 'staff' | 'parent' | 'generic'
   Taro.switchTab({ url: '/pages/home/index' });
   setTimeout(() => {
     isRedirectingForbidden = false;
+  }, 200);
+}
+
+/** 未完成身份选择时强制回 identity-select（打开 store-entry 不清除 pending） */
+let isRedirectingIdentity = false;
+function redirectToIdentitySelect() {
+  if (isRedirectingIdentity) return;
+  isRedirectingIdentity = true;
+  Taro.redirectTo({
+    url: IDENTITY_SELECT_PAGE,
+    fail: () => {
+      Taro.reLaunch({ url: IDENTITY_SELECT_PAGE });
+    },
+  });
+  setTimeout(() => {
+    isRedirectingIdentity = false;
   }, 200);
 }
 
@@ -311,6 +341,23 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
       }
       setAuthorized(false);
       return;
+    }
+
+    // 未完成身份选择：非白名单路径强制回 identity-select（优先于角色矩阵，避免被踢回首页）
+    if (profile) {
+      let identityPending = false;
+      try {
+        identityPending = Taro.getStorageSync(IDENTITY_SELECT_PENDING_KEY) === '1';
+      } catch {
+        identityPending = false;
+      }
+      if (identityPending && !isIdentityOnboardingAllowlistedPath(currentPath)) {
+        if (!currentPath.includes('identity-select')) {
+          redirectToIdentitySelect();
+        }
+        setAuthorized(false);
+        return;
+      }
     }
 
     // C-01 授权：已登录用户做角色校验，越权页面（如家长访问薪资页）阻断并回首页

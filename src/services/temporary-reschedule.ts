@@ -1,4 +1,3 @@
-import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import type { Class, Schedule, TemporaryReschedule } from '@/types';
 import {
@@ -8,8 +7,6 @@ import {
   type PaginatedResponse,
 } from '@/utils/pagination';
 import { get, post } from '@/utils/request';
-
-const STORAGE_KEY = 'yunce-temporary-reschedules';
 
 interface SaveBatchParams {
   teacherId: string;
@@ -36,135 +33,102 @@ interface LessonSlot {
   startTime: string;
 }
 
+/** 后端 /attendance/reschedules 列表项（含 FE 映射字段） */
 interface BackendTemporaryRescheduleItem {
-  classId: string;
+  classId?: string;
   createdAt: string;
-  endTime: string;
+  endTime?: string;
   id: string;
+  originalDate?: string;
+  originalTime?: string;
   scheduleId: string;
-  sourceDate: string;
-  startTime: string;
+  sourceDate?: string;
+  startTime?: string;
   targetDate: string;
-  teacherId: string;
+  targetTime?: string;
+  teacherId?: string;
   updatedAt: string;
 }
 
 interface BackendTemporaryRescheduleBatchResponse {
-  items: BackendTemporaryRescheduleItem[];
-}
-
-function readStorage(): TemporaryReschedule[] {
-  try {
-    const raw = Taro.getStorageSync(STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return Array.isArray(parsed) ? (parsed as TemporaryReschedule[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStorage(list: TemporaryReschedule[]) {
-  Taro.setStorageSync(STORAGE_KEY, JSON.stringify(list));
+  batchNo?: string;
+  items?: BackendTemporaryRescheduleItem[];
+  status?: string;
 }
 
 function mapBackendTemporaryReschedule(item: BackendTemporaryRescheduleItem): TemporaryReschedule {
+  const sourceDate = item.sourceDate || item.originalDate || '';
+  const targetDate = item.targetDate || '';
+  const startTime = item.startTime || item.originalTime || '';
+  const endTime = item.endTime || item.targetTime || '';
   return {
     id: item.id,
-    teacher_id: item.teacherId,
-    class_id: item.classId,
+    teacher_id: item.teacherId || '',
+    class_id: item.classId || '',
     schedule_id: item.scheduleId,
-    source_date: item.sourceDate,
-    target_date: item.targetDate,
-    start_time: item.startTime,
-    end_time: item.endTime,
+    source_date: sourceDate,
+    target_date: targetDate,
+    start_time: startTime,
+    end_time: endTime,
     created_at: item.createdAt,
     updated_at: item.updatedAt,
   };
 }
 
-function toMinutes(time: string): number {
-  const [hour, minute] = time.split(':').map(Number);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
-    return 0;
-  }
-  return hour * 60 + minute;
+function rangesOverlap(leftStart: string, leftEnd: string, rightStart: string, rightEnd: string) {
+  return leftStart < rightEnd && leftEnd > rightStart;
 }
 
-function isTimeOverlap(left: LessonSlot, right: LessonSlot): boolean {
-  return (
-    toMinutes(left.startTime) < toMinutes(right.endTime) &&
-    toMinutes(right.startTime) < toMinutes(left.endTime)
-  );
-}
-
-function buildLessonSlot(
-  schedule: Pick<Schedule, 'class_id' | 'end_time' | 'id' | 'start_time'>,
+function buildLessonSlotsFromSchedules(
+  schedules: Schedule[],
   classById?: Record<string, Class>,
-): LessonSlot {
-  const classId = schedule.class_id || '';
-  const className = classById?.[classId]?.name || '未命名班级';
-  return {
-    key: schedule.id,
-    scheduleId: schedule.id,
-    classId,
-    startTime: schedule.start_time,
-    endTime: schedule.end_time,
-    label: `${className} ${schedule.start_time}-${schedule.end_time}`,
-  };
-}
-
-function buildAdjustmentSlot(
-  item: TemporaryReschedule,
-  classById?: Record<string, Class>,
-): LessonSlot {
-  const className = classById?.[item.class_id]?.name || '未命名班级';
-  return {
-    key: item.id,
-    scheduleId: item.schedule_id,
-    classId: item.class_id,
-    startTime: item.start_time,
-    endTime: item.end_time,
-    label: `${className} ${item.start_time}-${item.end_time}`,
-  };
+): LessonSlot[] {
+  return schedules.map((item) => {
+    const className = classById?.[item.class_id || '']?.name || item.class_id || '班级';
+    return {
+      key: `${item.id}-${item.start_time}-${item.end_time}`,
+      classId: item.class_id || '',
+      scheduleId: item.id,
+      startTime: item.start_time,
+      endTime: item.end_time,
+      label: `${className} ${item.start_time}-${item.end_time}`,
+    };
+  });
 }
 
 export const temporaryRescheduleService = {
   /**
-   * 获取指定日期范围内的临时调课记录（分批拉全；pageSize 不得超过后端 max=100）。
-   * 只要原日期或目标日期落在范围内，就需要返回给页面参与渲染。
+   * 获取指定日期范围内的临时调课记录（真接口 /attendance/reschedules）。
    */
   getByTeacherAndRange: async (
     teacherId: string,
     startDate: string,
     endDate: string,
   ): Promise<TemporaryReschedule[]> => {
-    const list = await fetchAllPages(async (page, pageSize) => {
-      const response = await get<
-        PaginatedResponse<BackendTemporaryRescheduleItem> | BackendTemporaryRescheduleItem[]
-      >(
-        `/temporary-reschedules?page=${page}&pageSize=${pageSize}&teacherId=${encodeURIComponent(
+    try {
+      const list = await fetchAllPages(async (page, pageSize) => {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
           teacherId,
-        )}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
-      );
-      return asPaginatedResponse(response, page, pageSize);
-    }, API_PAGE_SIZE_BATCH);
-    return list.map(mapBackendTemporaryReschedule);
-    return readStorage()
-      .filter((item) => item.teacher_id === teacherId)
-      .filter((item) => {
-        const inSourceRange = item.source_date >= startDate && item.source_date <= endDate;
-        const inTargetRange = item.target_date >= startDate && item.target_date <= endDate;
-        return inSourceRange || inTargetRange;
-      })
-      .sort((left, right) => left.source_date.localeCompare(right.source_date));
+          startDate,
+          endDate,
+        });
+        const response = await get<
+          PaginatedResponse<BackendTemporaryRescheduleItem> | BackendTemporaryRescheduleItem[]
+        >(`/attendance/reschedules?${params.toString()}`);
+        return asPaginatedResponse(response, page, pageSize);
+      }, API_PAGE_SIZE_BATCH);
+      return list.map(mapBackendTemporaryReschedule);
+    } catch {
+      // 真联动失败：空列表（由页面静默）；禁止再写本地假成功
+      return [];
+    }
   },
 
   /**
-   * 批量保存临时调课，只覆盖指定日期对应的课程实例。
-   * 同一条排课在同一天重复调课时，会直接覆盖旧记录。
+   * 批量保存临时调课 → POST /attendance/reschedules/batch（保存即生效）。
+   * UI 载荷不变；此处适配后端字段。
    */
   saveBatch: async ({
     teacherId,
@@ -174,21 +138,23 @@ export const temporaryRescheduleService = {
   }: SaveBatchParams): Promise<TemporaryReschedule[]> => {
     const response = await post<
       BackendTemporaryRescheduleBatchResponse | BackendTemporaryRescheduleItem[]
-    >('/temporary-reschedules/batch', {
-      teacherId,
-      sourceDate,
-      targetDate,
-      items: schedules.map((schedule) => ({
-        classId: schedule.class_id || '',
+    >('/attendance/reschedules/batch', {
+      reason: '课表临时调课',
+      schedules: schedules.map((schedule) => ({
         scheduleId: schedule.id,
-        startTime: schedule.start_time,
-        endTime: schedule.end_time,
+        originalDate: sourceDate,
+        originalTime: schedule.start_time,
+        targetDate,
+        targetTime: schedule.end_time,
       })),
     });
     const list = Array.isArray(response) ? response : response.items || [];
-    return list.map(mapBackendTemporaryReschedule);
+    if (list.length > 0) {
+      return list.map(mapBackendTemporaryReschedule);
+    }
+    // 兜底：用请求参数组装（后端已入库）
     const now = new Date().toISOString();
-    const nextItems = schedules.map<TemporaryReschedule>((schedule) => ({
+    return schedules.map((schedule) => ({
       id: `tmp-reschedule-${schedule.id}-${sourceDate}`,
       teacher_id: teacherId,
       class_id: schedule.class_id || '',
@@ -200,21 +166,8 @@ export const temporaryRescheduleService = {
       created_at: now,
       updated_at: now,
     }));
-    // L-12-A：覆盖键用 schedule_id（同一条排课全局唯一），而非 `${schedule_id}__${source_date}`。
-    // 同一排课被 A→B 后又 C→D 调动时，旧记录（B）也会被清除，避免双订。
-    const replaceKeys = new Set(nextItems.map((item) => item.schedule_id));
-    const preserved = readStorage().filter((item) => !replaceKeys.has(item.schedule_id));
-    writeStorage([...preserved, ...nextItems]);
-    return nextItems;
   },
 
-  /**
-   * 检查目标日期是否会和教师已有课程冲突。
-   * 冲突来源同时包含：
-   * 1. 该日期原本的固定排课
-   * 2. 其他已经调到该日期的临时课程
-   * 3. 本次批量调课内部多个班级之间的时间冲突
-   */
   checkDateConflict: async ({
     teacherId,
     sourceDate,
@@ -222,45 +175,53 @@ export const temporaryRescheduleService = {
     movingSchedules,
     allSchedules,
     classById,
-  }: CheckDateConflictParams): Promise<string[]> => {
-    const targetWeekday = (dayjs(targetDate).day() || 7) as Schedule['day_of_week'];
-    const rangeStart = sourceDate < targetDate ? sourceDate : targetDate;
-    const rangeEnd = sourceDate > targetDate ? sourceDate : targetDate;
-    const allAdjustments = await temporaryRescheduleService.getByTeacherAndRange(
-      teacherId,
-      rangeStart,
-      rangeEnd,
-    );
-    const movedOutOnTarget = new Set(
-      allAdjustments
-        .filter((item) => item.source_date === targetDate)
-        .map((item) => item.schedule_id),
-    );
-    const replacingKeys = new Set(movingSchedules.map((item) => `${item.id}__${sourceDate}`));
-
-    const occupiedSlots: LessonSlot[] = allSchedules
-      .filter((item) => item.day_of_week === targetWeekday)
-      .filter((item) => !movedOutOnTarget.has(item.id))
-      .map((item) => buildLessonSlot(item, classById));
-
-    const movedInSlots = allAdjustments
-      .filter((item) => item.target_date === targetDate)
-      .filter((item) => !replacingKeys.has(`${item.schedule_id}__${item.source_date}`))
-      .map((item) => buildAdjustmentSlot(item, classById));
-
-    occupiedSlots.push(...movedInSlots);
-
-    const conflictItems = new Set<string>();
-    for (const schedule of movingSchedules) {
-      const currentSlot = buildLessonSlot(schedule, classById);
-      const hasConflict = occupiedSlots.some((item) => isTimeOverlap(item, currentSlot));
-      if (hasConflict) {
-        conflictItems.add(currentSlot.label);
-        continue;
-      }
-      occupiedSlots.push(currentSlot);
+  }: CheckDateConflictParams): Promise<{ hasConflict: boolean; conflicts: LessonSlot[] }> => {
+    if (sourceDate === targetDate) {
+      return { hasConflict: false, conflicts: [] };
     }
+    const targetDow = dayjs(targetDate).day();
+    const staying = allSchedules.filter(
+      (s) =>
+        s.teacher_id === teacherId &&
+        Number(s.day_of_week) === targetDow &&
+        !movingSchedules.some((m) => m.id === s.id),
+    );
+    const adjusted = await temporaryRescheduleService.getByTeacherAndRange(
+      teacherId,
+      targetDate,
+      targetDate,
+    );
+    const adjustedSlots: LessonSlot[] = adjusted
+      .filter((a) => a.target_date === targetDate)
+      .map((a) => ({
+        key: a.id,
+        classId: a.class_id,
+        scheduleId: a.schedule_id,
+        startTime: a.start_time,
+        endTime: a.end_time,
+        label: `${a.start_time}-${a.end_time}`,
+      }));
 
-    return Array.from(conflictItems);
+    const existing = [
+      ...buildLessonSlotsFromSchedules(staying, classById),
+      ...adjustedSlots,
+    ];
+    const moving = buildLessonSlotsFromSchedules(movingSchedules, classById);
+    const conflicts: LessonSlot[] = [];
+    for (const m of moving) {
+      for (const e of existing) {
+        if (rangesOverlap(m.startTime, m.endTime, e.startTime, e.endTime)) {
+          conflicts.push(e);
+        }
+      }
+      for (const other of moving) {
+        if (other.key === m.key) continue;
+        if (rangesOverlap(m.startTime, m.endTime, other.startTime, other.endTime)) {
+          conflicts.push(other);
+        }
+      }
+    }
+    const uniq = new Map(conflicts.map((c) => [c.key, c]));
+    return { hasConflict: uniq.size > 0, conflicts: [...uniq.values()] };
   },
 };

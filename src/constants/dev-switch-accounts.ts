@@ -91,10 +91,18 @@ export const DEV_SWITCH_ACCOUNTS: DevSwitchAccount[] = [
 /** @deprecated 使用 DEV_SWITCH_ACCOUNTS */
 export const MOCK_SWITCH_ACCOUNTS = DEV_SWITCH_ACCOUNTS;
 
+/** 常见误输入 → 种子邮箱（避免 principal@ 与 principal1@ 混淆） */
+const DEV_LOGIN_EMAIL_ALIASES: Record<string, string> = {
+  principal: 'principal1@yunce.com',
+  'principal@yunce.com': 'principal1@yunce.com',
+};
+
 /** 短用户名或邮箱 → 登录邮箱 */
 export function resolveDevLoginEmail(usernameOrEmail: string): string | null {
   const raw = usernameOrEmail.trim().toLowerCase();
   if (!raw) return null;
+  const aliased = DEV_LOGIN_EMAIL_ALIASES[raw];
+  if (aliased) return aliased;
   if (raw.includes('@')) return raw;
   const hit = DEV_SWITCH_ACCOUNTS.find((a) => a.username.toLowerCase() === raw);
   return hit?.email ?? null;

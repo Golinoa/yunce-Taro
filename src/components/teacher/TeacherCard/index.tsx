@@ -40,7 +40,12 @@ const TeacherCard: React.FC<TeacherCardProps> = ({ teacher, onClick }) => {
       onClick={onClick}
     >
       <View className="flex items-center gap-3">
-        <Avatar name={teacher.name} size="lg" className={cn(isResigned && 'grayscale-60')} />
+        <Avatar
+          name={teacher.name}
+          avatarUrl={teacher.avatar}
+          size="lg"
+          className={cn(isResigned && 'grayscale-60')}
+        />
         <View className="flex-1 min-w-0">
           <View className="flex items-center gap-2">
             <Text className="text-base font-bold text-foreground truncate">{teacher.name}</Text>

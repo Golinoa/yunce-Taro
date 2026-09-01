@@ -179,6 +179,8 @@ const ProfileEdit: React.FC = () => {
   /** 个人头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与子女头像一致） */
   const handleAvatarPick = useCallback(async () => {
     try {
+      const { ensurePrivacyAuthorized } = await import('@/utils/privacy-authorize');
+      await ensurePrivacyAuthorized();
       const tempPath = await chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' });
       // 替换图片：删掉旧的本地临时文件，避免本地存储累积
       if (isTempImagePath(draft.avatar_url)) deleteTempImage(draft.avatar_url);

@@ -2,8 +2,13 @@
  * 课程分类 Store
  *
  * 管理课程分类列表、加载状态，以及分类的增删改查。
+ * API 未接通返回空时保留默认班课/团课/私教，避免课表独立 tab 被清空。
  */
 import { create } from 'zustand';
+import {
+  DEFAULT_COURSE_CATEGORY_CONFIGS,
+  resolveCourseCategoriesFromApi,
+} from '@/constants/course-category-defaults';
 import { courseCategoryService } from '@/services/course-category';
 import type {
   CourseCategoryConfig,
@@ -35,80 +40,24 @@ interface CourseCategoryState {
   remove: (id: string) => Promise<void>;
 }
 
-const DEFAULT_CATEGORIES: CourseCategoryConfig[] = [
-  {
-    id: 'cat-class',
-    name: '班课',
-    sortOrder: 1,
-    minOpenCount: 1,
-    bookingDeadline: 'at_start',
-    cancelQueueTime: 'at_start',
-    nonCancelTime: 'at_start',
-    autoCheckin: 'at_end',
-    studentSelfCheckin: true,
-    distanceLimit: false,
-    checkinBeforeMinutes: 60,
-    checkinAfterMinutes: 120,
-    mode: 'class',
-    independentDisplay: true,
-    isSystem: true,
-    createdAt: '2026-07-01T10:00:00Z',
-    updatedAt: '2026-07-01T10:00:00Z',
-  },
-  {
-    id: 'cat-group',
-    name: '团课',
-    sortOrder: 2,
-    minOpenCount: 1,
-    bookingDeadline: 'at_start',
-    cancelQueueTime: 'at_start',
-    nonCancelTime: 'at_start',
-    autoCheckin: 'at_end',
-    studentSelfCheckin: true,
-    distanceLimit: false,
-    checkinBeforeMinutes: 60,
-    checkinAfterMinutes: 120,
-    mode: 'group',
-    independentDisplay: true,
-    isSystem: true,
-    createdAt: '2026-07-01T10:00:00Z',
-    updatedAt: '2026-07-01T10:00:00Z',
-  },
-  {
-    id: 'cat-private',
-    name: '私教',
-    sortOrder: 3,
-    minOpenCount: 1,
-    bookingDeadline: 'at_start',
-    cancelQueueTime: 'at_start',
-    nonCancelTime: 'at_start',
-    autoCheckin: 'at_end',
-    studentSelfCheckin: true,
-    distanceLimit: false,
-    checkinBeforeMinutes: 60,
-    checkinAfterMinutes: 120,
-    mode: 'private',
-    independentDisplay: true,
-    isSystem: true,
-    createdAt: '2026-07-01T10:00:00Z',
-    updatedAt: '2026-07-01T10:00:00Z',
-  },
-];
-
 export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => ({
-  categories: [...DEFAULT_CATEGORIES],
+  categories: [...DEFAULT_COURSE_CATEGORY_CONFIGS],
   loading: false,
   error: null,
-  activeCategoryId: DEFAULT_CATEGORIES[0]?.id ?? '',
+  activeCategoryId: DEFAULT_COURSE_CATEGORY_CONFIGS[0]?.id ?? '',
 
   fetchList: async () => {
     set({ loading: true, error: null });
     try {
       const list = await courseCategoryService.getList();
-      // 按 sortOrder 升序排列
-      const sorted = [...list].sort((a, b) => a.sortOrder - b.sortOrder);
-      set({ categories: sorted });
+      const next = resolveCourseCategoriesFromApi(list);
+      const currentId = get().activeCategoryId;
+      const activeCategoryId = next.some((c) => c.id === currentId)
+        ? currentId
+        : (next[0]?.id ?? '');
+      set({ categories: next, activeCategoryId });
     } catch (err) {
+      // 失败时保留已有默认/缓存分类，仅记错误（课表勿因失败清空 tab）
       set({ error: err instanceof Error ? err.message : '加载分类失败' });
     } finally {
       set({ loading: false });

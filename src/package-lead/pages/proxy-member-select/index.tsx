@@ -1,8 +1,9 @@
-﻿import { View, Text, Input, ScrollView, Image } from '@tarojs/components';
+﻿import { View, Text, Input, ScrollView } from '@tarojs/components';
 import Taro, { useLoad, useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
+import StudentAvatar from '@/components/student/StudentAvatar';
 import { homeService } from '@/services';
 import { useAuth } from '@/utils/auth';
 
@@ -159,19 +160,7 @@ const ProxyMemberSelectPage: React.FC = () => {
                 className="flex items-center gap-[20rpx] rounded-[24rpx] bg-card px-[24rpx] py-[24rpx]"
                 onClick={() => handleToggle(item.id)}
               >
-                {item.avatar_url ? (
-                  <Image
-                    className="h-[72rpx] w-[72rpx] flex-shrink-0 rounded-full"
-                    src={item.avatar_url}
-                    mode="aspectFill"
-                  />
-                ) : (
-                  <View className="center h-[72rpx] w-[72rpx] flex-shrink-0 rounded-full bg-muted">
-                    <Text className="text-[28rpx] font-medium text-muted-foreground">
-                      {item.name.slice(0, 1)}
-                    </Text>
-                  </View>
-                )}
+                <StudentAvatar name={item.name} src={item.avatar_url} size="sm" />
                 <View className="min-w-0 flex-1">
                   <View className="flex items-center gap-[12rpx]">
                     <Text className="text-[30rpx] font-medium text-foreground">{item.name}</Text>

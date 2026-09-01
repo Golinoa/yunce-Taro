@@ -130,7 +130,7 @@ const SalarySettingsPage: React.FC = () => {
                   className="bg-white rounded-[28rpx] px-[28rpx] py-[24rpx] shadow-card press-bg flex items-center"
                   onClick={() => handleOpenDetail(t)}
                 >
-                  <Avatar name={t.name} size="md" />
+                  <Avatar name={t.name} avatarUrl={t.avatar} size="md" />
                   <View className="flex-1 ml-[20rpx] min-w-0">
                     <View className="flex items-center gap-[12rpx] mb-[8rpx]">
                       <Text className="text-[30rpx] font-semibold text-foreground">{t.name}</Text>

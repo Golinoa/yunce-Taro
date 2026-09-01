@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
+import { SYSTEM_SETTING_ITEMS } from '@/constants/system-settings-items';
 import { APP_VERSION } from '@/constants/version';
 import { calendarSyncService } from '@/services/calendar-sync';
 import { campusService } from '@/services/campus';
@@ -43,56 +44,8 @@ import { showInputModal } from '@/utils/modal';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 
-/** 设置项配置 */
-interface SettingItem {
-  title: string;
-  route: string;
-  /** 仅管理员可见 */
-  adminOnly?: boolean;
-  /** 管理角色可见（管理员 / 校长） */
-  managerOnly?: boolean;
-  /** 家长不可见（机构/教务配置） */
-  hideForParent?: boolean;
-}
-
-/** 系统设置全量分组 */
-const ALL_SETTING_ITEMS: SettingItem[] = [
-  {
-    title: '操作日志',
-    route: '/package-settings/pages/audit-log/index',
-    /** 家长不可见；教师可看本人日志 */
-    hideForParent: true,
-  },
-  {
-    title: '主题颜色',
-    route: '/package-settings/pages/theme-settings/index',
-    /** 全员可见；个人偏好存本地（当前库无校区主题字段） */
-  },
-  {
-    title: '待办提醒',
-    route: '/package-settings/pages/todo-settings/index',
-    managerOnly: true,
-  },
-  {
-    title: '角色权限',
-    route: '/package-settings/pages/permission-settings/index',
-    adminOnly: true,
-  },
-  {
-    title: '定时备份',
-    route: '',
-    adminOnly: true,
-  },
-  {
-    title: '用户协议',
-    route: '/package-settings/pages/agreement/index',
-  },
-  {
-    title: '重置新手引导',
-    route: '__reset_onboarding__',
-    adminOnly: true,
-  },
-];
+/** 系统设置全量分组（真源：constants/system-settings-items） */
+const ALL_SETTING_ITEMS = SYSTEM_SETTING_ITEMS;
 
 /** 未实现入口占位提示 */
 const PLACEHOLDER_TIP = '功能开发中，敬请期待';

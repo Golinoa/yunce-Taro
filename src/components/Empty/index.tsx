@@ -1,32 +1,14 @@
 /**
  * 空状态组件
  * 支持 MDI 图标名（优先）和 Emoji（兼容）
+ * mdi-* 一律走 Icon，禁止把图标名渲染成文案
  */
 import { View, Text } from '@tarojs/components';
 import React from 'react';
 import Icon from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
-
-const MDI_ICON_NAMES: string[] = [
-  'mdi-inbox',
-  'mdi-account-search',
-  'mdi-account-question-outline',
-  'mdi-school-outline',
-  'mdi-calendar-blank',
-  'mdi-book-open-blank-variant',
-  'mdi-book-open-variant',
-  'mdi-wallet-outline',
-  'mdi-calendar-check-outline',
-  'mdi-account-group-outline',
-  'mdi-account-multiple-plus',
-  'mdi-bell-off',
-  'mdi-chart-bar',
-  'mdi-package-variant',
-  'mdi-clipboard-text',
-  'mdi-alert-circle-outline',
-  'mdi-alert-circle',
-  'mdi-history',
-];
+import { MDI_ICONS } from '@/components/Icon/icons';
+import { resolveEmptyIcon, resolveEmptyMdiName } from '@/utils/empty-icon';
 
 interface EmptyProps {
   icon?: string;
@@ -41,16 +23,20 @@ const Empty: React.FC<EmptyProps> = ({
   actionText,
   onAction,
 }) => {
-  const isMdi = icon.startsWith('mdi-') && MDI_ICON_NAMES.includes(icon);
+  const resolved = resolveEmptyIcon(icon);
+  const mdiName =
+    resolved.kind === 'mdi'
+      ? resolveEmptyMdiName(resolved.value, (name) => Boolean(MDI_ICONS[name]))
+      : null;
 
   return (
     <View className="flex flex-col items-center justify-center py-12">
-      {isMdi ? (
+      {mdiName ? (
         <View className="mb-3 drop-shadow-sm">
-          <Icon name={icon as IconName} size="xxl" color="muted" />
+          <Icon name={mdiName as IconName} size="xxl" color="muted" />
         </View>
       ) : (
-        <Text className="text-6xl mb-3 drop-shadow-sm">{icon}</Text>
+        <Text className="text-6xl mb-3 drop-shadow-sm">{resolved.value}</Text>
       )}
       <Text className="text-sm text-muted-foreground text-center">{description}</Text>
       {actionText && onAction && (

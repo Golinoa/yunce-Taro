@@ -117,12 +117,7 @@ const SubjectManagementPage: React.FC = () => {
               onAction={() => void reload()}
             />
           ) : subjects.length === 0 ? (
-            <Empty
-              icon="mdi-book-education-outline"
-              description="暂无科目，点击底部添加"
-              actionText="添加科目"
-              onAction={handleAdd}
-            />
+            <Empty icon="mdi-book-education-outline" description="暂无科目，点击底部添加" />
           ) : (
             <View className="flex flex-col gap-[20rpx]">
               {subjects.map((subject) => (

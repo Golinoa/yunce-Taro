@@ -1,11 +1,9 @@
 /**
  * 门店入驻申请页 pages/store-entry/index
  *
- * 由品牌介绍页底部「门店入驻」按钮进入，用于收集场馆入驻信息：
- * - 门店名称、省市区、门店类型、详细地址、地图定位
- * - 入驻协议同意 + 提交
- *
- * 布局对齐参考设计稿：单一卡片表单，标签在输入框上方，字段顺序自上而下。
+ * 由品牌介绍页「申请门店入驻」进入，收集场馆入驻信息。
+ * 产品：未登录可预览/填表；提交时必须登录（草稿回跳）；绑邮箱为软要求（可「下次再说」）；
+ * 提交后须运营审核，无免审。获批后申请人 = 管理员（OWNER）；同机构可有多校区。
  */
 import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -16,14 +14,30 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_NAME_ZH } from '@/constants/brand';
+import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
 import { auditLogService } from '@/services/audit-log';
-import { saveStoreEntryDraft, storeEntryService } from '@/services/store-entry';
+import {
+  readStoreEntryDraft,
+  saveStoreEntryDraft,
+  storeEntryService,
+} from '@/services/store-entry';
 import { useCampusStore } from '@/stores/campus';
 import type { StoreType } from '@/types/store-entry';
 import { useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import { logError } from '@/utils/logger';
-import { withRouteGuard } from '@/utils/route-guard';
+import { LOGIN_REDIRECT_KEY, withRouteGuard } from '@/utils/route-guard';
+import { normalizeStoreEntryStatus } from '@/utils/store-entry-status';
+import {
+  applyStoreEntryDraftToForm,
+  resolveStoreEntrySubmitGate,
+} from '@/utils/store-entry-submit';
+import { refreshSessionForTenant } from '@/services/auth';
+import { ensureUserLocationAuthorized } from '@/utils/location-authorize';
+import { ensurePrivacyAuthorized } from '@/utils/privacy-authorize';
+
+const LOGIN_PAGE = '/package-auth/pages/login/index';
+const STORE_ENTRY_PATH = '/package-settings/pages/store-entry/index';
 
 /** 门店类型选项 */
 const VENUE_TYPE_OPTIONS = ['总店', '分店'];
@@ -183,10 +197,26 @@ const StoreEntry: React.FC = () => {
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
-  const [typePickerVisible, setTypePickerVisible] = useState(false); // 门店类型弹窗（PickerSheet）
+  const [typePickerVisible, setTypePickerVisible] = useState(false);
+  /** 本会话已点「下次再说」：不再反复软挡邮箱 */
+  const [emailPromptSkipped, setEmailPromptSkipped] = useState(false);
 
   useEffect(() => {
     clearIdentitySelectionPending();
+    const draft = applyStoreEntryDraftToForm(readStoreEntryDraft());
+    if (!draft) return;
+    setForm((prev) => ({
+      ...prev,
+      name: draft.name || prev.name,
+      type: (draft.type as StoreType) || prev.type,
+      region: draft.region || prev.region,
+      address: draft.address || prev.address,
+      locationName: draft.locationName || prev.locationName,
+      latitude: draft.latitude ?? prev.latitude,
+      longitude: draft.longitude ?? prev.longitude,
+      contactName: draft.contactName || prev.contactName,
+      contactPhone: draft.contactPhone || prev.contactPhone,
+    }));
   }, []);
 
   const regionText = useMemo(() => form.region.filter(Boolean).join(' '), [form.region]);
@@ -225,29 +255,42 @@ const StoreEntry: React.FC = () => {
     return Object.keys(next).length === 0;
   }, [form]);
 
-  const handleChooseLocation = useCallback(() => {
-    Taro.chooseLocation({
-      success: (res) => {
-        if (!res) return;
-        const locationName = res.name || res.address || '';
-        updateForm('locationName', locationName);
-        updateForm('address', locationName);
-        updateForm('latitude', res.latitude ?? 0);
-        updateForm('longitude', res.longitude ?? 0);
+  const handleChooseLocation = useCallback(async () => {
+    try {
+      // 1) 隐私指引（未同意时会弹 PrivacyPopup；此前直接 chooseLocation 会静默失败）
+      await ensurePrivacyAuthorized();
+      // 2) 位置权限（系统授权弹窗 / 引导去设置）
+      const locationOk = await ensureUserLocationAuthorized();
+      if (!locationOk) {
+        Taro.showToast({ title: '需要位置权限才能选地址', icon: 'none' });
+        return;
+      }
 
-        // 优先从地点名称中解析省市区；解析到则自动填充，解析不到保持用户手动选择
-        const parsed = parseChineseAddress(res.name) || parseChineseAddress(res.address);
-        if (parsed) {
-          updateForm('region', [parsed.province, parsed.city, parsed.district]);
-        }
-      },
-      fail: (err) => {
-        if (err?.errMsg?.includes('cancel') || err?.errMsg?.includes('auth')) return;
-        Taro.showToast({ title: '定位失败，请重试', icon: 'none' });
-      },
-    }).catch(() => {
-      // 吞掉 Promise rejection
-    });
+      const res = await Taro.chooseLocation({});
+      if (!res) return;
+      const locationName = res.name || res.address || '';
+      updateForm('locationName', locationName);
+      updateForm('address', locationName);
+      updateForm('latitude', res.latitude ?? 0);
+      updateForm('longitude', res.longitude ?? 0);
+
+      const parsed = parseChineseAddress(res.name) || parseChineseAddress(res.address);
+      if (parsed) {
+        updateForm('region', [parsed.province, parsed.city, parsed.district]);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String((err as { errMsg?: string })?.errMsg || '');
+      if (/cancel|取消/i.test(msg)) return;
+      if (/隐私|privacy|disagree|不同意/i.test(msg)) {
+        Taro.showToast({ title: '请先同意隐私保护指引', icon: 'none' });
+        return;
+      }
+      if (/auth|authorize|permission|权限|deny/i.test(msg)) {
+        Taro.showToast({ title: '需要位置权限才能选地址', icon: 'none' });
+        return;
+      }
+      Taro.showToast({ title: '定位失败，请重试', icon: 'none' });
+    }
   }, [updateForm]);
 
   const handleSubmit = useCallback(async () => {
@@ -261,35 +304,61 @@ const StoreEntry: React.FC = () => {
       return;
     }
 
+    const payload = {
+      name: form.name.trim(),
+      type: form.type,
+      region: form.region.filter(Boolean),
+      address: form.address.trim(),
+      locationName: form.locationName,
+      latitude: form.latitude || undefined,
+      longitude: form.longitude || undefined,
+      contactName: form.contactName.trim(),
+      contactPhone: form.contactPhone.trim(),
+    };
+
+    const gate = resolveStoreEntrySubmitGate({
+      isLoggedIn: Boolean(profile?.id),
+      profile,
+      emailPromptSkipped,
+    });
+
+    if (gate.kind === 'login_required') {
+      saveStoreEntryDraft(payload);
+      try {
+        Taro.setStorageSync(LOGIN_REDIRECT_KEY, STORE_ENTRY_PATH);
+      } catch {
+        /* ignore */
+      }
+      Taro.showToast({ title: '提交申请需先登录', icon: 'none' });
+      void Taro.navigateTo({ url: LOGIN_PAGE });
+      return;
+    }
+
+    if (gate.kind === 'email_soft_prompt') {
+      const modal = await Taro.showModal({
+        title: '建议绑定邮箱',
+        content: '绑定邮箱便于接收审核结果通知。可「下次再说」直接提交，或先去绑定。',
+        confirmText: '下次再说',
+        cancelText: '去绑定',
+      });
+      if (modal.confirm) {
+        setEmailPromptSkipped(true);
+      } else {
+        // 去绑定：保留草稿后跳转资料页（页内可绑邮箱）
+        saveStoreEntryDraft(payload);
+        void Taro.navigateTo({ url: '/package-student/pages/profile-edit/index' });
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
-      const result = await storeEntryService.submit({
-        name: form.name.trim(),
-        type: form.type,
-        region: form.region.filter(Boolean),
-        address: form.address.trim(),
-        locationName: form.locationName,
-        latitude: form.latitude || undefined,
-        longitude: form.longitude || undefined,
-        contactName: form.contactName.trim(),
-        contactPhone: form.contactPhone.trim(),
-      });
+      const result = await storeEntryService.submit(payload);
 
-      // 保存草稿：pending 页被拒绝时可原样重新提交（POST /store-entry/applications/re-submit）
-      saveStoreEntryDraft({
-        name: form.name.trim(),
-        type: form.type,
-        region: form.region.filter(Boolean),
-        address: form.address.trim(),
-        locationName: form.locationName,
-        latitude: form.latitude || undefined,
-        longitude: form.longitude || undefined,
-        contactName: form.contactName.trim(),
-        contactPhone: form.contactPhone.trim(),
-      });
+      saveStoreEntryDraft(payload);
+      // 提交后挂演示机构：刷新 JWT 注入真实 organizationId
+      await refreshSessionForTenant();
 
-      // L-18-A：提交成功后主动刷新校区列表，并将新校区纳入可见范围，
-      // 避免「入驻成功却看不到校区」。仅当数据层实际创建了校区（campusId 存在）时刷新。
       if (result.campusId) {
         await useCampusStore.getState().fetchCampuses();
         const { allowedCampusIds } = useCampusStore.getState();
@@ -298,10 +367,6 @@ const StoreEntry: React.FC = () => {
         }
       }
 
-      // L-18-B：成功文案与数据层实际行为统一——
-      // mock 同步建校区即开通（status: 'approved'）→ pending 页展示入驻成功；
-      // 真实后端仅提交申请单（status: 'pending'）→ pending 页展示审核中。
-      // 审计日志（用户口径 2026-08-22）：门店入驻申请属机构扩张运营数据
       try {
         await auditLogService.record({
           action: 'store.apply',
@@ -309,7 +374,7 @@ const StoreEntry: React.FC = () => {
           operatorName: profile?.name || '未知',
           operatorRole: profile?.currentContext?.role || 'unknown',
           targetType: 'store',
-          targetId: result.campusId || '',
+          targetId: result.campusId || result.organizationId || '',
           detail: `门店入驻申请：「${form.name.trim()}」（${form.type}）`,
           meta: {
             storeName: form.name.trim(),
@@ -322,15 +387,16 @@ const StoreEntry: React.FC = () => {
         logError('audit store.apply', e);
       }
       const storeName = encodeURIComponent(form.name.trim());
+      const statusQuery = normalizeStoreEntryStatus(result.status);
       void Taro.redirectTo({
-        url: `/package-settings/pages/store-entry/pending/index?status=${result.status}&storeName=${storeName}`,
+        url: `/package-settings/pages/store-entry/pending/index?status=${statusQuery}&storeName=${storeName}`,
       });
     } catch {
       Taro.showToast({ title: '提交失败，请稍后重试', icon: 'none' });
     } finally {
       setSubmitting(false);
     }
-  }, [validate, form, profile]);
+  }, [validate, form, profile, emailPromptSkipped]);
 
   return (
     <PageContainer safeBottom className="flex flex-col bg-background">
@@ -339,10 +405,10 @@ const StoreEntry: React.FC = () => {
           {/* 顶部标题区 */}
           <View className="mb-[8rpx]">
             <Text className="text-[44rpx] font-bold text-foreground leading-tight">
-              注册门店账户
+              {STORE_ENTRY_IDENTITY_COPY.formTitle}
             </Text>
             <Text className="text-[28rpx] text-muted-foreground mt-[12rpx] leading-relaxed block">
-              请填写资料，我们将在2个工作日内审核
+              {STORE_ENTRY_IDENTITY_COPY.formSubtitle}
             </Text>
           </View>
 

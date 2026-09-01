@@ -1,4 +1,4 @@
 export default definePageConfig({
-  navigationBarTitleText: '注册门店账户',
+  navigationBarTitleText: '门店入驻',
   enablePullDownRefresh: false,
 });

@@ -90,7 +90,7 @@ function TrialRecordCard({
       onClick={() => onOpenLead(item.lead_id)}
     >
       <View className="flex items-start gap-[16rpx]">
-        <Avatar name={item.child_name || '试'} size="md" fallback="initial" />
+        <Avatar name={item.child_name || '试'} size="md" />
         <View className="min-w-0 flex-1">
           <View className="flex items-center justify-between gap-[12rpx]">
             <View className="min-w-0 flex flex-row items-center gap-[12rpx]">

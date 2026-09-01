@@ -5,12 +5,11 @@
  * - default: 白色圆角卡片，用于传统布局
  * - gradient: 沉浸式橙色头部，头像 + 名称 + 手机号/机构 + 我的资料
  */
-import { View, Text, Image } from '@tarojs/components';
+import { View, Text } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
-import { BRAND_LOGO } from '@/constants/brand';
 
 export type ProfileHeaderVariant = 'default' | 'gradient';
 
@@ -58,11 +57,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <View className="absolute bottom-[120rpx] left-0 right-0 px-page-padding flex items-center gap-[24rpx]">
           {/* 头像：白色圆形底 + 灰色外边框，头像缩小后自然留出白色内边 */}
           <View className="relative flex-shrink-0 w-[96rpx] h-[96rpx] rounded-full border-[4rpx] border-solid border-border bg-card flex items-center justify-center overflow-hidden">
-            <Image
-              src={avatarUrl || BRAND_LOGO}
-              mode="aspectFill"
-              className="w-[80rpx] h-[80rpx] rounded-full flex-shrink-0"
-            />
+            <Avatar name={name} avatarUrl={avatarUrl} size="lg" className="w-[80rpx] h-[80rpx]" />
           </View>
 
           <View className="flex-1 min-w-0">

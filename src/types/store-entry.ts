@@ -31,9 +31,9 @@ export interface StoreEntryFormData {
 export interface StoreEntryResult {
   /** 申请记录 ID */
   id?: string;
-  /** 申请状态 */
-  status: 'pending' | 'approved' | 'rejected';
-  /** 关联校区 ID（mock 环境下提交后直接创建） */
+  /** 申请状态（BE 对外大写；FE 读取时经 normalizeStoreEntryStatus） */
+  status: 'pending' | 'approved' | 'rejected' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  /** 关联校区 ID（批准后才有；提交申请阶段通常无） */
   campusId?: string;
   /** 入驻申请单 ID（POST /store-entry/applications 返回） */
   applicationId?: string;
@@ -48,7 +48,7 @@ export interface StoreEntryLatestResult {
   /** 最新申请单；无申请记录时为 null */
   application?: {
     id: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'pending' | 'approved' | 'rejected' | 'PENDING' | 'APPROVED' | 'REJECTED';
     rejectReason?: string | null;
     contactPhone?: string;
   } | null;

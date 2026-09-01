@@ -87,10 +87,6 @@ const TeacherListPage: React.FC = () => {
     Taro.navigateTo({ url: '/package-teacher/pages/teacher-form/index' });
   }, []);
 
-  const handleInvite = useCallback(() => {
-    Taro.navigateTo({ url: '/package-teacher/pages/staff-invite/index' });
-  }, []);
-
   const handleEdit = useCallback((id: string) => {
     Taro.navigateTo({ url: `/package-teacher/pages/teacher-form/index?id=${id}` });
   }, []);
@@ -263,15 +259,8 @@ const TeacherListPage: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* 邀请 / 新增员工 */}
+      {/* 新增员工（点对点邀请在员工详情） */}
       <View className="fixed right-[32rpx] bottom-[calc(64rpx+env(safe-area-inset-bottom))] flex flex-col items-end gap-[16rpx]">
-        <View
-          className="flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-card border border-border shadow-float press-scale"
-          onClick={handleInvite}
-        >
-          <Icon name="mdi-link-variant" size={28} className="text-primary" />
-          <Text className="text-[28rpx] font-medium text-primary">邀请员工</Text>
-        </View>
         <View
           className="flex flex-row items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-primary shadow-float press-scale"
           onClick={handleAdd}

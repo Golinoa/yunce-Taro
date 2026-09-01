@@ -15,6 +15,11 @@ import type {
 } from '@/types/profile';
 import { isDevApiEnv } from '@/utils/build-env';
 import { get, post, put } from '@/utils/request';
+import {
+  decodeAccessTokenClaims,
+  isUuidOrganizationId,
+  pickRealTenantId,
+} from '@/utils/tenant-id';
 
 export interface TestAccount {
   username: string;
@@ -54,6 +59,12 @@ interface BackendUserInfo {
   avatar: null | string;
   phone: null | string;
   email?: null | string;
+  /** 主租户机构 UUID（有 ACTIVE 租户时由 BE 返回） */
+  organizationId?: null | string;
+  /** 主租户校区 UUID */
+  campusId?: null | string;
+  /** 机构展示名（仅 UI） */
+  organizationName?: null | string;
   teacher?: {
     id: string;
     institution: null | string;
@@ -91,6 +102,10 @@ interface BackendProfileDetailPayload {
   phone: null | string;
   profileId: string;
   role: BackendRole;
+  /** 主租户机构 UUID（有则优先于 base） */
+  organizationId?: null | string;
+  campusId?: null | string;
+  organizationName?: null | string;
   teacher?: {
     id: string;
     inviteCode: string;
@@ -183,6 +198,9 @@ function readClientRegisterDraft(): RegisterDraft | null {
 }
 
 const buildOrganizationName = (user: BackendUserInfo, role: UserRole): string => {
+  if (user.organizationName?.trim()) {
+    return user.organizationName.trim();
+  }
   if (role === 'teacher') {
     return user.teacher?.institution?.trim() || '';
   }
@@ -194,11 +212,29 @@ const buildOrganizationName = (user: BackendUserInfo, role: UserRole): string =>
   return user.parent?.student?.name ? `${user.parent.student.name}家长` : '';
 };
 
-const mapBackendProfile = (user: BackendUserInfo): Profile => {
+/**
+ * 将后端 UserInfo 映射为前端 Profile。
+ * organizationId 只能来自接口真实 UUID 或 access_token claims，禁止用名称/profileId 冒充。
+ */
+export const mapBackendProfile = (user: BackendUserInfo, accessToken?: string | null): Profile => {
   const role = mapBackendRole(user.role);
   const organizationName = buildOrganizationName(user, role);
   const identityId = user.id;
-  const organizationId = organizationName || user.profileId;
+  const jwtClaims = decodeAccessTokenClaims(accessToken);
+  const forbidden = [
+    user.profileId,
+    user.id,
+    user.nickname,
+    organizationName,
+    user.principal?.institution,
+    user.teacher?.institution,
+    user.organizationName,
+  ];
+  const organizationId = pickRealTenantId(
+    [user.organizationId, jwtClaims.organizationId],
+    forbidden,
+  );
+  const campusId = pickRealTenantId([user.campusId, jwtClaims.campusId], forbidden) || undefined;
   const now = new Date().toISOString();
 
   return {
@@ -215,12 +251,14 @@ const mapBackendProfile = (user: BackendUserInfo): Profile => {
         organizationId,
         organizationName,
         isDefault: true,
+        ...(campusId ? { campusIds: [campusId] } : {}),
       },
     ],
     currentContext: {
       identityId,
       role,
       organizationId,
+      ...(campusId ? { campusId } : {}),
     },
     created_at: now,
     updated_at: now,
@@ -243,15 +281,32 @@ const buildOrganizationNameFromProfileDetail = (
   return fallback;
 };
 
-const mergeBackendProfileDetail = (
+export const mergeBackendProfileDetail = (
   baseProfile: Profile,
   detail: BackendProfileDetailPayload,
 ): Profile => {
-  const organizationName = buildOrganizationNameFromProfileDetail(
-    detail,
-    baseProfile.identities[0]?.organizationName || baseProfile.currentContext.organizationId,
-  );
-  const organizationId = organizationName || baseProfile.currentContext.organizationId;
+  // 展示名可更新；organizationId 优先 detail 真实 UUID，否则仅保留 base 中已是 UUID 的值
+  const organizationName =
+    detail.organizationName?.trim() ||
+    buildOrganizationNameFromProfileDetail(
+      detail,
+      baseProfile.identities[0]?.organizationName || '',
+    );
+  const forbidden = [
+    detail.profileId,
+    detail.id,
+    detail.nickname,
+    organizationName,
+    detail.teacher?.institution,
+  ];
+  const fromDetail = pickRealTenantId([detail.organizationId], forbidden);
+  const previous = baseProfile.currentContext.organizationId || '';
+  const organizationId = fromDetail || (isUuidOrganizationId(previous) ? previous : '');
+  const campusId =
+    pickRealTenantId([detail.campusId], forbidden) ||
+    (isUuidOrganizationId(baseProfile.currentContext.campusId)
+      ? baseProfile.currentContext.campusId
+      : undefined);
 
   return {
     ...baseProfile,
@@ -266,12 +321,14 @@ const mergeBackendProfileDetail = (
             ...identity,
             organizationId,
             organizationName,
+            ...(campusId ? { campusIds: [campusId] } : {}),
           }
         : identity,
     ),
     currentContext: {
       ...baseProfile.currentContext,
       organizationId,
+      ...(campusId ? { campusId } : {}),
     },
     created_at: detail.createdAt || baseProfile.created_at,
     updated_at: new Date().toISOString(),
@@ -308,8 +365,20 @@ const mapBackendSession = (payload: BackendAuthPayload): AuthSession => ({
 
 const mapBackendAuthPayload = (payload: BackendAuthPayload): AuthPayload => ({
   session: mapBackendSession(payload),
-  profile: mapBackendProfile(payload.user),
+  profile: mapBackendProfile(payload.user, payload.token),
 });
+
+const persistLocalProfile = (profile: Profile | null): void => {
+  try {
+    if (!profile) {
+      Taro.removeStorageSync(USER_PROFILE_KEY);
+      return;
+    }
+    Taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* ignore */
+  }
+};
 
 const readStoredSession = (): AuthSession | null => {
   try {
@@ -572,7 +641,12 @@ export async function prepareEmailLogin(
   }
 
   try {
-    await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'LOGIN' }, { skipAuth: true });
+    // 发码接口单独放宽 timeout 作兜底；全局 TIMEOUT 仍为 10s。后端已异步 SES，正常应远低于此。
+    await post(
+      AUTH_ENDPOINTS.emailCode,
+      { email: trimmed, purpose: 'LOGIN' },
+      { skipAuth: true, timeout: 20000 },
+    );
     return {
       status: 'ready',
       email: trimmed,
@@ -583,6 +657,70 @@ export async function prepareEmailLogin(
     return {
       status: 'email_not_found',
       error: { message: getErrorMessage(error, '验证码发送失败') },
+    };
+  }
+}
+
+/** 注册页发码（purpose=REGISTER；未注册邮箱） */
+export async function prepareEmailRegister(email: string): Promise<EmailLoginPrepareResult> {
+  const trimmed = email.trim();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return {
+      status: 'email_not_found',
+      error: { message: '请输入正确的邮箱地址' },
+    };
+  }
+
+  try {
+    await post(
+      AUTH_ENDPOINTS.emailCode,
+      { email: trimmed, purpose: 'REGISTER' },
+      { skipAuth: true, timeout: 20000 },
+    );
+    return {
+      status: 'ready',
+      email: trimmed,
+      maskedEmail: maskEmailAddress(trimmed),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      status: 'email_not_found',
+      error: { message: getErrorMessage(error, '验证码发送失败') },
+    };
+  }
+}
+
+/** 邮箱 + 验证码 + 密码注册（写入 passwordHash） */
+export async function registerWithEmailPassword(input: {
+  email: string;
+  code: string;
+  password: string;
+  role?: 'PARENT' | 'PRINCIPAL';
+}): Promise<LoginResult> {
+  try {
+    const data = await post<BackendAuthPayload>(
+      AUTH_ENDPOINTS.register,
+      {
+        email: input.email.trim(),
+        code: input.code.trim(),
+        password: input.password,
+        role: input.role ?? 'PRINCIPAL',
+      },
+      { skipAuth: true },
+    );
+    const mapped = mapBackendAuthPayload(data);
+    return {
+      session: mapped.session,
+      profile: mapped.profile,
+      isNewUser: true,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: getErrorMessage(error, '注册失败') },
     };
   }
 }
@@ -833,7 +971,7 @@ export async function getSession(): Promise<{
     }
 
     const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me);
-    const baseProfile = mapBackendProfile(user);
+    const baseProfile = mapBackendProfile(user, storedSession.access_token);
     const currentRole = mapBackendRole(user.role);
 
     if (currentRole !== 'principal') {
@@ -883,11 +1021,20 @@ export async function updateProfile(
   },
 ): Promise<{ profile: Profile | null; error: { message: string } | null }> {
   try {
-    const updated = await put<BackendUserInfo>(
-      AUTH_ENDPOINTS.profile,
-      patch as Record<string, unknown>,
-    );
-    const mapped = mapBackendProfile(updated);
+    // 后端契约：nickname / avatar（不是 avatar_url）；name 写入 nickname
+    const body: Record<string, unknown> = {};
+    const nickname = (patch.nickname ?? patch.name)?.trim();
+    if (nickname) body.nickname = nickname;
+    if (patch.avatar_url !== undefined) {
+      const avatar = patch.avatar_url.trim();
+      if (avatar) body.avatar = avatar;
+    }
+    if (patch.phone !== undefined) body.phone = patch.phone;
+    if (patch.email !== undefined) body.email = patch.email;
+
+    const updated = await put<BackendUserInfo>(AUTH_ENDPOINTS.profile, body);
+    const accessToken = readStoredSession()?.access_token;
+    const mapped = mapBackendProfile(updated, accessToken);
     return { profile: mapped, error: null };
   } catch (err) {
     return {
@@ -949,6 +1096,81 @@ export async function logout(): Promise<void> {
     );
   } finally {
     clearStoredAuth();
+  }
+}
+
+/**
+ * 强制用 refresh 换新会话（门店入驻批准后注入 organizationId）。
+ * BE refresh 会重新 resolve ACTIVE 主租户；成功后同步本地 Profile 与 JWT 一致。
+ */
+export async function refreshSessionForTenant(): Promise<{
+  ok: boolean;
+  error?: { message: string };
+  profile?: Profile | null;
+}> {
+  const stored = readStoredSession();
+  const refreshToken = stored?.refresh_token;
+  if (!refreshToken) {
+    return { ok: false, error: { message: '请重新登录后再进入机构端' } };
+  }
+  try {
+    const data = await post<{
+      token: string;
+      refreshToken: string;
+      expiresIn: number;
+    }>(AUTH_ENDPOINTS.refresh, { refreshToken }, { skipAuth: true });
+    if (!data?.token || !data.refreshToken) {
+      return { ok: false, error: { message: '刷新会话失败' } };
+    }
+    const next = {
+      ...stored,
+      access_token: data.token,
+      refresh_token: data.refreshToken,
+      expires_at: Math.floor(Date.now() / 1000) + (data.expiresIn || 7200),
+    };
+    Taro.setStorageSync(AUTH_TOKEN_KEY, JSON.stringify(next));
+
+    // 用 me + 新 JWT 重映射 Profile，确保 organizationId 与 token 同为真实 UUID
+    let profile: Profile | null = null;
+    try {
+      const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me);
+      profile = mapBackendProfile(user, data.token);
+      persistLocalProfile(profile);
+    } catch {
+      const claims = decodeAccessTokenClaims(data.token);
+      const orgId = pickRealTenantId([claims.organizationId]);
+      const campusId = pickRealTenantId([claims.campusId]) || undefined;
+      try {
+        const raw = Taro.getStorageSync(USER_PROFILE_KEY);
+        if (raw && orgId) {
+          const prev = JSON.parse(raw) as Profile;
+          profile = {
+            ...prev,
+            identities: prev.identities.map((identity, index) =>
+              index === 0
+                ? {
+                    ...identity,
+                    organizationId: orgId,
+                    ...(campusId ? { campusIds: [campusId] } : {}),
+                  }
+                : identity,
+            ),
+            currentContext: {
+              ...prev.currentContext,
+              organizationId: orgId,
+              ...(campusId ? { campusId } : {}),
+            },
+          };
+          persistLocalProfile(profile);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return { ok: true, profile };
+  } catch {
+    return { ok: false, error: { message: '刷新会话失败，请重新登录' } };
   }
 }
 

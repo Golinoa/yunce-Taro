@@ -25,7 +25,6 @@ import ProfileGrid from '@/components/profile/ProfileGrid';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ProfileStats from '@/components/profile/ProfileStats';
 import StoreOnboarding from '@/components/profile/StoreOnboarding';
-import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { resolveLifecycle } from '@/constants/membership-tips';
 import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
@@ -97,7 +96,6 @@ const Profile: React.FC = () => {
   // 弹窗控制
   const [showBindSheet, setShowBindSheet] = useState(false);
   const [showSwitchSheet, setShowSwitchSheet] = useState(false);
-  const [showRoleSheet, setShowRoleSheet] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [binding, setBinding] = useState(false);
 
@@ -440,16 +438,6 @@ const Profile: React.FC = () => {
         onClick: handleCardManage,
       },
       {
-        label: '约课规则',
-        icon: 'mdi-calendar-check-outline' as const,
-        onClick: () => handleNavigate('/package-course/pages/booking-rule/index'),
-      },
-      {
-        label: '学员转校',
-        icon: 'mdi-swap-horizontal' as const,
-        onClick: () => handleNavigate('/package-student/pages/student-transfer/index'),
-      },
-      {
         label: '薪资管理',
         icon: 'mdi-wallet-outline' as const,
         onClick: () => handleNavigate('/package-teacher/pages/salary-home/index'),
@@ -524,11 +512,6 @@ const Profile: React.FC = () => {
         label: '消息通知',
         icon: 'mdi-message-text-outline',
         onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
-      },
-      {
-        label: '切换身份',
-        icon: 'mdi-account-switch-outline',
-        onClick: () => setShowRoleSheet(true),
       },
     ];
     // 系统设置：所有角色可见，内部设置项按权限过滤
@@ -651,11 +634,6 @@ const Profile: React.FC = () => {
         label: '消息通知',
         icon: 'mdi-message-text-outline' as const,
         onClick: () => handleNavigate('/package-settings/pages/notifications/index'),
-      },
-      {
-        label: '切换身份',
-        icon: 'mdi-account-switch-outline' as const,
-        onClick: () => setShowRoleSheet(true),
       },
       {
         label: '账号设置',
@@ -925,9 +903,6 @@ const Profile: React.FC = () => {
             </View>
           </View>
         </BottomSheet>
-
-        {/* ====== 切换身份 Sheet ====== */}
-        <RoleSwitchSheet visible={showRoleSheet} onClose={() => setShowRoleSheet(false)} />
       </View>
     </PageContainer>
   );

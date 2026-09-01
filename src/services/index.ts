@@ -29,6 +29,9 @@ export {
   registerStep1ByEmail,
   registerStep2,
   registerStep3,
+  prepareEmailLogin,
+  prepareEmailRegister,
+  registerWithEmailPassword,
   signUp,
   verifyCampusCode,
   verifyStudentCode,
@@ -98,6 +101,8 @@ export type {
   Membership,
   MyOrganizationResult,
   BindOrganizationResult,
+  BindByCodeResult,
+  BindByCodeKind,
   ShareContext,
   StudentParentRelation,
 } from './organization';

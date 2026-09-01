@@ -4,15 +4,25 @@
 import Taro from '@tarojs/taro';
 import type { Profile } from '@/types/profile';
 import { hasPendingInviteCode, consumePendingInviteCode } from '@/utils/invite-parent-link';
+import {
+  IDENTITY_ONBOARDING_PATH_MARKERS,
+  IDENTITY_SELECT_PENDING_KEY,
+  isIdentityOnboardingAllowlistedPath,
+} from '@/utils/identity-path-allowlist';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
+import { isUuidOrganizationId } from '@/utils/tenant-id';
 
 export const LAST_LOGIN_IS_NEW_USER_KEY = 'yunce:last-login-is-new-user';
 export const ONBOARDING_SKIPPED_KEY = 'yunce:onboarding-skipped';
-/** 待完成「选择身份」标记：新用户未完成身份选择前保持，完成入驻/绑定后清除 */
-export const IDENTITY_SELECT_PENDING_KEY = 'yunce:identity-select-pending';
+export { IDENTITY_SELECT_PENDING_KEY };
 
-const DEFAULT_ORG_NAMES = new Set(['松果排课', '未知机构']);
+export { IDENTITY_ONBOARDING_PATH_MARKERS, isIdentityOnboardingAllowlistedPath };
+
+/** 有 pending 且不在白名单 → 应强制回 identity-select */
+export function shouldRedirectToIdentitySelect(path: string): boolean {
+  return hasIdentitySelectionPending() && !isIdentityOnboardingAllowlistedPath(path);
+}
 
 export function markLastLoginAsNewUser(): void {
   try {
@@ -127,8 +137,8 @@ export function needsOnboarding(profile: Profile | null): boolean {
   }
 
   if (role === 'principal' || role === 'admin') {
-    const orgName = profile.identities[0]?.organizationName?.trim();
-    return !orgName || DEFAULT_ORG_NAMES.has(orgName);
+    // 以真实 UUID organizationId 为准，禁止用机构名 / 演示名判断
+    return !isUuidOrganizationId(profile.currentContext?.organizationId);
   }
 
   return false;
@@ -136,10 +146,26 @@ export function needsOnboarding(profile: Profile | null): boolean {
 
 /** 登录成功后的统一跳转
  *
- * 分流（R1）：新用户 → 选择身份页（门店入驻 / 绑定机构）；
- * 携带分享上下文（inviteCode/teacherCode 参数）→ 直接走归属流程（进首页弹关系确认），不经过身份选择；
- * 老用户保持现状。
+ * 分流：已有真实机构上下文 → 业务首页；
+ * 未绑定机构 → 选择身份（门店入驻 / 绑定机构）；
+ * 分享邀请上下文已挂上 → 首页关系确认。
+ * 完善资料优先于身份选择。
  */
+function redirectWithFailFallback(url: string): void {
+  Taro.redirectTo({
+    url,
+    fail: () => {
+      Taro.showToast({ title: '页面打开失败，请重试', icon: 'none' });
+      Taro.reLaunch({
+        url: '/package-auth/pages/login/index',
+        fail: () => {
+          Taro.showToast({ title: '请重新打开小程序', icon: 'none' });
+        },
+      });
+    },
+  });
+}
+
 export function navigateAfterAuth(
   profile: Profile | null,
   options?: { isNewUser?: boolean },
@@ -148,38 +174,32 @@ export function navigateAfterAuth(
     return;
   }
 
-  // 新用户（含上次登录未消费标记 + 尚未完成选择身份）
-  const isNewUser = Boolean(options?.isNewUser) || hasIdentitySelectionPending();
-
   if (needsProfileSetup(profile, options?.isNewUser)) {
     // Keep identity-select pending across profile-setup (production funnel)
     markIdentitySelectionPending();
-    Taro.redirectTo({ url: '/package-auth/pages/profile-setup/index' });
+    redirectWithFailFallback('/package-auth/pages/profile-setup/index');
     return;
   }
 
-  if (isNewUser) {
-    // Share invite context already attached at login → home + relation confirm
-    if (hasPendingInviteCode()) {
-      consumePendingInviteCode();
-      consumeIdentitySelectionPending();
-      navigateAfterLogin(profile);
-      return;
-    }
-    // New user → identity-select (store entry | bind org). Same path as production.
-    markIdentitySelectionPending();
-    Taro.redirectTo({ url: '/package-auth/pages/identity-select/index' });
+  // 已有真实机构 / 已完成家长绑定：清残留 pending，进业务首页
+  // （修复：误标 isNewUser 或上次卡在「选择身份」的老种子账号被错误拦下）
+  if (!needsOnboarding(profile)) {
+    clearIdentitySelectionPending();
+    navigateAfterLogin(profile);
     return;
   }
 
-  if (needsOnboarding(profile)) {
-    // Legacy onboarding page retired; reuse identity-select
-    markIdentitySelectionPending();
-    Taro.redirectTo({ url: '/package-auth/pages/identity-select/index' });
+  // 分享邀请上下文已挂上 → 首页弹关系确认，跳过身份选择
+  if (hasPendingInviteCode()) {
+    consumePendingInviteCode();
+    consumeIdentitySelectionPending();
+    navigateAfterLogin(profile);
     return;
   }
 
-  navigateAfterLogin(profile);
+  // 未绑定机构：选择身份（门店入驻 | 绑定机构）
+  markIdentitySelectionPending();
+  redirectWithFailFallback('/package-auth/pages/identity-select/index');
 }
 
 /** After profile-setup: continue production funnel via pending identity flag */

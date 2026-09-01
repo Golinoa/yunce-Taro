@@ -52,6 +52,7 @@ import {
   type LessonSharePayload,
 } from '@/utils/lesson-share';
 import { logError } from '@/utils/logger';
+import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import {
   upsertParentBooking,
   updateParentBookingStatus,
@@ -574,6 +575,7 @@ const SchedulePage: React.FC = () => {
   >({});
   const [lessonRecords, setLessonRecords] = useState<LessonRecord[]>([]);
   const [temporaryReschedules, setTemporaryReschedules] = useState<TemporaryReschedule[]>([]);
+  const lastScheduleAuxFetchAtRef = useRef(0);
   const [trialBookingKeys, setTrialBookingKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   /** 当前左滑打开按钮的卡片 ID，用于卡片互斥 */
@@ -933,14 +935,13 @@ const SchedulePage: React.FC = () => {
             .then(setLessonRecords)
             .catch((err) => {
               logError('SchedulePage refreshDateData records', err);
-              Taro.showToast({ title: '课表记录加载失败', icon: 'none' });
+              // 口径：无权限/失败 → 保留缓存或空白，不弹失败打断
             });
           void temporaryRescheduleService
             .getByTeacherAndRange(currentUserId, startDate, endDate)
             .then(setTemporaryReschedules)
             .catch((err) => {
               logError('SchedulePage refreshDateData reschedules', err);
-              Taro.showToast({ title: '临时调课加载失败', icon: 'none' });
             });
         }
       }, 150);
@@ -1057,7 +1058,7 @@ const SchedulePage: React.FC = () => {
       });
     } catch (err) {
       logError('SchedulePage loadBaseData', err);
-      Taro.showToast({ title: '课表加载失败', icon: 'none' });
+      // 口径：无权限/拉数失败 → 空白课表，不用失败 toast 打断
     } finally {
       setLoading(false);
     }
@@ -1085,9 +1086,10 @@ const SchedulePage: React.FC = () => {
         currentCampusId,
       );
       setLessonRecords(list);
+      lastScheduleAuxFetchAtRef.current = Date.now();
     } catch (err) {
       logError('SchedulePage loadMonthRecords', err);
-      Taro.showToast({ title: '课表记录加载失败', icon: 'none' });
+      // 保留缓存；不反复 toast（Tab 切换会多次触发）
     }
   }, [currentUserId, currentCampusId, selectedDate]);
 
@@ -1104,9 +1106,10 @@ const SchedulePage: React.FC = () => {
         endDate,
       );
       setTemporaryReschedules(list);
+      lastScheduleAuxFetchAtRef.current = Date.now();
     } catch (err) {
       logError('SchedulePage loadTemporaryReschedules', err);
-      Taro.showToast({ title: '临时调课加载失败', icon: 'none' });
+      // 后端未挂载接口时 service 已降级本地；此处不再弹失败打断
     }
   }, [currentUserId, selectedDate]);
 
@@ -1158,6 +1161,13 @@ const SchedulePage: React.FC = () => {
 
     if (hasRefreshSignal || newCategoryId) {
       void loadBaseData();
+      void loadMonthRecords();
+      void loadTemporaryReschedules();
+      return;
+    }
+    // 产品口径：Tab 切换 TTL 内不重复打消课/临调接口
+    if (isWithinRefetchTtl(lastScheduleAuxFetchAtRef.current)) {
+      return;
     }
     void loadMonthRecords();
     void loadTemporaryReschedules();

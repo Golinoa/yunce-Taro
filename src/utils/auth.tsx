@@ -18,6 +18,7 @@ import {
   registerStep1ByEmail,
   registerStep2,
   registerStep3,
+  registerWithEmailPassword,
   restoreRegisterDrafts,
   switchIdentity as switchIdentityService,
   updateProfile as updateProfileService,
@@ -63,11 +64,17 @@ export interface AuthState {
   signInWithUsername: (
     username: string,
     password: string,
-  ) => Promise<{ error: { message: string } | null }>;
+  ) => Promise<{
+    error: { message: string } | null;
+    profile?: Profile | null;
+    isNewUser?: boolean;
+  }>;
   /** 微信一键登录 */
-  signInWithWechat: (
-    code: string,
-  ) => Promise<{ error: { message: string } | null; isNewUser?: boolean }>;
+  signInWithWechat: (code: string) => Promise<{
+    error: { message: string } | null;
+    isNewUser?: boolean;
+    profile?: Profile | null;
+  }>;
   /** 微信登录后绑定手机号+密码（无短信） */
   bindWechatPhone: (
     phone: string,
@@ -89,7 +96,17 @@ export interface AuthState {
   signInWithEmailCode: (
     email: string,
     code: string,
-  ) => Promise<{ error: { message: string } | null; isNewUser?: boolean }>;
+  ) => Promise<{
+    error: { message: string } | null;
+    isNewUser?: boolean;
+    profile?: Profile | null;
+  }>;
+  /** 邮箱验证码 + 密码注册 */
+  signUpWithEmailPassword: (
+    email: string,
+    code: string,
+    password: string,
+  ) => Promise<{ error: { message: string } | null; profile?: Profile | null }>;
 
   /** 注册 Step1：创建账号（邮箱） */
   signUpStep1: (payload: {
@@ -327,11 +344,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (username: string, password: string) => {
       const result = await login(username, password);
       if (result.error) return { error: result.error };
+      if (result.isNewUser) {
+        markLastLoginAsNewUser();
+      }
       setSession(result.session);
       setProfile(result.profile);
       persistAuth(result.profile, result.session);
       syncUserRole(result.profile?.currentContext?.role || null);
-      return { error: null };
+      return { error: null, profile: result.profile, isNewUser: result.isNewUser };
     },
     [persistAuth, syncUserRole],
   );
@@ -348,7 +368,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(result.profile);
       persistAuth(result.profile, result.session);
       syncUserRole(result.profile?.currentContext?.role || null);
-      return { error: null, isNewUser: result.isNewUser };
+      return { error: null, isNewUser: result.isNewUser, profile: result.profile };
     },
     [persistAuth, syncUserRole],
   );
@@ -411,7 +431,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(result.profile);
       persistAuth(result.profile, result.session);
       syncUserRole(result.profile?.currentContext?.role || null);
-      return { error: null, isNewUser: result.isNewUser };
+      return { error: null, isNewUser: result.isNewUser, profile: result.profile };
+    },
+    [persistAuth, syncUserRole],
+  );
+
+  // 注册：邮箱验证码 + 密码
+  const signUpWithEmailPassword = useCallback(
+    async (email: string, code: string, password: string) => {
+      const result = await registerWithEmailPassword({ email, code, password });
+      if (result.error) return { error: result.error };
+      markLastLoginAsNewUser();
+      setSession(result.session);
+      setProfile(result.profile);
+      persistAuth(result.profile, result.session);
+      syncUserRole(result.profile?.currentContext?.role || null);
+      return { error: null, profile: result.profile };
     },
     [persistAuth, syncUserRole],
   );
@@ -605,6 +640,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sendBindEmailCode: sendBindEmailCodeFn,
       signInWithPhone,
       signInWithEmailCode,
+      signUpWithEmailPassword,
       signUpStep1,
       signUpStep2,
       signUpStep3,
@@ -633,6 +669,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sendBindEmailCodeFn,
       signInWithPhone,
       signInWithEmailCode,
+      signUpWithEmailPassword,
       signUpStep1,
       signUpStep2,
       signUpStep3,

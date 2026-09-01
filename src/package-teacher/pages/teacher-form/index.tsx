@@ -435,9 +435,7 @@ const TeacherFormPage: React.FC = () => {
           <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx]">
             <View className="flex flex-row items-start justify-between gap-[24rpx]">
               <View className="flex-1 flex flex-col gap-[8rpx]">
-                {/* 主标题 */}
                 <Text className="text-[30rpx] font-medium text-foreground">展示在私教老师列表</Text>
-                {/* 开启状态补充说明 */}
                 {form.showInPrivateList ? (
                   <Text className="text-[24rpx] text-primary leading-relaxed">
                     开启后，该老师会出现在首页私教课程的可选老师列表
@@ -455,6 +453,25 @@ const TeacherFormPage: React.FC = () => {
               />
             </View>
           </View>
+
+          {isEdit ? (
+            <View
+              className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx] flex flex-row items-center justify-between press-bg"
+              onClick={() => {
+                Taro.navigateTo({
+                  url: `/package-teacher/pages/staff-invite/index?teacherId=${encodeURIComponent(String(id))}`,
+                });
+              }}
+            >
+              <View className="flex-1 min-w-0">
+                <Text className="text-[30rpx] font-medium text-foreground block">邀请绑定微信</Text>
+                <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] block">
+                  生成临时码，让员工微信绑定到本资料
+                </Text>
+              </View>
+              <Text className="text-[26rpx] text-primary shrink-0">去邀请</Text>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 

@@ -52,6 +52,7 @@ import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
+import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
@@ -195,6 +196,7 @@ const Home: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   // ---- 公共状态 ----
   const isFirstMount = useRef(true);
+  const lastHomeFetchAtRef = useRef<number>(0);
   const [fabMenuExpanded, setFabMenuExpanded] = useState(false);
   const [fabVisible, setFabVisible] = useState(false);
   /** 四象限拖动中锁定首页滚动，避免抢手势 */
@@ -369,6 +371,7 @@ const Home: React.FC = () => {
           setParentSchedules(parentData?.todaySchedules || []);
           setParentPackages(parentData?.packages || []);
           setParentFallbackStudentId(parentData?.students?.[0]?.id || '');
+          lastHomeFetchAtRef.current = Date.now();
         } catch (err) {
           logError('Home loadParentData', err);
         }
@@ -379,6 +382,7 @@ const Home: React.FC = () => {
         try {
           const unread = await homeService.getUnreadCount(profile.id, currentRole);
           setUnreadCount(unread);
+          lastHomeFetchAtRef.current = Date.now();
         } catch (err) {
           logError('Home loadUnreadCount', err);
         }
@@ -414,6 +418,7 @@ const Home: React.FC = () => {
         setUnreadCount(unread);
         setTodoItems(todoList);
         setRecentRecords(lessonRecords);
+        lastHomeFetchAtRef.current = Date.now();
 
         // 未点名提醒（用户口径 2026-08-23）：当天 20:00 后，今日课表存在下课未点名 → 微信订阅消息提醒补点名
         const now = new Date();
@@ -542,6 +547,10 @@ const Home: React.FC = () => {
     void checkPendingRelation();
     if (isFirstMount.current) {
       isFirstMount.current = false;
+      return;
+    }
+    // 产品口径：Tab 切换 TTL 内不重复全量拉库
+    if (isWithinRefetchTtl(lastHomeFetchAtRef.current)) {
       return;
     }
     loadData(currentCampusId);

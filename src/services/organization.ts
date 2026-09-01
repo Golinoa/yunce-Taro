@@ -2,13 +2,16 @@
  * Service 层 — 机构绑定 / 分享归属 API
  *
  * 契约（baseURL 已含 /api/app/v1）：
- * - POST /organization/bind                    { inviteCode } → 绑定机构（自动创建子女 + 机构用户）
+ * - POST /organization/bind-code             { inviteCode } → 统一绑定（S 学员 / E 员工 / 无前缀兼容）
+ * - POST /organization/bind                 { inviteCode } → 仅学员绑定（兼容旧路径）
  * - POST /organization/bindings/:studentParentId/relation  { relation: self|father|mother }
  * - GET  /organization/me                      我的机构状态 + 待确认关系
  * - GET  /share/context?inviteCode=xxx         分享上下文（落地页展示邀请人）
  */
 import Taro from '@tarojs/taro';
 import { get, post, put } from '@/utils/request';
+
+const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 
 /** 与学员的关系（后端 Zod 常量校验，不建枚举列） */
 export type StudentParentRelation = 'self' | 'father' | 'mother';
@@ -42,12 +45,37 @@ export interface MyOrganizationResult {
   memberships: Membership[];
 }
 
-/** POST /organization/bind 响应 */
+/** POST /organization/bind 响应（学员专属旧路径） */
 export interface BindOrganizationResult {
   studentId: string;
   studentName: string;
   organizationId: string;
   studentParentId: string;
+}
+
+/** POST /organization/bind-code 统一绑定响应（与 BE discriminated union 对齐） */
+export type BindByCodeKind = 'student' | 'staff';
+
+export interface BindByCodeResult {
+  kind: BindByCodeKind;
+  organizationId: string;
+  organizationName?: string;
+  /** 学员路径 */
+  studentId?: string;
+  studentName?: string;
+  studentParentId?: string;
+  /** 员工路径 */
+  campusId?: string;
+  campusName?: string | null;
+  roleCode?: string;
+  campusRole?: string;
+  alreadyJoined?: boolean;
+  profileRole?: string;
+  acceptedAt?: string | null;
+  /** 员工加入后可能下发新租户会话（与 campus-invite accept 同形） */
+  token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
 }
 
 /** GET /share/context 响应 */
@@ -58,8 +86,41 @@ export interface ShareContext {
   teacherName: string;
 }
 
+function persistAuthTokens(token: string, refreshToken: string, expiresIn: number): void {
+  try {
+    const raw = Taro.getStorageSync(AUTH_TOKEN_KEY);
+    const session = raw ? JSON.parse(raw) : {};
+    Taro.setStorageSync(
+      AUTH_TOKEN_KEY,
+      JSON.stringify({
+        ...session,
+        access_token: token,
+        refresh_token: refreshToken,
+        expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export const organizationService = {
-  /** 绑定机构（学员邀请码 → 自动创建子女 + 机构用户 MEMBER） */
+  /**
+   * 统一绑定机构（选择身份「绑定机构」主路径）
+   * POST /organization/bind-code { inviteCode }
+   * - S* → 学员绑定；E* → 员工校区邀请；无前缀 → 后端兼容分流
+   */
+  bindByCode: async (inviteCode: string): Promise<BindByCodeResult> => {
+    const data = await post<BindByCodeResult>('/organization/bind-code', {
+      inviteCode: inviteCode.trim().toUpperCase(),
+    });
+    if (data.token && data.refreshToken && typeof data.expiresIn === 'number') {
+      persistAuthTokens(data.token, data.refreshToken, data.expiresIn);
+    }
+    return data;
+  },
+
+  /** 绑定机构（学员邀请码 → 自动创建子女 + 机构用户 MEMBER）；兼容旧入口 */
   bind: async (inviteCode: string): Promise<BindOrganizationResult> => {
     return post<BindOrganizationResult>('/organization/bind', { inviteCode });
   },

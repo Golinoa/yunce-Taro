@@ -1,40 +1,46 @@
 /**
- * 选择身份页 pages/identity-select/index（R1）
+ * 选择身份页 pages/identity-select/index
  *
- * 新用户注册/完善资料后必经：选择「门店入驻」或「绑定机构」。
- * - 门店入驻 → 门店入驻申请页（package-settings/pages/store-entry/index）
- * - 绑定机构 → 输入学员邀请码绑定（package-auth/pages/parent-onboarding/index）
- *
- * pending 标记在目标页成功进入后再清除，避免目标页被守卫拦截时丢回流入口。
- * 已是家长身份时仅保留「绑定机构」，避免点门店入驻后被权限拦回。
+ * 注册/登录后未完成「开店或绑机构」前强制停留本页。
+ * - 门店入驻 → store-entry（管理员申请，需运营审核；打开不清除 pending）
+ * - 绑定机构 → 本页弹窗输入一码（不跳页）；后端按码特征区分学员/员工
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import BindOrgSheet from '@/components/BindOrgSheet';
 import Icon from '@/components/Icon';
+import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
+import { getSession } from '@/services/auth';
+import { organizationService, savePendingRelation } from '@/services/organization';
 import { isParentRole, useAuth } from '@/utils/auth';
+import {
+  clearIdentitySelectionPending,
+  navigateAfterAuth,
+} from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const ALL_IDENTITY_OPTIONS = [
   {
     key: 'store-entry',
-    title: '门店入驻',
-    desc: '我是机构负责人，创建自己的门店',
+    title: STORE_ENTRY_IDENTITY_COPY.optionTitle,
+    desc: STORE_ENTRY_IDENTITY_COPY.optionDesc,
     icon: 'mdi-office-building',
     url: '/package-settings/pages/store-entry/index',
   },
   {
     key: 'bind-org',
-    title: '绑定机构',
-    desc: '已有机构，输入学员邀请码加入',
+    title: STORE_ENTRY_IDENTITY_COPY.bindOrgTitle,
+    desc: STORE_ENTRY_IDENTITY_COPY.bindOrgDesc,
     icon: 'mdi-account-group',
-    url: '/package-auth/pages/parent-onboarding/index',
   },
 ] as const;
 
 const IdentitySelect: React.FC = () => {
   const navHeight = useNavSafeHeight();
-  const { currentRole } = useAuth();
+  const { currentRole, refreshProfile } = useAuth();
+  const [bindVisible, setBindVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const options = useMemo(() => {
     if (isParentRole(currentRole)) {
@@ -43,9 +49,62 @@ const IdentitySelect: React.FC = () => {
     return [...ALL_IDENTITY_OPTIONS];
   }, [currentRole]);
 
-  const handleSelect = useCallback((url: string) => {
-    Taro.navigateTo({ url });
+  const handleSelect = useCallback((key: (typeof ALL_IDENTITY_OPTIONS)[number]['key']) => {
+    if (key === 'bind-org') {
+      setBindVisible(true);
+      return;
+    }
+    const opt = ALL_IDENTITY_OPTIONS.find((item) => item.key === key);
+    if (opt && 'url' in opt && opt.url) {
+      Taro.navigateTo({ url: opt.url });
+    }
   }, []);
+
+  const handleBindClose = useCallback(() => {
+    if (submitting) return;
+    setBindVisible(false);
+  }, [submitting]);
+
+  const handleBindSubmit = useCallback(
+    async (inviteCode: string) => {
+      if (submitting) return;
+      setSubmitting(true);
+      try {
+        const result = await organizationService.bindByCode(inviteCode);
+        if (
+          result.kind === 'student' &&
+          result.studentId &&
+          result.studentName &&
+          result.studentParentId
+        ) {
+          savePendingRelation({
+            studentId: result.studentId,
+            studentName: result.studentName,
+            studentParentId: result.studentParentId,
+          });
+        }
+        clearIdentitySelectionPending();
+        await refreshProfile();
+        const { profile: latestProfile } = await getSession();
+        setBindVisible(false);
+        Taro.showToast({
+          title: result.alreadyJoined ? '您已加入该机构' : '绑定成功',
+          icon: 'success',
+        });
+        setTimeout(() => {
+          navigateAfterAuth(latestProfile, { isNewUser: false });
+        }, 600);
+      } catch (error) {
+        Taro.showToast({
+          title: error instanceof Error && error.message ? error.message : '绑定失败，请检查邀请码',
+          icon: 'none',
+        });
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [refreshProfile, submitting],
+  );
 
   return (
     <View className="min-h-screen flex flex-col bg-background relative overflow-hidden">
@@ -65,8 +124,8 @@ const IdentitySelect: React.FC = () => {
           </Text>
           <Text className="text-[28rpx] text-muted-foreground">
             {isParentRole(currentRole)
-              ? '请使用机构提供的学员邀请码绑定孩子'
-              : '选择进入方式，后续可在设置中调整'}
+              ? '请使用机构提供的邀请码绑定'
+              : '请先选择：开自己的店，或用邀请码加入已有机构'}
           </Text>
         </View>
 
@@ -75,7 +134,7 @@ const IdentitySelect: React.FC = () => {
             <View
               key={opt.key}
               className="flex items-center rounded-[32rpx] bg-card border-2 border-transparent p-[32rpx] shadow-soft active:scale-[0.99] transition-all duration-200"
-              onClick={() => handleSelect(opt.url)}
+              onClick={() => handleSelect(opt.key)}
             >
               <View className="w-[96rpx] h-[96rpx] rounded-[28rpx] bg-primary/10 flex items-center justify-center mr-[24rpx]">
                 <Icon name={opt.icon} size={48} className="text-primary" />
@@ -96,9 +155,16 @@ const IdentitySelect: React.FC = () => {
         <Text className="text-[24rpx] text-muted-foreground text-center block mt-[48rpx] leading-[1.7]">
           {isParentRole(currentRole)
             ? '绑定成功后可在「我的」查看孩子课表与课时'
-            : '门店入驻需提交资质审核；绑定机构需输入学员邀请码'}
+            : STORE_ENTRY_IDENTITY_COPY.footerHint}
         </Text>
       </View>
+
+      <BindOrgSheet
+        visible={bindVisible}
+        submitting={submitting}
+        onClose={handleBindClose}
+        onSubmit={handleBindSubmit}
+      />
     </View>
   );
 };

@@ -266,7 +266,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
       return;
     }
 
-    const conflictItems = await temporaryRescheduleService.checkDateConflict({
+    const conflictResult = await temporaryRescheduleService.checkDateConflict({
       teacherId: currentUserId,
       sourceDate,
       targetDate: targetDateStr,
@@ -274,7 +274,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
       allSchedules: schedules,
       classById,
     });
-    if (conflictItems.length > 0) {
+    if (conflictResult.hasConflict) {
       Taro.showToast({
         title: '目标日期存在时间冲突',
         icon: 'none',

@@ -1,37 +1,48 @@
 /**
  * 门店入驻申请中页 pages/store-entry/pending/index（R3）
  *
- * 进页查询真实申请状态：
+ * 进页查询真实申请状态（兼容 PENDING/pending 大小写）：
  * - pending  → 审核中（展示申请信息 + 联系客服）
- * - approved → 入驻成功（可进入机构端首页）
- * - rejected → 展示拒绝原因 + 重新提交（P1-5，草稿原样重提）
+ * - approved → 入驻成功（刷会话注入 organizationId 后进入机构端）
+ * - rejected → 展示拒绝原因 + 重新提交
+ *
+ * 产品：获批后用户 = 管理员（OWNER）；校区岗「校长」≠ 本页身份。
  */
 import { View, Text, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import { refreshSessionForTenant } from '@/services/auth';
 import { readStoreEntryDraft, storeEntryService } from '@/services/store-entry';
 import type { StoreEntryLatestResult } from '@/types/store-entry';
+import { useAuth } from '@/utils/auth';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { navigateAfterLogin, withRouteGuard } from '@/utils/route-guard';
+import {
+  isStoreEntryApproved,
+  isStoreEntryRejected,
+  normalizeStoreEntryStatus,
+} from '@/utils/store-entry-status';
 
 /** 分包静态资源，构建时 copy 至 dist/package-settings/assets/ */
 const WX_QR_CODE = '/package-settings/assets/wx.jpg';
 
 const StoreEntryPendingPage: React.FC = () => {
   usePrimaryNavigationBar();
+  const { refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [latest, setLatest] = useState<StoreEntryLatestResult | null>(null);
   const [resubmitting, setResubmitting] = useState(false);
+  const [entering, setEntering] = useState(false);
 
-  const status = latest?.application?.status || 'pending';
+  const status = normalizeStoreEntryStatus(latest?.application?.status || 'pending');
   const rejectReason =
     latest?.application?.rejectReason || latest?.organization?.rejectReason || '';
   const storeName = latest?.organization?.name || '';
 
-  const isOpened = status === 'approved';
-  const isRejected = status === 'rejected';
+  const isOpened = isStoreEntryApproved(status);
+  const isRejected = isStoreEntryRejected(status);
 
   useEffect(() => {
     void Taro.setNavigationBarTitle({
@@ -59,22 +70,37 @@ const StoreEntryPendingPage: React.FC = () => {
   const tip = useMemo(() => {
     if (isOpened) {
       return storeName
-        ? `门店入驻成功，校区「${storeName}」已创建，现在可进入机构端开始管理。`
-        : '门店入驻成功，现在可进入机构端开始管理。';
+        ? `门店入驻成功，默认主校区「${storeName}」已创建。您已是该机构管理员，可进入机构端开始管理。`
+        : '门店入驻成功，您已是机构管理员，可进入机构端开始管理。';
     }
     if (isRejected) {
-      return '很抱歉，您的入驻申请未通过审核，可修改资料后重新提交。';
+      return '很抱歉，您的入驻申请未通过运营审核，可修改资料后重新提交。';
     }
-    return '您的门店入驻申请已提交，工作人员将在 1-3 个工作日内与您联系。';
+    return '您的门店入驻申请已提交，需运营审核通过后开通（通常 1-3 个工作日）。';
   }, [isOpened, isRejected, storeName]);
 
   const handlePreviewQr = useCallback(() => {
     void Taro.previewImage({ current: WX_QR_CODE, urls: [WX_QR_CODE] });
   }, []);
 
-  const handleEnterOrg = useCallback(() => {
-    navigateAfterLogin();
-  }, []);
+  const handleEnterOrg = useCallback(async () => {
+    if (entering) return;
+    setEntering(true);
+    try {
+      // 批准前会话可能无 organizationId；强制 refresh 注入 ACTIVE 主租户
+      const refreshed = await refreshSessionForTenant();
+      if (!refreshed.ok) {
+        Taro.showToast({ title: refreshed.error?.message || '请重新登录', icon: 'none' });
+        return;
+      }
+      await refreshProfile();
+      navigateAfterLogin();
+    } catch {
+      Taro.showToast({ title: '进入失败，请重新登录后再试', icon: 'none' });
+    } finally {
+      setEntering(false);
+    }
+  }, [entering, refreshProfile]);
 
   const handleResubmit = useCallback(async () => {
     const draft = readStoreEntryDraft();
@@ -143,7 +169,9 @@ const StoreEntryPendingPage: React.FC = () => {
             className="mt-[32rpx] h-[92rpx] rounded-full bg-primary flex items-center justify-center active:opacity-90"
             onClick={handleEnterOrg}
           >
-            <Text className="text-[30rpx] font-semibold text-white">进入机构端首页</Text>
+            <Text className="text-[30rpx] font-semibold text-white">
+              {entering ? '进入中...' : '进入机构端首页'}
+            </Text>
           </View>
         )}
 

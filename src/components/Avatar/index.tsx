@@ -1,18 +1,75 @@
-import { View, Text, Image } from '@tarojs/components';
+import { Image } from '@tarojs/components';
 import cn from 'classnames';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BRAND_LOGO } from '@/constants/brand';
+import { resolveAvatarSrc } from '@/utils/avatar-src';
 
 /**
  * Avatar - 全局统一头像组件
  *
- * 支持：
- * - 图片头像（avatarUrl 优先）
- * - 姓氏+颜色头像（基于名字 hash 稳定取色）
- * - 4 种尺寸：sm / md / lg / xl
+ * 未上传头像 / 图片加载失败 → 统一品牌 Logo（sgpk.png），禁止空态问号或姓氏色块冒充默认头像。
  */
 
-const AVATAR_COLORS = [
+export interface AvatarProps {
+  /** 显示名称（兼容旧调用；默认头像不再依赖首字） */
+  name: string;
+  /** 头像图片 URL（优先；空则品牌 Logo） */
+  avatarUrl?: string;
+  /** 尺寸 */
+  size?: 'sm' | 'md' | 'mlg' | 'lg' | 'xl';
+  /**
+   * @deprecated 产品口径：一律品牌 Logo；保留参数避免调用方报错
+   */
+  fallback?: 'brand' | 'initial';
+  /** 额外类名 */
+  className?: string;
+  /** 点击事件 */
+  onClick?: () => void;
+}
+
+const SIZE_MAP = {
+  sm: { container: 'w-12 h-12' },
+  md: { container: 'w-[68rpx] h-[68rpx]' },
+  mlg: { container: 'w-[72rpx] h-[72rpx]' },
+  lg: { container: 'w-20 h-20' },
+  xl: { container: 'w-40 h-40' },
+} as const;
+
+const Avatar: React.FC<AvatarProps> = ({
+  name: _name,
+  avatarUrl,
+  size = 'md',
+  fallback: _fallback = 'brand',
+  className,
+  onClick,
+}) => {
+  const { container } = SIZE_MAP[size];
+  const preferred = resolveAvatarSrc(avatarUrl);
+  const [src, setSrc] = useState(preferred);
+
+  useEffect(() => {
+    setSrc(resolveAvatarSrc(avatarUrl));
+  }, [avatarUrl]);
+
+  return (
+    <Image
+      src={src}
+      mode="aspectFill"
+      className={cn('rounded-full flex-shrink-0 bg-white', container, className)}
+      onClick={onClick}
+      onError={() => {
+        if (src !== BRAND_LOGO) {
+          setSrc(BRAND_LOGO);
+        }
+      }}
+    />
+  );
+};
+
+export default Avatar;
+
+/** @deprecated 色块姓氏方案已废弃；保留导出避免外部引用炸裂 */
+export const AVATAR_COLORS = [
   '#5EC8A8',
   '#E89BB8',
   '#6BA3D6',
@@ -23,86 +80,11 @@ const AVATAR_COLORS = [
   '#B8D45E',
 ];
 
-/** 根据名字 hash 稳定取色 */
-function getAvatarColor(name: string): string {
+/** @deprecated */
+export function getAvatarColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
-
-export interface AvatarProps {
-  /** 显示名称（取首字，同时用于颜色 hash） */
-  name: string;
-  /** 头像图片 URL（优先于文字头像） */
-  avatarUrl?: string;
-  /** 尺寸 */
-  size?: 'sm' | 'md' | 'mlg' | 'lg' | 'xl';
-  /** 无图片时：brand 品牌默认图 / initial 姓氏色块 */
-  fallback?: 'brand' | 'initial';
-  /** 额外类名 */
-  className?: string;
-  /** 点击事件 */
-  onClick?: () => void;
-}
-
-const SIZE_MAP = {
-  sm: { container: 'w-12 h-12', text: 'text-xs' }, // 48rpx
-  md: { container: 'w-[68rpx] h-[68rpx]', text: 'text-[26rpx]' }, // 68rpx
-  mlg: { container: 'w-[72rpx] h-[72rpx]', text: 'text-[26rpx]' }, // 72rpx（介于 md 与 lg 之间，网格密集场景使用）
-  lg: { container: 'w-20 h-20', text: 'text-lg' }, // 80rpx
-  xl: { container: 'w-40 h-40', text: 'text-[60rpx]' }, // 160rpx
-} as const;
-
-const Avatar: React.FC<AvatarProps> = ({
-  name,
-  avatarUrl,
-  size = 'md',
-  fallback = 'brand',
-  className,
-  onClick,
-}) => {
-  const { container, text } = SIZE_MAP[size];
-  const resolvedAvatarUrl = avatarUrl?.trim() || undefined;
-
-  if (resolvedAvatarUrl) {
-    return (
-      <Image
-        src={resolvedAvatarUrl}
-        mode="aspectFill"
-        className={cn('rounded-full flex-shrink-0', container, className)}
-        onClick={onClick}
-      />
-    );
-  }
-
-  if (fallback === 'brand') {
-    return (
-      <Image
-        src={BRAND_LOGO}
-        mode="aspectFill"
-        className={cn('rounded-full flex-shrink-0', container, className)}
-        onClick={onClick}
-      />
-    );
-  }
-
-  // 文字头像兜底（员工列表等场景）
-  return (
-    <View
-      className={cn(
-        'rounded-full flex items-center justify-center font-semibold text-white flex-shrink-0',
-        container,
-        className,
-      )}
-      style={{ background: getAvatarColor(name) }}
-      onClick={onClick}
-    >
-      <Text className={cn('text-white font-semibold', text)}>{name[0]}</Text>
-    </View>
-  );
-};
-
-export default Avatar;
-export { AVATAR_COLORS, getAvatarColor };

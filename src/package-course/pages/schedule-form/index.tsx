@@ -1042,14 +1042,14 @@ const ScheduleForm: React.FC = () => {
         return;
       }
       const adj: Schedule = { ...originalSchedule, start_time: startTime, end_time: endTime };
-      const conflicts = await temporaryRescheduleService.checkDateConflict({
+      const conflictResult = await temporaryRescheduleService.checkDateConflict({
         teacherId: currentUserId,
         sourceDate: sd,
         targetDate: td,
         movingSchedules: [adj],
         allSchedules,
       });
-      if (conflicts.length > 0) {
+      if (conflictResult.hasConflict) {
         Taro.showToast({ title: '目标日期存在时间冲突', icon: 'none', duration: 3000 });
         return;
       }

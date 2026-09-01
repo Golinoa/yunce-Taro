@@ -295,9 +295,7 @@ const Holidays: React.FC = () => {
           <View className="py-[160rpx]">
             <Empty
               icon="mdi-calendar-blank-outline"
-              description="暂无停课放假，点击右下角添加或生成法定节假日"
-              actionText="生成法定节假日"
-              onAction={() => void handleGenerate()}
+              description="暂无停课放假，点击右下角添加或使用顶栏生成法定节假日"
             />
           </View>
         ) : null}

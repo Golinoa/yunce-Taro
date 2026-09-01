@@ -10,15 +10,14 @@
  *
  * 头像策略：用户上传了用上传的；未上传统一用品牌默认图 sgpk.png
  */
-import { View, Text, Image, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
-import Avatar from '@/components/Avatar';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
-import { BRAND_LOGO } from '@/constants/brand';
+import StudentAvatar from '@/components/student/StudentAvatar';
 import { studentService } from '@/services';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -174,7 +173,6 @@ interface StudentCardProps {
 const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives, onOpenDetail }) => {
   const genderLabel = student.gender ? GENDER_MAP[student.gender] : '未设置';
   const birthdayLabel = student.birthday || '未设置';
-  const avatarSrc = student.avatar_url || BRAND_LOGO;
 
   return (
     <View
@@ -184,16 +182,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives, o
       {/* 头部：头像 + 姓名 + 标签 */}
       <View className="flex items-center gap-[20rpx]">
         <View className="relative w-[112rpx] h-[112rpx] rounded-full border-[4rpx] border-solid border-white shadow-soft bg-white overflow-hidden">
-          {student.avatar_url ? (
-            <Avatar
-              name={student.name}
-              avatarUrl={student.avatar_url}
-              size="lg"
-              className="w-full h-full"
-            />
-          ) : (
-            <Image src={avatarSrc} mode="aspectFill" className="w-full h-full rounded-full" />
-          )}
+          <StudentAvatar name={student.name} src={student.avatar_url} size="lg" className="w-full h-full" />
         </View>
         <View className="flex-1 min-w-0">
           <Text className="text-[34rpx] font-bold text-foreground truncate block">

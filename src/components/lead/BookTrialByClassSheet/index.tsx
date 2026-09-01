@@ -466,12 +466,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                   )}
                   onClick={() => handleSelectLead(lead)}
                 >
-                  <Avatar
-                    name={lead.child_name}
-                    avatarUrl={lead.avatar_url}
-                    size="md"
-                    fallback="initial"
-                  />
+                  <Avatar name={lead.child_name} avatarUrl={lead.avatar_url} size="md" />
                   <View className="flex-1 min-w-0">
                     <Text className="text-base font-medium text-foreground block">
                       {lead.child_name}
@@ -532,7 +527,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
                   )}
                   onClick={() => handleSelectStudent(stu)}
                 >
-                  <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" fallback="initial" />
+                  <Avatar name={stu.name} avatarUrl={stu.avatar_url} size="md" />
                   <View className="flex-1 min-w-0">
                     <Text className="text-base font-medium text-foreground block">
                       {stu.name}
