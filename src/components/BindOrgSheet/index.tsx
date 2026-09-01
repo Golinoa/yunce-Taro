@@ -44,13 +44,7 @@ const BindOrgSheet: React.FC<BindOrgSheetProps> = ({
   }, [code, onSubmit, submitting]);
 
   return (
-    <BottomSheet
-      visible={visible}
-      title="绑定机构"
-      onClose={onClose}
-      height="auto"
-      keyboardAware
-    >
+    <BottomSheet visible={visible} title="绑定机构" onClose={onClose} height="auto" keyboardAware>
       <View className="flex flex-col gap-[24rpx] px-[8rpx] pb-[16rpx]">
         <Text className="text-[26rpx] leading-relaxed text-muted-foreground">
           请输入机构提供的邀请码。系统将自动识别学员码或员工码。

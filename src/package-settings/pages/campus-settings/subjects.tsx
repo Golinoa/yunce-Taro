@@ -232,10 +232,7 @@ const Subjects: React.FC = () => {
         </View>
       ) : (
         <View className="px-[32rpx] pt-[180rpx]">
-          <Empty
-            icon="mdi-book-education-outline"
-            description="暂无科目，点击右上角添加科目"
-          />
+          <Empty icon="mdi-book-education-outline" description="暂无科目，点击右上角添加科目" />
         </View>
       )}
 

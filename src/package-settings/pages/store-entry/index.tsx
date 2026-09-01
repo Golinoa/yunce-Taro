@@ -279,7 +279,8 @@ const StoreEntry: React.FC = () => {
         updateForm('region', [parsed.province, parsed.city, parsed.district]);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String((err as { errMsg?: string })?.errMsg || '');
+      const msg =
+        err instanceof Error ? err.message : String((err as { errMsg?: string })?.errMsg || '');
       if (/cancel|取消/i.test(msg)) return;
       if (/隐私|privacy|disagree|不同意/i.test(msg)) {
         Taro.showToast({ title: '请先同意隐私保护指引', icon: 'none' });

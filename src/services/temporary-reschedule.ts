@@ -202,10 +202,7 @@ export const temporaryRescheduleService = {
         label: `${a.start_time}-${a.end_time}`,
       }));
 
-    const existing = [
-      ...buildLessonSlotsFromSchedules(staying, classById),
-      ...adjustedSlots,
-    ];
+    const existing = [...buildLessonSlotsFromSchedules(staying, classById), ...adjustedSlots];
     const moving = buildLessonSlotsFromSchedules(movingSchedules, classById);
     const conflicts: LessonSlot[] = [];
     for (const m of moving) {

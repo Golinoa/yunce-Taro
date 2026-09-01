@@ -14,10 +14,7 @@ import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
 import { getSession } from '@/services/auth';
 import { organizationService, savePendingRelation } from '@/services/organization';
 import { isParentRole, useAuth } from '@/utils/auth';
-import {
-  clearIdentitySelectionPending,
-  navigateAfterAuth,
-} from '@/utils/auth-onboarding';
+import { clearIdentitySelectionPending, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const ALL_IDENTITY_OPTIONS = [

@@ -15,11 +15,7 @@ import type {
 } from '@/types/profile';
 import { isDevApiEnv } from '@/utils/build-env';
 import { get, post, put } from '@/utils/request';
-import {
-  decodeAccessTokenClaims,
-  isUuidOrganizationId,
-  pickRealTenantId,
-} from '@/utils/tenant-id';
+import { decodeAccessTokenClaims, isUuidOrganizationId, pickRealTenantId } from '@/utils/tenant-id';
 
 export interface TestAccount {
   username: string;

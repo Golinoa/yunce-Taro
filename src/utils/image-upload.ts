@@ -58,7 +58,8 @@ export function isLocalWechatFilePath(url?: string): boolean {
   if (/^https?:\/\/(tmp|usr)\b/i.test(value)) return true;
   if (value.includes('://tmp/') || value.includes('://usr/')) return true;
   // 无 scheme 的沙箱绝对路径（少见）
-  if (value.startsWith('/tmp') || value.startsWith('/usr') || value.startsWith('/data/')) return true;
+  if (value.startsWith('/tmp') || value.startsWith('/usr') || value.startsWith('/data/'))
+    return true;
   return false;
 }
 

@@ -179,9 +179,8 @@ describe('auth-onboarding', () => {
     (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
     markIdentitySelectionPending();
 
-    const { navigateAfterAuth, hasIdentitySelectionPending } = await import(
-      '@/utils/auth-onboarding'
-    );
+    const { navigateAfterAuth, hasIdentitySelectionPending } =
+      await import('@/utils/auth-onboarding');
     const profile = baseProfile({ name: '万老师', nickname: '万老师' });
     expect(needsOnboarding(profile)).toBe(false);
 

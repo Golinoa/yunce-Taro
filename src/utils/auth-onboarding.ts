@@ -3,12 +3,12 @@
  */
 import Taro from '@tarojs/taro';
 import type { Profile } from '@/types/profile';
-import { hasPendingInviteCode, consumePendingInviteCode } from '@/utils/invite-parent-link';
 import {
   IDENTITY_ONBOARDING_PATH_MARKERS,
   IDENTITY_SELECT_PENDING_KEY,
   isIdentityOnboardingAllowlistedPath,
 } from '@/utils/identity-path-allowlist';
+import { hasPendingInviteCode, consumePendingInviteCode } from '@/utils/invite-parent-link';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
 import { isUuidOrganizationId } from '@/utils/tenant-id';

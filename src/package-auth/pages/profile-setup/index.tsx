@@ -175,7 +175,11 @@ const ProfileSetup: React.FC = () => {
             onClick={handleAvatarEntry}
           >
             {avatarUrl ? (
-              <Image src={resolveAvatarSrc(avatarUrl)} className="w-full h-full" mode="aspectFill" />
+              <Image
+                src={resolveAvatarSrc(avatarUrl)}
+                className="w-full h-full"
+                mode="aspectFill"
+              />
             ) : (
               <Image src={BRAND_LOGO} className="w-full h-full" mode="aspectFill" />
             )}
