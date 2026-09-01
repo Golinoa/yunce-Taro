@@ -17,6 +17,8 @@ export const IDENTITY_ONBOARDING_PATH_MARKERS = [
   'package-student/pages/parent-bind',
   'package-lead/pages/invite-landing',
   'package-auth/pages/campus-invite-landing',
+  'package-auth/pages/invite-register',
+  'package-settings/pages/store-referral-landing',
 ] as const;
 
 /** 当前路径是否在身份选择漏斗白名单内（含 forgot* under login） */

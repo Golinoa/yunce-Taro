@@ -24,6 +24,7 @@ import {
   isStoreEntryRejected,
   normalizeStoreEntryStatus,
 } from '@/utils/store-entry-status';
+import { consumePendingStoreReferralCode } from '@/utils/invite-store-referral-link';
 
 /** 分包静态资源，构建时 copy 至 dist/package-settings/assets/ */
 const WX_QR_CODE = '/package-settings/assets/wx.jpg';
@@ -111,6 +112,7 @@ const StoreEntryPendingPage: React.FC = () => {
     setResubmitting(true);
     try {
       await storeEntryService.resubmit(draft);
+      consumePendingStoreReferralCode();
       Taro.showToast({ title: '已重新提交', icon: 'success' });
       setLatest(null);
       setLoading(true);

@@ -39,6 +39,8 @@ export interface StoreEntryResult {
   applicationId?: string;
   /** 关联机构 ID */
   organizationId?: string;
+  /** L4 推荐机构 ID（有 O 码归因时返回） */
+  referrerOrganizationId?: string | null;
   /** 拒绝原因（rejected 时展示） */
   rejectReason?: string;
 }
@@ -51,6 +53,7 @@ export interface StoreEntryLatestResult {
     status: 'pending' | 'approved' | 'rejected' | 'PENDING' | 'APPROVED' | 'REJECTED';
     rejectReason?: string | null;
     contactPhone?: string;
+    referrerOrganizationId?: string | null;
   } | null;
   /** 关联机构；无申请记录时为 null */
   organization?: {
@@ -58,5 +61,10 @@ export interface StoreEntryLatestResult {
     status: string;
     rejectReason?: string | null;
     name?: string;
+  } | null;
+  /** L4 推荐机构（有归因时返回） */
+  referrerOrganization?: {
+    id: string;
+    name: string;
   } | null;
 }

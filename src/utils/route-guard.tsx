@@ -10,6 +10,7 @@ import { getPermissionConfig } from '@/services/permission';
 import { defaultRoleGrant, type DataModule } from '@/types/permission';
 import type { Profile, UserRole } from '@/types/profile';
 import { useAuth } from '@/utils/auth';
+import { needsProfileSetup } from '@/utils/auth-onboarding';
 import {
   IDENTITY_SELECT_PENDING_KEY,
   isIdentityOnboardingAllowlistedPath,
@@ -41,9 +42,14 @@ const PUBLIC_PAGES = [
   '/package-lead/pages/invite-landing/index',
   /** 校区员工邀请落地：可未登录预览，接受时再登录 */
   '/package-auth/pages/campus-invite-landing/index',
+  /** 员工招生码落地：可未登录预览，注册时再登录 */
+  '/package-auth/pages/invite-register/index',
+  /** L4 门店互邀落地：可未登录预览，再跳转 store-entry */
+  '/package-settings/pages/store-referral-landing/index',
 ];
 const LOGIN_PAGE = '/package-auth/pages/login/index';
 const IDENTITY_SELECT_PAGE = '/package-auth/pages/identity-select/index';
+const PROFILE_SETUP_PAGE = '/package-auth/pages/profile-setup/index';
 export const LOGIN_REDIRECT_KEY = 'loginRedirectPath';
 const REDIRECT_KEY = LOGIN_REDIRECT_KEY;
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
@@ -219,6 +225,22 @@ function redirectToForbidden(reason?: 'manager' | 'staff' | 'parent' | 'generic'
   }, 200);
 }
 
+/** 未完成资料完善时强制回 profile-setup（优先于 identity-select） */
+let isRedirectingProfileSetup = false;
+function redirectToProfileSetup() {
+  if (isRedirectingProfileSetup) return;
+  isRedirectingProfileSetup = true;
+  Taro.redirectTo({
+    url: PROFILE_SETUP_PAGE,
+    fail: () => {
+      Taro.reLaunch({ url: PROFILE_SETUP_PAGE });
+    },
+  });
+  setTimeout(() => {
+    isRedirectingProfileSetup = false;
+  }, 200);
+}
+
 /** 未完成身份选择时强制回 identity-select（打开 store-entry 不清除 pending） */
 let isRedirectingIdentity = false;
 function redirectToIdentitySelect() {
@@ -338,6 +360,15 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
       }
       if (!currentPath.includes(LOGIN_PAGE)) {
         redirectToLogin(currentPath);
+      }
+      setAuthorized(false);
+      return;
+    }
+
+    // 未完善头像昵称：优先于 identity-select（避免重进小程序直接进选身份）
+    if (profile && needsProfileSetup(profile)) {
+      if (!currentPath.includes('profile-setup')) {
+        redirectToProfileSetup();
       }
       setAuthorized(false);
       return;

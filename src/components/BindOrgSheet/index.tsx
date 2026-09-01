@@ -2,7 +2,7 @@
  * BindOrgSheet - 选择身份「绑定机构」统一输码弹窗
  *
  * 使用场景：identity-select 点击「绑定机构」；不跳转 parent-onboarding。
- * 功能：单个邀请码输入 → 调用 POST /organization/bind-code（S 学员 / E 员工）。
+ * 功能：单个邀请码输入 → 调用 POST /organization/bind-code（S 学员 / E 员工；O/P 码请走对应落地页）。
  * 相关组件：BottomSheet、FormInput
  */
 import { View, Text } from '@tarojs/components';
