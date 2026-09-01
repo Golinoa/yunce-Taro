@@ -8,7 +8,7 @@
  *
  * 全部使用 UnoCSS Token，随主题色（blue/coral/orange）联动。
  */
-import { View, Text, ScrollView, Picker, Button, Input } from '@tarojs/components';
+import { View, Text, ScrollView, Picker, Button, Input, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
@@ -25,6 +25,8 @@ import { BRAND_LOGO } from '@/constants/brand';
 import { lessonRecordService, packageService, studentService } from '@/services';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { resolveAvatarSrc } from '@/utils/avatar-src';
+import { handleChooseAvatarError } from '@/utils/choose-avatar-error';
 import {
   deleteTempImage,
   isImageCancelError,
@@ -34,6 +36,7 @@ import {
   uploadImage,
 } from '@/utils/image-upload';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { usePrivacyForProfileFields } from '@/utils/use-privacy-for-profile-fields';
 
 type Gender = 'male' | 'female' | 'other';
 
@@ -109,6 +112,8 @@ const ProfileEdit: React.FC = () => {
     bindAccountEmail,
     sendBindEmailCode,
   } = useAuth();
+
+  const { privacyReady, ensurePrivacy } = usePrivacyForProfileFields();
 
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
   const [showBindEmail, setShowBindEmail] = useState(false);
@@ -200,6 +205,17 @@ const ProfileEdit: React.FC = () => {
     [draft.avatar_url, updateField],
   );
 
+  const handleAvatarTap = useCallback(async () => {
+    const ok = await ensurePrivacy();
+    if (!ok) {
+      Taro.showToast({
+        title: '需要同意隐私保护指引后才能选择头像',
+        icon: 'none',
+        duration: 2800,
+      });
+    }
+  }, [ensurePrivacy]);
+
   /** 已有头像：查看大图 / 删除（重选走 chooseAvatar 按钮） */
   const handleAvatarManage = useCallback(() => {
     if (!draft.avatar_url) {
@@ -247,7 +263,9 @@ const ProfileEdit: React.FC = () => {
         phone: draft.phone.trim(),
         gender: (draft.gender || undefined) as Gender | undefined,
         birthday: draft.birthday.trim(),
+        id_card: draft.id_card.trim(),
         region: draft.region.trim(),
+        address: draft.address.trim(),
       });
       if (error) {
         Taro.showToast({ title: error.message || '保存失败', icon: 'none' });
@@ -410,23 +428,33 @@ const ProfileEdit: React.FC = () => {
                 label="头像"
                 right={
                   <View className="flex items-center gap-[16rpx]">
-                    <Button
-                      className="p-0 m-0 after:border-none bg-transparent border-none active:opacity-90"
-                      plain
-                      openType="chooseAvatar"
-                      onChooseAvatar={handleChooseAvatar}
-                    >
-                      <View className="relative">
-                        <Avatar
-                          name={draft.nickname || profile?.name || '我'}
-                          avatarUrl={draft.avatar_url || BRAND_LOGO}
-                          size="md"
+                    {privacyReady ? (
+                      <Button
+                        className="w-[120rpx] h-[120rpx] rounded-full overflow-hidden p-0 m-0 after:border-none border-none bg-transparent active:opacity-90"
+                        plain
+                        hoverClass="none"
+                        openType="chooseAvatar"
+                        onChooseAvatar={handleChooseAvatar}
+                        onError={handleChooseAvatarError}
+                      >
+                        <Image
+                          src={resolveAvatarSrc(draft.avatar_url || BRAND_LOGO)}
+                          className="w-full h-full rounded-full"
+                          mode="aspectFill"
                         />
-                        <View className="absolute -bottom-[4rpx] -right-[4rpx] w-[32rpx] h-[32rpx] rounded-full bg-primary border-[2rpx] border-card flex items-center justify-center">
-                          <Icon name="mdi-camera" size={18} color="white" />
-                        </View>
+                      </Button>
+                    ) : (
+                      <View
+                        className="w-[120rpx] h-[120rpx] rounded-full overflow-hidden active:opacity-90"
+                        onClick={handleAvatarTap}
+                      >
+                        <Image
+                          src={resolveAvatarSrc(draft.avatar_url || BRAND_LOGO)}
+                          className="w-full h-full rounded-full"
+                          mode="aspectFill"
+                        />
                       </View>
-                    </Button>
+                    )}
                     {draft.avatar_url ? (
                       <Text
                         className="text-[24rpx] text-primary press-scale"
@@ -441,14 +469,26 @@ const ProfileEdit: React.FC = () => {
               <FieldRow
                 label="昵称"
                 right={
-                  <Input
-                    type="nickname"
-                    className="flex-1 text-[30rpx] text-foreground text-right"
-                    placeholder="点选微信昵称，或自行填写"
-                    value={draft.nickname}
-                    onInput={(e) => updateField('nickname', e.detail.value || '')}
-                    maxlength={20}
-                  />
+                  privacyReady ? (
+                    <Input
+                      key={`nickname-ready-${profile?.id ?? 'edit'}`}
+                      type="nickname"
+                      className="flex-1 text-[30rpx] text-foreground text-right"
+                      placeholder="点选微信昵称，或自行填写"
+                      defaultValue={draft.nickname}
+                      onInput={(e) => updateField('nickname', e.detail.value || '')}
+                      maxlength={20}
+                    />
+                  ) : (
+                    <View
+                      className="flex-1 flex items-center justify-end"
+                      onClick={() => {
+                        void ensurePrivacy();
+                      }}
+                    >
+                      <Text className="text-[30rpx] text-muted-foreground">请先同意隐私指引</Text>
+                    </View>
+                  )
                 }
               />
               <FieldRow

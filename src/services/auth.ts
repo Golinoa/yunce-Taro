@@ -1027,6 +1027,11 @@ export async function updateProfile(
     }
     if (patch.phone !== undefined) body.phone = patch.phone;
     if (patch.email !== undefined) body.email = patch.email;
+    if (patch.gender !== undefined) body.gender = patch.gender;
+    if (patch.birthday !== undefined) body.birthday = patch.birthday;
+    if (patch.id_card !== undefined) body.id_card = patch.id_card;
+    if (patch.region !== undefined) body.region = patch.region;
+    if (patch.address !== undefined) body.address = patch.address;
 
     const updated = await put<BackendUserInfo>(AUTH_ENDPOINTS.profile, body);
     const accessToken = readStoredSession()?.access_token;
