@@ -172,25 +172,93 @@ export interface OfficialPrivacyPageEnterOptions {
   delayMs?: number;
 }
 
-function invokeOfficialPrivacyRequire(reason: string, flowId: string): void {
-  privacyTrace('officialPrivacy.pageEnter', { reason, flowId });
+export const PRIVACY_DENIED_TOAST = '请先同意《隐私保护指引》后才能继续使用';
+
+function markPrivacyAuthorized(): void {
+  usePrivacyStore.getState().setNeedAuthorization(false);
+  usePrivacyStore.getState().setStatus('authorized');
+}
+
+function markPrivacyDenied(): void {
+  usePrivacyStore.getState().setStatus('denied');
+}
+
+function showPrivacyDeniedToast(): void {
+  Taro.showToast({
+    title: PRIVACY_DENIED_TOAST,
+    icon: 'none',
+    duration: 2800,
+  });
+}
+
+function invokeOfficialPrivacyRequire(
+  reason: string,
+  flowId: string,
+  handlers: {
+    tracePrefix: string;
+    showDeniedToast?: boolean;
+    onSuccess?: () => void;
+    onFail?: (err: { errMsg?: string }) => void;
+  },
+): void {
+  privacyTrace(handlers.tracePrefix, { reason, flowId });
 
   const requirePrivacyAuthorize = getRequirePrivacyAuthorize();
   if (typeof requirePrivacyAuthorize !== 'function') {
     privacyTrace('officialPrivacy.unsupported', { reason, flowId });
+    if (handlers.showDeniedToast) {
+      showPrivacyDeniedToast();
+    }
+    handlers.onFail?.({ errMsg: 'unsupported' });
     return;
   }
 
   requirePrivacyAuthorize({
     success: () => {
-      privacyTrace('officialPrivacy.pageEnter.success', { reason, flowId });
-      usePrivacyStore.getState().setNeedAuthorization(false);
-      usePrivacyStore.getState().setStatus('authorized');
+      privacyTrace(`${handlers.tracePrefix}.success`, { reason, flowId });
+      markPrivacyAuthorized();
+      handlers.onSuccess?.();
     },
     fail: (err) => {
-      privacyTrace('officialPrivacy.pageEnter.fail', { reason, flowId, errMsg: err?.errMsg, err });
-      usePrivacyStore.getState().setStatus('denied');
+      privacyTrace(`${handlers.tracePrefix}.fail`, { reason, flowId, errMsg: err?.errMsg, err });
+      markPrivacyDenied();
+      if (handlers.showDeniedToast) {
+        showPrivacyDeniedToast();
+      }
+      handlers.onFail?.(err);
     },
+  });
+}
+
+/**
+ * 用户点击同步栈内唤起微信官方隐私弹窗（图二）。
+ * 已授权时直接执行回调，避免重复弹窗。
+ */
+export function promptOfficialPrivacyOnUserAction(
+  reason: string,
+  onAuthorized: () => void,
+  onDenied?: () => void,
+): void {
+  const flowId = privacyNewFlowId('userAction');
+  privacyTrace('officialPrivacy.userAction', { reason, flowId });
+
+  if (process.env.TARO_ENV !== 'weapp') {
+    onAuthorized();
+    return;
+  }
+
+  const store = usePrivacyStore.getState();
+  if (store.status === 'authorized' && !store.needAuthorization) {
+    privacyTrace('officialPrivacy.userAction.skip.alreadyAuthorized', { reason, flowId });
+    onAuthorized();
+    return;
+  }
+
+  invokeOfficialPrivacyRequire(reason, flowId, {
+    tracePrefix: 'officialPrivacy.userAction',
+    showDeniedToast: true,
+    onSuccess: onAuthorized,
+    onFail: () => onDenied?.(),
   });
 }
 
@@ -211,7 +279,9 @@ export function promptWechatOfficialPrivacyOnPageEnter(
 
   const timer = setTimeout(() => {
     if (typeof Taro.getPrivacySetting !== 'function') {
-      invokeOfficialPrivacyRequire(reason, flowId);
+      invokeOfficialPrivacyRequire(reason, flowId, {
+        tracePrefix: 'officialPrivacy.pageEnter',
+      });
       return;
     }
 
@@ -226,11 +296,15 @@ export function promptWechatOfficialPrivacyOnPageEnter(
         }
         usePrivacyStore.getState().setNeedAuthorization(true);
         usePrivacyStore.getState().setStatus('need');
-        invokeOfficialPrivacyRequire(reason, flowId);
+        invokeOfficialPrivacyRequire(reason, flowId, {
+          tracePrefix: 'officialPrivacy.pageEnter',
+        });
       },
       fail: (err) => {
         privacyTrace('officialPrivacy.pageEnter.queryFail', { reason, flowId, err });
-        invokeOfficialPrivacyRequire(reason, flowId);
+        invokeOfficialPrivacyRequire(reason, flowId, {
+          tracePrefix: 'officialPrivacy.pageEnter',
+        });
       },
     });
   }, delayMs);

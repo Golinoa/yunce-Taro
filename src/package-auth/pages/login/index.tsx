@@ -12,8 +12,10 @@ import { authCapabilities } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterAuth } from '@/utils/auth-onboarding';
-import { promptPrivacySyncInHandler } from '@/utils/privacy-authorize';
-import { promptWechatOfficialPrivacyOnPageEnter } from '@/utils/privacy';
+import {
+  promptOfficialPrivacyOnUserAction,
+  promptWechatOfficialPrivacyOnPageEnter,
+} from '@/utils/privacy';
 import { privacyTrace } from '@/utils/privacy-debug';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
@@ -59,7 +61,8 @@ const Login: React.FC = () => {
 
   const runAfterOfficialPrivacy = useCallback((reason: string, action: () => void) => {
     privacyTrace('login.runAfterOfficialPrivacy', { reason });
-    promptPrivacySyncInHandler(
+    promptOfficialPrivacyOnUserAction(
+      reason,
       () => {
         privacyTrace('login.runAfterOfficialPrivacy.ok', { reason });
         action();

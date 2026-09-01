@@ -108,3 +108,4 @@ import BottomSheet from '@/components/BottomSheet';
 - `pages.mdc` — 页面结构与生命周期
 - `typescript.mdc` — 类型规范
 - `review-checklist.mdc` — 完整审查清单
+- `privacy-auth.mdc` — 图一/图二口径与微信隐私授权（禁止搞反）
