@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "description": "真机走查持久化记录。走查完成后用 HTML 导出覆盖本文件并 commit，或粘贴 JSON 反馈 Agent。",
+  "session": {
+    "tester": "",
+    "environment": "Staging / dev.chancore.cn",
+    "testDate": "",
+    "beCommit": "260957f",
+    "feCommit": "4c61c4e"
+  },
+  "items": {},
+  "frozen": {},
+  "updatedAt": null,
+  "rules": [
+    "已通过项关联代码路径视为冻结，后续优化不得静默改动",
+    "每次优化须评估是否触及 frozen 注册表中的文件/接口",
+    "受限（可能影响已验收链路）须先询问用户"
+  ]
+}

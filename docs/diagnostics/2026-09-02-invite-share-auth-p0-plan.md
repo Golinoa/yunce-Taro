@@ -583,9 +583,10 @@ status: PENDING | USED | EXPIRED | CANCELLED
 
 #### 建议下一步
 
-1. **提交剩余 P0 BE/FE**（parent-share、wxacode、migration、store-referral-landing 等）
-2. **开始 §11.7 真机走查**（D 部署 → VH → V4T-R → X）；Review 修复不阻塞走查
-3. **不必再开一轮 code review**；走查失败项再开 bug
+1. ~~**提交剩余 P0 BE/FE**~~ ✅ BE `260957f` · FE `4c61c4e`
+2. **开始 §11.7 真机走查**（D 部署 → VH → V4T-R → X → F）
+3. 走查工具：`docs/diagnostics/2026-09-02-device-walkthrough.html`（浏览器打开，导出 JSON 反馈）
+4. 持久化：`docs/diagnostics/device-walkthrough-record.json` + 规则 `.cursor/rules/invite-walkthrough-frozen-chains.mdc`
 
 ---
 
