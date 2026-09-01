@@ -1,64 +1,239 @@
 /**
  * 隐私合规初始化
- *
- * 微信自 2023-09-15 起强制启用《个人信息保护指引》合规：
- * 调用隐私受限接口（如 getLocation / chooseLocation / chooseAddress / getClipboardData 等）
- * 或后台数据预拉取前，必须让用户先同意隐私协议，否则接口失败（即真机日志里的
- * "backgroundfetch privacy fail" 之类）。
- *
- * 本模块在 App 启动时执行一次：
- *  1. 注册 wx.onNeedPrivacyAuthorization 监听 —— 任意隐私接口触发时展示我们的弹窗。
- *  2. wx.getPrivacySetting 查询授权状态并拿到协议名称。
- *  3. 若仍需要授权，主动 wx.requirePrivacyAuthorize 提前弹出（桌面冷启动时跳过，避免闪退）。
- *
- * 仅微信小程序环境生效（H5 等不支持隐私接口，直接跳过）。
  */
 import Taro from '@tarojs/taro';
+import { logDebug } from '@/utils/logger';
+import {
+  privacyApiSupport,
+  privacyNewFlowId,
+  privacyTrace,
+  privacyTraceBootstrap,
+  privacyTraceQuerySetting,
+} from '@/utils/privacy-debug';
 import { usePrivacyStore } from '@/stores/privacy';
 
-let inited = false;
+let listenerReady = false;
+let listenerReadyWaiters: Array<() => void> = [];
 
 export interface InitPrivacyOptions {
-  /** 从桌面 / 最近使用等快捷入口冷启动：不主动 requirePrivacyAuthorize */
+  /** @deprecated 保留兼容；启动不再据此主动弹窗 */
   shortcutColdStart?: boolean;
 }
 
-export function initPrivacy(options?: InitPrivacyOptions): void {
-  if (inited) return;
-  // 仅微信小程序需要隐私授权流程；其他端（H5）无此 API，跳过
-  if (process.env.TARO_ENV !== 'weapp') return;
-  inited = true;
+function markListenerReady(): void {
+  listenerReady = true;
+  privacyTrace('listener.ready');
+  const waiters = listenerReadyWaiters;
+  listenerReadyWaiters = [];
+  waiters.forEach((w) => w());
+}
 
-  const shortcutColdStart = options?.shortcutColdStart === true;
+/** 等待隐私监听已注册（ensurePrivacy 前调用） */
+export function waitPrivacyListenerReady(timeoutMs = 5000): Promise<void> {
+  if (listenerReady) return Promise.resolve();
+  if (process.env.TARO_ENV !== 'weapp') return Promise.resolve();
 
-  // 1) 必须先注册监听，再触发任何隐私接口
-  Taro.onNeedPrivacyAuthorization((resolve) => {
+  privacyTrace('listener.wait.start', { timeoutMs });
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      listenerReadyWaiters = listenerReadyWaiters.filter((w) => w !== onReady);
+      privacyTrace('listener.wait.timeout', { timeoutMs });
+      resolve();
+    }, timeoutMs);
+    const onReady = () => {
+      clearTimeout(timer);
+      privacyTrace('listener.wait.resolved');
+      resolve();
+    };
+    listenerReadyWaiters.push(onReady);
+  });
+}
+
+export function isPrivacyListenerReady(): boolean {
+  return listenerReady || process.env.TARO_ENV !== 'weapp';
+}
+
+export function getPrivacyNeedAuthorization(): Promise<boolean> {
+  if (process.env.TARO_ENV !== 'weapp') return Promise.resolve(false);
+
+  privacyTrace('getPrivacyNeedAuthorization.start');
+
+  return new Promise((resolve) => {
+    Taro.getPrivacySetting({
+      success: (res) => {
+        logDebug('privacy.getPrivacySetting', {
+          needAuthorization: res.needAuthorization,
+          privacyContractName: res.privacyContractName,
+        });
+        privacyTrace('getPrivacyNeedAuthorization.success', {
+          needAuthorization: res.needAuthorization,
+          privacyContractName: res.privacyContractName,
+        });
+        usePrivacyStore.getState().setContractName(res.privacyContractName);
+        usePrivacyStore.getState().setNeedAuthorization(res.needAuthorization);
+        if (!res.needAuthorization) {
+          usePrivacyStore.getState().setStatus('authorized');
+        }
+        resolve(Boolean(res.needAuthorization));
+      },
+      fail: (err) => {
+        logDebug('privacy.getPrivacySetting.fail', err);
+        privacyTrace('getPrivacyNeedAuthorization.fail', { err });
+        usePrivacyStore.getState().setNeedAuthorization(true);
+        usePrivacyStore.getState().setStatus('need');
+        resolve(true);
+      },
+    });
+  });
+}
+
+export function registerPrivacyListener(): void {
+  privacyTraceBootstrap();
+
+  if (process.env.TARO_ENV !== 'weapp') {
+    markListenerReady();
+    return;
+  }
+  if (listenerReady) {
+    privacyTrace('registerListener.skip', { reason: 'already-ready' });
+    return;
+  }
+
+  if (typeof Taro.onNeedPrivacyAuthorization !== 'function') {
+    logDebug('privacy.registerListener', '当前基础库/Taro 不支持 onNeedPrivacyAuthorization');
+    privacyTrace('registerListener.unsupported', { apis: privacyApiSupport() });
+    markListenerReady();
+    return;
+  }
+
+  privacyTrace('registerListener.attach');
+
+  Taro.onNeedPrivacyAuthorization((resolve, eventInfo) => {
+    privacyTrace('onNeedPrivacyAuthorization.fired', {
+      referrer: (eventInfo as { referrer?: string } | undefined)?.referrer,
+      eventInfo,
+    });
     usePrivacyStore.getState().enqueue(resolve);
   });
+  markListenerReady();
+}
 
-  // 2) 查询授权状态 + 协议名称（异步，不阻塞启动）
+export function initPrivacy(_options?: InitPrivacyOptions): void {
+  if (process.env.TARO_ENV !== 'weapp') return;
+
+  privacyTrace('initPrivacy.start', { options: _options });
+
   Taro.getPrivacySetting({
     success: (res) => {
+      privacyTrace('initPrivacy.getPrivacySetting.success', {
+        needAuthorization: res.needAuthorization,
+        privacyContractName: res.privacyContractName,
+      });
       const store = usePrivacyStore.getState();
       store.setContractName(res.privacyContractName);
       store.setNeedAuthorization(res.needAuthorization);
-
-      // 3) 快捷入口冷启动不主动弹隐私窗（官方启动优化 + 避免闪退）
-      if (shortcutColdStart || !res.needAuthorization) {
-        return;
+      if (!res.needAuthorization) {
+        store.setStatus('authorized');
+      } else {
+        store.setStatus('need');
       }
-
-      Taro.requirePrivacyAuthorize({
-        success: () => {
-          // 用户已在弹窗中同意，无需额外处理
-        },
-        fail: () => {
-          // 用户拒绝，已通过弹窗 disagree 处理，忽略
-        },
-      });
     },
-    fail: () => {
-      // 查询失败（多因后台未配置隐私协议）—— 不弹窗，静默降级
+    fail: (err) => {
+      privacyTrace('initPrivacy.getPrivacySetting.fail', { err });
+      usePrivacyStore.getState().setStatus('unknown');
     },
   });
+}
+
+/** 登录页等场景：主动 dump 一次微信侧隐私状态（不改变业务逻辑） */
+export function debugDumpPrivacySetting(reason: string): void {
+  privacyTraceQuerySetting(reason);
+}
+
+function getRequirePrivacyAuthorize():
+  | ((opt: {
+      success?: () => void;
+      fail?: (err: { errMsg?: string }) => void;
+    }) => void)
+  | undefined {
+  return (
+    Taro as typeof Taro & {
+      requirePrivacyAuthorize?: (opt: {
+        success?: () => void;
+        fail?: (err: { errMsg?: string }) => void;
+      }) => void;
+    }
+  ).requirePrivacyAuthorize;
+}
+
+export interface OfficialPrivacyPageEnterOptions {
+  /** 等待页面过渡完成后再弹窗，默认 450ms */
+  delayMs?: number;
+}
+
+function invokeOfficialPrivacyRequire(reason: string, flowId: string): void {
+  privacyTrace('officialPrivacy.pageEnter', { reason, flowId });
+
+  const requirePrivacyAuthorize = getRequirePrivacyAuthorize();
+  if (typeof requirePrivacyAuthorize !== 'function') {
+    privacyTrace('officialPrivacy.unsupported', { reason, flowId });
+    return;
+  }
+
+  requirePrivacyAuthorize({
+    success: () => {
+      privacyTrace('officialPrivacy.pageEnter.success', { reason, flowId });
+      usePrivacyStore.getState().setNeedAuthorization(false);
+      usePrivacyStore.getState().setStatus('authorized');
+    },
+    fail: (err) => {
+      privacyTrace('officialPrivacy.pageEnter.fail', { reason, flowId, errMsg: err?.errMsg, err });
+      usePrivacyStore.getState().setStatus('denied');
+    },
+  });
+}
+
+/**
+ * 进入页面时唤起微信官方隐私弹窗（图二）。
+ * 放在主包 privacy 模块，避免分包 sub-common chunk 加载失败。
+ * @returns 取消函数（页面 hide/unmount 时调用，避免延迟弹窗误触发）
+ */
+export function promptWechatOfficialPrivacyOnPageEnter(
+  reason: string,
+  options?: OfficialPrivacyPageEnterOptions,
+): () => void {
+  if (process.env.TARO_ENV !== 'weapp') return () => {};
+
+  const delayMs = options?.delayMs ?? 450;
+  const flowId = privacyNewFlowId('pageEnter');
+  privacyTrace('officialPrivacy.pageEnter.schedule', { reason, flowId, delayMs });
+
+  const timer = setTimeout(() => {
+    if (typeof Taro.getPrivacySetting !== 'function') {
+      invokeOfficialPrivacyRequire(reason, flowId);
+      return;
+    }
+
+    Taro.getPrivacySetting({
+      success: (res) => {
+        usePrivacyStore.getState().setContractName(res.privacyContractName);
+        if (!res.needAuthorization) {
+          privacyTrace('officialPrivacy.pageEnter.skip.alreadyAuthorized', { reason, flowId });
+          usePrivacyStore.getState().setNeedAuthorization(false);
+          usePrivacyStore.getState().setStatus('authorized');
+          return;
+        }
+        usePrivacyStore.getState().setNeedAuthorization(true);
+        usePrivacyStore.getState().setStatus('need');
+        invokeOfficialPrivacyRequire(reason, flowId);
+      },
+      fail: (err) => {
+        privacyTrace('officialPrivacy.pageEnter.queryFail', { reason, flowId, err });
+        invokeOfficialPrivacyRequire(reason, flowId);
+      },
+    });
+  }, delayMs);
+
+  return () => clearTimeout(timer);
 }

@@ -1,17 +1,8 @@
 /**
  * 隐私授权 Store — Zustand
- *
- * 对接微信《个人信息保护指引》平台合规要求：
- *  - wx.onNeedPrivacyAuthorization 触发时（任意隐私受限接口调用 / requirePrivacyAuthorize），
- *    入栈 resolve 并展示隐私弹窗。
- *  - 用户在弹窗点击「同意并继续」（原生按钮 open-type="agreePrivacyAuthorization"）后，
- *    调用所有 pending resolve({ event: 'agree' })，被拦截的隐私接口才会继续执行。
- *  - 点击「暂不使用」则 resolve({ event: 'disagree' })，被拦截接口以隐私未授权失败。
- *
- * 与业务层 AgreementSheet（登录注册前的用户协议+隐私政策确认）相互独立，
- * 这里处理的是微信基础库强制的隐私授权流程。
  */
 import { create } from 'zustand';
+import { privacyStoreSnapshot, privacyTrace } from '@/utils/privacy-debug';
 
 /** 微信 onNeedPrivacyAuthorization 回调注入的 resolve 函数 */
 export type PrivacyResolve = (params: { event: 'agree' | 'disagree'; buttonId?: string }) => void;
@@ -19,63 +10,119 @@ export type PrivacyResolve = (params: { event: 'agree' | 'disagree'; buttonId?: 
 /** 同意按钮 id，必须与实际渲染的原生 agree 按钮 id 一致（基础库会校验按钮是否被点击过） */
 export const PRIVACY_AGREE_BUTTON_ID = 'privacy-agree-btn';
 
+export type PrivacyAuthStatus = 'unknown' | 'authorized' | 'need' | 'denied';
+
 interface PrivacyState {
-  /** 弹窗是否展示 */
   visible: boolean;
-  /** 隐私协议名称（来自 wx.getPrivacySetting.privacyContractName），如《松果排课隐私保护指引》 */
   contractName: string;
-  /** 是否仍需授权（来自 wx.getPrivacySetting.needAuthorization） */
   needAuthorization: boolean;
-  /** 待处理的隐私接口 resolve 列表（onNeedPrivacyAuthorization 可能在同一时机多次触发） */
+  status: PrivacyAuthStatus;
+  prompting: boolean;
   pendingResolves: PrivacyResolve[];
 
   setContractName: (name: string) => void;
   setNeedAuthorization: (need: boolean) => void;
-  /** 由 onNeedPrivacyAuthorization 触发：入栈 resolve 并展示弹窗 */
+  setStatus: (status: PrivacyAuthStatus) => void;
+  setPrompting: (prompting: boolean) => void;
+  setVisible: (visible: boolean) => void;
   enqueue: (resolve: PrivacyResolve) => void;
-  /** 用户同意：放行所有 pending 隐私接口并收起弹窗 */
   agree: () => void;
-  /** 用户拒绝：拒绝所有 pending 隐私接口并收起弹窗 */
   disagree: () => void;
+  showBlockedGate: () => void;
 }
 
 export const usePrivacyStore = create<PrivacyState>((set, get) => ({
   visible: false,
   contractName: '《隐私保护指引》',
   needAuthorization: false,
+  status: 'unknown',
+  prompting: false,
   pendingResolves: [],
 
-  setContractName: (name) => set({ contractName: name || '《隐私保护指引》' }),
-  setNeedAuthorization: (need) => set({ needAuthorization: need }),
+  setContractName: (name) => {
+    privacyTrace('store.setContractName', { name });
+    set({ contractName: name || '《隐私保护指引》' });
+  },
+  setNeedAuthorization: (need) => {
+    privacyTrace('store.setNeedAuthorization', { need, before: privacyStoreSnapshot() });
+    set((s) => ({
+      needAuthorization: need,
+      status: need ? (s.status === 'denied' ? 'denied' : 'need') : 'authorized',
+      ...(need ? {} : { visible: false, prompting: false }),
+    }));
+  },
+  setStatus: (status) => {
+    privacyTrace('store.setStatus', { status });
+    set({ status });
+  },
+  setPrompting: (prompting) => {
+    privacyTrace('store.setPrompting', { prompting });
+    set({ prompting });
+  },
+  setVisible: (visible) => {
+    privacyTrace('store.setVisible', { visible });
+    set({ visible });
+  },
 
   enqueue: (resolve) => {
+    privacyTrace('store.enqueue', { beforePending: get().pendingResolves.length });
     set((s) => ({
       pendingResolves: [...s.pendingResolves, resolve],
       visible: true,
+      status: s.status === 'denied' ? 'denied' : 'need',
+      needAuthorization: true,
     }));
+    privacyTrace('store.enqueue.done', { afterPending: get().pendingResolves.length });
   },
 
   agree: () => {
     const resolves = get().pendingResolves;
-    resolves.forEach((r) => {
+    privacyTrace('store.agree', { resolveCount: resolves.length });
+    resolves.forEach((r, index) => {
       try {
         r({ event: 'agree', buttonId: PRIVACY_AGREE_BUTTON_ID });
-      } catch {
-        // 单个 resolve 异常不影响其余接口
+        privacyTrace('store.agree.resolve.ok', { index });
+      } catch (err) {
+        privacyTrace('store.agree.resolve.error', { index, err });
       }
     });
-    set({ pendingResolves: [], visible: false });
+    set({
+      pendingResolves: [],
+      visible: false,
+      needAuthorization: false,
+      status: 'authorized',
+    });
+    privacyTrace('store.agree.done');
   },
 
   disagree: () => {
     const resolves = get().pendingResolves;
-    resolves.forEach((r) => {
+    privacyTrace('store.disagree', { resolveCount: resolves.length });
+    resolves.forEach((r, index) => {
       try {
         r({ event: 'disagree' });
-      } catch {
-        // 忽略
+        privacyTrace('store.disagree.resolve.ok', { index });
+      } catch (err) {
+        privacyTrace('store.disagree.resolve.error', { index, err });
       }
     });
-    set({ pendingResolves: [], visible: false });
+    set({
+      pendingResolves: [],
+      visible: true,
+      needAuthorization: true,
+      status: 'denied',
+    });
+    privacyTrace('store.disagree.done');
+  },
+
+  showBlockedGate: () => {
+    privacyTrace('store.showBlockedGate', { before: privacyStoreSnapshot() });
+    set({
+      visible: true,
+      needAuthorization: true,
+      status:
+        get().status === 'authorized' ? 'need' : get().status === 'denied' ? 'denied' : 'need',
+    });
+    privacyTrace('store.showBlockedGate.done');
   },
 }));

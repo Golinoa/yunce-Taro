@@ -1,14 +1,17 @@
 import Taro, { useDidShow, useDidHide, useLaunch } from '@tarojs/taro';
 import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import PrivacyPopup from '@/components/PrivacyPopup';
 import { SubscribeAuthHost } from '@/components/subscribe';
 import { scheduleDeferredAppStartup } from '@/utils/app-startup';
 import { AuthProvider } from '@/utils/auth';
 import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import { logError } from '@/utils/logger';
+import { privacyTraceBootstrap } from '@/utils/privacy-debug';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import 'uno.css';
+
+privacyTraceBootstrap();
+// 不注册 onNeedPrivacyAuthorization，保留微信系统原生隐私弹窗（图二）
 /**
  * 跨分包共享模块必须被主包引用，否则 Taro MiniSplitChunksPlugin
  * 会将它们提取到 <subpackage>/sub-common/ 目录，导致微信小程序运行时
@@ -95,7 +98,6 @@ const App: React.FC<{ children?: React.ReactNode }> = (props) => {
     <ErrorBoundary>
       <AuthProvider>
         {props.children}
-        <PrivacyPopup />
         <SubscribeAuthHost />
       </AuthProvider>
     </ErrorBoundary>

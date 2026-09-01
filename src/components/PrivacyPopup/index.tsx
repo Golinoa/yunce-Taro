@@ -1,82 +1,164 @@
 /**
- * PrivacyPopup - 微信隐私授权强制弹窗
- *
- * 仅在微信平台隐私授权流程中由 usePrivacyStore.visible 控制展示。
- * 关键点：
- *  - 「同意并继续」必须是原生 <Button open-type="agreePrivacyAuthorization">，
- *    微信基础库靠它识别用户的真实点击；点击后 onAgreePrivacyAuthorization 触发，
- *    再调用 store.agree() 放行被拦截的隐私接口。
- *  - 「暂不使用」调用 store.disagree()，被拦截接口以隐私未授权失败。
- *  - 不传 BottomSheet 的 onClose，避免点击遮罩把等待中的隐私接口卡在 pending。
- *  - 协议名称可点击跳转 wx.openPrivacyContract 查看完整协议。
+ * PrivacyPopup - 微信隐私授权强制弹窗 / 拒绝后全局拦截层
  */
 import { View, Text, ScrollView, Button } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React from 'react';
-import BottomSheet from '@/components/BottomSheet';
+import React, { useCallback, useEffect, useState } from 'react';
 import { usePrivacyStore, PRIVACY_AGREE_BUTTON_ID } from '@/stores/privacy';
+import { privacyTrace } from '@/utils/privacy-debug';
+import { promptPrivacyIfNeeded } from '@/utils/privacy-authorize';
 
 const PrivacyPopup: React.FC = () => {
   const visible = usePrivacyStore((s) => s.visible);
   const contractName = usePrivacyStore((s) => s.contractName);
+  const status = usePrivacyStore((s) => s.status);
+  const pendingCount = usePrivacyStore((s) => s.pendingResolves.length);
+  const prompting = usePrivacyStore((s) => s.prompting);
+  const [retrying, setRetrying] = useState(false);
+
+  const hasPending = pendingCount > 0;
+  const denied = status === 'denied';
+  const busy = prompting || retrying;
+
+  useEffect(() => {
+    privacyTrace('PrivacyPopup.renderState', {
+      visible,
+      status,
+      pendingCount,
+      hasPending,
+      denied,
+      prompting,
+      retrying,
+      buttonMode: hasPending ? 'native-agreePrivacyAuthorization' : 'view-retry(非原生)',
+    });
+  }, [visible, status, pendingCount, hasPending, denied, prompting, retrying]);
+
+  useEffect(() => {
+    if (visible) {
+      privacyTrace('PrivacyPopup.mounted', { hasPending, denied });
+    } else {
+      privacyTrace('PrivacyPopup.hidden');
+    }
+  }, [visible, hasPending, denied]);
 
   const handleAgree = () => {
+    privacyTrace('PrivacyPopup.handleAgree', { pendingCount });
     usePrivacyStore.getState().agree();
   };
 
   const handleDisagree = () => {
+    privacyTrace('PrivacyPopup.handleDisagree', { pendingCount });
     usePrivacyStore.getState().disagree();
     Taro.showToast({
-      title: '需要同意隐私保护指引后才能使用相册等功能，可再次尝试',
+      title: '不同意隐私保护指引将无法使用本小程序',
       icon: 'none',
       duration: 2800,
     });
   };
 
+  const handleRetry = useCallback(async () => {
+    if (retrying) return;
+    privacyTrace('PrivacyPopup.handleRetry.start');
+    setRetrying(true);
+    try {
+      const ok = await promptPrivacyIfNeeded();
+      privacyTrace('PrivacyPopup.handleRetry.done', { ok });
+      if (!ok) {
+        Taro.showToast({
+          title: '请同意隐私保护指引后继续使用',
+          icon: 'none',
+          duration: 2500,
+        });
+      }
+    } finally {
+      setRetrying(false);
+    }
+  }, [retrying]);
+
   const openContract = () => {
+    privacyTrace('PrivacyPopup.openContract');
     Taro.openPrivacyContract({
-      fail: () => {
+      success: () => privacyTrace('PrivacyPopup.openContract.success'),
+      fail: (err) => {
+        privacyTrace('PrivacyPopup.openContract.fail', { err });
         Taro.showToast({ title: '暂无法打开隐私协议', icon: 'none' });
       },
     });
   };
 
+  if (!visible) return null;
+
   return (
-    <BottomSheet visible={visible} title="隐私保护指引" fillHeight scrollable={false}>
-      <View className="flex flex-col h-full px-[40rpx] pt-[8rpx]">
-        <ScrollView scrollY className="flex-1">
-          <Text className="text-[28rpx] text-foreground leading-relaxed block">
-            在你使用「松果排课」小程序服务之前，请仔细阅读
-          </Text>
-          <Text className="text-[28rpx] text-primary" onClick={openContract}>
-            {contractName}
-          </Text>
-          <Text className="text-[28rpx] text-foreground leading-relaxed block mt-[20rpx]">
-            当您点击“同意并继续”，即表示您已理解并同意我们按照上述指引收集、使用您的个人信息。我们仅在您授权范围内使用信息，并严格保护您的数据安全。
-          </Text>
-          <Text className="text-[26rpx] text-muted-foreground leading-relaxed block mt-[20rpx]">
-            若不同意，部分功能（如定位、选择位置、读取剪切板等）将无法正常使用。
-          </Text>
+    <View className="fixed inset-0 z-[9999] flex flex-col justify-end" catchMove>
+      <View className="absolute inset-0 bg-black/55" />
+      <View className="relative z-10 w-full rounded-t-[40rpx] bg-white px-[40rpx] pt-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))]">
+        <Text className="text-[34rpx] font-semibold text-foreground block mb-[20rpx]">
+          {denied ? '须同意隐私保护指引' : '隐私保护指引'}
+        </Text>
+
+        <ScrollView scrollY style={{ maxHeight: '42vh' }}>
+          {denied ? (
+            <Text className="text-[28rpx] text-foreground leading-relaxed block">
+              你已拒绝隐私保护指引，无法继续登录使用。请阅读并同意
+              <Text className="text-primary" onClick={openContract}>
+                {contractName}
+              </Text>
+              后重试。
+            </Text>
+          ) : (
+            <>
+              <Text className="text-[28rpx] text-foreground leading-relaxed block">
+                在你使用「松果排课」小程序服务之前，请仔细阅读
+              </Text>
+              <Text className="text-[28rpx] text-primary" onClick={openContract}>
+                {contractName}
+              </Text>
+              <Text className="text-[28rpx] text-foreground leading-relaxed block mt-[20rpx]">
+                点击「同意并继续」，即表示你已理解并同意我们按上述指引收集、使用相关信息。
+              </Text>
+              <Text className="text-[26rpx] text-muted-foreground leading-relaxed block mt-[20rpx]">
+                若不同意，将无法登录并正常使用本小程序。
+              </Text>
+            </>
+          )}
         </ScrollView>
 
-        <View className="pt-[24rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))]">
-          <Button
-            id={PRIVACY_AGREE_BUTTON_ID}
-            openType="agreePrivacyAuthorization"
-            onAgreePrivacyAuthorization={handleAgree}
-            className="privacy-agree-btn"
-          >
-            同意并继续
-          </Button>
-          <View
-            className="mt-[24rpx] flex items-center justify-center h-[88rpx] active:opacity-70"
-            onClick={handleDisagree}
-          >
-            <Text className="text-[30rpx] text-muted-foreground">暂不使用</Text>
-          </View>
+        <View className="pt-[28rpx]">
+          {hasPending ? (
+            <>
+              <Button
+                id={PRIVACY_AGREE_BUTTON_ID}
+                openType="agreePrivacyAuthorization"
+                onAgreePrivacyAuthorization={handleAgree}
+                className="privacy-agree-btn"
+              >
+                同意并继续
+              </Button>
+              <View
+                className="mt-[24rpx] flex items-center justify-center h-[88rpx] active:opacity-70"
+                onClick={handleDisagree}
+              >
+                <Text className="text-[30rpx] text-muted-foreground">不同意</Text>
+              </View>
+            </>
+          ) : (
+            <View
+              className={`h-[96rpx] rounded-full flex items-center justify-center bg-primary active:opacity-90 ${
+                busy ? 'opacity-60' : ''
+              }`}
+              onClick={() => {
+                if (busy) return;
+                void handleRetry();
+              }}
+            >
+              <Text className="text-[32rpx] font-semibold text-white">
+                {busy ? '正在唤起授权…' : '同意隐私保护指引并继续'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
-    </BottomSheet>
+    </View>
   );
 };
 
