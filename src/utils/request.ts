@@ -5,6 +5,8 @@
  */
 import Taro from '@tarojs/taro';
 import { getApiBaseUrl } from '@/utils/build-env';
+import { mapGatewayErrorMessage, mapNetworkFailMessage } from '@/utils/api-gateway-error';
+import { logRequestIssue } from '@/utils/logger';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
@@ -170,9 +172,18 @@ async function refreshAccessToken(): Promise<string | null> {
       }
 
       clearAuthSession();
+      logRequestIssue('refresh_fail', {
+        path: '/auth/refresh',
+        statusCode: res.statusCode,
+        errMsg: 'refresh response not ok',
+      });
       return null;
-    } catch {
+    } catch (err) {
       clearAuthSession();
+      logRequestIssue('refresh_fail', {
+        path: '/auth/refresh',
+        errMsg: err instanceof Error ? err.message : String(err),
+      });
       return null;
     } finally {
       refreshInFlight = null;
@@ -281,7 +292,15 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
     }
 
     // 统一解析后端错误消息（修复 422 等丢失 message 的问题）
-    const errorMessage = extractErrorMessage(res);
+    const gatewayMessage = mapGatewayErrorMessage(res.statusCode);
+    const errorMessage = gatewayMessage ?? extractErrorMessage(res);
+    if (res.statusCode >= 500) {
+      logRequestIssue('http5xx', {
+        path: url,
+        statusCode: res.statusCode,
+        errMsg: errorMessage,
+      });
+    }
     if (isQuotaExceededMessage(errorMessage)) {
       handleQuotaExceeded(errorMessage);
     }
@@ -301,8 +320,13 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
     });
     // #endregion
     if (err instanceof ApiError) throw err;
-    // 网络错误
-    throw new ApiError(-1, '网络异常，请检查网络连接');
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const isTimeout = /timeout|超时/i.test(errMsg);
+    logRequestIssue(isTimeout ? 'timeout' : 'network', {
+      path: url,
+      errMsg,
+    });
+    throw new ApiError(-1, mapNetworkFailMessage(err));
   }
 }
 
