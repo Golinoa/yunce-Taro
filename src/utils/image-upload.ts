@@ -17,6 +17,7 @@
  */
 import Taro from '@tarojs/taro';
 import { uploadService, type UploadType } from '@/services/upload';
+import { ensurePrivacyAuthorized } from '@/utils/privacy-authorize';
 
 export interface ChooseImageOptions {
   /** 最大文件大小（MB），默认 5 */
@@ -288,37 +289,31 @@ async function persistTempFile(tempFilePath: string): Promise<string> {
   }
 }
 
-export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise<string> {
-  const { maxSizeMB = 5, sourceType = ['album', 'camera'], cropScale } = options;
+/** 裁剪产物文件落盘延迟的重试等待（ms） */
+const FILE_FLUSH_RETRY_DELAY_MS = 400;
+
+/** 简易延时 */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * chooseMedia / chooseAvatar 返回的本地临时图：体积校验、可选裁剪、持久化到 USER_DATA_PATH。
+ * chooseAvatar 相册/拍照路径必须走此函数，避免填昵称期间临时文件失效。
+ */
+async function processSelectedImageFile(
+  tempFilePath: string,
+  size: number,
+  options: { maxSizeMB?: number; cropScale?: keyof Taro.cropImage.CropScale },
+): Promise<string> {
+  const { maxSizeMB = 5, cropScale } = options;
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
-  let res;
-  try {
-    res = await Taro.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sizeType: ['compressed'],
-      sourceType,
-    });
-  } catch (err) {
-    const errMsg = (err as { errMsg?: string })?.errMsg || '';
-    if (errMsg.toLowerCase().includes('cancel')) {
-      throw new ImageCancelError();
-    }
-    throw err;
-  }
-
-  const tempFile = res.tempFiles[0];
-  if (!tempFile?.tempFilePath) {
-    throw new ImageCancelError();
-  }
-
-  const size = tempFile.size ?? 0;
   if (size > maxSizeBytes) {
     throw new Error(`图片大小超过 ${maxSizeMB}M 限制`);
   }
 
-  let finalPath = tempFile.tempFilePath;
+  let finalPath = tempFilePath;
   // canvas 兜底转存的产物已直接落在 USER_DATA_PATH，无需再持久化
   let finalPathPersisted = false;
   // 仅在需要裁剪时才调用 wx.cropImage；API 不可用或异常时静默回退原图
@@ -404,12 +399,64 @@ export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise
   return persisted;
 }
 
-/** 裁剪产物文件落盘延迟的重试等待（ms） */
-const FILE_FLUSH_RETRY_DELAY_MS = 400;
+/** chooseAvatar 等已选本地路径：持久化 + 默认 1:1 裁剪 + 5MB 校验 */
+export async function stabilizeAvatarLocalPath(
+  tempFilePath: string,
+  options: { maxSizeMB?: number; cropScale?: keyof Taro.cropImage.CropScale } = {},
+): Promise<string> {
+  const trimmed = tempFilePath?.trim();
+  if (!trimmed) {
+    throw new ImageCancelError();
+  }
 
-/** 简易延时 */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  let size = 0;
+  try {
+    const info = await Taro.getFileInfo({ filePath: trimmed });
+    if ('size' in info && typeof info.size === 'number') {
+      size = info.size;
+    }
+  } catch {
+    /* 无法读取大小时仍尝试持久化，上传阶段会再失败 */
+  }
+
+  return processSelectedImageFile(trimmed, size, {
+    maxSizeMB: options.maxSizeMB ?? 5,
+    cropScale: options.cropScale ?? '1:1',
+  });
+}
+
+export async function chooseImageTemp(options: ChooseImageOptions = {}): Promise<string> {
+  const { maxSizeMB = 5, sourceType = ['album', 'camera'], cropScale } = options;
+
+  if (process.env.TARO_ENV === 'weapp') {
+    await ensurePrivacyAuthorized();
+  }
+
+  let res;
+  try {
+    res = await Taro.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sizeType: ['compressed'],
+      sourceType,
+    });
+  } catch (err) {
+    const errMsg = (err as { errMsg?: string })?.errMsg || '';
+    if (errMsg.toLowerCase().includes('cancel')) {
+      throw new ImageCancelError();
+    }
+    throw err;
+  }
+
+  const tempFile = res.tempFiles[0];
+  if (!tempFile?.tempFilePath) {
+    throw new ImageCancelError();
+  }
+
+  return processSelectedImageFile(tempFile.tempFilePath, tempFile.size ?? 0, {
+    maxSizeMB,
+    cropScale,
+  });
 }
 
 /**

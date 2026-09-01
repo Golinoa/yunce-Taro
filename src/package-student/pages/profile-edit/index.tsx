@@ -8,7 +8,7 @@
  *
  * 全部使用 UnoCSS Token，随主题色（blue/coral/orange）联动。
  */
-import { View, Text, ScrollView, Picker } from '@tarojs/components';
+import { View, Text, ScrollView, Picker, Button, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
@@ -26,10 +26,12 @@ import { lessonRecordService, packageService, studentService } from '@/services'
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import {
-  chooseImageTemp,
   deleteTempImage,
   isImageCancelError,
+  isLocalWechatFilePath,
   isTempImagePath,
+  stabilizeAvatarLocalPath,
+  uploadImage,
 } from '@/utils/image-upload';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
@@ -176,51 +178,45 @@ const ProfileEdit: React.FC = () => {
     [bindAccountEmail, bindingEmail],
   );
 
-  /** 个人头像：相册/拍照选图（1:1 裁剪 + 本地持久化，与子女头像一致） */
-  const handleAvatarPick = useCallback(async () => {
-    try {
-      const { ensurePrivacyAuthorized } = await import('@/utils/privacy-authorize');
-      await ensurePrivacyAuthorized();
-      const tempPath = await chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' });
-      // 替换图片：删掉旧的本地临时文件，避免本地存储累积
-      if (isTempImagePath(draft.avatar_url)) deleteTempImage(draft.avatar_url);
-      updateField('avatar_url', tempPath);
-    } catch (err) {
-      if (isImageCancelError(err)) return;
-      const message = err instanceof Error ? err.message : '选择图片失败';
-      if (message.includes('超过') || message.includes('限制')) {
-        void Taro.showModal({
-          title: '图片过大',
-          content: message,
-          showCancel: false,
-          confirmText: '知道了',
-        });
-      } else {
+  /** 个人头像：微信原生 chooseAvatar（含相册/拍照/微信头像） */
+  const handleChooseAvatar = useCallback(
+    async (event: { detail: { avatarUrl: string } }) => {
+      const next = event.detail?.avatarUrl?.trim();
+      if (!next) {
+        Taro.showToast({ title: '未获取到头像', icon: 'none' });
+        return;
+      }
+      try {
+        const stablePath = await stabilizeAvatarLocalPath(next);
+        if (isTempImagePath(draft.avatar_url)) deleteTempImage(draft.avatar_url);
+        updateField('avatar_url', stablePath);
+        Taro.showToast({ title: '头像已更新', icon: 'success' });
+      } catch (err) {
+        if (isImageCancelError(err)) return;
+        const message = err instanceof Error ? err.message : '头像处理失败';
         Taro.showToast({ title: message, icon: 'none' });
       }
-    }
-  }, [draft.avatar_url, updateField]);
+    },
+    [draft.avatar_url, updateField],
+  );
 
-  /** 个人头像点击：未选→直接选相册；已选→弹「查看图片/重新选择/删除头像」 */
-  const handleAvatarClick = useCallback(() => {
+  /** 已有头像：查看大图 / 删除（重选走 chooseAvatar 按钮） */
+  const handleAvatarManage = useCallback(() => {
     if (!draft.avatar_url) {
-      void handleAvatarPick();
       return;
     }
     void Taro.showActionSheet({
-      itemList: ['查看图片', '重新选择', '删除头像'],
+      itemList: ['查看图片', '删除头像'],
       success: (res) => {
         if (res.tapIndex === 0) {
           void Taro.previewImage({ current: draft.avatar_url, urls: [draft.avatar_url] });
         } else if (res.tapIndex === 1) {
-          void handleAvatarPick();
-        } else if (res.tapIndex === 2) {
           if (isTempImagePath(draft.avatar_url)) deleteTempImage(draft.avatar_url);
           updateField('avatar_url', '');
         }
       },
     });
-  }, [draft.avatar_url, handleAvatarPick, updateField]);
+  }, [draft.avatar_url, updateField]);
 
   // 保存
   const handleSave = useCallback(async () => {
@@ -234,10 +230,20 @@ const ProfileEdit: React.FC = () => {
     }
     setSaving(true);
     try {
+      let remoteAvatar = draft.avatar_url.trim();
+      if (remoteAvatar && isLocalWechatFilePath(remoteAvatar)) {
+        Taro.showLoading({ title: '上传头像...', mask: true });
+        try {
+          remoteAvatar = await uploadImage(remoteAvatar, 'avatar');
+        } finally {
+          Taro.hideLoading();
+        }
+      }
+
       const { error } = await submitUpdate({
         name: draft.nickname.trim(),
         nickname: draft.nickname.trim(),
-        avatar_url: draft.avatar_url.trim(),
+        avatar_url: remoteAvatar || undefined,
         phone: draft.phone.trim(),
         gender: (draft.gender || undefined) as Gender | undefined,
         birthday: draft.birthday.trim(),
@@ -248,6 +254,9 @@ const ProfileEdit: React.FC = () => {
       } else {
         Taro.showToast({ title: '保存成功', icon: 'success' });
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '保存失败，请重试';
+      Taro.showToast({ title: message, icon: 'none' });
     } finally {
       setSaving(false);
     }
@@ -396,35 +405,49 @@ const ProfileEdit: React.FC = () => {
           <View className="px-[32rpx] pt-[24rpx] flex flex-col gap-[24rpx] pb-[40rpx]">
             {/* 基础信息表单 */}
             <View className="bg-card rounded-[28rpx] py-[8rpx] shadow-soft overflow-hidden">
-              {/* 头像：点击直接选相册/拍照；已上传可查看/重选/删除 */}
+              {/* 头像：chooseAvatar 原生 sheet；已上传可查看/删除 */}
               <FieldRow
                 label="头像"
-                onClick={handleAvatarClick}
                 right={
-                  <View className="flex items-center gap-[8rpx]">
-                    <View className="relative">
-                      <Avatar
-                        name={draft.nickname || profile?.name || '我'}
-                        avatarUrl={draft.avatar_url || BRAND_LOGO}
-                        size="md"
-                      />
-                      {/* 相机小角标，提示可点击上传 */}
-                      <View className="absolute -bottom-[4rpx] -right-[4rpx] w-[32rpx] h-[32rpx] rounded-full bg-primary border-[2rpx] border-card flex items-center justify-center">
-                        <Icon name="mdi-camera" size={18} color="white" />
+                  <View className="flex items-center gap-[16rpx]">
+                    <Button
+                      className="p-0 m-0 after:border-none bg-transparent border-none active:opacity-90"
+                      plain
+                      openType="chooseAvatar"
+                      onChooseAvatar={handleChooseAvatar}
+                    >
+                      <View className="relative">
+                        <Avatar
+                          name={draft.nickname || profile?.name || '我'}
+                          avatarUrl={draft.avatar_url || BRAND_LOGO}
+                          size="md"
+                        />
+                        <View className="absolute -bottom-[4rpx] -right-[4rpx] w-[32rpx] h-[32rpx] rounded-full bg-primary border-[2rpx] border-card flex items-center justify-center">
+                          <Icon name="mdi-camera" size={18} color="white" />
+                        </View>
                       </View>
-                    </View>
-                    <RowArrow />
+                    </Button>
+                    {draft.avatar_url ? (
+                      <Text
+                        className="text-[24rpx] text-primary press-scale"
+                        onClick={handleAvatarManage}
+                      >
+                        管理
+                      </Text>
+                    ) : null}
                   </View>
                 }
               />
               <FieldRow
                 label="昵称"
                 right={
-                  <FormInput
-                    variant="ghost"
-                    placeholder="请输入昵称"
+                  <Input
+                    type="nickname"
+                    className="flex-1 text-[30rpx] text-foreground text-right"
+                    placeholder="点选微信昵称，或自行填写"
                     value={draft.nickname}
                     onInput={(e) => updateField('nickname', e.detail.value || '')}
+                    maxlength={20}
                   />
                 }
               />

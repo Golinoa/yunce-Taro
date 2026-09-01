@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>微信授权方案 · 拍板页</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #fff;
+      --text: #1a1a2e;
+      --muted: #5c6370;
+      --green: #07c160;
+      --green-bg: #e8f8ef;
+      --amber: #f59e0b;
+      --amber-bg: #fff8e6;
+      --blue: #2563eb;
+      --blue-bg: #eff6ff;
+      --border: #e5e7eb;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: 20px 16px 48px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 16px 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .card h2 {
+      font-size: 17px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .ok { background: var(--green-bg); color: #067a42; }
+    .warn { background: var(--amber-bg); color: #b45309; }
+    .info { background: var(--blue-bg); color: var(--blue); }
+    .flow {
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin: 10px 0;
+      white-space: pre-line;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; font-weight: 600; }
+    .pick {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .opt {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: default;
+    }
+    .opt.rec { border-color: var(--green); background: var(--green-bg); }
+    .opt code { font-size: 12px; background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 4px; }
+    .opt strong { display: block; margin-bottom: 2px; }
+    .opt span { font-size: 12px; color: var(--muted); }
+    .reply {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+      margin-top: 16px;
+      word-break: break-all;
+    }
+    .reply-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .legend span { font-size: 12px; padding: 4px 10px; border-radius: 6px; }
+    .two { display: grid; gap: 14px; }
+    @media (min-width: 600px) { .two { grid-template-columns: 1fr 1fr; } }
+    .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    img.demo { width: 100%; max-width: 280px; border-radius: 8px; border: 1px solid var(--border); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>微信授权 · 拍板页</h1>
+    <p class="sub">一页看完，复制底部回复即可。2026-09-01</p>
+
+    <div class="legend">
+      <span class="badge ok">✅ 已达标 / 推荐</span>
+      <span class="badge warn">⚠️ 待你决定</span>
+      <span class="badge info">ℹ️ 说明</span>
+    </div>
+
+    <!-- 头像 -->
+    <div class="card">
+      <h2>① 本人头像 <span class="badge ok">profile-setup 已完成</span></h2>
+      <p class="note"><strong>重要：</strong><code>chooseAvatar</code> 不是「只能微信头像」。点头像后微信原生弹窗含：</p>
+      <table>
+        <tr><th>用微信头像</th><th>从相册选择</th><th>拍照</th><th>取消</th></tr>
+        <tr><td>可选</td><td>✅ 相册</td><td>✅ 拍照</td><td>退出</td></tr>
+      </table>
+      <p class="note" style="margin-top:10px">未授权相册时，用户选「相册/拍照」后由微信弹隐私 + 权限，不用我们替用户决定。</p>
+
+      <p style="margin-top:14px;font-weight:600;font-size:14px">Q1 本人头像（完善资料 + 个人中心改头像）</p>
+      <div class="pick">
+        <div class="opt rec">
+          <strong>A1 · chooseAvatar（推荐）</strong>
+          <span>原生 sheet，含相册/拍照/微信头像，合规最好</span>
+        </div>
+        <div class="opt">
+          <strong>A2 · 只要相册直连 chooseMedia</strong>
+          <span>没有「一键微信头像」；本人资料合规弱一点</span>
+        </div>
+        <div class="opt">
+          <strong>A3 · 自定义双入口</strong>
+          <span>不推荐，非官方 UI</span>
+        </div>
+      </div>
+
+      <p style="margin-top:14px;font-weight:600;font-size:14px">Q2 学员照 / 课程封面等业务图</p>
+      <div class="pick">
+        <div class="opt rec">
+          <strong>B1 · 继续 chooseMedia（推荐）</strong>
+          <span>学员不是微信用户资料，不能用 chooseAvatar</span>
+        </div>
+        <div class="opt">
+          <strong>B2 · 也改 chooseAvatar</strong>
+          <span>❌ 不合规，别选</span>
+        </div>
+      </div>
+
+      <p style="margin-top:14px;font-weight:600;font-size:14px">Q3 相册前隐私指引</p>
+      <div class="pick">
+        <div class="opt rec">
+          <strong>C1 · chooseImageTemp 内统一加隐私（推荐）</strong>
+          <span>一处改，反馈/学员/作业图都受益</span>
+        </div>
+        <div class="opt">
+          <strong>C2 · 各页自己加</strong>
+          <span>现状，不一致</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日历 -->
+    <div class="card">
+      <h2>② 同步手机日历 <span class="badge warn">待拍板</span></h2>
+      <p class="note">两件事叠在一起，别和头像混为一谈：</p>
+      <div class="two">
+        <div class="flow"><strong>写系统日历</strong>
+wx.addPhoneCalendar
+→ 手机系统弹权限
+→ 课表进系统日历提醒</div>
+        <div class="flow"><strong>微信订阅消息</strong>
+requestSubscribeMessage
+→ 微信原生订阅面板
+→ 变动时可发微信通知</div>
+      </div>
+      <table>
+        <tr><th>项</th><th>现状</th></tr>
+        <tr><td>默认</td><td><strong>关</strong>，用户自己开 ✅</td></tr>
+        <tr><td>入口</td><td>课表弹窗 / 排课后 / 设置 Switch</td></tr>
+        <tr><td>拒微信订阅</td><td>仍会写系统日历 ✅</td></tr>
+        <tr><td>拒系统日历权限</td><td>只 Toast，无「去设置」 ⚠️</td></tr>
+      </table>
+
+      <p style="margin-top:14px;font-weight:600;font-size:14px">Q4 开同步时：订阅 vs 写日历</p>
+      <div class="pick">
+        <div class="opt rec">
+          <strong>D1 · 现状（推荐）</strong>
+          <span>可拒订阅，仍写系统日历</span>
+        </div>
+        <div class="opt">
+          <strong>D2 · 拒订阅就不写日历</strong>
+          <span>更严，可能误伤</span>
+        </div>
+        <div class="opt">
+          <strong>D3 · 完全拆开两个开关</strong>
+          <span>最清晰，改动大</span>
+        </div>
+      </div>
+
+      <p style="margin-top:14px;font-weight:600;font-size:14px">Q5 系统日历权限被拒</p>
+      <div class="pick">
+        <div class="opt">
+          <strong>E1 · 只 Toast（现状）</strong>
+        </div>
+        <div class="opt rec">
+          <strong>E2 · 弹窗 +「去设置」（推荐）</strong>
+          <span>和门店选地址一样</span>
+        </div>
+      </div>
+
+      <p style="margin-top:14px;font-weight:600;font-size:14px">Q6 课表/排课前的说明弹窗</p>
+      <div class="pick">
+        <div class="opt rec">
+          <strong>F1 · 保留说明再开启（推荐）</strong>
+          <span>不替用户决定，先讲清楚再开</span>
+        </div>
+        <div class="opt">
+          <strong>F2 · 去掉说明，一点就开</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- 其他已OK -->
+    <div class="card">
+      <h2>③ 其它 <span class="badge ok">不用动</span></h2>
+      <table>
+        <tr><th>能力</th><th>页面</th><th>状态</th></tr>
+        <tr><td>位置选门店</td><td>门店入驻 store-entry</td><td>✅ 隐私 → 原生位置 → 选地图</td></tr>
+        <tr><td>订阅消息</td><td>注册 / 消息通知开关</td><td>✅ 用户点击后直接微信原生面板</td></tr>
+        <tr><td>隐私指引</td><td>全局 PrivacyPopup</td><td>✅ 已接</td></tr>
+      </table>
+    </div>
+
+    <!-- 推荐 -->
+    <div class="card" style="border-color: var(--green);">
+      <h2>推荐一键回复</h2>
+      <p class="note">复制下面一行发给我即可：</p>
+      <div class="reply">Q1 A1 Q2 B1 Q3 C1 Q4 D1 Q5 E2 Q6 F1</div>
+      <p class="note" style="margin-top:10px">想改哪项，只改对应字母，例如日历要拆开：<code>Q4 D3</code></p>
+    </div>
+
+    <p class="note" style="text-align:center;margin-top:20px">
+      文件路径：<code>yunceTaro/docs/PM/wechat-auth-decision.html</code><br>
+      浏览器打开本文件即可
+    </p>
+  </div>
+</body>
+</html>

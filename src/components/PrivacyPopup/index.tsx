@@ -26,6 +26,11 @@ const PrivacyPopup: React.FC = () => {
 
   const handleDisagree = () => {
     usePrivacyStore.getState().disagree();
+    Taro.showToast({
+      title: '需要同意隐私保护指引后才能使用相册等功能，可再次尝试',
+      icon: 'none',
+      duration: 2800,
+    });
   };
 
   const openContract = () => {

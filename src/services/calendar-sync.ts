@@ -25,7 +25,11 @@ import {
   shouldShowCalendarSyncPrompt,
 } from '@/utils/calendar-sync-settings';
 import { logError } from '@/utils/logger';
-import { addPhoneCalendarEvent, isAddPhoneCalendarSupported } from '@/utils/phone-calendar';
+import {
+  addPhoneCalendarEvent,
+  isAddPhoneCalendarSupported,
+  promptPhoneCalendarPermissionSetting,
+} from '@/utils/phone-calendar';
 import { post } from '@/utils/request';
 
 const EVENT_MAP_STORAGE_KEY = 'yunce:calendar-sync-event-map';
@@ -275,6 +279,7 @@ export const calendarSyncService = {
     let added = 0;
     let skipped = 0;
     let failed = 0;
+    let authDenied = false;
     const reportItems: Array<{
       scheduleId: string;
       title: string;
@@ -291,7 +296,7 @@ export const calendarSyncService = {
         continue;
       }
 
-      const ok = await addPhoneCalendarEvent({
+      const addResult = await addPhoneCalendarEvent({
         title: occurrence.title,
         startTime: toUnixSeconds(occurrence.date, occurrence.startTime),
         endTime: toUnixSeconds(occurrence.date, occurrence.endTime),
@@ -300,7 +305,7 @@ export const calendarSyncService = {
         alarmOffset: (occurrence.reminderMinutes ?? 15) * 60,
       });
 
-      if (ok) {
+      if (addResult === 'success') {
         added += 1;
         eventMap[mapKey] = { fingerprint, syncedAt: new Date().toISOString() };
         reportItems.push({
@@ -312,6 +317,9 @@ export const calendarSyncService = {
         });
       } else {
         failed += 1;
+        if (addResult === 'auth_denied') {
+          authDenied = true;
+        }
       }
     }
 
@@ -322,6 +330,12 @@ export const calendarSyncService = {
       await reportCalendarSync('add', reportItems);
       if (!params.silent) {
         Taro.showToast({ title: `已同步 ${added} 节课到日历`, icon: 'none' });
+      }
+    } else if (!params.silent && added === 0 && failed > 0) {
+      if (authDenied) {
+        await promptPhoneCalendarPermissionSetting();
+      } else {
+        Taro.showToast({ title: '部分课程未能写入日历', icon: 'none' });
       }
     } else if (!params.silent && failed > 0) {
       Taro.showToast({ title: '部分课程未能写入日历', icon: 'none' });

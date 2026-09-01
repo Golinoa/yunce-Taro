@@ -147,6 +147,40 @@ describe('calendarSyncService.syncWeekAhead', () => {
     expect(Taro.addPhoneCalendar).toHaveBeenCalled();
     expect(getCalendarSyncSettings(USER).lastSyncedUntil).toBeTruthy();
   });
+
+  it('全部写入失败且权限被拒时引导打开设置', async () => {
+    vi.stubEnv('TARO_ENV', 'weapp');
+    saveCalendarSyncSettings(USER, { enabled: true });
+    vi.spyOn(Taro, 'addPhoneCalendar').mockRejectedValue({
+      errMsg: 'addPhoneCalendar:fail auth deny',
+    });
+    const showModalSpy = vi
+      .spyOn(Taro, 'showModal')
+      .mockResolvedValue({ confirm: false, cancel: true } as never);
+    (Taro as unknown as { openSetting: typeof Taro.openSetting }).openSetting = vi
+      .fn()
+      .mockResolvedValue({} as Taro.openSetting.SuccessCallbackResult);
+
+    const monday = dayjs().startOf('week').add(1, 'day');
+    const schedule: Schedule = {
+      ...baseSchedule,
+      day_of_week: (monday.day() || 7) as Schedule['day_of_week'],
+    };
+
+    const result = await calendarSyncService.syncWeekAhead({
+      userId: USER,
+      teacherId: USER,
+      schedules: [schedule],
+      classes: [{ id: 'class-1', name: '钢琴班' } as never],
+      silent: false,
+    });
+
+    expect(result.added).toBe(0);
+    expect(result.failed).toBeGreaterThan(0);
+    expect(showModalSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '需要日历权限', confirmText: '去设置' }),
+    );
+  });
 });
 
 describe('calendarSyncService.maybePromptOnSchedulePage', () => {

@@ -1,7 +1,7 @@
 /**
  * 微信登录后完善头像与昵称
  *
- * - 头像：相册（chooseMedia，先走隐私授权）或微信头像（button open-type=chooseAvatar）
+ * - 头像：Button open-type=chooseAvatar → stabilizeAvatarLocalPath（持久化/1:1/5MB）
  * - 昵称：Input type=nickname（点选微信昵称）或自行填写
  * - 保存：本地文件先上传 CDN，再 PUT /profile { nickname, avatar }
  * 开发/生产同一套代码，仅 API/CDN 域名随环境配置切换。
@@ -10,19 +10,17 @@ import { View, Text, Button, Image, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useState } from 'react';
-import BottomSheet from '@/components/BottomSheet';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
-import { resolveAvatarSrc } from '@/utils/avatar-src';
 import { getSession } from '@/services/auth';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterProfileSetup } from '@/utils/auth-onboarding';
+import { resolveAvatarSrc } from '@/utils/avatar-src';
 import {
-  chooseImageTemp,
   isImageCancelError,
   isLocalWechatFilePath,
+  stabilizeAvatarLocalPath,
   uploadImage,
 } from '@/utils/image-upload';
-import { ensurePrivacyAuthorized } from '@/utils/privacy-authorize';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const ProfileSetup: React.FC = () => {
@@ -31,55 +29,44 @@ const ProfileSetup: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
   const [nickname, setNickname] = useState(profile?.nickname || profile?.name || '');
   const [submitting, setSubmitting] = useState(false);
-  const [wechatAvatarSheetOpen, setWechatAvatarSheetOpen] = useState(false);
   /** 键盘 + 微信原生昵称条占位，避免底栏与「完成并继续」重叠 */
   const [keyboardInset, setKeyboardInset] = useState(0);
 
   const NICKNAME_BAR_EXTRA_PX = 56;
 
-  const handleWechatAvatar = useCallback((event: { detail: { avatarUrl: string } }) => {
+  const handleWechatAvatar = useCallback(async (event: { detail: { avatarUrl: string } }) => {
     const next = event.detail?.avatarUrl?.trim();
     if (!next) {
-      Taro.showToast({ title: '未获取到微信头像', icon: 'none' });
+      Taro.showToast({ title: '未获取到头像', icon: 'none' });
       return;
     }
-    setAvatarUrl(next);
-    setWechatAvatarSheetOpen(false);
-    Taro.showToast({ title: '已选择微信头像', icon: 'success' });
-  }, []);
-
-  const pickFromAlbum = useCallback(async () => {
     try {
-      // 直接触发隐私授权（未同意则弹 PrivacyPopup）；同意后再打开相册
-      await ensurePrivacyAuthorized();
-      const path = await chooseImageTemp({
-        maxSizeMB: 5,
-        cropScale: '1:1',
-        sourceType: ['album', 'camera'],
-      });
-      setAvatarUrl(path);
+      const stablePath = await stabilizeAvatarLocalPath(next);
+      setAvatarUrl(stablePath);
+      Taro.showToast({ title: '头像已更新', icon: 'success' });
     } catch (err) {
       if (isImageCancelError(err)) return;
-      const message = err instanceof Error ? err.message : '选择图片失败';
+      const message = err instanceof Error ? err.message : '头像处理失败';
+      if (/隐私|privacy|disagree|不同意|相册/i.test(message)) {
+        Taro.showToast({
+          title: '需要同意隐私保护指引后才能使用相册',
+          icon: 'none',
+          duration: 2800,
+        });
+        return;
+      }
+      if (message.includes('超过') || message.includes('限制')) {
+        void Taro.showModal({
+          title: '图片过大',
+          content: message,
+          showCancel: false,
+          confirmText: '知道了',
+        });
+        return;
+      }
       Taro.showToast({ title: message, icon: 'none' });
     }
   }, []);
-
-  const handleAvatarEntry = useCallback(() => {
-    void Taro.showActionSheet({
-      itemList: ['从相册选择', '使用微信头像'],
-      success: (res) => {
-        if (res.tapIndex === 0) {
-          void pickFromAlbum();
-          return;
-        }
-        if (res.tapIndex === 1) {
-          // chooseAvatar 必须由用户点击带 open-type 的原生 Button，不能编程触发
-          setWechatAvatarSheetOpen(true);
-        }
-      },
-    });
-  }, [pickFromAlbum]);
 
   const syncKeyboardInset = useCallback((height: number) => {
     setKeyboardInset(height > 0 ? height + NICKNAME_BAR_EXTRA_PX : 0);
@@ -170,9 +157,11 @@ const ProfileSetup: React.FC = () => {
 
       <View className="relative z-10 flex-1 flex flex-col items-stretch justify-center px-[48rpx]">
         <View className="flex flex-col items-center mb-[48rpx]">
-          <View
-            className="w-[220rpx] h-[220rpx] rounded-full overflow-hidden bg-muted flex items-center justify-center border-[4rpx] border-solid border-primary/20 active:opacity-90"
-            onClick={handleAvatarEntry}
+          <Button
+            className="w-[220rpx] h-[220rpx] rounded-full overflow-hidden bg-muted flex items-center justify-center border-[4rpx] border-solid border-primary/20 p-0 m-0 after:border-none active:opacity-90"
+            plain
+            openType="chooseAvatar"
+            onChooseAvatar={handleWechatAvatar}
           >
             {avatarUrl ? (
               <Image
@@ -183,10 +172,10 @@ const ProfileSetup: React.FC = () => {
             ) : (
               <Image src={BRAND_LOGO} className="w-full h-full" mode="aspectFill" />
             )}
-          </View>
+          </Button>
           <Text className="text-[26rpx] text-muted-foreground mt-[20rpx]">点击选择头像</Text>
           <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">
-            可从相册上传，或使用微信头像
+            使用微信头像、相册或拍照
           </Text>
         </View>
 
@@ -225,25 +214,6 @@ const ProfileSetup: React.FC = () => {
           </Text>
         </View>
       </View>
-
-      <BottomSheet
-        visible={wechatAvatarSheetOpen}
-        title="使用微信头像"
-        onClose={() => setWechatAvatarSheetOpen(false)}
-      >
-        <View className="px-[32rpx] pb-[48rpx]">
-          <Text className="text-[26rpx] text-muted-foreground block mb-[28rpx]">
-            微信要求：须点击下方按钮，从微信头像中选择（开发者工具可能受限，请用真机验证）
-          </Text>
-          <Button
-            className="m-0 h-[96rpx] rounded-full flex items-center justify-center bg-primary text-white text-[30rpx] font-semibold after:border-none"
-            openType="chooseAvatar"
-            onChooseAvatar={handleWechatAvatar}
-          >
-            选择微信头像
-          </Button>
-        </View>
-      </BottomSheet>
     </View>
   );
 };
