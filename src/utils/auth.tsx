@@ -23,11 +23,12 @@ import {
   switchIdentity as switchIdentityService,
   updateProfile as updateProfileService,
   validateInviteCode as validateInviteCodeService,
-  wechatLogin,
+  type WechatLoginOptions,
   bindWechatCredentials,
   bindAccountEmail,
   sendBindEmailCode,
 } from '@/services/auth';
+import { performWechatAuth } from '@/utils/wechat-login-coordinator';
 import type {
   AuthSession,
   Identity,
@@ -69,10 +70,13 @@ export interface AuthState {
     profile?: Profile | null;
     isNewUser?: boolean;
   }>;
-  /** 微信一键登录 */
-  signInWithWechat: (code: string) => Promise<{
+  /** 微信一键登录（整链单飞：内部 wx.login + POST） */
+  signInWithWechat: (
+    options?: WechatLoginOptions,
+  ) => Promise<{
     error: { message: string } | null;
     isNewUser?: boolean;
+    shareAttached?: boolean;
     profile?: Profile | null;
   }>;
   /** 微信登录后绑定手机号+密码（无短信） */
@@ -356,10 +360,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [persistAuth, syncUserRole],
   );
 
-  // 登录：微信
+  // 登录：微信（整链单飞，页面不再直接 Taro.login）
   const signInWithWechat = useCallback(
-    async (code: string) => {
-      const result = await wechatLogin(code);
+    async (options?: WechatLoginOptions) => {
+      const result = await performWechatAuth(options);
       if (result.error) return { error: result.error };
       if (result.isNewUser) {
         markLastLoginAsNewUser();
@@ -368,7 +372,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(result.profile);
       persistAuth(result.profile, result.session);
       syncUserRole(result.profile?.currentContext?.role || null);
-      return { error: null, isNewUser: result.isNewUser, profile: result.profile };
+      return {
+        error: null,
+        isNewUser: result.isNewUser,
+        shareAttached: result.shareAttached,
+        profile: result.profile,
+      };
     },
     [persistAuth, syncUserRole],
   );

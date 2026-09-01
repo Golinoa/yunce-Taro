@@ -106,14 +106,7 @@ const Login: React.FC = () => {
     try {
       Taro.showLoading({ title: '登录中...', mask: true });
       privacyTrace('login.executeWechatLogin.taroLogin.call');
-      const { code: wxCode } = await Taro.login();
-      privacyTrace('login.executeWechatLogin.taroLogin.done', { hasCode: Boolean(wxCode) });
-      if (!wxCode) {
-        Taro.hideLoading();
-        Taro.showToast({ title: '微信授权失败，请重试', icon: 'none' });
-        return;
-      }
-      const { error, isNewUser, profile: nextProfile } = await signInWithWechat(wxCode);
+      const { error, isNewUser, profile: nextProfile } = await signInWithWechat();
       privacyTrace('login.executeWechatLogin.signIn', {
         hasError: Boolean(error),
         hasProfile: Boolean(nextProfile),

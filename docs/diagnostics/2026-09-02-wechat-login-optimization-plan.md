@@ -3,8 +3,9 @@
 > 备份日期：2026-09-02  
 > 计划初版：`a7a909c` / `b7b1fbc`  
 > 自查复审：§12 · 跨模块复审：§13  
+> **⛔ P1 实施门禁：须先完成** [`2026-09-02-invite-share-auth-p0-plan.md`](./2026-09-02-invite-share-auth-p0-plan.md) **P0 验收 V1–V7**  
 > 代码基线：yunceTaro `661c176` · yunce-backend `78c9ad6`  
-> 范围：**仅**微信一键登录链路；不含 warmToken / Redis 存 code / 密码登录 / mapBackendProfile 大改
+> 范围：**仅**微信一键登录性能；**不含** invite 拉新 P0（见上链接）
 
 ---
 
@@ -161,11 +162,13 @@ return { token: tx.accessToken, refreshToken: tx.refreshToken, expiresIn: tx.exp
 ## 5. 实施顺序
 
 ```
-Phase 0  计划 + git checkpoint
-Phase 1  方案 A（Coordinator + 单测）— 可独立上线
-Phase 2  方案 B（后端 minimal + 单测）— 依赖 Phase 0 基线，不依赖 Phase 1 逻辑但可同 PR
-Phase 3  联调 + 模拟 CI
+Phase 0  计划 + git checkpoint                    ✅
+Phase 1  方案 A（Coordinator + 单测）             ✅ 2026-09-02
+Phase 2  方案 B（后端 minimal + 单测）             ✅ 2026-09-02
+Phase 3  联调 + 真机验收（与 P0 VH/V4T 一并）     ⏳ 后置
 ```
+
+**验收策略（2026-09-02）**：P1 功能/单测完成后，与 P0 真机项 **统一验收**；验收通过后再分批 push/合 PR。
 
 **取消原 Phase 3（mapBackendProfile 大改）**：交叉验证后非本次阻塞项。
 
@@ -255,8 +258,8 @@ Phase 3  联调 + 模拟 CI
 
 - warmToken / Redis 存 code
 - `mapBackendProfile` teacher/parent 映射（既有债务，单独 PR）
-- 修改 wechat 默认 role 以支持 TEACHER/PARENT 主登录页微信登录（产品决策，非性能优化）
-- 前端 `wechatLogin` 携带 `inviteCode`（`PENDING_INVITE_CODE_KEY` 已存但未 POST，**既有缺口**）
+- 修改 wechat 默认 role 以支持 TEACHER/PARENT 主登录页微信登录（见 **P0 invite 计划** D4）
+- **`inviteCode` / 员工拉新全链路** → **[P0 计划](./2026-09-02-invite-share-auth-p0-plan.md)**
 - `showLoading` 时机微调（体感项，稳定性无关）
 - `emailPasswordLogin` 共用 minimal builder（可后续复用，非必须）
 
@@ -280,12 +283,14 @@ Phase 3  联调 + 模拟 CI
 - **无需为 perfection 扩 scope**；稳定性边界清晰。
 - **无明显安全漏洞**：不存 code、不改鉴权、不改 JWT  mint 逻辑。
 
-### 12.3 复审后 git
+### 12.4 实施记录（2026-09-02）
 
-| 仓库 | 提交 |
-|------|------|
-| yunceTaro | 本文件更新 → `docs: self-review wechat login optimization plan` |
-| yunce-backend | 索引文件同步 |
+| Phase | 变更 | 单测 |
+|-------|------|------|
+| 1 | `wechat-login-coordinator.ts` 整链单飞；三页移除 `Taro.login`；`signInWithWechat(options?)` | FE 3 passed |
+| 2 | `buildMinimalLoginUserInfo` 替代 wechatLogin 内 `buildUserInfo`；去掉 count/二次 profile 重查 | BE auth 37 passed |
+
+**Git 备份点**：Phase 1（FE）/ Phase 2（BE）各一 commit，验收后再 push。
 
 ---
 

@@ -30,6 +30,7 @@ import {
 import { isInviteLessonExpired } from '@/utils/invite-lesson-expired';
 import { getOrCreateInviteVisitorKey } from '@/utils/invite-visitor-key';
 import { logError } from '@/utils/logger';
+import { ensurePrivacyBeforeAuth, promptPrivacySyncInHandler } from '@/utils/privacy-authorize';
 import { useMiniProgramNavBarLayout } from '@/utils/use-nav-safe-height';
 import './index.scss';
 
@@ -359,12 +360,10 @@ const InviteLandingPage: React.FC = () => {
     if (wechatSubmitting) return;
     setWechatSubmitting(true);
     try {
-      const { code: wxCode } = await Taro.login();
-      if (!wxCode) {
-        Taro.showToast({ title: '微信授权失败，请重试', icon: 'none' });
-        return;
-      }
-      const { error } = await signInWithWechat(wxCode);
+      const privacyOk = await ensurePrivacyBeforeAuth();
+      if (!privacyOk) return;
+
+      const { error } = await signInWithWechat();
       if (error) {
         Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
         return;
@@ -418,12 +417,18 @@ const InviteLandingPage: React.FC = () => {
         success: (res) => {
           if (!res.confirm) return;
           setAgreed(true);
-          void executeWechatLogin();
+          // ★ showModal「同意」回调仍在用户手势内，同步栈触发微信原生隐私授权
+          promptPrivacySyncInHandler(() => {
+            void executeWechatLogin();
+          });
         },
       });
       return;
     }
-    void executeWechatLogin();
+    // ★ 登录按钮同步栈内触发微信原生隐私授权
+    promptPrivacySyncInHandler(() => {
+      void executeWechatLogin();
+    });
   }, [agreed, executeWechatLogin, setAgreed, wechatSubmitting]);
 
   const persistSuccess = useCallback(
