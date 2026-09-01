@@ -546,6 +546,47 @@ status: PENDING | USED | EXPIRED | CANCELLED
 
 **自动化**：`organization.bind-code.test` O/P · `org-referral.service.test` soft-fail · `store-entry.service.test` 归因字段
 
+**Git 提交**（Review 修复批次）：
+
+| 仓库 | Commit | 说明 |
+|------|--------|------|
+| yunce-backend | `3188838` | R-1..R-8 BE + org-referral 模块 |
+| yunceTaro | `dc31498` | R-5..R-8 FE + §11.8 计划文档 |
+
+### 11.9 二次 Review（2026-09-02，Review 修复后）
+
+#### 测试覆盖评估
+
+| 链路 | 覆盖 | 缺口 | 是否必补 |
+|------|------|------|----------|
+| O 码 soft-fail | `org-referral.service.test` | 缺「带无效 referralCode 仍成功 submit」集成用例 | P3，单测已覆盖 resolve |
+| bind-code O/P 拒绝 | `organization.bind-code.test` | — | ✅ 达标 |
+| store-entry 归因字段 | `store-entry.service.test` + L4 acceptance | — | ✅ 达标 |
+| Admin list/detail 归因 | 无单测 assert include | mock 未验 `referrerOrganization` | **可不做**（见下） |
+| org-referral 路由限流 | 无 HTTP 集成测 | — | P3，与 share/context 同级 |
+
+#### 剩余缺口与消费者评估
+
+| 项 | 状态 | 消费者 | 本阶段建议 |
+|----|------|--------|------------|
+| Admin UI 展示推荐机构 | BE API 已 include | **本仓库无 yunce-admin 前端** | **不做**；V4T-R4 真机/DB 验收即可 |
+| FE 申请状态页展示归因 | `getLatest` 已返回 | pending 页**未读** referrer | **不做**；申请人无产品需求 |
+| L4 FE 主链路 | landing/about/store-entry | 代码在 working tree **未提交** | **须提交 P0 FE 批次**后再走查 |
+| P0 BE 主链路 | parent-share/wxacode/migration | 仍在 working tree | **须提交 P0 BE 批次**后再部署 |
+| campus-invite wxacode scene | 仅 link 分享 | 无 wxacode 消费者 | **不做** |
+| R-1 静默丢归因 | 无效 O 码 → null | 产品可接受（优先可提交） | 真机 V4T-R5 覆盖无效码 landing |
+
+#### 未发现的新断链
+
+- bind-code / wechat-login / wxacode / Coordinator 链路：**无新短路**
+- `resolveReferrerOrganizationId` soft-fail 不会抛错阻断 submit：**已验证**
+
+#### 建议下一步
+
+1. **提交剩余 P0 BE/FE**（parent-share、wxacode、migration、store-referral-landing 等）
+2. **开始 §11.7 真机走查**（D 部署 → VH → V4T-R → X）；Review 修复不阻塞走查
+3. **不必再开一轮 code review**；走查失败项再开 bug
+
 ---
 
 ## 12. 下一任务（P0 计划内未完成项）
