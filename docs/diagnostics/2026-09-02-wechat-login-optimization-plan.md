@@ -2,7 +2,7 @@
 
 > 备份日期：2026-09-02  
 > 计划初版：`a7a909c` / `b7b1fbc`  
-> 自查复审后：见 §12  
+> 自查复审：§12 · 跨模块复审：§13  
 > 代码基线：yunceTaro `661c176` · yunce-backend `78c9ad6`  
 > 范围：**仅**微信一键登录链路；不含 warmToken / Redis 存 code / 密码登录 / mapBackendProfile 大改
 
@@ -87,8 +87,9 @@ wechatLogin
 | **改** | `src/package-auth/pages/login/index.tsx` |
 | **改** | `src/package-lead/pages/invite-landing/index.tsx` |
 | **改** | `src/package-auth/pages/invite-register/index.tsx` |
+| **改** | `src/utils/auth.tsx` — `signInWithWechat` 内聚 `performWechatAuth` |
 
-**不改**：`request.ts`、隐私模块、后端路由、`auth.tsx` 签名。
+**不改**：`request.ts`、隐私模块、后端路由。
 
 ### 方案 B — 后端瘦身（**不改** transaction 对外签名）
 
@@ -105,20 +106,29 @@ wechatLogin
 
 ## 4. 改造思路
 
-### 4.1 WechatLoginCoordinator
+### 4.1 WechatLoginCoordinator（整链单飞，对齐 `refreshInFlight`）
 
 ```typescript
-let loginCodeTask: Promise<string> | null = null;
+let wechatAuthTask: Promise<LoginResult> | null = null;
 
-export function obtainWxLoginCode(): Promise<string> { /* 单飞 Taro.login */ }
-export function invalidateWxLoginCodeTask(): void { loginCodeTask = null; }
+/** wx.login + POST /wechat-login 作为一个原子任务单飞 */
+export async function performWechatAuth(): Promise<LoginResult> {
+  if (wechatAuthTask) return wechatAuthTask;
+  wechatAuthTask = (async () => {
+    const code = await obtainWxLoginCode(); // 内层单飞 Taro.login
+    return wechatLogin(code);
+  })().finally(() => { wechatAuthTask = null; });
+  return wechatAuthTask;
+}
 ```
 
 **规则**：
 
 - code **不落 Storage / Redis**
-- 微信登录 **失败且未拿到 token** 时 `invalidateWxLoginCodeTask()`，允许用户重试时再 login
-- 三处 `Taro.login()` → `obtainWxLoginCode()`
+- 三处页面经 `signInWithWechat` → `performWechatAuth()`，不再直接 `Taro.login()`
+- task 在 `finally` 释放；失败可重试
+
+> **第三次复审**：仅单飞 `wx.login` 不够——同一 code 被两个调用各 POST 一次会 40029。须 **整链单飞**。
 
 ### 4.2 后端 wechat-login 瘦身（稳定优先）
 
@@ -139,9 +149,12 @@ return { token: tx.accessToken, refreshToken: tx.refreshToken, expiresIn: tx.exp
 
 `buildMinimalLoginUserInfo`：
 
-- **保留**：与现 `mapBackendProfile` + PRINCIPAL `needsOnboarding` 相关的全部字段（含 `organizationId/campusId/organizationName`）
-- **删除**：`teacher.count`、`countStudents`、`countByTeacher`、`class.count` 等统计查询
-- **不新增**对外字段；`TeacherInfo.studentCount` 等 optional 字段可省略
+- **保留**：与现 `mapBackendProfile` + `needsOnboarding`（PRINCIPAL）相关的字段
+- **保留（非 PRINCIPAL 链路）**：`teacher.findFirst`（`user.id` 须为 teacher.id）、`parent` + student 最小字段——**仅去掉 count 类查询**，不删 id 解析
+- **删除**：`teacher.count`、`countStudents`、`countByTeacher`、`class.count`
+- **不修改**：`initializeUserWithTransaction`、`attachShareContext`（invite 归属仍在事务内）
+
+> share 测试（`auth.share.test.ts`）走 `role: PARENT + inviteCode`，与主登录页不同；**事务逻辑不改**，仅 user 组装变轻。若 mock 依赖 `buildUserInfo` 二次 `findUnique`，实施时改为断言 transaction 返回的 profile。
 
 ---
 
@@ -190,7 +203,7 @@ Phase 3  联调 + 模拟 CI
 
 ### 7.1 前端（方案 A）
 
-`wechat-login-coordinator.test.ts`：并发单飞、失败后 invalidate、重试再 login。
+`wechat-login-coordinator.test.ts`：并发 `performWechatAuth` 仅 1 次 login + 1 次 POST；失败后重试。
 
 ### 7.2 后端（方案 B）
 
@@ -243,6 +256,7 @@ Phase 3  联调 + 模拟 CI
 - warmToken / Redis 存 code
 - `mapBackendProfile` teacher/parent 映射（既有债务，单独 PR）
 - 修改 wechat 默认 role 以支持 TEACHER/PARENT 主登录页微信登录（产品决策，非性能优化）
+- 前端 `wechatLogin` 携带 `inviteCode`（`PENDING_INVITE_CODE_KEY` 已存但未 POST，**既有缺口**）
 - `showLoading` 时机微调（体感项，稳定性无关）
 - `emailPasswordLogin` 共用 minimal builder（可后续复用，非必须）
 
@@ -272,3 +286,39 @@ Phase 3  联调 + 模拟 CI
 |------|------|
 | yunceTaro | 本文件更新 → `docs: self-review wechat login optimization plan` |
 | yunce-backend | 索引文件同步 |
+
+---
+
+## 13. 第三次复审：跨模块 / 跨链路影响（2026-09-02）
+
+### 13.1 影响面矩阵
+
+| 模块 / 链路 | 方案 A | 方案 B | 处理 |
+|-------------|--------|--------|------|
+| 登录三页 + `signInWithWechat` | 整链单飞 | 响应更快 | ✅ Phase 1 |
+| `invite-landing` onboarding | 无逻辑改 | 无 | ✅ `markOnboardingSkipped` 保持 |
+| `request.ts` refresh / 401 | 无 | 无 | ✅ 不触及 |
+| `route-guard` / `auth-onboarding` | 无 | PRINCIPAL profile 字段不变 | ✅ F2 |
+| 密码/邮箱/手机登录、register | 无 | 仍 `buildUserInfo` | ✅ 刻意隔离 |
+| `/auth/me`、`getSession` | 无 | 无 | ✅ 不触及 |
+| `home` 统计 | 无 | 走 `/home`，不读 login count | ✅ grep 验证 |
+| `auth.share.test.ts` | 无 | 事务不变；mock 或需微调 | ✅ Phase 2 必跑 |
+| `auth.service.test.ts` TEACHER | 无 | 保留 findFirst，去 count | ✅ §4.2 |
+| Swagger / yunce-admin / E2E | 无 | 无 | ✅ 无影响 |
+
+### 13.2 本次须写入计划的修正
+
+| 缺口 | 适配 |
+|------|------|
+| 仅单飞 wx.login | 改为 `performWechatAuth` 整链单飞（§4.1） |
+| minimal 误删 teacher/parent id 查询 | 只删 count（§4.2） |
+| share.test mock 依赖二次 findUnique | Phase 2 实施时调整 mock |
+
+### 13.3 既有缺口（记录，不纳入本次）
+
+- 前端 `wechatLogin` 未 POST `inviteCode`（storage 有存）——与优化无关
+- 主登录页 TEACHER/PARENT 微信登录 → ConflictError——现行为
+
+### 13.4 结论
+
+有影响项均已对照并适配；**不必为完美扩大 scope**；稳定性边界不变。
