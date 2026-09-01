@@ -169,17 +169,16 @@ function auditPackageSize() {
 }
 
 /**
- * 校验分包页面 require 的 sub-common / sub-vendors 文件是否真实存在。
- * 这类「module is not defined」不会被 vitest 覆盖，必须在产物层拦截。
+ * 收集分包页面里对 sub-common / sub-vendors 的 require。
  */
-function verifySubpackageChunkRequires() {
+function collectSubpackageChunkRequires() {
   const requireRe = /require\(["'](\.\.\/)+((?:sub-common\/[^"']+\.js)|sub-vendors\.js)["']\)/g;
-  const missing = [];
   const pageJsFiles = collectFiles(distRoot).filter((filePath) => {
     const rel = path.relative(distRoot, filePath).replace(/\\/g, '/');
     return /^package-[^/]+\/pages\/.+\/index\.js$/.test(rel);
   });
 
+  const requires = [];
   for (const filePath of pageJsFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
     let match;
@@ -188,16 +187,62 @@ function verifySubpackageChunkRequires() {
       const requiredRel = match[0].match(/require\(["']([^"']+)["']\)/)?.[1];
       if (!requiredRel) continue;
       const resolved = path.normalize(path.join(path.dirname(filePath), requiredRel));
-      if (!fs.existsSync(resolved)) {
-        missing.push({
-          page: path.relative(distRoot, filePath).replace(/\\/g, '/'),
-          require: requiredRel,
-          expected: path.relative(distRoot, resolved).replace(/\\/g, '/'),
-        });
-      }
+      requires.push({
+        page: path.relative(distRoot, filePath).replace(/\\/g, '/'),
+        require: requiredRel,
+        expected: path.relative(distRoot, resolved).replace(/\\/g, '/'),
+        resolved,
+      });
     }
   }
 
+  return { pageJsFiles, requires };
+}
+
+/**
+ * Taro MiniSplitChunksPlugin 偶发只在部分分包写出同 hash 的 sub-common，
+ * 其它分包页面仍 require 本地路径 → 运行时 module is not defined。
+ * 从已写出的兄弟分包拷贝同名 chunk 补齐。
+ */
+function healMissingSubpackageChunks(requires) {
+  const missing = requires.filter((item) => !fs.existsSync(item.resolved));
+  if (missing.length === 0) return 0;
+
+  const chunkIndex = new Map();
+  for (const filePath of collectFiles(distRoot)) {
+    const rel = path.relative(distRoot, filePath).replace(/\\/g, '/');
+    const m = rel.match(/^package-[^/]+\/sub-common\/([^/]+\.js)$/);
+    if (!m) continue;
+    if (!chunkIndex.has(m[1])) chunkIndex.set(m[1], filePath);
+  }
+
+  let healed = 0;
+  for (const item of missing) {
+    const base = path.basename(item.resolved);
+    const donor = chunkIndex.get(base);
+    if (!donor || !item.require.includes('sub-common/')) {
+      continue;
+    }
+    fs.mkdirSync(path.dirname(item.resolved), { recursive: true });
+    fs.copyFileSync(donor, item.resolved);
+    healed += 1;
+    console.log(
+      `[postbuild-weapp-fixes] healed ${item.expected} <- ${path.relative(distRoot, donor).replace(/\\/g, '/')}`,
+    );
+  }
+
+  return healed;
+}
+
+/**
+ * 校验分包页面 require 的 sub-common / sub-vendors 文件是否真实存在。
+ * 这类「module is not defined」不会被 vitest 覆盖，必须在产物层拦截。
+ */
+function verifySubpackageChunkRequires() {
+  const { pageJsFiles, requires } = collectSubpackageChunkRequires();
+  healMissingSubpackageChunks(requires);
+
+  const missing = requires.filter((item) => !fs.existsSync(item.resolved));
   if (missing.length > 0) {
     console.error('[postbuild-weapp-fixes] ERROR: missing subpackage chunk(s):');
     missing.forEach((item) => {

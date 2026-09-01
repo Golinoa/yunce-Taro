@@ -11,6 +11,7 @@ import {
   markOnboardingSkipped,
   needsOnboarding,
   needsProfileSetup,
+  isSubscribeContextReady,
   ONBOARDING_SKIPPED_KEY,
   shouldRedirectToIdentitySelect,
 } from '@/utils/auth-onboarding';
@@ -59,6 +60,14 @@ describe('auth-onboarding', () => {
     expect(needsProfileSetup(baseProfile({ name: '未命名用户', nickname: undefined }))).toBe(true);
     expect(needsProfileSetup(baseProfile({ name: '', nickname: undefined }))).toBe(true);
     expect(needsProfileSetup(baseProfile({ name: '张老师', nickname: '张老师' }))).toBe(false);
+  });
+
+  it('isSubscribeContextReady 无机构或未完善资料时不请求 bootstrap', () => {
+    expect(isSubscribeContextReady(null)).toBe(false);
+    expect(isSubscribeContextReady(baseProfile({ name: '未命名用户', nickname: undefined }))).toBe(
+      false,
+    );
+    expect(isSubscribeContextReady(baseProfile({ name: '万老师', nickname: '万老师' }))).toBe(true);
   });
 
   it('needsOnboarding 校长以真实机构 id 为准（UUID 或种子 org-yunce，不用机构名）', () => {
@@ -190,6 +199,26 @@ describe('auth-onboarding', () => {
     expect(redirectTo).not.toHaveBeenCalled();
     expect(routeGuard.navigateAfterLogin).toHaveBeenCalledWith(profile);
     expect(hasIdentitySelectionPending()).toBe(false);
+  });
+
+  it('navigateAfterAuth：shareAttached 时跳过 identity-select 进首页', async () => {
+    const routeGuard = await import('@/utils/route-guard');
+    const redirectTo = vi.fn();
+    (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
+
+    const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
+    navigateAfterAuth(
+      baseProfile({
+        name: '新家长',
+        nickname: '新家长',
+        currentContext: { identityId: 'identity-1', role: 'parent', organizationId: '' },
+        parent_profile: { id: 'parent-1', bind_status: 'unbound' },
+      }),
+      { shareAttached: true },
+    );
+
+    expect(redirectTo).not.toHaveBeenCalled();
+    expect(routeGuard.navigateAfterLogin).toHaveBeenCalled();
   });
 
   it('navigateAfterAuth：无机构 id 才进选择身份', async () => {

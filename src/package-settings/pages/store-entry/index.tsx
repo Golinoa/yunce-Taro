@@ -33,6 +33,7 @@ import {
   resolveStoreEntrySubmitGate,
 } from '@/utils/store-entry-submit';
 import { refreshSessionForTenant } from '@/services/auth';
+import { consumePendingStoreReferralCode } from '@/utils/invite-store-referral-link';
 import { ensureUserLocationAuthorized } from '@/utils/location-authorize';
 import { ensurePrivacyAuthorized } from '@/utils/privacy-authorize';
 
@@ -356,6 +357,7 @@ const StoreEntry: React.FC = () => {
     try {
       const result = await storeEntryService.submit(payload);
 
+      consumePendingStoreReferralCode();
       saveStoreEntryDraft(payload);
       // 提交后挂演示机构：刷新 JWT 注入真实 organizationId
       await refreshSessionForTenant();

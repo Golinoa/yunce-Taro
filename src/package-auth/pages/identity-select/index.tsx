@@ -6,7 +6,7 @@
  * - 绑定机构 → 本页弹窗输入一码（不跳页）；后端按码特征区分学员/员工
  */
 import { View, Text } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useMemo, useState } from 'react';
 import BindOrgSheet from '@/components/BindOrgSheet';
 import Icon from '@/components/Icon';
@@ -14,7 +14,7 @@ import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
 import { getSession } from '@/services/auth';
 import { organizationService, savePendingRelation } from '@/services/organization';
 import { isParentRole, useAuth } from '@/utils/auth';
-import { clearIdentitySelectionPending, navigateAfterAuth } from '@/utils/auth-onboarding';
+import { clearIdentitySelectionPending, navigateAfterAuth, needsProfileSetup } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const ALL_IDENTITY_OPTIONS = [
@@ -35,9 +35,16 @@ const ALL_IDENTITY_OPTIONS = [
 
 const IdentitySelect: React.FC = () => {
   const navHeight = useNavSafeHeight();
-  const { currentRole, refreshProfile } = useAuth();
+  const { profile, currentRole, refreshProfile } = useAuth();
   const [bindVisible, setBindVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useDidShow(() => {
+    Taro.hideLoading();
+    if (profile && needsProfileSetup(profile)) {
+      Taro.redirectTo({ url: '/package-auth/pages/profile-setup/index' });
+    }
+  });
 
   const options = useMemo(() => {
     if (isParentRole(currentRole)) {

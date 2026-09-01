@@ -8,7 +8,7 @@ import {
   IDENTITY_SELECT_PENDING_KEY,
   isIdentityOnboardingAllowlistedPath,
 } from '@/utils/identity-path-allowlist';
-import { hasPendingInviteCode, consumePendingInviteCode } from '@/utils/invite-parent-link';
+import { consumePendingInviteCode, markShareAttached, consumeShareAttached } from '@/utils/invite-parent-link';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
 import { isUuidOrganizationId } from '@/utils/tenant-id';
@@ -27,10 +27,15 @@ export function shouldRedirectToIdentitySelect(path: string): boolean {
 export function markLastLoginAsNewUser(): void {
   try {
     Taro.setStorageSync(LAST_LOGIN_IS_NEW_USER_KEY, '1');
-    markLoginOptInPending();
+    // 订阅 opt-in 延后到有机构上下文后再标记（见 markSubscribeOptInAfterTenantReady）
   } catch {
     /* 静默 */
   }
+}
+
+/** 用户完成入驻/绑机构后，进站再弹一次微信订阅授权 */
+export function markSubscribeOptInAfterTenantReady(): void {
+  markLoginOptInPending();
 }
 
 export function consumeLastLoginIsNewUser(): boolean {
@@ -144,11 +149,26 @@ export function needsOnboarding(profile: Profile | null): boolean {
   return false;
 }
 
+/** 新用户漏斗进行中（完善资料 / 选身份 / 未绑机构）— 此阶段不应调订阅 bootstrap */
+export function isOnboardingFunnelActive(profile: Profile | null, options?: { isNewUser?: boolean }): boolean {
+  if (!profile) return false;
+  if (needsProfileSetup(profile, options?.isNewUser)) return true;
+  if (hasIdentitySelectionPending()) return true;
+  return needsOnboarding(profile);
+}
+
+/** 已有真实机构上下文时才应请求 subscribe-message/bootstrap */
+export function isSubscribeContextReady(profile: Profile | null): boolean {
+  if (!profile?.id) return false;
+  if (needsProfileSetup(profile)) return false;
+  return isUuidOrganizationId(profile.currentContext?.organizationId);
+}
+
 /** 登录成功后的统一跳转
  *
  * 分流：已有真实机构上下文 → 业务首页；
  * 未绑定机构 → 选择身份（门店入驻 / 绑定机构）；
- * 分享邀请上下文已挂上 → 首页关系确认。
+ * 分享招生归属成功 → 直接进首页（跳过选身份）。
  * 完善资料优先于身份选择。
  */
 function redirectWithFailFallback(url: string): void {
@@ -168,10 +188,14 @@ function redirectWithFailFallback(url: string): void {
 
 export function navigateAfterAuth(
   profile: Profile | null,
-  options?: { isNewUser?: boolean },
+  options?: { isNewUser?: boolean; shareAttached?: boolean },
 ): void {
   if (!profile) {
     return;
+  }
+
+  if (options?.shareAttached) {
+    markShareAttached();
   }
 
   if (needsProfileSetup(profile, options?.isNewUser)) {
@@ -181,18 +205,21 @@ export function navigateAfterAuth(
     return;
   }
 
-  // 已有真实机构 / 已完成家长绑定：清残留 pending，进业务首页
-  // （修复：误标 isNewUser 或上次卡在「选择身份」的老种子账号被错误拦下）
-  if (!needsOnboarding(profile)) {
-    clearIdentitySelectionPending();
+  // 员工招生归属成功：跳过 identity-select（即使家长尚未绑定孩子）
+  if (consumeShareAttached()) {
+    consumePendingInviteCode();
+    consumeIdentitySelectionPending();
     navigateAfterLogin(profile);
     return;
   }
 
-  // 分享邀请上下文已挂上 → 首页弹关系确认，跳过身份选择
-  if (hasPendingInviteCode()) {
-    consumePendingInviteCode();
-    consumeIdentitySelectionPending();
+  // 已有真实机构 / 已完成家长绑定：清残留 pending，进业务首页
+  // （修复：误标 isNewUser 或上次卡在「选择身份」的老种子账号被错误拦下）
+  if (!needsOnboarding(profile)) {
+    clearIdentitySelectionPending();
+    if (isSubscribeContextReady(profile)) {
+      markSubscribeOptInAfterTenantReady();
+    }
     navigateAfterLogin(profile);
     return;
   }

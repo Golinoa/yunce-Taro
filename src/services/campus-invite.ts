@@ -30,6 +30,7 @@ export interface CampusInvitePreview {
   status: CampusInviteStatus;
   expireAt: string;
   roleLabel?: string;
+  usedByUserId?: string | null;
 }
 
 export interface CampusInviteItem {
@@ -122,7 +123,7 @@ export function buildPointToPointInvitePayload(input: {
     campusId: input.campusId,
     targetTeacherId: input.teacherId,
     roleCode: input.roleCode ?? 'campus_teacher',
-    expireMinutes: input.expireMinutes ?? 60,
+    expireMinutes: input.expireMinutes ?? 24 * 60,
   };
 }
 

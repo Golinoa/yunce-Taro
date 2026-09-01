@@ -24,6 +24,7 @@ export default defineAppConfig({
         'pages/identity-select/index',
         'pages/parent-onboarding/index',
         'pages/campus-invite-landing/index',
+        'pages/invite-register/index',
         'pages/role-switch/index',
         'pages/role-switch/add-role',
       ],
@@ -112,7 +113,6 @@ export default defineAppConfig({
         'pages/venue-form/index',
         'pages/room-form/index',
         'pages/system-settings/index',
-        'pages/developer-mode/index',
         'pages/permission-settings/index',
         'pages/permission-form/index',
         'pages/threshold-config/index',
@@ -129,6 +129,7 @@ export default defineAppConfig({
         'pages/membership/index',
         'pages/store-entry/index',
         'pages/store-entry/pending/index',
+        'pages/store-referral-landing/index',
         'pages/notifications/index',
         'pages/message-auth/index',
       ],
@@ -165,7 +166,11 @@ export default defineAppConfig({
       ],
     },
   ],
-  /** 隐私受限接口声明（微信隐私合规强制要求，未声明会 101 失败） */
+  /**
+   * 地理位置隐私接口声明（微信强制）。
+   * 头像/昵称（chooseAvatar、input type=nickname）及相册（chooseMedia）
+   * 须在 MP 后台「用户隐私保护指引」勾选「昵称、头像」「照片或视频」，非本字段配置。
+   */
   requiredPrivateInfos: ['chooseLocation', 'getLocation'],
   /**
    * 位置权限用途说明（chooseLocation 选门店地址前系统弹窗文案）

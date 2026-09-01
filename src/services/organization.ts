@@ -79,11 +79,17 @@ export interface BindByCodeResult {
 }
 
 /** GET /share/context 响应 */
+export type ShareInviteViewStatus = 'pending' | 'expired' | 'used' | 'invalid';
+
 export interface ShareContext {
+  inviteStatus: ShareInviteViewStatus;
   organizationId: string;
   organizationName: string;
   teacherId: string;
   teacherName: string;
+  inviteCode: string;
+  expireAt: string;
+  usedByUserId?: string | null;
 }
 
 function persistAuthTokens(token: string, refreshToken: string, expiresIn: number): void {

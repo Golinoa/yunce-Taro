@@ -1,14 +1,17 @@
 /**
  * 邀请链接工具
  * - 家长绑定：复制小程序邀请链接（E08/E09 第三按钮）
- * - 员工邀请（P1-1）：生成携带 teacherCode（员工邀请码）的分享链接，
- *   落地页解析 → 登录/注册带 inviteCode，注册后归属该机构/员工
+ * - 员工招生（L2）：POST 创建 24h 临时码，落地页 invite-register?code=
  */
 import Taro from '@tarojs/taro';
+import { parentShareInviteService } from '@/services/parent-share-invite';
 import { post } from '@/utils/request';
 
 /** 待归属员工邀请码存储 key：分享落地页/登录页写入，注册登录完成后消费 */
 export const PENDING_INVITE_CODE_KEY = 'yunce:pending-invite-code';
+
+/** 最近一次登录 shareAttached 标记（navigateAfterAuth 消费） */
+export const LAST_SHARE_ATTACHED_KEY = 'yunce:last-share-attached';
 
 /** 规范化邀请码参数（query / scene） */
 export function normalizeInviteCodeParam(raw: string): string {
@@ -39,7 +42,7 @@ export function getPendingInviteCode(): string {
   }
 }
 
-/** 是否存在待归属邀请码（navigateAfterAuth 据此判断是否跳过身份选择） */
+/** 是否存在待归属邀请码 */
 export function hasPendingInviteCode(): boolean {
   return Boolean(getPendingInviteCode());
 }
@@ -57,31 +60,52 @@ export function consumePendingInviteCode(): string {
   return code;
 }
 
-/** 构建员工邀请落地页路径（带 teacherCode 参数） */
-export function buildTeacherInvitePath(teacherCode: string): string {
-  const code = (teacherCode || '').trim().toUpperCase();
-  return `/package-lead/pages/invite-landing/index?teacherCode=${encodeURIComponent(code)}`;
+export function markShareAttached(): void {
+  try {
+    Taro.setStorageSync(LAST_SHARE_ATTACHED_KEY, '1');
+  } catch {
+    /* ignore */
+  }
 }
 
-/** 复制员工邀请链接（P1-1）：携带机构 + 员工邀请码 */
-export async function copyTeacherInviteLink(
-  teacherCode: string,
-  options?: { extraPath?: string },
-): Promise<void> {
-  if (!(teacherCode || '').trim()) {
-    Taro.showToast({ title: '邀请码异常', icon: 'none' });
-    return;
+export function consumeShareAttached(): boolean {
+  try {
+    const value = Taro.getStorageSync(LAST_SHARE_ATTACHED_KEY);
+    Taro.removeStorageSync(LAST_SHARE_ATTACHED_KEY);
+    return value === '1' || value === true;
+  } catch {
+    return false;
   }
+}
 
-  const path = buildTeacherInvitePath(teacherCode) + (options?.extraPath || '');
-  const link = `package-auth/pages/index/index?redirect=${encodeURIComponent(path)}`;
+/** 构建员工招生落地页直链（带临时 code 参数） */
+export function buildTeacherInvitePath(inviteCode: string): string {
+  const code = (inviteCode || '').trim().toUpperCase();
+  return `/package-auth/pages/invite-register/index?code=${encodeURIComponent(code)}`;
+}
 
-  await Taro.setClipboardData({ data: link });
-  Taro.showToast({
-    title: '邀请链接已复制（勿随意转发）',
-    icon: 'none',
-    duration: 2500,
-  });
+/** 创建临时邀请并复制直链（24h 有效） */
+export async function copyTeacherInviteLink(options?: { extraPath?: string }): Promise<void> {
+  try {
+    const created = await parentShareInviteService.create();
+    if (!created?.landingPath && !created?.inviteCode) {
+      Taro.showToast({ title: '生成邀请链接失败', icon: 'none' });
+      return;
+    }
+
+    const path =
+      created.landingPath ||
+      buildTeacherInvitePath(created.inviteCode) + (options?.extraPath || '');
+
+    await Taro.setClipboardData({ data: path });
+    Taro.showToast({
+      title: '邀请链接已复制（24h有效，勿随意转发）',
+      icon: 'none',
+      duration: 2800,
+    });
+  } catch {
+    Taro.showToast({ title: '生成邀请链接失败', icon: 'none' });
+  }
 }
 
 export async function copyParentInviteLink(studentId: string): Promise<void> {
@@ -101,9 +125,8 @@ export async function copyParentInviteLink(studentId: string): Promise<void> {
     }
 
     const path = `/package-student/pages/parent-bind/index?studentId=${encodeURIComponent(studentId)}&token=${encodeURIComponent(created.token)}`;
-    const link = `package-auth/pages/index/index?redirect=${encodeURIComponent(path)}`;
 
-    await Taro.setClipboardData({ data: link });
+    await Taro.setClipboardData({ data: path });
     Taro.showToast({
       title: '链接已复制（48h有效，勿随意转发）',
       icon: 'none',

@@ -26,12 +26,7 @@ const ROLE_OPTIONS: { code: CampusInviteRoleCode; label: string; desc: string }[
   { code: 'campus_principal', label: '校区校长', desc: '校区管理与邀请权限' },
 ];
 
-const EXPIRE_OPTIONS: { label: string; expireMinutes?: number; expireDays?: number }[] = [
-  { label: '30 分钟', expireMinutes: 30 },
-  { label: '1 小时', expireMinutes: 60 },
-  { label: '1 天', expireDays: 1 },
-  { label: '7 天', expireDays: 7 },
-];
+const EXPIRE_MINUTES = 24 * 60;
 
 function formatExpireAt(iso: string): string {
   const date = new Date(iso);
@@ -50,7 +45,6 @@ const StaffInvitePage: React.FC = () => {
   const [campusId, setCampusId] = useState('');
   const [campusName, setCampusName] = useState('');
   const [roleCode, setRoleCode] = useState<CampusInviteRoleCode>('campus_teacher');
-  const [expireIndex, setExpireIndex] = useState(1);
   const [creating, setCreating] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [invites, setInvites] = useState<CampusInviteItem[]>([]);
@@ -85,8 +79,6 @@ const StaffInvitePage: React.FC = () => {
     void loadInvites();
   });
 
-  const expireOption = EXPIRE_OPTIONS[expireIndex];
-
   const handleCreate = useCallback(async () => {
     if (!campusId || creating) return;
     if (isPointToPoint && !targetTeacherId) {
@@ -99,8 +91,7 @@ const StaffInvitePage: React.FC = () => {
         campusId,
         roleCode,
         ...(isPointToPoint ? { targetTeacherId } : {}),
-        expireMinutes: expireOption.expireMinutes,
-        expireDays: expireOption.expireDays,
+        expireMinutes: EXPIRE_MINUTES,
       });
       setLatest(result);
       Taro.showToast({ title: '邀请码已生成', icon: 'success' });
@@ -113,7 +104,7 @@ const StaffInvitePage: React.FC = () => {
     } finally {
       setCreating(false);
     }
-  }, [campusId, creating, roleCode, expireOption, loadInvites, isPointToPoint, targetTeacherId]);
+  }, [campusId, creating, roleCode, loadInvites, isPointToPoint, targetTeacherId]);
 
   const handleCopyLink = useCallback(async (code: string) => {
     await copyCampusInviteLink(code);
@@ -181,32 +172,10 @@ const StaffInvitePage: React.FC = () => {
         </View>
 
         <View className="bg-card rounded-[24rpx] p-[28rpx] border border-border mb-[24rpx]">
-          <Text className="text-[28rpx] font-semibold text-foreground block mb-[20rpx]">
+          <Text className="text-[28rpx] font-semibold text-foreground block mb-[12rpx]">
             有效期
           </Text>
-          <View className="flex flex-row flex-wrap gap-[16rpx]">
-            {EXPIRE_OPTIONS.map((opt, index) => (
-              <View
-                key={opt.label}
-                className={cn(
-                  'px-[28rpx] py-[14rpx] rounded-full border',
-                  expireIndex === index
-                    ? 'bg-primary border-primary'
-                    : 'bg-transparent border-border',
-                )}
-                onClick={() => setExpireIndex(index)}
-              >
-                <Text
-                  className={cn(
-                    'text-[26rpx]',
-                    expireIndex === index ? 'text-primary-foreground' : 'text-foreground',
-                  )}
-                >
-                  {opt.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <Text className="text-[26rpx] text-muted-foreground">24 小时（统一口径，过期后需重新生成）</Text>
         </View>
 
         <ActionButton

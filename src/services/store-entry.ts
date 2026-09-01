@@ -16,6 +16,7 @@ import type {
   StoreEntryResult,
 } from '@/types/store-entry';
 import { get, post } from '@/utils/request';
+import { getPendingStoreReferralCode } from '@/utils/invite-store-referral-link';
 
 /** 门店入驻表单草稿 key：未登录提交前 / 驳回重提均可恢复 */
 export const STORE_ENTRY_DRAFT_KEY = 'yunce:store-entry-draft';
@@ -51,6 +52,7 @@ export function clearStoreEntryDraft(): void {
 export const storeEntryService = {
   /** 提交门店入驻申请 */
   submit: async (data: StoreEntryFormData): Promise<StoreEntryResult> => {
+    const referralCode = getPendingStoreReferralCode() || undefined;
     return post<StoreEntryResult>('/store-entry/applications', {
       name: data.name,
       type: data.type,
@@ -61,6 +63,7 @@ export const storeEntryService = {
       longitude: data.longitude,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
+      referralCode,
     });
   },
 
@@ -71,6 +74,7 @@ export const storeEntryService = {
 
   /** 被拒绝后重新提交（复用原机构，原地 UPDATE 申请单） */
   resubmit: async (data: StoreEntryFormData): Promise<StoreEntryResult> => {
+    const referralCode = getPendingStoreReferralCode() || undefined;
     return post<StoreEntryResult>('/store-entry/applications/re-submit', {
       name: data.name,
       type: data.type,
@@ -81,6 +85,7 @@ export const storeEntryService = {
       longitude: data.longitude,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
+      referralCode,
     });
   },
 };

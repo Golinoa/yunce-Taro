@@ -36,6 +36,10 @@ export default defineConfig({
         'src/package-course/pages/package-form/constants.ts',
         'src/components/InstallmentPanel/installment-utils.ts',
         'src/components/DatePickerSheet/date-picker-utils.ts',
+        'src/utils/batch-operation.ts',
+        'src/utils/upload-flow.ts',
+        'src/utils/use-batch-render.ts',
+        'src/utils/schedule-guard.ts',
       ],
       thresholds: {
         // 起步门槛：随回归套件补全逐步上调至 review 建议的 60%+

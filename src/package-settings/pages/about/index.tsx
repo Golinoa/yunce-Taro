@@ -14,12 +14,14 @@
 import { View, Text, ScrollView, Button } from '@tarojs/components';
 import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon, { IconName } from '@/components/Icon';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
 import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
+import { orgReferralService } from '@/services/org-referral';
 import { useThemeStore } from '@/stores/theme';
 import { useAuth } from '@/utils/auth';
+import { buildStoreReferralSharePath } from '@/utils/invite-store-referral-link';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -136,16 +138,42 @@ export const ABOUT_SHARE_SLOGAN = STORE_ENTRY_IDENTITY_COPY.aboutShareSlogan;
 const About: React.FC = () => {
   usePrimaryNavigationBar();
   const { activeTheme } = useThemeStore();
-  const { currentRole } = useAuth();
+  const { currentRole, session } = useAuth();
+  const [sharePath, setSharePath] = useState(
+    ABOUT_SHARE_PATH.replace(/^\//, ''),
+  );
   // 已登录的教师/家长不应再被引导去门店入驻（会被守卫拦回）
   const showStoreEntry = useMemo(() => {
     if (!currentRole) return true;
     return currentRole === 'principal' || currentRole === 'admin';
   }, [currentRole]);
 
+  useEffect(() => {
+    if (!showStoreEntry || !session) {
+      setSharePath(ABOUT_SHARE_PATH.replace(/^\//, ''));
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const mine = await orgReferralService.getMine();
+        if (!cancelled && mine.inviteCode) {
+          setSharePath(buildStoreReferralSharePath(mine.inviteCode));
+        }
+      } catch {
+        if (!cancelled) {
+          setSharePath(ABOUT_SHARE_PATH.replace(/^\//, ''));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showStoreEntry, session]);
+
   useShareAppMessage(() => ({
     title: ABOUT_SHARE_SLOGAN,
-    path: ABOUT_SHARE_PATH,
+    path: sharePath,
     imageUrl: BRAND_LOGO,
   }));
 
