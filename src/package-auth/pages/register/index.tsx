@@ -4,17 +4,17 @@
 import { View, Text, Image, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import { BRAND_LOGO } from '@/constants/brand';
-import { prepareEmailRegister } from '@/services/auth';
+import { EMAIL_PATTERN } from '@/constants/email-auth';
+import { sendRegisterEmailCode } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterAuth } from '@/utils/auth-onboarding';
+import { ensurePrivacyBeforeAuth, promptPrivacySyncInHandler } from '@/utils/privacy-authorize';
+import { useEmailOtpSend } from '@/utils/use-email-otp-send';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CODE_COUNTDOWN_SEC = 60;
 
 const Register: React.FC = () => {
   const { signUpWithEmailPassword } = useAuth();
@@ -27,37 +27,9 @@ const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showAgreementDialog, setShowAgreementDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [countdown, setCountdown] = useState(0);
   const [pendingRegister, setPendingRegister] = useState(false);
-  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-      }
-    };
-  }, []);
-
-  const startCountdown = useCallback(() => {
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
-    setCountdown(CODE_COUNTDOWN_SEC);
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-            countdownTimerRef.current = null;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
+  const { sendLabel, sendDisabled, handleSend } = useEmailOtpSend(sendRegisterEmailCode);
 
   const executeRegister = useCallback(async () => {
     if (submitting) return;
@@ -66,6 +38,9 @@ const Register: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const privacyOk = await ensurePrivacyBeforeAuth();
+      if (!privacyOk) return;
+
       const { error, profile: nextProfile } = await signUpWithEmailPassword(
         trimmedEmail,
         trimmedCode,
@@ -88,8 +63,7 @@ const Register: React.FC = () => {
   }, [code, email, password, signUpWithEmailPassword, submitting]);
 
   const handleSendCode = useCallback(async () => {
-    if (sendingCode || countdown > 0) return;
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
       Taro.showToast({ title: '请输入邮箱', icon: 'none' });
       return;
@@ -98,28 +72,8 @@ const Register: React.FC = () => {
       Taro.showToast({ title: '请输入正确的邮箱地址', icon: 'none' });
       return;
     }
-
-    setSendingCode(true);
-    startCountdown();
-    const result = await prepareEmailRegister(trimmedEmail);
-    setSendingCode(false);
-
-    if (result.error || result.status !== 'ready') {
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
-      }
-      setCountdown(0);
-      Taro.showToast({ title: result.error?.message || '验证码发送失败', icon: 'none' });
-      return;
-    }
-
-    Taro.showToast({
-      title: `验证码已受理，请查收 ${result.maskedEmail || result.email || ''}`,
-      icon: 'none',
-      duration: 2500,
-    });
-  }, [countdown, email, sendingCode, startCountdown]);
+    await handleSend(trimmedEmail);
+  }, [email, handleSend]);
 
   const handleRegister = useCallback(() => {
     if (submitting) return;
@@ -150,15 +104,26 @@ const Register: React.FC = () => {
       setShowAgreementDialog(true);
       return;
     }
-    void executeRegister();
+    // ★ 注册按钮同步栈内触发微信原生隐私授权（异步 require 弹不出原生框）
+    promptPrivacySyncInHandler(() => {
+      void executeRegister();
+    });
   }, [agreed, code, confirmPassword, email, executeRegister, password, submitting]);
 
   const handleAgreementConfirm = useCallback(() => {
     setAgreed(true);
     setShowAgreementDialog(false);
-    if (pendingRegister) {
-      void executeRegister();
-    }
+    // ★ 协议弹窗「同意」按钮的同步回调栈内触发微信原生隐私授权
+    promptPrivacySyncInHandler(
+      () => {
+        if (pendingRegister) {
+          void executeRegister();
+        }
+      },
+      () => {
+        setPendingRegister(false);
+      },
+    );
   }, [executeRegister, pendingRegister, setAgreed]);
 
   const goLogin = useCallback(() => {
@@ -224,13 +189,14 @@ const Register: React.FC = () => {
           <Text
             className={cn(
               'pl-[24rpx] text-[28rpx] font-semibold flex-shrink-0',
-              countdown > 0 || sendingCode ? 'text-muted-foreground' : 'text-primary',
+              sendDisabled ? 'text-muted-foreground' : 'text-primary',
             )}
             onClick={() => {
+              if (sendDisabled) return;
               void handleSendCode();
             }}
           >
-            {sendingCode ? '发送中' : countdown > 0 ? `${countdown}s` : '发送验证码'}
+            {sendLabel}
           </Text>
         </View>
 

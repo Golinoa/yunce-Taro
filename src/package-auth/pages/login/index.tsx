@@ -8,7 +8,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
-import { authCapabilities } from '@/services/auth';
+import {
+  authCapabilities,
+  checkEmailRegistered,
+  resolveLoginEmailInput,
+  sendRegisterEmailCode,
+} from '@/services/auth';
+import { EMAIL_PATTERN } from '@/constants/email-auth';
 import { useAgreementStore } from '@/stores/agreement';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterAuth } from '@/utils/auth-onboarding';
@@ -38,10 +44,22 @@ const Login: React.FC = () => {
   useDidShow(() => {
     privacyTrace('login.page.show', { agreed, loading, hasProfile: Boolean(profile) });
     cancelPrivacyPromptRef.current?.();
-    // 等登录页过渡完成后再弹微信官方隐私（图二），避免进页瞬间弹出
     cancelPrivacyPromptRef.current = promptWechatOfficialPrivacyOnPageEnter('login.page.show', {
       delayMs: 450,
     });
+
+    const params = Taro.getCurrentInstance().router?.params;
+    const emailParam = params?.email;
+    if (emailParam) {
+      try {
+        setAccount(decodeURIComponent(emailParam).trim().toLowerCase());
+      } catch {
+        setAccount(emailParam.trim().toLowerCase());
+      }
+    }
+    if (emailParam || params?.from === 'reset') {
+      setPassword('');
+    }
   });
 
   useEffect(() => {
@@ -128,6 +146,18 @@ const Login: React.FC = () => {
     const trimmedAccount = account.trim();
     const trimmedPassword = password;
 
+    const loginEmail = resolveLoginEmailInput(trimmedAccount);
+    if (!loginEmail) {
+      Taro.showToast({ title: '请输入正确的邮箱地址', icon: 'none' });
+      return;
+    }
+
+    const registered = await checkEmailRegistered(loginEmail);
+    if (registered.error) {
+      Taro.showToast({ title: registered.error.message, icon: 'none' });
+      return;
+    }
+
     setPasswordSubmitting(true);
     try {
       Taro.showLoading({ title: '登录中...', mask: true });
@@ -170,7 +200,11 @@ const Login: React.FC = () => {
     if (passwordSubmitting || wechatSubmitting) return;
     const trimmedAccount = account.trim();
     if (!trimmedAccount) {
-      Taro.showToast({ title: '请输入账号', icon: 'none' });
+      Taro.showToast({ title: '请输入邮箱', icon: 'none' });
+      return;
+    }
+    if (!EMAIL_PATTERN.test(trimmedAccount) && !resolveLoginEmailInput(trimmedAccount)) {
+      Taro.showToast({ title: '请输入正确的邮箱地址', icon: 'none' });
       return;
     }
     if (!password) {
@@ -273,7 +307,7 @@ const Login: React.FC = () => {
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="text"
-            placeholder="请输入账号"
+            placeholder="请输入邮箱"
             placeholderClass="text-muted-foreground font-normal"
             value={account}
             maxlength={64}

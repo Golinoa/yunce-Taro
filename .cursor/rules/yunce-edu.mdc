@@ -109,3 +109,4 @@ import BottomSheet from '@/components/BottomSheet';
 - `typescript.mdc` — 类型规范
 - `review-checklist.mdc` — 完整审查清单
 - `privacy-auth.mdc` — 图一/图二口径与微信隐私授权（禁止搞反）
+- `email-auth.mdc` — 邮箱发码/未注册/60s 冷却/找回密码

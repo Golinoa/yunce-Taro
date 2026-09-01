@@ -6,11 +6,12 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
+import { EMAIL_PATTERN } from '@/constants/email-auth';
+import { useEmailOtpSend } from '@/utils/use-email-otp-send';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_PASSWORD_LENGTH = 20;
 
@@ -36,10 +37,20 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [sending, setSending] = useState(false);
-  const [countdown, setCountdown] = useState(0);
   const [maskedHint, setMaskedHint] = useState('');
-  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const sendBindCode = useCallback(
+    async (addr: string) => {
+      const result = await onSendCode(addr);
+      if (!result.error && result.maskedEmail) {
+        setMaskedHint(result.maskedEmail);
+      }
+      return result;
+    },
+    [onSendCode],
+  );
+
+  const { sendLabel, sendDisabled, handleSend, clearCountdown } = useEmailOtpSend(sendBindCode);
 
   useEffect(() => {
     if (!visible) {
@@ -47,69 +58,19 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
       setCode('');
       setPassword('');
       setConfirmPassword('');
-      setSending(false);
-      setCountdown(0);
       setMaskedHint('');
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
-      }
+      clearCountdown();
     }
-  }, [visible]);
-
-  useEffect(
-    () => () => {
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  const startCountdown = useCallback(() => {
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
-    setCountdown(60);
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-            countdownTimerRef.current = null;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
+  }, [clearCountdown, visible]);
 
   const handleSendCode = useCallback(async () => {
-    if (sending || countdown > 0) return;
     const trimmed = email.trim().toLowerCase();
     if (!EMAIL_PATTERN.test(trimmed)) {
       Taro.showToast({ title: '请输入正确的邮箱', icon: 'none' });
       return;
     }
-    setSending(true);
-    try {
-      const result = await onSendCode(trimmed);
-      if (result.error) {
-        Taro.showToast({ title: result.error.message || '验证码发送失败', icon: 'none' });
-        return;
-      }
-      startCountdown();
-      const hint = result.maskedEmail || trimmed;
-      setMaskedHint(hint);
-      Taro.showToast({
-        title: `验证码已发送至${hint}`,
-        icon: 'none',
-      });
-    } finally {
-      setSending(false);
-    }
-  }, [countdown, email, onSendCode, sending, startCountdown]);
+    await handleSend(trimmed);
+  }, [email, handleSend]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = email.trim().toLowerCase();
@@ -178,11 +139,11 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
             <Text
               className={cn(
                 'text-[26rpx] font-semibold',
-                countdown > 0 || sending ? 'text-muted-foreground' : 'text-primary',
+                sendDisabled ? 'text-muted-foreground' : 'text-primary',
               )}
-              onClick={countdown > 0 || sending ? undefined : () => void handleSendCode()}
+              onClick={sendDisabled ? undefined : () => void handleSendCode()}
             >
-              {sending ? '发送中' : countdown > 0 ? `${countdown}s` : '发送验证码'}
+              {sendLabel}
             </Text>
           </View>
         </View>

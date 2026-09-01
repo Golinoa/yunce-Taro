@@ -4,6 +4,12 @@
  */
 import Taro from '@tarojs/taro';
 import { resolveDevLoginEmail } from '@/constants/dev-switch-accounts';
+import {
+  EMAIL_NOT_REGISTERED,
+  EMAIL_PATTERN,
+  EMAIL_SEND_FAILED,
+  PASSWORD_RESET_SUCCESS,
+} from '@/constants/email-auth';
 import type {
   AuthSession,
   Profile,
@@ -34,6 +40,7 @@ const AUTH_ENDPOINTS = {
   phoneLogin: '/auth/phone-login',
   smsCode: '/auth/sms-code',
   emailCode: '/auth/email-code',
+  checkEmail: '/auth/check-email',
   emailLogin: '/auth/email-login',
   resetPasswordEmail: '/auth/reset-password-email',
   register: '/auth/register',
@@ -46,6 +53,78 @@ const AUTH_ENDPOINTS = {
 } as const;
 
 const REGISTER_DRAFT_STORAGE_KEY = 'yunce-edu-register-draft-local';
+
+/** 登录/找回密码：解析邮箱输入（生产走邮箱；dev 保留短用户名与误输入 alias） */
+export function resolveLoginEmailInput(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (isDevApiEnv()) {
+    const devEmail = resolveDevLoginEmail(trimmed);
+    if (devEmail) {
+      const lower = trimmed.toLowerCase();
+      if (devEmail !== lower || !EMAIL_PATTERN.test(trimmed)) {
+        return devEmail;
+      }
+    }
+  }
+  if (EMAIL_PATTERN.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return isDevApiEnv() ? resolveDevLoginEmail(trimmed) : null;
+}
+
+/** 校验邮箱已注册（不发码），与找回密码发码前校验口径一致 */
+export async function checkEmailRegistered(
+  email: string,
+): Promise<{ error: { message: string } | null }> {
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return { error: { message: '请输入正确的邮箱地址' } };
+  }
+  try {
+    await post(AUTH_ENDPOINTS.checkEmail, { email: trimmed }, { skipAuth: true });
+    return { error: null };
+  } catch (error) {
+    return { error: { message: getErrorMessage(error, EMAIL_NOT_REGISTERED) } };
+  }
+}
+
+export type EmailOtpSendResult = {
+  error: { message: string } | null;
+  maskedEmail?: string;
+};
+
+export async function sendPasswordResetCode(email: string): Promise<EmailOtpSendResult> {
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return { error: { message: '请输入正确的邮箱地址' } };
+  }
+  try {
+    await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'RESET' }, { skipAuth: true });
+    return { error: null, maskedEmail: maskEmailAddress(trimmed) };
+  } catch (error) {
+    return { error: { message: getErrorMessage(error, EMAIL_SEND_FAILED) } };
+  }
+}
+
+export async function sendRegisterEmailCode(email: string): Promise<EmailOtpSendResult> {
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return { error: { message: '请输入正确的邮箱地址' } };
+  }
+  try {
+    await post(
+      AUTH_ENDPOINTS.emailCode,
+      { email: trimmed, purpose: 'REGISTER' },
+      { skipAuth: true, timeout: 20000 },
+    );
+    return { error: null, maskedEmail: maskEmailAddress(trimmed) };
+  } catch (error) {
+    return { error: { message: getErrorMessage(error, EMAIL_SEND_FAILED) } };
+  }
+}
+
+export { PASSWORD_RESET_SUCCESS };
 
 interface BackendUserInfo {
   id: string;
@@ -132,8 +211,6 @@ export const authCapabilities = {
   supportsWechatLogin: true,
   usesMockRegister: false,
 } as const;
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function maskEmailAddress(email: string): string {
   const [localPart = '', domain = ''] = email.split('@');
@@ -460,12 +537,12 @@ export interface LoginResult {
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
-  const email = resolveDevLoginEmail(username);
+  const email = resolveLoginEmailInput(username);
   if (!email) {
     return {
       session: null,
       profile: null,
-      error: { message: '请使用种子账号邮箱或已登记的测环境用户名登录' },
+      error: { message: '请输入正确的邮箱地址' },
     };
   }
   try {

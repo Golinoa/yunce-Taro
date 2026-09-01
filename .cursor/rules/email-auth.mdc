@@ -1,0 +1,40 @@
+---
+description: 邮箱登录/注册/找回密码 — 发码冷却、未注册提示、toast 口径
+alwaysApply: true
+---
+
+# 邮箱认证统一口径
+
+## 未注册
+
+- toast：**该邮箱尚未注册**（无额外引导）
+- **不**发码、**不**启 60s 倒计时
+
+## 发码冷却（60s）
+
+- 含义：1 分钟内只能点一次「发送验证码」，**不**承诺邮件已送达
+- **HTTP 200 后**才启动倒计时（禁止「一点就倒计时」）
+- 429 / 过于频繁：保持倒计时
+- 未注册 / 5xx / 网络失败：清倒计时
+- 按钮文案：`发送验证码` 或 `59s`，**不用**占满式「发送中」
+
+## purpose 与后端校验
+
+| purpose | 发码前校验 |
+|---------|------------|
+| LOGIN / check-email / 密码登录 | 须已注册 |
+| REGISTER | 须未注册 |
+| RESET | 须已注册；**同步 SES**，失败 invalidate OTP |
+| BIND | 已登录绑定 |
+
+## 找回密码成功
+
+- toast「密码已重置，请使用新密码登录」
+- `redirectTo` 登录页 `?email=...&from=reset`
+- 登录页 `useDidShow` 回填邮箱、**清空密码**
+
+## 实现
+
+- Hook：`src/utils/use-email-otp-send.ts`
+- 文案：`src/constants/email-auth.ts`
+- 校验：`POST /auth/check-email`（登录密码提交前）
