@@ -3,14 +3,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createSubmitLock } from '@/utils/submit-lock';
 import PageContainer from '@/components/PageContainer';
-import {
-  packageService,
-  lessonRecordService,
-  classService,
-  subjectService,
-  uploadService,
-  subscribeMessageService,
-} from '@/services';
+import { classService, uploadService } from '@/services';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
@@ -25,7 +18,6 @@ import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { chooseImageTemp } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
-import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { runImageUploadFlow } from '@/utils/upload-flow';
 import ClassLessonPanel from './ClassLessonPanel';
@@ -41,16 +33,8 @@ import { formatDate, formatTime } from './lesson-form-datetime';
 import type { StudentEditSheetTarget } from './StudentEditSheet';
 import SingleLessonPanel from './SingleLessonPanel';
 import { isWithinLessonOperateWindow } from './lesson-operate';
-import { executeClassSubmit } from './lesson-submit-class';
-import { executeSingleDeduct } from './lesson-submit-single';
-import {
-  executeIncrementalEditSave,
-  executeSupplementSave,
-} from './lesson-submit-supplement';
-import { resolveLessonSubmitKind } from './lesson-submit';
+import { useLessonFormActions } from './use-lesson-form-actions';
 import { useLessonFormLoaders } from './use-lesson-form-loaders';
-
-const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 
 const LessonForm: React.FC = () => {
   const { profile, currentRole } = useAuth();
@@ -519,132 +503,6 @@ const LessonForm: React.FC = () => {
     });
   }, []);
 
-  const emitScheduleRefreshSignal = useCallback(() => {
-    try {
-      Taro.setStorageSync(SCHEDULE_REFRESH_SIGNAL_KEY, String(Date.now()));
-    } catch (err) {
-      logError('emit schedule refresh signal', err);
-    }
-  }, []);
-
-  const handleSubmitSuccessReturn = useCallback(
-    async (
-      title: string,
-      icon: 'success' | 'none' = 'success',
-      duration = 1800,
-      options?: { renewSubscribe?: boolean },
-    ) => {
-      emitScheduleRefreshSignal();
-      Taro.showToast({ title, icon, duration });
-      // E05：点名成功后底部弹窗补充可发送次数（不阻断返回）
-      if (options?.renewSubscribe) {
-        try {
-          Taro.hideToast();
-          await subscribeMessageService.runFlow('E05', {
-            campusId: campusId || undefined,
-            role: profile?.currentContext?.role,
-          });
-        } catch (error) {
-          logError('subscribe E05 after checkin', error);
-        }
-      }
-      Taro.navigateBack({
-        fail: () => {
-          void Taro.switchTab({ url: '/pages/schedule/index' });
-        },
-      });
-    },
-    [campusId, emitScheduleRefreshSignal, profile?.currentContext?.role],
-  );
-
-  // ===== 班级模式：切换签到状态 =====
-  /** 切换到指定状态：签到/请假/未到 */
-  const handleSetStudentCheckin = useCallback((studentId: string, nextStatus: CheckinStatus) => {
-    if (nextStatus === 'checked') {
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        next.add(studentId);
-        return next;
-      });
-      setLeaveStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-    } else if (nextStatus === 'leave') {
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-      setLeaveStudentIds((prev) => {
-        const next = new Set(prev);
-        next.add(studentId);
-        return next;
-      });
-    } else {
-      // 未到：从 checked 和 leave 都移除
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-      setLeaveStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-    }
-  }, []);
-
-  // ===== 试听学员签到状态切换 =====
-  const handleSetTrialCheckin = useCallback((bookingId: string, nextStatus: CheckinStatus) => {
-    setTrialCheckinMap((prev) => ({ ...prev, [bookingId]: nextStatus }));
-  }, []);
-
-  const presentTrialBookings = useMemo(
-    () => trialBookings.filter((b) => trialCheckinMap[b.id] === 'checked'),
-    [trialBookings, trialCheckinMap],
-  );
-  const leaveTrialBookings = useMemo(
-    () => trialBookings.filter((b) => trialCheckinMap[b.id] === 'leave'),
-    [trialBookings, trialCheckinMap],
-  );
-  const absentTrialBookings = useMemo(
-    () => trialBookings.filter((b) => trialCheckinMap[b.id] === 'absent'),
-    [trialBookings, trialCheckinMap],
-  );
-
-  // ===== 班级模式：出勤学员 =====
-  const presentStudents = useMemo(
-    () => classStudents.filter((s) => checkedStudentIds.has(s.id)),
-    [classStudents, checkedStudentIds],
-  );
-  const leaveStudents = useMemo(
-    () => classStudents.filter((student) => leaveStudentIds.has(student.id)),
-    [classStudents, leaveStudentIds],
-  );
-  const absentStudents = useMemo(
-    () =>
-      classStudents.filter(
-        (student) => !checkedStudentIds.has(student.id) && !leaveStudentIds.has(student.id),
-      ),
-    [checkedStudentIds, classStudents, leaveStudentIds],
-  );
-  const classCheckedCount = presentStudents.length;
-  const classLeaveCount = leaveStudents.length;
-  const classAbsentCount = absentStudents.length;
-  const allSelectableChecked =
-    classStudents.length > 0 && classCheckedCount === classStudents.length;
-
-  const addableStudents = useMemo(
-    () =>
-      allStudents.filter(
-        (student) => !classStudents.some((currentStudent) => currentStudent.id === student.id),
-      ),
-    [allStudents, classStudents],
-  );
-
   // ===== 图片上传 =====
   const handleUploadImage = useCallback(async () => {
     // 统一流程：chooseMedia + 隐私预检 + 压缩（一次一张），取消静默、失败有 toast
@@ -666,73 +524,6 @@ const LessonForm: React.FC = () => {
     setHomeworkImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleOpenStudentDetailSheet = useCallback(
-    (target: {
-      type: 'formal' | 'trial';
-      id: string;
-      name: string;
-      remaining: string;
-      deduct: string;
-      courseName?: string;
-      student?: Student;
-    }) => {
-      setDetailSheetTarget(target);
-      // 预填备注：草稿优先（最新输入），否则取已落库的消课记录备注
-      const saved = recordByStudentId.get(target.id)?.note || '';
-      setDetailSheetRemark(studentRemarkDrafts[target.id] || saved);
-      setShowStudentDetailSheet(true);
-    },
-    [recordByStudentId, studentRemarkDrafts],
-  );
-
-  const handleCloseStudentDetailSheet = useCallback(() => {
-    setShowStudentDetailSheet(false);
-  }, []);
-
-  const handleConfirmStudentRemark = useCallback(async () => {
-    if (!detailSheetTarget) {
-      return;
-    }
-    const remark = detailSheetRemark.trim();
-    const studentId = detailSheetTarget.id;
-
-    // 统一先落草稿（作为 UI 呈现与提交携带的唯一事实源）
-    setStudentRemarkDrafts((prev) => ({ ...prev, [studentId]: remark }));
-
-    // 试听学员：仅暂存草稿，随下次提交点名写入记录
-    if (detailSheetTarget.type === 'trial') {
-      Taro.showToast({ title: remark ? '备注已保存' : '备注已清除', icon: 'success' });
-      return;
-    }
-
-    // 正式学员：已有点名记录 → 立即写入消课记录
-    const record = recordByStudentId.get(studentId);
-    if (record) {
-      try {
-        await lessonRecordService.update(record.id, {
-          note: remark || undefined,
-        });
-        // 同步本地记录，保证卡片备注即时呈现
-        setRecordByStudentId((prev) => {
-          const next = new Map(prev);
-          const current = next.get(studentId);
-          if (current) {
-            next.set(studentId, { ...current, note: remark || undefined });
-          }
-          return next;
-        });
-        Taro.showToast({ title: '备注已保存', icon: 'success' });
-      } catch (err) {
-        logError('save student remark', err);
-        Taro.showToast({ title: '备注保存失败，请重试', icon: 'none' });
-      }
-      return;
-    }
-
-    // 尚无考勤记录：草稿已在提交点名时随 create 写入
-    Taro.showToast({ title: '已保存，提交点名后生效', icon: 'none' });
-  }, [detailSheetRemark, detailSheetTarget, recordByStudentId]);
-
   const handleConfirmSelector = useCallback(
     (v: string) => {
       if (selector.type === 'teacher') setSelectedTeachingTeacherId(v);
@@ -747,451 +538,83 @@ const LessonForm: React.FC = () => {
     [handlePickPackage, selector.type],
   );
 
-  const handleTransferStudent = useCallback(
-    async (student: Student, targetClassId: string) => {
-      if (!selectedClassId) {
-        return;
-      }
-      try {
-        await classService.transferStudent(selectedClassId, targetClassId, student.id);
-        Taro.showToast({ title: '调班成功', icon: 'success' });
-        setClassStudents((prev) => prev.filter((s) => s.id !== student.id));
-        setStudentPackages((prev) => {
-          const next = new Map(prev);
-          next.delete(student.id);
-          return next;
-        });
-        setShowStudentDetailSheet(false);
-      } catch (err) {
-        logError('transfer student', err);
-        Taro.showToast({ title: '调班失败', icon: 'none' });
-      }
-    },
-    [selectedClassId],
-  );
-
-  const handleRemoveStudent = useCallback(
-    async (student: Student) => {
-      if (!selectedClassId) {
-        return;
-      }
-      const res = await Taro.showModal({
-        title: '确认移除',
-        content: `确定将 ${student.name} 从班级移除吗？`,
-        confirmText: '移除',
-        confirmColor: '#ef4444',
-      });
-      if (!res.confirm) {
-        return;
-      }
-      try {
-        await classService.removeStudent(selectedClassId, student.id);
-        Taro.showToast({ title: '移除成功', icon: 'success' });
-        setClassStudents((prev) => prev.filter((s) => s.id !== student.id));
-        setStudentPackages((prev) => {
-          const next = new Map(prev);
-          next.delete(student.id);
-          return next;
-        });
-        setShowStudentDetailSheet(false);
-      } catch (err) {
-        logError('remove student', err);
-        Taro.showToast({ title: '移除失败', icon: 'none' });
-      }
-    },
-    [selectedClassId],
-  );
-
-  const handleConfirmAddStudents = useCallback(
-    async (ids: string[]) => {
-      if (ids.length === 0) {
-        Taro.showToast({ title: '请选择学员', icon: 'none' });
-        return;
-      }
-
-      const appendedStudents = addableStudents.filter((student) => ids.includes(student.id));
-      if (appendedStudents.length === 0) {
-        Taro.showToast({ title: '暂无可添加学员', icon: 'none' });
-        return;
-      }
-
-      const packageEntries = await Promise.all(
-        appendedStudents.map(async (student) => {
-          const pkgs = await packageService.getActiveByStudent(student.id);
-          const best = pickBestPackage(pkgs, hoursUsed);
-          if (!best) {
-            return { studentId: student.id, pkg: null, subject: null };
-          }
-
-          const subject = best.subject_id ? await subjectService.getById(best.subject_id) : null;
-          return { studentId: student.id, pkg: best, subject };
-        }),
-      );
-
-      setClassStudents((prev) => [...prev, ...appendedStudents]);
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        ids.forEach((studentId) => {
-          if (!leaveStudentIds.has(studentId)) {
-            next.add(studentId);
-          }
-        });
-        return next;
-      });
-      setStudentPackages((prev) => {
-        const next = new Map(prev);
-        packageEntries.forEach(({ studentId, pkg }) => {
-          if (pkg) {
-            next.set(studentId, pkg);
-          }
-        });
-        return next;
-      });
-      setStudentSubjects((prev) => {
-        const next = new Map(prev);
-        packageEntries.forEach(({ studentId, pkg, subject }) => {
-          if (pkg) {
-            next.set(studentId, subject);
-          }
-        });
-        return next;
-      });
-      setShowAddStudentSheet(false);
-
-      if (addStudentSheetPurpose === 'supplement') {
-        setSupplementStudentIds(new Set(ids));
-        setAttendanceMode('supplement');
-      }
-    },
-    [addStudentSheetPurpose, addableStudents, hoursUsed, leaveStudentIds],
-  );
-
-  const handleToggleSelectAllStudents = useCallback(() => {
-    if (allSelectableChecked) {
-      setCheckedStudentIds(new Set());
-      return;
-    }
-    setCheckedStudentIds(
-      new Set(
-        classStudents
-          .filter((student) => !leaveStudentIds.has(student.id))
-          .map((student) => student.id),
-      ),
-    );
-  }, [allSelectableChecked, classStudents, leaveStudentIds]);
-
-  const getStudentCheckinStatus = useCallback(
-    (studentId: string): CheckinStatus => {
-      if (leaveStudentIds.has(studentId)) {
-        return 'leave';
-      }
-      if (checkedStudentIds.has(studentId)) {
-        return 'checked';
-      }
-      return 'absent';
-    },
-    [checkedStudentIds, leaveStudentIds],
-  );
-
-  const handleAttendanceSaveSuccess = useCallback(
-    async (title: string) => {
-      emitScheduleRefreshSignal();
-      Taro.showToast({ title, icon: 'success' });
-      if (selectedClassId) {
-        await loadClassStudents(selectedClassId);
-      }
-    },
-    [emitScheduleRefreshSignal, loadClassStudents, selectedClassId],
-  );
-
-  const buildPersistShared = useCallback(
-    () => ({
-      lessonDate,
-      hoursUsed,
-      selectedClassId,
-      selectedTeachingTeacherId,
-      currentTeacherId,
-      selectedAssistantTeacherId,
-      campusId,
-      room,
-      content,
-      performance,
-      homework,
-      homeworkImages,
-      studentPackages,
-      studentSubjects,
-      studentRemarkDrafts,
-      makeupStudentIds,
-      senderId: profile?.id || '',
-    }),
-    [
-      campusId,
-      content,
-      currentTeacherId,
-      homework,
-      homeworkImages,
-      hoursUsed,
-      lessonDate,
-      makeupStudentIds,
-      performance,
-      profile?.id,
-      room,
-      selectedAssistantTeacherId,
-      selectedClassId,
-      selectedTeachingTeacherId,
-      studentPackages,
-      studentRemarkDrafts,
-      studentSubjects,
-    ],
-  );
-
-  const batchSaveUi = useMemo(
-    () => ({
-      submitLock: submitLockRef.current,
-      setSubmitting,
-      invalidateStudents,
-      currentUserId,
-      onSuccess: handleAttendanceSaveSuccess,
-    }),
-    [currentUserId, handleAttendanceSaveSuccess, invalidateStudents],
-  );
-
-  const handleSupplementSave = useCallback(async () => {
-    await executeSupplementSave({
-      selectedClassId,
-      supplementStudentIds,
-      checkedStudentIds,
-      classStudents,
-      hoursUsed,
-      getStatus: getStudentCheckinStatus,
-      getExistingRecord: (studentId) => recordByStudentId.get(studentId),
-      shared: buildPersistShared(),
-      operator: {
-        id: currentUserId || profile?.id || '',
-        name: profile?.name || '未知',
-        role: profile?.currentContext?.role || 'unknown',
-      },
-      ui: batchSaveUi,
-    });
-  }, [
-    batchSaveUi,
-    buildPersistShared,
-    checkedStudentIds,
-    classStudents,
-    currentUserId,
-    getStudentCheckinStatus,
-    hoursUsed,
-    profile,
-    recordByStudentId,
-    selectedClassId,
-    supplementStudentIds,
-  ]);
-
-  const handleIncrementalEditSave = useCallback(async () => {
-    await executeIncrementalEditSave({
-      selectedClassId,
-      classStudents,
-      hoursUsed,
-      attendanceBaseline,
-      getStatus: getStudentCheckinStatus,
-      getExistingRecord: (studentId) => recordByStudentId.get(studentId),
-      shared: buildPersistShared(),
-      onNoChange: () => setAttendanceMode('view'),
-      ui: batchSaveUi,
-    });
-  }, [
-    attendanceBaseline,
-    batchSaveUi,
-    buildPersistShared,
-    classStudents,
-    getStudentCheckinStatus,
-    hoursUsed,
-    recordByStudentId,
-    selectedClassId,
-  ]);
-
-  const handleSingleSubmit = useCallback(async () => {
-    await executeSingleDeduct({
-      selectedStudent,
-      matchedPackage,
-      hoursUsed,
-      lessonDate,
-      selectedTeachingTeacherId,
-      currentTeacherId,
-      currentUserId,
-      content,
-      performance,
-      homework,
-      homeworkImages,
-      campusId,
-      room,
-      profile,
-      submitLock: submitLockRef.current,
-      setSubmitting,
-      invalidateStudents,
-      onSuccess: () => {
-        void handleSubmitSuccessReturn('消课成功', 'success', 1800, { renewSubscribe: true });
-      },
-    });
-  }, [
-    selectedStudent,
-    matchedPackage,
-    hoursUsed,
-    selectedTeachingTeacherId,
-    currentTeacherId,
-    currentUserId,
-    lessonDate,
-    content,
-    performance,
-    homework,
-    homeworkImages,
-    profile,
-    invalidateStudents,
-    handleSubmitSuccessReturn,
-    campusId,
-    room,
-  ]);
-
-  const handleClassSubmit = useCallback(async () => {
-    await executeClassSubmit({
-      selectedClassId,
-      selectedClassName: selectedClass?.name,
-      classStudents,
-      trialBookings,
-      presentStudents,
-      leaveStudents,
-      absentStudents,
-      presentTrialBookings,
-      leaveTrialBookings,
-      absentTrialBookings,
-      classAbsentCount,
-      hoursUsed,
-      lessonDate,
-      selectedTeachingTeacherId,
-      currentTeacherId,
-      selectedAssistantTeacherId,
-      currentUserId,
-      content,
-      performance,
-      homework,
-      homeworkImages,
-      campusId,
-      room,
-      studentPackages,
-      studentSubjects,
-      studentRemarkDrafts,
-      trialLeadMap,
-      profileId: profile?.id,
-      loadLessonRecordsByDate,
-      submitLock: submitLockRef.current,
-      setSubmitting,
-      invalidateStudents,
-      onSuccess: (title, icon, duration, options) => {
-        void handleSubmitSuccessReturn(title, icon, duration, options);
-      },
-    });
-  }, [
-    content,
-    currentTeacherId,
-    currentUserId,
-    homework,
-    homeworkImages,
-    hoursUsed,
-    invalidateStudents,
-    handleSubmitSuccessReturn,
-    lessonDate,
-    loadLessonRecordsByDate,
-    leaveStudents,
-    absentStudents,
-    performance,
-    classStudents,
-    presentStudents,
-    profile?.id,
-    selectedAssistantTeacherId,
-    selectedClass?.name,
-    selectedClassId,
-    selectedTeachingTeacherId,
+  const {
+    handleSetStudentCheckin,
+    handleSetTrialCheckin,
+    classCheckedCount,
+    classLeaveCount,
     classAbsentCount,
-    studentPackages,
-    studentRemarkDrafts,
-    studentSubjects,
-    trialBookings,
-    presentTrialBookings,
-    leaveTrialBookings,
-    absentTrialBookings,
-    trialLeadMap,
-    campusId,
-    room,
-  ]);
-
-  const handleSubmit = useCallback(() => {
-    const kind = resolveLessonSubmitKind({
-      isEditEntryAttempt,
-      mode,
-      isAlreadyChecked,
-      attendanceMode,
-    });
-    if (kind === 'blocked-edit') {
-      Taro.showToast({ title: '历史消课记录不支持编辑', icon: 'none' });
-      return;
-    }
-    if (kind === 'single') {
-      void handleSingleSubmit();
-      return;
-    }
-    if (kind === 'supplement') {
-      void handleSupplementSave();
-      return;
-    }
-    if (kind === 'edit') {
-      void handleIncrementalEditSave();
-      return;
-    }
-    void handleClassSubmit();
-  }, [
-    attendanceMode,
-    handleClassSubmit,
-    handleIncrementalEditSave,
-    handleSingleSubmit,
-    handleSupplementSave,
-    isAlreadyChecked,
+    allSelectableChecked,
+    addableStudents,
+    handleOpenStudentDetailSheet,
+    handleCloseStudentDetailSheet,
+    handleConfirmStudentRemark,
+    handleTransferStudent,
+    handleRemoveStudent,
+    handleConfirmAddStudents,
+    handleToggleSelectAllStudents,
+    handleSubmit,
+    submitText,
+    studentCheckinStatusMap,
+  } = useLessonFormActions({
     isEditEntryAttempt,
     mode,
-  ]);
-
-  // ===== 提交按钮文案 =====
-  const submitText = useMemo(() => {
-    if (mode === 'single') {
-      if (!selectedStudent || !matchedPackage) return '确认消课';
-      const isOwe = matchedPackage.remaining_hours < hoursUsed;
-      return isOwe ? `确认消课（欠课${hoursUsed}课时）` : `确认消课 ${hoursUsed}课时`;
-    }
-    const totalPresent = presentStudents.length + presentTrialBookings.length;
-    if (totalPresent === 0) return '确认消课';
-    return `确认消课 ${totalPresent}人×${hoursUsed}课时`;
-  }, [
-    matchedPackage,
-    mode,
-    presentStudents.length,
-    presentTrialBookings.length,
-    selectedStudent,
+    isAlreadyChecked,
+    attendanceMode,
+    selectedClassId,
+    selectedClassName: selectedClass?.name,
+    classStudents,
+    allStudents,
+    checkedStudentIds,
+    leaveStudentIds,
+    trialBookings,
+    trialCheckinMap,
+    trialLeadMap,
+    recordByStudentId,
+    studentRemarkDrafts,
+    detailSheetTarget,
+    detailSheetRemark,
+    addStudentSheetPurpose,
     hoursUsed,
-  ]);
-
-  // ===== 班级学员签到状态映射（给卡片用） =====
-  const studentCheckinStatusMap = useMemo(() => {
-    const map: Record<string, CheckinStatus> = {};
-    classStudents.forEach((stu) => {
-      if (leaveStudentIds.has(stu.id)) {
-        map[stu.id] = 'leave';
-      } else if (checkedStudentIds.has(stu.id)) {
-        map[stu.id] = 'checked';
-      } else {
-        map[stu.id] = 'absent';
-      }
-    });
-    return map;
-  }, [classStudents, checkedStudentIds, leaveStudentIds]);
+    lessonDate,
+    selectedTeachingTeacherId,
+    selectedAssistantTeacherId,
+    currentTeacherId,
+    currentUserId,
+    campusId,
+    room,
+    content,
+    performance,
+    homework,
+    homeworkImages,
+    studentPackages,
+    studentSubjects,
+    makeupStudentIds,
+    supplementStudentIds,
+    attendanceBaseline,
+    selectedStudent,
+    matchedPackage,
+    profile,
+    submitLockRef,
+    invalidateStudents,
+    loadClassStudents,
+    loadLessonRecordsByDate,
+    setCheckedStudentIds,
+    setLeaveStudentIds,
+    setTrialCheckinMap,
+    setDetailSheetTarget,
+    setDetailSheetRemark,
+    setShowStudentDetailSheet,
+    setStudentRemarkDrafts,
+    setRecordByStudentId,
+    setClassStudents,
+    setStudentPackages,
+    setStudentSubjects,
+    setShowAddStudentSheet,
+    setSupplementStudentIds,
+    setAttendanceMode,
+    setSubmitting,
+  });
 
   /** 过滤后的正式学员列表（搜索+考勤筛选） */
   const filteredClassStudents = useMemo(() => {

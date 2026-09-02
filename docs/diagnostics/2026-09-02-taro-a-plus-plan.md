@@ -60,7 +60,7 @@
 
 | ID | 状态 | 说明 |
 |----|------|------|
-| Q2-2 | ✅ 提交+加载+面板+弹层+loaders | load `f4a8732`；panels `5d7c57f`；sheets `07befdb`；loaders hook 本提交；页约 **1342** 行 · `backup/taro-a-plus-q2-2-loaders-2026-09-03` |
+| Q2-2 | ✅ 提交+加载+面板+弹层+loaders+actions | load `f4a8732`；panels `5d7c57f`；sheets `07befdb`；loaders `56b51a6`；actions 本提交；页约 **864** 行（此前 loaders 后实为 **1441**，非 1342）· `backup/taro-a-plus-q2-2-actions-2026-09-03` |
 | Q2-1 | ✅ 导航+卡片+开放列表 | `e66787d` OpenClass |
 | Q2-1 | ✅ +日 Swiper 项 | `ca6decf` · ScheduleDaySwiperItem · `backup/taro-a-plus-q2-1-day-swiper-2026-09-03` |
 | Q2-1 | ✅ +loaders hook | `use-schedule-loaders`；页约 **2199** 行 · `backup/taro-a-plus-q2-1-loaders-2026-09-03` |
@@ -104,7 +104,7 @@
 |------|------|
 | `src/pages/schedule/index.tsx` | 3404 |
 | `src/package-course/pages/lesson-form/index.tsx` | 3079 |
-| `src/package-course/pages/schedule-form/index.tsx` | 1090 |
+| `src/package-course/pages/schedule-form/index.tsx` | 836 |
 | `src/services/student.ts` | 2071 |
 | `src/services/auth.ts` | 89（门面；login/session/profile 已拆） |
 
