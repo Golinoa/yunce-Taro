@@ -64,7 +64,7 @@
 | Q2-1 | ✅ 导航+卡片+开放列表 | `e66787d` OpenClass |
 | Q2-1 | ✅ +日 Swiper 项 | `ca6decf` · ScheduleDaySwiperItem · `backup/taro-a-plus-q2-1-day-swiper-2026-09-03` |
 | Q2-1 | ✅ +loaders hook | `use-schedule-loaders`；页约 **2199** 行 · `backup/taro-a-plus-q2-1-loaders-2026-09-03` |
-| Q2-1 | ✅ +batch sheets | `ScheduleBatchSheets`；页约 **2053** 行 · `backup/taro-a-plus-q2-1-batch-sheets-2026-09-03` |
+| Q2-1 | ✅ +batch sheets | `88d9d33` · `ScheduleBatchSheets`；页约 **2053** 行 · `backup/taro-a-plus-q2-1-batch-sheets-2026-09-03` |
 | Q2-3 | ✅ 保存+时段+基础/规则卡+弹层/底栏 | timeslots `7ae9469`；base/rule cards；sheets+footer 本提交；页约 **1447** 行 |
 | Q2-4 | ✅ | student 已拆；auth 门面 **89** 行 · `e66787d` |
 | Q2-5 | ✅ | `82567c0` · … |
