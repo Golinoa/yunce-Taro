@@ -1,19 +1,13 @@
-import { View, Text, ScrollView, Swiper, SwiperItem } from '@tarojs/components';
+import { View, ScrollView, Swiper, SwiperItem } from '@tarojs/components';
 import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
-import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import CalendarWeekSelector, { type CalendarDotType } from '@/components/CalendarWeekSelector';
+import { type CalendarDotType } from '@/components/CalendarWeekSelector';
 import DraggableFab from '@/components/DraggableFab';
-import Icon from '@/components/Icon';
 import BookTrialByClassSheet from '@/components/lead/BookTrialByClassSheet';
 import TrialBookingView from '@/components/lead/TrialBookingView';
 import PageContainer from '@/components/PageContainer';
-import {
-  classBookingService,
-  notificationService,
-  studentService,
-} from '@/services';
+import { notificationService, studentService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useThemeStore } from '@/stores/theme';
@@ -32,26 +26,10 @@ import {
 } from '@/utils/lesson-share';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
-import { upsertParentBooking, updateParentBookingStatus } from '@/utils/parent-bookings';
 import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import { withRouteGuard } from '@/utils/route-guard';
 import { parseTimeToMinutes } from '@/utils/schedule-guard';
-import { getCardActionVisibility } from '@/utils/schedule-card-actions';
 import { getWeekdayText } from '@/utils/schedule-card-status';
-import {
-  buildBookingPagePath,
-  buildCheckinLessonFormPath,
-  buildOpenSlotRollCallPath,
-  buildScheduleFormEditPath,
-  buildScheduleFormReschedulePath,
-  buildSupplementLessonFormPath,
-  buildViewOnlyLessonFormPath,
-  resolveSchedulePrimaryActionKind,
-  validateEditScheduleNav,
-  validateOpenSlotRollCallNav,
-  validateRollCallNav,
-  validateSupplementNav,
-} from '@/utils/schedule-lesson-nav';
 import { buildDangerActionMeta } from '@/utils/schedule-danger-meta';
 import {
   buildScheduleCardsForDate,
@@ -65,9 +43,9 @@ import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
 import OpenClassScheduleList from './OpenClassScheduleList';
 import ScheduleDaySwiperItem from './ScheduleDaySwiperItem';
+import SchedulePageChrome from './SchedulePageChrome';
 import ScheduleVenueTab from './ScheduleVenueTab';
 import {
-  getTabContainerWidth,
   rpxToPx,
   TAB_GAP_RPX,
   TAB_RIGHT_FIXED_WIDTH_RPX,
@@ -76,11 +54,13 @@ import {
 import ScheduleBatchSheets, {
   type ScheduleBatchActionType as BatchActionType,
 } from './ScheduleBatchSheets';
+import { useScheduleCardActions } from './use-schedule-card-actions';
 import {
   useScheduleDangerActions,
   type ScheduleDangerActionState,
 } from './use-schedule-danger-actions';
 import { useScheduleLoaders } from './use-schedule-loaders';
+import { useScheduleOpenSlotActions } from './use-schedule-open-slot-actions';
 
 type ScheduleTabType = 'category' | 'venue';
 
@@ -766,155 +746,60 @@ const SchedulePage: React.FC = () => {
     notifyStudentAndParents,
   });
 
-  const handleOpenBookSheet = useCallback((item: ScheduleCardItem) => {
-    setBookSheetItem(item);
-    setBookSheetVisible(true);
-  }, []);
+  const {
+    handleOpenBookSheet,
+    handleCloseBookSheet,
+    handleBookTrialByClassSuccess,
+    handleSupplement,
+    handlePrimaryAction,
+    handleRollCall,
+    handleEditSchedule,
+    handleClassReschedule,
+    handleCreateSchedule,
+    handleManageBookingConfig,
+    handleBatchAction,
+    toggleBatchClassSelection,
+    handleSelectAllBatchClasses,
+    handleChooseBatchType,
+    handleConfirmBatchClassSelection,
+  } = useScheduleCardActions({
+    selectedDate,
+    currentTime,
+    selectedClassId,
+    filterAllClassId: FILTER_ALL_CLASS,
+    activeTabMode: activeTab?.mode,
+    cardActionLockRef,
+    batchClassOptions,
+    batchSelectedClassIds,
+    loadBaseData,
+    setBookSheetItem,
+    setBookSheetVisible,
+    setTrialBookingKeys,
+    setTeacherSwitchSheetVisible,
+    setBatchSelectedClassIds,
+    setBatchActionSheetVisible,
+    setBatchActionType,
+    setBatchClassSheetVisible,
+    setDangerActionState,
+  });
 
-  const handleCloseBookSheet = useCallback(() => {
-    setBookSheetVisible(false);
-    setBookSheetItem(null);
-  }, []);
-
-  const handleBookTrialByClassSuccess = useCallback(
-    ({ classId, lessonDate }: { classId: string; lessonDate: string }) => {
-      // 预约成功后本地标记该班级时段为试听，并刷新课表数据
-      setTrialBookingKeys((prev) => {
-        const next = new Set(prev);
-        next.add(`${classId}|${lessonDate}`);
-        return next;
-      });
-      void loadBaseData();
-    },
-    [loadBaseData],
-  );
-
-  /** 卡片「补录」：仅历史课且 30 天内 */
-  const handleSupplement = useCallback((item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
-    const error = validateSupplementNav(item, actionDate, dayjs());
-    if (error) {
-      Taro.showToast({ title: error, icon: 'none' });
-      return;
-    }
-    Taro.navigateTo({ url: buildSupplementLessonFormPath(item, actionDate) });
-  }, []);
-
-  /** 历史课超时：仅查看（不带补录 action） */
-  const handleViewHistoricalLesson = useCallback(
-    (item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
-      if (!item.classId) {
-        Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
-        return;
-      }
-      Taro.navigateTo({ url: buildViewOnlyLessonFormPath(item, actionDate) });
-    },
-    [],
-  );
-
-  const handlePrimaryAction = useCallback(
-    (item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
-      // 子按钮（约试听等）已抢先处理时，忽略卡片主点击（微信 stopPropagation 不可靠）
-      if (cardActionLockRef.current) {
-        return;
-      }
-      const kind = resolveSchedulePrimaryActionKind(item, actionDate, dayjs());
-      if (kind === 'booking') {
-        Taro.navigateTo({
-          url: buildBookingPagePath(actionDate.format('YYYY-MM-DD')),
-        });
-        return;
-      }
-      if (kind === 'supplement') {
-        handleSupplement(item, actionDate);
-        return;
-      }
-      if (kind === 'view') {
-        handleViewHistoricalLesson(item, actionDate);
-        return;
-      }
-      Taro.navigateTo({ url: buildCheckinLessonFormPath(item, actionDate) });
-    },
-    [handleSupplement, handleViewHistoricalLesson],
-  );
-
-  /** 卡片「点名」：进 lesson-form 正常点名 */
-  const handleRollCall = useCallback((item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
-    const error = validateRollCallNav(item, actionDate, dayjs());
-    if (error) {
-      Taro.showToast({ title: error, icon: 'none' });
-      return;
-    }
-    Taro.navigateTo({ url: buildCheckinLessonFormPath(item, actionDate) });
-  }, []);
-
-  /** 团课开放时段「点名」：复用 lesson-form（classId + 日期时段；有开班排课则带 scheduleId） */
-  const handleOpenSlotRollCall = useCallback((slot: ClassBookingSlot) => {
-    const error = validateOpenSlotRollCallNav(slot);
-    if (error) {
-      Taro.showToast({ title: error, icon: 'none' });
-      return;
-    }
-    Taro.navigateTo({
-      url: buildOpenSlotRollCallPath({
-        class_id: slot.class_id!,
-        lesson_date: slot.lesson_date,
-        start_time: slot.start_time,
-        opened_schedule_id: slot.opened_schedule_id,
-      }),
-    });
-  }, []);
-
-  const handleEditSchedule = useCallback(
-    (item: ScheduleCardItem) => {
-      const visibility = getCardActionVisibility(item, selectedDate, currentTime);
-      const error = validateEditScheduleNav(item, selectedDate, currentTime, visibility);
-      if (error) {
-        Taro.showToast({ title: error, icon: 'none' });
-        return;
-      }
-      Taro.navigateTo({
-        url: buildScheduleFormEditPath(item.id),
-      });
-    },
-    [currentTime, selectedDate],
-  );
-
-  /** 班级调课：这一天整班换到别的时间（仅本次），长期仍挂在原排课规则上 */
-  const handleClassReschedule = useCallback(
-    (item: ScheduleCardItem) => {
-      const visibility = getCardActionVisibility(item, selectedDate, currentTime);
-      if (!visibility.showEditAndReschedule) {
-        Taro.showToast({ title: '过去日期课程不支持调课', icon: 'none' });
-        return;
-      }
-      Taro.navigateTo({
-        url: buildScheduleFormReschedulePath(item.id, selectedDate.format('YYYY-MM-DD')),
-      });
-    },
-    [currentTime, selectedDate],
-  );
-
-  const handleCreateSchedule = useCallback(
-    (sourceMode?: string) => {
-      const mode = sourceMode || activeTab?.mode || 'class';
-      Taro.navigateTo({
-        url: `/package-course/pages/schedule-form/index?sourceMode=${encodeURIComponent(mode)}`,
-      });
-    },
-    [activeTab?.mode],
-  );
-
-  /** 预约视图：打开老师预约开关列表弹窗 */
-  const handleManageBookingConfig = useCallback(() => {
-    setTeacherSwitchSheetVisible(true);
-  }, []);
-
-  const handleBatchAction = useCallback(() => {
-    const initialSelectedIds =
-      selectedClassId && selectedClassId !== FILTER_ALL_CLASS ? [selectedClassId] : [];
-    setBatchSelectedClassIds(initialSelectedIds);
-    setBatchActionSheetVisible(true);
-  }, [selectedClassId]);
+  const {
+    handleOpenClassSlotConfig,
+    handleProxyBooking,
+    handleOpenSlotRollCall,
+    handleEditOpenSlot,
+    handleParentBookOpenSlot,
+    handleParentCancelOpenSlot,
+    handleCancelOpenSlot,
+    handleRestoreOpenSlot,
+  } = useScheduleOpenSlotActions({
+    filteredClasses,
+    campuses,
+    currentCampusId,
+    profile,
+    loadOpenClassSlots,
+    setOpenClassSlots,
+  });
 
   const renderDateCards = useCallback(
     (date: dayjs.Dayjs) => {
@@ -925,261 +810,6 @@ const SchedulePage: React.FC = () => {
   );
 
   /** 班课日卡片列表已抽至 ScheduleDaySwiperItem（Q2-1） */
-
-  const toggleBatchClassSelection = useCallback((classId: string) => {
-    setBatchSelectedClassIds((prev) =>
-      prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId],
-    );
-  }, []);
-
-  const handleSelectAllBatchClasses = useCallback(() => {
-    setBatchSelectedClassIds((prev) =>
-      prev.length === batchClassOptions.length ? [] : batchClassOptions.map((item) => item.id),
-    );
-  }, [batchClassOptions]);
-
-  const handleChooseBatchType = useCallback(
-    (type: BatchActionType) => {
-      setBatchActionType(type);
-      setBatchActionSheetVisible(false);
-      if (type === 'reschedule') {
-        if (selectedDate.isBefore(currentTime, 'day')) {
-          Taro.showToast({ title: '过去的日期不能批量调课', icon: 'none' });
-          return;
-        }
-        const date = encodeURIComponent(selectedDate.format('YYYY-MM-DD'));
-        const classId = encodeURIComponent(selectedClassId || '');
-        void Taro.navigateTo({
-          url: `/package-course/pages/batch-reschedule-select/index?date=${date}&classId=${classId}`,
-        });
-        return;
-      }
-      setBatchClassSheetVisible(true);
-    },
-    [currentTime, selectedClassId, selectedDate],
-  );
-
-  const handleConfirmBatchClassSelection = useCallback(() => {
-    if (batchSelectedClassIds.length === 0) {
-      Taro.showToast({ title: '请至少选择一个班级', icon: 'none' });
-      return;
-    }
-
-    setDangerActionState({
-      visible: true,
-      type: 'batch-delete',
-      item: null,
-    });
-  }, [batchSelectedClassIds.length]);
-
-  const handleOpenClassSlotConfig = useCallback((classId: string, dateStr: string) => {
-    const date = encodeURIComponent(dateStr);
-    void Taro.navigateTo({
-      url: `/package-lead/pages/class-slot-config/index?classId=${encodeURIComponent(classId)}&date=${date}`,
-    });
-  }, []);
-
-  const handleProxyBooking = useCallback(
-    (slot: ClassBookingSlot) => {
-      const date = encodeURIComponent(slot.lesson_date);
-      const time = encodeURIComponent(slot.start_time);
-      const endTime = encodeURIComponent(slot.end_time || '');
-      const className = encodeURIComponent(slot.class_name || '');
-      const subjectId = filteredClasses.find((item) => item.id === slot.class_id)?.subject_id || '';
-      void Taro.navigateTo({
-        url:
-          `/package-lead/pages/proxy-booking-form/index?teacherId=${encodeURIComponent(slot.teacher_id)}` +
-          `&date=${date}&time=${time}&endTime=${endTime}&mode=group` +
-          `&classId=${encodeURIComponent(slot.class_id)}&className=${className}` +
-          `&subjectId=${encodeURIComponent(subjectId)}`,
-      });
-    },
-    [filteredClasses],
-  );
-
-  /** 开放预约：左滑编辑时段 — 跳转到简约表单编辑页 */
-  const handleEditOpenSlot = useCallback((slot: ClassBookingSlot) => {
-    const date = encodeURIComponent(slot.lesson_date);
-    void Taro.navigateTo({
-      url:
-        `/package-lead/pages/open-slot-edit/index?slotId=${encodeURIComponent(slot.id)}` +
-        `&classId=${encodeURIComponent(slot.class_id)}&date=${date}`,
-    });
-  }, []);
-
-  /** 家长端：团课开放时段预约 */
-  const handleParentBookOpenSlot = useCallback(
-    async (slot: ClassBookingSlot) => {
-      if (!profile?.id) {
-        Taro.showToast({ title: '请先登录', icon: 'none' });
-        return;
-      }
-      if (slot.status === 'rest') {
-        Taro.showToast({ title: '该时段休息中', icon: 'none' });
-        return;
-      }
-      if (slot.status === 'full' || slot.current_count >= slot.max_count) {
-        Taro.showToast({ title: '名额已满', icon: 'none' });
-        return;
-      }
-
-      try {
-        const kids = await studentService.getByParent(profile.id);
-        if (kids.length === 0) {
-          Taro.showToast({ title: '暂无绑定学员', icon: 'none' });
-          return;
-        }
-
-        let student = kids[0];
-        if (kids.length > 1) {
-          const sheet = await Taro.showActionSheet({
-            itemList: kids.map((k) => k.name),
-          });
-          student = kids[sheet.tapIndex];
-        }
-
-        const alreadyBooked = (slot.booking_students || []).some((s) => s.id === student.id);
-        if (alreadyBooked) {
-          Taro.showToast({ title: '已预约该时段', icon: 'none' });
-          return;
-        }
-
-        const created = await classBookingService.addBookingRecord(slot.id, student.id);
-        // 本地仅缓存展示；真相源为 class-booking record id
-        upsertParentBooking({
-          id: created.id || `pb-${slot.id}-${student.id}`,
-          userId: profile.id,
-          studentId: student.id,
-          studentName: student.name,
-          occurrenceKey: `${slot.class_id}:${slot.lesson_date}:${slot.start_time}`,
-          courseId: slot.class_id,
-          courseName: slot.class_name || '团课',
-          courseType: 'group',
-          classId: slot.class_id,
-          campusId: slot.campus_id,
-          lessonDate: slot.lesson_date,
-          timeRange: `${slot.start_time}-${slot.end_time}`,
-          teacherName: slot.teacher_name || '老师',
-          deadline: dayjs(`${slot.lesson_date} ${slot.start_time}`)
-            .subtract(1, 'hour')
-            .toISOString(),
-          campusName:
-            campuses.find((c) => c.id === (slot.campus_id || currentCampusId))?.name || '校区',
-          room: slot.room,
-          status: 'booked',
-          createdAt: created.created_at || new Date().toISOString(),
-        });
-
-        await loadOpenClassSlots(dayjs(slot.lesson_date), true);
-        Taro.showToast({ title: '预约成功', icon: 'success' });
-      } catch (err) {
-        logError('parent book open slot', err);
-        Taro.showToast({ title: '预约失败', icon: 'none' });
-      }
-    },
-    [campuses, currentCampusId, loadOpenClassSlots, profile],
-  );
-
-  /** 家长端：取消团课预约 */
-  const handleParentCancelOpenSlot = useCallback(
-    async (slot: ClassBookingSlot) => {
-      if (!profile?.id) {
-        Taro.showToast({ title: '请先登录', icon: 'none' });
-        return;
-      }
-      try {
-        const kids = await studentService.getByParent(profile.id);
-        const kidIds = new Set(kids.map((k) => k.id));
-        const bookedKids = (slot.booking_students || []).filter((s) => kidIds.has(s.id));
-        if (bookedKids.length === 0) {
-          Taro.showToast({ title: '未预约该时段', icon: 'none' });
-          return;
-        }
-
-        let student = bookedKids[0];
-        if (bookedKids.length > 1) {
-          const sheet = await Taro.showActionSheet({
-            itemList: bookedKids.map((k) => k.name),
-          });
-          student = bookedKids[sheet.tapIndex];
-        }
-
-        const { confirm } = await Taro.showModal({
-          title: '取消预约',
-          content: `确认取消「${student.name}」该时段的预约？`,
-        });
-        if (!confirm) return;
-
-        const records = await classBookingService.getRecordsBySlot(slot.id);
-        const record = records.find((r) => r.student_id === student.id && r.status !== 'cancelled');
-        if (record) {
-          await classBookingService.removeBookingRecord(record.id);
-          updateParentBookingStatus(record.id, 'cancelled');
-        }
-        // 兼容旧本地草稿 id
-        updateParentBookingStatus(`pb-${slot.id}-${student.id}`, 'cancelled');
-
-        await loadOpenClassSlots(dayjs(slot.lesson_date), true);
-        Taro.showToast({ title: '已取消预约', icon: 'success' });
-      } catch (err) {
-        logError('parent cancel open slot', err);
-        Taro.showToast({ title: '取消失败', icon: 'none' });
-      }
-    },
-    [loadOpenClassSlots, profile],
-  );
-  /** 开放预约：左滑取消 — 将活跃/已满时段设为休息 */
-  const handleCancelOpenSlot = useCallback(async (slot: ClassBookingSlot) => {
-    if (slot.status === 'rest') return;
-    try {
-      await classBookingService.updateSlotStatus(slot.id, 'rest');
-      setOpenClassSlots((prev) => {
-        const next = { ...prev };
-        const dateKey = slot.lesson_date;
-        if (next[dateKey]) {
-          next[dateKey] = { ...next[dateKey] };
-          const classSlots = next[dateKey][slot.class_id];
-          if (classSlots) {
-            next[dateKey][slot.class_id] = classSlots.map((s) =>
-              s.id === slot.id ? { ...s, status: 'rest' as const } : s,
-            );
-          }
-        }
-        return next;
-      });
-      Taro.showToast({ title: '已设为休息', icon: 'success' });
-    } catch (err) {
-      logError('cancel open slot', err);
-      Taro.showToast({ title: '操作失败', icon: 'none' });
-    }
-  }, []);
-
-  /** 开放预约：左滑恢复 — 将休息时段恢复为活跃 */
-  const handleRestoreOpenSlot = useCallback(async (slot: ClassBookingSlot) => {
-    if (slot.status !== 'rest') return;
-    try {
-      await classBookingService.updateSlotStatus(slot.id, 'active');
-      setOpenClassSlots((prev) => {
-        const next = { ...prev };
-        const dateKey = slot.lesson_date;
-        if (next[dateKey]) {
-          next[dateKey] = { ...next[dateKey] };
-          const classSlots = next[dateKey][slot.class_id];
-          if (classSlots) {
-            next[dateKey][slot.class_id] = classSlots.map((s) =>
-              s.id === slot.id ? { ...s, status: 'active' as const } : s,
-            );
-          }
-        }
-        return next;
-      });
-      Taro.showToast({ title: '已恢复开放', icon: 'success' });
-    } catch (err) {
-      logError('restore open slot', err);
-      Taro.showToast({ title: '操作失败', icon: 'none' });
-    }
-  }, []);
-
   /** 团课开放预约列表已抽至 OpenClassScheduleList（Q2-1） */
 
   // 注意：不传 safeBottom — pb-safe-bottom 会给外层 View 增加安全区 padding，
@@ -1193,95 +823,21 @@ const SchedulePage: React.FC = () => {
         id="schedule-page-root"
         className="relative h-screen bg-schedule-page flex flex-col overflow-hidden"
       >
-        <View className="bg-schedule-header flex-shrink-0">
-          <View
-            className="flex items-end justify-end px-[18rpx] pb-[18rpx]"
-            style={{ height: `${navSafeHeight}px` }}
-          />
-        </View>
-
-        <View className="bg-schedule-page flex-shrink-0">
-          {/* 主分类 Tab：基础模式 + 场地 + 独立展示分类 */}
-          <View className="flex items-center px-[24rpx] py-[16rpx]">
-            <ScrollView
-              id="schedule-tab-scroll"
-              className="flex-1 min-w-0 overflow-hidden"
-              scrollX
-              scrollWithAnimation
-              showScrollbar={false}
-              enhanced
-              scrollLeft={tabScrollLeft}
-            >
-              <View
-                className="flex items-center"
-                style={{ width: `${getTabContainerWidth(tabs.length)}rpx` }}
-              >
-                {tabs.map((tab, index) => {
-                  const isActive = activeTabKey === tab.key;
-                  const isLast = index === tabs.length - 1;
-                  return (
-                    <View
-                      key={tab.key}
-                      className={cn(
-                        'flex items-center justify-center rounded-full border py-[12rpx] transition-colors active:scale-95 shrink-0',
-                        !isLast && 'mr-[16rpx]',
-                        isActive ? 'border-primary/55 bg-primary/10' : 'border-border bg-card',
-                      )}
-                      style={{ width: `${TAB_WIDTH_RPX}rpx` }}
-                      onClick={() => handleMainTabChange(tab.key, index)}
-                    >
-                      <Text
-                        className={cn(
-                          'text-[28rpx] font-medium',
-                          isActive ? 'text-primary' : 'text-foreground-secondary',
-                        )}
-                      >
-                        {tab.label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-            <View className="ml-[16rpx] flex flex-shrink-0 items-center gap-[16rpx]">
-              {!isParent && (
-                <View
-                  className="flex items-center gap-[4rpx] active:opacity-70"
-                  onClick={handleBatchAction}
-                >
-                  <Text className="text-[28rpx] text-foreground-secondary">筛选</Text>
-                  <Icon name="mdi-chevron-down" size={20} color="mutedForeground" />
-                </View>
-              )}
-              {!isParent && (activeTab?.mode === 'class' || activeTab?.mode === 'group') && (
-                <View
-                  className="flex h-[56rpx] w-[56rpx] items-center justify-center active:opacity-70"
-                  onClick={handleBatchAction}
-                >
-                  <Icon
-                    name="mdi-checkbox-multiple-marked-outline"
-                    size={28}
-                    color="mutedForeground"
-                  />
-                </View>
-              )}
-            </View>
-          </View>
-
-          {activeTab?.mode !== 'private' && (
-            <CalendarWeekSelector
-              selectedDate={selectedDate}
-              onChange={handleScheduleDateChange}
-              getDateDotType={
-                activeTab?.type === 'venue'
-                  ? undefined
-                  : scheduleSubMode === 'fixed'
-                    ? getDateDotType
-                    : getOpenDateDotType
-              }
-            />
-          )}
-        </View>
+        <SchedulePageChrome
+          navSafeHeight={navSafeHeight}
+          tabs={tabs}
+          activeTabKey={activeTabKey}
+          activeTab={activeTab}
+          tabScrollLeft={tabScrollLeft}
+          isParent={isParent}
+          selectedDate={selectedDate}
+          scheduleSubMode={scheduleSubMode}
+          getDateDotType={getDateDotType}
+          getOpenDateDotType={getOpenDateDotType}
+          onMainTabChange={handleMainTabChange}
+          onBatchAction={handleBatchAction}
+          onScheduleDateChange={handleScheduleDateChange}
+        />
 
         {activeTab?.mode === 'class' && activeTab?.type === 'category' && (
           <Swiper
