@@ -13,9 +13,6 @@ import Icon from '@/components/Icon';
 import BookTrialByClassSheet from '@/components/lead/BookTrialByClassSheet';
 import TrialBookingView from '@/components/lead/TrialBookingView';
 import PageContainer from '@/components/PageContainer';
-import ScheduleActionButton from '@/components/schedule/ScheduleActionButton';
-import ScheduleCard from '@/components/schedule/ScheduleCard';
-import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import VenueBookingCard from '@/components/schedule/VenueBookingCard';
 import {
   classBookingService,
@@ -56,16 +53,11 @@ import { upsertParentBooking, updateParentBookingStatus } from '@/utils/parent-b
 import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import { withRouteGuard } from '@/utils/route-guard';
 import {
-  canOperateHistoricalLesson,
   canSuspendOpenSlot,
   canSuspendThisLesson,
   parseTimeToMinutes,
 } from '@/utils/schedule-guard';
-import {
-  getCardActionVisibility,
-  isHistoricalClassCard,
-  isUpcomingClassCard,
-} from '@/utils/schedule-card-actions';
+import { getCardActionVisibility } from '@/utils/schedule-card-actions';
 import { getWeekdayText } from '@/utils/schedule-card-status';
 import {
   buildBookingPagePath,
@@ -106,6 +98,7 @@ import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
 import OpenClassScheduleList from './OpenClassScheduleList';
+import ScheduleDaySwiperItem from './ScheduleDaySwiperItem';
 import {
   getTabContainerWidth,
   rpxToPx,
@@ -1713,279 +1706,7 @@ const SchedulePage: React.FC = () => {
     [buildCardsForDate],
   );
 
-  const renderSwiperItem = useCallback(
-    (date: dayjs.Dayjs) => {
-      const { cards, summary } = renderDateCards(date);
-
-      return (
-        <View className="h-full bg-muted">
-          <ScrollView
-            className="h-full"
-            scrollY
-            enhanced
-            showScrollbar={false}
-            onScroll={() => setOpenCardId(null)}
-          >
-            <View className="min-h-full">
-              <View className="px-[24rpx] py-[12rpx]">
-                <Text className="text-[28rpx] text-foreground-secondary">
-                  共<Text className="font-semibold text-schedule-header">{summary.total}</Text>
-                  节课，
-                  <Text className="ml-[8rpx]">已点名：</Text>
-                  <Text className="font-semibold text-foreground-secondary">{summary.checked}</Text>
-                  节，
-                  <Text className="ml-[8rpx]">未点名：</Text>
-                  <Text className="font-semibold text-schedule-header">{summary.unchecked}</Text>节
-                </Text>
-              </View>
-
-              <View className="px-[24rpx] pb-[160rpx] pt-[12rpx]">
-                {loading && cards.length === 0 ? (
-                  <View className="py-[120rpx] flex items-center justify-center">
-                    <Text className="text-[28rpx] text-muted-foreground">课表加载中...</Text>
-                  </View>
-                ) : null}
-
-                {!loading && cards.length === 0 ? (
-                  <View className="rounded-[16rpx] bg-card py-[80rpx] shadow-card">
-                    <Empty icon="mdi-calendar-blank" description="当前日期暂无课程安排" />
-                  </View>
-                ) : null}
-
-                <View className="flex flex-col gap-[14rpx]">
-                  {cards.map((item) => {
-                    const actionVisibility = getCardActionVisibility(item, date, currentTime);
-                    const isCancelled = item.status === 'cancelled';
-                    const cardBody = (
-                      <ScheduleCard
-                        item={item}
-                        showShare={!isParent && item.status !== 'cancelled'}
-                        onSharePrepare={
-                          isParent
-                            ? undefined
-                            : (card) => {
-                                pendingShareRef.current = {
-                                  type: 'class_lesson',
-                                  teacherId: currentTeacherId || currentUserId,
-                                  campusId:
-                                    card.campusId ||
-                                    currentCampusId ||
-                                    profile?.currentContext?.campusId ||
-                                    '',
-                                  classId: card.classId || '',
-                                  className: card.className,
-                                  scheduleId: card.id,
-                                  date: date.format('YYYY-MM-DD'),
-                                  start: card.startTime,
-                                  end: card.endTime,
-                                };
-                              }
-                        }
-                        metaAction={
-                          isParent ? (
-                            item.status !== 'cancelled' && isUpcomingClassCard(item.status) ? (
-                              <ScheduleActionButton
-                                label="请假"
-                                variant="neutral"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  runCardButtonAction(() => {
-                                    const lessonKey = `${item.id}:${date.format('YYYY-MM-DD')}`;
-                                    const studentId = item.students?.[0]?.id || '';
-                                    const query = [
-                                      studentId ? `studentId=${encodeURIComponent(studentId)}` : '',
-                                      `lessonKey=${encodeURIComponent(lessonKey)}`,
-                                      item.classId
-                                        ? `classId=${encodeURIComponent(item.classId)}`
-                                        : '',
-                                    ]
-                                      .filter(Boolean)
-                                      .join('&');
-                                    void Taro.navigateTo({
-                                      url: `/package-course/pages/leave-request/index?${query}`,
-                                    });
-                                  });
-                                }}
-                              />
-                            ) : undefined
-                          ) : item.status === 'cancelled' ? undefined : isHistoricalClassCard(
-                              item.status,
-                              date,
-                              currentTime,
-                            ) ? (
-                            canOperateHistoricalLesson(date, currentTime) ? (
-                              <ScheduleActionButton
-                                label="补录"
-                                variant="neutral"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  runCardButtonAction(() => handleSupplement(item, date));
-                                }}
-                              />
-                            ) : undefined
-                          ) : (
-                            <ScheduleActionButton
-                              label={item.status === 'urgent' ? '立即点名' : '点名'}
-                              variant="attend"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                runCardButtonAction(() => handleRollCall(item, date));
-                              }}
-                            />
-                          )
-                        }
-                        footerAction={
-                          isParent || !isUpcomingClassCard(item.status) ? undefined : (
-                            <View
-                              className="flex min-h-[48rpx] items-center px-[4rpx] active:opacity-70"
-                              hoverStopPropagation
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                runCardButtonAction(() => handleOpenBookSheet(item));
-                              }}
-                            >
-                              <Text className="text-[24rpx] text-primary">约试听/补课</Text>
-                              <Text className="ml-[2rpx] text-[24rpx] text-primary">›</Text>
-                            </View>
-                          )
-                        }
-                        showStudentRow={
-                          item.status !== 'cancelled' &&
-                          (isUpcomingClassCard(item.status) ||
-                            item.status === 'active' ||
-                            (item.students?.length || 0) > 0)
-                        }
-                      />
-                    );
-
-                    if (isParent) {
-                      const openLeave = () => {
-                        if (item.status === 'cancelled') return;
-                        const lessonKey = `${item.id}:${date.format('YYYY-MM-DD')}`;
-                        const studentId = item.students?.[0]?.id || '';
-                        const query = [
-                          studentId ? `studentId=${encodeURIComponent(studentId)}` : '',
-                          `lessonKey=${encodeURIComponent(lessonKey)}`,
-                          item.classId ? `classId=${encodeURIComponent(item.classId)}` : '',
-                        ]
-                          .filter(Boolean)
-                          .join('&');
-                        void Taro.navigateTo({
-                          url: `/package-course/pages/leave-request/index?${query}`,
-                        });
-                      };
-                      return (
-                        <View key={item.id} className="rounded-[16rpx]" onClick={openLeave}>
-                          {cardBody}
-                        </View>
-                      );
-                    }
-
-                    return (
-                      <SwappableScheduleCard
-                        key={item.id}
-                        cardId={item.id}
-                        openCardId={openCardId}
-                        onOpenChange={setOpenCardId}
-                        onClick={() => handlePrimaryAction(item, date)}
-                        actions={[
-                          {
-                            label: '编辑',
-                            variant: 'default',
-                            onClick: () => handleEditSchedule(item),
-                            disabled: !actionVisibility.showEditAndReschedule,
-                          },
-                          {
-                            label: '停课',
-                            variant: 'warning',
-                            onClick: () => {
-                              void handleSuspendLesson(item);
-                            },
-                            disabled: !canSuspendThisLesson(item, date, currentTime),
-                          },
-                          {
-                            label: '调课',
-                            variant: 'warning',
-                            onClick: () => handleClassReschedule(item),
-                            disabled: !actionVisibility.showEditAndReschedule,
-                          },
-                          isCancelled
-                            ? {
-                                label: '恢复',
-                                variant: 'warning',
-                                onClick: () => void handleRestoreLesson(item),
-                              }
-                            : {
-                                label: '取消',
-                                variant: 'danger',
-                                onClick: () => void handleCancelLesson(item),
-                                disabled: !actionVisibility.showCancelLesson,
-                              },
-                        ]}
-                      >
-                        {cardBody}
-                      </SwappableScheduleCard>
-                    );
-                  })}
-                </View>
-
-                {!isParent && pausedClasses.length > 0 ? (
-                  <View className="mt-[28rpx] flex flex-col gap-[14rpx]">
-                    <Text className="px-[4rpx] text-[24rpx] text-muted-foreground">已停课班级</Text>
-                    {pausedClasses.map((cls) => (
-                      <View
-                        key={cls.id}
-                        className="flex items-center gap-[16rpx] rounded-[16rpx] bg-card px-[24rpx] py-[22rpx] shadow-card"
-                      >
-                        <View className="min-w-0 flex-1">
-                          <Text className="block text-[28rpx] font-medium text-foreground truncate">
-                            {cls.name}
-                          </Text>
-                          <Text className="mt-[4rpx] block text-[22rpx] text-muted-foreground">
-                            停课中 · 课表已隐藏排课
-                          </Text>
-                        </View>
-                        <View
-                          className="shrink-0 rounded-[12rpx] bg-primary px-[22rpx] py-[12rpx] active:opacity-85"
-                          onClick={() => void handleResumeClass(cls.id, cls.name)}
-                        >
-                          <Text className="text-[24rpx] font-semibold text-primary-foreground">
-                            恢复上课
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      );
-    },
-    [
-      renderDateCards,
-      loading,
-      currentTime,
-      openCardId,
-      handleOpenBookSheet,
-      runCardButtonAction,
-      handlePrimaryAction,
-      handleRollCall,
-      handleSupplement,
-      handleEditSchedule,
-      handleClassReschedule,
-      handleCancelLesson,
-      handleRestoreLesson,
-      handleSuspendLesson,
-      handleResumeClass,
-      pausedClasses,
-      isParent,
-    ],
-  );
+  /** 班课日卡片列表已抽至 ScheduleDaySwiperItem（Q2-1） */
 
   const toggleBatchClassSelection = useCallback((classId: string) => {
     setBatchSelectedClassIds((prev) =>
@@ -2400,11 +2121,42 @@ const SchedulePage: React.FC = () => {
             onChange={handleSwiperChange}
             onAnimationFinish={handleSwiperFinish}
           >
-            {scheduleDateWindow.map((date) => (
-              <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-                {renderSwiperItem(date)}
-              </SwiperItem>
-            ))}
+            {scheduleDateWindow.map((date) => {
+              const { cards, summary } = renderDateCards(date);
+              return (
+                <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
+                  <ScheduleDaySwiperItem
+                    date={date}
+                    cards={cards}
+                    summary={summary}
+                    loading={loading}
+                    currentTime={currentTime}
+                    openCardId={openCardId}
+                    onOpenCardIdChange={setOpenCardId}
+                    isParent={isParent}
+                    currentCampusId={currentCampusId || ''}
+                    currentTeacherId={currentTeacherId}
+                    currentUserId={currentUserId}
+                    profileCampusId={profile?.currentContext?.campusId}
+                    pausedClasses={pausedClasses}
+                    onPrepareShare={(payload) => {
+                      pendingShareRef.current = payload;
+                    }}
+                    onRunCardButtonAction={runCardButtonAction}
+                    onOpenBookSheet={handleOpenBookSheet}
+                    onPrimaryAction={handlePrimaryAction}
+                    onRollCall={handleRollCall}
+                    onSupplement={handleSupplement}
+                    onEditSchedule={handleEditSchedule}
+                    onClassReschedule={handleClassReschedule}
+                    onCancelLesson={handleCancelLesson}
+                    onRestoreLesson={handleRestoreLesson}
+                    onSuspendLesson={handleSuspendLesson}
+                    onResumeClass={handleResumeClass}
+                  />
+                </SwiperItem>
+              );
+            })}
           </Swiper>
         )}
 
