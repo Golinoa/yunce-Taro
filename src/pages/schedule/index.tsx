@@ -81,6 +81,20 @@ import {
   resolveScheduleStatus,
   type ScheduleCardStatus,
 } from '@/utils/schedule-card-status';
+import {
+  buildBookingPagePath,
+  buildCheckinLessonFormPath,
+  buildOpenSlotRollCallPath,
+  buildScheduleFormEditPath,
+  buildScheduleFormReschedulePath,
+  buildSupplementLessonFormPath,
+  buildViewOnlyLessonFormPath,
+  resolveSchedulePrimaryActionKind,
+  validateEditScheduleNav,
+  validateOpenSlotRollCallNav,
+  validateRollCallNav,
+  validateSupplementNav,
+} from '@/utils/schedule-lesson-nav';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -1209,31 +1223,12 @@ const SchedulePage: React.FC = () => {
 
   /** 卡片「补录」：仅历史课且 30 天内 */
   const handleSupplement = useCallback((item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
-    if (!item.classId) {
-      Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
+    const error = validateSupplementNav(item, actionDate, dayjs());
+    if (error) {
+      Taro.showToast({ title: error, icon: 'none' });
       return;
     }
-    if (item.status === 'cancelled') {
-      Taro.showToast({ title: '已取消课程无法补录', icon: 'none' });
-      return;
-    }
-    if (!isHistoricalClassCard(item.status, actionDate, dayjs())) {
-      Taro.showToast({ title: '未下课课程请先点名', icon: 'none' });
-      return;
-    }
-    if (!canOperateHistoricalLesson(actionDate, dayjs())) {
-      Taro.showToast({ title: '已超过 30 天补录期限', icon: 'none' });
-      return;
-    }
-    // 已点名：补录漏人；未点名的历史课：以补录入口打开点名页完成登记
-    const actionQuery = item.status === 'done' ? '&action=supplement' : '';
-    const url =
-      `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
-      `&classId=${encodeURIComponent(item.classId)}` +
-      `&lessonDate=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}` +
-      `&hasTrialStudent=${item.hasTrialStudent ? '1' : '0'}` +
-      actionQuery;
-    Taro.navigateTo({ url });
+    Taro.navigateTo({ url: buildSupplementLessonFormPath(item, actionDate) });
   }, []);
 
   /** 历史课超时：仅查看（不带补录 action） */
@@ -1243,13 +1238,7 @@ const SchedulePage: React.FC = () => {
         Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
         return;
       }
-      const url =
-        `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
-        `&classId=${encodeURIComponent(item.classId)}` +
-        `&lessonDate=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}` +
-        `&hasTrialStudent=${item.hasTrialStudent ? '1' : '0'}` +
-        `&viewOnly=1`;
-      Taro.navigateTo({ url });
+      Taro.navigateTo({ url: buildViewOnlyLessonFormPath(item, actionDate) });
     },
     [],
   );
@@ -1260,84 +1249,63 @@ const SchedulePage: React.FC = () => {
       if (cardActionLockRef.current) {
         return;
       }
-      if (item.bookingTag) {
+      const kind = resolveSchedulePrimaryActionKind(item, actionDate, dayjs());
+      if (kind === 'booking') {
         Taro.navigateTo({
-          url: `/package-course/pages/booking/index?date=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}`,
+          url: buildBookingPagePath(actionDate.format('YYYY-MM-DD')),
         });
         return;
       }
-
-      // 历史课：30 天内同补录；超时仅查看
-      if (isHistoricalClassCard(item.status, actionDate, dayjs())) {
-        if (canOperateHistoricalLesson(actionDate, dayjs())) {
-          handleSupplement(item, actionDate);
-        } else {
-          handleViewHistoricalLesson(item, actionDate);
-        }
+      if (kind === 'supplement') {
+        handleSupplement(item, actionDate);
         return;
       }
-
-      // 未开课 / 上课中：进点名页
-      const checkinUrl =
-        `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
-        `&classId=${encodeURIComponent(item.classId || '')}` +
-        `&lessonDate=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}` +
-        `&hasTrialStudent=${item.hasTrialStudent ? '1' : '0'}`;
-      Taro.navigateTo({ url: checkinUrl });
+      if (kind === 'view') {
+        handleViewHistoricalLesson(item, actionDate);
+        return;
+      }
+      Taro.navigateTo({ url: buildCheckinLessonFormPath(item, actionDate) });
     },
     [handleSupplement, handleViewHistoricalLesson],
   );
 
   /** 卡片「点名」：进 lesson-form 正常点名 */
   const handleRollCall = useCallback((item: ScheduleCardItem, actionDate: dayjs.Dayjs) => {
-    if (item.status === 'cancelled') {
-      Taro.showToast({ title: '已取消课程无法点名', icon: 'none' });
+    const error = validateRollCallNav(item, actionDate, dayjs());
+    if (error) {
+      Taro.showToast({ title: error, icon: 'none' });
       return;
     }
-    if (isHistoricalClassCard(item.status, actionDate, dayjs())) {
-      Taro.showToast({ title: '历史课程请使用补录', icon: 'none' });
-      return;
-    }
-    const url =
-      `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
-      `&classId=${encodeURIComponent(item.classId || '')}` +
-      `&lessonDate=${encodeURIComponent(actionDate.format('YYYY-MM-DD'))}` +
-      `&hasTrialStudent=${item.hasTrialStudent ? '1' : '0'}`;
-    Taro.navigateTo({ url });
+    Taro.navigateTo({ url: buildCheckinLessonFormPath(item, actionDate) });
   }, []);
 
   /** 团课开放时段「点名」：复用 lesson-form（classId + 日期时段；有开班排课则带 scheduleId） */
   const handleOpenSlotRollCall = useCallback((slot: ClassBookingSlot) => {
-    if (slot.status === 'rest') {
-      Taro.showToast({ title: '休息时段无法点名', icon: 'none' });
+    const error = validateOpenSlotRollCallNav(slot);
+    if (error) {
+      Taro.showToast({ title: error, icon: 'none' });
       return;
     }
-    if (!slot.class_id) {
-      Taro.showToast({ title: '当前时段缺少班级信息', icon: 'none' });
-      return;
-    }
-    const scheduleId = slot.opened_schedule_id || '';
-    const url =
-      `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(slot.class_id)}` +
-      `&lessonDate=${encodeURIComponent(slot.lesson_date)}` +
-      `&lessonTime=${encodeURIComponent(slot.start_time)}` +
-      (scheduleId ? `&scheduleId=${encodeURIComponent(scheduleId)}` : '');
-    Taro.navigateTo({ url });
+    Taro.navigateTo({
+      url: buildOpenSlotRollCallPath({
+        class_id: slot.class_id!,
+        lesson_date: slot.lesson_date,
+        start_time: slot.start_time,
+        opened_schedule_id: slot.opened_schedule_id,
+      }),
+    });
   }, []);
 
   const handleEditSchedule = useCallback(
     (item: ScheduleCardItem) => {
-      if (isHistoricalClassCard(item.status, selectedDate, currentTime)) {
-        Taro.showToast({ title: '历史课程不支持编辑', icon: 'none' });
-        return;
-      }
       const visibility = getCardActionVisibility(item, selectedDate, currentTime);
-      if (!visibility.showEditAndReschedule) {
-        Taro.showToast({ title: '当前课程不支持编辑', icon: 'none' });
+      const error = validateEditScheduleNav(item, selectedDate, currentTime, visibility);
+      if (error) {
+        Taro.showToast({ title: error, icon: 'none' });
         return;
       }
       Taro.navigateTo({
-        url: `/package-course/pages/schedule-form/index?id=${encodeURIComponent(item.id)}`,
+        url: buildScheduleFormEditPath(item.id),
       });
     },
     [currentTime, selectedDate],
@@ -1351,11 +1319,8 @@ const SchedulePage: React.FC = () => {
         Taro.showToast({ title: '过去日期课程不支持调课', icon: 'none' });
         return;
       }
-      const lessonDate = selectedDate.format('YYYY-MM-DD');
       Taro.navigateTo({
-        url:
-          `/package-course/pages/schedule-form/index?id=${encodeURIComponent(item.id)}` +
-          `&mode=reschedule&lessonDate=${encodeURIComponent(lessonDate)}`,
+        url: buildScheduleFormReschedulePath(item.id, selectedDate.format('YYYY-MM-DD')),
       });
     },
     [currentTime, selectedDate],

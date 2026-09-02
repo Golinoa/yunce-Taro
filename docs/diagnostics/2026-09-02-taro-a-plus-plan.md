@@ -61,7 +61,7 @@
 | ID | 状态 | 说明 |
 |----|------|------|
 | Q2-2 | ✅ 提交+加载 | `f4a8732` · `backup/taro-a-plus-q2-2-load-2026-09-02`：出勤回填/试听/课包；页约 2426 行 |
-| Q2-1 | ✅ 起步 | `6f722fb` · `backup/taro-a-plus-q2-1-card-helpers-2026-09-02`：schedule-card-actions/status + 单测 |
+| Q2-1 | ✅ 起步+导航 | card helpers + `schedule-lesson-nav`（点名/补录/编辑 URL）；页约 3324 行 |
 | Q2-3 | ✅ 起步 | `f1d6b98` · `backup/taro-a-plus-q2-3-form-helpers-2026-09-02`：time / teacher-selection / YesNoToggle |
 | Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
 | Q2-2 | ✅ | Checkin + submit handlers + **attendance load helpers** |
@@ -75,7 +75,7 @@
 | Q3-5 | ✅ 起步 | coverage include 热路径 |
 | Q3-1/2/4 | ⏳ | |
 
-下一节点：继续削 lesson-form / schedule 巨型页；真机门禁；Q3 分层/Token。
+下一节点：继续削 schedule（危险操作/卡片构建）与 lesson-form UI；真机门禁；Q3。
 
 ---
 
