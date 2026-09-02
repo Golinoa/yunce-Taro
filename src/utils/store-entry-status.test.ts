@@ -27,4 +27,10 @@ describe('normalizeStoreEntryStatus', () => {
     expect(normalizeStoreEntryStatus(undefined)).toBe('pending');
     expect(normalizeStoreEntryStatus('')).toBe('pending');
   });
+
+  it('未知/非法状态回落 pending', () => {
+    expect(normalizeStoreEntryStatus('UNKNOWN')).toBe('pending');
+    expect(normalizeStoreEntryStatus('foo')).toBe('pending');
+    expect(isStoreEntryPending('DRAFT')).toBe(true);
+  });
 });

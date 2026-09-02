@@ -79,4 +79,30 @@ describe('invite-staff-link (B0-1 L3 直链)', () => {
     expect(consumePendingCampusInviteCode()).toBe('ETEST01');
     expect(hasPendingCampusInviteCode()).toBe(false);
   });
+
+  it('缺参：空码不写 storage；consume 空串', () => {
+    storePendingCampusInviteCode('   ');
+    expect(setStorageSync).not.toHaveBeenCalled();
+    getStorageSync.mockReturnValue('');
+    expect(consumePendingCampusInviteCode()).toBe('');
+    expect(removeStorageSync).not.toHaveBeenCalled();
+  });
+
+  it('编码往返：特殊字符经 encodeURIComponent 进 path，大写规范化', () => {
+    const path = buildCampusInvitePath('e@b c/1');
+    expect(path).toContain('code=');
+    const encoded = path.split('code=')[1];
+    expect(decodeURIComponent(encoded)).toBe('E@B C/1');
+  });
+
+  it('storage 异常时 get 回落空串；set 静默失败', () => {
+    getStorageSync.mockImplementation(() => {
+      throw new Error('storage');
+    });
+    expect(getPendingCampusInviteCode()).toBe('');
+    setStorageSync.mockImplementation(() => {
+      throw new Error('storage');
+    });
+    expect(() => storePendingCampusInviteCode('EABC')).not.toThrow();
+  });
 });
