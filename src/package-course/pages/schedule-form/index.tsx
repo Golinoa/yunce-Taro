@@ -57,10 +57,16 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { withRouteGuard } from '@/utils/route-guard';
+import YesNoToggle from './YesNoToggle';
+import { getTeacherSelectionInfo } from './teacher-selection';
+import {
+  formatMinutesToTime,
+  getNextDateByDayOfWeek,
+  MIN_DURATION_MINUTES,
+  parseTimeToMinutes,
+} from './time';
 
 /* ======================== 常量 ======================== */
-
-const MIN_DURATION_MINUTES = 30;
 
 /** 与时段配置 class-slot-config 一致的预约设置选项 */
 type AutoOpenType = NonNullable<Class['auto_open_type']>;
@@ -100,98 +106,6 @@ const END_MODE_OPTIONS: { label: string; value: EndMode }[] = [
   { label: '限日期', value: 'by_date' },
   { label: '按次数', value: 'by_count' },
 ];
-
-/** 是/否分段开关（节假日是否排课） */
-const YesNoToggle: React.FC<{
-  value: boolean;
-  onChange: (v: boolean) => void;
-}> = ({ value, onChange }) => (
-  <View className="flex items-center rounded-full bg-muted p-[4rpx]">
-    <View
-      className={cn(
-        'min-w-[72rpx] rounded-full px-[20rpx] py-[10rpx] text-center transition-colors',
-        value ? 'bg-primary' : 'bg-transparent',
-      )}
-      onClick={() => onChange(true)}
-    >
-      <Text
-        className={cn('text-[24rpx] font-medium', value ? 'text-white' : 'text-muted-foreground')}
-      >
-        是
-      </Text>
-    </View>
-    <View
-      className={cn(
-        'min-w-[72rpx] rounded-full px-[20rpx] py-[10rpx] text-center transition-colors',
-        !value ? 'bg-[#64748B]' : 'bg-transparent',
-      )}
-      onClick={() => onChange(false)}
-    >
-      <Text
-        className={cn('text-[24rpx] font-medium', !value ? 'text-white' : 'text-muted-foreground')}
-      >
-        否
-      </Text>
-    </View>
-  </View>
-);
-
-/* ======================== 工具函数 ======================== */
-
-function getNextDateByDayOfWeek(dayOfWeek: DayOfWeek, baseDate = dayjs()): dayjs.Dayjs {
-  const currentDate = baseDate.startOf('day');
-  const currentWeekday = (currentDate.day() || 7) as DayOfWeek;
-  const diff = dayOfWeek - currentWeekday;
-  return currentDate.add(diff >= 0 ? diff : diff + 7, 'day');
-}
-
-function parseTimeToMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-  return h * 60 + m;
-}
-
-function formatMinutesToTime(m: number): string {
-  const s = Math.max(0, Math.min(24 * 60 - 1, m));
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
-
-function getTeacherSelectionInfo(params: {
-  classInfo: Class | null;
-  teacherById: Record<string, TeacherUIModel>;
-  fallbackTeacherId?: string;
-  fallbackTeacherName?: string;
-  fallbackAssistantTeacherId?: string;
-  fallbackAssistantTeacherName?: string;
-}) {
-  const {
-    classInfo,
-    teacherById,
-    fallbackTeacherId,
-    fallbackTeacherName,
-    fallbackAssistantTeacherId,
-    fallbackAssistantTeacherName,
-  } = params;
-  const tIds = classInfo?.teachers?.length
-    ? classInfo.teachers
-    : classInfo?.teacher_id
-      ? [classInfo.teacher_id]
-      : [];
-  const teachers = tIds.map((id) => teacherById[id]).filter(Boolean);
-  const lead =
-    teachers.find((t) => t.role !== 'assist') ||
-    (classInfo?.teacher_id ? teacherById[classInfo.teacher_id] : undefined) ||
-    (fallbackTeacherId ? teacherById[fallbackTeacherId] : undefined);
-  const assist =
-    teachers.find((t) => t.role === 'assist' && t.id !== lead?.id) ||
-    (fallbackAssistantTeacherId ? teacherById[fallbackAssistantTeacherId] : undefined);
-  return {
-    leadTeacherId: lead?.id || fallbackTeacherId || '',
-    leadTeacherName: lead?.name || fallbackTeacherName || '待分配',
-    assistantTeacherId: assist?.id || fallbackAssistantTeacherId || '',
-    assistantTeacherName: assist?.name || fallbackAssistantTeacherName || '未安排',
-  };
-}
 
 /** 时间槽组 */
 interface TimeSlotPair {
