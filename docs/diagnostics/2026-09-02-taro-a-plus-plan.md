@@ -43,9 +43,20 @@
 | 基线 | ✅ | `backup/pre-taro-a-plus-2026-09-02` @ `9fd950c` |
 | B0-1 | ✅ | `eb2937e` · `backup/taro-a-plus-b0-1-2026-09-02` |
 | B0-2 | ✅ | `3b23316` · `backup/taro-a-plus-b0-2-2026-09-02` |
-| B0-3 | ✅ | 本节点：walkthrough X-3/X-3b + V3T-5/6 文档；FE 单测已在 B0-1/2 |
+| B0-2 hotfix | ✅ | `b3a0d1b` · `backup/taro-a-plus-b0-2-hotfix-2026-09-02`（清 loginRedirect，防 accept 后回环） |
+| B0-3 | ✅ | `083bbf8` · `backup/taro-a-plus-b0-3-2026-09-02` |
 
-下一节点：Wave 1（G1-1 消课防重入 …）。
+### Wave 1 进度
+
+| ID | 状态 | 说明 |
+|----|------|------|
+| G1-1 | ✅ | `21991df` · `backup/taro-a-plus-g1-1-2026-09-02` |
+| G1-2 | ✅ | 砍「全部已签到」假入口 |
+| G1-5 | ✅ | L3 过期/已用满屏分态 |
+| G1-6 | ✅ | DeductResult.fifoSplitKnown=false |
+| G1-3 / G1-4 | ⏳ 真机 | 无法代跑；见 walkthrough X-3/VH/V4T |
+
+下一节点：Wave 2 巨型页拆分。
 
 ---
 
