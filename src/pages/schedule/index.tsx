@@ -73,13 +73,8 @@ import {
   isUpcomingClassCard,
 } from '@/utils/schedule-card-actions';
 import {
-  getClassCardStatusRank,
   getDurationText,
-  getTeacherNames,
   getWeekdayText,
-  isBookingSchedule,
-  resolveScheduleStatus,
-  type ScheduleCardStatus,
 } from '@/utils/schedule-card-status';
 import {
   buildBookingPagePath,
@@ -95,13 +90,32 @@ import {
   validateRollCallNav,
   validateSupplementNav,
 } from '@/utils/schedule-lesson-nav';
+import {
+  buildCancelLessonNotifyCopy,
+  buildCancelLessonRecordContent,
+  buildDangerActionMeta,
+  buildDissolveClassNotifyContent,
+  buildRestoreLessonConfirmContent,
+  buildResumeClassConfirmContent,
+  buildSuspendLessonConfirmContent,
+  buildSuspendLessonRecordContent,
+  buildSuspendNotifyCopy,
+  buildSuspendOpenSlotConfirmContent,
+  formatLessonChangeTime,
+  type ScheduleDangerActionType,
+} from '@/utils/schedule-danger-meta';
+import {
+  buildScheduleCardsForDate,
+  summarizeScheduleCards,
+  type ScheduleCardItem,
+  type ScheduleCardStudentAvatar,
+} from '@/utils/schedule-card-build';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
 
 type BatchActionType = 'reschedule' | 'delete';
-type ScheduleDangerActionType = 'cancel' | 'delete' | 'batch-delete';
 
 type ScheduleTabType = 'category' | 'venue';
 
@@ -126,35 +140,6 @@ const BASE_MODE_LABEL: Record<CourseCategoryMode, string> = {
   group: '团课',
   private: '私教',
 };
-
-interface ScheduleCardStudentAvatar {
-  id: string;
-  name: string;
-  avatar?: string;
-}
-
-interface ScheduleCardItem {
-  id: string;
-  classId?: string;
-  campusId?: string;
-  detailRecordId?: string;
-  className: string;
-  startTime: string;
-  endTime: string;
-  leadTeacherName: string;
-  assistantTeacherName?: string;
-  note?: string;
-  room?: string;
-  checkedCount: number;
-  totalCount: number;
-  status: ScheduleCardStatus;
-  countdownText?: string;
-  bookingTag?: string;
-  hasTrialStudent?: boolean;
-  canCancelLesson: boolean;
-  isTemporaryAdjusted?: boolean;
-  students?: ScheduleCardStudentAvatar[];
-}
 
 interface ScheduleDangerActionState {
   visible: boolean;
@@ -943,118 +928,21 @@ const SchedulePage: React.FC = () => {
   );
 
   const buildCardsForDate = useCallback(
-    (date: dayjs.Dayjs): ScheduleCardItem[] => {
-      const dateStr = date.format('YYYY-MM-DD');
-      const weekday = (date.day() || 7) as Schedule['day_of_week'];
-      const dayRecords = lessonRecords.filter((record) => record.lesson_date === dateStr);
-      const movedOutScheduleIdSet = new Set(
-        temporaryReschedules
-          .filter((item) => item.source_date === dateStr)
-          .map((item) => item.schedule_id),
-      );
-      const movedInSchedules = temporaryReschedules
-        .filter((item) => item.target_date === dateStr)
-        .reduce<Array<Schedule & { __temporaryAdjusted: boolean }>>((acc, item) => {
-          const originalSchedule = scheduleById[item.schedule_id];
-          if (!originalSchedule) {
-            return acc;
-          }
-
-          acc.push({
-            ...originalSchedule,
-            start_time: item.start_time,
-            end_time: item.end_time,
-            class_id: item.class_id,
-            day_of_week: weekday,
-            updated_at: item.updated_at,
-            note: originalSchedule.note,
-            __temporaryAdjusted: true,
-          });
-          return acc;
-        }, []);
-      const visibleSchedules = [
-        ...filteredSchedules
-          .filter((schedule) => schedule.day_of_week === weekday)
-          .filter((schedule) => !movedOutScheduleIdSet.has(schedule.id)),
-        ...movedInSchedules,
-      ];
-
-      return visibleSchedules
-        .filter((schedule) => !selectedClassId || schedule.class_id === selectedClassId)
-        .map((schedule) => {
-          const classInfo =
-            (schedule.class_id ? classById[schedule.class_id] : undefined) ||
-            (schedule.class_id
-              ? {
-                  id: schedule.class_id,
-                  name: schedule.class_info?.name || schedule.note || '未命名班级',
-                  teacher_id: '',
-                  created_at: '',
-                  updated_at: '',
-                  type: 'limited',
-                  status: 'active',
-                  used_lessons: 0,
-                  color: 'primary',
-                  student_count: schedule.total_count || 0,
-                }
-              : undefined);
-          const recordList = dayRecords.filter((record) =>
-            schedule.class_id
-              ? record.class_id === schedule.class_id
-              : record.student_id === schedule.student_id,
-          );
-          const totalCount =
-            classInfo?.student_count || schedule.total_count || (schedule.student_id ? 1 : 0);
-          const { leadTeacherName, assistantTeacherName } = getTeacherNames(
-            classInfo,
-            teacherById,
-            schedule.teacher_name || currentTeacherName,
-            schedule,
-          );
-          const statusResult = resolveScheduleStatus({
-            selectedDate: date,
-            startTime: schedule.start_time,
-            endTime: schedule.end_time,
-            records: recordList,
-            totalCount,
-            now: currentTime,
-          });
-
-          return {
-            id: schedule.id,
-            classId: schedule.class_id,
-            campusId: classInfo?.campus_id,
-            detailRecordId: recordList[0]?.id,
-            className:
-              classInfo?.name || schedule.class_info?.name || schedule.note || '未命名班级',
-            startTime: schedule.start_time,
-            endTime: schedule.end_time,
-            leadTeacherName,
-            assistantTeacherName,
-            note: schedule.note || '',
-            room: schedule.room || undefined,
-            checkedCount: statusResult.checkedCount,
-            totalCount,
-            status: statusResult.status,
-            countdownText: statusResult.countdownText,
-            bookingTag: isBookingSchedule(schedule) ? '约' : undefined,
-            // 试听：仅当天该班有有效试听预约时显示（非「班内曾有体验课包」）
-            hasTrialStudent: Boolean(
-              schedule.class_id &&
-              trialBookingKeys.has(`${schedule.class_id}|${date.format('YYYY-MM-DD')}`),
-            ),
-            canCancelLesson: statusResult.status !== 'cancelled',
-            isTemporaryAdjusted:
-              '__temporaryAdjusted' in schedule ? Boolean(schedule.__temporaryAdjusted) : false,
-            students: schedule.class_id ? classStudentAvatars[schedule.class_id] || [] : [],
-          };
-        })
-        .sort((left, right) => {
-          const rank = getClassCardStatusRank(left.status) - getClassCardStatusRank(right.status);
-          if (rank !== 0) return rank;
-          return parseTimeToMinutes(left.startTime) - parseTimeToMinutes(right.startTime);
-        });
-    },
+    (date: dayjs.Dayjs): ScheduleCardItem[] =>
+      buildScheduleCardsForDate({
+        date,
+        now: currentTime,
+        filteredSchedules,
+        scheduleById,
+        temporaryReschedules,
+        lessonRecords,
+        selectedClassId,
+        classById,
+        teacherById,
+        classStudentAvatars,
+        trialBookingKeys,
+        currentTeacherName,
+      }),
     [
       classById,
       classStudentAvatars,
@@ -1162,41 +1050,16 @@ const SchedulePage: React.FC = () => {
     });
   }, []);
 
-  const dangerActionMeta = useMemo(() => {
-    if (!dangerActionState.type) {
-      return null;
-    }
-
-    if (dangerActionState.type === 'batch-delete') {
-      return {
-        title: '删除提示',
-        confirmText: '确认删除',
-        tone: 'danger' as const,
-        description: `确认删除所选 ${selectedBatchClasses.length} 个班级吗？删除后会向相关学员发送班级解散通知。`,
-      };
-    }
-
-    const item = dangerActionState.item;
-    if (!item) {
-      return null;
-    }
-
-    if (dangerActionState.type === 'cancel') {
-      return {
-        title: '取消开课提醒',
-        confirmText: '确认取消开课',
-        tone: 'warning' as const,
-        description: `是否确定取消【${item.className}】${selectedDate.format('YYYY-MM-DD')} ${item.startTime}-${item.endTime}的课，取消后不可恢复并自动发送取消开课提醒给学员`,
-      };
-    }
-
-    return {
-      title: '删除提示',
-      confirmText: '确认删除',
-      tone: 'danger' as const,
-      description: '确认要批量删除所选课节吗，删除后将不能恢复?',
-    };
-  }, [dangerActionState.item, dangerActionState.type, selectedBatchClasses.length, selectedDate]);
+  const dangerActionMeta = useMemo(
+    () =>
+      buildDangerActionMeta({
+        type: dangerActionState.type,
+        item: dangerActionState.item,
+        lessonDate: selectedDate.format('YYYY-MM-DD'),
+        batchCount: selectedBatchClasses.length,
+      }),
+    [dangerActionState.item, dangerActionState.type, selectedBatchClasses.length, selectedDate],
+  );
 
   const handleOpenBookSheet = useCallback((item: ScheduleCardItem) => {
     setBookSheetItem(item);
@@ -1363,10 +1226,16 @@ const SchedulePage: React.FC = () => {
         return;
       }
 
+      const confirmCopy = buildRestoreLessonConfirmContent({
+        className: item.className,
+        lessonDate,
+        startTime: item.startTime,
+        endTime: item.endTime,
+      });
       const confirmResult = await Taro.showModal({
-        title: '恢复开课',
-        content: `确定恢复【${item.className}】${lessonDate} ${item.startTime}-${item.endTime} 的课程吗？`,
-        confirmText: '恢复',
+        title: confirmCopy.title,
+        content: confirmCopy.content,
+        confirmText: confirmCopy.confirmText,
         confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
       });
 
@@ -1416,10 +1285,16 @@ const SchedulePage: React.FC = () => {
       }
 
       const lessonDate = selectedDate.format('YYYY-MM-DD');
+      const confirmCopy = buildSuspendLessonConfirmContent({
+        className: item.className,
+        lessonDate,
+        startTime: item.startTime,
+        endTime: item.endTime,
+      });
       const confirmResult = await Taro.showModal({
-        title: '停课确认',
-        content: `确定停课【${item.className}】${lessonDate} ${item.startTime}-${item.endTime}？停课后本节课临时取消，将向学员家长发送站内通知与订阅消息。`,
-        confirmText: '确认停课',
+        title: confirmCopy.title,
+        content: confirmCopy.content,
+        confirmText: confirmCopy.confirmText,
         confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
       });
       if (!confirmResult.confirm) return;
@@ -1428,7 +1303,12 @@ const SchedulePage: React.FC = () => {
       const selectedClass =
         filteredClasses.find((classItem) => classItem.id === item.classId) || null;
       const className = selectedClass?.name || item.className;
-      const changeTime = `${lessonDate} ${item.startTime}-${item.endTime}`;
+      const changeTime = formatLessonChangeTime({
+        lessonDate,
+        startTime: item.startTime,
+        endTime: item.endTime,
+      });
+      const notifyCopy = buildSuspendNotifyCopy({ className, changeTime });
 
       // 并发锁：已有批量操作执行中则忽略本次，避免重复创建停课记录
       const lock = batchOperationLockRef.current;
@@ -1449,7 +1329,11 @@ const SchedulePage: React.FC = () => {
               lesson_date: lessonDate,
               hours_used: 0,
               status: 'cancelled',
-              content: `停课：${item.className} ${item.startTime}-${item.endTime}`,
+              content: buildSuspendLessonRecordContent({
+                className: item.className,
+                startTime: item.startTime,
+                endTime: item.endTime,
+              }),
             });
             createdRecords.push(createdRecord);
 
@@ -1458,8 +1342,8 @@ const SchedulePage: React.FC = () => {
               await notificationService.send({
                 sender_id: profile?.id || currentUserId,
                 receiver_id: binding.parent_id,
-                title: `${className}停课通知`,
-                content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
+                title: notifyCopy.title,
+                content: notifyCopy.content,
                 related_id: student.id,
                 type: 'schedule_change',
               });
@@ -1468,7 +1352,7 @@ const SchedulePage: React.FC = () => {
                 bizKey: `lesson-suspend:${item.id}:${lessonDate}:${binding.parent_id}`,
                 className,
                 changeTime,
-                changeReason: '本节课临时停课',
+                changeReason: notifyCopy.changeReason,
               });
             }
           }
@@ -1507,11 +1391,17 @@ const SchedulePage: React.FC = () => {
       }
 
       const displayName = className || slot.class_name || '该班级';
-      const changeTime = `${slot.lesson_date} ${slot.start_time}-${slot.end_time}`;
+      const changeTime = formatLessonChangeTime({
+        lessonDate: slot.lesson_date,
+        startTime: slot.start_time,
+        endTime: slot.end_time,
+      });
+      const confirmCopy = buildSuspendOpenSlotConfirmContent({ displayName, changeTime });
+      const notifyCopy = buildSuspendNotifyCopy({ className: displayName, changeTime });
       const confirmResult = await Taro.showModal({
-        title: '停课确认',
-        content: `确定停课【${displayName}】${changeTime}？停课后本节开放时段临时取消，将向已约学员家长发送站内通知与订阅消息。`,
-        confirmText: '确认停课',
+        title: confirmCopy.title,
+        content: confirmCopy.content,
+        confirmText: confirmCopy.confirmText,
         confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
       });
       if (!confirmResult.confirm) return;
@@ -1544,8 +1434,8 @@ const SchedulePage: React.FC = () => {
               await notificationService.send({
                 sender_id: profile?.id || currentUserId,
                 receiver_id: binding.parent_id,
-                title: `${displayName}停课通知`,
-                content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
+                title: notifyCopy.title,
+                content: notifyCopy.content,
                 related_id: student.id,
                 type: 'schedule_change',
               });
@@ -1554,7 +1444,7 @@ const SchedulePage: React.FC = () => {
                 bizKey: `slot-suspend:${slot.id}:${binding.parent_id}`,
                 className: displayName,
                 changeTime,
-                changeReason: '本节课临时停课',
+                changeReason: notifyCopy.changeReason,
               });
             }
           }
@@ -1573,10 +1463,11 @@ const SchedulePage: React.FC = () => {
   const handleResumeClass = useCallback(
     async (classId: string, className: string) => {
       if (!classId) return;
+      const confirmCopy = buildResumeClassConfirmContent(className);
       const confirmResult = await Taro.showModal({
-        title: '恢复上课',
-        content: `确定恢复【${className}】上课？恢复后课表将重新展示该班排课/开放时段。`,
-        confirmText: '恢复上课',
+        title: confirmCopy.title,
+        content: confirmCopy.content,
+        confirmText: confirmCopy.confirmText,
         confirmColor: getThemeHexColors(themeStore.activeTheme).primary,
       });
       if (!confirmResult.confirm) return;
@@ -1643,18 +1534,28 @@ const SchedulePage: React.FC = () => {
               lesson_date: lessonDate,
               hours_used: 0,
               status: 'cancelled',
-              content: `取消开课：${item.className} ${item.startTime}-${item.endTime}`,
+              content: buildCancelLessonRecordContent({
+                className: item.className,
+                startTime: item.startTime,
+                endTime: item.endTime,
+              }),
             });
 
             createdRecords.push(createdRecord);
 
+            const cancelNotify = buildCancelLessonNotifyCopy({
+              className: selectedClass?.name || item.className,
+              lessonDate,
+              startTime: item.startTime,
+              endTime: item.endTime,
+            });
             const parents = await studentService.getParents(student.id);
             for (const binding of parents) {
               await notificationService.send({
                 sender_id: profile?.id || currentUserId,
                 receiver_id: binding.parent_id,
-                title: `${selectedClass?.name || item.className}已取消`,
-                content: `${lessonDate} ${item.startTime}-${item.endTime} 的课程已取消`,
+                title: cancelNotify.title,
+                content: cancelNotify.content,
                 related_id: student.id,
               });
             }
@@ -1696,10 +1597,11 @@ const SchedulePage: React.FC = () => {
             await classService.remove(classItem.id);
 
             for (const student of students) {
+              const dissolveNotify = buildDissolveClassNotifyContent(classItem.name);
               await notifyStudentAndParents(
                 student.id,
-                '班级解散通知',
-                `您所在的「${classItem.name}」已解散，请留意老师后续安排。`,
+                dissolveNotify.title,
+                dissolveNotify.content,
               );
             }
 
@@ -1827,13 +1729,7 @@ const SchedulePage: React.FC = () => {
   const renderDateCards = useCallback(
     (date: dayjs.Dayjs) => {
       const cards = buildCardsForDate(date);
-      const summary = {
-        total: cards.length,
-        checked: cards.filter((item) => item.checkedCount > 0).length,
-        unchecked: Math.max(cards.length - cards.filter((item) => item.checkedCount > 0).length, 0),
-      };
-
-      return { cards, summary };
+      return { cards, summary: summarizeScheduleCards(cards) };
     },
     [buildCardsForDate],
   );
