@@ -204,6 +204,36 @@ const CampusInviteLanding: React.FC = () => {
     );
   }
 
+  if (landingView === 'expired') {
+    return (
+      <View className="min-h-screen flex flex-col items-center justify-center bg-background px-[48rpx]">
+        <View style={{ height: `${navHeight}px` }} />
+        <Icon name="mdi-clock-alert-outline" size={80} className="text-muted-foreground mb-[24rpx]" />
+        <Text className="text-[36rpx] font-semibold text-foreground text-center mb-[16rpx]">
+          邀请链接已过期
+        </Text>
+        <Text className="text-[28rpx] text-muted-foreground text-center">
+          该链接有效期为 24 小时，请联系邀请人重新生成
+        </Text>
+      </View>
+    );
+  }
+
+  if (landingView === 'used_invalid') {
+    return (
+      <View className="min-h-screen flex flex-col items-center justify-center bg-background px-[48rpx]">
+        <View style={{ height: `${navHeight}px` }} />
+        <Icon name="mdi-link-off" size={80} className="text-muted-foreground mb-[24rpx]" />
+        <Text className="text-[36rpx] font-semibold text-foreground text-center mb-[16rpx]">
+          邀请链接已失效
+        </Text>
+        <Text className="text-[28rpx] text-muted-foreground text-center">
+          该链接已被使用，请联系邀请人重新生成
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View className="min-h-screen flex flex-col bg-background">
       <View style={{ height: `${navHeight}px` }} />
@@ -223,17 +253,6 @@ const CampusInviteLanding: React.FC = () => {
           <InfoRow label="有效期至" value={formatExpireAt(preview.expireAt)} />
           <InfoRow label="邀请码" value={preview.inviteCode} copyable />
         </View>
-
-        {landingView === 'used_invalid' ? (
-          <Text className="text-[28rpx] text-muted-foreground text-center block">
-            该邀请链接已被使用，请联系邀请人重新生成
-          </Text>
-        ) : null}
-        {landingView === 'expired' ? (
-          <Text className="text-[28rpx] text-muted-foreground text-center block">
-            邀请链接已过期，请联系邀请人重新生成（有效期 24 小时）
-          </Text>
-        ) : null}
       </View>
 
       <View className="px-[48rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))]">
