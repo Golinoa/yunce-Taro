@@ -102,7 +102,7 @@
 |------|------|
 | `src/pages/schedule/index.tsx` | 3404 |
 | `src/package-course/pages/lesson-form/index.tsx` | 3079 |
-| `src/package-course/pages/schedule-form/index.tsx` | 2042 |
+| `src/package-course/pages/schedule-form/index.tsx` | 1554 |
 | `src/services/student.ts` | 2071 |
 | `src/services/auth.ts` | 89（门面；login/session/profile 已拆） |
 

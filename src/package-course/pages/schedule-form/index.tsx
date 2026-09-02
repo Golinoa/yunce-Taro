@@ -23,12 +23,10 @@ import type { CalendarDotType } from '@/components/CalendarWeekSelector';
 import ClassPickerSheet from '@/components/course/ClassPickerSheet';
 import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import Empty from '@/components/Empty';
-import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import ScheduleConflictDialog from '@/components/schedule/ScheduleConflictDialog';
-import Stepper from '@/components/Stepper';
 import TimePickerSheet from '@/components/TimePickerSheet';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
@@ -57,7 +55,6 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { withRouteGuard } from '@/utils/route-guard';
-import YesNoToggle from './YesNoToggle';
 import { getTeacherSelectionInfo } from './teacher-selection';
 import {
   formatMinutesToTime,
@@ -77,18 +74,16 @@ import {
   mergeScheduleConflictResults,
 } from './schedule-form-save';
 import {
-  AUTO_OPEN_OPTIONS,
   END_MODE_OPTIONS,
-  REPEAT_OPTIONS,
   SCHEDULE_TYPE_OPTIONS,
-  SLOT_MAX_COUNT_OPTIONS,
-  WEEKDAY_OPTIONS,
   type AutoOpenType,
   type EndMode,
   type RepeatMode,
   type SchedulingMode,
   type TimeSlotPair,
 } from './schedule-form-constants';
+import ScheduleFormBaseCard from './ScheduleFormBaseCard';
+import ScheduleFormRuleCard from './ScheduleFormRuleCard';
 import ScheduleFormTimeSlots from './ScheduleFormTimeSlots';
 
 /* ======================== 主组件 ======================== */
@@ -1289,385 +1284,58 @@ const ScheduleForm: React.FC = () => {
         }}
       >
         <View className="min-h-screen pb-[200rpx]">
-          {/* 基础信息卡 */}
-          <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card">
-            <View className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]">
-              <Text className="text-[28rpx] text-foreground">课程类型</Text>
-              <View
-                className="flex items-center gap-[8rpx]"
-                onClick={() => setTypePickerVisible(true)}
-              >
-                <Text className="text-[28rpx] text-foreground">
-                  {SCHEDULE_TYPE_OPTIONS[isGroupMode ? 1 : 0]}
-                </Text>
-                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-              </View>
-            </View>
+          <ScheduleFormBaseCard
+            isGroupMode={isGroupMode}
+            selectedClassName={selectedClass?.name}
+            selectedTeachingTeacherId={selectedTeachingTeacherId}
+            selectedAssistantTeacherId={selectedAssistantTeacherId}
+            teachingTeacherName={
+              teacherById[selectedTeachingTeacherId]?.name || classInfoCard?.teacherName
+            }
+            assistantTeacherName={
+              teacherById[selectedAssistantTeacherId]?.name || classInfoCard?.assistantName
+            }
+            classLevelLabel={classLevelLabel}
+            selectedRoomName={selectedRoomName}
+            hasRooms={rooms.length > 0}
+            consumedHours={consumedHours}
+            autoOpenType={autoOpenType}
+            slotMaxCount={slotMaxCount}
+            minOpenCount={minOpenCount}
+            onOpenTypePicker={() => setTypePickerVisible(true)}
+            onOpenClassPicker={() => setClassPickerVisible(true)}
+            onOpenTeacherPicker={() => setTeacherPickerVisible(true)}
+            onOpenAssistantPicker={() => setAssistantPickerVisible(true)}
+            onOpenLevelPicker={() => setLevelPickerVisible(true)}
+            onOpenRoomPicker={() => setRoomPickerVisible(true)}
+            onConsumedHoursChange={setConsumedHours}
+            onAutoOpenTypeChange={setAutoOpenType}
+            onSlotMaxCountChange={setSlotMaxCount}
+            onMinOpenCountChange={setMinOpenCount}
+          />
 
-            <View className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]">
-              <Text className="text-[28rpx] text-foreground">班级名称</Text>
-              <View
-                className="flex items-center gap-[8rpx]"
-                onClick={() => setClassPickerVisible(true)}
-              >
-                <Text
-                  className={cn(
-                    'text-[28rpx]',
-                    selectedClass ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {selectedClass?.name || '请选择'}
-                </Text>
-                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-              </View>
-            </View>
-
-            <View
-              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
-              onClick={() => setTeacherPickerVisible(true)}
-            >
-              <Text className="text-[28rpx] text-foreground">老师</Text>
-              <View className="flex items-center gap-[8rpx]">
-                <Text
-                  className={cn(
-                    'text-[28rpx]',
-                    selectedTeachingTeacherId ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {teacherById[selectedTeachingTeacherId]?.name ||
-                    classInfoCard?.teacherName ||
-                    '请选择'}
-                </Text>
-                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-              </View>
-            </View>
-            <View
-              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
-              onClick={() => setAssistantPickerVisible(true)}
-            >
-              <Text className="text-[28rpx] text-foreground">助教</Text>
-              <View className="flex items-center gap-[8rpx]">
-                <Text
-                  className={cn(
-                    'text-[28rpx]',
-                    selectedAssistantTeacherId ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {teacherById[selectedAssistantTeacherId]?.name ||
-                    classInfoCard?.assistantName ||
-                    '请选择'}
-                </Text>
-                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-              </View>
-            </View>
-            <View
-              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
-              onClick={() => setLevelPickerVisible(true)}
-            >
-              <Text className="text-[28rpx] text-foreground">课程难度</Text>
-              <View className="flex items-center gap-[8rpx]">
-                <View className="rounded-[8rpx] border border-primary px-[16rpx] py-[6rpx]">
-                  <Text className="text-[24rpx] text-primary">{classLevelLabel}</Text>
-                </View>
-                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-              </View>
-            </View>
-
-            <View
-              className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx]"
-              onClick={() => setRoomPickerVisible(true)}
-            >
-              <Text className="text-[28rpx] text-foreground">上课教室</Text>
-              <View className="flex items-center gap-[8rpx]">
-                <Text
-                  className={cn(
-                    'text-[28rpx]',
-                    selectedRoomName ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {selectedRoomName || (rooms.length ? '请选择' : '当前校区暂无教室')}
-                </Text>
-                <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-              </View>
-            </View>
-
-            <View
-              className={cn(
-                'flex items-center justify-between px-[32rpx] py-[24rpx]',
-                isGroupMode ? 'border-b border-border/60' : '',
-              )}
-            >
-              <Text className="text-[28rpx] text-foreground">消耗课时</Text>
-              <Stepper
-                value={consumedHours}
-                min={0.5}
-                max={99}
-                step={0.5}
-                onChange={setConsumedHours}
-              />
-            </View>
-
-            {isGroupMode ? (
-              <>
-                <View className="border-b border-border/60 px-[32rpx] py-[20rpx]">
-                  <Text className="block text-[28rpx] font-medium text-foreground">预约设置</Text>
-                  <Text className="mt-[6rpx] block text-[22rpx] text-muted-foreground">
-                    与时段配置同步，保存后两边一致
-                  </Text>
-                </View>
-                <View
-                  className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx] active:opacity-70"
-                  onClick={() => {
-                    void Taro.showActionSheet({
-                      itemList: AUTO_OPEN_OPTIONS.map((item) => item.label),
-                    })
-                      .then((result) => {
-                        const next = AUTO_OPEN_OPTIONS[result.tapIndex]?.key;
-                        if (next) setAutoOpenType(next);
-                      })
-                      .catch(() => undefined);
-                  }}
-                >
-                  <Text className="text-[28rpx] text-foreground">自动开班条件</Text>
-                  <View className="flex items-center gap-[8rpx]">
-                    <Text className="text-[28rpx] text-muted-foreground">
-                      {AUTO_OPEN_OPTIONS.find((item) => item.key === autoOpenType)?.label}
-                    </Text>
-                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                  </View>
-                </View>
-                <View
-                  className="flex items-center justify-between border-b border-border/60 px-[32rpx] py-[24rpx] active:opacity-70"
-                  onClick={() => {
-                    void Taro.showActionSheet({
-                      itemList: [...SLOT_MAX_COUNT_OPTIONS],
-                    })
-                      .then((result) => {
-                        const num = Number(SLOT_MAX_COUNT_OPTIONS[result.tapIndex]);
-                        if (!Number.isFinite(num)) return;
-                        setSlotMaxCount(num);
-                        if (minOpenCount > num) setMinOpenCount(num);
-                      })
-                      .catch(() => undefined);
-                  }}
-                >
-                  <Text className="text-[28rpx] text-foreground">每时段可约人数</Text>
-                  <View className="flex items-center gap-[8rpx]">
-                    <Text className="text-[28rpx] text-muted-foreground">{slotMaxCount} 人</Text>
-                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                  </View>
-                </View>
-                <View
-                  className="flex items-center justify-between px-[32rpx] py-[24rpx] active:opacity-70"
-                  onClick={() => {
-                    const options = Array.from({ length: slotMaxCount }, (_, i) => String(i + 1));
-                    void Taro.showActionSheet({ itemList: options })
-                      .then((result) => {
-                        const num = Number(options[result.tapIndex]);
-                        if (Number.isFinite(num) && num >= 1) setMinOpenCount(num);
-                      })
-                      .catch(() => undefined);
-                  }}
-                >
-                  <Text className="text-[28rpx] text-foreground">最少开班人数</Text>
-                  <View className="flex items-center gap-[8rpx]">
-                    <Text className="text-[28rpx] text-muted-foreground">{minOpenCount} 人</Text>
-                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                  </View>
-                </View>
-              </>
-            ) : null}
-          </View>
-
-          {/* 排课规则卡 */}
-          <View className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[28rpx]">
-            <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">
-              排课规则
-            </Text>
-            <View className="flex gap-[16rpx]">
-              {(
-                [
-                  { label: '规则排课', value: 'rule' as const },
-                  { label: '自由排课', value: 'free' as const },
-                ] as const
-              ).map((opt) => {
-                const active = schedulingMode === opt.value;
-                return (
-                  <View
-                    key={opt.value}
-                    className={cn(
-                      'flex-1 rounded-[16rpx] py-[20rpx] text-center',
-                      active ? 'bg-primary' : 'bg-muted',
-                    )}
-                    onClick={() => setSchedulingMode(opt.value)}
-                  >
-                    <Text
-                      className={cn(
-                        'text-[28rpx] font-medium',
-                        active ? 'text-white' : 'text-foreground',
-                      )}
-                    >
-                      {opt.label}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-
-            {schedulingMode === 'rule' ? (
-              <View className="mt-[8rpx]">
-                <View
-                  className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
-                  onClick={() => setCalendarVisible(true)}
-                >
-                  <Text className="text-[28rpx] text-foreground">开始日期</Text>
-                  <View className="flex items-center gap-[8rpx]">
-                    <Text className="text-[28rpx] text-foreground">{startDate}</Text>
-                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                  </View>
-                </View>
-
-                <View className="border-b border-border/60 py-[24rpx]">
-                  <Text className="mb-[16rpx] block text-[28rpx] text-foreground">重复方式</Text>
-                  <View className="flex gap-[12rpx]">
-                    {REPEAT_OPTIONS.map((opt) => {
-                      const active = repeatMode === opt.value;
-                      return (
-                        <View
-                          key={opt.value}
-                          className={cn(
-                            'flex-1 rounded-full py-[14rpx] text-center',
-                            active ? 'bg-primary' : 'bg-muted',
-                          )}
-                          onClick={() => setRepeatMode(opt.value)}
-                        >
-                          <Text
-                            className={cn(
-                              'text-[26rpx]',
-                              active ? 'text-white' : 'text-foreground',
-                            )}
-                          >
-                            {opt.label}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {repeatMode !== 'alternate' ? (
-                  <View className="border-b border-border/60 py-[24rpx]">
-                    <Text className="mb-[16rpx] block text-[28rpx] text-foreground">上课周几</Text>
-                    <View className="flex flex-wrap gap-[12rpx]">
-                      {WEEKDAY_OPTIONS.map((opt) => {
-                        const active = selectedDays.includes(opt.value);
-                        return (
-                          <View
-                            key={opt.value}
-                            className={cn(
-                              'h-[64rpx] w-[64rpx] rounded-full center flex items-center justify-center',
-                              active ? 'bg-primary' : 'bg-muted',
-                            )}
-                            onClick={() => toggleWeekday(opt.value)}
-                          >
-                            <Text
-                              className={cn(
-                                'text-[26rpx]',
-                                active ? 'text-white' : 'text-foreground',
-                              )}
-                            >
-                              {opt.label}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ) : null}
-
-                <View
-                  className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
-                  onClick={() => setEndModePickerVisible(true)}
-                >
-                  <Text className="text-[28rpx] text-foreground">结束方式</Text>
-                  <View className="flex items-center gap-[8rpx]">
-                    <Text className="text-[28rpx] text-foreground">
-                      {END_MODE_OPTIONS.find((o) => o.value === endMode)?.label || '不结束'}
-                    </Text>
-                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                  </View>
-                </View>
-
-                {endMode === 'by_date' ? (
-                  <View
-                    className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
-                    onClick={() => setEndDateCalendarVisible(true)}
-                  >
-                    <Text className="text-[28rpx] text-foreground">结束日期</Text>
-                    <View className="flex items-center gap-[8rpx]">
-                      <Text className="text-[28rpx] text-foreground">{endDate}</Text>
-                      <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                    </View>
-                  </View>
-                ) : null}
-
-                {endMode === 'by_count' ? (
-                  <View className="flex items-center justify-between border-b border-border/60 py-[24rpx]">
-                    <Text className="text-[28rpx] text-foreground">上课次数</Text>
-                    <Stepper value={endCount} min={1} max={999} step={1} onChange={setEndCount} />
-                  </View>
-                ) : null}
-
-                <View className="flex items-center justify-between py-[24rpx]">
-                  <View className="flex items-center gap-[16rpx]">
-                    <Text className="text-[28rpx] text-foreground">节假日是否排课</Text>
-                    <Text className="text-[24rpx] text-primary" onClick={openHolidaySettings}>
-                      设置
-                    </Text>
-                  </View>
-                  <YesNoToggle value={scheduleOnHoliday} onChange={setScheduleOnHoliday} />
-                </View>
-              </View>
-            ) : (
-              <View id="schedule-free-dates" className="mt-[8rpx]">
-                <View
-                  className="flex items-center justify-between border-b border-border/60 py-[24rpx]"
-                  onClick={openFreeCalendar}
-                >
-                  <Text className="text-[28rpx] text-foreground">上课日期</Text>
-                  <View className="flex items-center gap-[8rpx]">
-                    <Text className="text-[28rpx] text-primary">
-                      {freeDates.length > 0 ? `已选 ${freeDates.length} 天` : '多选日期'}
-                    </Text>
-                    <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
-                  </View>
-                </View>
-                {freeDates.length > 0 ? (
-                  <View className="flex flex-wrap gap-[12rpx] pt-[20rpx]">
-                    {freeDates.map((d) => (
-                      <View
-                        key={d}
-                        className="flex items-center gap-[8rpx] rounded-full bg-primary/10 px-[16rpx] py-[10rpx]"
-                        onClick={() => removeFreeDate(d)}
-                      >
-                        <Text className="text-[24rpx] text-primary">
-                          {dayjs(d).format('MM/DD')}
-                        </Text>
-                        <Icon name="mdi-close" size={18} color="primary" />
-                      </View>
-                    ))}
-                    <View
-                      className="flex items-center gap-[6rpx] rounded-full border border-dashed border-primary/40 px-[16rpx] py-[10rpx]"
-                      onClick={openFreeCalendar}
-                    >
-                      <Icon name="mdi-plus" size={18} color="primary" />
-                      <Text className="text-[24rpx] text-primary">继续选</Text>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            )}
-          </View>
+          <ScheduleFormRuleCard
+            schedulingMode={schedulingMode}
+            startDate={startDate}
+            repeatMode={repeatMode}
+            selectedDays={selectedDays}
+            endMode={endMode}
+            endDate={endDate}
+            endCount={endCount}
+            scheduleOnHoliday={scheduleOnHoliday}
+            freeDates={freeDates}
+            onSchedulingModeChange={setSchedulingMode}
+            onOpenStartCalendar={() => setCalendarVisible(true)}
+            onRepeatModeChange={setRepeatMode}
+            onToggleWeekday={toggleWeekday}
+            onOpenEndModePicker={() => setEndModePickerVisible(true)}
+            onOpenEndDateCalendar={() => setEndDateCalendarVisible(true)}
+            onEndCountChange={setEndCount}
+            onScheduleOnHolidayChange={setScheduleOnHoliday}
+            onOpenHolidaySettings={openHolidaySettings}
+            onOpenFreeCalendar={openFreeCalendar}
+            onRemoveFreeDate={removeFreeDate}
+          />
 
           {renderTimeSlotsBlock()}
 
