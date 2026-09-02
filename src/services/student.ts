@@ -1296,23 +1296,28 @@ export const packageService = {
     return mapBackendPackage(updated);
   },
 
-  /** 扣减课时（FIFO：先扣购买再扣赠送，返回课包+扣减明细） */
+  /** 扣减课时；BE 仅回 remainingHours，拆分字段标记 fifoSplitKnown=false */
   deductHours: async (
     packageId: string,
     hours: number,
   ): Promise<{ pkg: CoursePackage; deduct: DeductResult }> =>
     post<BackendPackageMutationResponse>(`/course-packages/${packageId}/deduct`, {
       hours,
-    }).then((pkg) => ({
-      pkg: mapBackendPackage(pkg),
-      deduct: {
-        purchased_deduct: hours,
-        bonus_deduct: 0,
-        purchased_remaining: Math.max(pkg.remainingHours, 0),
-        bonus_remaining: 0,
-        remaining_hours: Math.max(pkg.remainingHours, 0),
-      },
-    })),
+    }).then((pkg) => {
+      const remaining = Math.max(pkg.remainingHours, 0);
+      return {
+        pkg: mapBackendPackage(pkg),
+        deduct: {
+          // 未拆分：不假装 FIFO；整笔量仅作兼容字段
+          purchased_deduct: hours,
+          bonus_deduct: 0,
+          purchased_remaining: remaining,
+          bonus_remaining: 0,
+          remaining_hours: remaining,
+          fifoSplitKnown: false,
+        },
+      };
+    }),
 
   /** 获取学员的活跃课包 */
   getActiveByStudent: async (studentId: string): Promise<CoursePackage[]> => {

@@ -158,17 +158,21 @@ export interface PackageTransaction {
 }
 
 /**
- * FIFO 扣减结果（消课时返回，记录购买/赠送分别扣减了多少）
+ * 扣减结果。
+ * 注意：当前 BE `POST /course-packages/:id/deduct` 只返回课包 remainingHours，
+ * **不返回** FIFO 购买/赠送拆分；`fifoSplitKnown=false` 时勿把 purchased/bonus 当真实拆分。
  */
 export interface DeductResult {
-  /** 购买课时扣减量 */
+  /** 购买课时扣减量（fifoSplitKnown=false 时仅为兼容占位，勿业务依赖） */
   purchased_deduct: number;
-  /** 赠送课时扣减量 */
+  /** 赠送课时扣减量（fifoSplitKnown=false 时为 0 占位） */
   bonus_deduct: number;
-  /** 购买课时剩余 */
+  /** 购买课时剩余（未拆分时回填 remaining_hours） */
   purchased_remaining: number;
-  /** 赠送课时剩余 */
+  /** 赠送课时剩余（未拆分时为 0） */
   bonus_remaining: number;
-  /** 总剩余 */
+  /** 总剩余（与后端 remainingHours 对齐，可信） */
   remaining_hours: number;
+  /** 后端是否返回了 FIFO 拆分明细 */
+  fifoSplitKnown: boolean;
 }
