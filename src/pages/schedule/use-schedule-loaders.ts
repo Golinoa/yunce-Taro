@@ -25,6 +25,12 @@ import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import type { BookableVenue } from '@/types/venue-booking';
 import { logError } from '@/utils/logger';
 import type { ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
+import {
+  buildMonthAuxDateRange,
+  buildTrialBookingKeys,
+  filterOpenClasses,
+  shouldSkipOpenSlotLoad,
+} from './schedule-loaders-logic';
 
 export interface UseScheduleLoadersParams {
   currentUserId: string;
@@ -112,25 +118,22 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
 
   const loadOpenClassSlots = useCallback(
     async (targetDate: dayjs.Dayjs, force = false) => {
-      if (viewMode !== 'schedule' || scheduleSubMode !== 'open') {
-        return;
-      }
-      const openClasses = filteredClasses.filter((item) => item.schedule_mode === 'open');
       const dateStr = targetDate.format('YYYY-MM-DD');
-
-      // 正在加载中，避免重复请求
-      if (loadingOpenSlotDatesRef.current.has(dateStr)) {
-        return;
-      }
-
-      // 已缓存且非错误状态，直接复用（force 可跳过缓存用于重试）
       if (
-        !force &&
-        Object.prototype.hasOwnProperty.call(openClassSlotsRef.current, dateStr) &&
-        !errorOpenSlotDatesRef.current.has(dateStr)
+        shouldSkipOpenSlotLoad({
+          viewMode,
+          scheduleSubMode,
+          dateStr,
+          force,
+          loadingDates: loadingOpenSlotDatesRef.current,
+          cachedDates: openClassSlotsRef.current,
+          errorDates: errorOpenSlotDatesRef.current,
+        })
       ) {
         return;
       }
+
+      const openClasses = filterOpenClasses(filteredClasses);
 
       if (openClasses.length === 0) {
         openClassSlotsRef.current = { ...openClassSlotsRef.current, [dateStr]: {} };
@@ -186,7 +189,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
   );
 
   const loadOpenSlotDates = useCallback(async () => {
-    const openClasses = filteredClasses.filter((item) => item.schedule_mode === 'open');
+    const openClasses = filterOpenClasses(filteredClasses);
     if (openClasses.length === 0) {
       setOpenSlotDates(new Set());
       return;
@@ -216,8 +219,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
           void loadOpenClassSlots(date.subtract(1, 'day'), true);
         }
         if (currentUserId) {
-          const startDate = date.startOf('month').subtract(7, 'day').format('YYYY-MM-DD');
-          const endDate = date.endOf('month').add(7, 'day').format('YYYY-MM-DD');
+          const { startDate, endDate } = buildMonthAuxDateRange(date);
           void lessonRecordService
             .getByTeacherAndRange(currentUserId, startDate, endDate, currentCampusId)
             .then(setLessonRecords)
@@ -311,14 +313,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
           avatar: student.avatar_url,
         }));
       });
-      const nextTrialBookingKeys = new Set<string>(
-        leadBookings
-          .filter(
-            (b) =>
-              b.class_id && b.lesson_date && (b.status === 'pending' || b.status === 'confirmed'),
-          )
-          .map((b) => `${b.class_id}|${b.lesson_date}`),
-      );
+      const nextTrialBookingKeys = buildTrialBookingKeys(leadBookings);
       setSchedules(scheduleList);
       setClasses(classList);
       setTeachers(teacherList);
@@ -359,8 +354,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
       return;
     }
     try {
-      const startDate = selectedDate.startOf('month').subtract(7, 'day').format('YYYY-MM-DD');
-      const endDate = selectedDate.endOf('month').add(7, 'day').format('YYYY-MM-DD');
+      const { startDate, endDate } = buildMonthAuxDateRange(selectedDate);
       const list = await lessonRecordService.getByTeacherAndRange(
         currentUserId,
         startDate,
@@ -380,8 +374,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
       return;
     }
     try {
-      const startDate = selectedDate.startOf('month').subtract(7, 'day').format('YYYY-MM-DD');
-      const endDate = selectedDate.endOf('month').add(7, 'day').format('YYYY-MM-DD');
+      const { startDate, endDate } = buildMonthAuxDateRange(selectedDate);
       const list = await temporaryRescheduleService.getByTeacherAndRange(
         currentUserId,
         startDate,
