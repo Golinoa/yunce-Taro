@@ -15,19 +15,13 @@
 
 import { View, Text, ScrollView, Textarea } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import CalendarMonthSheet from '@/components/CalendarMonthSheet';
 import type { CalendarDotType } from '@/components/CalendarWeekSelector';
-import ClassPickerSheet from '@/components/course/ClassPickerSheet';
 import ClassStudentsCard from '@/components/course/ClassStudentsCard';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
-import PickerSheet, { PickerOption } from '@/components/PickerSheet';
-import ScheduleConflictDialog from '@/components/schedule/ScheduleConflictDialog';
-import TimePickerSheet from '@/components/TimePickerSheet';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
@@ -74,8 +68,6 @@ import {
   mergeScheduleConflictResults,
 } from './schedule-form-save';
 import {
-  END_MODE_OPTIONS,
-  SCHEDULE_TYPE_OPTIONS,
   type AutoOpenType,
   type EndMode,
   type RepeatMode,
@@ -83,7 +75,9 @@ import {
   type TimeSlotPair,
 } from './schedule-form-constants';
 import ScheduleFormBaseCard from './ScheduleFormBaseCard';
+import ScheduleFormFooter from './ScheduleFormFooter';
 import ScheduleFormRuleCard from './ScheduleFormRuleCard';
+import ScheduleFormSheets from './ScheduleFormSheets';
 import ScheduleFormTimeSlots from './ScheduleFormTimeSlots';
 
 /* ======================== 主组件 ======================== */
@@ -1367,201 +1361,100 @@ const ScheduleForm: React.FC = () => {
       </ScrollView>
 
       {/* ====== 底部操作栏：抬高层级+不透明底，避免学员红叉滚动透出 ====== */}
-      <View className="fixed bottom-0 left-0 right-0 z-200 border-t border-border bg-white px-[28rpx] pt-[10rpx] pb-safe-bar">
-        {!canSubmit && submitBlockedReason && (
-          <View className="absolute left-[28rpx] right-[28rpx] top-[-56rpx] z-200 rounded-[16rpx] bg-white px-[20rpx] py-[12rpx] shadow-soft">
-            <Text className="text-[24rpx] text-muted-foreground">{submitBlockedReason}</Text>
-          </View>
-        )}
-        <View
-          className={cn(
-            'flex h-[80rpx] w-full items-center justify-center rounded-full',
-            !canSubmit || saving || deleting ? 'bg-muted' : 'bg-primary',
-          )}
-          onClick={
-            !canSubmit || saving || deleting
-              ? undefined
-              : () => {
-                  void handleSave();
-                }
-          }
-        >
-          <Text
-            className={cn(
-              'text-[30rpx] font-medium',
-              !canSubmit || saving || deleting
-                ? 'text-muted-foreground'
-                : 'text-primary-foreground',
-            )}
-          >
-            {saving ? '保存中...' : isEdit ? (isRescheduleMode ? '确认调课' : '保存修改') : '保存'}
-          </Text>
-        </View>
-      </View>
+      <ScheduleFormFooter
+        canSubmit={canSubmit}
+        submitBlockedReason={submitBlockedReason}
+        saving={saving}
+        deleting={deleting}
+        isEdit={isEdit}
+        isRescheduleMode={isRescheduleMode}
+        onSave={() => {
+          void handleSave();
+        }}
+      />
 
-      {/* 开始日期 */}
-      <CalendarMonthSheet
-        visible={calendarVisible}
-        title="选择开始日期"
-        selectedDate={dayjs(startDate)}
-        onClose={() => {
+      <ScheduleFormSheets
+        calendarVisible={calendarVisible}
+        startDate={startDate}
+        onCloseCalendar={() => {
           setCalendarVisible(false);
           restoreScrollAfterSheet();
         }}
-        onSelect={(d) => {
-          setStartDate(d.format('YYYY-MM-DD'));
-          setSelectedDateValue(d.format('YYYY-MM-DD'));
-          setDayOfWeek((d.day() || 7) as DayOfWeek);
+        onSelectStartDate={(date, dow) => {
+          setStartDate(date);
+          setSelectedDateValue(date);
+          setDayOfWeek(dow);
         }}
         getDateDotType={getDateDotType}
-        disablePastDates
-      />
-
-      {/* 结束日期 */}
-      <CalendarMonthSheet
-        visible={endDateCalendarVisible}
-        title="选择结束日期"
-        selectedDate={dayjs(endDate)}
-        onClose={() => {
+        endDateCalendarVisible={endDateCalendarVisible}
+        endDate={endDate}
+        onCloseEndDateCalendar={() => {
           setEndDateCalendarVisible(false);
           restoreScrollAfterSheet();
         }}
-        onSelect={(d) => setEndDate(d.format('YYYY-MM-DD'))}
-        disablePastDates
-      />
-
-      {/* 自由排课：课表同款月历多选 */}
-      <CalendarMonthSheet
-        visible={freeCalendarVisible}
-        title="选择上课日期"
-        selectedDate={dayjs(freeDates[freeDates.length - 1] || startDate)}
-        selectedDates={freeDates}
-        multiSelect
-        onClose={closeFreeCalendar}
-        onSelect={() => undefined}
-        onSelectMulti={handleFreeDatesConfirm}
-        getDateDotType={getDateDotType}
-        disablePastDates
-      />
-
-      <PickerSheet
-        visible={typePickerVisible}
-        title="课程类型"
-        options={[
-          { label: '班课', value: 'class' },
-          { label: '团课', value: 'group' },
-        ]}
-        value={isGroupMode ? 'group' : 'class'}
-        onClose={() => setTypePickerVisible(false)}
-        onConfirm={(v) => {
-          const next = v === 'group' ? 'group' : 'class';
+        onSelectEndDate={setEndDate}
+        freeCalendarVisible={freeCalendarVisible}
+        freeDates={freeDates}
+        onCloseFreeCalendar={closeFreeCalendar}
+        onSelectFreeDates={handleFreeDatesConfirm}
+        typePickerVisible={typePickerVisible}
+        isGroupMode={isGroupMode}
+        onCloseTypePicker={() => setTypePickerVisible(false)}
+        onConfirmType={(next) => {
           setScheduleType(next);
           setClassId('');
           setTypePickerVisible(false);
         }}
-      />
-
-      <ClassPickerSheet
-        visible={classPickerVisible}
-        title={isGroupMode ? '选择团课班级' : '选择班级'}
-        courseMode={isGroupMode ? 'group' : 'class'}
+        classPickerVisible={classPickerVisible}
         classes={classes}
         scheduledClassIds={scheduledClassIds}
-        value={classId}
-        onClose={() => setClassPickerVisible(false)}
-        onConfirm={(v) => setClassId(v)}
-      />
-
-      <PickerSheet
-        visible={roomPickerVisible}
-        title="选择上课教室"
-        options={[
-          { label: '不指定教室', value: '' },
-          ...rooms.map((r): PickerOption => ({ label: r.name, value: r.id || r.name })),
-        ]}
-        value={room}
-        onClose={() => setRoomPickerVisible(false)}
-        onConfirm={(v) => setRoom(v)}
-      />
-
-      <PickerSheet
-        visible={endModePickerVisible}
-        title="结束方式"
-        options={END_MODE_OPTIONS.map((o): PickerOption => ({ label: o.label, value: o.value }))}
-        value={endMode}
-        onClose={() => setEndModePickerVisible(false)}
-        onConfirm={(v) => setEndMode(v as EndMode)}
-      />
-
-      <PickerSheet
-        visible={teacherPickerVisible}
-        title="选择老师"
-        options={[
-          { label: '请选择', value: '' },
-          ...teachers
-            .filter((t) => t.role !== 'assist' || t.id === selectedTeachingTeacherId)
-            .map((t): PickerOption => ({ label: t.name, value: t.id })),
-        ]}
-        value={selectedTeachingTeacherId}
-        onClose={() => setTeacherPickerVisible(false)}
-        onConfirm={handleTeacherConfirm}
-      />
-
-      <PickerSheet
-        visible={assistantPickerVisible}
-        title="选择助教"
-        options={[
-          { label: '未安排', value: '' },
-          ...teachers
-            .filter(
-              (t) =>
-                t.id !== selectedTeachingTeacherId &&
-                (t.role === 'assist' || t.id === selectedAssistantTeacherId),
-            )
-            .map((t): PickerOption => ({ label: t.name, value: t.id })),
-        ]}
-        value={selectedAssistantTeacherId}
-        onClose={() => setAssistantPickerVisible(false)}
-        onConfirm={handleAssistantConfirm}
-      />
-
-      <PickerSheet
-        visible={levelPickerVisible}
-        title="课程难度"
-        options={(Object.keys(CLASS_LEVEL_LABELS) as ClassLevel[]).map(
-          (k): PickerOption => ({ label: CLASS_LEVEL_LABELS[k], value: k }),
-        )}
-        value={courseLevel}
-        onClose={() => setLevelPickerVisible(false)}
-        onConfirm={(v) => {
-          setCourseLevel(v as ClassLevel);
+        classId={classId}
+        onCloseClassPicker={() => setClassPickerVisible(false)}
+        onConfirmClass={setClassId}
+        roomPickerVisible={roomPickerVisible}
+        rooms={rooms}
+        room={room}
+        onCloseRoomPicker={() => setRoomPickerVisible(false)}
+        onConfirmRoom={setRoom}
+        endModePickerVisible={endModePickerVisible}
+        endMode={endMode}
+        onCloseEndModePicker={() => setEndModePickerVisible(false)}
+        onConfirmEndMode={setEndMode}
+        teacherPickerVisible={teacherPickerVisible}
+        teachers={teachers}
+        selectedTeachingTeacherId={selectedTeachingTeacherId}
+        onCloseTeacherPicker={() => setTeacherPickerVisible(false)}
+        onConfirmTeacher={handleTeacherConfirm}
+        assistantPickerVisible={assistantPickerVisible}
+        selectedAssistantTeacherId={selectedAssistantTeacherId}
+        onCloseAssistantPicker={() => setAssistantPickerVisible(false)}
+        onConfirmAssistant={handleAssistantConfirm}
+        levelPickerVisible={levelPickerVisible}
+        courseLevel={courseLevel}
+        onCloseLevelPicker={() => setLevelPickerVisible(false)}
+        onConfirmLevel={(level) => {
+          setCourseLevel(level);
           setLevelPickerVisible(false);
         }}
-      />
-
-      <TimePickerSheet
-        visible={timePickerVisible}
-        title={timePickerTitle}
-        value={timePickerValue}
-        onClose={() => {
+        timePickerVisible={timePickerVisible}
+        timePickerTitle={timePickerTitle}
+        timePickerValue={timePickerValue}
+        onCloseTimePicker={() => {
           setTimePickerVisible(false);
           if (chainingTimePickerRef.current) return;
           setTimePickerPhase('start');
           setEditingSlotId(null);
           restoreScrollAfterSheet();
         }}
-        onConfirm={handleTimePickerConfirm}
-      />
-
-      <ScheduleConflictDialog
-        visible={conflictDialogVisible}
+        onConfirmTime={handleTimePickerConfirm}
+        conflictDialogVisible={conflictDialogVisible}
         conflictSummary={conflictResult?.conflictSummary || ''}
         conflicts={conflictResult?.conflicts || []}
-        onModify={() => {
+        onConflictModify={() => {
           ignoreConflictRef.current = false;
           setConflictDialogVisible(false);
         }}
-        onIgnore={() => {
+        onConflictIgnore={() => {
           ignoreConflictRef.current = true;
           setConflictDialogVisible(false);
           void handleSave();
