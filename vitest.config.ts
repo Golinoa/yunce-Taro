@@ -36,6 +36,17 @@ export default defineConfig({
         'src/package-course/pages/package-form/constants.ts',
         'src/components/InstallmentPanel/installment-utils.ts',
         'src/components/DatePickerSheet/date-picker-utils.ts',
+        'src/components/teacher/SalaryRuleEditor/validate.ts',
+        'src/components/teacher/SalaryRuleEditor/builders.ts',
+        'src/package-course/pages/course-form/course-form-validate.ts',
+        'src/package-course/pages/course-form/course-form-submit.ts',
+        'src/package-course/pages/course-form/course-form-time.ts',
+        'src/package-course/pages/course-form/course-form-constants.ts',
+        'src/package-student/pages/student-detail/student-detail-package.ts',
+        'src/pages/schedule/schedule-danger-logic.ts',
+        'src/pages/schedule/schedule-derived-logic.ts',
+        'src/pages/schedule/schedule-loaders-logic.ts',
+        'src/pages/schedule/schedule-tab-layout.ts',
         'src/utils/batch-operation.ts',
         'src/utils/upload-flow.ts',
         'src/utils/use-batch-render.ts',
@@ -56,7 +67,8 @@ export default defineConfig({
       thresholds: {
         // 起步门槛：随回归套件补全逐步上调至 review 建议的 60%+
         // Q3-5：热路径 invite/auth-onboarding/route-guard/submit-lock 已纳入门禁统计
-        lines: 35,
+        // cov-w1：本轮抽出纯模块纳入门禁，lines 35 → 42（全量 ~81% 仍过门）
+        lines: 42,
       },
     },
   },
