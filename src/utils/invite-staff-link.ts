@@ -51,12 +51,12 @@ export async function copyCampusInviteLink(inviteCode: string): Promise<void> {
     return;
   }
 
+  /** 直链落地页（与 L2 invite-register 一致）；禁止再包一层 index?redirect=（全仓无消费） */
   const path = buildCampusInvitePath(inviteCode);
-  const link = `package-auth/pages/index/index?redirect=${encodeURIComponent(path)}`;
 
-  await Taro.setClipboardData({ data: link });
+  await Taro.setClipboardData({ data: path });
   Taro.showToast({
-    title: '员工邀请链接已复制',
+    title: '员工邀请链接已复制（24h有效）',
     icon: 'none',
     duration: 2500,
   });
