@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>多窗口任务 · 测试覆盖扩面（2026-09-03）</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #fff;
+      --text: #1a1d23;
+      --muted: #5c6570;
+      --line: #e4e7ec;
+      --ok: #0f7b4c;
+      --ok-bg: #e8f7ef;
+      --warn: #9a6700;
+      --warn-bg: #fff6e0;
+      --accent: #1f4b99;
+      --accent-bg: #eef3fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 28px 18px 72px; }
+    h1 { font-size: 1.45rem; margin: 0 0 8px; }
+    h2 { font-size: 1.08rem; margin: 28px 0 10px; }
+    h3 { font-size: 0.98rem; margin: 0 0 8px; }
+    .meta { color: var(--muted); font-size: 0.88rem; margin-bottom: 14px; }
+    .callout {
+      background: var(--accent-bg);
+      border: 1px solid #d5e0f2;
+      border-left: 3px solid var(--accent);
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+    }
+    .callout.warn {
+      background: var(--warn-bg);
+      border-color: #f0d89a;
+      border-left-color: var(--warn);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .card.win { border-left: 3px solid var(--accent); }
+    .pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      margin-right: 6px;
+    }
+    .pill.ok { background: var(--ok-bg); color: var(--ok); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: #f0f2f5; color: var(--muted); font-size: 0.8rem; }
+    tr:last-child td { border-bottom: none; }
+    code {
+      font-size: 0.84em;
+      background: #f0f2f5;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    pre.prompt {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0f1419;
+      color: #e8eef5;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      margin: 0;
+      font-family: ui-monospace, Consolas, "Courier New", monospace;
+    }
+    ul { margin: 6px 0 0; padding-left: 1.2em; }
+    li { margin: 4px 0; }
+    .copy-hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>多窗口任务 · 测试覆盖扩面</h1>
+    <p class="meta">
+      日期 2026-09-03 · 前置：<code>opt/integrate</code> 已合入 W1–W4 拆分 ·
+      目标：把「已有单测」真正纳入门禁，并补课表/消课/邀请边界回归 ·
+      质量评估：<code>D:/Coding/yunce/yunceTaro前端质量评估.html</code>
+    </p>
+
+    <div class="callout warn">
+      <strong>本轮不做</strong>巨型页再拆（home / invite-landing / statistics 留给下一波）。
+      <strong>本轮只做</strong>：coverage.include 扩面 + 门槛上调 + 热路径边界用例补强。
+      W0 只调度/review/合并，不写业务代码。
+    </div>
+
+    <h2>背景与验收总目标</h2>
+    <div class="card">
+      <ul>
+        <li>当前约 <strong>88</strong> 个测试文件；<code>vitest.config.ts</code> 的 <code>coverage.include</code> 仍偏旧热路径，<strong>不含</strong>本轮已抽出的纯模块。</li>
+        <li>门槛 <code>lines: 35</code> — 本轮目标抬到 <strong>40</strong>（若绿可试 42，不强求）。</li>
+        <li>发版门禁：<code>npm run check</code> + <code>npm run coverage</code> + <code>npm run build:weapp:dev</code>（仓库暂无 verify:sop 脚本）。</li>
+        <li>分支建议：各自 <code>opt/cov-w1</code> … <code>opt/cov-w4</code>，基线 <code>opt/integrate</code>（或已推远程的 integrate tip）。</li>
+      </ul>
+    </div>
+
+    <h2>窗口分工</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>窗</th>
+          <th>职责</th>
+          <th>主改路径</th>
+          <th>完成定义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>W0</strong></td>
+          <td>调度 / Review / 合并 / 收尾</td>
+          <td>—</td>
+          <td>四窗合入 integrate；check+coverage+build 绿；更新质量评估 HTML</td>
+        </tr>
+        <tr>
+          <td><strong>W1</strong></td>
+          <td>门禁扩面：新纯模块进 coverage</td>
+          <td><code>vitest.config.ts</code> + 必要补测</td>
+          <td>include 列入下表模块；lines≥40；coverage 绿</td>
+        </tr>
+        <tr>
+          <td><strong>W2</strong></td>
+          <td>课表纯逻辑边界补强</td>
+          <td><code>src/pages/schedule/schedule-*-logic*</code></td>
+          <td>新增边界用例 ≥8；不改页面行为</td>
+        </tr>
+        <tr>
+          <td><strong>W3</strong></td>
+          <td>消课 / lesson-form 回归包</td>
+          <td><code>package-course/pages/lesson-form/**</code></td>
+          <td>submit/operate/checkin/attendance 边界补齐；可抽纯函数再测</td>
+        </tr>
+        <tr>
+          <td><strong>W4</strong></td>
+          <td>邀请 / 鉴权 / route-guard 边界</td>
+          <td><code>src/utils/invite-*</code> · auth · route-guard</td>
+          <td>补失败/空参/状态机分支；已有测不重复堆砌</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>W1 必须纳入 coverage.include 的模块</h2>
+    <div class="card">
+      <p class="copy-hint">下列路径须加入 <code>vitest.config.ts → coverage.include</code>（已有测的优先；无测则先补最小用例再 include）：</p>
+      <ul>
+        <li><code>src/components/teacher/SalaryRuleEditor/validate.ts</code></li>
+        <li><code>src/components/teacher/SalaryRuleEditor/builders.ts</code></li>
+        <li><code>src/package-course/pages/course-form/course-form-validate.ts</code></li>
+        <li><code>src/package-course/pages/course-form/course-form-submit.ts</code></li>
+        <li><code>src/package-course/pages/course-form/course-form-time.ts</code></li>
+        <li><code>src/package-course/pages/course-form/course-form-constants.ts</code>（若仅常量可只 include dirty key 相关导出路）</li>
+        <li><code>src/package-student/pages/student-detail/student-detail-package.ts</code></li>
+        <li><code>src/pages/schedule/schedule-danger-logic.ts</code></li>
+        <li><code>src/pages/schedule/schedule-derived-logic.ts</code></li>
+        <li><code>src/pages/schedule/schedule-loaders-logic.ts</code></li>
+        <li><code>src/pages/schedule/schedule-tab-layout.ts</code>（若存在纯导出）</li>
+      </ul>
+    </div>
+
+    <div class="grid">
+      <div class="card win">
+        <h3><span class="pill">W0</span>调度提示词</h3>
+        <p class="copy-hint">复制给 W0 窗口：</p>
+        <pre class="prompt">你是 W0（调度）。本轮主题：测试覆盖扩面（coverage.include + 热路径边界）。
+基线：opt/integrate。质量评估与本计划：
+- D:/Coding/yunce/yunceTaro前端质量评估.html
+- docs/diagnostics/2026-09-03-multi-window-coverage-plan.html
+
+规则：
+1. 你不写业务功能代码；只 review、合并、收尾。
+2. 各窗完成后：缺陷优先 review → 能过则合入 opt/integrate。
+3. 合并顺序建议：W1（门禁面）→ W2 → W3 → W4；若冲突由你解在 integrate。
+4. 收尾：npm run check && npm run coverage && npm run build:weapp:dev；更新质量评估 HTML 中「测试与门禁」小节。
+5. 禁止推送除非用户明确说推送。
+
+先确认四窗分支已从 integrate tip 拉出，再开始收各窗回报。</pre>
+      </div>
+
+      <div class="card win">
+        <h3><span class="pill">W1</span>门禁扩面</h3>
+        <p class="copy-hint">复制给 W1 窗口：</p>
+        <pre class="prompt">你是 W1。worktree 建议：yunceTaro-cov-w1 · 分支 opt/cov-w1-gate · 基线 opt/integrate。
+
+任务：把本轮已抽出的纯模块纳入 vitest coverage.include，并上调 lines 门槛。
+
+必做：
+1. 编辑 vitest.config.ts coverage.include，加入计划 HTML「W1 必须纳入」列表中已有单测覆盖的文件。
+2. thresholds.lines：35 → 40（若全绿可尝试 42；红则停在 40 或补最小测）。
+3. 若某文件尚无测：先写最小 vitest 再 include，禁止裸 include 未测空文件。
+4. 跑：npx vitest run --coverage ；npm run check。
+5. 不要改页面 UI / 业务行为；不要拆巨型页。
+
+交付：提交说明列出新增 include 路径与最终 lines 门槛；简短汇报 coverage 摘要。</pre>
+      </div>
+
+      <div class="card win">
+        <h3><span class="pill">W2</span>课表逻辑边界</h3>
+        <p class="copy-hint">复制给 W2 窗口：</p>
+        <pre class="prompt">你是 W2。分支 opt/cov-w2-schedule · 基线 opt/integrate。
+
+任务：强化 src/pages/schedule/schedule-*-logic 边界用例（已有 ~40 测，补缺口）。
+
+优先补：
+- buildScheduleTabs：无分类 / 仅独立展示 / venue 开关
+- filterClassesForTab：家长可见、无 category_id 兼容分支
+- resolveDateDotType / resolveOpenDateDotType：临调迁入迁出、过去日
+- shouldSkipOpenSlotLoad：force / loading / error / cache 组合
+- resolveBatchDeleteToast：全成/全败/部分失败
+- applyOpenSlotRestStatus：缺 dateKey / 缺 classSlots
+
+约束：
+- 只改 *.test.ts 与必要的纯函数导出（若测不到可小改 logic 可测性，禁止改 hooks 行为）。
+- 新增用例合计 ≥8。
+- 跑：npx vitest run src/pages/schedule/schedule-*-logic.test.ts src/pages/schedule/schedule-tab-layout.test.ts
+
+交付：用例清单 + 绿测证明。</pre>
+      </div>
+
+      <div class="card win">
+        <h3><span class="pill">W3</span>消课 / lesson-form</h3>
+        <p class="copy-hint">复制给 W3 窗口：</p>
+        <pre class="prompt">你是 W3。分支 opt/cov-w3-lesson · 基线 opt/integrate。
+
+任务：补强 package-course/pages/lesson-form 回归（已有 submit/operate/checkin/attendance 测）。
+
+必做：
+1. 阅读现有 *.test.ts，找出未覆盖的失败分支、空学员、防重入、窗口外补录拒绝等。
+2. 每个已有测试文件至少新增 1～2 个有意义边界用例；或从 use-lesson-form-actions 抽出纯判定再测（若抽离，actions 行数勿继续膨胀）。
+3. 禁止大范围 UI 重构；禁止改消课业务口径。
+4. 跑：npx vitest run src/package-course/pages/lesson-form
+
+交付：新增用例说明 + 与产品口径一致性自检。</pre>
+      </div>
+
+      <div class="card win">
+        <h3><span class="pill">W4</span>邀请 / 鉴权</h3>
+        <p class="copy-hint">复制给 W4 窗口：</p>
+        <pre class="prompt">你是 W4。分支 opt/cov-w4-invite · 基线 opt/integrate。
+
+任务：补强邀请落地 / staff·parent link / route-guard / auth-onboarding 边界（utils 层已有测）。
+
+优先：
+- invite-landing-view-state：非法 token、过期、已绑定、角色不匹配
+- invite-staff-link / invite-parent-link：缺参、编码往返
+- route-guard：未登录 / 无权限路径
+- auth-onboarding / store-entry-*：已在 coverage.include 的再补 1～2 关键分支即可
+
+约束：
+- 只动 utils/services 纯逻辑与测试；不要改 invite-landing 巨型页 UI（下波再拆）。
+- 跑相关 vitest；确保 npm run coverage 不因你的改动变红。
+
+交付：用例清单；注明是否需要 W1 同步改 include（一般不需要）。</pre>
+      </div>
+    </div>
+
+    <h2>协作节奏</h2>
+    <div class="card">
+      <ol>
+        <li>四窗并行开工；W1 优先尽早合，避免其它窗反复 rebase 门槛配置。</li>
+        <li>每窗完成 → 用户喊 W0 review → 过则合并 integrate。</li>
+        <li>全部合并后 W0 收尾：check + coverage + build:weapp:dev，更新质量评估 HTML。</li>
+      </ol>
+    </div>
+
+    <h2>明确不做</h2>
+    <div class="card">
+      <ul>
+        <li>拆 home / invite-landing / statistics / profile / card-form 巨型页（下波）。</li>
+        <li>改产品文案、改 Mock 业务数据语义、改后端契约。</li>
+        <li>为冲覆盖率写无断言的空测、或把无关文件塞进 include。</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
