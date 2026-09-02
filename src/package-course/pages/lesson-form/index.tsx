@@ -19,7 +19,6 @@ import {
   studentService,
   packageService,
   lessonRecordService,
-  leaveService,
   classService,
   subjectService,
   uploadService,
@@ -54,7 +53,7 @@ import {
   type ClassAttendanceMode,
 } from './checkin-status';
 import StudentEditSheet from './StudentEditSheet';
-import { getLessonRecordPriority, isWithinLessonOperateWindow } from './lesson-operate';
+import { isWithinLessonOperateWindow } from './lesson-operate';
 import { executeClassSubmit } from './lesson-submit-class';
 import { executeSingleDeduct } from './lesson-submit-single';
 import {
@@ -62,6 +61,13 @@ import {
   executeSupplementSave,
 } from './lesson-submit-supplement';
 import { resolveLessonSubmitKind } from './lesson-submit';
+import {
+  buildClassAttendanceState,
+  buildTrialCheckinMap,
+  fetchApprovedLeaveStudentIds,
+  loadPackageMapsForStudents,
+  resolveClassAttendanceMode,
+} from './lesson-attendance-load';
 
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
@@ -76,14 +82,6 @@ function formatTime(d: Date): string {
   const h = String(d.getHours()).padStart(2, '0');
   const m = String(d.getMinutes()).padStart(2, '0');
   return `${h}:${m}`;
-}
-
-function isDateWithinRange(targetDate: string, startDate?: string, endDate?: string) {
-  if (!targetDate || !startDate) {
-    return false;
-  }
-  const end = endDate || startDate;
-  return targetDate >= startDate && targetDate <= end;
 }
 
 /** 根据日期返回星期几 */
@@ -355,24 +353,11 @@ const LessonForm: React.FC = () => {
 
   const loadApprovedLeaveStudentIds = useCallback(
     async (students: Student[]) => {
-      if (!lessonDate || students.length === 0) {
-        const emptySet = new Set<string>();
-        setLeaveStudentIds(emptySet);
-        return emptySet;
-      }
-
-      const leaveList = await leaveService.getByTeacher(currentTeacherId);
-      const classStudentIds = new Set(students.map((student) => student.id));
-      const nextLeaveStudentIds = new Set(
-        leaveList
-          .filter(
-            (leave) =>
-              leave.status === 'approved' &&
-              classStudentIds.has(leave.student_id) &&
-              isDateWithinRange(lessonDate, leave.original_date, leave.end_date),
-          )
-          .map((leave) => leave.student_id),
-      );
+      const nextLeaveStudentIds = await fetchApprovedLeaveStudentIds({
+        teacherId: currentTeacherId,
+        students,
+        lessonDate,
+      });
       setLeaveStudentIds(nextLeaveStudentIds);
       return nextLeaveStudentIds;
     },
@@ -409,7 +394,6 @@ const LessonForm: React.FC = () => {
       });
       setTrialLeadMap(nextLeadMap);
       // 回填试听学员已有点名记录；无记录默认"未到"
-      const trialStudentIds = new Set(classBookings.map((b) => b.trial_student_id));
       let trialExisting: LessonRecord[] = [];
       try {
         trialExisting = await lessonRecordService.getByTeacherAndRange(
@@ -420,27 +404,14 @@ const LessonForm: React.FC = () => {
       } catch (err) {
         logError('loadTrialBookings records', err);
       }
-      const trialRecords = trialExisting.filter(
-        (record) =>
-          record.class_id === selectedClassId &&
-          record.lesson_date === lessonDate &&
-          trialStudentIds.has(record.student_id),
+      setTrialCheckinMap(
+        buildTrialCheckinMap({
+          bookings: classBookings,
+          records: trialExisting,
+          classId: selectedClassId,
+          lessonDate,
+        }),
       );
-      const initMap: Record<string, CheckinStatus> = {};
-      classBookings.forEach((b) => {
-        const matched = trialRecords.find((r) => r.student_id === b.trial_student_id);
-        if (matched) {
-          initMap[b.id] =
-            matched.status === 'leave'
-              ? 'leave'
-              : matched.status && !['absent', 'cancelled'].includes(matched.status)
-                ? 'checked'
-                : 'absent';
-        } else {
-          initMap[b.id] = 'absent';
-        }
-      });
-      setTrialCheckinMap(initMap);
     } catch (err) {
       logError('loadTrialBookings', err);
       setTrialBookings([]);
@@ -508,57 +479,29 @@ const LessonForm: React.FC = () => {
 
         // 加载该班级/日期已有点名记录 → 判定是否已点名并回填学员状态（查看模式）
         const existingRecords = await loadLessonRecordsByDate();
-        const classRecords = existingRecords.filter(
-          (record) =>
-            record.class_id === classIdParam &&
-            record.lesson_date === lessonDate &&
-            students.some((student) => student.id === record.student_id),
-        );
-        setExistingClassRecords(classRecords);
-        const nextChecked = new Set<string>();
-        const nextLeave = new Set<string>();
-        classRecords.forEach((record) => {
-          if (record.status === 'leave') {
-            nextLeave.add(record.student_id);
-          } else if (record.status && !['absent', 'cancelled'].includes(record.status)) {
-            nextChecked.add(record.student_id);
-          }
+        const attendance = buildClassAttendanceState({
+          records: existingRecords,
+          classId: classIdParam,
+          lessonDate,
+          studentIds: students.map((student) => student.id),
         });
-        const hasRecords = classRecords.length > 0;
-        setIsAlreadyChecked(hasRecords);
-        setCheckedStudentIds(nextChecked);
-        setLeaveStudentIds(nextLeave);
-        const nextRecordMap = new Map<string, LessonRecord>();
-        classRecords.forEach((record) => {
-          const current = nextRecordMap.get(record.student_id);
-          if (getLessonRecordPriority(record) >= getLessonRecordPriority(current)) {
-            nextRecordMap.set(record.student_id, record);
-          }
-        });
-        setRecordByStudentId(nextRecordMap);
+        setExistingClassRecords(attendance.classRecords);
+        setIsAlreadyChecked(attendance.hasRecords);
+        setCheckedStudentIds(attendance.checkedStudentIds);
+        setLeaveStudentIds(attendance.leaveStudentIds);
+        setRecordByStudentId(attendance.recordByStudentId);
         setSupplementStudentIds(new Set());
-        // 超时 / viewOnly：即使未点名也只读；窗口内未点名可正常提交
-        const canOperate = !viewOnlyParam && isWithinLessonOperateWindow(lessonDate);
-        setAttendanceMode(hasRecords || !canOperate ? 'view' : 'normal');
+        setAttendanceMode(
+          resolveClassAttendanceMode({
+            hasRecords: attendance.hasRecords,
+            viewOnly: viewOnlyParam,
+            lessonDate,
+          }),
+        );
 
-        // 为每个学员匹配课包
-        const pkgMap = new Map<string, CoursePackage>();
-        const subMap = new Map<string, Subject | null>();
-        for (const stu of students) {
-          const pkgs = await packageService.getActiveByStudent(stu.id);
-          const best = pickBestPackage(pkgs, hoursUsed);
-          if (best) {
-            pkgMap.set(stu.id, best);
-            if (best.subject_id) {
-              const sub = await subjectService.getById(best.subject_id);
-              subMap.set(stu.id, sub);
-            } else {
-              subMap.set(stu.id, null);
-            }
-          }
-        }
-        setStudentPackages(pkgMap);
-        setStudentSubjects(subMap);
+        const { packages, subjects } = await loadPackageMapsForStudents(students, hoursUsed);
+        setStudentPackages(packages);
+        setStudentSubjects(subjects);
       }
     };
     loadData();
@@ -906,57 +849,29 @@ const LessonForm: React.FC = () => {
 
       // 加载该班级/日期已有点名记录 → 判定是否已点名并回填学员状态（查看模式）
       const existing = await loadLessonRecordsByDate();
-      const classRecords = existing.filter(
-        (record) =>
-          record.class_id === classId &&
-          record.lesson_date === lessonDate &&
-          mergedStudents.some((student) => student.id === record.student_id),
-      );
-      setExistingClassRecords(classRecords);
-      const nextChecked = new Set<string>();
-      const nextLeave = new Set<string>();
-      classRecords.forEach((record) => {
-        if (record.status === 'leave') {
-          nextLeave.add(record.student_id);
-        } else if (record.status && !['absent', 'cancelled'].includes(record.status)) {
-          nextChecked.add(record.student_id);
-        }
+      const attendance = buildClassAttendanceState({
+        records: existing,
+        classId,
+        lessonDate,
+        studentIds: mergedStudents.map((student) => student.id),
       });
-      const hasRecords = classRecords.length > 0;
-      setIsAlreadyChecked(hasRecords);
-      setCheckedStudentIds(nextChecked);
-      setLeaveStudentIds(nextLeave);
-      const nextRecordMap = new Map<string, LessonRecord>();
-      classRecords.forEach((record) => {
-        const current = nextRecordMap.get(record.student_id);
-        if (getLessonRecordPriority(record) >= getLessonRecordPriority(current)) {
-          nextRecordMap.set(record.student_id, record);
-        }
-      });
-      setRecordByStudentId(nextRecordMap);
+      setExistingClassRecords(attendance.classRecords);
+      setIsAlreadyChecked(attendance.hasRecords);
+      setCheckedStudentIds(attendance.checkedStudentIds);
+      setLeaveStudentIds(attendance.leaveStudentIds);
+      setRecordByStudentId(attendance.recordByStudentId);
       setSupplementStudentIds(new Set());
-      // 已点名 → 查看；未点名且在 30 天窗口内 → 正常点名；超时 → 仅查看
-      const canOperate = !viewOnlyParam && isWithinLessonOperateWindow(lessonDate);
-      setAttendanceMode(hasRecords || !canOperate ? 'view' : 'normal');
+      setAttendanceMode(
+        resolveClassAttendanceMode({
+          hasRecords: attendance.hasRecords,
+          viewOnly: viewOnlyParam,
+          lessonDate,
+        }),
+      );
 
-      // 为每个学员匹配课包
-      const pkgMap = new Map<string, CoursePackage>();
-      const subMap = new Map<string, Subject | null>();
-      for (const stu of mergedStudents) {
-        const pkgs = await packageService.getActiveByStudent(stu.id);
-        const best = pickBestPackage(pkgs, hoursUsed);
-        if (best) {
-          pkgMap.set(stu.id, best);
-          if (best.subject_id) {
-            const sub = await subjectService.getById(best.subject_id);
-            subMap.set(stu.id, sub);
-          } else {
-            subMap.set(stu.id, null);
-          }
-        }
-      }
-      setStudentPackages(pkgMap);
-      setStudentSubjects(subMap);
+      const { packages, subjects } = await loadPackageMapsForStudents(mergedStudents, hoursUsed);
+      setStudentPackages(packages);
+      setStudentSubjects(subjects);
     },
     [
       applyClassTeacherDefaults,
