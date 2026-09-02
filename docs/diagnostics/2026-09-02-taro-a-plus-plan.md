@@ -60,7 +60,7 @@
 
 | ID | 状态 | 说明 |
 |----|------|------|
-| Q2-2 | ✅ 提交拆分 | 补录/增量/单人/班级 handler + persist + `withSubmitLock` 单测；页约 2511 行 |
+| Q2-2 | ✅ 提交拆分 | `3c0ff01` · `backup/taro-a-plus-q2-2-submit-2026-09-02`：补录/增量/单人/班级 + persist + 防重入单测；页约 2511 行 |
 | Q2-1 | ✅ 起步 | `6f722fb` · `backup/taro-a-plus-q2-1-card-helpers-2026-09-02`：schedule-card-actions/status + 单测 |
 | Q2-3 | ✅ 起步 | `f1d6b98` · `backup/taro-a-plus-q2-3-form-helpers-2026-09-02`：time / teacher-selection / YesNoToggle |
 | Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
