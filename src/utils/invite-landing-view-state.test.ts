@@ -32,6 +32,21 @@ describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
         resolveParentShareLandingView({ inviteStatus: 'pending', usedByUserId: null }, null),
       ).toBe('pending');
     });
+
+    it('非法/未知 inviteStatus → 按 pending 可注册态（页内再校验 token）', () => {
+      expect(
+        resolveParentShareLandingView({ inviteStatus: 'invalid', usedByUserId: null }, null),
+      ).toBe('pending');
+      expect(
+        resolveParentShareLandingView({ inviteStatus: '', usedByUserId: null }, 'user-x'),
+      ).toBe('pending');
+    });
+
+    it('已绑定但 viewer 角色/身份不匹配（usedBy 非当前用户）→ used_invalid', () => {
+      expect(
+        resolveParentShareLandingView({ inviteStatus: 'used', usedByUserId: 'binder' }, 'other'),
+      ).toBe('used_invalid');
+    });
   });
 
   describe('L3 V3T-3 / V3T-4', () => {
@@ -56,6 +71,21 @@ describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
       ).toBe('used_invalid');
     });
 
+    it('USED 但 usedByUserId 缺失 / 未登录 → used_invalid（非本人绑定）', () => {
+      expect(
+        resolveCampusInviteLandingView(
+          { status: 'USED', expireAt: future, usedByUserId: null },
+          null,
+        ),
+      ).toBe('used_invalid');
+      expect(
+        resolveCampusInviteLandingView(
+          { status: 'USED', expireAt: future, usedByUserId: undefined },
+          'staff-1',
+        ),
+      ).toBe('used_invalid');
+    });
+
     it('V3T-4: 过期 → 不可接受态', () => {
       expect(resolveCampusInviteLandingView({ status: 'PENDING', expireAt: past }, 'staff-1')).toBe(
         'expired',
@@ -63,6 +93,24 @@ describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
       expect(resolveCampusInviteLandingView({ status: 'EXPIRED', expireAt: future }, null)).toBe(
         'expired',
       );
+    });
+
+    it('expireAt 恰等于 now → expired；PENDING 未过期 → pending', () => {
+      const now = Date.parse('2026-09-03T00:00:00.000Z');
+      expect(
+        resolveCampusInviteLandingView(
+          { status: 'PENDING', expireAt: '2026-09-03T00:00:00.000Z' },
+          null,
+          now,
+        ),
+      ).toBe('expired');
+      expect(
+        resolveCampusInviteLandingView(
+          { status: 'PENDING', expireAt: '2026-09-03T01:00:00.000Z' },
+          null,
+          now,
+        ),
+      ).toBe('pending');
     });
   });
 });

@@ -85,6 +85,18 @@ describe('store-entry-onboarding', () => {
     );
   });
 
+  it('resolveStoreEntryFunnelDestination：非管理员（教师）→ identity-select', () => {
+    expect(
+      resolveStoreEntryFunnelDestination({
+        profile: {
+          ...managerNoOrg(),
+          currentContext: { identityId: 'i1', role: 'teacher', organizationId: '' },
+        } as Profile,
+        latest: { application: { id: 'a1', status: 'PENDING' } },
+      }),
+    ).toBe('identity-select');
+  });
+
   it('resolveStoreEntryFunnelDestination：PENDING → pending', () => {
     expect(
       resolveStoreEntryFunnelDestination({

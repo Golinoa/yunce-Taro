@@ -156,6 +156,47 @@ describe('auth-onboarding', () => {
     ).toBe(true);
   });
 
+  it('needsOnboarding 教师无机构名需引导；已有机构则否', () => {
+    expect(
+      needsOnboarding(
+        baseProfile({
+          currentContext: { identityId: 'identity-1', role: 'teacher', organizationId: '' },
+          teacher_profile: { id: 't1' } as Profile['teacher_profile'],
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      needsOnboarding(
+        baseProfile({
+          currentContext: { identityId: 'identity-1', role: 'teacher', organizationId: 'org-1' },
+          teacher_profile: { id: 't1', institution: '星火' } as Profile['teacher_profile'],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('needsWechatPhoneBind：仅新用户且无手机号时需要', async () => {
+    const { needsWechatPhoneBind } = await import('@/utils/auth-onboarding');
+    expect(needsWechatPhoneBind(baseProfile({ phone: '13800000000' }), false)).toBe(false);
+    expect(needsWechatPhoneBind(baseProfile({ phone: '13800000000' }), true)).toBe(false);
+    expect(needsWechatPhoneBind(baseProfile({ phone: '' }), true)).toBe(true);
+    expect(needsWechatPhoneBind(null, true)).toBe(true);
+  });
+
+  it('isOnboardingFunnelActive：完善资料 / pending 身份 / 未入驻任一为真', async () => {
+    const { isOnboardingFunnelActive } = await import('@/utils/auth-onboarding');
+    expect(isOnboardingFunnelActive(null)).toBe(false);
+    expect(
+      isOnboardingFunnelActive(baseProfile({ name: '万老师', nickname: '万老师' }), {
+        isNewUser: true,
+      }),
+    ).toBe(true);
+    markIdentitySelectionPending();
+    expect(isOnboardingFunnelActive(baseProfile({ name: '万老师', nickname: '万老师' }))).toBe(
+      true,
+    );
+  });
+
   it('跳过引导后不再提示', () => {
     markOnboardingSkipped();
     expect(hasSkippedOnboarding()).toBe(true);
