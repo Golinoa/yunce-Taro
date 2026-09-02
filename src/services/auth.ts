@@ -3,7 +3,6 @@
  * 所有认证相关请求统一通过此处，真实 API 联调时只改此处即可
  */
 import Taro from '@tarojs/taro';
-import { resolveDevLoginEmail } from '@/constants/dev-switch-accounts';
 import {
   EMAIL_NOT_REGISTERED,
   EMAIL_PATTERN,
@@ -22,6 +21,9 @@ import type {
 import { isDevApiEnv } from '@/utils/build-env';
 import { get, post, put } from '@/utils/request';
 import { decodeAccessTokenClaims, isUuidOrganizationId, pickRealTenantId } from '@/utils/tenant-id';
+import { maskEmailAddress, resolveLoginEmailInput } from '@/services/auth-email';
+
+export { resolveLoginEmailInput } from '@/services/auth-email';
 
 export interface TestAccount {
   username: string;
@@ -53,25 +55,6 @@ const AUTH_ENDPOINTS = {
 } as const;
 
 const REGISTER_DRAFT_STORAGE_KEY = 'yunce-edu-register-draft-local';
-
-/** 登录/找回密码：解析邮箱输入（生产走邮箱；dev 保留短用户名与误输入 alias） */
-export function resolveLoginEmailInput(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  if (isDevApiEnv()) {
-    const devEmail = resolveDevLoginEmail(trimmed);
-    if (devEmail) {
-      const lower = trimmed.toLowerCase();
-      if (devEmail !== lower || !EMAIL_PATTERN.test(trimmed)) {
-        return devEmail;
-      }
-    }
-  }
-  if (EMAIL_PATTERN.test(trimmed)) {
-    return trimmed.toLowerCase();
-  }
-  return isDevApiEnv() ? resolveDevLoginEmail(trimmed) : null;
-}
 
 /** 校验邮箱已注册（不发码），与找回密码发码前校验口径一致 */
 export async function checkEmailRegistered(
@@ -212,13 +195,6 @@ export const authCapabilities = {
   supportsWechatLogin: true,
   usesMockRegister: false,
 } as const;
-
-function maskEmailAddress(email: string): string {
-  const [localPart = '', domain = ''] = email.split('@');
-  if (!localPart || !domain) return email;
-  if (localPart.length <= 2) return `${localPart[0] || '*'}***@${domain}`;
-  return `${localPart.slice(0, 2)}***@${domain}`;
-}
 
 const clearStoredAuth = (): void => {
   try {

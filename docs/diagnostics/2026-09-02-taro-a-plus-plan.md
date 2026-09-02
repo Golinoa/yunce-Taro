@@ -62,11 +62,11 @@
 |----|------|------|
 | Q2-2 | 🔄 进行中 | `896fd0a` · `backup/taro-a-plus-q2-2-checkin-2026-09-02`：CheckinCard / checkin-status / StudentEditSheet；提交 handler 仍在页内 |
 | Q2-1 | ✅ 起步 | `6f722fb` · `backup/taro-a-plus-q2-1-card-helpers-2026-09-02`：schedule-card-actions/status + 单测 |
-| Q2-3 | ✅ 起步 | 抽出 `time` / `teacher-selection` / `YesNoToggle` + 单测 |
-| Q2-4 | ⏳ | student/auth 神文件 |
+| Q2-3 | ✅ 起步 | `f1d6b98` · `backup/taro-a-plus-q2-3-form-helpers-2026-09-02`：time / teacher-selection / YesNoToggle |
+| Q2-4 | 🔄 起步 | 抽出 `auth-email`（resolveLoginEmailInput / maskEmailAddress） |
 | Q2-5 | ✅ | `82567c0` · `backup/taro-a-plus-q2-5-getparents-2026-09-02`；后端配套 `6872334`（listParents+profileId，在 fix/tenant-isolation-p0） |
 
-下一节点：Q2-4 auth/student 收敛；巨型页继续拆。
+下一节点：Q2-4 续拆 student.ts；巨型页继续拆。
 
 ---
 
