@@ -123,4 +123,72 @@ describe('lesson-attendance-load (Q2-2)', () => {
     expect(map.b1).toBe('checked');
     expect(map.b2).toBe('absent');
   });
+
+  it('空学员 / 空记录：出勤状态与试听映射不抛错', () => {
+    const emptyState = buildClassAttendanceState({
+      classId: 'c1',
+      lessonDate: '2026-09-02',
+      studentIds: [],
+      records: [
+        { id: '1', student_id: 'a', class_id: 'c1', lesson_date: '2026-09-02', status: 'normal' },
+      ] as never[],
+    });
+    expect(emptyState.hasRecords).toBe(false);
+    expect(emptyState.checkedStudentIds.size).toBe(0);
+
+    const noRecords = buildClassAttendanceState({
+      classId: 'c1',
+      lessonDate: '2026-09-02',
+      studentIds: ['a'],
+      records: [],
+    });
+    expect(noRecords.hasRecords).toBe(false);
+    expect(noRecords.recordByStudentId.size).toBe(0);
+
+    expect(
+      buildTrialCheckinMap({
+        classId: 'c1',
+        lessonDate: '2026-09-02',
+        bookings: [],
+        records: [],
+      }),
+    ).toEqual({});
+  });
+
+  it('窗口外 / 已有记录 → view（拒绝进入可操作补录模式）', () => {
+    const now = new Date('2026-09-02T12:00:00');
+    // 超 30 天：仅查看，与课表「超时隐藏补录 / viewOnly」口径一致
+    expect(
+      resolveClassAttendanceMode({
+        hasRecords: false,
+        viewOnly: false,
+        lessonDate: '2026-08-02',
+        now,
+      }),
+    ).toBe('view');
+    // 窗口边界日仍可 normal
+    expect(
+      resolveClassAttendanceMode({
+        hasRecords: false,
+        viewOnly: false,
+        lessonDate: '2026-08-03',
+        now,
+      }),
+    ).toBe('normal');
+    // 已有点名记录即使在窗内也是 view（补录需显式切 supplement）
+    expect(
+      resolveClassAttendanceMode({
+        hasRecords: true,
+        viewOnly: false,
+        lessonDate: '2026-09-01',
+        now,
+      }),
+    ).toBe('view');
+  });
+
+  it('mapRecordStatusToCheckin：空状态与未知态', () => {
+    expect(mapRecordStatusToCheckin(undefined)).toBe('absent');
+    expect(mapRecordStatusToCheckin(null)).toBe('absent');
+    expect(mapRecordStatusToCheckin('')).toBe('absent');
+  });
 });
