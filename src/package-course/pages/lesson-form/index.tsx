@@ -2,10 +2,7 @@ import { View } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createSubmitLock } from '@/utils/submit-lock';
-import DatePickerSheet from '@/components/DatePickerSheet';
 import PageContainer from '@/components/PageContainer';
-import PickerSheet, { PickerOption } from '@/components/PickerSheet';
-import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import {
   studentService,
   packageService,
@@ -44,8 +41,9 @@ import {
 } from './checkin-status';
 import LessonFormFooter from './LessonFormFooter';
 import LessonFormHeader from './LessonFormHeader';
+import LessonFormSheets from './LessonFormSheets';
 import { formatDate, formatTime } from './lesson-form-datetime';
-import StudentEditSheet from './StudentEditSheet';
+import type { StudentEditSheetTarget } from './StudentEditSheet';
 import SingleLessonPanel from './SingleLessonPanel';
 import { isWithinLessonOperateWindow } from './lesson-operate';
 import { executeClassSubmit } from './lesson-submit-class';
@@ -220,15 +218,7 @@ const LessonForm: React.FC = () => {
 
   // ===== 学员卡片编辑弹窗 =====
   const [showStudentDetailSheet, setShowStudentDetailSheet] = useState(false);
-  const [detailSheetTarget, setDetailSheetTarget] = useState<{
-    type: 'formal' | 'trial';
-    id: string;
-    name: string;
-    remaining: string;
-    deduct: string;
-    courseName?: string;
-    student?: Student;
-  } | null>(null);
+  const [detailSheetTarget, setDetailSheetTarget] = useState<StudentEditSheetTarget | null>(null);
   const [detailSheetRemark, setDetailSheetRemark] = useState('');
   // 单学员备注草稿：studentId → 备注。优先落库到消课记录（record.note）；
   // 学员尚无考勤记录时先暂存于此，随下次提交点名写入记录，保证输入不丢失。
@@ -1090,6 +1080,64 @@ const LessonForm: React.FC = () => {
     setShowStudentDetailSheet(false);
   }, []);
 
+  const handleConfirmStudentRemark = useCallback(async () => {
+    if (!detailSheetTarget) {
+      return;
+    }
+    const remark = detailSheetRemark.trim();
+    const studentId = detailSheetTarget.id;
+
+    // 统一先落草稿（作为 UI 呈现与提交携带的唯一事实源）
+    setStudentRemarkDrafts((prev) => ({ ...prev, [studentId]: remark }));
+
+    // 试听学员：仅暂存草稿，随下次提交点名写入记录
+    if (detailSheetTarget.type === 'trial') {
+      Taro.showToast({ title: remark ? '备注已保存' : '备注已清除', icon: 'success' });
+      return;
+    }
+
+    // 正式学员：已有点名记录 → 立即写入消课记录
+    const record = recordByStudentId.get(studentId);
+    if (record) {
+      try {
+        await lessonRecordService.update(record.id, {
+          note: remark || undefined,
+        });
+        // 同步本地记录，保证卡片备注即时呈现
+        setRecordByStudentId((prev) => {
+          const next = new Map(prev);
+          const current = next.get(studentId);
+          if (current) {
+            next.set(studentId, { ...current, note: remark || undefined });
+          }
+          return next;
+        });
+        Taro.showToast({ title: '备注已保存', icon: 'success' });
+      } catch (err) {
+        logError('save student remark', err);
+        Taro.showToast({ title: '备注保存失败，请重试', icon: 'none' });
+      }
+      return;
+    }
+
+    // 尚无考勤记录：草稿已在提交点名时随 create 写入
+    Taro.showToast({ title: '已保存，提交点名后生效', icon: 'none' });
+  }, [detailSheetRemark, detailSheetTarget, recordByStudentId]);
+
+  const handleConfirmSelector = useCallback(
+    (v: string) => {
+      if (selector.type === 'teacher') setSelectedTeachingTeacherId(v);
+      else if (selector.type === 'campus') {
+        setCampusId(v);
+        setRoom('');
+      } else if (selector.type === 'package') {
+        void handlePickPackage(v);
+      } else setRoom(v);
+      setSelector((prev) => ({ ...prev, visible: false }));
+    },
+    [handlePickPackage, selector.type],
+  );
+
   const handleTransferStudent = useCallback(
     async (student: Student, targetClassId: string) => {
       if (!selectedClassId) {
@@ -1713,86 +1761,6 @@ const LessonForm: React.FC = () => {
           />
         )}
 
-        {/* ====== 学员选择弹窗：与课程管理 ClassStudentsCard「选择上课学员」同款 ====== */}
-        <StudentMultiSelectSheet
-          visible={showStudentPicker}
-          students={allStudents}
-          selectedIds={selectedStudent ? [selectedStudent.id] : []}
-          subjects={subjectOptions}
-          maxSelectable={1}
-          showUnscheduledFilter
-          title="选择上课学员"
-          onClose={() => setShowStudentPicker(false)}
-          onConfirm={handleConfirmSingleStudent}
-        />
-
-        <StudentMultiSelectSheet
-          visible={showAddStudentSheet}
-          students={addableStudents}
-          selectedIds={[]}
-          subjects={subjectOptions}
-          subjectId={selectedClass?.subject_id}
-          title={addStudentSheetPurpose === 'supplement' ? '选择补录学员' : '添加学员到点名名单'}
-          onClose={() => setShowAddStudentSheet(false)}
-          onConfirm={(ids) => void handleConfirmAddStudents(ids)}
-        />
-
-        {/* ====== 学员编辑弹窗 ====== */}
-        <StudentEditSheet
-          visible={showStudentDetailSheet}
-          target={detailSheetTarget}
-          remark={detailSheetRemark}
-          classes={classes}
-          selectedClassId={selectedClassId}
-          onRemarkChange={setDetailSheetRemark}
-          onClose={handleCloseStudentDetailSheet}
-          onTransfer={handleTransferStudent}
-          onRemove={handleRemoveStudent}
-          onConfirm={async () => {
-            if (!detailSheetTarget) {
-              return;
-            }
-            const remark = detailSheetRemark.trim();
-            const studentId = detailSheetTarget.id;
-
-            // 统一先落草稿（作为 UI 呈现与提交携带的唯一事实源）
-            setStudentRemarkDrafts((prev) => ({ ...prev, [studentId]: remark }));
-
-            // 试听学员：仅暂存草稿，随下次提交点名写入记录
-            if (detailSheetTarget.type === 'trial') {
-              Taro.showToast({ title: remark ? '备注已保存' : '备注已清除', icon: 'success' });
-              return;
-            }
-
-            // 正式学员：已有点名记录 → 立即写入消课记录
-            const record = recordByStudentId.get(studentId);
-            if (record) {
-              try {
-                await lessonRecordService.update(record.id, {
-                  note: remark || undefined,
-                });
-                // 同步本地记录，保证卡片备注即时呈现
-                setRecordByStudentId((prev) => {
-                  const next = new Map(prev);
-                  const current = next.get(studentId);
-                  if (current) {
-                    next.set(studentId, { ...current, note: remark || undefined });
-                  }
-                  return next;
-                });
-                Taro.showToast({ title: '备注已保存', icon: 'success' });
-              } catch (err) {
-                logError('save student remark', err);
-                Taro.showToast({ title: '备注保存失败，请重试', icon: 'none' });
-              }
-              return;
-            }
-
-            // 尚无考勤记录：草稿已在提交点名时随 create 写入
-            Taro.showToast({ title: '已保存，提交点名后生效', icon: 'none' });
-          }}
-        />
-
         {/* ====== 底部操作栏 ====== */}
         <LessonFormFooter
           mode={mode}
@@ -1814,68 +1782,45 @@ const LessonForm: React.FC = () => {
         />
       </View>
 
-      {/* 统一弹窗选择器（PickerSheet 标准组件） */}
-      <PickerSheet
-        visible={selector.visible}
-        title={
-          selector.type === 'teacher'
-            ? '选择主讲老师'
-            : selector.type === 'campus'
-              ? '选择校区'
-              : selector.type === 'package'
-                ? '选择消课课包'
-                : '选择教室'
-        }
-        options={
-          selector.type === 'teacher'
-            ? teacherOptions.map((t): PickerOption => ({ label: t.name, value: t.id }))
-            : selector.type === 'campus'
-              ? [
-                  { label: '请选择', value: '' },
-                  ...campusOptions.map((c): PickerOption => ({ label: c.name, value: c.id })),
-                ]
-              : selector.type === 'package'
-                ? studentActivePackages.map(
-                    (p): PickerOption => ({
-                      label: `${p.name}（剩 ${p.remaining_hours} 课时）`,
-                      value: p.id,
-                    }),
-                  )
-                : [
-                    { label: '请选择', value: '' },
-                    ...rooms
-                      .filter((r) => r.status === 'active')
-                      .map((r): PickerOption => ({ label: r.name, value: r.name })),
-                  ]
-        }
-        value={
-          selector.type === 'teacher'
-            ? selectedTeachingTeacherId
-            : selector.type === 'campus'
-              ? campusId
-              : selector.type === 'package'
-                ? matchedPackage?.id || ''
-                : room
-        }
-        onClose={() => setSelector((prev) => ({ ...prev, visible: false }))}
-        onConfirm={(v) => {
-          if (selector.type === 'teacher') setSelectedTeachingTeacherId(v);
-          else if (selector.type === 'campus') {
-            setCampusId(v);
-            setRoom('');
-          } else if (selector.type === 'package') {
-            void handlePickPackage(v);
-          } else setRoom(v);
-          setSelector((prev) => ({ ...prev, visible: false }));
-        }}
-      />
-
-      <DatePickerSheet
-        visible={lessonDatePickerVisible}
-        title="选择上课日期"
-        value={lessonDate}
-        onClose={() => setLessonDatePickerVisible(false)}
-        onConfirm={(date) => {
+      {/* ====== 弹层：学员多选 / 编辑 / Picker / 日期 ====== */}
+      <LessonFormSheets
+        showStudentPicker={showStudentPicker}
+        allStudents={allStudents}
+        selectedStudent={selectedStudent}
+        subjectOptions={subjectOptions}
+        onCloseStudentPicker={() => setShowStudentPicker(false)}
+        onConfirmSingleStudent={handleConfirmSingleStudent}
+        showAddStudentSheet={showAddStudentSheet}
+        addableStudents={addableStudents}
+        selectedClass={selectedClass}
+        addStudentSheetPurpose={addStudentSheetPurpose}
+        onCloseAddStudentSheet={() => setShowAddStudentSheet(false)}
+        onConfirmAddStudents={(ids) => void handleConfirmAddStudents(ids)}
+        showStudentDetailSheet={showStudentDetailSheet}
+        detailSheetTarget={detailSheetTarget}
+        detailSheetRemark={detailSheetRemark}
+        classes={classes}
+        selectedClassId={selectedClassId}
+        onRemarkChange={setDetailSheetRemark}
+        onCloseStudentDetailSheet={handleCloseStudentDetailSheet}
+        onTransferStudent={handleTransferStudent}
+        onRemoveStudent={handleRemoveStudent}
+        onConfirmStudentRemark={handleConfirmStudentRemark}
+        selector={selector}
+        teacherOptions={teacherOptions}
+        campusOptions={campusOptions}
+        rooms={rooms}
+        studentActivePackages={studentActivePackages}
+        selectedTeachingTeacherId={selectedTeachingTeacherId}
+        campusId={campusId}
+        matchedPackageId={matchedPackage?.id || ''}
+        room={room}
+        onCloseSelector={() => setSelector((prev) => ({ ...prev, visible: false }))}
+        onConfirmSelector={handleConfirmSelector}
+        lessonDatePickerVisible={lessonDatePickerVisible}
+        lessonDate={lessonDate}
+        onCloseLessonDatePicker={() => setLessonDatePickerVisible(false)}
+        onConfirmLessonDate={(date) => {
           setLessonDate(date);
           setLessonDatePickerVisible(false);
         }}
