@@ -241,7 +241,6 @@ const SalaryRuleEditor: React.FC<SalaryRuleEditorProps> = ({
           {value.lessonFeeMode === 'by_course' && (
             <CourseGroupFeeEditor
               groups={value.courseGroupFees}
-              errors={errors}
               onToggleShare={toggleCourseShare}
               onToggleItemShare={toggleCourseItemShare}
               onUpdateRate={updateCourseRate}

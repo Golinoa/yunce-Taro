@@ -102,20 +102,22 @@ export function validateSalaryRule(value: SalaryRuleConfig): SalaryRuleEditorErr
     const minCount = Number(t.minCount);
     const maxCount = Number(t.maxCount);
     const rate = Number(t.rate);
-    next.attendanceTiers = next.attendanceTiers || {};
     if (t.minCount !== '' && (Number.isNaN(minCount) || minCount < 0)) {
+      next.attendanceTiers = next.attendanceTiers || {};
       next.attendanceTiers[t.id] = {
         ...(next.attendanceTiers[t.id] || {}),
         minCount: '不能为负数',
       };
     }
     if (t.maxCount !== '' && (Number.isNaN(maxCount) || maxCount < 0)) {
+      next.attendanceTiers = next.attendanceTiers || {};
       next.attendanceTiers[t.id] = {
         ...(next.attendanceTiers[t.id] || {}),
         maxCount: '不能为负数',
       };
     }
     if (t.rate !== '' && (Number.isNaN(rate) || rate < 0)) {
+      next.attendanceTiers = next.attendanceTiers || {};
       next.attendanceTiers[t.id] = { ...(next.attendanceTiers[t.id] || {}), rate: '不能为负数' };
     }
   });
@@ -123,11 +125,12 @@ export function validateSalaryRule(value: SalaryRuleConfig): SalaryRuleEditorErr
   value.perfTiers.forEach((t) => {
     const threshold = Number(t.threshold);
     const rate = Number(t.rate);
-    next.perfTiers = next.perfTiers || {};
     if (t.threshold !== '' && (Number.isNaN(threshold) || threshold < 0)) {
+      next.perfTiers = next.perfTiers || {};
       next.perfTiers[t.id] = { ...(next.perfTiers[t.id] || {}), threshold: '不能为负数' };
     }
     if (t.rate !== '' && (Number.isNaN(rate) || rate < 0)) {
+      next.perfTiers = next.perfTiers || {};
       next.perfTiers[t.id] = { ...(next.perfTiers[t.id] || {}), rate: '不能为负数' };
     }
   });
@@ -144,11 +147,12 @@ export function validateSalaryRule(value: SalaryRuleConfig): SalaryRuleEditorErr
       e.tiers.forEach((t) => {
         const threshold = Number(t.threshold);
         const rate = Number(t.rate);
-        itemErr.tiers = itemErr.tiers || {};
         if (t.threshold !== '' && (Number.isNaN(threshold) || threshold < 0)) {
+          itemErr.tiers = itemErr.tiers || {};
           itemErr.tiers[t.id] = { ...(itemErr.tiers[t.id] || {}), threshold: '不能为负数' };
         }
         if (t.rate !== '' && (Number.isNaN(rate) || rate < 0)) {
+          itemErr.tiers = itemErr.tiers || {};
           itemErr.tiers[t.id] = { ...(itemErr.tiers[t.id] || {}), rate: '不能为负数' };
         }
       });
@@ -157,17 +161,24 @@ export function validateSalaryRule(value: SalaryRuleConfig): SalaryRuleEditorErr
       e.perfTiers.forEach((t) => {
         const threshold = Number(t.threshold);
         const rate = Number(t.rate);
-        itemErr.perfTiers = itemErr.perfTiers || {};
         if (t.threshold !== '' && (Number.isNaN(threshold) || threshold < 0)) {
+          itemErr.perfTiers = itemErr.perfTiers || {};
           itemErr.perfTiers[t.id] = {
             ...(itemErr.perfTiers[t.id] || {}),
             threshold: '不能为负数',
           };
         }
         if (t.rate !== '' && (Number.isNaN(rate) || rate < 0)) {
+          itemErr.perfTiers = itemErr.perfTiers || {};
           itemErr.perfTiers[t.id] = { ...(itemErr.perfTiers[t.id] || {}), rate: '不能为负数' };
         }
       });
+    }
+    if (itemErr.tiers && Object.keys(itemErr.tiers).length === 0) {
+      delete itemErr.tiers;
+    }
+    if (itemErr.perfTiers && Object.keys(itemErr.perfTiers).length === 0) {
+      delete itemErr.perfTiers;
     }
     if (Object.keys(itemErr).length > 0) {
       next.categoryLessonFees = next.categoryLessonFees || {};

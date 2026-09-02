@@ -3,25 +3,43 @@ import { createDefaultSalaryRule } from '@/domain/teacher-salary';
 import { isSalaryRuleValid, validateSalaryRule } from './validate';
 
 describe('validateSalaryRule', () => {
-  it('默认规则在固定底薪模式下可过校验（忽略空 attendance/perf 占位）', () => {
-    const rule = createDefaultSalaryRule();
-    // 默认含 attendance/perf 占位行；原逻辑会对空行写入空对象 key。
-    // 清空占位后验证「正常填写」路径。
-    const cleaned = {
-      ...rule,
-      attendanceTiers: [],
-      perfTiers: [],
-    };
-    const errors = validateSalaryRule(cleaned);
+  it('createDefaultSalaryRule 原样可过校验，且无 attendance/perf 空 key', () => {
+    const errors = validateSalaryRule(createDefaultSalaryRule());
     expect(isSalaryRuleValid(errors)).toBe(true);
+    expect(errors.attendanceTiers).toBeUndefined();
+    expect(errors.perfTiers).toBeUndefined();
+  });
+
+  it('分类 algorithm=tier 仅空占位可过校验，无 categoryLessonFees 空污染', () => {
+    const base = createDefaultSalaryRule();
+    const rule = {
+      ...base,
+      categoryLessonFees: base.categoryLessonFees.map((item, idx) =>
+        idx === 0 ? { ...item, algorithm: 'tier' as const } : item,
+      ),
+    };
+    const errors = validateSalaryRule(rule);
+    expect(isSalaryRuleValid(errors)).toBe(true);
+    expect(errors.categoryLessonFees).toBeUndefined();
+  });
+
+  it('分类 algorithm=perf 仅空占位可过校验，无 categoryLessonFees 空污染', () => {
+    const base = createDefaultSalaryRule();
+    const rule = {
+      ...base,
+      categoryLessonFees: base.categoryLessonFees.map((item, idx) =>
+        idx === 0 ? { ...item, algorithm: 'perf' as const } : item,
+      ),
+    };
+    const errors = validateSalaryRule(rule);
+    expect(isSalaryRuleValid(errors)).toBe(true);
+    expect(errors.categoryLessonFees).toBeUndefined();
   });
 
   it('固定底薪为负数时报错', () => {
     const rule = {
       ...createDefaultSalaryRule(),
       fixedBaseAmount: -1,
-      attendanceTiers: [],
-      perfTiers: [],
     };
     const errors = validateSalaryRule(rule);
     expect(errors.fixedBaseAmount).toBe('请输入正确的底薪金额');
@@ -30,8 +48,6 @@ describe('validateSalaryRule', () => {
   it('医社保开启且金额为负时报错', () => {
     const rule = {
       ...createDefaultSalaryRule(),
-      attendanceTiers: [],
-      perfTiers: [],
       insurance: { enabled: true, companyAmount: -2, personalAmount: '' as const },
     };
     const errors = validateSalaryRule(rule);
@@ -41,8 +57,6 @@ describe('validateSalaryRule', () => {
   it('提成阶梯比例为负时报错', () => {
     const rule = {
       ...createDefaultSalaryRule(),
-      attendanceTiers: [],
-      perfTiers: [],
       commissionMode: 'personal_perf' as const,
       commissionTiers: [{ id: 'c1', perfThreshold: 100, rate: -5 }],
     };
@@ -54,8 +68,6 @@ describe('validateSalaryRule', () => {
     const base = createDefaultSalaryRule();
     const rule = {
       ...base,
-      attendanceTiers: [],
-      perfTiers: [],
       categoryLessonFees: [
         {
           ...base.categoryLessonFees[0],
@@ -74,11 +86,19 @@ describe('validateSalaryRule', () => {
     const base = createDefaultSalaryRule();
     const rule = {
       ...base,
-      attendanceTiers: [],
-      perfTiers: [],
       categoryExtraFees: [{ ...base.categoryExtraFees[0], rate: -1 }],
     };
     const errors = validateSalaryRule(rule);
     expect(errors.categoryExtraFees?.[base.categoryExtraFees[0].id]).toBe('补贴不能为负数');
+  });
+
+  it('attendance 占位填负数时报错', () => {
+    const base = createDefaultSalaryRule();
+    const rule = {
+      ...base,
+      attendanceTiers: [{ id: 'a1', minCount: -1, maxCount: '', rate: '' }],
+    };
+    const errors = validateSalaryRule(rule);
+    expect(errors.attendanceTiers?.a1?.minCount).toBe('不能为负数');
   });
 });

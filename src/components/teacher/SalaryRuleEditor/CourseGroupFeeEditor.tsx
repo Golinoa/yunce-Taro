@@ -4,11 +4,9 @@ import FormInput from '@/components/FormInput';
 import Switch from '@/components/Switch';
 import type { CourseGroupFee } from '@/types/teacher';
 import { CATEGORY_MODE_LABEL } from './constants';
-import type { SalaryRuleEditorErrors } from './types';
 
 export interface CourseGroupFeeEditorProps {
   groups: CourseGroupFee[];
-  errors: SalaryRuleEditorErrors;
   onToggleShare: (categoryId: string, on: boolean) => void;
   onToggleItemShare: (categoryId: string, courseId: string, on: boolean) => void;
   onUpdateRate: (categoryId: string, courseId: string, raw: string) => void;
