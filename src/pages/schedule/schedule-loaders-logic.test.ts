@@ -93,6 +93,29 @@ describe('shouldSkipOpenSlotLoad', () => {
   it('无缓存且非加载中时不跳过', () => {
     expect(shouldSkipOpenSlotLoad(base)).toBe(false);
   });
+
+  it('force + loading 仍跳过（加载中优先）', () => {
+    expect(
+      shouldSkipOpenSlotLoad({
+        ...base,
+        force: true,
+        loadingDates: new Set(['2026-09-01']),
+        cachedDates: { '2026-09-01': {} },
+        errorDates: new Set(['2026-09-01']),
+      }),
+    ).toBe(true);
+  });
+
+  it('force + 缓存错误日：不跳过，允许重拉', () => {
+    expect(
+      shouldSkipOpenSlotLoad({
+        ...base,
+        force: true,
+        cachedDates: { '2026-09-01': {} },
+        errorDates: new Set(['2026-09-01']),
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('buildMonthAuxDateRange', () => {
