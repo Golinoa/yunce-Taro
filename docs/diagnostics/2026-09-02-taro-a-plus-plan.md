@@ -62,10 +62,10 @@
 |----|------|------|
 | Q2-2 | ✅ 提交+加载 | `f4a8732` · `backup/taro-a-plus-q2-2-load-2026-09-02`：出勤回填/试听/课包；页约 2426 行 |
 | Q2-1 | ✅ 导航+卡片+危险文案 | `d40ce9c` · `backup/taro-a-plus-q2-1-card-danger-2026-09-02`：页约 3225 行 |
-| Q2-3 | ✅ 保存路径 | `e2df5b8` · `backup/taro-a-plus-q2-3-save-2026-09-03`：页约 1992 行 |
-| Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
-| Q2-2 | ✅ | Checkin + submit handlers + **attendance load helpers** |
-| Q2-2 | ✅ 面板抽出 | `5d7c57f` · `backup/taro-a-plus-q2-2-panels-2026-09-03`：Header/Single/Class/Footer + datetime；页 **2426 → 1887**（−539） |
+| Q2-3 | ✅ 保存+时段UI | `7ae9469` timeslots；页约 1885 行 |
+| Q2-1 | ✅ +tab布局 | `fa3ff9a` tab-layout；页约 3208 行 |
+| Q2-2 | ✅ 面板抽出 | `5d7c57f` · 页 **1887** 行 |
+| Q2-4 | ✅ | student 已拆；auth → login/session/profile 模块，`auth.ts` 门面约 **89** 行 · `backup/taro-a-plus-q2-4-auth-2026-09-03` |
 | Q2-5 | ✅ | `82567c0` · … |
 
 ### Wave 3 进度
@@ -105,7 +105,7 @@
 | `src/package-course/pages/lesson-form/index.tsx` | 3079 |
 | `src/package-course/pages/schedule-form/index.tsx` | 2042 |
 | `src/services/student.ts` | 2071 |
-| `src/services/auth.ts` | 1181 |
+| `src/services/auth.ts` | 89（门面；login/session/profile 已拆） |
 
 | ID | 项 | 完成定义 |
 |----|-----|----------|
