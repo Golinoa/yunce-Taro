@@ -38,6 +38,15 @@ import {
   type ScheduleDangerActionType,
 } from '@/utils/schedule-danger-meta';
 import { canSuspendOpenSlot, canSuspendThisLesson } from '@/utils/schedule-guard';
+import {
+  applyOpenSlotRestStatus,
+  filterCancelledRecordsForRestore,
+  filterClassesAfterBatchDelete,
+  filterSchedulesAfterBatchDelete,
+  mergeLessonRecordsForDate,
+  removeCancelledRecordsForDate,
+  resolveBatchDeleteToast,
+} from './schedule-danger-logic';
 
 export interface ScheduleDangerActionState {
   visible: boolean;
@@ -132,18 +141,14 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
 
   const handleRestoreLesson = useCallback(
     async (item: ScheduleCardItem) => {
-      if (!item.classId) {
+      const classId = item.classId;
+      if (!classId) {
         Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
         return;
       }
 
       const lessonDate = selectedDate.format('YYYY-MM-DD');
-      const cancelledRecords = lessonRecords.filter(
-        (record) =>
-          record.class_id === item.classId &&
-          record.lesson_date === lessonDate &&
-          record.status === 'cancelled',
-      );
+      const cancelledRecords = filterCancelledRecordsForRestore(lessonRecords, classId, lessonDate);
 
       if (cancelledRecords.length === 0) {
         Taro.showToast({ title: '未找到取消记录', icon: 'none' });
@@ -175,16 +180,7 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
           await Promise.all(
             cancelledRecords.map((record) => lessonRecordService.remove(record.id)),
           );
-          setLessonRecords((prev) =>
-            prev.filter(
-              (record) =>
-                !(
-                  record.class_id === item.classId &&
-                  record.lesson_date === lessonDate &&
-                  record.status === 'cancelled'
-                ),
-            ),
-          );
+          setLessonRecords((prev) => removeCancelledRecordsForDate(prev, classId, lessonDate));
           Taro.showToast({ title: '已恢复本次课程', icon: 'success' });
         });
       } catch (err) {
@@ -281,12 +277,9 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
             }
           }
 
-          setLessonRecords((prev) => {
-            const filtered = prev.filter(
-              (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
-            );
-            return [...filtered, ...createdRecords];
-          });
+          setLessonRecords((prev) =>
+            mergeLessonRecordsForDate(prev, classId, lessonDate, createdRecords),
+          );
           Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
         });
       } catch (err) {
@@ -337,20 +330,7 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
       try {
         await lock.run('suspend-open-slot', async () => {
           await classBookingService.updateSlotStatus(slot.id, 'rest');
-          setOpenClassSlots((prev) => {
-            const next = { ...prev };
-            const dateKey = slot.lesson_date;
-            if (next[dateKey]) {
-              next[dateKey] = { ...next[dateKey] };
-              const classSlots = next[dateKey][slot.class_id];
-              if (classSlots) {
-                next[dateKey][slot.class_id] = classSlots.map((s) =>
-                  s.id === slot.id ? { ...s, status: 'rest' as const } : s,
-                );
-              }
-            }
-            return next;
-          });
+          setOpenClassSlots((prev) => applyOpenSlotRestStatus(prev, slot));
 
           const bookingStudents = slot.booking_students || [];
           for (const student of bookingStudents) {
@@ -486,12 +466,9 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
             }
           }
 
-          setLessonRecords((prev) => {
-            const filtered = prev.filter(
-              (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
-            );
-            return [...filtered, ...createdRecords];
-          });
+          setLessonRecords((prev) =>
+            mergeLessonRecordsForDate(prev, classId, lessonDate, createdRecords),
+          );
           closeDangerActionDialog();
           Taro.showToast({ title: '已取消本次课程', icon: 'success' });
         });
@@ -538,10 +515,8 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
         }
 
         if (successIds.length > 0) {
-          setClasses((prev) => prev.filter((classItem) => !successIds.includes(classItem.id)));
-          setSchedules((prev) =>
-            prev.filter((scheduleItem) => !successIds.includes(scheduleItem.class_id || '')),
-          );
+          setClasses((prev) => filterClassesAfterBatchDelete(prev, successIds));
+          setSchedules((prev) => filterSchedulesAfterBatchDelete(prev, successIds));
           if (successIds.includes(selectedClassId)) {
             setSelectedClassId(filterAllClassId);
           }
@@ -572,17 +547,8 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
           }
         }
 
-        if (failedNames.length === 0) {
-          Taro.showToast({ title: `已删除 ${successIds.length} 个班级`, icon: 'success' });
-        } else if (successIds.length === 0) {
-          Taro.showToast({ title: '删除失败，请重试', icon: 'none' });
-        } else {
-          Taro.showToast({
-            title: `${successIds.length}个已删除，${failedNames.length}个失败`,
-            icon: 'none',
-            duration: 3000,
-          });
-        }
+        const toast = resolveBatchDeleteToast(successIds.length, failedNames.length);
+        Taro.showToast(toast);
       } finally {
         setDangerActionSubmitting(false);
       }
