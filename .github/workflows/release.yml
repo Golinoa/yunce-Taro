@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: '24.20.0'
           cache: npm
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm run check
       - run: npm run coverage
 
@@ -56,7 +56,7 @@ jobs:
           cache: npm
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Resolve version / desc
         id: meta
