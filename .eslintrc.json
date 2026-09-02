@@ -84,5 +84,37 @@
     "native/",
     "*.config.js",
     "*.config.ts"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "src/pages/**/*.{ts,tsx}",
+        "src/stores/**/*.{ts,tsx}",
+        "src/package-*/pages/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@/data",
+                "message": "pages/stores 禁止直连 @/data；请经 @/services 访问（Q3-1）。"
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@/data/*", "@/data/**"],
+                "message": "pages/stores 禁止直连 @/data/*；请经 @/services 访问（Q3-1）。"
+              },
+              {
+                "group": ["**/data", "**/data/*", "**/data/**"],
+                "message": "pages/stores 禁止相对路径引入 data 层；请经 @/services 访问（Q3-1）。"
+              }
+            ]
+          }
+        ]
+      }
+    }
   ]
 }

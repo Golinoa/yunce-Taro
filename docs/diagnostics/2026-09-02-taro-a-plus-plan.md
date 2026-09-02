@@ -65,17 +65,20 @@
 | Q2-3 | ✅ 保存路径 | `e2df5b8` · `backup/taro-a-plus-q2-3-save-2026-09-03`：页约 1992 行 |
 | Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
 | Q2-2 | ✅ | Checkin + submit handlers + **attendance load helpers** |
+| Q2-2 | ✅ 面板抽出 | `backup/taro-a-plus-q2-2-panels-2026-09-03`：Header/Single/Class/Footer + datetime；页 **2426 → ~1887**（−539） |
 | Q2-5 | ✅ | `82567c0` · … |
 
 ### Wave 3 进度
 
 | ID | 状态 | 说明 |
 |----|------|------|
+| Q3-1 | ✅ | eslint `no-restricted-imports`：`src/pages/**`、`src/stores/**`、`src/package-*/pages/**` 禁 `@/data` 与 `**/data/**`（error；当前 0 违规）· `backup/taro-a-plus-q3-gates-2026-09-03` |
+| Q3-2 | ✅ 轻量 | AGENTS 已写明**禁止新增 SCSS**；eslint 禁 `*.scss` import 暂跳过（遗留 `invite-landing` 会吵） |
 | Q3-3 | ✅ 起步 | AGENTS / rules / PRD：Taro 4 |
-| Q3-5 | ✅ 起步 | coverage include 热路径 |
-| Q3-1/2/4 | ⏳ | |
+| Q3-5 | ✅ | coverage.include + `route-guard.tsx` + `route-guard.test.ts`；lines 门槛 30→35（全量 ~79% 仍过门） |
+| Q3-4 | ⏳ | 次级大页队列 |
 
-下一节点：继续削巨型页至 &lt;800；真机 G1-3/4；Q3-1/2/4。
+下一节点：继续削巨型页至 &lt;800；真机 G1-3/4；Q3-4。
 
 ---
 
