@@ -99,11 +99,6 @@ const LeadBookingDetailPage: React.FC = () => {
     return 1;
   }, []);
 
-  const handleCheckInAll = useCallback(async () => {
-    if (!booking) return;
-    Taro.showToast({ title: '签到功能开发中', icon: 'none' });
-  }, [booking]);
-
   const handleCancel = useCallback(async () => {
     if (!booking) return;
     const res = await Taro.showModal({
@@ -139,17 +134,9 @@ const LeadBookingDetailPage: React.FC = () => {
     if (booking.status === 'cancelled') {
       return { label: '恢复预约', variant: 'primary' as const, action: handleRestore };
     }
-    const now = dayjs();
-    const endAt = dayjs(`${booking.lesson_date} ${booking.end_time}`);
-    const isEnded = now.isAfter(endAt);
-    if (isEnded) {
-      return { label: '全部已签到', variant: 'primary' as const, action: handleCheckInAll };
-    }
-    return [
-      { label: '取消预约', variant: 'ghost' as const, action: handleCancel },
-      { label: '全部已签到', variant: 'primary' as const, action: handleCheckInAll },
-    ];
-  }, [booking, handleCancel, handleCheckInAll, handleRestore]);
+    // G1-2：体验课签到未接通 — 砍掉「全部已签到」假入口，仅保留取消
+    return { label: '取消预约', variant: 'ghost' as const, action: handleCancel };
+  }, [booking, handleCancel, handleRestore]);
 
   if (loading) {
     return (
@@ -283,7 +270,12 @@ const LeadBookingDetailPage: React.FC = () => {
             ))
           ) : bottomAction ? (
             <View
-              className="center h-[80rpx] w-full rounded-full bg-primary text-[30rpx] font-medium text-white transition-all active:scale-95 active:bg-primary/90"
+              className={cn(
+                'center h-[80rpx] w-full rounded-full text-[30rpx] font-medium transition-all active:scale-95',
+                bottomAction.variant === 'primary'
+                  ? 'bg-primary text-white active:bg-primary/90'
+                  : 'border border-border bg-white text-foreground active:bg-muted',
+              )}
               onClick={bottomAction.action}
             >
               {bottomAction.label}
