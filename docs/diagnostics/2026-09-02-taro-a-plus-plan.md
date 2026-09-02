@@ -65,7 +65,7 @@
 | Q2-1 | ✅ +日 Swiper 项 | `ca6decf` · ScheduleDaySwiperItem · `backup/taro-a-plus-q2-1-day-swiper-2026-09-03` |
 | Q2-1 | ✅ +loaders hook | `use-schedule-loaders`；页约 **2199** 行 · `backup/taro-a-plus-q2-1-loaders-2026-09-03` |
 | Q2-1 | ✅ +batch sheets | `88d9d33` · `ScheduleBatchSheets`；页约 **2053** 行 · `backup/taro-a-plus-q2-1-batch-sheets-2026-09-03` |
-| Q2-3 | ✅ 保存+时段+基础/规则卡+弹层/底栏+save hook | timeslots `7ae9469`；base/rule cards；sheets+footer `d751d07`；`use-schedule-form-save` 本提交；页约 **1110** 行 |
+| Q2-3 | ✅ 保存+时段+基础/规则卡+弹层/底栏+save hook | timeslots `7ae9469`；base/rule cards；sheets+footer `d751d07`；`use-schedule-form-save` `eedbf3f`；页约 **1090** 行 · `backup/taro-a-plus-q2-3-panels-2026-09-03` |
 | Q2-4 | ✅ | student 已拆；auth 门面 **89** 行 · `e66787d` |
 | Q2-5 | ✅ | `82567c0` · … |
 
@@ -104,7 +104,7 @@
 |------|------|
 | `src/pages/schedule/index.tsx` | 3404 |
 | `src/package-course/pages/lesson-form/index.tsx` | 3079 |
-| `src/package-course/pages/schedule-form/index.tsx` | 1110 |
+| `src/package-course/pages/schedule-form/index.tsx` | 1090 |
 | `src/services/student.ts` | 2071 |
 | `src/services/auth.ts` | 89（门面；login/session/profile 已拆） |
 
