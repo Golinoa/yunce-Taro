@@ -68,9 +68,7 @@ describe('lesson-submit helpers (Q2-2)', () => {
     expect(
       validateSupplementSave({ selectedClassId: 'c1', supplementCount: 2, hoursUsed: 0 }),
     ).toBe('消课课时必须大于0');
-    expect(validateIncrementalEditSave({ selectedClassId: null, hoursUsed: 1 })).toBe(
-      '请选择班级',
-    );
+    expect(validateIncrementalEditSave({ selectedClassId: null, hoursUsed: 1 })).toBe('请选择班级');
     expect(validateIncrementalEditSave({ selectedClassId: 'c1', hoursUsed: 0 })).toBe(
       '消课课时必须大于0',
     );
