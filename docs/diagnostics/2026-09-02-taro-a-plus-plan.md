@@ -61,8 +61,9 @@
 | ID | 状态 | 说明 |
 |----|------|------|
 | Q2-2 | ✅ 提交+加载+面板+弹层 | load `f4a8732`；panels `5d7c57f`；sheets `07befdb`；页约 **1832** 行 · `backup/taro-a-plus-q2-2-sheets-2026-09-03` |
-| Q2-1 | ✅ 导航+卡片+开放列表 | `e66787d` OpenClass；页约 **2694** 行 |
-| Q2-1 | ✅ +日 Swiper 项 | `ca6decf` · ScheduleDaySwiperItem；页约 **2471** 行 · `backup/taro-a-plus-q2-1-day-swiper-2026-09-03` |
+| Q2-1 | ✅ 导航+卡片+开放列表 | `e66787d` OpenClass |
+| Q2-1 | ✅ +日 Swiper 项 | `ca6decf` · ScheduleDaySwiperItem · `backup/taro-a-plus-q2-1-day-swiper-2026-09-03` |
+| Q2-1 | ✅ +loaders hook | `use-schedule-loaders`；页约 **2199** 行 · `backup/taro-a-plus-q2-1-loaders-2026-09-03` |
 | Q2-3 | ✅ 保存+时段+基础/规则卡+弹层/底栏 | timeslots `7ae9469`；base/rule cards；sheets+footer 本提交；页约 **1447** 行 |
 | Q2-4 | ✅ | student 已拆；auth 门面 **89** 行 · `e66787d` |
 | Q2-5 | ✅ | `82567c0` · … |
