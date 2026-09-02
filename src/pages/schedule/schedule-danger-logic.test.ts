@@ -174,6 +174,28 @@ describe('applyOpenSlotRestStatus', () => {
     const prev = { '2026-09-02': { c1: [] } };
     expect(applyOpenSlotRestStatus(prev, slot)).toEqual(prev);
   });
+
+  it('缺 dateKey：原样返回（无该 lesson_date 键）', () => {
+    const slot = makeSlot({ id: 'slot1', class_id: 'c1', lesson_date: '2026-09-01' });
+    const prev: Record<string, Record<string, ClassBookingSlot[]>> = {};
+    const next = applyOpenSlotRestStatus(prev, slot);
+    expect(next).toEqual({});
+    expect(Object.keys(next)).toEqual([]);
+  });
+
+  it('有 dateKey 但缺 classSlots：不改其它班，目标班仍无条目', () => {
+    const other = makeSlot({ id: 'slot-other', class_id: 'c2', lesson_date: '2026-09-01' });
+    const prev = {
+      '2026-09-01': {
+        c2: [other],
+      },
+    };
+    const slot = makeSlot({ id: 'slot1', class_id: 'c1', lesson_date: '2026-09-01' });
+    const next = applyOpenSlotRestStatus(prev, slot);
+    expect(next['2026-09-01'].c1).toBeUndefined();
+    expect(next['2026-09-01'].c2[0].status).toBe('active');
+    expect(prev['2026-09-01'].c2[0].status).toBe('active');
+  });
 });
 
 describe('filterClassesAfterBatchDelete / filterSchedulesAfterBatchDelete', () => {
@@ -208,6 +230,13 @@ describe('resolveBatchDeleteToast', () => {
       title: '2个已删除，1个失败',
       icon: 'none',
       duration: 3000,
+    });
+  });
+
+  it('failedCount=0 时即使 successCount=0 也走全成文案', () => {
+    expect(resolveBatchDeleteToast(0, 0)).toEqual({
+      title: '已删除 0 个班级',
+      icon: 'success',
     });
   });
 });

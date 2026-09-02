@@ -108,6 +108,31 @@ describe('buildScheduleTabs', () => {
     const tabs = buildScheduleTabs(categories, false);
     expect(tabs.some((t) => t.mode === 'private')).toBe(false);
   });
+
+  it('无分类且关闭场地 → 空 Tab', () => {
+    expect(buildScheduleTabs([], false)).toEqual([]);
+  });
+
+  it('无分类仅开场地 → 仅 venue', () => {
+    const tabs = buildScheduleTabs([], true);
+    expect(tabs.map((t) => t.key)).toEqual(['venue']);
+    expect(tabs[0].type).toBe('venue');
+  });
+
+  it('仅独立展示分类时不生成 mode Tab，可与场地并存', () => {
+    const categories = [
+      makeCategory({
+        id: 'c-ind',
+        name: '独立私教',
+        mode: 'private',
+        sortOrder: 2,
+        independentDisplay: true,
+      }),
+    ];
+    const tabs = buildScheduleTabs(categories, true);
+    expect(tabs.map((t) => t.key)).toEqual(['category-c-ind', 'venue']);
+    expect(tabs.every((t) => t.key !== 'mode-private')).toBe(true);
+  });
 });
 
 describe('resolveActiveCategoryIds', () => {
@@ -224,6 +249,58 @@ describe('filterClassesForTab', () => {
       parentClassIds: new Set(['cl1']),
     });
     expect(result.map((c) => c.id)).toEqual(['cl1']);
+  });
+
+  it('无 category_id 时 class 模式保留 fixed/未设，排除 open', () => {
+    const classes = [
+      makeClass({ id: 'cl-fixed', name: 'Fixed', schedule_mode: 'fixed' }),
+      makeClass({ id: 'cl-unset', name: 'Unset' }),
+      makeClass({ id: 'cl-open', name: 'Open', schedule_mode: 'open' }),
+    ];
+    const result = filterClassesForTab({
+      activeTab: classTab,
+      activeCategoryIds: new Set(['c1']),
+      classes,
+      isParent: false,
+      parentClassIds: new Set(),
+    });
+    expect(result.map((c) => c.id)).toEqual(['cl-fixed', 'cl-unset']);
+  });
+
+  it('无 category_id 时 private 模式一律排除', () => {
+    const privateTab: ScheduleTabItem = {
+      key: 'mode-private',
+      type: 'category',
+      label: '私教',
+      mode: 'private',
+      sortOrder: 3,
+    };
+    const result = filterClassesForTab({
+      activeTab: privateTab,
+      activeCategoryIds: new Set(['c-private']),
+      classes: [
+        makeClass({ id: 'cl1', name: 'A', schedule_mode: 'fixed' }),
+        makeClass({ id: 'cl2', name: 'B', schedule_mode: 'open' }),
+      ],
+      isParent: false,
+      parentClassIds: new Set(),
+    });
+    expect(result).toEqual([]);
+  });
+
+  it('家长在团课 Tab 同样受 parentClassIds 约束', () => {
+    const classes = [
+      makeClass({ id: 'g1', name: 'Mine', category_id: 'c-group' }),
+      makeClass({ id: 'g2', name: 'Other', category_id: 'c-group' }),
+    ];
+    const result = filterClassesForTab({
+      activeTab: groupTab,
+      activeCategoryIds: new Set(['c-group']),
+      classes,
+      isParent: true,
+      parentClassIds: new Set(['g1']),
+    });
+    expect(result.map((c) => c.id)).toEqual(['g1']);
   });
 });
 
@@ -345,6 +422,61 @@ describe('resolveDateDotType', () => {
     });
     expect(dot).toBe('active');
   });
+
+  it('临调迁入到过去日 → past', () => {
+    const pastTuesday = dayjs('2026-08-25'); // Tuesday before NOW
+    const reschedules: TemporaryReschedule[] = [
+      {
+        id: 'tr1',
+        teacher_id: 't1',
+        class_id: 'cl1',
+        schedule_id: 's1',
+        source_date: '2026-08-18',
+        target_date: '2026-08-25',
+        start_time: '09:00',
+        end_time: '10:00',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+      },
+    ];
+    expect(
+      resolveDateDotType({
+        date: pastTuesday,
+        currentTime: NOW,
+        filteredSchedules: [],
+        selectedClassId: '',
+        temporaryReschedules: reschedules,
+        calendarWeekdaySet: new Set<Schedule['day_of_week']>(),
+      }),
+    ).toBe('past');
+  });
+
+  it('selectedClassId 过滤临调迁入：其它班迁入不点亮', () => {
+    const reschedules: TemporaryReschedule[] = [
+      {
+        id: 'tr1',
+        teacher_id: 't1',
+        class_id: 'cl-other',
+        schedule_id: 's-other',
+        source_date: '2026-08-25',
+        target_date: '2026-09-08',
+        start_time: '09:00',
+        end_time: '10:00',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+      },
+    ];
+    expect(
+      resolveDateDotType({
+        date: tuesday,
+        currentTime: NOW,
+        filteredSchedules: [],
+        selectedClassId: 'cl1',
+        temporaryReschedules: reschedules,
+        calendarWeekdaySet: new Set<Schedule['day_of_week']>(),
+      }),
+    ).toBe('none');
+  });
 });
 
 describe('resolveOpenDateDotType', () => {
@@ -362,5 +494,10 @@ describe('resolveOpenDateDotType', () => {
         new Set([NOW.subtract(1, 'day').format('YYYY-MM-DD')]),
       ),
     ).toBe('past');
+  });
+
+  it('当天有开放时段不算 past（isBefore day 为 false）', () => {
+    const today = dayjs('2026-09-01T23:59:00');
+    expect(resolveOpenDateDotType(today, NOW, new Set(['2026-09-01']))).toBe('active');
   });
 });
