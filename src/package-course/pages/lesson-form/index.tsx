@@ -1,19 +1,10 @@
-import { View, Text, Input, Picker, Textarea, Image } from '@tarojs/components';
+import { View } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createSubmitLock } from '@/utils/submit-lock';
-import ActionButton from '@/components/ActionButton';
-import Card from '@/components/Card';
 import DatePickerSheet from '@/components/DatePickerSheet';
-import FormRow from '@/components/FormRow';
-import Icon from '@/components/Icon';
-import ClassSelector from '@/components/lesson/ClassSelector';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
-import StarRating from '@/components/StarRating';
-import Stepper from '@/components/Stepper';
-import StudentAvatar from '@/components/student/StudentAvatar';
 import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import {
   studentService,
@@ -45,14 +36,17 @@ import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { runImageUploadFlow } from '@/utils/upload-flow';
-import { CheckinCard } from './CheckinCard';
+import ClassLessonPanel from './ClassLessonPanel';
 import {
   buildCheckinBaseline,
-  CHECKIN_OPTION_STYLES,
   type CheckinStatus,
   type ClassAttendanceMode,
 } from './checkin-status';
+import LessonFormFooter from './LessonFormFooter';
+import LessonFormHeader from './LessonFormHeader';
+import { formatDate, formatTime } from './lesson-form-datetime';
 import StudentEditSheet from './StudentEditSheet';
+import SingleLessonPanel from './SingleLessonPanel';
 import { isWithinLessonOperateWindow } from './lesson-operate';
 import { executeClassSubmit } from './lesson-submit-class';
 import { executeSingleDeduct } from './lesson-submit-single';
@@ -69,33 +63,7 @@ import {
   resolveClassAttendanceMode,
 } from './lesson-attendance-load';
 
-/** 格式化日期为 YYYY-MM-DD */
-function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-/** 格式化时间为 HH:mm */
-function formatTime(d: Date): string {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-/** 根据日期返回星期几 */
-function getWeekday(dateStr: string): string {
-  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return weekdays[date.getDay()];
-}
-
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
-const FORM_CARD_CLASS_NAME = 'mx-[24rpx] mb-3 overflow-hidden rounded-[20rpx] bg-white shadow-soft';
 
 const LessonForm: React.FC = () => {
   const { profile, currentRole } = useAuth();
@@ -1652,518 +1620,97 @@ const LessonForm: React.FC = () => {
   return (
     <PageContainer safeBottom>
       <View className="min-h-screen bg-background pb-28">
-        {/* 自定义导航栏：标题居中，返回按钮与原生胶囊对齐 */}
-        <View className="sticky top-0 z-50 border-b border-black/5 bg-white">
-          <View className="pt-nav-safe">
-            <View className="relative flex h-[88rpx] items-center justify-center">
-              <View
-                className="absolute left-[32rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full active:bg-muted/60"
-                onClick={handleBack}
-              >
-                <Icon name="mdi-chevron-left" size={40} color="foreground" />
-              </View>
-              <Text className="max-w-[60%] truncate text-[34rpx] font-bold text-foreground">
-                {mode === 'class' ? selectedClass?.name || pageTitle : pageTitle}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* 模式切换 Tab - 白色背景+底部指示器 */}
-        {shouldShowModeTabs ? (
-          <View className="bg-white shadow-sm">
-            <View className="flex">
-              <View
-                className="flex-1 flex items-center justify-center py-3_d5 relative"
-                onClick={() => setMode('single')}
-              >
-                <Text
-                  className={`text-base font-medium ${mode === 'single' ? 'text-primary' : 'text-muted-foreground'}`}
-                >
-                  学员消课
-                </Text>
-                {mode === 'single' && (
-                  <View className="absolute bottom-0 left-0 right-0 h-0_d5 bg-primary" />
-                )}
-              </View>
-              <View
-                className="flex-1 flex items-center justify-center py-3_d5 relative"
-                onClick={() => setMode('class')}
-              >
-                <Text
-                  className={`text-base font-medium ${mode === 'class' ? 'text-primary' : 'text-muted-foreground'}`}
-                >
-                  班级消课
-                </Text>
-                {mode === 'class' && (
-                  <View className="absolute bottom-0 left-0 right-0 h-0_d5 bg-primary" />
-                )}
-              </View>
-            </View>
-          </View>
-        ) : null}
+        <LessonFormHeader
+          mode={mode}
+          pageTitle={pageTitle}
+          selectedClassName={selectedClass?.name}
+          shouldShowModeTabs={shouldShowModeTabs}
+          onBack={handleBack}
+          onModeChange={setMode}
+        />
 
         {/* ====== 单人模式 ====== */}
         {mode === 'single' && (
-          <View className="px-[32rpx] py-[24rpx] pb-[32rpx] flex flex-col gap-[24rpx]">
-            {/* 选择学员 */}
-            <Card className="p-[32rpx]" marginBottom={false}>
-              <FormRow
-                label="选择学员"
-                required
-                border={false}
-                onClick={() => void handleOpenStudentPicker()}
-              >
-                {selectedStudent ? (
-                  <View className="flex flex-row items-center gap-[12rpx] min-w-0">
-                    <StudentAvatar
-                      name={selectedStudent.name}
-                      src={selectedStudent.avatar_url}
-                      size="sm"
-                    />
-                    <View className="min-w-0 flex-1">
-                      <Text className="block text-[30rpx] text-foreground truncate">
-                        {selectedStudent.name}
-                        {selectedStudent.nickname ? `（${selectedStudent.nickname}）` : ''}
-                      </Text>
-                    </View>
-                    <Text className="text-[24rpx] text-primary shrink-0">更换</Text>
-                  </View>
-                ) : (
-                  <Text className="text-[30rpx] text-muted-foreground">请选择学员</Text>
-                )}
-              </FormRow>
-            </Card>
-
-            {/* 消课信息（选学员后显示） */}
-            {selectedStudent ? (
-              <>
-                <Card className="p-[32rpx]" marginBottom={false}>
-                  <FormRow
-                    label="消课课包"
-                    required
-                    border
-                    helperText={
-                      studentActivePackages.length > 1
-                        ? `该学员有 ${studentActivePackages.length} 个课包，请选择本次消课课包`
-                        : undefined
-                    }
-                    onClick={
-                      studentActivePackages.length > 1
-                        ? () => setSelector({ visible: true, type: 'package' })
-                        : undefined
-                    }
-                  >
-                    {matchedPackage ? (
-                      <View className="min-w-0 flex-1">
-                        <Text className="block text-[30rpx] text-foreground truncate text-right">
-                          {matchedPackage.name}
-                        </Text>
-                        <Text className="block text-[22rpx] text-muted-foreground text-right mt-[4rpx]">
-                          {matchedSubject?.name ? `${matchedSubject.name} · ` : ''}
-                          剩余 {matchedPackage.remaining_hours} 课时
-                          {matchedPackage.remaining_hours < hoursUsed ? ' · 将欠课' : ''}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text className="text-[30rpx] text-destructive">无可用课包</Text>
-                    )}
-                  </FormRow>
-
-                  <FormRow
-                    label="主讲老师"
-                    required
-                    border
-                    onClick={() => setSelector({ visible: true, type: 'teacher' })}
-                  >
-                    <Text className="text-[30rpx] text-foreground truncate">
-                      {selectedTeachingTeacher?.name || profile?.name || '请选择'}
-                    </Text>
-                  </FormRow>
-
-                  <FormRow label="消课课时" required border>
-                    <Stepper value={hoursUsed} min={0.5} step={0.5} onChange={setHoursUsed} />
-                  </FormRow>
-
-                  <FormRow label="上课日期" border onClick={() => setLessonDatePickerVisible(true)}>
-                    <View className="flex flex-row items-center gap-[8rpx]">
-                      <Text className="text-[30rpx] text-foreground">{lessonDate}</Text>
-                      <Icon name="mdi-calendar" size="sm" color="muted" />
-                    </View>
-                  </FormRow>
-
-                  <FormRow label="上课时间" border>
-                    <Picker
-                      mode="time"
-                      value={lessonTime}
-                      onChange={(e) => setLessonTime(e.detail.value || lessonTime)}
-                    >
-                      <View className="flex flex-row items-center gap-[8rpx]">
-                        <Text className="text-[30rpx] text-foreground">{lessonTime}</Text>
-                        <Icon name="mdi-clock-outline" size="sm" color="muted" />
-                      </View>
-                    </Picker>
-                  </FormRow>
-
-                  <FormRow
-                    label="上课校区"
-                    border
-                    onClick={() => setSelector({ visible: true, type: 'campus' })}
-                  >
-                    <Text className="text-[30rpx] text-foreground truncate">
-                      {campusOptions.find((item) => item.id === campusId)?.name || '请选择'}
-                    </Text>
-                  </FormRow>
-
-                  <FormRow
-                    label="上课教室"
-                    border={false}
-                    onClick={() => setSelector({ visible: true, type: 'room' })}
-                  >
-                    <Text
-                      className={cn(
-                        'text-[30rpx] truncate',
-                        room ? 'text-foreground' : 'text-muted-foreground',
-                      )}
-                    >
-                      {room || '请选择'}
-                    </Text>
-                  </FormRow>
-                </Card>
-
-                <Card className="p-[32rpx]" marginBottom={false}>
-                  <View className="pb-[24rpx] border-b-[2rpx] border-border/30">
-                    <Text className="mb-[12rpx] block text-[30rpx] text-foreground">教学内容</Text>
-                    <Textarea
-                      className="w-full p-[16rpx] bg-background rounded-[16rpx] text-[28rpx] text-foreground min-h-[100rpx]"
-                      placeholder="选填"
-                      value={content}
-                      onInput={(e) => setContent(e.detail.value || '')}
-                    />
-                  </View>
-
-                  <View className="py-[24rpx] border-b-[2rpx] border-border/30">
-                    <Text className="mb-[12rpx] block text-[30rpx] text-foreground">学生表现</Text>
-                    <StarRating value={performance} onChange={setPerformance} />
-                  </View>
-
-                  <View className="pt-[24rpx]">
-                    <Text className="mb-[12rpx] block text-[30rpx] text-foreground">课后作业</Text>
-                    <Textarea
-                      className="w-full p-[16rpx] bg-background rounded-[16rpx] text-[28rpx] text-foreground min-h-[100rpx]"
-                      placeholder="选填"
-                      value={homework}
-                      onInput={(e) => setHomework(e.detail.value || '')}
-                    />
-                    <View className="flex flex-wrap gap-3 mt-3">
-                      {homeworkImages.map((img, idx) => (
-                        <View key={idx} className="relative w-[120rpx] h-[120rpx]">
-                          <Image
-                            src={img}
-                            mode="aspectFill"
-                            className="w-[120rpx] h-[120rpx] rounded-xl"
-                            lazyLoad
-                          />
-                          <View
-                            className="absolute -top-2 -right-2 w-[36rpx] h-[36rpx] rounded-full bg-destructive flex items-center justify-center"
-                            onClick={() => handleRemoveImage(idx)}
-                          >
-                            <Text className="text-white text-xs">×</Text>
-                          </View>
-                        </View>
-                      ))}
-                      {homeworkImages.length < 3 && (
-                        <View
-                          className={`w-[120rpx] h-[120rpx] rounded-xl border-2 border-dashed border-input flex items-center justify-center bg-background ${uploading ? 'state-loading' : 'press-scale'}`}
-                          onClick={uploading ? undefined : handleUploadImage}
-                        >
-                          <Text className="text-xl text-muted-foreground">
-                            {uploading ? '...' : '+'}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </Card>
-              </>
-            ) : null}
-          </View>
+          <SingleLessonPanel
+            selectedStudent={selectedStudent}
+            studentActivePackages={studentActivePackages}
+            matchedPackage={matchedPackage}
+            matchedSubject={matchedSubject}
+            hoursUsed={hoursUsed}
+            lessonDate={lessonDate}
+            lessonTime={lessonTime}
+            campusId={campusId}
+            campusOptions={campusOptions}
+            room={room}
+            selectedTeachingTeacher={selectedTeachingTeacher}
+            profileName={profile?.name}
+            content={content}
+            performance={performance}
+            homework={homework}
+            homeworkImages={homeworkImages}
+            uploading={uploading}
+            onOpenStudentPicker={() => void handleOpenStudentPicker()}
+            onOpenPackageSelector={() => setSelector({ visible: true, type: 'package' })}
+            onOpenTeacherSelector={() => setSelector({ visible: true, type: 'teacher' })}
+            onHoursChange={setHoursUsed}
+            onOpenDatePicker={() => setLessonDatePickerVisible(true)}
+            onLessonTimeChange={setLessonTime}
+            onOpenCampusSelector={() => setSelector({ visible: true, type: 'campus' })}
+            onOpenRoomSelector={() => setSelector({ visible: true, type: 'room' })}
+            onContentChange={setContent}
+            onPerformanceChange={setPerformance}
+            onHomeworkChange={setHomework}
+            onRemoveImage={handleRemoveImage}
+            onUploadImage={handleUploadImage}
+          />
         )}
 
         {/* ====== 班级模式 ====== */}
         {mode === 'class' && (
-          <>
-            {/* 头部信息卡片：当前时间 / 老师 / 助教 / 课程介绍 / 备注 */}
-            {selectedClassId ? (
-              <View className="mx-[24rpx] mt-3 rounded-[20rpx] bg-white px-[28rpx] py-[24rpx] shadow-soft">
-                <View className="flex items-start justify-between gap-[20rpx]">
-                  <View className="flex-1">
-                    <Text className="block text-[44rpx] font-bold leading-[56rpx] text-foreground">
-                      {displayLessonTime}
-                    </Text>
-                    <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
-                      {lessonDate}（{getWeekday(lessonDate)}）
-                    </Text>
-                    <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
-                      老师：{selectedTeachingTeacher?.name || profile?.name || '-'}
-                    </Text>
-                    <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
-                      助教：{selectedAssistantTeacher?.name || '-'}
-                    </Text>
-                    <Text className="mt-[12rpx] block text-[24rpx] leading-[36rpx] text-muted-foreground">
-                      课程介绍：{selectedClass?.note || '-'}
-                    </Text>
-                    <View className="mt-[12rpx] flex items-start gap-[8rpx]">
-                      <Text className="shrink-0 text-[24rpx] leading-[44rpx] text-muted-foreground">
-                        备注：
-                      </Text>
-                      <Input
-                        className="min-h-[44rpx] flex-1 text-[24rpx] leading-[44rpx] text-foreground"
-                        value={homework}
-                        onInput={(e) => setHomework(e.detail.value || '')}
-                        placeholder="可随时填写备注"
-                        placeholderClass="text-muted-foreground"
-                      />
-                    </View>
-                  </View>
-                  {!isAlreadyChecked ? (
-                    <View className="flex shrink-0 flex-row items-center gap-[12rpx]">
-                      {canEditClass ? (
-                        <View
-                          className="flex items-center justify-center rounded-[12rpx] bg-primary px-[28rpx] py-[12rpx]"
-                          onClick={() => {
-                            if (!selectedClassId) {
-                              Taro.showToast({ title: '缺少班级信息', icon: 'none' });
-                              return;
-                            }
-                            Taro.navigateTo({
-                              url: `/package-course/pages/course-form/index?id=${encodeURIComponent(selectedClassId)}&type=class`,
-                            });
-                          }}
-                        >
-                          <Text className="text-[24rpx] font-medium leading-none text-primary-foreground">
-                            编辑
-                          </Text>
-                        </View>
-                      ) : null}
-                      <View
-                        className={cn(
-                          'flex items-center justify-center rounded-[12rpx] px-[28rpx] py-[12rpx]',
-                          isClassPaused ? 'bg-primary' : 'border border-warning/30 bg-warning/10',
-                        )}
-                        onClick={() => void handleToggleClassPause()}
-                      >
-                        <Text
-                          className={cn(
-                            'text-[24rpx] font-medium leading-none',
-                            isClassPaused ? 'text-primary-foreground' : 'text-warning',
-                          )}
-                        >
-                          {isClassPaused ? '恢复' : '停课'}
-                        </Text>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            ) : null}
-
-            <View className="pt-3">
-              {/* 班级选择（非直接进入时显示） */}
-              {!isClassDirectEntry ? (
-                <View className={FORM_CARD_CLASS_NAME}>
-                  <View className="border-b border-black/5 px-4 py-3">
-                    <View className="mb-[6rpx] flex items-center gap-1">
-                      <Text className="text-[24rpx] text-foreground">班级</Text>
-                      <Text className="text-[24rpx] text-destructive">*</Text>
-                    </View>
-                    <ClassSelector
-                      classes={classes}
-                      selectedClassId={selectedClassId}
-                      scheduledClassIds={scheduledClassIds}
-                      onSelect={handleSelectClass}
-                    />
-                  </View>
-                </View>
-              ) : null}
-
-              {selectedClassId ? (
-                <>
-                  {/* 搜索框 */}
-                  <View className={FORM_CARD_CLASS_NAME}>
-                    <View className="flex items-center gap-[16rpx] px-4 py-3">
-                      <Icon name="mdi-magnify" size="sm" color="muted" />
-                      <Input
-                        className="flex-1 text-[26rpx] text-foreground"
-                        value={studentSearchKeyword}
-                        onInput={(e) => setStudentSearchKeyword(e.detail.value || '')}
-                        placeholder="请输入学员姓名"
-                        placeholderClass="text-muted-foreground"
-                      />
-                    </View>
-                  </View>
-
-                  {/* 消耗课时 */}
-                  <View className={FORM_CARD_CLASS_NAME}>
-                    <View className="flex items-center justify-between px-4 py-3">
-                      <Text className="text-[28rpx] text-foreground">消耗课时</Text>
-                      <Stepper value={hoursUsed} min={0.5} step={0.5} onChange={setHoursUsed} />
-                    </View>
-                  </View>
-
-                  {/* 授课扣费 */}
-                  <View className={FORM_CARD_CLASS_NAME}>
-                    <View className="flex items-center justify-between px-4 py-3">
-                      <Text className="text-[28rpx] text-foreground">授课扣费</Text>
-                      <View className="flex items-center gap-[8rpx]">
-                        <Input
-                          className="h-[72rpx] w-[160rpx] rounded-xl bg-background px-4 text-right text-[28rpx] leading-[72rpx] text-foreground"
-                          type="digit"
-                          value={feeAmount}
-                          onInput={(e) => setFeeAmount(e.detail.value || '0')}
-                          placeholder="0"
-                          placeholderClass="text-muted-foreground"
-                        />
-                        <Text className="text-[26rpx] text-muted-foreground">元</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* 考勤状态筛选 */}
-                  <View className={FORM_CARD_CLASS_NAME}>
-                    <View
-                      className="flex items-center justify-between px-4 py-3"
-                      onClick={() =>
-                        Taro.showActionSheet({
-                          itemList: ['全部', '签到', '请假', '未到'],
-                          success: (res) => {
-                            const map: Array<'all' | CheckinStatus> = [
-                              'all',
-                              'checked',
-                              'leave',
-                              'absent',
-                            ];
-                            setAttendanceFilter(map[res.tapIndex] || 'all');
-                          },
-                        })
-                      }
-                    >
-                      <Text className="text-[28rpx] text-foreground">考勤状态</Text>
-                      <View className="flex items-center gap-[8rpx]">
-                        <Text className="text-[26rpx] text-muted-foreground">
-                          {attendanceFilter === 'all'
-                            ? '全部'
-                            : CHECKIN_OPTION_STYLES[attendanceFilter].label}
-                        </Text>
-                        <Icon name="mdi-chevron-right" size="sm" color="muted" />
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* 统计信息 */}
-                  <View className="mx-[24rpx] mb-3">
-                    <Text className="text-[24rpx] text-muted-foreground">
-                      学员已选
-                      <Text className="text-destructive">
-                        {classCheckedCount + classLeaveCount + classAbsentCount}
-                      </Text>
-                      ，签到
-                      <Text className="text-destructive">{classCheckedCount}</Text>
-                      ，请假
-                      <Text className="text-destructive">{classLeaveCount}</Text>
-                      ，未到
-                      <Text className="text-destructive">{classAbsentCount}</Text>
-                    </Text>
-                  </View>
-
-                  {/* 学员列表 - 试听优先 */}
-                  <View className="mx-[24rpx] mb-3">
-                    <View className="mb-[16rpx] flex items-center justify-between">
-                      <Text className="text-[26rpx] font-medium text-foreground">学员列表</Text>
-                      {!isAlreadyChecked ? (
-                        <View
-                          className="flex items-center justify-center rounded-[12rpx] bg-muted px-[16rpx] py-[8rpx]"
-                          onClick={handleOpenAddStudentSheet}
-                        >
-                          <Text className="text-[22rpx] font-medium leading-none text-muted-foreground">
-                            添加学员
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <View className="grid grid-cols-2 gap-[16rpx]">
-                      {mergedStudentList.map((item) => {
-                        if (item.type === 'trial') {
-                          const booking = item.booking;
-                          const status = trialCheckinMap[booking.id] || 'absent';
-                          const info = getTrialCardInfo();
-                          return (
-                            <CheckinCard
-                              key={booking.id}
-                              name={item.name}
-                              status={status}
-                              remaining={info.remaining}
-                              deduct={info.deduct}
-                              isTrial
-                              disabled={isStudentCardDisabled(booking.id)}
-                              onToggleStatus={(next) => handleSetTrialCheckin(booking.id, next)}
-                              onOpenDetailSheet={() =>
-                                handleOpenStudentDetailSheet({
-                                  type: 'trial',
-                                  id: booking.id,
-                                  name: item.name,
-                                  remaining: info.remaining,
-                                  deduct: info.deduct,
-                                  courseName: '试听',
-                                })
-                              }
-                            />
-                          );
-                        }
-                        const stu = item.student;
-                        const status = studentCheckinStatusMap[stu.id] || 'absent';
-                        const info = getStudentCardInfo(stu);
-                        return (
-                          <CheckinCard
-                            key={stu.id}
-                            name={stu.name}
-                            status={status}
-                            remaining={info.remaining}
-                            deduct={info.deduct}
-                            isMakeup={makeupStudentIds.has(stu.id)}
-                            disabled={isStudentCardDisabled(stu.id)}
-                            highlight={supplementStudentIds.has(stu.id)}
-                            note={
-                              studentRemarkDrafts[stu.id] || recordByStudentId.get(stu.id)?.note
-                            }
-                            onToggleStatus={(next) => handleSetStudentCheckin(stu.id, next)}
-                            onOpenDetailSheet={() =>
-                              handleOpenStudentDetailSheet({
-                                type: 'formal',
-                                id: stu.id,
-                                name: stu.name,
-                                remaining: info.remaining,
-                                deduct: info.deduct,
-                                courseName: info.courseName,
-                                student: stu,
-                              })
-                            }
-                          />
-                        );
-                      })}
-                    </View>
-                    {mergedStudentList.length === 0 ? (
-                      <View className="rounded-[20rpx] bg-white px-[24rpx] py-[32rpx] shadow-soft">
-                        <Text className="text-center text-[24rpx] text-muted-foreground">
-                          暂无匹配学员
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </>
-              ) : null}
-            </View>
-          </>
+          <ClassLessonPanel
+            selectedClassId={selectedClassId}
+            selectedClass={selectedClass}
+            classes={classes}
+            scheduledClassIds={scheduledClassIds}
+            isClassDirectEntry={isClassDirectEntry}
+            displayLessonTime={displayLessonTime}
+            lessonDate={lessonDate}
+            selectedTeachingTeacher={selectedTeachingTeacher}
+            selectedAssistantTeacher={selectedAssistantTeacher}
+            profileName={profile?.name}
+            homework={homework}
+            isAlreadyChecked={isAlreadyChecked}
+            canEditClass={canEditClass}
+            isClassPaused={isClassPaused}
+            studentSearchKeyword={studentSearchKeyword}
+            hoursUsed={hoursUsed}
+            feeAmount={feeAmount}
+            attendanceFilter={attendanceFilter}
+            classCheckedCount={classCheckedCount}
+            classLeaveCount={classLeaveCount}
+            classAbsentCount={classAbsentCount}
+            mergedStudentList={mergedStudentList}
+            trialCheckinMap={trialCheckinMap}
+            studentCheckinStatusMap={studentCheckinStatusMap}
+            makeupStudentIds={makeupStudentIds}
+            supplementStudentIds={supplementStudentIds}
+            studentRemarkDrafts={studentRemarkDrafts}
+            recordByStudentId={recordByStudentId}
+            onHomeworkChange={setHomework}
+            onToggleClassPause={() => void handleToggleClassPause()}
+            onSelectClass={handleSelectClass}
+            onStudentSearchChange={setStudentSearchKeyword}
+            onHoursChange={setHoursUsed}
+            onFeeAmountChange={setFeeAmount}
+            onAttendanceFilterChange={setAttendanceFilter}
+            onOpenAddStudentSheet={handleOpenAddStudentSheet}
+            getTrialCardInfo={getTrialCardInfo}
+            getStudentCardInfo={getStudentCardInfo}
+            isStudentCardDisabled={isStudentCardDisabled}
+            onSetTrialCheckin={handleSetTrialCheckin}
+            onSetStudentCheckin={handleSetStudentCheckin}
+            onOpenStudentDetailSheet={handleOpenStudentDetailSheet}
+          />
         )}
 
         {/* ====== 学员选择弹窗：与课程管理 ClassStudentsCard「选择上课学员」同款 ====== */}
@@ -2247,110 +1794,24 @@ const LessonForm: React.FC = () => {
         />
 
         {/* ====== 底部操作栏 ====== */}
-        {mode === 'class' ? (
-          <View className="fixed bottom-0 left-0 right-0 z-100 border-t border-border bg-white px-[32rpx] pt-[20rpx] pb-safe-bar">
-            <View className="flex items-center justify-between gap-[24rpx]">
-              <View
-                className={`flex items-center gap-[12rpx] ${attendanceMode === 'view' || attendanceMode === 'supplement' ? 'opacity-50' : ''}`}
-                onClick={
-                  attendanceMode === 'view' || attendanceMode === 'supplement'
-                    ? undefined
-                    : handleToggleSelectAllStudents
-                }
-              >
-                <View
-                  className={`flex h-[36rpx] w-[36rpx] items-center justify-center rounded-full border-2 ${allSelectableChecked ? 'border-primary bg-primary' : 'border-muted-foreground bg-white'}`}
-                >
-                  {allSelectableChecked ? <Icon name="mdi-check" size="xs" color="white" /> : null}
-                </View>
-                <Text className="text-[26rpx] text-foreground">全选签到</Text>
-              </View>
-              {isAlreadyChecked && attendanceMode === 'view' ? (
-                canModifyLesson ? (
-                  <View className="flex items-center gap-[16rpx]">
-                    <View
-                      className="rounded-[48rpx] border border-primary bg-white px-[36rpx] py-[22rpx]"
-                      onClick={handleOpenSupplementSheet}
-                    >
-                      <Text className="text-center text-[28rpx] font-medium text-primary">
-                        补录
-                      </Text>
-                    </View>
-                    <View
-                      className="rounded-[48rpx] bg-primary px-[36rpx] py-[22rpx]"
-                      onClick={handleEnterEditMode}
-                    >
-                      <Text className="text-center text-[28rpx] font-medium text-primary-foreground">
-                        修改
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View className="rounded-[48rpx] bg-muted px-[48rpx] py-[22rpx]">
-                    <Text className="text-center text-[28rpx] font-medium text-white">已提交</Text>
-                  </View>
-                )
-              ) : isAlreadyChecked && attendanceMode === 'supplement' ? (
-                <View className="flex items-center gap-[16rpx]">
-                  <View
-                    className="rounded-[48rpx] border border-border bg-white px-[32rpx] py-[22rpx]"
-                    onClick={handleCancelSupplement}
-                  >
-                    <Text className="text-center text-[28rpx] font-medium text-foreground">
-                      取消
-                    </Text>
-                  </View>
-                  <View
-                    className={`rounded-[48rpx] px-[32rpx] py-[22rpx] ${submitting || supplementStudentIds.size === 0 ? 'bg-muted' : 'bg-primary'}`}
-                    onClick={
-                      submitting || supplementStudentIds.size === 0 ? undefined : handleSubmit
-                    }
-                  >
-                    <Text className="text-center text-[28rpx] font-medium text-white">
-                      {submitting ? '保存中...' : '保存补录'}
-                    </Text>
-                  </View>
-                </View>
-              ) : isAlreadyChecked && attendanceMode === 'edit' ? (
-                <View
-                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting ? 'bg-muted' : 'bg-primary'}`}
-                  onClick={submitting ? undefined : handleSubmit}
-                >
-                  <Text className="text-center text-[28rpx] font-medium text-primary-foreground">
-                    {submitting ? '保存中...' : '保存修改'}
-                  </Text>
-                </View>
-              ) : !canModifyLesson ? (
-                <View className="rounded-[48rpx] bg-muted px-[48rpx] py-[22rpx]">
-                  <Text className="text-center text-[28rpx] font-medium text-white">仅查看</Text>
-                </View>
-              ) : (
-                <View
-                  className={`rounded-[48rpx] px-[48rpx] py-[22rpx] ${submitting || !selectedClassId || isClassPaused ? 'bg-muted' : 'bg-primary'}`}
-                  onClick={
-                    submitting || !selectedClassId || isClassPaused
-                      ? () => {
-                          if (isClassPaused) {
-                            Taro.showToast({ title: '班级已停课，请先恢复上课', icon: 'none' });
-                          }
-                        }
-                      : handleSubmit
-                  }
-                >
-                  <Text className="text-center text-[28rpx] font-medium text-primary-foreground">
-                    {submitting ? '提交中...' : isClassPaused ? '已停课' : '提交点名'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        ) : (
-          <ActionButton
-            text={submitText}
-            disabled={submitting || !selectedStudent}
-            onClick={handleSubmit}
-          />
-        )}
+        <LessonFormFooter
+          mode={mode}
+          attendanceMode={attendanceMode}
+          allSelectableChecked={allSelectableChecked}
+          isAlreadyChecked={isAlreadyChecked}
+          canModifyLesson={canModifyLesson}
+          submitting={submitting}
+          supplementStudentIdsSize={supplementStudentIds.size}
+          selectedClassId={selectedClassId}
+          isClassPaused={isClassPaused}
+          selectedStudent={Boolean(selectedStudent)}
+          submitText={submitText}
+          onToggleSelectAllStudents={handleToggleSelectAllStudents}
+          onOpenSupplementSheet={handleOpenSupplementSheet}
+          onEnterEditMode={handleEnterEditMode}
+          onCancelSupplement={handleCancelSupplement}
+          onSubmit={handleSubmit}
+        />
       </View>
 
       {/* 统一弹窗选择器（PickerSheet 标准组件） */}
