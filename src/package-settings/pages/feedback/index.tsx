@@ -42,7 +42,7 @@ const Feedback: React.FC = () => {
       maxCount: MAX_IMAGES,
       choose: () => chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' }),
       upload: async (path) => {
-        const result = await uploadService.upload(path);
+        const result = await uploadService.upload(path, { type: 'feedback' });
         return result.url;
       },
       onSuccess: (url) => setImages((prev) => [...prev, url]),

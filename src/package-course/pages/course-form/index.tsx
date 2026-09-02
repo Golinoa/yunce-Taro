@@ -935,8 +935,12 @@ const CourseFormPage: React.FC = () => {
     let homeImageUrl: string | undefined;
     try {
       [backgroundImageUrl, homeImageUrl] = await Promise.all([
-        backgroundImage ? uploadImage(backgroundImage, 'course') : Promise.resolve(undefined),
-        homeImage ? uploadImage(homeImage, 'course') : Promise.resolve(undefined),
+        backgroundImage
+          ? uploadImage(backgroundImage, 'course', { refId: courseId || undefined })
+          : Promise.resolve(undefined),
+        homeImage
+          ? uploadImage(homeImage, 'course', { refId: courseId || undefined })
+          : Promise.resolve(undefined),
       ]);
     } catch {
       Taro.showToast({ title: '图片上传失败，请重试', icon: 'none' });

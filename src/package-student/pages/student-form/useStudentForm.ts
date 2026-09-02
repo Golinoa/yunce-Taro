@@ -10,7 +10,7 @@ import type { CampusUIModel, Subject } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { isAdmin, useAuth } from '@/utils/auth';
-import { chooseImageTemp, isImageCancelError } from '@/utils/image-upload';
+import { chooseImageTemp, isImageCancelError, isLocalWechatFilePath, uploadImage } from '@/utils/image-upload';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 
@@ -497,7 +497,15 @@ export function useStudentForm(): UseStudentFormReturn {
       let newStudent: Student | undefined;
       let packageInitializationFailed = false;
 
+      const resolveAvatarForStudent = async (targetStudentId: string): Promise<string | undefined> => {
+        const raw = avatarUrl.trim();
+        if (!raw) return undefined;
+        if (!isLocalWechatFilePath(raw)) return raw;
+        return uploadImage(raw, 'student_avatar', { refId: targetStudentId });
+      };
+
       if (isEdit) {
+        const remoteAvatar = await resolveAvatarForStudent(studentId);
         const updated = await studentService.update(studentId, {
           name: name.trim(),
           nickname: nickname.trim() || undefined,
@@ -506,7 +514,7 @@ export function useStudentForm(): UseStudentFormReturn {
           birthday: birthday || undefined,
           address: address.trim() || undefined,
           note: note.trim() || undefined,
-          avatar_url: avatarUrl || undefined,
+          avatar_url: remoteAvatar,
           ...feePayload,
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
@@ -516,6 +524,10 @@ export function useStudentForm(): UseStudentFormReturn {
         Taro.showToast({ title: '更新成功', icon: 'success' });
       } else {
         const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const localAvatarPending = isLocalWechatFilePath(avatarUrl) ? avatarUrl.trim() : '';
+        const existingRemoteAvatar =
+          avatarUrl.trim() && !localAvatarPending ? avatarUrl.trim() : undefined;
+
         newStudent = await studentService.create({
           teacher_id: teacherId,
           name: name.trim(),
@@ -526,11 +538,30 @@ export function useStudentForm(): UseStudentFormReturn {
           birthday: birthday || undefined,
           address: address.trim() || undefined,
           note: note.trim() || undefined,
-          avatar_url: avatarUrl || undefined,
+          avatar_url: existingRemoteAvatar,
           ...feePayload,
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
         });
+
+        if (newStudent && localAvatarPending) {
+          try {
+            const remoteAvatar = await uploadImage(localAvatarPending, 'student_avatar', {
+              refId: newStudent.id,
+            });
+            const withAvatar = await studentService.update(newStudent.id, {
+              avatar_url: remoteAvatar,
+            });
+            if (withAvatar) {
+              newStudent = withAvatar;
+            } else {
+              newStudent = { ...newStudent, avatar_url: remoteAvatar };
+            }
+          } catch (error) {
+            logError('upload student avatar after create', error);
+            Taro.showToast({ title: '学员已创建，头像上传失败可稍后编辑补传', icon: 'none' });
+          }
+        }
 
         if (newStudent) {
           updateStudentInCache(currentUserId, newStudent);

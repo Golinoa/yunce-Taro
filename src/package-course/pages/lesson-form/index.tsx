@@ -533,6 +533,7 @@ const LessonForm: React.FC = () => {
     getStudentCardInfo,
   } = useLessonFormHelpers({
     classIdParam,
+    recordIdParam,
     mode,
     viewOnlyParam,
     lessonDate,

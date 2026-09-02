@@ -58,6 +58,38 @@ describe('uploadService', () => {
     expect(result.filename).toBe('photo.jpg');
   });
 
+  it('携带 refId 申请 token（lesson_media）', async () => {
+    mockedPost.mockResolvedValue({
+      token: 'qiniu-token',
+      uploadUrl: 'https://upload.qiniup.com',
+      domain: 'https://res.example.com',
+      bucket: 'yunce-prod',
+      prefix: 'lesson/homework/',
+      key: 'uploads/org/lesson/l1/homework/x.jpg',
+      url: 'https://res.example.com/uploads/org/lesson/l1/homework/x.jpg',
+    });
+    uploadFileMock.mockImplementation((options) => {
+      options.success?.({
+        statusCode: 200,
+        data: '{}',
+        errMsg: 'uploadFile:ok',
+      });
+      return { abort: vi.fn() };
+    });
+
+    await uploadService.upload('wxfile://tmp/hw.jpg', {
+      type: 'lesson_media',
+      refId: 'lesson-1',
+      filename: 'hw.jpg',
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith('/upload/token', {
+      type: 'lesson_media',
+      filename: 'hw.jpg',
+      refId: 'lesson-1',
+    });
+  });
+
   it('七牛上传证书错误时给出可读提示', async () => {
     mockedPost.mockResolvedValue({
       token: 'qiniu-token',

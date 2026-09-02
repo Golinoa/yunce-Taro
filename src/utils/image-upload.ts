@@ -493,11 +493,19 @@ export function deleteTempImage(path?: string): void {
  *
  * 保存图片的业务层（course-form / teacher / campus 等）统一在此处完成“本地路径 → 线上 URL”的转换。
  */
-export async function uploadImage(filePath: string, type: UploadType = 'common'): Promise<string> {
+export async function uploadImage(
+  filePath: string,
+  type: UploadType = 'common',
+  options?: { refId?: string; filename?: string },
+): Promise<string> {
   if (!filePath) return filePath;
   if (filePath.startsWith('data:')) return filePath;
   // 已是公网 URL 才跳过；http://usr / http://tmp 必须继续上传
   if (isRemotePublicUrl(filePath)) return filePath;
-  const res = await uploadService.upload(filePath, { type });
+  const res = await uploadService.upload(filePath, {
+    type,
+    refId: options?.refId,
+    filename: options?.filename,
+  });
   return res.url;
 }

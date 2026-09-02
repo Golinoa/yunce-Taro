@@ -7,14 +7,25 @@
 import Taro from '@tarojs/taro';
 import { post } from '@/utils/request';
 
-/** 与后端 upload-token 一致的类型 */
-export type UploadType = 'avatar' | 'venue' | 'course' | 'courseware' | 'common';
+/** 与后端 upload-token 一致的类型（目录隔离 v2） */
+export type UploadType =
+  | 'avatar'
+  | 'student_avatar'
+  | 'venue'
+  | 'course'
+  | 'courseware'
+  | 'lesson_media'
+  | 'prep'
+  | 'feedback'
+  | 'common';
 
 export interface UploadOptions {
   /** 上传类型，决定七牛 key 前缀与大小限制 */
   type?: UploadType;
   /** 原始文件名，用于生成可读 key */
   filename?: string;
+  /** 业务实体 id：studentId / lessonRecordId / prepId / courseId 等 */
+  refId?: string;
 }
 
 /** 上传结果 */
@@ -39,8 +50,14 @@ function resolveFilename(filePath: string, filename?: string): string {
   return filename || filePath.split('/').pop() || 'unknown.jpg';
 }
 
-async function fetchUploadToken(type: UploadType, filename: string): Promise<UploadTokenPayload> {
-  return post<UploadTokenPayload>('/upload/token', { type, filename });
+async function fetchUploadToken(
+  type: UploadType,
+  filename: string,
+  refId?: string,
+): Promise<UploadTokenPayload> {
+  const body: { type: UploadType; filename: string; refId?: string } = { type, filename };
+  if (refId) body.refId = refId;
+  return post<UploadTokenPayload>('/upload/token', body);
 }
 
 /** 直传七牛；成功后的访问地址以 token 响应中的 url 为准 */
@@ -94,8 +111,9 @@ async function realUploadFile(
   filePath: string,
   type: UploadType,
   filename: string,
+  refId?: string,
 ): Promise<UploadResult> {
-  const tokenPayload = await fetchUploadToken(type, filename);
+  const tokenPayload = await fetchUploadToken(type, filename, refId);
   return uploadToQiniu(filePath, tokenPayload, filename);
 }
 
@@ -107,7 +125,7 @@ export const uploadService = {
   upload: (filePath: string, options: UploadOptions = {}): Promise<UploadResult> => {
     const type = options.type ?? 'common';
     const filename = resolveFilename(filePath, options.filename);
-    return realUploadFile(filePath, type, filename);
+    return realUploadFile(filePath, type, filename, options.refId);
   },
 
   /**

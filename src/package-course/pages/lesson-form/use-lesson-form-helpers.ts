@@ -19,6 +19,8 @@ import { isWithinLessonOperateWindow } from './lesson-operate';
 
 export interface UseLessonFormHelpersParams {
   classIdParam: string;
+  /** 编辑已有消课记录时的 recordId，用作七牛 lesson_media refId */
+  recordIdParam?: string;
   mode: 'single' | 'class';
   viewOnlyParam: boolean;
   lessonDate: string;
@@ -45,6 +47,7 @@ export interface UseLessonFormHelpersParams {
 export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
   const {
     classIdParam,
+    recordIdParam = '',
     mode,
     viewOnlyParam,
     lessonDate,
@@ -67,6 +70,9 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
     studentSubjects,
     hoursUsed,
   } = params;
+
+  /** 作业图上传 ref：优先消课记录，否则班级，避免无机构实体时缺 refId */
+  const lessonMediaRefId = recordIdParam || selectedClassId || classIdParam || 'draft';
 
   const isClassPaused = selectedClass?.status === 'paused';
 
@@ -133,14 +139,17 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
       maxCount: 3,
       choose: () => chooseImageTemp({ maxSizeMB: 5, cropScale: '16:9' }),
       upload: async (path) => {
-        const result = await uploadService.upload(path, { type: 'courseware' });
+        const result = await uploadService.upload(path, {
+          type: 'lesson_media',
+          refId: lessonMediaRefId,
+        });
         return result.url;
       },
       onSuccess: (url) => setHomeworkImages((prev) => [...prev, url]),
       onUploadingChange: setUploading,
       successToastTitle: '上传成功',
     });
-  }, [homeworkImages, setHomeworkImages, setUploading]);
+  }, [homeworkImages, lessonMediaRefId, setHomeworkImages, setUploading]);
 
   const handleRemoveImage = useCallback(
     (index: number) => {
