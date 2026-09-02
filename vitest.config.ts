@@ -68,7 +68,8 @@ export default defineConfig({
         // 起步门槛：随回归套件补全逐步上调至 review 建议的 60%+
         // Q3-5：热路径 invite/auth-onboarding/route-guard/submit-lock 已纳入门禁统计
         // cov-w1：本轮抽出纯模块纳入门禁，lines 35 → 42（全量 ~81% 仍过门）
-        lines: 42,
+        // split-w4：SalaryRuleEditor/validate 边界补齐后 lines 42 → 50（全量 ~83%+ 仍过门）
+        lines: 50,
       },
     },
   },
