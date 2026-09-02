@@ -56,6 +56,7 @@ import ScheduleFormSheets from './ScheduleFormSheets';
 import ScheduleFormTimeSlots from './ScheduleFormTimeSlots';
 import { useScheduleFormLoaders } from './use-schedule-form-loaders';
 import { useScheduleFormSave } from './use-schedule-form-save';
+import { useScheduleFormTime } from './use-schedule-form-time';
 
 /* ======================== 主组件 ======================== */
 
@@ -116,8 +117,6 @@ const ScheduleForm: React.FC = () => {
   /** 自由排课：课表同款月历多选 */
   const [freeCalendarVisible, setFreeCalendarVisible] = useState(false);
   const [roomPickerVisible, setRoomPickerVisible] = useState(false);
-  const [scrollTop, setScrollTop] = useState(0);
-  const savedScrollTopRef = useRef(0);
   const autoOpenedClassPickerRef = useRef(false);
   const [endModePickerVisible, setEndModePickerVisible] = useState(false);
   const [conflictDialogVisible, setConflictDialogVisible] = useState(false);
@@ -136,14 +135,6 @@ const ScheduleForm: React.FC = () => {
   const [autoOpenType, setAutoOpenType] = useState<AutoOpenType>('full');
   const [slotMaxCount, setSlotMaxCount] = useState(6);
   const [minOpenCount, setMinOpenCount] = useState(5);
-  /** 上课时间：空态点加号 → 选开始 → 选结束 */
-  const [timePickerVisible, setTimePickerVisible] = useState(false);
-  const [timePickerTitle, setTimePickerTitle] = useState('选择开始时间');
-  const [timePickerValue, setTimePickerValue] = useState('09:00');
-  const [timePickerPhase, setTimePickerPhase] = useState<'start' | 'end'>('start');
-  const [draftStartTime, setDraftStartTime] = useState('09:00');
-  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
-  const chainingTimePickerRef = useRef(false);
 
   /* 原有字段（保留兼容） */
   const [campusId, setCampusId] = useState('');
@@ -264,14 +255,6 @@ const ScheduleForm: React.FC = () => {
     [room, rooms],
   );
 
-  const timeDisplayDateLabel = useMemo(() => {
-    const raw = schedulingMode === 'free' && freeDates.length > 0 ? freeDates[0] : startDate;
-    if (!raw || !dayjs(raw).isValid()) return '请选择日期';
-    const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
-    const d = dayjs(raw);
-    return `${d.format('YYYY-MM-DD')} 星期${WEEK[d.day()]}`;
-  }, [freeDates, schedulingMode, startDate]);
-
   /** 当前选中的班级信息（用于展示卡片） */
   const classInfoCard = useMemo(() => {
     if (!selectedClass) return null;
@@ -307,9 +290,6 @@ const ScheduleForm: React.FC = () => {
     campusOptions,
   ]);
 
-  /* 是否已添加上课时间 */
-  const hasRealTimeSlots = timeSlots.length > 0;
-
   const sourceLessonDateText = useMemo(() => {
     if (lessonDateParam && dayjs(lessonDateParam).isValid())
       return dayjs(lessonDateParam).format('YYYY-MM-DD');
@@ -331,25 +311,6 @@ const ScheduleForm: React.FC = () => {
     [allSchedules],
   );
 
-  const restoreScrollAfterSheet = useCallback(() => {
-    const y = savedScrollTopRef.current;
-    // 微小偏移强制 ScrollView 应用 scrollTop，防止 BottomSheet 关闭后回顶
-    setTimeout(() => {
-      setScrollTop(y + 0.01);
-    }, 80);
-    setTimeout(() => {
-      setScrollTop(y);
-    }, 160);
-  }, []);
-
-  const openFreeCalendar = useCallback(() => {
-    setFreeCalendarVisible(true);
-  }, []);
-
-  const closeFreeCalendar = useCallback(() => {
-    setFreeCalendarVisible(false);
-    restoreScrollAfterSheet();
-  }, [restoreScrollAfterSheet]);
   const getDateDotType = useCallback(
     (date: dayjs.Dayjs): CalendarDotType => {
       const wd = (date.day() || 7) as Schedule['day_of_week'];
@@ -374,83 +335,37 @@ const ScheduleForm: React.FC = () => {
     );
   }, []); // 仅初始化时校验
 
+  /* ---- 时间段 / 自由日期 / 滚动恢复 ---- */
+  const {
+    scrollTop,
+    timePickerVisible,
+    timePickerTitle,
+    timePickerValue,
+    allowMultiTimeSlots,
+    hasRealTimeSlots,
+    timeDisplayDateLabel,
+    restoreScrollAfterSheet,
+    openFreeCalendar,
+    closeFreeCalendar,
+    openTimePickerFlow,
+    handleTimePickerConfirm,
+    closeTimePicker,
+    removeTimeSlot,
+    removeFreeDate,
+    handleFreeDatesConfirm,
+    onScrollCapture,
+  } = useScheduleFormTime({
+    schedulingMode,
+    repeatMode,
+    timeSlots,
+    setTimeSlots,
+    freeDates,
+    setFreeDates,
+    startDate,
+    setFreeCalendarVisible,
+  });
+
   /* ---- 操作方法 ---- */
-
-  const allowMultiTimeSlots = !(schedulingMode === 'rule' && repeatMode === 'alternate');
-
-  /** 打开时间选择：空态新增 或 编辑已有时段 */
-  const openTimePickerFlow = useCallback(
-    (slotId?: number) => {
-      if (slotId == null && !allowMultiTimeSlots && timeSlots.length >= 1) {
-        Taro.showToast({ title: '隔天排课仅支持一组时间', icon: 'none' });
-        return;
-      }
-      setEditingSlotId(slotId ?? null);
-      setTimePickerPhase('start');
-      setTimePickerTitle('选择开始时间');
-      const existing = slotId != null ? timeSlots.find((t) => t.id === slotId) : null;
-      const start = existing?.start || '09:00';
-      setDraftStartTime(start);
-      setTimePickerValue(start);
-      setTimePickerVisible(true);
-    },
-    [allowMultiTimeSlots, timeSlots],
-  );
-
-  const handleTimePickerConfirm = useCallback(
-    (time: string) => {
-      if (timePickerPhase === 'start') {
-        setDraftStartTime(time);
-        setTimePickerPhase('end');
-        setTimePickerTitle('选择结束时间');
-        const existing =
-          editingSlotId != null ? timeSlots.find((t) => t.id === editingSlotId) : null;
-        const defaultEnd =
-          existing?.end && existing.end > time
-            ? existing.end
-            : formatMinutesToTime(parseTimeToMinutes(time) + 60);
-        setTimePickerValue(defaultEnd);
-        chainingTimePickerRef.current = true;
-        // TimePickerSheet 确认后会 onClose，下一帧再打开结束时间选择
-        setTimeout(() => {
-          setTimePickerVisible(true);
-          chainingTimePickerRef.current = false;
-        }, 80);
-        return;
-      }
-
-      if (time <= draftStartTime) {
-        Taro.showToast({ title: '结束时间需晚于开始时间', icon: 'none' });
-        chainingTimePickerRef.current = true;
-        setTimeout(() => {
-          setTimePickerVisible(true);
-          chainingTimePickerRef.current = false;
-        }, 80);
-        return;
-      }
-
-      if (editingSlotId != null) {
-        setTimeSlots((prev) =>
-          prev.map((ts) =>
-            ts.id === editingSlotId ? { ...ts, start: draftStartTime, end: time } : ts,
-          ),
-        );
-      } else {
-        setTimeSlots((prev) => [...prev, { id: Date.now(), start: draftStartTime, end: time }]);
-      }
-      setEditingSlotId(null);
-      setTimePickerPhase('start');
-      // 仅恢复原滚动位置，不主动滚到时间区（避免弹窗关闭后滚动条跳动）
-      restoreScrollAfterSheet();
-    },
-    [draftStartTime, editingSlotId, restoreScrollAfterSheet, timePickerPhase, timeSlots],
-  );
-
-  /** 删除一组时间（删光后回到中间加号空态） */
-  const removeTimeSlot = useCallback((id: number) => {
-    setTimeSlots((prev) => prev.filter((ts) => ts.id !== id));
-  }, []);
-
   const handleTeacherConfirm = useCallback((v: string) => {
     setSelectedTeachingTeacherId(v);
     setTeacherPickerVisible(false);
@@ -479,18 +394,6 @@ const ScheduleForm: React.FC = () => {
       }`,
     });
   }, [campusId, currentCampusId]);
-
-  const removeFreeDate = useCallback((date: string) => {
-    setFreeDates((prev) => prev.filter((d) => d !== date));
-  }, []);
-
-  const handleFreeDatesConfirm = useCallback(
-    (dates: string[]) => {
-      setFreeDates(dates);
-      restoreScrollAfterSheet();
-    },
-    [restoreScrollAfterSheet],
-  );
 
   /* ---- 提交校验 ---- */
   const submitBlockedReason = useMemo(
@@ -628,21 +531,6 @@ const ScheduleForm: React.FC = () => {
     );
 
   /* ======================== 主渲染 ======================== */
-  const renderTimeSlotsBlock = (title = '上课时间') => (
-    <ScheduleFormTimeSlots
-      title={title}
-      schedulingMode={schedulingMode}
-      hasRealTimeSlots={hasRealTimeSlots}
-      timeSlots={timeSlots}
-      timeDisplayDateLabel={timeDisplayDateLabel}
-      allowMultiTimeSlots={allowMultiTimeSlots}
-      onOpenFreeCalendar={openFreeCalendar}
-      onOpenRuleCalendar={() => setCalendarVisible(true)}
-      onOpenTimePicker={(slotId) => openTimePickerFlow(slotId)}
-      onRemoveTimeSlot={removeTimeSlot}
-    />
-  );
-
   return (
     <PageContainer safeBottom className="bg-muted">
       <ScrollView
@@ -654,9 +542,7 @@ const ScheduleForm: React.FC = () => {
         scrollWithAnimation={false}
         onScroll={(e) => {
           const top = e.detail?.scrollTop;
-          if (typeof top === 'number' && Number.isFinite(top)) {
-            savedScrollTopRef.current = top;
-          }
+          if (typeof top === 'number') onScrollCapture(top);
         }}
       >
         <View className="min-h-screen pb-[200rpx]">
@@ -713,7 +599,18 @@ const ScheduleForm: React.FC = () => {
             onRemoveFreeDate={removeFreeDate}
           />
 
-          {renderTimeSlotsBlock()}
+          <ScheduleFormTimeSlots
+            title="上课时间"
+            schedulingMode={schedulingMode}
+            hasRealTimeSlots={hasRealTimeSlots}
+            timeSlots={timeSlots}
+            timeDisplayDateLabel={timeDisplayDateLabel}
+            allowMultiTimeSlots={allowMultiTimeSlots}
+            onOpenFreeCalendar={openFreeCalendar}
+            onOpenRuleCalendar={() => setCalendarVisible(true)}
+            onOpenTimePicker={(slotId) => openTimePickerFlow(slotId)}
+            onRemoveTimeSlot={removeTimeSlot}
+          />
 
           {selectedClass && !isGroupMode ? (
             <View className="mx-[24rpx] mt-[32rpx]">
@@ -821,13 +718,7 @@ const ScheduleForm: React.FC = () => {
         timePickerVisible={timePickerVisible}
         timePickerTitle={timePickerTitle}
         timePickerValue={timePickerValue}
-        onCloseTimePicker={() => {
-          setTimePickerVisible(false);
-          if (chainingTimePickerRef.current) return;
-          setTimePickerPhase('start');
-          setEditingSlotId(null);
-          restoreScrollAfterSheet();
-        }}
+        onCloseTimePicker={closeTimePicker}
         onConfirmTime={handleTimePickerConfirm}
         conflictDialogVisible={conflictDialogVisible}
         conflictSummary={conflictResult?.conflictSummary || ''}
