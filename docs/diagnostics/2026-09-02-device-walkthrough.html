@@ -128,7 +128,7 @@ const CHAIN_LABELS = {
   'V4T-R2': '好友打开互邀页', 'V4T-R3': '跳转入驻', 'V4T-R5': '错误邀请码', 'X-4': '转发链接',
   'VH-1': '教师招生二维码', 'VH-3': '微信未配置提示', 'VH-5': '转发分享卡片',
   'V4T-R1': '管理员分享互邀', 'V4T-R6': '非管理员分享',
-  'V4T-R4': '记录谁推荐的', 'X-1': '完整招生流程', 'X-2': '链接已用过', 'X-3': '员工邀请', 'X-5': '变成会员',
+  'V4T-R4': '记录谁推荐的', 'X-1': '完整招生流程', 'X-2': '链接已用过', 'X-3': '员工邀请(复制+未登录回跳)', 'X-3b': '员工邀请(已登录)', 'X-5': '变成会员',
 };
 
 const SECTIONS = [
@@ -182,7 +182,8 @@ const SECTIONS = [
       { id: 'V4T-R4', account: 'B 用户：新注册邮箱 或 新微信号<br>（勿用 principal1/teacher1）', steps: 'B 从互邀链进入 → 填入驻表 → 登录/注册 → 提交申请', expected: '提交成功；后台可见「推荐来源 = 机构 A（松果排课）」' },
       { id: 'X-1', account: '教师 <code>teacher1@yunce.com</code><br>家长：新微信号 / 新邮箱', steps: '完整走一遍：教师发 P 码 → 家长扫码注册 → 绑定机构', expected: '全流程成功；邀请状态变为已使用' },
       { id: 'X-2', account: '第三人（未参与 X-1 的微信）', steps: '换一个人点 X-1 里已经用过的邀请链接', expected: '提示已失效' },
-      { id: 'X-3', account: '校长 <code>principal1@yunce.com</code><br>员工：新邮箱或 <code>teacher3@yunce.com</code>', steps: '校长发校区员工邀请 → 员工打开链接接受', expected: '成功加入校区' },
+      { id: 'X-3', account: '校长 <code>principal1@yunce.com</code><br>员工：新微信号（先退出登录）', steps: '①校长生成邀请 → 点「复制邀请链接」②员工用复制的直链打开（路径含 campus-invite-landing?code=）③未登录点「登录并接受」→ 登录后须回到落地页再接受', expected: '链接为落地页直链（无 index?redirect=）；登录后回到邀请页；接受成功加入校区' },
+      { id: 'X-3b', account: '校长 <code>principal1@yunce.com</code><br>已登录员工', steps: '员工已登录时打开同一类邀请直链 → 点接受', expected: '成功加入；再开链接见成功页' },
       { id: 'X-5', account: '<code>principal1@yunce.com</code>', steps: '（抽一条）给 X-1 邀请来的学员充值或发卡', expected: '邀请关系升级为「会员」' },
     ]
   },

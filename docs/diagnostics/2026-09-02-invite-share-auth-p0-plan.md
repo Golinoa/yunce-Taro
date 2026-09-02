@@ -276,6 +276,10 @@ status: PENDING | USED | EXPIRED | CANCELLED
 | V3T-2 | accept 成功 | USED；他人不可再用 |
 | V3T-3 | 接受者再开链接 | 加入成功页 |
 | V3T-4 | 过期 | 不可 accept |
+| V3T-5 | **复制邀请链接** | 剪贴板为 `campus-invite-landing?code=` **直链**（禁止 `index?redirect=`） |
+| V3T-6 | **未登录 → 登录并接受** | 登录后回到落地页可接受（不进选身份截走） |
+
+> V3T-5/6 FE 单测：`invite-staff-link.test.ts` · `auth-onboarding.test.ts`（B0-1/B0-2，2026-09-02）。真机仍记 X-3 / X-3b。
 
 ### 原 V2-1～V2-6
 
@@ -510,7 +514,8 @@ status: PENDING | USED | EXPIRED | CANCELLED
 |---|------|------|------|
 | X-1 | L2 完整：生成链 → 新家长注册绑定 | LEAD + USED + 绑定者再开成功页 | ⏳ |
 | X-2 | L2：他人开已 USED 链 | 失效页 | ⏳ |
-| X-3 | L3 完整：24h 员工邀请 accept | USED + 成功页 | ⏳ |
+| X-3 | L3：复制直链 + 未登录登录回跳 + accept | USED + 成功页；直链无 redirect 壳 | ⏳ 真机（FE 单测 ✅ B0） |
+| X-3b | L3：已登录打开直链 accept | 成功加入 | ⏳ |
 | X-4 | L2 跨设备转发 `invite-register?code=` | 链接可打开 + context 正常 | ⏳ |
 | X-5 | B2 升会员 | 充值/发卡后 LEAD→MEMBER（抽一条走查） | ⏳ |
 
