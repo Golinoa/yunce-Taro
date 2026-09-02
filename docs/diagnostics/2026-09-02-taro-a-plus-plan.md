@@ -61,7 +61,7 @@
 | ID | 状态 | 说明 |
 |----|------|------|
 | Q2-2 | ✅ 提交+加载 | `f4a8732` · `backup/taro-a-plus-q2-2-load-2026-09-02`：出勤回填/试听/课包；页约 2426 行 |
-| Q2-1 | ✅ 起步+导航 | card helpers + `schedule-lesson-nav`（点名/补录/编辑 URL）；页约 3324 行 |
+| Q2-1 | ✅ 起步+导航 | `936dc64` · `backup/taro-a-plus-q2-1-nav-2026-09-02`：lesson-form 导航；页约 3324 行 |
 | Q2-3 | ✅ 起步 | `f1d6b98` · `backup/taro-a-plus-q2-3-form-helpers-2026-09-02`：time / teacher-selection / YesNoToggle |
 | Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
 | Q2-2 | ✅ | Checkin + submit handlers + **attendance load helpers** |
