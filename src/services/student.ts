@@ -15,12 +15,13 @@ import type {
 } from '@/types/course-package';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
-import type { Notification, NotificationType } from '@/types/notification';
 import type { Schedule } from '@/types/schedule';
-import type { Student, StudentParent } from '@/types/student';
+import type { Student } from '@/types/student';
 import { notWired } from '@/utils/not-wired';
 import type { PaginatedResponse } from '@/utils/pagination';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
+import { notificationService } from '@/services/notification';
+import { studentParentService } from '@/services/student-parents';
 import { del, get, post, put } from '@/utils/request';
 
 interface BackendStudentListItem {
@@ -482,27 +483,6 @@ interface BackendLeaveRequestCreateResponse {
   studentName?: null | string;
 }
 
-interface BackendNotificationItem {
-  content?: null | string;
-  createdAt: string;
-  id: string;
-  read: boolean;
-  senderName?: null | string;
-  title: string;
-  type: 'SYSTEM' | 'LEAVE' | 'SCHEDULE' | 'CHECKIN' | 'HOMEWORK';
-}
-
-interface BackendNotificationListResponse {
-  list: BackendNotificationItem[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-  unreadCount: number;
-}
-
 const mapBackendGender = (gender?: null | 'FEMALE' | 'MALE'): Student['gender'] => {
   if (gender === 'MALE') return 'male';
   if (gender === 'FEMALE') return 'female';
@@ -633,43 +613,6 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
         pkg.status === 'ACTIVE' ? 'active' : pkg.status === 'EXPIRED' ? 'expired' : 'completed',
       created_at: pkg.validEnd || item.createdAt,
     })),
-  };
-}
-
-/** GET /students/:id/parents 单项 */
-interface BackendStudentParentItem {
-  id: string;
-  profileId?: string | null;
-  userId?: string | null;
-  relation?: string | null;
-  bindStatus?: string | null;
-  createdAt?: string;
-  profile?: {
-    nickname?: string | null;
-    phone?: string | null;
-    avatar?: string | null;
-  } | null;
-}
-
-function mapBackendStudentParent(
-  studentId: string,
-  item: BackendStudentParentItem,
-): StudentParent {
-  const profileId = item.profileId || '';
-  return {
-    id: item.id,
-    student_id: studentId,
-    /** 通知 receiverId = profileId */
-    parent_id: profileId,
-    parent: item.profile
-      ? {
-          id: profileId,
-          name: item.profile.nickname || '家长',
-          phone: item.profile.phone || undefined,
-          avatar_url: item.profile.avatar || undefined,
-        }
-      : undefined,
-    created_at: item.createdAt || '',
   };
 }
 
@@ -1068,62 +1011,6 @@ function mapBackendSchedule(
   };
 }
 
-function mapBackendNotificationType(
-  notification: Pick<BackendNotificationItem, 'type' | 'title'>,
-): NotificationType {
-  switch (notification.type) {
-    case 'LEAVE':
-      return /审批|结果|回复/.test(notification.title) ? 'leave_response' : 'leave_request';
-    case 'SCHEDULE':
-      return 'schedule_change';
-    case 'CHECKIN':
-      return 'lesson_complete';
-    default:
-      return 'general';
-  }
-}
-
-function mapBackendNotification(notification: BackendNotificationItem): Notification {
-  return {
-    id: notification.id,
-    sender_id: '',
-    receiver_id: '',
-    type: mapBackendNotificationType(notification),
-    title: notification.title,
-    content: notification.content || undefined,
-    is_read: notification.read,
-    created_at: notification.createdAt,
-    sender: notification.senderName ? { name: notification.senderName } : undefined,
-  };
-}
-
-function mapFrontendNotificationType(
-  type?: NotificationType,
-  title?: string,
-): 'SYSTEM' | 'LEAVE' | 'SCHEDULE' | 'CHECKIN' | 'HOMEWORK' {
-  switch (type) {
-    case 'leave_request':
-    case 'leave_response':
-      return 'LEAVE';
-    case 'schedule_change':
-      return 'SCHEDULE';
-    case 'lesson_complete':
-      return 'CHECKIN';
-    case 'general':
-      return /作业/.test(title || '') ? 'HOMEWORK' : 'SYSTEM';
-    default:
-      return /请假/.test(title || '')
-        ? 'LEAVE'
-        : /排课|课表/.test(title || '')
-          ? 'SCHEDULE'
-          : /上课|消课|核销/.test(title || '')
-            ? 'CHECKIN'
-            : /作业/.test(title || '')
-              ? 'HOMEWORK'
-              : 'SYSTEM';
-  }
-}
-
 function mapBackendLeaveStatus(status: BackendLeaveRequestItem['status']): LeaveRequest['status'] {
   switch (status) {
     case 'APPROVED':
@@ -1258,39 +1145,19 @@ export const studentService = {
   },
 
   /** 获取学员的绑定家长 */
-  getParents: async (studentId: string): Promise<StudentParent[]> => {
-    const list = await get<BackendStudentParentItem[]>(`/students/${studentId}/parents`);
-    return (list || []).map((item) => mapBackendStudentParent(studentId, item));
-  },
+  getParents: studentParentService.getParents,
 
   /** 解绑家长 */
-  removeParent: async (studentId: string, bindingId: string) => {
-    await del(`/students/${studentId}/parents/${bindingId}`);
-  },
+  removeParent: studentParentService.removeParent,
 
   /** 通过邀请码查找学员 */
-  findByInviteCode: async (code: string) => {
-    return get<{
-      id: string;
-      name: string;
-      avatar?: string | null;
-      nickname?: string | null;
-      teacher?: {
-        id: string;
-        nickname?: string | null;
-        avatar?: string | null;
-        institution?: string | null;
-      };
-    }>(`/students/by-invite-code/${encodeURIComponent(code)}`);
-  },
+  findByInviteCode: studentParentService.findByInviteCode,
 
   /**
    * 绑定家长到学员（后端按手机号绑定，非 parentId）
    * @deprecated 业务侧请使用 parent-invite-links；保留以兼容旧调用
    */
-  bindParent: async (studentId: string, phone: string, relation = '家长') => {
-    return post(`/students/${studentId}/bind-parent`, { phone, relation });
-  },
+  bindParent: studentParentService.bindParent,
 };
 
 // ============================================
@@ -2181,71 +2048,9 @@ export const scheduleService = {
 };
 
 // ============================================
-// 通知 Service
+// 通知 Service（实现见 notification.ts）
 // ============================================
-export const notificationService = {
-  /** 收件箱（分批拉全；列表页后续可改 usePagedQuery） */
-  getByReceiver: async (_receiverId: string): Promise<Notification[]> => {
-    const list = await fetchAllPages(async (page, pageSize) => {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(pageSize),
-      });
-      const data = await get<BackendNotificationListResponse>(
-        `/notifications?${params.toString()}`,
-      );
-      return asPaginatedResponse(data, page, pageSize);
-    }, API_PAGE_SIZE_BATCH);
-    return list.map(mapBackendNotification);
-  },
-  markAsRead: async (notificationId: string) => {
-    await put(`/notifications/${notificationId}/read`, {});
-    return;
-  },
-  markAllAsRead: async (_receiverId: string) => {
-    await put('/notifications/read-all', {});
-    return;
-  },
-  send: async (data: {
-    sender_id: string;
-    receiver_id?: string;
-    receiver_ids?: string[];
-    title: string;
-    content: string;
-    related_id?: string;
-    type?: NotificationType;
-  }): Promise<Notification> => {
-    const receiverIds = data.receiver_ids || (data.receiver_id ? [data.receiver_id] : []);
-    const filteredReceiverIds = receiverIds.filter(Boolean);
-    if (filteredReceiverIds.length === 0) {
-      throw new Error('缺少通知接收者');
-    }
-
-    await post('/notifications', {
-      receiverIds: filteredReceiverIds,
-      type: mapFrontendNotificationType(data.type, data.title),
-      title: data.title,
-      content: data.content,
-    });
-
-    return {
-      id: '',
-      sender_id: data.sender_id,
-      receiver_id: filteredReceiverIds[0],
-      type:
-        data.type ||
-        mapBackendNotificationType({
-          type: mapFrontendNotificationType(data.type, data.title),
-          title: data.title,
-        }),
-      title: data.title,
-      content: data.content,
-      related_id: data.related_id,
-      is_read: false,
-      created_at: new Date().toISOString(),
-    };
-  },
-};
+export { notificationService };
 
 // ============================================
 // 工具函数

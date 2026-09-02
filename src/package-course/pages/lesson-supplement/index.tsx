@@ -11,7 +11,6 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import {
   classService,
   lessonRecordService,
-  notificationService,
   packageService,
   scheduleService,
   studentService,
@@ -27,6 +26,7 @@ import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import { hasTrialPackage, pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -360,26 +360,18 @@ const LessonSupplementPage: React.FC = () => {
             content: matchedPackage ? contentText : `${contentText}（欠课时）`,
           });
 
-          try {
-            const parents = await studentService.getParents(student.id);
-            for (const binding of parents) {
-              if (!binding.parent_id) continue;
-              await notificationService.send({
-                sender_id: profile?.id || '',
-                receiver_id: binding.parent_id,
-                title: `${displayClassName}已补录签到`,
-                content: matchedPackage
-                  ? `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，剩余 ${
-                      createdRecord.remaining_hours ??
-                      Math.max(matchedPackage.remaining_hours - hoursUsed, 0)
-                    } 课时`
-                  : `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，当前暂无可扣课包，已记为欠课时`,
-                related_id: student.id,
-              });
-            }
-          } catch (notifyErr) {
-            logError('LessonSupplement notify parents', notifyErr);
-          }
+          await notifyStudentParentsSafe({
+            studentId: student.id,
+            senderId: profile?.id || '',
+            title: `${displayClassName}已补录签到`,
+            content: matchedPackage
+              ? `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，剩余 ${
+                  createdRecord.remaining_hours ??
+                  Math.max(matchedPackage.remaining_hours - hoursUsed, 0)
+                } 课时`
+              : `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，当前暂无可扣课包，已记为欠课时`,
+            logLabel: 'LessonSupplement notify parents',
+          });
 
           successList.push(student.name);
         } catch (error) {

@@ -45,6 +45,7 @@ import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { chooseImageTemp } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
+import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { runImageUploadFlow } from '@/utils/upload-flow';
@@ -1436,29 +1437,21 @@ const LessonForm: React.FC = () => {
           homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
         });
 
-        try {
-          const parents = await studentService.getParents(student.id);
-          for (const binding of parents) {
-            if (!binding.parent_id) continue;
-            await notificationService.send({
-              sender_id: profile?.id || '',
-              receiver_id: binding.parent_id,
-              title: options.isSupplement
-                ? `${student.name} 已补录签到`
-                : `${student.name} 课时已核销`,
-              content: options.isSupplement
-                ? `${lessonDateValue} 已补录 ${hoursUsed} 课时，剩余 ${
-                    createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
-                  } 课时`
-                : `本次核销 ${hoursUsed} 课时，剩余 ${
-                    createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
-                  } 课时`,
-              related_id: student.id,
-            });
-          }
-        } catch (notifyErr) {
-          logError('lesson-form notify parents after checkin', notifyErr);
-        }
+        await notifyStudentParentsSafe({
+          studentId: student.id,
+          senderId: profile?.id || '',
+          title: options.isSupplement
+            ? `${student.name} 已补录签到`
+            : `${student.name} 课时已核销`,
+          content: options.isSupplement
+            ? `${lessonDateValue} 已补录 ${hoursUsed} 课时，剩余 ${
+                createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
+              } 课时`
+            : `本次核销 ${hoursUsed} 课时，剩余 ${
+                createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
+              } 课时`,
+          logLabel: 'lesson-form notify parents after checkin',
+        });
         return;
       }
 
@@ -1727,21 +1720,13 @@ const LessonForm: React.FC = () => {
         room: room || undefined,
       });
 
-      try {
-        const parents = await studentService.getParents(selectedStudent.id);
-        for (const binding of parents) {
-          if (!binding.parent_id) continue;
-          await notificationService.send({
-            sender_id: profile?.id || '',
-            receiver_id: binding.parent_id,
-            title: `${selectedStudent.name} 课时已消课`,
-            content: `本次消课 ${hoursUsed} 课时，剩余 ${createdRecord.remaining_hours ?? Math.max(matchedPackage.remaining_hours - hoursUsed, 0)} 课时`,
-            related_id: selectedStudent.id,
-          });
-        }
-      } catch (notifyErr) {
-        logError('lesson-form notify parents after single deduct', notifyErr);
-      }
+      await notifyStudentParentsSafe({
+        studentId: selectedStudent.id,
+        senderId: profile?.id || '',
+        title: `${selectedStudent.name} 课时已消课`,
+        content: `本次消课 ${hoursUsed} 课时，剩余 ${createdRecord.remaining_hours ?? Math.max(matchedPackage.remaining_hours - hoursUsed, 0)} 课时`,
+        logLabel: 'lesson-form notify parents after single deduct',
+      });
 
       invalidateStudents(currentUserId);
       // 审计日志（用户口径 2026-08-22）：单人消课属重要日志
@@ -1898,21 +1883,13 @@ const LessonForm: React.FC = () => {
             });
           }
 
-          try {
-            const parents = await studentService.getParents(student.id);
-            for (const binding of parents) {
-              if (!binding.parent_id) continue;
-              await notificationService.send({
-                sender_id: profile?.id || '',
-                receiver_id: binding.parent_id,
-                title: `${student.name} 课时已核销`,
-                content: `本次核销 ${hoursUsed} 课时，剩余 ${createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)} 课时`,
-                related_id: student.id,
-              });
-            }
-          } catch (notifyErr) {
-            logError('lesson-form notify parents after class checkin', notifyErr);
-          }
+          await notifyStudentParentsSafe({
+            studentId: student.id,
+            senderId: profile?.id || '',
+            title: `${student.name} 课时已核销`,
+            content: `本次核销 ${hoursUsed} 课时，剩余 ${createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)} 课时`,
+            logLabel: 'lesson-form notify parents after class checkin',
+          });
 
           successCount += 1;
         } catch (err) {

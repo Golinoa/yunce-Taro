@@ -10,9 +10,10 @@ export {
   leaveService,
   classService,
   scheduleService,
-  notificationService,
   formatDateCN,
 } from './student';
+export { notificationService } from './notification';
+export { studentParentService } from './student-parents';
 export { courseTemplateService } from './course-template';
 export { cardTypeService } from './card-type';
 export type { FeeMethod } from './student';
