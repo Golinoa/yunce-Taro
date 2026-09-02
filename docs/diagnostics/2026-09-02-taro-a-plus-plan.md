@@ -60,7 +60,8 @@
 
 | ID | 状态 | 说明 |
 |----|------|------|
-| Q2-2 | ✅ 提交+加载+面板+弹层+loaders+actions | load `f4a8732`；panels `5d7c57f`；sheets `07befdb`；loaders `56b51a6`；actions 本提交；页约 **864** 行（此前 loaders 后实为 **1441**，非 1342）· `backup/taro-a-plus-q2-2-actions-2026-09-03` |
+| Q2-2 | ✅ **&lt;800 收口** | helpers 本提交；页 **738** 行（此前 actions 后约 **864**）· `backup/taro-a-plus-q2-2-under800-2026-09-03` |
+| Q2-2 | ✅ 提交+加载+面板+弹层+loaders+actions | load `f4a8732`；panels `5d7c57f`；sheets `07befdb`；loaders `56b51a6`；actions `5adc9e8` 前序；页约 **864** 行（loaders 后曾 **1441**）· `backup/taro-a-plus-q2-2-actions-2026-09-03` |
 | Q2-1 | ✅ 导航+卡片+开放列表 | `e66787d` OpenClass |
 | Q2-1 | ✅ +日 Swiper 项 | `ca6decf` · ScheduleDaySwiperItem · `backup/taro-a-plus-q2-1-day-swiper-2026-09-03` |
 | Q2-1 | ✅ +loaders hook | `use-schedule-loaders`；页约 **2199** 行 · `backup/taro-a-plus-q2-1-loaders-2026-09-03` |
@@ -80,7 +81,7 @@
 | Q3-5 | ✅ | coverage.include + `route-guard.tsx` + `route-guard.test.ts`；lines 门槛 30→35（全量 ~79% 仍过门） |
 | Q3-4 | ⏳ | 次级大页队列 |
 
-下一节点：真机 G1-3/4；Q3-4（次级大页）；schedule / lesson-form 继续削行。
+下一节点：Q2-2 lesson-form 已 &lt;800；继续削 schedule 至 &lt;800；真机 G1-3/4；Q3-4。
 
 ---
 
@@ -104,7 +105,7 @@
 | 文件 | 行数 |
 |------|------|
 | `src/pages/schedule/index.tsx` | 3404 |
-| `src/package-course/pages/lesson-form/index.tsx` | 3079 |
+| `src/package-course/pages/lesson-form/index.tsx` | 738 |
 | `src/package-course/pages/schedule-form/index.tsx` | 730（&lt;800 ✅） |
 | `src/services/student.ts` | 2071 |
 | `src/services/auth.ts` | 89（门面；login/session/profile 已拆） |
