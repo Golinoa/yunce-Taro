@@ -65,6 +65,17 @@ import {
   MIN_DURATION_MINUTES,
   parseTimeToMinutes,
 } from './time';
+import {
+  formatRescheduleTimeLabel,
+  getScheduleFormSubmitBlockedReason,
+  validateRescheduleSaveInput,
+} from './schedule-form-validate';
+import {
+  buildScheduleRuleNote,
+  buildScheduleSaveSuccessTitle,
+  buildScheduleSaveTargets,
+  mergeScheduleConflictResults,
+} from './schedule-form-save';
 
 /* ======================== 常量 ======================== */
 
@@ -800,93 +811,47 @@ const ScheduleForm: React.FC = () => {
   /* 班级带出老师/助教只读，不再提供选择器 */
 
   /* ---- 提交校验 ---- */
-  const submitBlockedReason = useMemo(() => {
-    if (!currentUserId) return '未获取到登录信息';
-    if (mode === 'student') return '真实联调仅支持班级排课';
-    if (mode === 'class' && !classId) return '请选择班级';
-    if (!selectedTeachingTeacherId) return '请选择主讲老师';
-    if (isGroupMode) {
-      if (!Number.isFinite(slotMaxCount) || slotMaxCount < 1) {
-        return '请设置每时段可约人数';
-      }
-      if (!Number.isFinite(minOpenCount) || minOpenCount < 1) {
-        return '请设置最少开班人数';
-      }
-      if (minOpenCount > slotMaxCount) {
-        return '最少开班人数不能大于每时段可约人数';
-      }
-    }
-    if (timeSlots.length === 0) return '请添加上课时间';
-    if (timeSlots.some((ts) => !ts.start || !ts.end)) return '请填写完整的上课时间';
-    if (timeSlots.some((ts) => ts.start >= ts.end)) return '结束时间需晚于开始时间';
-    if (schedulingMode === 'rule') {
-      if (!startDate) return '请选择开始日期';
-      if (repeatMode !== 'alternate' && selectedDays.length === 0) return '请至少选择一个上课周几';
-      if (repeatMode === 'alternate' && timeSlots.length !== 1) return '隔天排课仅支持一组时间';
-      if (endMode === 'by_date' && !endDate) return '请选择结束日期';
-      if (endMode === 'by_date' && dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
-        return '结束日期不能早于开始日期';
-      }
-      if (endMode === 'by_count' && endCount < 1) return '按次数至少为 1';
-      // 结束班级（limited）与排课时间限制联动
-      if (selectedClass?.type === 'limited') {
-        const total = selectedClass.total_lessons ?? 0;
-        const used = selectedClass.used_lessons ?? 0;
-        const remaining = Math.max(0, total - used);
-        if (remaining <= 0) return '该班级课时已用完，无法继续排课';
-        if (endMode === 'never') return '该班级已开启结束课时限制，请选择限日期或按次数';
-        if (endMode === 'by_count' && endCount > remaining) {
-          return `按次数不能超过剩余课时（剩余 ${remaining}）`;
-        }
-        if (endMode === 'by_date' && startDate && endDate && selectedDays.length > 0) {
-          let projected = 0;
-          let cursor = dayjs(startDate);
-          const end = dayjs(endDate);
-          const daySet = new Set(selectedDays);
-          while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
-            const appDay = (cursor.day() || 7) as DayOfWeek;
-            if (daySet.has(appDay)) projected += 1;
-            cursor = cursor.add(1, 'day');
-          }
-          if (projected > remaining) {
-            return `日期范围内预计 ${projected} 次课，超过剩余课时 ${remaining}`;
-          }
-        }
-      }
-    } else if (freeDates.length === 0) {
-      return '请选择上课日期';
-    } else if (selectedClass?.type === 'limited') {
-      const total = selectedClass.total_lessons ?? 0;
-      const used = selectedClass.used_lessons ?? 0;
-      const remaining = Math.max(0, total - used);
-      if (remaining <= 0) return '该班级课时已用完，无法继续排课';
-      if (freeDates.length > remaining) {
-        return `自由排课选了 ${freeDates.length} 天，超过剩余课时 ${remaining}`;
-      }
-    }
-    return '';
-  }, [
-    classId,
-    currentUserId,
-    endCount,
-    endDate,
-    endMode,
-    freeDates.length,
-    isGroupMode,
-    minOpenCount,
-    mode,
-    repeatMode,
-    schedulingMode,
-    selectedDays,
-    selectedDays.length,
-    selectedTeachingTeacherId,
-    selectedClass?.type,
-    selectedClass?.total_lessons,
-    selectedClass?.used_lessons,
-    slotMaxCount,
-    startDate,
-    timeSlots,
-  ]);
+  const submitBlockedReason = useMemo(
+    () =>
+      getScheduleFormSubmitBlockedReason({
+        currentUserId,
+        mode,
+        classId,
+        selectedTeachingTeacherId,
+        isGroupMode,
+        slotMaxCount,
+        minOpenCount,
+        timeSlots,
+        schedulingMode,
+        startDate,
+        repeatMode,
+        selectedDays,
+        endMode,
+        endDate,
+        endCount,
+        freeDates,
+        selectedClass,
+      }),
+    [
+      classId,
+      currentUserId,
+      endCount,
+      endDate,
+      endMode,
+      freeDates,
+      isGroupMode,
+      minOpenCount,
+      mode,
+      repeatMode,
+      schedulingMode,
+      selectedDays,
+      selectedTeachingTeacherId,
+      selectedClass,
+      slotMaxCount,
+      startDate,
+      timeSlots,
+    ],
+  );
 
   const canSubmit = useMemo(
     () => !loading && !loadError && !notFound && !submitBlockedReason,
@@ -940,23 +905,20 @@ const ScheduleForm: React.FC = () => {
 
     /* 调课分支 */
     if (isRescheduleMode) {
-      if (!originalSchedule) {
-        Taro.showToast({ title: '未找到原课程信息', icon: 'none' });
+      const rescheduleError = validateRescheduleSaveInput({
+        originalSchedule,
+        sourceLessonDate: sourceLessonDateText,
+        targetDate: selectedDateValue,
+        startTime,
+        endTime,
+      });
+      if (rescheduleError) {
+        Taro.showToast({ title: rescheduleError, icon: 'none' });
         return;
       }
-      const sd = sourceLessonDateText,
-        td = selectedDateValue;
-      if (!sd || !dayjs(sd).isValid()) {
-        Taro.showToast({ title: '原上课日期异常', icon: 'none' });
-        return;
-      }
-      const noDate = td === sd,
-        noTime = startTime === originalSchedule.start_time && endTime === originalSchedule.end_time;
-      if (noDate && noTime) {
-        Taro.showToast({ title: '请至少调整日期或时间', icon: 'none' });
-        return;
-      }
-      const adj: Schedule = { ...originalSchedule, start_time: startTime, end_time: endTime };
+      const sd = sourceLessonDateText;
+      const td = selectedDateValue;
+      const adj: Schedule = { ...originalSchedule!, start_time: startTime, end_time: endTime };
       const conflictResult = await temporaryRescheduleService.checkDateConflict({
         teacherId: currentUserId,
         sourceDate: sd,
@@ -976,8 +938,12 @@ const ScheduleForm: React.FC = () => {
           targetDate: td,
           schedules: [adj],
         });
-        const ot = `${dayjs(sd).format('MM月DD日')} ${originalSchedule.start_time}-${originalSchedule.end_time}`;
-        const nt = `${dayjs(td).format('MM月DD日')} ${startTime}-${endTime}`;
+        const ot = formatRescheduleTimeLabel(
+          sd,
+          originalSchedule!.start_time,
+          originalSchedule!.end_time,
+        );
+        const nt = formatRescheduleTimeLabel(td, startTime, endTime);
         if (mode === 'class' && classId) {
           const cs = await classService.getStudents(classId);
           for (const s of cs)
@@ -1030,49 +996,31 @@ const ScheduleForm: React.FC = () => {
     }
 
     /* 创建/编辑排课 */
-    const buildRuleNote = () => {
-      const userNote = note.trim();
-      const needFull = autoOpenType === 'full' || autoOpenType === 'full_or_time';
-      const meta = [
-        isGroupMode ? '类型:团课' : '类型:班课',
-        isGroupMode
-          ? [
-              `自动开班:${autoOpenType}`,
-              `每时段可约:${slotMaxCount}`,
-              `最少开班:${Math.max(1, minOpenCount)}`,
-              needFull ? `满人开课:是 | 满人开课人数:${Math.max(1, minOpenCount)}` : '满人开课:否',
-            ].join(' | ')
-          : null,
-        schedulingMode === 'rule' ? `规则:${repeatMode}` : null,
-        schedulingMode === 'rule' ? `开始:${startDate}` : null,
-        schedulingMode === 'rule' && endMode === 'by_date' ? `结束日期:${endDate}` : null,
-        schedulingMode === 'rule' && endMode === 'by_count' ? `次数:${endCount}` : null,
-        schedulingMode === 'rule' && endMode === 'never' ? '结束:不结束' : null,
-        schedulingMode === 'rule' ? `节假日排课:${scheduleOnHoliday ? '是' : '否'}` : null,
-        `消耗课时:${consumedHours}`,
-      ]
-        .filter(Boolean)
-        .join(' | ');
-      return userNote ? `${userNote}\n${meta}` : meta;
-    };
+    const buildRuleNote = () =>
+      buildScheduleRuleNote({
+        note,
+        isGroupMode,
+        autoOpenType,
+        slotMaxCount,
+        minOpenCount,
+        schedulingMode,
+        repeatMode,
+        startDate,
+        endMode,
+        endDate,
+        endCount,
+        scheduleOnHoliday,
+        consumedHours,
+      });
 
-    const targets: { dayOfWeek: DayOfWeek; start: string; end: string; dateHint?: string }[] = [];
-    if (schedulingMode === 'rule') {
-      const days =
-        repeatMode === 'alternate' ? [(dayjs(startDate).day() || 7) as DayOfWeek] : selectedDays;
-      for (const dow of days) {
-        for (const ts of timeSlots) {
-          targets.push({ dayOfWeek: dow, start: ts.start, end: ts.end });
-        }
-      }
-    } else {
-      for (const d of freeDates) {
-        const dow = (dayjs(d).day() || 7) as DayOfWeek;
-        for (const ts of timeSlots) {
-          targets.push({ dayOfWeek: dow, start: ts.start, end: ts.end, dateHint: d });
-        }
-      }
-    }
+    const targets = buildScheduleSaveTargets({
+      schedulingMode,
+      repeatMode,
+      startDate,
+      selectedDays,
+      freeDates,
+      timeSlots,
+    });
 
     if (targets.length === 0) {
       Taro.showToast({ title: '请完善排课时间', icon: 'none' });
@@ -1083,46 +1031,23 @@ const ScheduleForm: React.FC = () => {
     const teacherIdForCheck = selectedTeachingTeacherId || currentUserId;
 
     if (!ignoreConflictRef.current) {
-      const merged: ScheduleConflictResult = {
-        hasConflict: false,
-        conflictSummary: '',
-        conflicts: [],
-      };
-      const seen = new Set<string>();
+      const results: ScheduleConflictResult[] = [];
       for (const t of targets) {
-        const result = await scheduleService.checkConflict({
-          teacherId: teacherIdForCheck,
-          dayOfWeek: t.dayOfWeek,
-          startTime: t.start,
-          endTime: t.end,
-          classId: mode === 'class' ? classId : undefined,
-          room: roomName,
-          excludeId: isEdit ? scheduleId : undefined,
-          dateHint: t.dateHint || (schedulingMode === 'rule' ? startDate : undefined),
-        });
-        if (!result.hasConflict) continue;
-        merged.hasConflict = true;
-        for (const c of result.conflicts) {
-          if (seen.has(c.id)) continue;
-          seen.add(c.id);
-          merged.conflicts.push(c);
-        }
-        if (!merged.conflictSummary && result.conflictSummary) {
-          merged.conflictSummary = result.conflictSummary;
-        }
+        results.push(
+          await scheduleService.checkConflict({
+            teacherId: teacherIdForCheck,
+            dayOfWeek: t.dayOfWeek,
+            startTime: t.start,
+            endTime: t.end,
+            classId: mode === 'class' ? classId : undefined,
+            room: roomName,
+            excludeId: isEdit ? scheduleId : undefined,
+            dateHint: t.dateHint || (schedulingMode === 'rule' ? startDate : undefined),
+          }),
+        );
       }
+      const merged = mergeScheduleConflictResults(results);
       if (merged.hasConflict) {
-        const typeSet = new Set(merged.conflicts.flatMap((c) => c.conflictTypes));
-        const labelMap = {
-          time: '时间冲突',
-          teacher: '老师冲突',
-          room: '教室冲突',
-          class: '班级冲突',
-        } as const;
-        merged.conflictSummary = (['time', 'teacher', 'room', 'class'] as const)
-          .filter((k) => typeSet.has(k))
-          .map((k) => labelMap[k])
-          .join('、');
         setConflictResult(merged);
         setConflictDialogVisible(true);
         return;
@@ -1240,11 +1165,7 @@ const ScheduleForm: React.FC = () => {
         ignoreConflictRef.current = false;
         emitScheduleRefresh();
         Taro.showToast({
-          title: isEdit
-            ? '保存成功'
-            : targets.length > 1
-              ? `已添加 ${targets.length} 条排课`
-              : '保存成功',
+          title: buildScheduleSaveSuccessTitle({ isEdit, targetCount: targets.length }),
           icon: 'success',
           duration: 800,
         });
