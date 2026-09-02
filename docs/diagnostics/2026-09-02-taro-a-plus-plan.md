@@ -62,7 +62,7 @@
 |----|------|------|
 | Q2-2 | ✅ 提交+加载 | `f4a8732` · `backup/taro-a-plus-q2-2-load-2026-09-02`：出勤回填/试听/课包；页约 2426 行 |
 | Q2-1 | ✅ 导航+卡片+危险文案 | `d40ce9c` · `backup/taro-a-plus-q2-1-card-danger-2026-09-02`：页约 3225 行 |
-| Q2-3 | ✅ 保存路径 | 校验/targets/冲突合并抽出 + 单测；页约 1992 行 |
+| Q2-3 | ✅ 保存路径 | `e2df5b8` · `backup/taro-a-plus-q2-3-save-2026-09-03`：页约 1992 行 |
 | Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
 | Q2-2 | ✅ | Checkin + submit handlers + **attendance load helpers** |
 | Q2-5 | ✅ | `82567c0` · … |
