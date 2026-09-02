@@ -75,10 +75,7 @@ export function useSalaryRuleEditor(
     const nextCourseGroupFees = buildCourseGroupFees(categories, templates, value.courseGroupFees);
     const nextCategoryLessonFees = buildCategoryLessonFees(categories, value.categoryLessonFees);
 
-    const courseGroupChanged = isCourseGroupFeesChanged(
-      nextCourseGroupFees,
-      value.courseGroupFees,
-    );
+    const courseGroupChanged = isCourseGroupFeesChanged(nextCourseGroupFees, value.courseGroupFees);
     const categoryLessonChanged = isCategoryLessonFeesChanged(
       nextCategoryLessonFees,
       value.categoryLessonFees,

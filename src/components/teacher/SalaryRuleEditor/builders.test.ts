@@ -70,9 +70,7 @@ describe('buildCourseGroupFees', () => {
 });
 
 describe('buildCategoryLessonFees', () => {
-  const categories = [
-    { id: 'c1', name: '新团课名', mode: 'group' },
-  ] as CourseCategoryConfig[];
+  const categories = [{ id: 'c1', name: '新团课名', mode: 'group' }] as CourseCategoryConfig[];
 
   it('已有项保留并刷新 name/groupType', () => {
     const existing: CategoryLessonFee[] = [

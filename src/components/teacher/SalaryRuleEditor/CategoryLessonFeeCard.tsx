@@ -52,8 +52,8 @@ const CategoryLessonFeeCard: React.FC<CategoryLessonFeeCardProps> = ({
   const [expanded, setExpanded] = useState(false);
   const hasError = Boolean(
     errors?.fixedRate ||
-      Object.keys(errors?.tiers || {}).length > 0 ||
-      Object.keys(errors?.perfTiers || {}).length > 0,
+    Object.keys(errors?.tiers || {}).length > 0 ||
+    Object.keys(errors?.perfTiers || {}).length > 0,
   );
 
   useEffect(() => {

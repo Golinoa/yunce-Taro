@@ -96,7 +96,7 @@ describe('validateSalaryRule', () => {
     const base = createDefaultSalaryRule();
     const rule = {
       ...base,
-      attendanceTiers: [{ id: 'a1', minCount: -1, maxCount: '', rate: '' }],
+      attendanceTiers: [{ id: 'a1', minCount: -1, maxCount: '' as const, rate: '' as const }],
     };
     const errors = validateSalaryRule(rule);
     expect(errors.attendanceTiers?.a1?.minCount).toBe('不能为负数');
