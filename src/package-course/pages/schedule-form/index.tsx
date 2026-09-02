@@ -76,54 +76,20 @@ import {
   buildScheduleSaveTargets,
   mergeScheduleConflictResults,
 } from './schedule-form-save';
-
-/* ======================== 常量 ======================== */
-
-/** 与时段配置 class-slot-config 一致的预约设置选项 */
-type AutoOpenType = NonNullable<Class['auto_open_type']>;
-const AUTO_OPEN_OPTIONS: { key: AutoOpenType; label: string }[] = [
-  { key: 'manual', label: '手动开班' },
-  { key: 'full', label: '约满开班' },
-  { key: 'time', label: '到时间自动开班' },
-  { key: 'full_or_time', label: '约满或到时间' },
-];
-const SLOT_MAX_COUNT_OPTIONS = ['1', '2', '3', '4', '5', '6', '8', '10', '12', '15', '20'] as const;
-
-/** 课程类型选项 */
-const SCHEDULE_TYPE_OPTIONS = ['班课', '团课'] as const;
-
-type SchedulingMode = 'rule' | 'free';
-type RepeatMode = 'weekly' | 'biweekly' | 'alternate';
-type EndMode = 'never' | 'by_date' | 'by_count';
-
-const WEEKDAY_OPTIONS: { label: string; value: DayOfWeek }[] = [
-  { label: '一', value: 1 },
-  { label: '二', value: 2 },
-  { label: '三', value: 3 },
-  { label: '四', value: 4 },
-  { label: '五', value: 5 },
-  { label: '六', value: 6 },
-  { label: '日', value: 7 },
-];
-
-const REPEAT_OPTIONS: { label: string; value: RepeatMode }[] = [
-  { label: '每周', value: 'weekly' },
-  { label: '隔周', value: 'biweekly' },
-  { label: '隔天', value: 'alternate' },
-];
-
-const END_MODE_OPTIONS: { label: string; value: EndMode }[] = [
-  { label: '不结束', value: 'never' },
-  { label: '限日期', value: 'by_date' },
-  { label: '按次数', value: 'by_count' },
-];
-
-/** 时间槽组 */
-interface TimeSlotPair {
-  id: number;
-  start: string;
-  end: string;
-}
+import {
+  AUTO_OPEN_OPTIONS,
+  END_MODE_OPTIONS,
+  REPEAT_OPTIONS,
+  SCHEDULE_TYPE_OPTIONS,
+  SLOT_MAX_COUNT_OPTIONS,
+  WEEKDAY_OPTIONS,
+  type AutoOpenType,
+  type EndMode,
+  type RepeatMode,
+  type SchedulingMode,
+  type TimeSlotPair,
+} from './schedule-form-constants';
+import ScheduleFormTimeSlots from './ScheduleFormTimeSlots';
 
 /* ======================== 主组件 ======================== */
 
@@ -1292,92 +1258,18 @@ const ScheduleForm: React.FC = () => {
 
   /* ======================== 主渲染 ======================== */
   const renderTimeSlotsBlock = (title = '上课时间') => (
-    <View
-      id="schedule-time-block"
-      className="mx-[24rpx] mt-[24rpx] overflow-hidden rounded-[20rpx] bg-card px-[32rpx] py-[28rpx]"
-    >
-      <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">{title}</Text>
-      {hasRealTimeSlots ? (
-        <>
-          <View className="overflow-hidden rounded-[16rpx] bg-muted/70">
-            <View
-              className="flex items-center justify-between border-b border-border/50 px-[24rpx] py-[22rpx]"
-              onClick={() => {
-                if (schedulingMode === 'free') {
-                  openFreeCalendar();
-                } else {
-                  setCalendarVisible(true);
-                }
-              }}
-            >
-              <View className="flex items-center gap-[12rpx]">
-                <Icon name="mdi-calendar" size={28} color="mutedForeground" />
-                <Text className="text-[28rpx] text-foreground">日期</Text>
-              </View>
-              <View className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]">
-                <Text className="text-[26rpx] text-foreground">{timeDisplayDateLabel}</Text>
-              </View>
-            </View>
-            {timeSlots.map((ts, index) => (
-              <View
-                key={ts.id}
-                className={cn(
-                  'flex items-center justify-between px-[24rpx] py-[22rpx]',
-                  index < timeSlots.length - 1 && 'border-b border-border/50',
-                )}
-              >
-                <View className="flex items-center gap-[12rpx]">
-                  <Icon name="mdi-clock-outline" size={28} color="mutedForeground" />
-                  <Text className="text-[28rpx] text-foreground">
-                    {timeSlots.length > 1 ? `时间${index + 1}` : '时间'}
-                  </Text>
-                </View>
-                <View className="flex items-center gap-[12rpx]">
-                  <View
-                    className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]"
-                    onClick={() => openTimePickerFlow(ts.id)}
-                  >
-                    <Text className="text-[26rpx] text-foreground">
-                      {ts.start}-{ts.end}
-                    </Text>
-                  </View>
-                  {timeSlots.length > 1 ? (
-                    <View
-                      className="flex h-[44rpx] w-[44rpx] items-center justify-center rounded-full bg-error/10"
-                      onClick={() => removeTimeSlot(ts.id)}
-                    >
-                      <Icon name="mdi-close" size={20} color="error" />
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
-          <Text className="mt-[16rpx] block text-[22rpx] text-muted-foreground">
-            点击上方日期或时间进行单独修改。
-          </Text>
-          {allowMultiTimeSlots ? (
-            <View
-              className="mt-[16rpx] flex items-center justify-center gap-[8rpx] py-[8rpx]"
-              onClick={() => openTimePickerFlow()}
-            >
-              <Icon name="mdi-plus" size={28} color="primary" />
-              <Text className="text-[26rpx] text-primary">添加时间段</Text>
-            </View>
-          ) : null}
-        </>
-      ) : (
-        <View
-          className="flex min-h-[260rpx] flex-col items-center justify-center rounded-[16rpx] border-[2rpx] border-dashed border-border bg-muted/60"
-          onClick={() => openTimePickerFlow()}
-        >
-          <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-primary shadow-md">
-            <Icon name="mdi-plus" size={40} color="#ffffff" />
-          </View>
-          <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">添加上课时间</Text>
-        </View>
-      )}
-    </View>
+    <ScheduleFormTimeSlots
+      title={title}
+      schedulingMode={schedulingMode}
+      hasRealTimeSlots={hasRealTimeSlots}
+      timeSlots={timeSlots}
+      timeDisplayDateLabel={timeDisplayDateLabel}
+      allowMultiTimeSlots={allowMultiTimeSlots}
+      onOpenFreeCalendar={openFreeCalendar}
+      onOpenRuleCalendar={() => setCalendarVisible(true)}
+      onOpenTimePicker={(slotId) => openTimePickerFlow(slotId)}
+      onRemoveTimeSlot={removeTimeSlot}
+    />
   );
 
   return (
