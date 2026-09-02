@@ -112,6 +112,11 @@ const CampusInviteLanding: React.FC = () => {
       const result = await campusInviteService.accept(inviteCode);
       consumePendingCampusInviteCode();
       clearIdentitySelectionPending();
+      try {
+        Taro.removeStorageSync(LOGIN_REDIRECT_KEY);
+      } catch {
+        /* ignore */
+      }
       await refreshProfile();
       const { profile: latestProfile } = await getSession();
       Taro.showToast({

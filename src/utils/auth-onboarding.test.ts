@@ -4,6 +4,7 @@ import type { Profile } from '@/types/profile';
 
 vi.mock('@/utils/route-guard', () => ({
   navigateAfterLogin: vi.fn(),
+  LOGIN_REDIRECT_KEY: 'loginRedirectPath',
 }));
 
 vi.mock('@/services/store-entry', () => ({
@@ -289,8 +290,13 @@ describe('auth-onboarding', () => {
 
     const { storePendingCampusInviteCode, PENDING_CAMPUS_INVITE_CODE_KEY } =
       await import('@/utils/invite-staff-link');
+    const { LOGIN_REDIRECT_KEY } = await import('@/utils/route-guard');
     Taro.removeStorageSync(PENDING_CAMPUS_INVITE_CODE_KEY);
     storePendingCampusInviteCode('EABC12345');
+    Taro.setStorageSync(
+      LOGIN_REDIRECT_KEY,
+      '/package-auth/pages/campus-invite-landing/index?code=EABC12345',
+    );
 
     const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
     const { navigateAfterLogin } = await import('@/utils/route-guard');
@@ -317,6 +323,8 @@ describe('auth-onboarding', () => {
       }),
     );
     expect(navigateAfterLogin).not.toHaveBeenCalled();
+    // 须清 loginRedirect，否则 accept 后再 navigateAfterLogin 会打回落地页
+    expect(Taro.getStorageSync(LOGIN_REDIRECT_KEY) || '').toBe('');
     Taro.removeStorageSync(PENDING_CAMPUS_INVITE_CODE_KEY);
   });
 

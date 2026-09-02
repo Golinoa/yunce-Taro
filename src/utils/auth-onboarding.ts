@@ -15,7 +15,7 @@ import {
   hasPendingCampusInviteCode,
 } from '@/utils/invite-staff-link';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
-import { navigateAfterLogin } from '@/utils/route-guard';
+import { LOGIN_REDIRECT_KEY, navigateAfterLogin } from '@/utils/route-guard';
 import {
   fetchStoreEntryLatestCached,
   isStoreEntryManagerRole,
@@ -227,6 +227,12 @@ export async function navigateAfterAuth(
     const campusCode = getPendingCampusInviteCode();
     if (campusCode) {
       clearIdentitySelectionPending();
+      // 已主动回落地页：清掉 loginRedirect，避免 accept 后再被 navigateAfterLogin 打回邀请页
+      try {
+        Taro.removeStorageSync(LOGIN_REDIRECT_KEY);
+      } catch {
+        /* ignore */
+      }
       redirectWithFailFallback(buildCampusInvitePath(campusCode));
       return;
     }
