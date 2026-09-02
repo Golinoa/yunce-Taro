@@ -63,8 +63,8 @@
 | Q2-2 | 🔄 进行中 | `896fd0a` · `backup/taro-a-plus-q2-2-checkin-2026-09-02`：CheckinCard / checkin-status / StudentEditSheet；提交 handler 仍在页内 |
 | Q2-1 | ✅ 起步 | `6f722fb` · `backup/taro-a-plus-q2-1-card-helpers-2026-09-02`：schedule-card-actions/status + 单测 |
 | Q2-3 | ✅ 起步 | `f1d6b98` · `backup/taro-a-plus-q2-3-form-helpers-2026-09-02`：time / teacher-selection / YesNoToggle |
-| Q2-4 | ✅ | `auth-email`；`notification` / `student-parents` / `leave` / **`package`** 从 student 抽出 |
-| Q2-2 | 🔄 | Checkin UI + notify helper + **lesson-operate**；提交 handler 仍在页内 |
+| Q2-4 | ✅ | student 神文件继续拆：`package` / `lesson-record` / `class` / leave / notification / parents |
+| Q2-2 | 🔄 | Checkin UI + notify + lesson-operate；提交 handler 仍在页内 |
 | Q2-5 | ✅ | `82567c0` · … |
 
 ### Wave 3 进度
@@ -75,7 +75,7 @@
 | Q3-5 | ✅ 起步 | coverage include 热路径 |
 | Q3-1/2/4 | ⏳ | |
 
-下一节点：续拆 class/schedule service；lesson-form 提交模块；真机门禁。
+下一节点：续拆 `scheduleService`；lesson-form 提交模块；真机门禁。
 
 ---
 

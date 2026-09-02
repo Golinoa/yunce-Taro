@@ -4,12 +4,12 @@
  */
 export {
   studentService,
-  lessonRecordService,
-  classService,
   scheduleService,
   formatDateCN,
 } from './student';
 export { packageService, packageTemplateService, invalidatePackagesCache } from './package';
+export { lessonRecordService } from './lesson-record';
+export { classService } from './class';
 export { leaveService } from './leave';
 export { notificationService } from './notification';
 export { studentParentService } from './student-parents';
