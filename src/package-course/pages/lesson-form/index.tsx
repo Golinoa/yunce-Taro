@@ -1,7 +1,8 @@
 import { View, Text, Input, Picker, Textarea, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createSubmitLock } from '@/utils/submit-lock';
 import ActionButton from '@/components/ActionButton';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
@@ -576,6 +577,8 @@ const LessonForm: React.FC = () => {
   const [homeworkImages, setHomeworkImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** G1-1：同步锁，挡住 setState 生效前的连点双提交 */
+  const submitLockRef = useRef(createSubmitLock());
 
   // ===== 校区 / 教室 =====
   const { currentCampusId } = useCampusStore();
@@ -1844,6 +1847,7 @@ const LessonForm: React.FC = () => {
       return;
     }
 
+    if (!submitLockRef.current.tryAcquire()) return;
     setSubmitting(true);
     const successNames: string[] = [];
     const failList: { name: string; reason: string }[] = [];
@@ -1896,6 +1900,7 @@ const LessonForm: React.FC = () => {
       logError('handleSupplementSave', error);
       Taro.showToast({ title: '补录失败，请重试', icon: 'none' });
     } finally {
+      submitLockRef.current.release();
       setSubmitting(false);
     }
   }, [
@@ -1944,6 +1949,7 @@ const LessonForm: React.FC = () => {
       return;
     }
 
+    if (!submitLockRef.current.tryAcquire()) return;
     setSubmitting(true);
     const successNames: string[] = [];
     const failList: { name: string; reason: string }[] = [];
@@ -1983,6 +1989,7 @@ const LessonForm: React.FC = () => {
       logError('handleIncrementalEditSave', error);
       Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
     } finally {
+      submitLockRef.current.release();
       setSubmitting(false);
     }
   }, [
@@ -2010,6 +2017,7 @@ const LessonForm: React.FC = () => {
       return;
     }
 
+    if (!submitLockRef.current.tryAcquire()) return;
     setSubmitting(true);
     try {
       const lessonDateValue = lessonDate;
@@ -2068,6 +2076,7 @@ const LessonForm: React.FC = () => {
       logError('submit lesson', err);
       Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
     } finally {
+      submitLockRef.current.release();
       setSubmitting(false);
     }
   }, [
@@ -2124,6 +2133,7 @@ const LessonForm: React.FC = () => {
       return;
     }
 
+    if (!submitLockRef.current.tryAcquire()) return;
     setSubmitting(true);
     let successCount = 0;
     const failList: { name: string; reason: string }[] = [];
@@ -2356,6 +2366,7 @@ const LessonForm: React.FC = () => {
       logError('class submit', err);
       Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
     } finally {
+      submitLockRef.current.release();
       setSubmitting(false);
     }
   }, [
