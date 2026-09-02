@@ -66,12 +66,25 @@ import {
   canSuspendThisLesson,
   parseTimeToMinutes,
 } from '@/utils/schedule-guard';
+import {
+  getCardActionVisibility,
+  isHistoricalClassCard,
+  isUpcomingClassCard,
+} from '@/utils/schedule-card-actions';
+import {
+  getClassCardStatusRank,
+  getDurationText,
+  getTeacherNames,
+  getWeekdayText,
+  isBookingSchedule,
+  resolveScheduleStatus,
+  type ScheduleCardStatus,
+} from '@/utils/schedule-card-status';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
 
-type ScheduleCardStatus = 'urgent' | 'upcoming' | 'active' | 'done' | 'ended' | 'cancelled';
 type BatchActionType = 'reschedule' | 'delete';
 type ScheduleDangerActionType = 'cancel' | 'delete' | 'batch-delete';
 
@@ -134,7 +147,6 @@ interface ScheduleDangerActionState {
   item: ScheduleCardItem | null;
 }
 
-const FULL_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'] as const;
 const FILTER_ALL_CLASS = '';
 const SCHEDULE_CARD_SWIPER_DURATION = 260;
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
@@ -158,292 +170,6 @@ const getTabContainerWidth = (tabCount: number): number =>
 function rpxToPx(rpx: number): number {
   const { windowWidth } = Taro.getWindowInfo();
   return (rpx * windowWidth) / 750;
-}
-
-function getDurationText(startTime: string, endTime: string): string {
-  const minutes = parseTimeToMinutes(endTime) - parseTimeToMinutes(startTime);
-  if (minutes <= 0) return '';
-  return `${minutes}'`;
-}
-
-function getCountdownText(diffMinutes: number): string | undefined {
-  if (diffMinutes <= 0 || diffMinutes > 30) {
-    return undefined;
-  }
-  return diffMinutes <= 5 ? `还有${diffMinutes}分钟开课` : `${diffMinutes}分钟后开课`;
-}
-
-function getTeacherNames(
-  classInfo: Class | undefined,
-  teacherById: Record<string, TeacherUIModel>,
-  fallbackTeacherName: string,
-  schedule?: Pick<Schedule, 'assistant_teacher_id' | 'assistant_teacher_name' | 'teacher_id'>,
-) {
-  const teacherIds = classInfo?.teachers?.length
-    ? classInfo.teachers
-    : classInfo?.teacher_id
-      ? [classInfo.teacher_id]
-      : [];
-  const teachers = teacherIds
-    .map((id) => teacherById[id])
-    .filter((teacher): teacher is TeacherUIModel => Boolean(teacher));
-  const leadTeacher =
-    teachers.find((teacher) => teacher.role !== 'assist') ||
-    teachers[0] ||
-    (classInfo?.teacher_id ? teacherById[classInfo.teacher_id] : undefined) ||
-    (schedule?.teacher_id ? teacherById[schedule.teacher_id] : undefined);
-  const assistantFromClass =
-    teachers.find((teacher) => teacher.role === 'assist' && teacher.id !== leadTeacher?.id) ||
-    undefined;
-  const assistantFromSchedule = schedule?.assistant_teacher_id
-    ? teacherById[schedule.assistant_teacher_id]
-    : undefined;
-  const assistantTeacherName =
-    assistantFromClass?.name ||
-    assistantFromSchedule?.name ||
-    schedule?.assistant_teacher_name ||
-    undefined;
-
-  return {
-    leadTeacherName: leadTeacher?.name || fallbackTeacherName || '未分配主讲',
-    assistantTeacherName:
-      assistantTeacherName && assistantTeacherName !== leadTeacher?.name
-        ? assistantTeacherName
-        : undefined,
-  };
-}
-
-/** 同一天：已开始（含上课中）在上，已下课在下；组内按开课时间 */
-function getClassCardStatusRank(status: ScheduleCardStatus): number {
-  switch (status) {
-    case 'active':
-      return 0;
-    case 'urgent':
-      return 1;
-    case 'upcoming':
-      return 2;
-    case 'done':
-      return 3;
-    case 'ended':
-      return 4;
-    case 'cancelled':
-      return 5;
-    default:
-      return 6;
-  }
-}
-
-function resolveScheduleStatus(params: {
-  selectedDate: dayjs.Dayjs;
-  startTime: string;
-  endTime: string;
-  records: LessonRecord[];
-  totalCount: number;
-  now: dayjs.Dayjs;
-}) {
-  const { selectedDate, startTime, endTime, records, totalCount, now } = params;
-  const selectedDateStr = selectedDate.format('YYYY-MM-DD');
-  const todayStr = now.format('YYYY-MM-DD');
-  const checkedCount = new Set(
-    records
-      .filter((record) => ['normal', 'makeup'].includes(record.status || 'normal'))
-      .map((record) => record.student_id),
-  ).size;
-  const recordedCount = new Set(
-    records.filter((record) => record.status !== 'cancelled').map((record) => record.student_id),
-  ).size;
-  const hasCancelled =
-    records.length > 0 && records.every((record) => record.status === 'cancelled');
-  const hasMakeup = records.some((record) => record.status === 'makeup');
-  const attendanceCompleted = totalCount > 0 ? recordedCount >= totalCount : checkedCount > 0;
-
-  if (hasCancelled) {
-    return {
-      status: 'cancelled' as const,
-      checkedCount,
-      hintText: '本次课程已取消，不扣减课时',
-      countdownText: undefined,
-      tags: ['取消'],
-      hasMakeup,
-    };
-  }
-
-  if (selectedDateStr < todayStr) {
-    if (checkedCount > 0 || attendanceCompleted) {
-      return {
-        status: 'done' as const,
-        checkedCount,
-        hintText:
-          totalCount > 0
-            ? `已完成 ${checkedCount}/${totalCount} 人消课`
-            : `已完成 ${checkedCount} 条消课记录`,
-        countdownText: undefined,
-        tags: [],
-        hasMakeup,
-      };
-    }
-
-    return {
-      status: 'ended' as const,
-      checkedCount,
-      hintText: '已下课，尚未登记消课记录',
-      countdownText: undefined,
-      tags: [],
-      hasMakeup,
-    };
-  }
-
-  if (selectedDateStr > todayStr) {
-    return {
-      status: 'upcoming' as const,
-      checkedCount,
-      countdownText: undefined,
-      hasMakeup,
-    };
-  }
-
-  // 当天课程一旦生成消课记录，就视为老师已完成点名，立即切换到查看态。
-  if (checkedCount > 0 || attendanceCompleted) {
-    return {
-      status: 'done' as const,
-      checkedCount,
-      countdownText: undefined,
-      hasMakeup,
-    };
-  }
-
-  const nowMinutes = now.hour() * 60 + now.minute();
-  const startMinutes = parseTimeToMinutes(startTime);
-  const endMinutes = parseTimeToMinutes(endTime);
-  const diffMinutes = startMinutes - nowMinutes;
-
-  if (nowMinutes < startMinutes) {
-    const urgent = diffMinutes <= 30;
-    return {
-      status: urgent ? ('urgent' as const) : ('upcoming' as const),
-      checkedCount,
-      countdownText: getCountdownText(diffMinutes),
-      hasMakeup,
-    };
-  }
-
-  if (nowMinutes >= startMinutes && nowMinutes <= endMinutes) {
-    return {
-      status: 'active' as const,
-      checkedCount,
-      countdownText: undefined,
-      hasMakeup,
-    };
-  }
-
-  return {
-    status: 'ended' as const,
-    checkedCount,
-    countdownText: undefined,
-    hasMakeup,
-  };
-}
-
-function getWeekdayText(dayOfWeek: Schedule['day_of_week']): string {
-  return FULL_WEEKDAY_LABELS[dayOfWeek - 1];
-}
-
-function isPastScheduleDate(selectedDate: dayjs.Dayjs, now: dayjs.Dayjs): boolean {
-  return selectedDate.isBefore(now, 'day');
-}
-
-function canCancelLessonButton(
-  selectedDate: dayjs.Dayjs,
-  startTime: string,
-  now: dayjs.Dayjs,
-): boolean {
-  void startTime;
-  return !isPastScheduleDate(selectedDate, now);
-}
-
-function shouldShowCancelLessonAction(
-  item: Pick<ScheduleCardItem, 'canCancelLesson' | 'status' | 'startTime'>,
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-): boolean {
-  if (!item.canCancelLesson || item.status === 'cancelled' || item.status === 'done') {
-    return false;
-  }
-  return canCancelLessonButton(selectedDate, item.startTime, now);
-}
-
-function shouldShowEditAndRescheduleButtons(
-  selectedDate: dayjs.Dayjs,
-  startTime: string,
-  now: dayjs.Dayjs,
-  isTemporaryAdjusted: boolean,
-  status: ScheduleCardStatus,
-): boolean {
-  void startTime;
-  void isTemporaryAdjusted;
-  if (status === 'done' || status === 'cancelled') {
-    return false;
-  }
-  return !isPastScheduleDate(selectedDate, now);
-}
-
-function shouldShowDeleteButton(
-  selectedDate: dayjs.Dayjs,
-  startTime: string,
-  now: dayjs.Dayjs,
-  isTemporaryAdjusted: boolean,
-): boolean {
-  void selectedDate;
-  void startTime;
-  void now;
-  void isTemporaryAdjusted;
-  return true;
-}
-
-function getCardActionVisibility(
-  item: Pick<ScheduleCardItem, 'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'>,
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-) {
-  // 普通课按钮按“过去 / 非过去”决定主按钮；删除规则对普通课始终保留。
-  return {
-    canManageBeforeStart: !isPastScheduleDate(selectedDate, now),
-    showEditAndReschedule: shouldShowEditAndRescheduleButtons(
-      selectedDate,
-      item.startTime,
-      now,
-      Boolean(item.isTemporaryAdjusted),
-      item.status,
-    ),
-    showCancelLesson: shouldShowCancelLessonAction(item, selectedDate, now),
-    showDelete: shouldShowDeleteButton(
-      selectedDate,
-      item.startTime,
-      now,
-      Boolean(item.isTemporaryAdjusted),
-    ),
-  };
-}
-
-/** 历史课：已过日期，或当日已下课/已点名 */
-function isHistoricalClassCard(
-  status: ScheduleCardItem['status'],
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-): boolean {
-  if (selectedDate.isBefore(now, 'day')) return true;
-  return status === 'done' || status === 'ended';
-}
-
-/** 未开课（未来或今日未开始）：可约试听/补课 / 点名 / 编辑 */
-function isUpcomingClassCard(status: ScheduleCardItem['status']): boolean {
-  return status === 'upcoming' || status === 'urgent';
-}
-
-/** 历史课可操作窗口：上课日起 30 天内可补录；超时仅可查看（逻辑见 utils/schedule-guard） */
-
-function isBookingSchedule(schedule: Schedule): boolean {
-  return Boolean(schedule.tag || schedule.student_id);
 }
 
 /**

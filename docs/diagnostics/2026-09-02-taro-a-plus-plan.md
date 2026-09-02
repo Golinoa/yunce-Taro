@@ -60,11 +60,11 @@
 
 | ID | 状态 | 说明 |
 |----|------|------|
-| Q2-2 | 🔄 进行中 | 已抽出 `CheckinCard` / `checkin-status` / `StudentEditSheet`；防重入见 G1-1；提交 handler 仍在页内 |
-| Q2-1 | ⏳ | schedule 拆分 |
+| Q2-2 | 🔄 进行中 | `896fd0a` · `backup/taro-a-plus-q2-2-checkin-2026-09-02`：CheckinCard / checkin-status / StudentEditSheet；提交 handler 仍在页内 |
+| Q2-1 | 🔄 进行中 | 抽出 `schedule-card-actions` / `schedule-card-status` + 单测 |
 | Q2-3/4/5 | ⏳ | |
 
-下一节点：继续 Q2-2 提交模块 / 或 Q2-1。
+下一节点：Q2-1 续拆 / Q2-3 schedule-form / 热路径 notWired。
 
 ---
 
