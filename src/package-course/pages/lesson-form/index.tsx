@@ -20,7 +20,6 @@ import {
   packageService,
   lessonRecordService,
   leaveService,
-  notificationService,
   classService,
   subjectService,
   uploadService,
@@ -29,7 +28,6 @@ import {
   subscribeMessageService,
   makeupBookingService,
 } from '@/services';
-import { auditLogService } from '@/services/audit-log';
 import { campusService, roomService } from '@/services/campus';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
@@ -45,7 +43,6 @@ import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { chooseImageTemp } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
-import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { runImageUploadFlow } from '@/utils/upload-flow';
@@ -58,6 +55,14 @@ import {
 } from './checkin-status';
 import StudentEditSheet from './StudentEditSheet';
 import { getLessonRecordPriority, isWithinLessonOperateWindow } from './lesson-operate';
+import { executeClassSubmit } from './lesson-submit-class';
+import { executeSingleDeduct } from './lesson-submit-single';
+import {
+  executeIncrementalEditSave,
+  executeSupplementSave,
+} from './lesson-submit-supplement';
+import { resolveLessonSubmitKind } from './lesson-submit';
+
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -1359,94 +1364,26 @@ const LessonForm: React.FC = () => {
     [emitScheduleRefreshSignal, loadClassStudents, selectedClassId],
   );
 
-  const persistStudentAttendanceRecord = useCallback(
-    async (
-      student: Student,
-      status: CheckinStatus,
-      options: { isSupplement?: boolean } = {},
-    ): Promise<void> => {
-      const existingRecord = recordByStudentId.get(student.id);
-      if (existingRecord) {
-        await lessonRecordService.remove(existingRecord.id);
-      }
-
-      const lessonDateValue = lessonDate;
-      const basePayload = {
-        teacher_id: selectedTeachingTeacherId || currentTeacherId,
-        operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-        assistant_teacher_id: selectedAssistantTeacherId || undefined,
-        student_id: student.id,
-        class_id: selectedClassId,
-        lesson_date: lessonDateValue,
-        campus_id: campusId || undefined,
-        room: room || undefined,
-      };
-
-      if (status === 'checked') {
-        const pkg = studentPackages.get(student.id);
-        if (!pkg) {
-          throw new Error(`${student.name}：无可用课包`);
-        }
-
-        const studentSubject = studentSubjects.get(student.id);
-        const isCrossSubject =
-          !!pkg.subject_id && !!studentSubject && pkg.subject_id !== studentSubject.id;
-
-        const createdRecord = await lessonRecordService.create({
-          ...basePayload,
-          package_id: pkg.id,
-          hours_used: hoursUsed,
-          status: options.isSupplement || makeupStudentIds.has(student.id) ? 'makeup' : 'normal',
-          is_cross_subject: isCrossSubject || undefined,
-          package_subject: isCrossSubject ? pkg.name : undefined,
-          class_subject: isCrossSubject ? studentSubject?.name : undefined,
-          content: options.isSupplement ? '补录签到' : content.trim() || undefined,
-          // 单学员备注：草稿优先，其次保留原记录的备注（增量编辑时记录被 remove 重建，不能丢）
-          note: studentRemarkDrafts[student.id] || existingRecord?.note || undefined,
-          performance: performance > 0 ? `${performance}星` : undefined,
-          homework: homework.trim() || undefined,
-          homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
-        });
-
-        await notifyStudentParentsSafe({
-          studentId: student.id,
-          senderId: profile?.id || '',
-          title: options.isSupplement
-            ? `${student.name} 已补录签到`
-            : `${student.name} 课时已核销`,
-          content: options.isSupplement
-            ? `${lessonDateValue} 已补录 ${hoursUsed} 课时，剩余 ${
-                createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
-              } 课时`
-            : `本次核销 ${hoursUsed} 课时，剩余 ${
-                createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)
-              } 课时`,
-          logLabel: 'lesson-form notify parents after checkin',
-        });
-        return;
-      }
-
-      if (status === 'leave') {
-        await lessonRecordService.create({
-          ...basePayload,
-          package_id: '',
-          hours_used: 0,
-          status: 'leave',
-          content: options.isSupplement ? '补录请假' : '家长已请假，本节课自动记为请假',
-          note: studentRemarkDrafts[student.id] || existingRecord?.note || undefined,
-        });
-        return;
-      }
-
-      await lessonRecordService.create({
-        ...basePayload,
-        package_id: '',
-        hours_used: 0,
-        status: 'absent',
-        content: options.isSupplement ? '补录未到' : '点名未到，待老师后续补录签到',
-        note: studentRemarkDrafts[student.id] || existingRecord?.note || undefined,
-      });
-    },
+  const buildPersistShared = useCallback(
+    () => ({
+      lessonDate,
+      hoursUsed,
+      selectedClassId,
+      selectedTeachingTeacherId,
+      currentTeacherId,
+      selectedAssistantTeacherId,
+      campusId,
+      room,
+      content,
+      performance,
+      homework,
+      homeworkImages,
+      studentPackages,
+      studentSubjects,
+      studentRemarkDrafts,
+      makeupStudentIds,
+      senderId: profile?.id || '',
+    }),
     [
       campusId,
       content,
@@ -1455,9 +1392,9 @@ const LessonForm: React.FC = () => {
       homeworkImages,
       hoursUsed,
       lessonDate,
+      makeupStudentIds,
       performance,
       profile?.id,
-      recordByStudentId,
       room,
       selectedAssistantTeacherId,
       selectedClassId,
@@ -1465,270 +1402,97 @@ const LessonForm: React.FC = () => {
       studentPackages,
       studentRemarkDrafts,
       studentSubjects,
-      makeupStudentIds,
     ],
   );
 
+  const batchSaveUi = useMemo(
+    () => ({
+      submitLock: submitLockRef.current,
+      setSubmitting,
+      invalidateStudents,
+      currentUserId,
+      onSuccess: handleAttendanceSaveSuccess,
+    }),
+    [currentUserId, handleAttendanceSaveSuccess, invalidateStudents],
+  );
+
   const handleSupplementSave = useCallback(async () => {
-    if (!selectedClassId) {
-      Taro.showToast({ title: '请选择班级', icon: 'none' });
-      return;
-    }
-    if (supplementStudentIds.size === 0) {
-      Taro.showToast({ title: '请先补录学员', icon: 'none' });
-      return;
-    }
-    if (hoursUsed <= 0) {
-      Taro.showToast({ title: '消课课时必须大于0', icon: 'none' });
-      return;
-    }
-
-    const supplementStudents = classStudents.filter((student) =>
-      supplementStudentIds.has(student.id),
-    );
-    const checkedCount = supplementStudents.filter((student) =>
-      checkedStudentIds.has(student.id),
-    ).length;
-
-    const confirmResult = await Taro.showModal({
-      title: '确认补录',
-      content: `将为 ${supplementStudents.length} 名学员追加本节课记录（签到 ${checkedCount} 人），不影响原有已点名学员。`,
-      confirmText: '保存补录',
-      confirmColor: '#3B6EF5',
+    await executeSupplementSave({
+      selectedClassId,
+      supplementStudentIds,
+      checkedStudentIds,
+      classStudents,
+      hoursUsed,
+      getStatus: getStudentCheckinStatus,
+      getExistingRecord: (studentId) => recordByStudentId.get(studentId),
+      shared: buildPersistShared(),
+      operator: {
+        id: currentUserId || profile?.id || '',
+        name: profile?.name || '未知',
+        role: profile?.currentContext?.role || 'unknown',
+      },
+      ui: batchSaveUi,
     });
-    if (!confirmResult.confirm) {
-      return;
-    }
-
-    if (!submitLockRef.current.tryAcquire()) return;
-    setSubmitting(true);
-    const successNames: string[] = [];
-    const failList: { name: string; reason: string }[] = [];
-
-    try {
-      for (const student of supplementStudents) {
-        const status = getStudentCheckinStatus(student.id);
-        try {
-          await persistStudentAttendanceRecord(student, status, { isSupplement: true });
-          successNames.push(student.name);
-        } catch (error) {
-          logError('supplement single student', error);
-          failList.push({
-            name: student.name,
-            reason: error instanceof Error ? error.message : '补录失败',
-          });
-        }
-      }
-
-      if (successNames.length > 0) {
-        try {
-          await auditLogService.record({
-            action: 'lesson.record',
-            operatorId: currentUserId || profile?.id || '',
-            operatorName: profile?.name || '未知',
-            operatorRole: profile?.currentContext?.role || 'unknown',
-            targetType: 'lesson_record',
-            detail: `补录签到：${successNames.join('、')}`,
-            meta: { count: successNames.length, names: successNames, hours: hoursUsed },
-          });
-        } catch (error) {
-          logError('audit supplement lesson.record', error);
-        }
-        invalidateStudents(currentUserId);
-      }
-
-      if (failList.length === 0) {
-        await handleAttendanceSaveSuccess(`已补录 ${successNames.length} 人`);
-      } else if (successNames.length === 0) {
-        Taro.showToast({ title: failList[0]?.reason || '补录失败', icon: 'none' });
-      } else {
-        Taro.showToast({
-          title: `${successNames.length}人成功，${failList.length}人失败`,
-          icon: 'none',
-          duration: 3000,
-        });
-        await handleAttendanceSaveSuccess(`已补录 ${successNames.length} 人`);
-      }
-    } catch (error) {
-      logError('handleSupplementSave', error);
-      Taro.showToast({ title: '补录失败，请重试', icon: 'none' });
-    } finally {
-      submitLockRef.current.release();
-      setSubmitting(false);
-    }
   }, [
+    batchSaveUi,
+    buildPersistShared,
     checkedStudentIds,
     classStudents,
     currentUserId,
     getStudentCheckinStatus,
-    handleAttendanceSaveSuccess,
     hoursUsed,
-    invalidateStudents,
-    persistStudentAttendanceRecord,
     profile,
+    recordByStudentId,
     selectedClassId,
     supplementStudentIds,
   ]);
 
   const handleIncrementalEditSave = useCallback(async () => {
-    if (!selectedClassId) {
-      Taro.showToast({ title: '请选择班级', icon: 'none' });
-      return;
-    }
-    if (hoursUsed <= 0) {
-      Taro.showToast({ title: '消课课时必须大于0', icon: 'none' });
-      return;
-    }
-
-    const changedStudents = classStudents.filter((student) => {
-      const currentStatus = getStudentCheckinStatus(student.id);
-      const baselineStatus = attendanceBaseline.get(student.id) || 'absent';
-      return currentStatus !== baselineStatus;
+    await executeIncrementalEditSave({
+      selectedClassId,
+      classStudents,
+      hoursUsed,
+      attendanceBaseline,
+      getStatus: getStudentCheckinStatus,
+      getExistingRecord: (studentId) => recordByStudentId.get(studentId),
+      shared: buildPersistShared(),
+      onNoChange: () => setAttendanceMode('view'),
+      ui: batchSaveUi,
     });
-
-    if (changedStudents.length === 0) {
-      Taro.showToast({ title: '暂无变更', icon: 'none' });
-      setAttendanceMode('view');
-      return;
-    }
-
-    const confirmResult = await Taro.showModal({
-      title: '确认保存修改',
-      content: `将更新 ${changedStudents.length} 名学员的本节课出勤记录，不影响未变更学员。`,
-      confirmText: '保存修改',
-      confirmColor: '#2563eb',
-    });
-    if (!confirmResult.confirm) {
-      return;
-    }
-
-    if (!submitLockRef.current.tryAcquire()) return;
-    setSubmitting(true);
-    const successNames: string[] = [];
-    const failList: { name: string; reason: string }[] = [];
-
-    try {
-      for (const student of changedStudents) {
-        const status = getStudentCheckinStatus(student.id);
-        try {
-          await persistStudentAttendanceRecord(student, status);
-          successNames.push(student.name);
-        } catch (error) {
-          logError('incremental edit single student', error);
-          failList.push({
-            name: student.name,
-            reason: error instanceof Error ? error.message : '保存失败',
-          });
-        }
-      }
-
-      if (successNames.length > 0) {
-        invalidateStudents(currentUserId);
-      }
-
-      if (failList.length === 0) {
-        await handleAttendanceSaveSuccess(`已更新 ${successNames.length} 人`);
-      } else if (successNames.length === 0) {
-        Taro.showToast({ title: failList[0]?.reason || '保存失败', icon: 'none' });
-      } else {
-        Taro.showToast({
-          title: `${successNames.length}人成功，${failList.length}人失败`,
-          icon: 'none',
-          duration: 3000,
-        });
-        await handleAttendanceSaveSuccess(`已更新 ${successNames.length} 人`);
-      }
-    } catch (error) {
-      logError('handleIncrementalEditSave', error);
-      Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
-    } finally {
-      submitLockRef.current.release();
-      setSubmitting(false);
-    }
   }, [
     attendanceBaseline,
+    batchSaveUi,
+    buildPersistShared,
     classStudents,
-    currentUserId,
     getStudentCheckinStatus,
-    handleAttendanceSaveSuccess,
     hoursUsed,
-    invalidateStudents,
-    persistStudentAttendanceRecord,
+    recordByStudentId,
     selectedClassId,
   ]);
+
   const handleSingleSubmit = useCallback(async () => {
-    if (!selectedStudent) {
-      Taro.showToast({ title: '请选择学生', icon: 'none' });
-      return;
-    }
-    if (!matchedPackage) {
-      Taro.showToast({ title: '没有可用课包', icon: 'none' });
-      return;
-    }
-    if (hoursUsed <= 0) {
-      Taro.showToast({ title: '消课课时必须大于0', icon: 'none' });
-      return;
-    }
-
-    if (!submitLockRef.current.tryAcquire()) return;
-    setSubmitting(true);
-    try {
-      const lessonDateValue = lessonDate;
-
-      // 单人快速消课无班级上下文，不存在「课包科目与班级不一致」
-      const createdRecord = await lessonRecordService.create({
-        teacher_id: selectedTeachingTeacherId || currentTeacherId,
-        operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-        student_id: selectedStudent.id,
-        package_id: matchedPackage.id,
-        lesson_date: lessonDateValue,
-        hours_used: hoursUsed,
-        content: content.trim() || undefined,
-        performance: performance > 0 ? `${performance}星` : undefined,
-        homework: homework.trim() || undefined,
-        homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
-        campus_id: campusId || undefined,
-        room: room || undefined,
-      });
-
-      await notifyStudentParentsSafe({
-        studentId: selectedStudent.id,
-        senderId: profile?.id || '',
-        title: `${selectedStudent.name} 课时已消课`,
-        content: `本次消课 ${hoursUsed} 课时，剩余 ${createdRecord.remaining_hours ?? Math.max(matchedPackage.remaining_hours - hoursUsed, 0)} 课时`,
-        logLabel: 'lesson-form notify parents after single deduct',
-      });
-
-      invalidateStudents(currentUserId);
-      // 审计日志（用户口径 2026-08-22）：单人消课属重要日志
-      try {
-        await auditLogService.record({
-          action: 'lesson.record',
-          operatorId: currentUserId || profile?.id || '',
-          operatorName: profile?.name || '未知',
-          operatorRole: profile?.currentContext?.role || 'unknown',
-          targetType: 'lesson_record',
-          targetId: createdRecord.id,
-          detail: `单人消课：学员「${selectedStudent.name}」消课 ${hoursUsed} 课时（课包「${matchedPackage?.name || matchedPackage.id}」）`,
-          meta: {
-            studentId: selectedStudent.id,
-            studentName: selectedStudent.name,
-            packageId: matchedPackage.id,
-            hours: hoursUsed,
-          },
-        });
-      } catch (e) {
-        logError('audit lesson.record', e);
-      }
-      // （预警提醒走首页待办事项：扣课时后剩余降到阈值 → 首页「课时续费提醒」待办，手动点已读）
-      handleSubmitSuccessReturn('消课成功', 'success', 1800, { renewSubscribe: true });
-    } catch (err) {
-      logError('submit lesson', err);
-      Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
-    } finally {
-      submitLockRef.current.release();
-      setSubmitting(false);
-    }
+    await executeSingleDeduct({
+      selectedStudent,
+      matchedPackage,
+      hoursUsed,
+      lessonDate,
+      selectedTeachingTeacherId,
+      currentTeacherId,
+      currentUserId,
+      content,
+      performance,
+      homework,
+      homeworkImages,
+      campusId,
+      room,
+      profile,
+      submitLock: submitLockRef.current,
+      setSubmitting,
+      invalidateStudents,
+      onSuccess: () => {
+        void handleSubmitSuccessReturn('消课成功', 'success', 1800, { renewSubscribe: true });
+      },
+    });
   }, [
     selectedStudent,
     matchedPackage,
@@ -1748,274 +1512,44 @@ const LessonForm: React.FC = () => {
     room,
   ]);
 
-  // ===== 班级模式：提交点名 =====
   const handleClassSubmit = useCallback(async () => {
-    if (!selectedClassId) {
-      Taro.showToast({ title: '请选择班级', icon: 'none' });
-      return;
-    }
-    if (classStudents.length === 0 && trialBookings.length === 0) {
-      Taro.showToast({ title: '班级内暂无学员', icon: 'none' });
-      return;
-    }
-    if (hoursUsed <= 0) {
-      Taro.showToast({ title: '消课课时必须大于0', icon: 'none' });
-      return;
-    }
-
-    const trialSummary =
-      trialBookings.length > 0
-        ? `；试听学员签到${presentTrialBookings.length}名，未到${absentTrialBookings.length}名（不扣课时）`
-        : '';
-    const attendanceSummaryText =
-      presentStudents.length > 0
-        ? `签到${presentStudents.length}名，请假${leaveStudents.length}名，未到${classAbsentCount}名；签到学员每人消课${hoursUsed}课时${trialSummary}。`
-        : `本次无签到学员，将记录请假${leaveStudents.length}名、未到${classAbsentCount}名，不扣减课时${trialSummary}。`;
-
-    const confirmResult = await Taro.showModal({
-      title: '确认消课',
-      content: `确认提交“${selectedClass?.name || '该班级'}”点名结果？\n${attendanceSummaryText}`,
-      confirmText: '确认消课',
-      confirmColor: '#2563eb',
+    await executeClassSubmit({
+      selectedClassId,
+      selectedClassName: selectedClass?.name,
+      classStudents,
+      trialBookings,
+      presentStudents,
+      leaveStudents,
+      absentStudents,
+      presentTrialBookings,
+      leaveTrialBookings,
+      absentTrialBookings,
+      classAbsentCount,
+      hoursUsed,
+      lessonDate,
+      selectedTeachingTeacherId,
+      currentTeacherId,
+      selectedAssistantTeacherId,
+      currentUserId,
+      content,
+      performance,
+      homework,
+      homeworkImages,
+      campusId,
+      room,
+      studentPackages,
+      studentSubjects,
+      studentRemarkDrafts,
+      trialLeadMap,
+      profileId: profile?.id,
+      loadLessonRecordsByDate,
+      submitLock: submitLockRef.current,
+      setSubmitting,
+      invalidateStudents,
+      onSuccess: (title, icon, duration, options) => {
+        void handleSubmitSuccessReturn(title, icon, duration, options);
+      },
     });
-
-    if (!confirmResult.confirm) {
-      return;
-    }
-
-    if (!submitLockRef.current.tryAcquire()) return;
-    setSubmitting(true);
-    let successCount = 0;
-    const failList: { name: string; reason: string }[] = [];
-
-    try {
-      const lessonDateValue = lessonDate;
-      const existingRecords = await loadLessonRecordsByDate();
-      const trialStudentIds = new Set(trialBookings.map((b) => b.trial_student_id));
-      const existingSubmitRecords = existingRecords.filter(
-        (record) =>
-          record.class_id === selectedClassId &&
-          record.lesson_date === lessonDateValue &&
-          (classStudents.some((student) => student.id === record.student_id) ||
-            trialStudentIds.has(record.student_id)),
-      );
-
-      // 点名页按当前表单结果重算整节课出勤，先清理本节课已存在的占位或签到记录，避免重复提交冲突。
-      await Promise.all(
-        existingSubmitRecords
-          .filter((record) =>
-            ['normal', 'makeup', 'leave', 'absent'].includes(record.status || 'normal'),
-          )
-          .map((record) => lessonRecordService.remove(record.id)),
-      );
-
-      for (const student of presentStudents) {
-        const pkg = studentPackages.get(student.id);
-        if (!pkg) {
-          failList.push({ name: student.name, reason: '无可用课包' });
-          continue;
-        }
-
-        try {
-          // 检测跨科目：课包科目与学生其他课包科目不一致
-          const studentSubject = studentSubjects.get(student.id);
-          const isCrossSubject =
-            !!pkg.subject_id && !!studentSubject && pkg.subject_id !== studentSubject.id;
-
-          const createdRecord = await lessonRecordService.create({
-            teacher_id: selectedTeachingTeacherId || currentTeacherId,
-            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-            assistant_teacher_id: selectedAssistantTeacherId || undefined,
-            student_id: student.id,
-            package_id: pkg.id,
-            class_id: selectedClassId,
-            lesson_date: lessonDateValue,
-            hours_used: hoursUsed,
-            is_cross_subject: isCrossSubject || undefined,
-            package_subject: isCrossSubject ? pkg.name : undefined,
-            class_subject: isCrossSubject ? studentSubject?.name : undefined,
-            content: content.trim() || undefined,
-            // 单学员备注：随提交写入（编辑弹窗输入的草稿）
-            note: studentRemarkDrafts[student.id] || undefined,
-            performance: performance > 0 ? `${performance}星` : undefined,
-            homework: homework.trim() || undefined,
-            homework_images: homeworkImages.length > 0 ? homeworkImages : undefined,
-            campus_id: campusId || undefined,
-            room: room || undefined,
-          });
-
-          if (isCrossSubject) {
-            await notificationService.send({
-              sender_id: profile?.id || '',
-              receiver_id: 'principal',
-              title: '跨科目消课提醒',
-              content: `${student.name} 使用「${pkg.name}」课包消课 ${hoursUsed} 课时（班级科目：${studentSubject?.name || '通用'}）`,
-              related_id: student.id,
-            });
-          }
-
-          await notifyStudentParentsSafe({
-            studentId: student.id,
-            senderId: profile?.id || '',
-            title: `${student.name} 课时已核销`,
-            content: `本次核销 ${hoursUsed} 课时，剩余 ${createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - hoursUsed, 0)} 课时`,
-            logLabel: 'lesson-form notify parents after class checkin',
-          });
-
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit single student', err);
-          failList.push({ name: student.name, reason: '消课失败' });
-        }
-      }
-
-      for (const student of leaveStudents) {
-        try {
-          await lessonRecordService.create({
-            teacher_id: selectedTeachingTeacherId || currentTeacherId,
-            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-            assistant_teacher_id: selectedAssistantTeacherId || undefined,
-            student_id: student.id,
-            package_id: '',
-            class_id: selectedClassId,
-            lesson_date: lessonDateValue,
-            hours_used: 0,
-            status: 'leave',
-            content: '家长已请假，本节课自动记为请假',
-            note: studentRemarkDrafts[student.id] || undefined,
-            campus_id: campusId || undefined,
-            room: room || undefined,
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit leave student', err);
-          failList.push({ name: student.name, reason: '请假记录失败' });
-        }
-      }
-
-      for (const student of absentStudents) {
-        try {
-          await lessonRecordService.create({
-            teacher_id: selectedTeachingTeacherId || currentTeacherId,
-            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-            assistant_teacher_id: selectedAssistantTeacherId || undefined,
-            student_id: student.id,
-            package_id: '',
-            class_id: selectedClassId,
-            lesson_date: lessonDateValue,
-            hours_used: 0,
-            status: 'absent',
-            content: '点名未到，待老师后续补录签到',
-            note: studentRemarkDrafts[student.id] || undefined,
-            campus_id: campusId || undefined,
-            room: room || undefined,
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit absent student', err);
-          failList.push({ name: student.name, reason: '未到记录失败' });
-        }
-      }
-
-      // 试听学员：签到不扣课时，请假/未到也记录考勤
-      for (const booking of presentTrialBookings) {
-        const lead = trialLeadMap[booking.lead_id];
-        try {
-          await lessonRecordService.create({
-            teacher_id: selectedTeachingTeacherId || currentTeacherId,
-            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-            assistant_teacher_id: selectedAssistantTeacherId || undefined,
-            student_id: booking.trial_student_id,
-            package_id: '',
-            class_id: selectedClassId,
-            lesson_date: lessonDateValue,
-            hours_used: 0,
-            status: 'normal',
-            content: `试听签到${booking.note ? `（${booking.note}）` : ''}`,
-            campus_id: campusId || undefined,
-            room: room || undefined,
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit trial present', err);
-          failList.push({ name: lead?.child_name || '试听学员', reason: '试听签到记录失败' });
-        }
-      }
-
-      for (const booking of leaveTrialBookings) {
-        const lead = trialLeadMap[booking.lead_id];
-        try {
-          await lessonRecordService.create({
-            teacher_id: selectedTeachingTeacherId || currentTeacherId,
-            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-            assistant_teacher_id: selectedAssistantTeacherId || undefined,
-            student_id: booking.trial_student_id,
-            package_id: '',
-            class_id: selectedClassId,
-            lesson_date: lessonDateValue,
-            hours_used: 0,
-            status: 'leave',
-            content: '试听学员请假',
-            campus_id: campusId || undefined,
-            room: room || undefined,
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit trial leave', err);
-          failList.push({ name: lead?.child_name || '试听学员', reason: '试听请假记录失败' });
-        }
-      }
-
-      for (const booking of absentTrialBookings) {
-        const lead = trialLeadMap[booking.lead_id];
-        try {
-          await lessonRecordService.create({
-            teacher_id: selectedTeachingTeacherId || currentTeacherId,
-            operator_teacher_id: currentTeacherId || selectedTeachingTeacherId,
-            assistant_teacher_id: selectedAssistantTeacherId || undefined,
-            student_id: booking.trial_student_id,
-            package_id: '',
-            class_id: selectedClassId,
-            lesson_date: lessonDateValue,
-            hours_used: 0,
-            status: 'absent',
-            content: '试听预约未到',
-            campus_id: campusId || undefined,
-            room: room || undefined,
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit trial absent', err);
-          failList.push({ name: lead?.child_name || '试听学员', reason: '试听未到记录失败' });
-        }
-      }
-
-      if (failList.length === 0) {
-        invalidateStudents(currentUserId);
-        handleSubmitSuccessReturn(
-          `签到${presentStudents.length + presentTrialBookings.length}人（含试听${presentTrialBookings.length}人），请假${leaveStudents.length}人，未到${classAbsentCount + absentTrialBookings.length}人`,
-          'success',
-          1800,
-          { renewSubscribe: true },
-        );
-      } else if (successCount === 0) {
-        Taro.showToast({ title: '全部消课失败', icon: 'none' });
-      } else {
-        invalidateStudents(currentUserId);
-        handleSubmitSuccessReturn(
-          `${successCount}条记录成功，${failList.length}条失败`,
-          'none',
-          3000,
-          { renewSubscribe: true },
-        );
-      }
-    } catch (err) {
-      logError('class submit', err);
-      Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
-    } finally {
-      submitLockRef.current.release();
-      setSubmitting(false);
-    }
   }, [
     content,
     currentTeacherId,
@@ -2050,29 +1584,30 @@ const LessonForm: React.FC = () => {
     room,
   ]);
 
-  // ===== 统一提交 =====
   const handleSubmit = useCallback(() => {
-    if (isEditEntryAttempt) {
+    const kind = resolveLessonSubmitKind({
+      isEditEntryAttempt,
+      mode,
+      isAlreadyChecked,
+      attendanceMode,
+    });
+    if (kind === 'blocked-edit') {
       Taro.showToast({ title: '历史消课记录不支持编辑', icon: 'none' });
       return;
     }
-
-    if (mode === 'single') {
-      handleSingleSubmit();
+    if (kind === 'single') {
+      void handleSingleSubmit();
       return;
     }
-
-    if (isAlreadyChecked && attendanceMode === 'supplement') {
+    if (kind === 'supplement') {
       void handleSupplementSave();
       return;
     }
-
-    if (isAlreadyChecked && attendanceMode === 'edit') {
+    if (kind === 'edit') {
       void handleIncrementalEditSave();
       return;
     }
-
-    handleClassSubmit();
+    void handleClassSubmit();
   }, [
     attendanceMode,
     handleClassSubmit,
