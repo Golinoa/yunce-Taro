@@ -996,6 +996,7 @@ const ScheduleForm: React.FC = () => {
       try {
         const parents = await studentService.getParents(sid);
         for (const p of parents) {
+          if (!p.parent_id) continue;
           try {
             await notificationService.send({
               sender_id: currentUserId,

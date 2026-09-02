@@ -360,20 +360,25 @@ const LessonSupplementPage: React.FC = () => {
             content: matchedPackage ? contentText : `${contentText}（欠课时）`,
           });
 
-          const parents = await studentService.getParents(student.id);
-          for (const binding of parents) {
-            await notificationService.send({
-              sender_id: profile?.id || '',
-              receiver_id: binding.parent_id,
-              title: `${displayClassName}已补录签到`,
-              content: matchedPackage
-                ? `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，剩余 ${
-                    createdRecord.remaining_hours ??
-                    Math.max(matchedPackage.remaining_hours - hoursUsed, 0)
-                  } 课时`
-                : `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，当前暂无可扣课包，已记为欠课时`,
-              related_id: student.id,
-            });
+          try {
+            const parents = await studentService.getParents(student.id);
+            for (const binding of parents) {
+              if (!binding.parent_id) continue;
+              await notificationService.send({
+                sender_id: profile?.id || '',
+                receiver_id: binding.parent_id,
+                title: `${displayClassName}已补录签到`,
+                content: matchedPackage
+                  ? `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，剩余 ${
+                      createdRecord.remaining_hours ??
+                      Math.max(matchedPackage.remaining_hours - hoursUsed, 0)
+                    } 课时`
+                  : `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，当前暂无可扣课包，已记为欠课时`,
+                related_id: student.id,
+              });
+            }
+          } catch (notifyErr) {
+            logError('LessonSupplement notify parents', notifyErr);
           }
 
           successList.push(student.name);

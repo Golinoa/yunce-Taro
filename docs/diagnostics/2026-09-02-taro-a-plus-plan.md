@@ -61,10 +61,11 @@
 | ID | 状态 | 说明 |
 |----|------|------|
 | Q2-2 | 🔄 进行中 | `896fd0a` · `backup/taro-a-plus-q2-2-checkin-2026-09-02`：CheckinCard / checkin-status / StudentEditSheet；提交 handler 仍在页内 |
-| Q2-1 | 🔄 进行中 | 抽出 `schedule-card-actions` / `schedule-card-status` + 单测 |
-| Q2-3/4/5 | ⏳ | |
+| Q2-1 | ✅ 起步 | `6f722fb` · `backup/taro-a-plus-q2-1-card-helpers-2026-09-02`：schedule-card-actions/status + 单测 |
+| Q2-5 | 🔄 | 接通 `getParents`/`removeParent`/`findByInviteCode`；消课通知失败不阻断提交；后端 listParents 补 `profileId` |
+| Q2-3/4 | ⏳ | |
 
-下一节点：Q2-1 续拆 / Q2-3 schedule-form / 热路径 notWired。
+下一节点：提交 Q2-5 → 续拆 schedule-form / student 神文件。
 
 ---
 

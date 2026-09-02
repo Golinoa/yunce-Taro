@@ -228,6 +228,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
       try {
         const parents = await studentService.getParents(studentId);
         for (const binding of parents) {
+          if (!binding.parent_id) continue;
           await notificationService.send({
             sender_id: currentUserId,
             receiver_id: binding.parent_id,

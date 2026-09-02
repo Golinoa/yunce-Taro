@@ -636,6 +636,43 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
   };
 }
 
+/** GET /students/:id/parents 单项 */
+interface BackendStudentParentItem {
+  id: string;
+  profileId?: string | null;
+  userId?: string | null;
+  relation?: string | null;
+  bindStatus?: string | null;
+  createdAt?: string;
+  profile?: {
+    nickname?: string | null;
+    phone?: string | null;
+    avatar?: string | null;
+  } | null;
+}
+
+function mapBackendStudentParent(
+  studentId: string,
+  item: BackendStudentParentItem,
+): StudentParent {
+  const profileId = item.profileId || '';
+  return {
+    id: item.id,
+    student_id: studentId,
+    /** 通知 receiverId = profileId */
+    parent_id: profileId,
+    parent: item.profile
+      ? {
+          id: profileId,
+          name: item.profile.nickname || '家长',
+          phone: item.profile.phone || undefined,
+          avatar_url: item.profile.avatar || undefined,
+        }
+      : undefined,
+    created_at: item.createdAt || '',
+  };
+}
+
 function mapBackendClassListItem(item: BackendClassListItem): Class {
   const ended = item.status === 'DISBANDED';
   const type = ended ? 'ended' : item.type === 'limited' ? 'limited' : 'unlimited';
@@ -1221,17 +1258,39 @@ export const studentService = {
   },
 
   /** 获取学员的绑定家长 */
-  getParents: async (_studentId: string): Promise<StudentParent[]> =>
-    notWired('student.getParents'),
+  getParents: async (studentId: string): Promise<StudentParent[]> => {
+    const list = await get<BackendStudentParentItem[]>(`/students/${studentId}/parents`);
+    return (list || []).map((item) => mapBackendStudentParent(studentId, item));
+  },
 
   /** 解绑家长 */
-  removeParent: async (_bindingId: string) => notWired('student.removeParent'),
+  removeParent: async (studentId: string, bindingId: string) => {
+    await del(`/students/${studentId}/parents/${bindingId}`);
+  },
 
   /** 通过邀请码查找学员 */
-  findByInviteCode: async (_code: string) => notWired('student.findByInviteCode'),
+  findByInviteCode: async (code: string) => {
+    return get<{
+      id: string;
+      name: string;
+      avatar?: string | null;
+      nickname?: string | null;
+      teacher?: {
+        id: string;
+        nickname?: string | null;
+        avatar?: string | null;
+        institution?: string | null;
+      };
+    }>(`/students/by-invite-code/${encodeURIComponent(code)}`);
+  },
 
-  /** 绑定家长到学员 */
-  bindParent: async (_studentId: string, _parentId: string) => notWired('student.bindParent'),
+  /**
+   * 绑定家长到学员（后端按手机号绑定，非 parentId）
+   * @deprecated 业务侧请使用 parent-invite-links；保留以兼容旧调用
+   */
+  bindParent: async (studentId: string, phone: string, relation = '家长') => {
+    return post(`/students/${studentId}/bind-parent`, { phone, relation });
+  },
 };
 
 // ============================================
