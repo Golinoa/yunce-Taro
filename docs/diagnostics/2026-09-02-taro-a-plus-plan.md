@@ -63,19 +63,19 @@
 | Q2-2 | 🔄 进行中 | `896fd0a` · `backup/taro-a-plus-q2-2-checkin-2026-09-02`：CheckinCard / checkin-status / StudentEditSheet；提交 handler 仍在页内 |
 | Q2-1 | ✅ 起步 | `6f722fb` · `backup/taro-a-plus-q2-1-card-helpers-2026-09-02`：schedule-card-actions/status + 单测 |
 | Q2-3 | ✅ 起步 | `f1d6b98` · `backup/taro-a-plus-q2-3-form-helpers-2026-09-02`：time / teacher-selection / YesNoToggle |
-| Q2-4 | ✅ 起步 | `auth-email`；`notification` / `student-parents` / `leave` 从 student 神文件抽出 |
-| Q2-2 | 🔄 | Checkin UI + `notifyStudentParentsSafe`；提交 handler 仍在页内 |
+| Q2-4 | ✅ | `auth-email`；`notification` / `student-parents` / `leave` / **`package`** 从 student 抽出 |
+| Q2-2 | 🔄 | Checkin UI + notify helper + **lesson-operate**；提交 handler 仍在页内 |
 | Q2-5 | ✅ | `82567c0` · … |
 
 ### Wave 3 进度
 
 | ID | 状态 | 说明 |
 |----|------|------|
-| Q3-3 | ✅ 起步 | AGENTS / rules / PRD / project-understanding：Taro 3 → **Taro 4** |
-| Q3-5 | ✅ 起步 | vitest coverage include 纳入 invite/auth-onboarding/submit-lock/schedule-card* 等热路径 |
+| Q3-3 | ✅ 起步 | AGENTS / rules / PRD：Taro 4 |
+| Q3-5 | ✅ 起步 | coverage include 热路径 |
 | Q3-1/2/4 | ⏳ | |
 
-下一节点：续拆 packageService；lesson-form 提交模块；真机门禁。
+下一节点：续拆 class/schedule service；lesson-form 提交模块；真机门禁。
 
 ---
 
