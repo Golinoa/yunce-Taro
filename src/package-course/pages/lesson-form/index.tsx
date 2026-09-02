@@ -4,7 +4,6 @@ import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createSubmitLock } from '@/utils/submit-lock';
 import ActionButton from '@/components/ActionButton';
-import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import FormRow from '@/components/FormRow';
@@ -49,6 +48,14 @@ import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
 import { runImageUploadFlow } from '@/utils/upload-flow';
+import { CheckinCard } from './CheckinCard';
+import {
+  buildCheckinBaseline,
+  CHECKIN_OPTION_STYLES,
+  type CheckinStatus,
+  type ClassAttendanceMode,
+} from './checkin-status';
+import StudentEditSheet from './StudentEditSheet';
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -97,12 +104,6 @@ function isWithinLessonOperateWindow(lessonDateStr: string, now = new Date()): b
   return lesson.getTime() >= earliest.getTime();
 }
 
-/** 签到状态：签到/请假/未到 */
-type CheckinStatus = 'checked' | 'leave' | 'absent';
-
-/** 已点名班级的交互模式 */
-type ClassAttendanceMode = 'normal' | 'view' | 'edit' | 'supplement';
-
 function getLessonRecordPriority(record?: LessonRecord): number {
   if (!record) {
     return 0;
@@ -120,329 +121,6 @@ function getLessonRecordPriority(record?: LessonRecord): number {
       return 1;
   }
 }
-
-function buildCheckinBaseline(
-  students: Student[],
-  checkedIds: Set<string>,
-  leaveIds: Set<string>,
-): Map<string, CheckinStatus> {
-  const baseline = new Map<string, CheckinStatus>();
-  students.forEach((student) => {
-    if (leaveIds.has(student.id)) {
-      baseline.set(student.id, 'leave');
-    } else if (checkedIds.has(student.id)) {
-      baseline.set(student.id, 'checked');
-    } else {
-      baseline.set(student.id, 'absent');
-    }
-  });
-  return baseline;
-}
-
-/** 状态对应样式 */
-const CHECKIN_OPTION_STYLES: Record<
-  CheckinStatus,
-  { label: string; activeBg: string; activeText: string; activeBorder?: string }
-> = {
-  checked: { label: '签到', activeBg: 'bg-success', activeText: 'text-white' },
-  leave: { label: '请假', activeBg: 'bg-destructive', activeText: 'text-white' },
-  absent: { label: '未到', activeBg: 'bg-warning', activeText: 'text-white' },
-};
-
-/** 单个状态选项按钮（圆角胶囊） */
-const CheckinOptionButton: React.FC<{
-  status: CheckinStatus;
-  current: CheckinStatus;
-  onClick: () => void;
-}> = ({ status, current, onClick }) => {
-  const active = status === current;
-  const style = CHECKIN_OPTION_STYLES[status];
-  return (
-    <View
-      className={`flex h-[52rpx] flex-1 items-center justify-center rounded-full border ${active ? `${style.activeBg} border-transparent` : 'border-border bg-muted/30'}`}
-      onClick={onClick}
-    >
-      <Text
-        className={`text-center text-[22rpx] font-medium ${active ? style.activeText : 'text-muted-foreground'}`}
-      >
-        {style.label}
-      </Text>
-    </View>
-  );
-};
-
-/** 学员签到卡片 - 图片风格：居中头像+两按钮（签到/未到请假切换）+编辑 */
-const CheckinCard: React.FC<{
-  name: string;
-  status: CheckinStatus;
-  remaining?: string;
-  deduct?: string;
-  isTrial?: boolean;
-  /** 补课学员左上角「补」标签 */
-  isMakeup?: boolean;
-  disabled?: boolean;
-  highlight?: boolean;
-  /** 本节课该学员的备注（有值才显示备注行） */
-  note?: string;
-  onToggleStatus: (next: CheckinStatus) => void;
-  onOpenDetailSheet: () => void;
-}> = ({
-  name,
-  status,
-  remaining = '',
-  deduct = '',
-  isTrial = false,
-  isMakeup = false,
-  disabled = false,
-  highlight = false,
-  note,
-  onToggleStatus,
-  onOpenDetailSheet,
-}) => {
-  const handleRightButtonClick = () => {
-    if (status === 'checked') {
-      onToggleStatus('absent');
-    } else if (status === 'absent') {
-      onToggleStatus('leave');
-    } else {
-      onToggleStatus('absent');
-    }
-  };
-  const rightLabel = status === 'leave' ? '请假' : '未到';
-  const rightActive = status === 'leave' || status === 'absent';
-  const rightActiveBg = status === 'leave' ? 'bg-destructive' : 'bg-warning';
-
-  const cornerBadgeLeft = highlight ? (isMakeup || isTrial ? 'left-[72rpx]' : 'left-0') : 'left-0';
-  const secondBadgeLeft = highlight ? 'left-[144rpx]' : 'left-[56rpx]';
-
-  return (
-    <View
-      className={`relative flex flex-col items-center rounded-[20rpx] bg-white px-[16rpx] py-[20rpx] shadow-card ${highlight ? 'border-2 border-primary bg-primary/5' : ''} ${disabled ? 'opacity-60' : ''}`}
-    >
-      {highlight ? (
-        <View className="absolute left-0 top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-primary/10 px-[12rpx] py-[4rpx]">
-          <Text className="text-[18rpx] font-medium text-primary">补录</Text>
-        </View>
-      ) : null}
-      {isMakeup ? (
-        <View
-          className={`absolute ${cornerBadgeLeft} top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-amber-500/15 px-[12rpx] py-[4rpx]`}
-        >
-          <Text className="text-[18rpx] font-medium text-amber-600">补</Text>
-        </View>
-      ) : null}
-      {isTrial ? (
-        <View
-          className={`absolute ${isMakeup ? secondBadgeLeft : cornerBadgeLeft} top-0 rounded-tl-[20rpx] rounded-br-[12rpx] bg-error/10 px-[12rpx] py-[4rpx]`}
-        >
-          <Text className="text-[18rpx] font-medium text-error">试听</Text>
-        </View>
-      ) : null}
-      <View
-        className="absolute right-[6rpx] top-[6rpx] flex h-[56rpx] w-[56rpx] items-center justify-center rounded-full bg-muted/40 active:opacity-70"
-        onClick={disabled ? undefined : onOpenDetailSheet}
-      >
-        <Icon name="mdi-square-edit-outline" size="md" color="primary" />
-      </View>
-      <StudentAvatar name={name} size="md" />
-      <Text className="mt-[12rpx] text-center text-[28rpx] font-medium text-foreground line-clamp-1">
-        {name}
-      </Text>
-      {/* 本节课备注：有备注时展示（点击右上角编辑图标可查看/修改） */}
-      {note ? (
-        <View className="mt-[6rpx] flex w-full items-center justify-center gap-[4rpx]">
-          <Icon name="mdi-note-text" size={22} color="warning" />
-          <Text className="max-w-[200rpx] truncate text-[20rpx] text-warning">{note}</Text>
-        </View>
-      ) : null}
-      <View className="relative mt-[12rpx] grid w-full grid-cols-2 gap-x-[16rpx] gap-y-[4rpx]">
-        <Text className="text-center text-[22rpx] text-muted-foreground">剩余</Text>
-        <Text className="text-center text-[22rpx] text-muted-foreground">扣课</Text>
-        <Text className="text-center text-[24rpx] text-destructive line-clamp-1">
-          {remaining || '-'}
-        </Text>
-        <Text className="text-center text-[24rpx] text-destructive line-clamp-1">
-          {deduct || '-'}
-        </Text>
-        {/* 分割竖线 */}
-        <View className="absolute bottom-[4rpx] left-1/2 top-[4rpx] w-[1rpx] -translate-x-1/2 bg-border" />
-      </View>
-      <View className="mt-[16rpx] grid w-full grid-cols-2 gap-[16rpx]">
-        <CheckinOptionButton
-          status="checked"
-          current={status}
-          onClick={() => {
-            if (!disabled) onToggleStatus('checked');
-          }}
-        />
-        <View
-          className={`flex h-[52rpx] flex-1 items-center justify-center rounded-full border ${rightActive ? `${rightActiveBg} border-transparent` : 'border-border bg-muted/30'}`}
-          onClick={disabled ? undefined : handleRightButtonClick}
-        >
-          <Text
-            className={`text-center text-[22rpx] font-medium ${rightActive ? 'text-white' : 'text-muted-foreground'}`}
-          >
-            {rightLabel}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-/** 学员编辑底部弹窗 - 调课/移除/备注 */
-const StudentEditSheet: React.FC<{
-  visible: boolean;
-  target: {
-    type: 'formal' | 'trial';
-    id: string;
-    name: string;
-    remaining: string;
-    deduct: string;
-    courseName?: string;
-    student?: Student;
-  } | null;
-  remark: string;
-  classes: Class[];
-  selectedClassId: string;
-  onRemarkChange: (value: string) => void;
-  onClose: () => void;
-  onTransfer: (student: Student, targetClassId: string) => void;
-  onRemove: (student: Student) => void;
-  onConfirm: () => void | Promise<void>;
-}> = ({
-  visible,
-  target,
-  remark,
-  classes,
-  selectedClassId,
-  onRemarkChange,
-  onClose,
-  onTransfer,
-  onRemove,
-  onConfirm,
-}) => {
-  const [showTransferList, setShowTransferList] = useState(false);
-
-  if (!target) {
-    return null;
-  }
-
-  const isTrial = target.type === 'trial';
-  const canManage = !isTrial && Boolean(target.student);
-
-  return (
-    <BottomSheet visible={visible} title="" height="auto" scrollable={false} onClose={onClose}>
-      <View className="px-[32rpx] pb-[calc(24rpx+env(safe-area-inset-bottom))] pt-[24rpx]">
-        {/* 头部：头像 + 调课/移除 */}
-        <View className="mb-[32rpx] flex items-center justify-between">
-          <View className="flex items-center gap-[16rpx]">
-            <StudentAvatar name={target.name} size="md" />
-            <Text className="text-[32rpx] font-medium text-foreground">{target.name}</Text>
-          </View>
-          {canManage ? (
-            <View className="flex items-center gap-[24rpx]">
-              <Text
-                className="text-[26rpx] text-primary"
-                onClick={() => setShowTransferList((prev) => !prev)}
-              >
-                调课
-              </Text>
-              {target.student ? (
-                <Text
-                  className="text-[26rpx] text-destructive"
-                  onClick={() => onRemove(target.student!)}
-                >
-                  移除
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-
-        {/* 调课班级列表 */}
-        {showTransferList && canManage ? (
-          <View className="mb-[24rpx] rounded-[16rpx] bg-muted/50 px-[20rpx] py-[16rpx]">
-            <Text className="mb-[12rpx] block text-[24rpx] text-muted-foreground">
-              选择目标班级
-            </Text>
-            <View className="flex flex-col gap-[12rpx]">
-              {classes
-                .filter((cls) => cls.id !== selectedClassId)
-                .map((cls) => (
-                  <View
-                    key={cls.id}
-                    className="flex items-center justify-between rounded-[12rpx] bg-white px-[20rpx] py-[18rpx]"
-                    onClick={() => {
-                      if (target.student) {
-                        onTransfer(target.student, cls.id);
-                      }
-                      setShowTransferList(false);
-                    }}
-                  >
-                    <Text className="text-[26rpx] text-foreground">{cls.name}</Text>
-                    <Icon name="mdi-chevron-right" size="sm" color="muted" />
-                  </View>
-                ))}
-              {classes.filter((cls) => cls.id !== selectedClassId).length === 0 ? (
-                <Text className="block text-center text-[24rpx] text-muted-foreground">
-                  暂无其他班级
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-
-        {/* 信息行 */}
-        <View className="mb-[24rpx] flex flex-col">
-          <View className="flex items-center justify-between border-b border-border/40 py-[24rpx]">
-            <Text className="text-[28rpx] text-muted-foreground">消耗课程</Text>
-            <Text className="text-[28rpx] font-medium text-foreground">
-              {target.courseName || '-'}
-            </Text>
-          </View>
-          <View className="flex items-center justify-between border-b border-border/40 py-[24rpx]">
-            <Text className="text-[28rpx] text-muted-foreground">扣课时</Text>
-            <Text className="text-[28rpx] font-medium text-foreground">{target.deduct || '0'}</Text>
-          </View>
-          <View className="flex items-center justify-between py-[24rpx]">
-            <Text className="text-[28rpx] text-muted-foreground">剩余课时</Text>
-            <Text className="text-[28rpx] font-medium text-foreground">
-              {target.remaining || '-'}
-            </Text>
-          </View>
-        </View>
-
-        {/* 备注 */}
-        <View className="mb-[24rpx]">
-          <Text className="mb-[12rpx] block text-[28rpx] text-foreground">备注</Text>
-          <View className="rounded-[16rpx] bg-muted/30 px-[20rpx] py-[16rpx]">
-            <Textarea
-              className="h-[160rpx] w-full text-[28rpx] leading-[44rpx] text-foreground placeholder:text-muted-foreground/60"
-              placeholder="请输入备注（学员端不可见）"
-              value={remark}
-              onInput={(e) => onRemarkChange(e.detail.value)}
-              maxlength={200}
-            />
-          </View>
-        </View>
-
-        {/* 确定按钮 */}
-        <View className="flex justify-center pb-[8rpx]">
-          <View
-            className="flex w-full items-center justify-center rounded-[48rpx] bg-primary py-[24rpx]"
-            onClick={async () => {
-              await onConfirm();
-              onClose();
-            }}
-          >
-            <Text className="text-[28rpx] font-medium text-white">确定</Text>
-          </View>
-        </View>
-      </View>
-    </BottomSheet>
-  );
-};
 
 const LessonForm: React.FC = () => {
   const { profile, currentRole } = useAuth();
@@ -1012,7 +690,13 @@ const LessonForm: React.FC = () => {
   }, [loadAllStudentsIfNeeded]);
 
   const handleEnterEditMode = useCallback(() => {
-    setAttendanceBaseline(buildCheckinBaseline(classStudents, checkedStudentIds, leaveStudentIds));
+    setAttendanceBaseline(
+      buildCheckinBaseline(
+        classStudents.map((s) => s.id),
+        checkedStudentIds,
+        leaveStudentIds,
+      ),
+    );
     setAttendanceMode('edit');
   }, [checkedStudentIds, classStudents, leaveStudentIds]);
 
