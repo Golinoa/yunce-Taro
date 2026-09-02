@@ -1,4 +1,9 @@
-/** L2 invite-register / L3 campus-invite-landing 落地页分态（纯函数，便于验收测试） */
+/**
+ * 邀约落地页分态（纯函数）
+ * - L1：试听课 invite-landing 主屏
+ * - L2：invite-register（家长分享临时码）
+ * - L3：campus-invite-landing（机构拉员工）
+ */
 
 export type ParentShareLandingView = 'expired' | 'used_invalid' | 'success_for_viewer' | 'pending';
 
@@ -28,4 +33,38 @@ export function resolveCampusInviteLandingView(
     return 'used_invalid';
   }
   return 'pending';
+}
+
+/** L1 试听邀约主屏 */
+export type TrialInviteLandingScreen = 'boot' | 'staff_blocked' | 'login_gate' | 'success' | 'main';
+
+export function resolveTrialInviteLandingScreen(input: {
+  bootstrapped: boolean;
+  authLoading: boolean;
+  staffBlocked: boolean;
+  needLoginGate: boolean;
+  success: boolean;
+}): TrialInviteLandingScreen {
+  if (!input.bootstrapped || input.authLoading) return 'boot';
+  if (input.staffBlocked) return 'staff_blocked';
+  if (input.needLoginGate) return 'login_gate';
+  if (input.success) return 'success';
+  return 'main';
+}
+
+/** 是否需要全屏登录门（须先微信登录再看内容） */
+export function resolveTrialInviteNeedLoginGate(input: {
+  bootstrapped: boolean;
+  guestMode: boolean;
+  hasSession: boolean;
+  staffBlocked: boolean;
+  success: boolean;
+}): boolean {
+  return (
+    input.bootstrapped &&
+    !input.guestMode &&
+    !input.hasSession &&
+    !input.staffBlocked &&
+    !input.success
+  );
 }

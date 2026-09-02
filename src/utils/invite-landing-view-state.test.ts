@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveCampusInviteLandingView,
   resolveParentShareLandingView,
+  resolveTrialInviteLandingScreen,
+  resolveTrialInviteNeedLoginGate,
 } from './invite-landing-view-state';
 
 describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
@@ -111,6 +113,86 @@ describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
           now,
         ),
       ).toBe('pending');
+    });
+  });
+
+  describe('L1 试听 invite-landing 主屏', () => {
+    it('needLoginGate：未登录且已 boot → true；guest/成功/员工拦截 → false', () => {
+      expect(
+        resolveTrialInviteNeedLoginGate({
+          bootstrapped: true,
+          guestMode: false,
+          hasSession: false,
+          staffBlocked: false,
+          success: false,
+        }),
+      ).toBe(true);
+      expect(
+        resolveTrialInviteNeedLoginGate({
+          bootstrapped: true,
+          guestMode: true,
+          hasSession: false,
+          staffBlocked: false,
+          success: false,
+        }),
+      ).toBe(false);
+      expect(
+        resolveTrialInviteNeedLoginGate({
+          bootstrapped: true,
+          guestMode: false,
+          hasSession: false,
+          staffBlocked: false,
+          success: true,
+        }),
+      ).toBe(false);
+    });
+
+    it('screen：boot / staff_blocked / login_gate / success / main', () => {
+      expect(
+        resolveTrialInviteLandingScreen({
+          bootstrapped: false,
+          authLoading: false,
+          staffBlocked: false,
+          needLoginGate: false,
+          success: false,
+        }),
+      ).toBe('boot');
+      expect(
+        resolveTrialInviteLandingScreen({
+          bootstrapped: true,
+          authLoading: false,
+          staffBlocked: true,
+          needLoginGate: false,
+          success: false,
+        }),
+      ).toBe('staff_blocked');
+      expect(
+        resolveTrialInviteLandingScreen({
+          bootstrapped: true,
+          authLoading: false,
+          staffBlocked: false,
+          needLoginGate: true,
+          success: false,
+        }),
+      ).toBe('login_gate');
+      expect(
+        resolveTrialInviteLandingScreen({
+          bootstrapped: true,
+          authLoading: false,
+          staffBlocked: false,
+          needLoginGate: false,
+          success: true,
+        }),
+      ).toBe('success');
+      expect(
+        resolveTrialInviteLandingScreen({
+          bootstrapped: true,
+          authLoading: false,
+          staffBlocked: false,
+          needLoginGate: false,
+          success: false,
+        }),
+      ).toBe('main');
     });
   });
 });

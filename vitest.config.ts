@@ -58,6 +58,8 @@ export default defineConfig({
         'src/utils/auth-onboarding.ts',
         'src/utils/invite-staff-link.ts',
         'src/utils/invite-landing-view-state.ts',
+        'src/utils/invite-landing-params.ts',
+        'src/utils/invite-landing-flow.ts',
         'src/utils/route-guard.tsx',
         'src/utils/submit-lock.ts',
         'src/utils/notify-student-parents.ts',
