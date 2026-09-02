@@ -14,7 +14,7 @@ alwaysApply: true
 
 | 项 | 规范 | 禁止 |
 |---|---|---|
-| 框架 | Taro 3/4 + React 18 函数组件 + Hooks | 类组件、Vue、其他框架 |
+| 框架 | Taro 4 + React 18 函数组件 + Hooks | 类组件、Vue、其他框架 |
 | 语言 | TypeScript（`strictNullChecks: true`） | 隐式 `any`、`@ts-ignore`、`as any` 滥用 |
 | 样式 | UnoCSS 原子化类名 + rpx 单位 | SCSS 文件、内联 style（非动态值）、px/rem |
 | 状态 | Zustand | Redux、MobX、组件内 `useState` 管理跨页全局态 |

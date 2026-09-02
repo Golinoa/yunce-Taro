@@ -9,7 +9,7 @@
 
 | 项 | 规范 | 禁止 |
 |---|---|---|
-| 框架 | Taro 3.x + React 18 | 类组件、Vue |
+| 框架 | Taro 4.x + React 18 | 类组件、Vue |
 | 语言 | TypeScript 严格模式 | 隐式 any、@ts-ignore |
 | 样式 | UnoCSS 原子化类名 + rpx 单位 | SCSS 文件、内联 style、px 单位 |
 | 状态 | Zustand | Redux、MobX、组件内 useState 管理全局状态 |

@@ -8,7 +8,7 @@
 ## 一、这是什么项目
 
 - **产品**：「松果排课」机构端教务 SaaS 小程序（多角色：校长 / 教师 / 家长 / 顾问）。
-- **形态**：Taro 3.x 跨端小程序，**当前主力编译目标是微信小程序（`weapp`）**，同时保留 swan/alipay/tt/h5/rn 等脚本。
+- **形态**：Taro 4.x 跨端小程序，**当前主力编译目标是微信小程序（`weapp`）**，同时保留 swan/alipay/tt/h5/rn 等脚本。
 - **当前状态**：**Mock 驱动**——所有数据来自 `src/data/*` 内存 mock，Service 层用 `mockXxx` 函数实现；联调时只需把 Service 一行改成 `request.ts` 的 API 调用即可。
 - **4 个主 Tab**：首页 `pages/home`、课表 `pages/schedule`、数据 `pages/statistics`、我的 `pages/profile`。
 
@@ -16,7 +16,7 @@
 
 | 维度 | 规范 | 禁止 |
 |------|------|------|
-| 框架 | Taro 3.x + **React 18（函数组件 + Hooks）** | class 组件、Vue |
+| 框架 | Taro 4.x + **React 18（函数组件 + Hooks）** | class 组件、Vue |
 | 语言 | **TypeScript 严格模式** | 隐式 any、`@ts-ignore` |
 | 样式 | **UnoCSS 原子类 + rpx 单位**（`presetRemRpx` 自动 baseFontSize=14 / 375 屏宽） | SCSS 文件、内联 style、px/rem |
 | 状态 | **Zustand**（全局状态唯一来源） | Redux/MobX、组件内 useState 管全局 |

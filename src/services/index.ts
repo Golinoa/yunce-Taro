@@ -7,11 +7,11 @@ export {
   packageService,
   packageTemplateService,
   lessonRecordService,
-  leaveService,
   classService,
   scheduleService,
   formatDateCN,
 } from './student';
+export { leaveService } from './leave';
 export { notificationService } from './notification';
 export { studentParentService } from './student-parents';
 export { courseTemplateService } from './course-template';

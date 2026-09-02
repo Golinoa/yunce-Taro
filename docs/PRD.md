@@ -5,7 +5,7 @@
 | 项目 | 说明 |
 |---|---|
 | 产品名称 | 云策教务 |
-| 技术栈 | Taro 3.x + React 18 + TypeScript + UnoCSS |
+| 技术栈 | Taro 4.x + React 18 + TypeScript + UnoCSS |
 | 目标用户 | 教培机构校长、授课教师、学生家长 |
 | 核心定位 | 一账号多身份的轻量化教务管理工具 |
 

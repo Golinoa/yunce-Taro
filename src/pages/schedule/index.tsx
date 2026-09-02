@@ -53,6 +53,7 @@ import {
   type LessonSharePayload,
 } from '@/utils/lesson-share';
 import { logError } from '@/utils/logger';
+import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import {
   upsertParentBooking,
   updateParentBookingStatus,
@@ -916,21 +917,13 @@ const SchedulePage: React.FC = () => {
         logError('SchedulePage notify student', err);
       }
 
-      try {
-        const parents = await studentService.getParents(studentId);
-        for (const binding of parents) {
-          if (!binding.parent_id) continue;
-          await notificationService.send({
-            sender_id: currentUserId,
-            receiver_id: binding.parent_id,
-            title,
-            content,
-            related_id: studentId,
-          });
-        }
-      } catch (err) {
-        logError('SchedulePage notify parents', err);
-      }
+      await notifyStudentParentsSafe({
+        studentId,
+        senderId: currentUserId,
+        title,
+        content,
+        logLabel: 'SchedulePage notify parents',
+      });
     },
     [currentUserId],
   );

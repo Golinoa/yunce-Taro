@@ -40,12 +40,21 @@ export default defineConfig({
         'src/utils/upload-flow.ts',
         'src/utils/use-batch-render.ts',
         'src/utils/schedule-guard.ts',
+        'src/utils/schedule-card-actions.ts',
+        'src/utils/schedule-card-status.ts',
         'src/utils/store-entry-onboarding.ts',
         'src/utils/store-entry-submit.ts',
+        'src/utils/auth-onboarding.ts',
+        'src/utils/invite-staff-link.ts',
+        'src/utils/invite-landing-view-state.ts',
+        'src/utils/submit-lock.ts',
+        'src/utils/notify-student-parents.ts',
+        'src/services/auth-email.ts',
         'src/constants/store-entry-copy.ts',
       ],
       thresholds: {
         // 起步门槛：随回归套件补全逐步上调至 review 建议的 60%+
+        // Q3-5：热路径 invite/auth-onboarding/submit-lock 已纳入门禁统计
         lines: 30,
       },
     },
