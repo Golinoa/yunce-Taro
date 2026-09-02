@@ -40,15 +40,45 @@
     .badge { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 99px; background: #e2e8f0; color: var(--muted); }
     .badge.lock { background: #ede9fe; color: var(--frozen); }
     #frozenRegistry { margin-top: 24px; }
+    .accounts-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 0.88rem; }
+    .accounts-box h3 { margin: 0 0 10px; font-size: 1rem; color: #92400e; }
+    .accounts-box table { border-radius: 6px; margin: 0; font-size: 0.85rem; }
+    .accounts-box th { background: #fef3c7; }
+    .flow-hint { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.9rem; }
+    .flow-hint strong { color: #166534; }
+    td.account-cell { font-size: 0.82rem; color: #374151; min-width: 140px; }
+    td.account-cell code { font-size: 0.8rem; word-break: break-all; }
   </style>
 </head>
 <body>
   <h1>📱 真机测试清单（邀请 / 分享 / 登录）</h1>
-  <p class="meta">按顺序从上到下测。测完一项就在「结果」里选通过或失败，点「保存」不会丢。</p>
+  <p class="meta">按顺序从上到下测，<strong>从登录页开始，由外到里</strong>。测完一项就在「结果」里选通过或失败，点「保存」不会丢。</p>
+
+  <div class="flow-hint">
+    <strong>走查顺序（由外到里）</strong><br>
+    ① 环境确认 → ② <strong>登录页</strong>（最外层入口）→ ③ <strong>外链/扫码落地</strong>（好友分享、二维码）→ ④ <strong>登录后内页</strong>（教师发码、管理员互邀）→ ⑤ <strong>完整业务闭环</strong><br>
+    <span style="color:var(--muted);font-size:0.85rem">第三步里带 ⚠ 的项需要先有分享链接/二维码：若还没有，可先跳到第四步生成，再回来测第三步。</span>
+  </div>
+
+  <div class="accounts-box">
+    <h3>🔑 测试账号（dev.chancore.cn 种子数据，密码统一 <code>123456</code>）</h3>
+    <table>
+      <thead><tr><th>用途</th><th>邮箱</th><th>密码</th><th>角色 / 机构</th></tr></thead>
+      <tbody>
+        <tr><td>校长 / 机构管理员（测 O 码互邀、完整流程）</td><td><code>principal1@yunce.com</code></td><td><code>123456</code></td><td>万老师 · 松果排课 / 曦绘艺术 · OWNER</td></tr>
+        <tr><td>教师（测招生二维码 P 码）</td><td><code>teacher1@yunce.com</code></td><td><code>123456</code></td><td>张老师 · 同上机构 · TEACHER</td></tr>
+        <tr><td>另一校长账号（备用）</td><td><code>teacher2@yunce.com</code></td><td><code>123456</code></td><td>李老师 · PRINCIPAL + ADMIN</td></tr>
+        <tr><td>家长（测非管理员分享）</td><td><code>parent1@yunce.com</code></td><td><code>123456</code></td><td>小明爸爸 · PARENT</td></tr>
+        <tr><td>新用户 B（测互邀入驻 / 家长注册）</td><td>新注册邮箱 或 未绑定的微信号</td><td>自设</td><td>不要用上面已有账号</td></tr>
+        <tr><td>第二台手机扫码</td><td>任意微信（可不登录）</td><td>—</td><td>测扫码 / 点分享卡片</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:10px 0 0;color:var(--muted);font-size:0.82rem;">微信一键登录：需该微信号已在后端绑定对应账号；没绑定的用「账号+密码」更稳。F2 测老用户微信登录时，请用已绑定 <code>principal1@yunce.com</code> 的微信号。</p>
+  </div>
 
   <div class="tip-box">
     <strong>启动后端怎么做？</strong><br>
-    ① 双击 <code>start.cmd</code>（会开 Docker 数据库 + 启动接口，窗口别关）<br>
+    ① 双击 <code>start.cmd</code>（会自动开 <strong>tunnel 窗口</strong> + Docker 数据库 + 接口，两个窗口都别关）<br>
     ② <strong>第一次或刚更新代码后</strong>，还需要同步数据库（见下面 D-1、D-2，或让开发帮你跑一条命令）<br>
     ③ 小程序用微信开发者工具打开 <code>yunceTaro/dist</code> 目录<br>
     ④ 真机预览时，接口地址是 <code>dev.chancore.cn</code>（已编译进当前包）
@@ -93,66 +123,67 @@ const STORAGE_KEY = 'yunce-device-walkthrough-v1';
 
 const CHAIN_LABELS = {
   'D-1': '家长邀请-数据库', 'D-2': '门店互邀-数据库', 'D-3': '页面发布', 'D-4': '微信环境',
-  'VH-1': '教师招生二维码', 'VH-2a': '扫码进招生页', 'VH-2b': '杀进程再扫码', 'VH-2c': '旧格式码',
-  'VH-3': '微信未配置提示', 'VH-4': '体验版/正式版', 'VH-5': '转发分享卡片',
-  'V4T-R1': '管理员分享互邀', 'V4T-R2': '好友打开互邀页', 'V4T-R3': '跳转入驻', 'V4T-R4': '记录谁推荐的',
-  'V4T-R5': '错误邀请码', 'V4T-R6': '非管理员分享',
-  'X-1': '完整招生流程', 'X-2': '链接已用过', 'X-3': '员工邀请', 'X-4': '转发链接', 'X-5': '变成会员',
-  'F1': '新用户微信登录', 'F2': '老用户微信登录', 'F3': '教师/家长登录', 'F4': '邀请页登录', 'F5': '连点登录', 'F6': '失败再试',
+  'F0': '账号密码登录', 'F1': '新用户微信登录', 'F2': '老用户微信登录', 'F3': '教师/家长登录', 'F4': '邀请页登录', 'F5': '连点登录', 'F6': '失败再试',
+  'VH-2a': '扫码进招生页', 'VH-2b': '杀进程再扫码', 'VH-2c': '旧格式码', 'VH-4': '体验版/正式版',
+  'V4T-R2': '好友打开互邀页', 'V4T-R3': '跳转入驻', 'V4T-R5': '错误邀请码', 'X-4': '转发链接',
+  'VH-1': '教师招生二维码', 'VH-3': '微信未配置提示', 'VH-5': '转发分享卡片',
+  'V4T-R1': '管理员分享互邀', 'V4T-R6': '非管理员分享',
+  'V4T-R4': '记录谁推荐的', 'X-1': '完整招生流程', 'X-2': '链接已用过', 'X-3': '员工邀请', 'X-5': '变成会员',
 };
 
 const SECTIONS = [
   {
-    title: '第一步：环境准备（必做）',
+    title: '第零步：环境准备（开发先确认，测功能前看一眼）',
     items: [
-      { id: 'D-1', steps: '确认数据库已更新「家长邀请」相关表（开发跑 migrate，或 Staging 已部署）', expected: '后端启动不报错；教师能生成招生码' },
-      { id: 'D-2', steps: '确认数据库已更新「门店互邀」相关表（机构推荐码、推荐来源字段）', expected: '关于页能生成 O 开头推荐码' },
-      { id: 'D-3', steps: '微信开发者工具 / 体验版里能找到「招生注册页」「门店互邀落地页」', expected: '页面能打开，不是 404' },
-      { id: 'D-4', steps: '体验版小程序 + 后端微信配置属于同一环境（都是体验版或都是正式版）', expected: '扫码能打开对应页面' },
+      { id: 'D-1', account: '—（开发操作）', steps: '确认数据库已更新「家长邀请」相关表（开发跑 migrate，或 Staging 已部署）', expected: '后端启动不报错；教师能生成招生码' },
+      { id: 'D-2', account: '—（开发操作）', steps: '确认数据库已更新「门店互邀」相关表（机构推荐码、推荐来源字段）', expected: '关于页能生成 O 开头推荐码' },
+      { id: 'D-3', account: '—', steps: '微信开发者工具 / 体验版里能找到「招生注册页」「门店互邀落地页」', expected: '页面能打开，不是 404' },
+      { id: 'D-4', account: '—', steps: '体验版小程序 + 后端微信配置属于同一环境（都是体验版或都是正式版）', expected: '扫码能打开对应页面' },
     ]
   },
   {
-    title: '第二步：教师招生二维码',
+    title: '第一步：登录页（由外入内 — 从最外层入口开始）',
     items: [
-      { id: 'VH-1', steps: '用教师账号登录 → 打开「招生二维码」页面', expected: '出现二维码图片；有过期时间提示' },
-      { id: 'VH-2a', steps: '用另一台手机扫这个二维码', expected: '进入「招生注册」页；能看到机构和老师信息' },
-      { id: 'VH-2b', steps: '完全关闭小程序后再扫码（或从微信「最近使用」进入）', expected: '仍然能识别邀请，信息正常' },
-      { id: 'VH-2c', steps: '（可选）开发者工具模拟旧格式扫码', expected: '旧码也能用' },
-      { id: 'VH-3', steps: '（可选）后端没配微信时打开二维码页', expected: '有明确错误提示，可以点重试' },
-      { id: 'VH-4', steps: '体验版扫体验码 / 正式版扫正式码', expected: '环境对得上能打开；对不上会失败' },
-      { id: 'VH-5', steps: '教师点右上角转发给好友', expected: '好友点开能进招生页' },
+      { id: 'F0', account: '<code>principal1@yunce.com</code><br>密码 <code>123456</code>', steps: '打开登录页 → <strong>手动勾选</strong>用户协议 → 输入邮箱密码 → 点「账号登录」', expected: '进入首页（曦绘艺术），不是空白页；协议默认<strong>不勾选</strong>' },
+      { id: 'F1', account: '未用过的微信号（勿绑种子邮箱）', steps: '退出登录 → 登录页点「微信一键登录」→ 同意隐私弹窗', expected: '进入完善资料或选择身份' },
+      { id: 'F2', account: '已绑定 principal1 的微信号<br>或先 F0 密码登录再测微信', steps: '用已有机构的校长账号微信登录', expected: '直接进首页，不会又让你选身份' },
+      { id: 'F3', account: '<code>teacher1@yunce.com</code> 或 <code>parent1@yunce.com</code><br>密码 <code>123456</code>', steps: '教师/家长账号在登录页点「微信一键登录」', expected: '提示角色不对（已知现象，可跳过）', defaultStatus: 'skip' },
+      { id: 'F5', account: '任意账号', steps: '登录页快速连点「微信登录」好几下', expected: '不会卡死；不会重复报错' },
+      { id: 'F6', account: '<code>principal1@yunce.com</code> / <code>123456</code>', steps: '故意断网点登录失败一次，再连上网重试', expected: '第二次能登录成功' },
     ]
   },
   {
-    title: '第三步：门店互相邀请（管理员分享）',
+    title: '第二步：外链 / 扫码落地（由外到里 — 从分享链进入，多数未登录）',
     items: [
-      { id: 'V4T-R1', steps: '机构 A 的管理员 →「关于」页 → 点分享', expected: '分享出去的是「门店互邀」链接（带 O 开头码）' },
-      { id: 'V4T-R2', steps: '用户 B 点开分享卡片', expected: '看到机构 A 的名字；有「申请入驻」按钮' },
-      { id: 'V4T-R3', steps: '点「申请门店入驻」', expected: '进入入驻填表页（未登录也能看表）' },
-      { id: 'V4T-R4', steps: 'B 登录后提交入驻申请', expected: '后台/数据库里能看到「推荐来源 = 机构 A」' },
-      { id: 'V4T-R5', steps: '手动打开一个瞎编的邀请链接', expected: '提示链接无效，不会白屏' },
-      { id: 'V4T-R6', steps: '用教师或家长账号在关于页分享', expected: '不会出现管理员的专属互邀码' },
+      { id: 'V4T-R5', account: '无需登录', steps: '手动打开一个瞎编的互邀链接（如 <code>?code=OINVALID1</code>）', expected: '提示链接无效，不会白屏' },
+      { id: 'V4T-R2', account: '第二台手机 / 另一微信（B 用户，未登录）', steps: '等第四步 V4T-R1 分享出卡片后，B 用户点开分享卡片', expected: '看到机构 A 的名字；有「申请入驻」按钮', depends: '需先完成 V4T-R1，或请开发给一条有效 O 码链接' },
+      { id: 'V4T-R3', account: 'B 用户（仍可未登录）', steps: '在互邀落地页点「申请门店入驻」', expected: '进入入驻填表页（未登录也能看表）' },
+      { id: 'VH-2a', account: '第二台手机（未登录）', steps: '等第四步 VH-1 生成码后，用另一台手机扫招生二维码', expected: '进入「招生注册」页；能看到机构和老师信息', depends: '需先完成 VH-1，或请教师先帮你生成码' },
+      { id: 'VH-2b', account: '第二台手机', steps: '完全关闭小程序后再扫码（或从微信「最近使用」进入）', expected: '仍然能识别邀请，信息正常' },
+      { id: 'VH-2c', account: '—（可选）', steps: '开发者工具模拟旧格式扫码 scene=<code>PABC12345</code>', expected: '旧码也能用' },
+      { id: 'VH-4', account: '—', steps: '体验版扫体验码 / 正式版扫正式码', expected: '环境对得上能打开；对不上会失败' },
+      { id: 'X-4', account: '第二台手机', steps: '把招生链接转发到另一台手机再打开', expected: '链接能用，信息对' },
+      { id: 'F4', account: '未登录或新用户', steps: '在招生注册页 / 试听课页里点「微信登录」', expected: '和以前一样能登进去' },
     ]
   },
   {
-    title: '第四步：其他邀请流程抽查',
+    title: '第三步：登录后内页（机构内操作 — 往里走）',
     items: [
-      { id: 'X-1', steps: '完整走一遍：发码 → 家长注册 → 绑定机构', expected: '全流程成功；邀请状态变为已使用' },
-      { id: 'X-2', steps: '换一个人点已经用过的邀请链接', expected: '提示已失效' },
-      { id: 'X-3', steps: '走一遍：校长发员工邀请 → 员工接受', expected: '成功加入校区' },
-      { id: 'X-4', steps: '把招生链接转发到另一台手机再打开', expected: '链接能用，信息对' },
-      { id: 'X-5', steps: '（抽一条）给邀请来的学员充值或发卡', expected: '邀请关系升级为「会员」' },
+      { id: 'VH-1', account: '<code>teacher1@yunce.com</code><br>密码 <code>123456</code>', steps: '教师登录 → 我的邀请 / 招生 → 打开「招生二维码」页', expected: '出现二维码图片；有过期时间提示' },
+      { id: 'VH-5', account: '<code>teacher1@yunce.com</code>', steps: '仍在二维码页 → 点右上角转发给好友', expected: '好友点开能进招生页（可回第二步 VH-2a 验证）' },
+      { id: 'V4T-R1', account: '<code>principal1@yunce.com</code><br>密码 <code>123456</code>', steps: '机构 A 管理员登录 →「设置」→「关于」→ 点右上角分享', expected: '分享出去的是「门店互邀」链接（带 O 开头码）' },
+      { id: 'V4T-R6', account: '<code>teacher1@yunce.com</code> 或 <code>parent1@yunce.com</code><br>密码 <code>123456</code>', steps: '用教师或家长账号登录 → 关于页点分享', expected: '不会出现管理员的专属 O 码（走普通 about 链接）' },
+      { id: 'VH-3', account: '—（可选，需开发关微信配置）', steps: '后端没配微信时打开二维码页', expected: '有明确错误提示，可以点重试' },
     ]
   },
   {
-    title: '第五步：微信登录（顺手测）',
+    title: '第四步：完整业务闭环（最里层 — 注册、提交、归因）',
     items: [
-      { id: 'F1', steps: '全新微信号在登录页点「微信登录」', expected: '进入完善资料或选择身份' },
-      { id: 'F2', steps: '已有机构的校长账号微信登录', expected: '直接进首页，不会又让你选身份' },
-      { id: 'F3', steps: '教师/家长账号在登录页微信登录', expected: '提示角色不对（这是已知现象，可跳过）', defaultStatus: 'skip' },
-      { id: 'F4', steps: '在招生页 / 试听课页里点微信登录', expected: '和以前一样能登进去' },
-      { id: 'F5', steps: '登录页快速连点「微信登录」好几下', expected: '不会卡死；不会重复报错' },
-      { id: 'F6', steps: '故意断网登录失败一次，再连上网重试', expected: '第二次能登录成功' },
+      { id: 'V4T-R4', account: 'B 用户：新注册邮箱 或 新微信号<br>（勿用 principal1/teacher1）', steps: 'B 从互邀链进入 → 填入驻表 → 登录/注册 → 提交申请', expected: '提交成功；后台可见「推荐来源 = 机构 A（松果排课）」' },
+      { id: 'X-1', account: '教师 <code>teacher1@yunce.com</code><br>家长：新微信号 / 新邮箱', steps: '完整走一遍：教师发 P 码 → 家长扫码注册 → 绑定机构', expected: '全流程成功；邀请状态变为已使用' },
+      { id: 'X-2', account: '第三人（未参与 X-1 的微信）', steps: '换一个人点 X-1 里已经用过的邀请链接', expected: '提示已失效' },
+      { id: 'X-3', account: '校长 <code>principal1@yunce.com</code><br>员工：新邮箱或 <code>teacher3@yunce.com</code>', steps: '校长发校区员工邀请 → 员工打开链接接受', expected: '成功加入校区' },
+      { id: 'X-5', account: '<code>principal1@yunce.com</code>', steps: '（抽一条）给 X-1 邀请来的学员充值或发卡', expected: '邀请关系升级为「会员」' },
     ]
   },
 ];
@@ -168,7 +199,18 @@ function defaultState() {
 }
 
 function loadState() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch (e) {}
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      SECTIONS.forEach(s => s.items.forEach(it => {
+        if (!parsed.items[it.id]) {
+          parsed.items[it.id] = { status: it.defaultStatus || 'pending', notes: '', testedAt: null };
+        }
+      }));
+      return parsed;
+    }
+  } catch (e) {}
   return defaultState();
 }
 
@@ -216,12 +258,14 @@ function render() {
     <section>
       <h2>${section.title}</h2>
       <table>
-        <thead><tr><th style="width:64px">编号</th><th>你要做什么</th><th>应该怎样</th><th style="width:100px">结果</th><th style="width:160px">备注（失败必填）</th></tr></thead>
+        <thead><tr><th style="width:64px">编号</th><th style="width:150px">用哪个账号</th><th>你要做什么</th><th>应该怎样</th><th style="width:100px">结果</th><th style="width:160px">备注（失败必填）</th></tr></thead>
         <tbody>${section.items.map(it => {
           const item = state.items[it.id] || { status: 'pending', notes: '' };
           const locked = item.status === 'pass';
+          const depNote = it.depends ? `<br><span style="color:var(--pending);font-size:0.78rem">⚠ ${it.depends}</span>` : '';
           return `<tr class="${item.status} ${locked?'frozen-row':''}">
             <td><code>${it.id}</code>${locked?'<br><span class="badge lock">已验收</span>':''}</td>
+            <td class="account-cell">${it.account || '—'}${depNote}</td>
             <td>${it.steps}</td>
             <td>${it.expected}</td>
             <td><select onchange="setStatus('${it.id}', this.value)">

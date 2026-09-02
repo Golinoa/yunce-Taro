@@ -17,6 +17,10 @@ import {
 } from '@/utils/identity-path-allowlist';
 import { isColdStartGracePeriod } from '@/utils/launch-scene';
 import { reportLocalDebug } from '@/utils/local-debug';
+import {
+  maybeRedirectStoreEntryPendingHub,
+  shouldRunStoreEntryColdStartCheck,
+} from '@/utils/store-entry-onboarding';
 import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 
 // 无需登录即可访问的页面
@@ -339,6 +343,7 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { profile, loading, refreshProfile } = useAuth();
   const [authorized, setAuthorized] = useState(false);
   const hasRefreshed = useRef(false);
+  const storeEntryFunnelCheckedRef = useRef(false);
   const guardStartAtRef = useRef(Date.now());
 
   const checkAuth = useCallback(() => {
@@ -438,6 +443,19 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
       redirectToLogin(currentPath);
     }
     setAuthorized(false);
+  }, [profile, loading]);
+
+  // 冷启动：已提交入驻待审时，home / identity-select 一次 redirect pending
+  useEffect(() => {
+    if (loading || !profile || storeEntryFunnelCheckedRef.current) {
+      return;
+    }
+    const currentPath = Taro.getCurrentInstance()?.router?.path || '';
+    if (!shouldRunStoreEntryColdStartCheck(currentPath)) {
+      return;
+    }
+    storeEntryFunnelCheckedRef.current = true;
+    void maybeRedirectStoreEntryPendingHub(profile);
   }, [profile, loading]);
 
   // 首次加载时 refreshProfile + checkAuth

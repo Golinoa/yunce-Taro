@@ -196,6 +196,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
                   index > 0 && '-ml-[14rpx]',
                 )}
                 mode="aspectFill"
+                lazyLoad
               />
             ))}
             {students.length === 0 ? (

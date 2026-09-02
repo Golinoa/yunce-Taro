@@ -75,7 +75,16 @@ function uploadToQiniu(
         resolve({ url: payload.url, filename });
       },
       fail: (err) => {
-        reject(new Error(err.errMsg || '七牛上传请求失败'));
+        const raw = err.errMsg || '七牛上传请求失败';
+        if (/ERR_CERT|certificate|证书|COMMON_NAME/i.test(raw)) {
+          reject(
+            new Error(
+              '头像上传失败：七牛上传域名证书校验未通过，请确认微信后台 uploadFile 已配置 upload.qiniup.com',
+            ),
+          );
+          return;
+        }
+        reject(new Error(raw));
       },
     });
   });

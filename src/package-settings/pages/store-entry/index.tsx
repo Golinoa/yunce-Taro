@@ -8,7 +8,8 @@
 import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import BindEmailSheet from '@/components/BindEmailSheet';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
@@ -16,6 +17,7 @@ import PickerSheet from '@/components/PickerSheet';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
 import { auditLogService } from '@/services/audit-log';
+import { refreshSessionForTenant } from '@/services/auth';
 import {
   readStoreEntryDraft,
   saveStoreEntryDraft,
@@ -25,17 +27,24 @@ import { useCampusStore } from '@/stores/campus';
 import type { StoreType } from '@/types/store-entry';
 import { useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
+import { consumePendingStoreReferralCode } from '@/utils/invite-store-referral-link';
+import { ensureUserLocationAuthorized } from '@/utils/location-authorize';
 import { logError } from '@/utils/logger';
+import { ensurePrivacyAuthorized } from '@/utils/privacy-authorize';
+import { ApiError } from '@/utils/request';
 import { LOGIN_REDIRECT_KEY, withRouteGuard } from '@/utils/route-guard';
+import {
+  invalidateStoreEntryLatestCache,
+  resolveStoreEntryFormGate,
+  resolveStoreEntrySubmitError,
+  STORE_ENTRY_PENDING_PATH,
+  writeStoreEntryLatestCache,
+} from '@/utils/store-entry-onboarding';
 import { normalizeStoreEntryStatus } from '@/utils/store-entry-status';
 import {
   applyStoreEntryDraftToForm,
   resolveStoreEntrySubmitGate,
 } from '@/utils/store-entry-submit';
-import { refreshSessionForTenant } from '@/services/auth';
-import { consumePendingStoreReferralCode } from '@/utils/invite-store-referral-link';
-import { ensureUserLocationAuthorized } from '@/utils/location-authorize';
-import { ensurePrivacyAuthorized } from '@/utils/privacy-authorize';
 
 const LOGIN_PAGE = '/package-auth/pages/login/index';
 const STORE_ENTRY_PATH = '/package-settings/pages/store-entry/index';
@@ -183,7 +192,7 @@ function FormSelect({
 }
 
 const StoreEntry: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, bindAccountEmail, sendBindEmailCode, refreshProfile } = useAuth();
   const [form, setForm] = useState<FormState>({
     name: '',
     type: '总店',
@@ -201,9 +210,12 @@ const StoreEntry: React.FC = () => {
   const [typePickerVisible, setTypePickerVisible] = useState(false);
   /** 本会话已点「下次再说」：不再反复软挡邮箱 */
   const [emailPromptSkipped, setEmailPromptSkipped] = useState(false);
+  const [gateLoading, setGateLoading] = useState(false);
+  const [showBindEmail, setShowBindEmail] = useState(false);
+  const [bindingEmail, setBindingEmail] = useState(false);
+  const submitInFlightRef = useRef(false);
 
   useEffect(() => {
-    clearIdentitySelectionPending();
     const draft = applyStoreEntryDraftToForm(readStoreEntryDraft());
     if (!draft) return;
     setForm((prev) => ({
@@ -219,6 +231,34 @@ const StoreEntry: React.FC = () => {
       contactPhone: draft.contactPhone || prev.contactPhone,
     }));
   }, []);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    void (async () => {
+      setGateLoading(true);
+      try {
+        const latest = await storeEntryService.queryLatestSafe();
+        if (cancelled) return;
+        writeStoreEntryLatestCache(latest);
+        const gate = resolveStoreEntryFormGate({
+          isLoggedIn: true,
+          latest,
+          loading: false,
+        });
+        if (gate.kind === 'redirect_pending') {
+          void Taro.redirectTo({ url: STORE_ENTRY_PENDING_PATH });
+        }
+      } catch {
+        /* 进页拦截失败不阻断填表 */
+      } finally {
+        if (!cancelled) setGateLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
 
   const regionText = useMemo(() => form.region.filter(Boolean).join(' '), [form.region]);
 
@@ -295,7 +335,37 @@ const StoreEntry: React.FC = () => {
     }
   }, [updateForm]);
 
+  const handleBindEmail = useCallback(
+    async (payload: { email: string; code: string; password: string }) => {
+      if (bindingEmail) return;
+      setBindingEmail(true);
+      try {
+        const { error } = await bindAccountEmail(payload.email, payload.code, payload.password);
+        if (error) {
+          Taro.showToast({ title: error.message || '绑定失败', icon: 'none' });
+          return;
+        }
+        setShowBindEmail(false);
+        await refreshProfile();
+        Taro.showToast({ title: '邮箱已绑定', icon: 'success' });
+      } finally {
+        setBindingEmail(false);
+      }
+    },
+    [bindAccountEmail, bindingEmail, refreshProfile],
+  );
+
+  const redirectToPendingAfterSubmit = useCallback((storeName: string, status: string) => {
+    clearIdentitySelectionPending();
+    invalidateStoreEntryLatestCache();
+    const encoded = encodeURIComponent(storeName);
+    void Taro.redirectTo({
+      url: `${STORE_ENTRY_PENDING_PATH}?status=${status}&storeName=${encoded}`,
+    });
+  }, []);
+
   const handleSubmit = useCallback(async () => {
+    if (submitInFlightRef.current || submitting) return;
     if (!validate()) {
       Taro.showToast({ title: '请完善入驻信息', icon: 'none' });
       return;
@@ -346,20 +416,19 @@ const StoreEntry: React.FC = () => {
       if (modal.confirm) {
         setEmailPromptSkipped(true);
       } else {
-        // 去绑定：保留草稿后跳转资料页（页内可绑邮箱）
         saveStoreEntryDraft(payload);
-        void Taro.navigateTo({ url: '/package-student/pages/profile-edit/index' });
+        setShowBindEmail(true);
         return;
       }
     }
 
+    submitInFlightRef.current = true;
     setSubmitting(true);
     try {
       const result = await storeEntryService.submit(payload);
 
       consumePendingStoreReferralCode();
       saveStoreEntryDraft(payload);
-      // 提交后挂演示机构：刷新 JWT 注入真实 organizationId
       await refreshSessionForTenant();
 
       if (result.campusId) {
@@ -389,17 +458,40 @@ const StoreEntry: React.FC = () => {
       } catch (e) {
         logError('audit store.apply', e);
       }
-      const storeName = encodeURIComponent(form.name.trim());
       const statusQuery = normalizeStoreEntryStatus(result.status);
-      void Taro.redirectTo({
-        url: `/package-settings/pages/store-entry/pending/index?status=${statusQuery}&storeName=${storeName}`,
-      });
-    } catch {
-      Taro.showToast({ title: '提交失败，请稍后重试', icon: 'none' });
+      redirectToPendingAfterSubmit(form.name.trim(), statusQuery);
+    } catch (err) {
+      const action = resolveStoreEntrySubmitError(err);
+      if (action.kind === 'redirect_pending') {
+        redirectToPendingAfterSubmit(form.name.trim(), 'pending');
+        return;
+      }
+      Taro.showToast({ title: action.message, icon: 'none' });
+      if (err instanceof ApiError) {
+        logError('store-entry submit', err);
+      }
     } finally {
+      submitInFlightRef.current = false;
       setSubmitting(false);
     }
-  }, [validate, form, profile, emailPromptSkipped]);
+  }, [
+    validate,
+    form,
+    profile,
+    emailPromptSkipped,
+    submitting,
+    redirectToPendingAfterSubmit,
+  ]);
+
+  if (gateLoading) {
+    return (
+      <PageContainer safeBottom className="px-[32rpx] py-[32rpx]">
+        <View className="flex items-center justify-center py-[120rpx]">
+          <Text className="text-[28rpx] text-muted-foreground">加载中...</Text>
+        </View>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer safeBottom className="flex flex-col bg-background">
@@ -611,6 +703,14 @@ const StoreEntry: React.FC = () => {
         value={form.type || ''}
         onClose={() => setTypePickerVisible(false)}
         onConfirm={(v) => updateForm('type', v as StoreType | '')}
+      />
+
+      <BindEmailSheet
+        visible={showBindEmail}
+        submitting={bindingEmail}
+        onClose={() => setShowBindEmail(false)}
+        onSendCode={sendBindEmailCode}
+        onSubmit={handleBindEmail}
       />
     </PageContainer>
   );

@@ -164,6 +164,7 @@ interface BackendAuthPayload {
   expiresIn: number;
   isNewUser?: boolean;
   refreshToken: string;
+  shareAttached?: boolean;
   token: string;
   user: BackendUserInfo;
 }
@@ -533,7 +534,13 @@ export interface LoginResult {
   session: AuthSession | null;
   profile: Profile | null;
   isNewUser?: boolean;
+  shareAttached?: boolean;
   error: { message: string } | null;
+}
+
+export interface WechatLoginOptions {
+  inviteCode?: string;
+  role?: 'PARENT' | 'PRINCIPAL' | 'TEACHER';
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
@@ -567,11 +574,21 @@ export async function login(username: string, password: string): Promise<LoginRe
   }
 }
 
-export async function wechatLogin(code: string): Promise<LoginResult> {
+export async function wechatLogin(
+  code: string,
+  options?: WechatLoginOptions,
+): Promise<LoginResult> {
   try {
+    const body: { code: string; inviteCode?: string; role?: string } = { code };
+    const inviteCode = (options?.inviteCode || '').trim();
+    if (inviteCode) {
+      body.inviteCode = inviteCode;
+      body.role = options?.role ?? 'PARENT';
+    }
+
     const data = await post<BackendAuthPayload>(
       AUTH_ENDPOINTS.wechatLogin,
-      { code },
+      body,
       { skipAuth: true },
     );
     const mapped = mapBackendAuthPayload(data);
@@ -579,6 +596,7 @@ export async function wechatLogin(code: string): Promise<LoginResult> {
       session: mapped.session,
       profile: mapped.profile,
       isNewUser: data.isNewUser,
+      shareAttached: data.shareAttached,
       error: null,
     };
   } catch (error) {

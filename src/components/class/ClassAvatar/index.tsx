@@ -49,6 +49,7 @@ const ClassAvatar: React.FC<ClassAvatarProps> = ({ size = 'md', src, className }
         src={imageSrc}
         mode="aspectFit"
         className="h-full w-full"
+        lazyLoad
         onError={() => {
           if (imageSrc !== BRAND_LOGO) setImageSrc(BRAND_LOGO);
         }}

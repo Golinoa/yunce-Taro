@@ -29,20 +29,22 @@ type PendingAction = 'wechat' | 'password' | null;
 
 const Login: React.FC = () => {
   const { profile, loading, signInWithWechat, signInWithUsername } = useAuth();
-  const { agreed, setAgreed } = useAgreementStore();
+  const { setAgreed } = useAgreementStore();
   const navHeight = useNavSafeHeight();
   const didPostLoginNavigate = useRef(false);
   const cancelPrivacyPromptRef = useRef<(() => void) | null>(null);
 
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
+  const [loginAgreed, setLoginAgreed] = useState(false);
   const [showAgreementDialog, setShowAgreementDialog] = useState(false);
   const [wechatSubmitting, setWechatSubmitting] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   useDidShow(() => {
-    privacyTrace('login.page.show', { agreed, loading, hasProfile: Boolean(profile) });
+    setLoginAgreed(false);
+    privacyTrace('login.page.show', { loginAgreed: false, loading, hasProfile: Boolean(profile) });
     cancelPrivacyPromptRef.current?.();
     cancelPrivacyPromptRef.current = promptWechatOfficialPrivacyOnPageEnter('login.page.show', {
       delayMs: 450,
@@ -181,12 +183,12 @@ const Login: React.FC = () => {
 
   const ensureAgreement = useCallback(
     (action: Exclude<PendingAction, null>) => {
-      if (agreed) return true;
+      if (loginAgreed) return true;
       setPendingAction(action);
       setShowAgreementDialog(true);
       return false;
     },
-    [agreed],
+    [loginAgreed],
   );
 
   const handlePasswordLogin = useCallback(() => {
@@ -223,7 +225,11 @@ const Login: React.FC = () => {
   ]);
 
   const handleWechatLogin = useCallback(() => {
-    privacyTrace('login.handleWechatLogin.click', { agreed, wechatSubmitting, passwordSubmitting });
+    privacyTrace('login.handleWechatLogin.click', {
+      loginAgreed,
+      wechatSubmitting,
+      passwordSubmitting,
+    });
     if (wechatSubmitting || passwordSubmitting) return;
     if (!authCapabilities.supportsWechatLogin) {
       privacyTrace('login.handleWechatLogin.unsupported');
@@ -235,7 +241,7 @@ const Login: React.FC = () => {
       void executeWechatLogin();
     });
   }, [
-    agreed,
+    loginAgreed,
     ensureAgreement,
     executeWechatLogin,
     passwordSubmitting,
@@ -245,6 +251,7 @@ const Login: React.FC = () => {
 
   const handleAgreementConfirm = useCallback(() => {
     privacyTrace('login.handleAgreementConfirm', { pendingAction });
+    setLoginAgreed(true);
     setAgreed(true);
     setShowAgreementDialog(false);
     if (pendingAction === 'wechat') {
@@ -322,15 +329,15 @@ const Login: React.FC = () => {
 
         <View
           className="mb-[32rpx] flex flex-row items-center gap-[12rpx]"
-          onClick={() => setAgreed(!agreed)}
+          onClick={() => setLoginAgreed(!loginAgreed)}
         >
           <View
             className={cn(
               'h-[28rpx] w-[28rpx] rounded-full border-[2rpx] flex items-center justify-center flex-shrink-0',
-              agreed ? 'border-primary bg-primary' : 'border-[#CFCFCF]',
+              loginAgreed ? 'border-primary bg-primary' : 'border-[#CFCFCF]',
             )}
           >
-            {agreed ? <Text className="text-[18rpx] text-white">✓</Text> : null}
+            {loginAgreed ? <Text className="text-[18rpx] text-white">✓</Text> : null}
           </View>
           <Text className="text-[22rpx] leading-[32rpx] text-muted-foreground">
             未注册账号请先注册；登录即表示已阅读并同意

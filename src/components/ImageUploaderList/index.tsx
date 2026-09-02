@@ -106,7 +106,7 @@ const ImageUploaderList: React.FC<ImageUploaderListProps> = ({
             className="w-[160rpx] h-[160rpx] rounded-[24rpx] overflow-hidden relative press-bg"
             onClick={() => handlePreview(index)}
           >
-            <Image className="w-full h-full" src={url} mode="aspectFill" />
+            <Image className="w-full h-full" src={url} mode="aspectFill" lazyLoad />
             {/* 删除按钮 */}
             <View
               className="absolute top-[8rpx] right-[8rpx] w-[40rpx] h-[40rpx] rounded-full bg-black/50 flex items-center justify-center z-10"

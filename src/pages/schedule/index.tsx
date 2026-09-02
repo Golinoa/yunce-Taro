@@ -46,19 +46,26 @@ import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import type { BookableVenue } from '@/types/venue-booking';
 import { isParentRole, useAuth } from '@/utils/auth';
+import { createOperationLock } from '@/utils/batch-operation';
 import {
   buildLessonSharePath,
   buildLessonShareTitle,
   type LessonSharePayload,
 } from '@/utils/lesson-share';
 import { logError } from '@/utils/logger';
-import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import {
   upsertParentBooking,
   updateParentBookingStatus,
   readParentBookings,
 } from '@/utils/parent-bookings';
+import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import { withRouteGuard } from '@/utils/route-guard';
+import {
+  canOperateHistoricalLesson,
+  canSuspendOpenSlot,
+  canSuspendThisLesson,
+  parseTimeToMinutes,
+} from '@/utils/schedule-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -151,14 +158,6 @@ const getTabContainerWidth = (tabCount: number): number =>
 function rpxToPx(rpx: number): number {
   const { windowWidth } = Taro.getWindowInfo();
   return (rpx * windowWidth) / 750;
-}
-
-function parseTimeToMinutes(time: string): number {
-  const [hour, minute] = time.split(':').map(Number);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
-    return 0;
-  }
-  return hour * 60 + minute;
 }
 
 function getDurationText(startTime: string, endTime: string): string {
@@ -441,47 +440,7 @@ function isUpcomingClassCard(status: ScheduleCardItem['status']): boolean {
   return status === 'upcoming' || status === 'urgent';
 }
 
-/** 停课：仅「尚未开课」的这一节可临时取消 */
-function canSuspendThisLesson(
-  item: Pick<ScheduleCardItem, 'status' | 'startTime'>,
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-): boolean {
-  if (
-    item.status === 'cancelled' ||
-    item.status === 'done' ||
-    item.status === 'ended' ||
-    item.status === 'active'
-  ) {
-    return false;
-  }
-  if (selectedDate.isBefore(now, 'day')) return false;
-  if (selectedDate.isAfter(now, 'day')) return true;
-  const startMinutes = parseTimeToMinutes(item.startTime);
-  const nowMinutes = now.hour() * 60 + now.minute();
-  return nowMinutes < startMinutes;
-}
-
-function canSuspendOpenSlot(
-  slot: Pick<ClassBookingSlot, 'status' | 'start_time' | 'lesson_date'>,
-  now: dayjs.Dayjs,
-): boolean {
-  if (slot.status === 'rest') return false;
-  const lessonDay = dayjs(slot.lesson_date);
-  if (lessonDay.isBefore(now, 'day')) return false;
-  if (lessonDay.isAfter(now, 'day')) return true;
-  const startMinutes = parseTimeToMinutes(slot.start_time);
-  const nowMinutes = now.hour() * 60 + now.minute();
-  return nowMinutes < startMinutes;
-}
-
-/** 历史课可操作窗口：上课日起 30 天内可补录；超时仅可查看 */
-const LESSON_OPERATE_WINDOW_DAYS = 30;
-
-function canOperateHistoricalLesson(lessonDate: dayjs.Dayjs, now: dayjs.Dayjs): boolean {
-  const earliest = now.startOf('day').subtract(LESSON_OPERATE_WINDOW_DAYS, 'day');
-  return !lessonDate.startOf('day').isBefore(earliest);
-}
+/** 历史课可操作窗口：上课日起 30 天内可补录；超时仅可查看（逻辑见 utils/schedule-guard） */
 
 function isBookingSchedule(schedule: Schedule): boolean {
   return Boolean(schedule.tag || schedule.student_id);
@@ -500,6 +459,8 @@ const SchedulePage: React.FC = () => {
   const campuses = useCampusStore((state) => state.campuses);
   const themeStore = useThemeStore();
   const isParent = isParentRole(currentRole);
+  /** 批量操作并发锁：恢复/停课/取消等危险操作共享，避免连点重复发请求 */
+  const batchOperationLockRef = useRef(createOperationLock());
   /** 家长绑定孩子所在班级，用于班课只看自己的排班 */
   const [parentClassIds, setParentClassIds] = useState<Set<string>>(new Set());
 
@@ -1728,19 +1689,26 @@ const SchedulePage: React.FC = () => {
         return;
       }
 
+      // 并发锁：已有批量操作执行中则忽略本次，避免重复请求
+      const lock = batchOperationLockRef.current;
+      if (lock.isLocked()) return;
       try {
-        await Promise.all(cancelledRecords.map((record) => lessonRecordService.remove(record.id)));
-        setLessonRecords((prev) =>
-          prev.filter(
-            (record) =>
-              !(
-                record.class_id === item.classId &&
-                record.lesson_date === lessonDate &&
-                record.status === 'cancelled'
-              ),
-          ),
-        );
-        Taro.showToast({ title: '已恢复本次课程', icon: 'success' });
+        await lock.run('restore-lesson', async () => {
+          await Promise.all(
+            cancelledRecords.map((record) => lessonRecordService.remove(record.id)),
+          );
+          setLessonRecords((prev) =>
+            prev.filter(
+              (record) =>
+                !(
+                  record.class_id === item.classId &&
+                  record.lesson_date === lessonDate &&
+                  record.status === 'cancelled'
+                ),
+            ),
+          );
+          Taro.showToast({ title: '已恢复本次课程', icon: 'success' });
+        });
       } catch (err) {
         logError('SchedulePage restore lesson', err);
         Taro.showToast({ title: '恢复失败，请重试', icon: 'none' });
@@ -1752,7 +1720,8 @@ const SchedulePage: React.FC = () => {
   /** 停课：仅未开课的这一节临时取消，并向学员家长发站内 + 订阅消息 */
   const handleSuspendLesson = useCallback(
     async (item: ScheduleCardItem) => {
-      if (!item.classId) {
+      const classId = item.classId;
+      if (!classId) {
         Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
         return;
       }
@@ -1776,52 +1745,57 @@ const SchedulePage: React.FC = () => {
       const className = selectedClass?.name || item.className;
       const changeTime = `${lessonDate} ${item.startTime}-${item.endTime}`;
 
+      // 并发锁：已有批量操作执行中则忽略本次，避免重复创建停课记录
+      const lock = batchOperationLockRef.current;
+      if (lock.isLocked()) return;
       try {
-        const students = await classService.getStudents(item.classId);
-        const createdRecords: LessonRecord[] = [];
+        await lock.run('suspend-lesson', async () => {
+          const students = await classService.getStudents(classId);
+          const createdRecords: LessonRecord[] = [];
 
-        for (const student of students) {
-          const createdRecord = await lessonRecordService.create({
-            teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
-            operator_teacher_id: currentTeacherId,
-            assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
-            student_id: student.id,
-            package_id: '',
-            class_id: item.classId,
-            lesson_date: lessonDate,
-            hours_used: 0,
-            status: 'cancelled',
-            content: `停课：${item.className} ${item.startTime}-${item.endTime}`,
-          });
-          createdRecords.push(createdRecord);
+          for (const student of students) {
+            const createdRecord = await lessonRecordService.create({
+              teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
+              operator_teacher_id: currentTeacherId,
+              assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
+              student_id: student.id,
+              package_id: '',
+              class_id: item.classId,
+              lesson_date: lessonDate,
+              hours_used: 0,
+              status: 'cancelled',
+              content: `停课：${item.className} ${item.startTime}-${item.endTime}`,
+            });
+            createdRecords.push(createdRecord);
 
-          const parents = await studentService.getParents(student.id);
-          for (const binding of parents) {
-            await notificationService.send({
-              sender_id: profile?.id || currentUserId,
-              receiver_id: binding.parent_id,
-              title: `${className}停课通知`,
-              content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
-              related_id: student.id,
-              type: 'schedule_change',
-            });
-            await subscribeMessageService.sendScheduleChangeToReceiver({
-              receiverUserId: binding.parent_id,
-              bizKey: `lesson-suspend:${item.id}:${lessonDate}:${binding.parent_id}`,
-              className,
-              changeTime,
-              changeReason: '本节课临时停课',
-            });
+            const parents = await studentService.getParents(student.id);
+            for (const binding of parents) {
+              await notificationService.send({
+                sender_id: profile?.id || currentUserId,
+                receiver_id: binding.parent_id,
+                title: `${className}停课通知`,
+                content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
+                related_id: student.id,
+                type: 'schedule_change',
+              });
+              await subscribeMessageService.sendScheduleChangeToReceiver({
+                receiverUserId: binding.parent_id,
+                bizKey: `lesson-suspend:${item.id}:${lessonDate}:${binding.parent_id}`,
+                className,
+                changeTime,
+                changeReason: '本节课临时停课',
+              });
+            }
           }
-        }
 
-        setLessonRecords((prev) => {
-          const filtered = prev.filter(
-            (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
-          );
-          return [...filtered, ...createdRecords];
+          setLessonRecords((prev) => {
+            const filtered = prev.filter(
+              (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
+            );
+            return [...filtered, ...createdRecords];
+          });
+          Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
         });
-        Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
       } catch (err) {
         logError('SchedulePage suspend lesson', err);
         Taro.showToast({ title: '停课失败，请重试', icon: 'none' });
@@ -1857,46 +1831,51 @@ const SchedulePage: React.FC = () => {
       });
       if (!confirmResult.confirm) return;
 
+      // 并发锁：已有批量操作执行中则忽略本次
+      const lock = batchOperationLockRef.current;
+      if (lock.isLocked()) return;
       try {
-        await classBookingService.updateSlotStatus(slot.id, 'rest');
-        setOpenClassSlots((prev) => {
-          const next = { ...prev };
-          const dateKey = slot.lesson_date;
-          if (next[dateKey]) {
-            next[dateKey] = { ...next[dateKey] };
-            const classSlots = next[dateKey][slot.class_id];
-            if (classSlots) {
-              next[dateKey][slot.class_id] = classSlots.map((s) =>
-                s.id === slot.id ? { ...s, status: 'rest' as const } : s,
-              );
+        await lock.run('suspend-open-slot', async () => {
+          await classBookingService.updateSlotStatus(slot.id, 'rest');
+          setOpenClassSlots((prev) => {
+            const next = { ...prev };
+            const dateKey = slot.lesson_date;
+            if (next[dateKey]) {
+              next[dateKey] = { ...next[dateKey] };
+              const classSlots = next[dateKey][slot.class_id];
+              if (classSlots) {
+                next[dateKey][slot.class_id] = classSlots.map((s) =>
+                  s.id === slot.id ? { ...s, status: 'rest' as const } : s,
+                );
+              }
+            }
+            return next;
+          });
+
+          const bookingStudents = slot.booking_students || [];
+          for (const student of bookingStudents) {
+            const parents = await studentService.getParents(student.id);
+            for (const binding of parents) {
+              await notificationService.send({
+                sender_id: profile?.id || currentUserId,
+                receiver_id: binding.parent_id,
+                title: `${displayName}停课通知`,
+                content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
+                related_id: student.id,
+                type: 'schedule_change',
+              });
+              await subscribeMessageService.sendScheduleChangeToReceiver({
+                receiverUserId: binding.parent_id,
+                bizKey: `slot-suspend:${slot.id}:${binding.parent_id}`,
+                className: displayName,
+                changeTime,
+                changeReason: '本节课临时停课',
+              });
             }
           }
-          return next;
+
+          Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
         });
-
-        const bookingStudents = slot.booking_students || [];
-        for (const student of bookingStudents) {
-          const parents = await studentService.getParents(student.id);
-          for (const binding of parents) {
-            await notificationService.send({
-              sender_id: profile?.id || currentUserId,
-              receiver_id: binding.parent_id,
-              title: `${displayName}停课通知`,
-              content: `${changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
-              related_id: student.id,
-              type: 'schedule_change',
-            });
-            await subscribeMessageService.sendScheduleChangeToReceiver({
-              receiverUserId: binding.parent_id,
-              bizKey: `slot-suspend:${slot.id}:${binding.parent_id}`,
-              className: displayName,
-              changeTime,
-              changeReason: '本节课临时停课',
-            });
-          }
-        }
-
-        Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
       } catch (err) {
         logError('SchedulePage suspend open slot', err);
         Taro.showToast({ title: '停课失败，请重试', icon: 'none' });
@@ -1945,7 +1924,8 @@ const SchedulePage: React.FC = () => {
       if (!item) {
         return;
       }
-      if (!item.classId) {
+      const classId = item.classId;
+      if (!classId) {
         Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
         return;
       }
@@ -1956,46 +1936,54 @@ const SchedulePage: React.FC = () => {
         filteredClasses.find((classItem) => classItem.id === item.classId) || null;
 
       setDangerActionSubmitting(true);
+      // 并发锁：已有批量操作执行中则忽略本次（与 submitting 双保险）
+      const lock = batchOperationLockRef.current;
+      if (lock.isLocked()) {
+        setDangerActionSubmitting(false);
+        return;
+      }
       try {
-        const students = await classService.getStudents(item.classId);
-        const createdRecords: LessonRecord[] = [];
+        await lock.run('cancel-lesson', async () => {
+          const students = await classService.getStudents(classId);
+          const createdRecords: LessonRecord[] = [];
 
-        for (const student of students) {
-          const createdRecord = await lessonRecordService.create({
-            teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
-            operator_teacher_id: currentTeacherId,
-            assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
-            student_id: student.id,
-            package_id: '',
-            class_id: item.classId,
-            lesson_date: lessonDate,
-            hours_used: 0,
-            status: 'cancelled',
-            content: `取消开课：${item.className} ${item.startTime}-${item.endTime}`,
-          });
-
-          createdRecords.push(createdRecord);
-
-          const parents = await studentService.getParents(student.id);
-          for (const binding of parents) {
-            await notificationService.send({
-              sender_id: profile?.id || currentUserId,
-              receiver_id: binding.parent_id,
-              title: `${selectedClass?.name || item.className}已取消`,
-              content: `${lessonDate} ${item.startTime}-${item.endTime} 的课程已取消`,
-              related_id: student.id,
+          for (const student of students) {
+            const createdRecord = await lessonRecordService.create({
+              teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
+              operator_teacher_id: currentTeacherId,
+              assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
+              student_id: student.id,
+              package_id: '',
+              class_id: item.classId,
+              lesson_date: lessonDate,
+              hours_used: 0,
+              status: 'cancelled',
+              content: `取消开课：${item.className} ${item.startTime}-${item.endTime}`,
             });
-          }
-        }
 
-        setLessonRecords((prev) => {
-          const filtered = prev.filter(
-            (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
-          );
-          return [...filtered, ...createdRecords];
+            createdRecords.push(createdRecord);
+
+            const parents = await studentService.getParents(student.id);
+            for (const binding of parents) {
+              await notificationService.send({
+                sender_id: profile?.id || currentUserId,
+                receiver_id: binding.parent_id,
+                title: `${selectedClass?.name || item.className}已取消`,
+                content: `${lessonDate} ${item.startTime}-${item.endTime} 的课程已取消`,
+                related_id: student.id,
+              });
+            }
+          }
+
+          setLessonRecords((prev) => {
+            const filtered = prev.filter(
+              (record) => !(record.class_id === item.classId && record.lesson_date === lessonDate),
+            );
+            return [...filtered, ...createdRecords];
+          });
+          closeDangerActionDialog();
+          Taro.showToast({ title: '已取消本次课程', icon: 'success' });
         });
-        closeDangerActionDialog();
-        Taro.showToast({ title: '已取消本次课程', icon: 'success' });
       } catch (err) {
         logError('SchedulePage cancel lesson', err);
         Taro.showToast({ title: '取消失败，请重试', icon: 'none' });
@@ -2894,6 +2882,7 @@ const SchedulePage: React.FC = () => {
                                     index > 0 && '-ml-[16rpx]',
                                   )}
                                   mode="aspectFill"
+                                  lazyLoad
                                 />
                               ))}
                           </View>
@@ -3139,6 +3128,7 @@ const SchedulePage: React.FC = () => {
                                       index > 0 && '-ml-[16rpx]',
                                     )}
                                     mode="aspectFill"
+                                    lazyLoad
                                   />
                                 ))}
                               <View

@@ -451,14 +451,27 @@ const CourseFormPage: React.FC = () => {
 
   // 加载科目列表和教师列表
   useEffect(() => {
-    subjectService.getList().then(setSubjects);
+    subjectService
+      .getList()
+      .then(setSubjects)
+      .catch((err) => {
+        logError('course-form load subjects', err);
+        setSubjects([]); // 空态兜底，避免选择器渲染失败
+        Taro.showToast({ title: '科目列表加载失败', icon: 'none' });
+      });
     fetchTeachers();
   }, [fetchTeachers]);
 
   // 班课模式：加载学员列表（依赖当前教师身份）
   useEffect(() => {
     if (!isClassMode || !profile?.id) return;
-    fetchByTeacher(profile.id).then(setStudentList);
+    fetchByTeacher(profile.id)
+      .then(setStudentList)
+      .catch((err) => {
+        // 次要数据：加载失败静默置空，不打断表单填写
+        logError('course-form load students', err);
+        setStudentList([]);
+      });
   }, [isClassMode, profile?.id, fetchByTeacher]);
 
   // 容纳人数不再按分类自动填充默认值，保持留空即「不限制人数」。

@@ -40,6 +40,9 @@ export default defineConfig({
         'src/utils/upload-flow.ts',
         'src/utils/use-batch-render.ts',
         'src/utils/schedule-guard.ts',
+        'src/utils/store-entry-onboarding.ts',
+        'src/utils/store-entry-submit.ts',
+        'src/constants/store-entry-copy.ts',
       ],
       thresholds: {
         // 起步门槛：随回归套件补全逐步上调至 review 建议的 60%+

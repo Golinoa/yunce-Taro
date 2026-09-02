@@ -10,6 +10,7 @@ import type { CampusUIModel, Subject } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { isAdmin, useAuth } from '@/utils/auth';
+import { chooseImageTemp, isImageCancelError } from '@/utils/image-upload';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 
@@ -441,17 +442,14 @@ export function useStudentForm(): UseStudentFormReturn {
 
   const handleChooseAvatar = useCallback(async () => {
     try {
-      const res = await Taro.chooseImage({
-        count: 1,
-        sizeType: ['compressed'],
-        sourceType: ['album', 'camera'],
-      });
-      const tempPath = res.tempFilePaths[0];
-      if (!tempPath) return;
-      setAvatarUrl(tempPath);
+      // 统一封装：chooseMedia + 隐私预检 + 1:1 裁剪 + 持久化（临时文件不回收，预览稳定）
+      const path = await chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' });
+      setAvatarUrl(path);
       Taro.showToast({ title: '头像已选择', icon: 'success' });
-    } catch {
-      // 用户取消
+    } catch (err) {
+      // 用户取消：静默
+      if (isImageCancelError(err)) return;
+      Taro.showToast({ title: '头像选择失败，请重试', icon: 'none' });
     }
   }, []);
 

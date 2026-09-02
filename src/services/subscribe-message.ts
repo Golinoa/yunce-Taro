@@ -43,6 +43,7 @@ import {
 } from '@/utils/subscribe-class-view';
 import { createClientRequestId, requestSubscribeMessageAuth } from '@/utils/subscribe-message';
 import type { SubscribeAuthEntry } from '@/utils/subscribe-message';
+import { isSubscribeContextReady } from '@/utils/auth-onboarding';
 
 const MESSAGE_AUTH_PAGE = '/package-settings/pages/message-auth/index';
 const LOGIN_OPT_IN_GROUPS: SubscribeTemplateGroup[] = [
@@ -132,8 +133,9 @@ export const subscribeMessageService = {
     campusId?: string,
     options?: { force?: boolean },
   ): Promise<SubscribeBootstrapDto> {
-    const userId = await resolveUserId();
-    if (!userId) {
+    const { profile } = await getSession();
+    const userId = profile?.id ?? null;
+    if (!userId || !isSubscribeContextReady(profile)) {
       return { templates: [], quotas: [], pendingPrompts: [], lowQuotaGroups: [] };
     }
 
@@ -579,8 +581,9 @@ export const subscribeMessageService = {
    * @returns true 表示本次已处理（含用户拒绝），调用方应跳过其它 onShow 提示
    */
   async maybeRunLoginOptIn(meta?: { role?: string; campusId?: string }): Promise<boolean> {
-    const userId = await resolveUserId();
-    if (!userId) return false;
+    const { profile } = await getSession();
+    const userId = profile?.id;
+    if (!userId || !isSubscribeContextReady(profile)) return false;
     if (hasLoginOptInDone(userId)) {
       clearLoginOptInPending();
       return false;

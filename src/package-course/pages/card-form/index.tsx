@@ -38,6 +38,7 @@ import type {
   CardTypeKind,
   CardTypeScope,
 } from '@/types/card-type';
+import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /** 表单字段错误 */
@@ -214,6 +215,12 @@ const CardFormPage: React.FC = () => {
           const existingNames = list.map((item) => item.name);
           setName(generateUniqueCopyName(data.name, existingNames));
         }
+      })
+      .catch((err) => {
+        logError('card-form load detail', err);
+        Taro.showToast({ title: '会员卡信息加载失败', icon: 'none' });
+        // 引导返回，避免停在空表单继续误操作
+        setTimeout(() => Taro.navigateBack(), 800);
       })
       .finally(() => setLoading(false));
   }, [cardId, copyFromId, isEdit, isCopy, fillForm]);

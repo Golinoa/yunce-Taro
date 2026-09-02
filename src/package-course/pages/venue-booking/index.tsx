@@ -395,6 +395,7 @@ const VenueBookingPage: React.FC = () => {
                             index > 0 && '-ml-[16rpx]',
                           )}
                           mode="aspectFill"
+                          lazyLoad
                         />
                       ))}
                       {remainingAvatarCount > 0 ? (

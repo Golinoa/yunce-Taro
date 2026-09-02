@@ -43,9 +43,11 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
+import { chooseImageTemp } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { withRouteGuard } from '@/utils/route-guard';
+import { runImageUploadFlow } from '@/utils/upload-flow';
 /** 格式化日期为 YYYY-MM-DD */
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -1499,30 +1501,19 @@ const LessonForm: React.FC = () => {
 
   // ===== 图片上传 =====
   const handleUploadImage = useCallback(async () => {
-    if (homeworkImages.length >= 3) {
-      Taro.showToast({ title: '最多上传3张图片', icon: 'none' });
-      return;
-    }
-    try {
-      const res = await Taro.chooseImage({
-        count: Math.min(3 - homeworkImages.length, 3),
-        sizeType: ['compressed'],
-        sourceType: ['album', 'camera'],
-      });
-      setUploading(true);
-      const tempPaths = res.tempFilePaths || [];
-      // 通过 uploadService 上传，mock 阶段返回固定 URL
-      const results = await uploadService.uploadBatch(tempPaths, { type: 'courseware' });
-      const urls = results.map((r) => r.url);
-      setHomeworkImages((prev) => [...prev, ...urls]);
-      if (urls.length > 0) {
-        Taro.showToast({ title: `上传成功 ${urls.length} 张`, icon: 'success' });
-      }
-    } catch {
-      // 用户取消或上传失败
-    } finally {
-      setUploading(false);
-    }
+    // 统一流程：chooseMedia + 隐私预检 + 压缩（一次一张），取消静默、失败有 toast
+    await runImageUploadFlow({
+      currentCount: homeworkImages.length,
+      maxCount: 3,
+      choose: () => chooseImageTemp({ maxSizeMB: 5, cropScale: '16:9' }),
+      upload: async (path) => {
+        const result = await uploadService.upload(path, { type: 'courseware' });
+        return result.url;
+      },
+      onSuccess: (url) => setHomeworkImages((prev) => [...prev, url]),
+      onUploadingChange: setUploading,
+      successToastTitle: '上传成功',
+    });
   }, [homeworkImages]);
 
   const handleRemoveImage = useCallback((index: number) => {
@@ -2763,6 +2754,7 @@ const LessonForm: React.FC = () => {
                             src={img}
                             mode="aspectFill"
                             className="w-[120rpx] h-[120rpx] rounded-xl"
+                            lazyLoad
                           />
                           <View
                             className="absolute -top-2 -right-2 w-[36rpx] h-[36rpx] rounded-full bg-destructive flex items-center justify-center"

@@ -13,7 +13,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
@@ -32,15 +32,6 @@ import {
   getCalendarSyncSettings,
   isCalendarSyncEnabled,
 } from '@/utils/calendar-sync-settings';
-import {
-  getDeveloperModeRemainingMs,
-  handleVersionNumberTap,
-  isDeveloperModeSessionValid,
-  isDeveloperModeUnlocked,
-  setDeveloperModeSessionValid,
-  verifyDeveloperModePassword,
-} from '@/utils/developer-mode';
-import { showInputModal } from '@/utils/modal';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 
@@ -57,8 +48,6 @@ const SystemSettings: React.FC = () => {
   const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
   const [calendarSyncEnabled, setCalendarSyncEnabledState] = useState(false);
   const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
-  const [developerModeVisible, setDeveloperModeVisible] = useState(isDeveloperModeUnlocked());
-  const developerExpireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUserId = profile?.id || '';
   const isParent = isParentRole(currentRole);
   const showCalendarSyncSwitch = !isParent && canUseCalendarSync(currentRole);
@@ -67,51 +56,8 @@ const SystemSettings: React.FC = () => {
   const [leaveAutoApprove, setLeaveAutoApprove] = useState<boolean | null>(null);
   const [leaveAutoApproveLoading, setLeaveAutoApproveLoading] = useState(false);
 
-  const scheduleDeveloperModeExpiry = useCallback(() => {
-    if (developerExpireTimerRef.current) {
-      clearTimeout(developerExpireTimerRef.current);
-      developerExpireTimerRef.current = null;
-    }
-    const remaining = getDeveloperModeRemainingMs();
-    if (remaining <= 0) {
-      setDeveloperModeVisible(false);
-      return;
-    }
-    setDeveloperModeVisible(true);
-    developerExpireTimerRef.current = setTimeout(() => {
-      setDeveloperModeVisible(isDeveloperModeUnlocked());
-      developerExpireTimerRef.current = null;
-    }, remaining + 50);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (developerExpireTimerRef.current) {
-        clearTimeout(developerExpireTimerRef.current);
-      }
-    };
-  }, []);
-
-  const promptDeveloperPassword = useCallback(() => {
-    showInputModal({
-      title: '开发者模式',
-      placeholderText: '请输入密码',
-      confirmColor: getThemeHexColors(activeTheme).primary,
-      success: (res) => {
-        if (!res.confirm) return;
-        if (!verifyDeveloperModePassword(res.content ?? '')) {
-          Taro.showToast({ title: '密码错误', icon: 'none' });
-          return;
-        }
-        setDeveloperModeSessionValid(true);
-        void Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
-      },
-    });
-  }, [activeTheme]);
-
   // 页面显示时读取最新开关状态
   useDidShow(() => {
-    scheduleDeveloperModeExpiry();
     setVenueBookingEnabledState(getVenueBookingEnabled());
     if (currentUserId) {
       setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
@@ -248,31 +194,6 @@ const SystemSettings: React.FC = () => {
     [activeTheme],
   );
 
-  const handleVersionTap = useCallback(() => {
-    const result = handleVersionNumberTap();
-    if (result === 'unlocked') {
-      setDeveloperModeVisible(true);
-      scheduleDeveloperModeExpiry();
-      Taro.showToast({ title: '已解锁（10 分钟）', icon: 'none' });
-      setTimeout(() => {
-        promptDeveloperPassword();
-      }, 400);
-    }
-  }, [promptDeveloperPassword, scheduleDeveloperModeExpiry]);
-
-  const handleOpenDeveloperMode = useCallback(() => {
-    if (!isDeveloperModeUnlocked()) {
-      setDeveloperModeVisible(false);
-      Taro.showToast({ title: '入口已关闭', icon: 'none' });
-      return;
-    }
-    if (isDeveloperModeSessionValid()) {
-      void Taro.navigateTo({ url: '/package-settings/pages/developer-mode/index' });
-      return;
-    }
-    promptDeveloperPassword();
-  }, [promptDeveloperPassword]);
-
   const handleSignOut = useCallback(async () => {
     const res = await Taro.showModal({
       title: '确认退出',
@@ -356,21 +277,8 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {developerModeVisible && !isParent && (
-            <View
-              className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg border-t border-border"
-              onClick={handleOpenDeveloperMode}
-            >
-              <Text className="text-[30rpx] text-foreground">开发者模式</Text>
-              <Icon name="mdi-chevron-right" size={28} color="mutedForeground" />
-            </View>
-          )}
-
-          {/* 当前版本（连点解锁开发者模式；家长仅展示版本） */}
-          <View
-            className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70"
-            onClick={isParent ? undefined : handleVersionTap}
-          >
+          {/* 当前版本（仅展示，无隐藏入口） */}
+          <View className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
             <Text className="text-[30rpx] text-foreground">当前版本</Text>
             <Text className="text-[28rpx] text-muted-foreground">v{APP_VERSION}</Text>
           </View>

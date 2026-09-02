@@ -1,6 +1,32 @@
 import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/types/profile';
+
+vi.mock('@/utils/route-guard', () => ({
+  navigateAfterLogin: vi.fn(),
+}));
+
+vi.mock('@/services/store-entry', () => ({
+  storeEntryService: {
+    queryLatestSafe: vi.fn(async () => null),
+  },
+}));
+
+const fetchStoreEntryLatestCachedMock = vi.fn(async () => null as import('@/types/store-entry').StoreEntryLatestResult | null);
+const shouldRedirectToStoreEntryPendingMock = vi.fn(() => false);
+
+vi.mock('@/utils/store-entry-onboarding', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/utils/store-entry-onboarding')>(
+      '@/utils/store-entry-onboarding',
+    );
+  return {
+    ...actual,
+    fetchStoreEntryLatestCached: (...args: unknown[]) => fetchStoreEntryLatestCachedMock(...args),
+    shouldRedirectToStoreEntryPending: (...args: unknown[]) =>
+      shouldRedirectToStoreEntryPendingMock(...args),
+  };
+});
 import {
   consumeLastLoginIsNewUser,
   hasSkippedOnboarding,
@@ -15,10 +41,7 @@ import {
   ONBOARDING_SKIPPED_KEY,
   shouldRedirectToIdentitySelect,
 } from '@/utils/auth-onboarding';
-
-vi.mock('@/utils/route-guard', () => ({
-  navigateAfterLogin: vi.fn(),
-}));
+import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 
 const ORG_UUID = '11111111-1111-4111-8111-111111111111';
 
@@ -47,8 +70,11 @@ const baseProfile = (patch: Partial<Profile> = {}): Profile => ({
 describe('auth-onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchStoreEntryLatestCachedMock.mockResolvedValue(null);
+    shouldRedirectToStoreEntryPendingMock.mockReturnValue(false);
     Taro.removeStorageSync(ONBOARDING_SKIPPED_KEY);
     Taro.removeStorageSync(IDENTITY_SELECT_PENDING_KEY);
+    invalidateStoreEntryLatestCache();
   });
 
   it('needsProfileSetup 新用户强制完善资料', () => {
@@ -169,7 +195,7 @@ describe('auth-onboarding', () => {
     (Taro as unknown as { showToast: typeof showToast }).showToast = showToast;
 
     const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
-    navigateAfterAuth(baseProfile({ name: '未命名用户', nickname: undefined }), {
+    await navigateAfterAuth(baseProfile({ name: '未命名用户', nickname: undefined }), {
       isNewUser: true,
     });
 
@@ -183,6 +209,8 @@ describe('auth-onboarding', () => {
   });
 
   it('navigateAfterAuth：已有机构的种子账号即使残留 pending 也进首页', async () => {
+    vi.resetModules();
+    fetchStoreEntryLatestCachedMock.mockResolvedValue(null);
     const routeGuard = await import('@/utils/route-guard');
     const redirectTo = vi.fn();
     (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
@@ -194,7 +222,7 @@ describe('auth-onboarding', () => {
     expect(needsOnboarding(profile)).toBe(false);
 
     // 密码登录老用户：不传 isNewUser（与 password-login 响应一致）
-    navigateAfterAuth(profile);
+    await navigateAfterAuth(profile);
 
     expect(redirectTo).not.toHaveBeenCalled();
     expect(routeGuard.navigateAfterLogin).toHaveBeenCalledWith(profile);
@@ -207,7 +235,7 @@ describe('auth-onboarding', () => {
     (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
 
     const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
-    navigateAfterAuth(
+    await navigateAfterAuth(
       baseProfile({
         name: '新家长',
         nickname: '新家长',
@@ -222,12 +250,14 @@ describe('auth-onboarding', () => {
   });
 
   it('navigateAfterAuth：无机构 id 才进选择身份', async () => {
+    vi.resetModules();
+    fetchStoreEntryLatestCachedMock.mockResolvedValue(null);
     const redirectTo = vi.fn();
     (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
     const { navigateAfterLogin } = await import('@/utils/route-guard');
 
     const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
-    navigateAfterAuth(
+    await navigateAfterAuth(
       baseProfile({
         name: '新用户',
         nickname: '新用户',
@@ -248,5 +278,37 @@ describe('auth-onboarding', () => {
       expect.objectContaining({ url: '/package-auth/pages/identity-select/index' }),
     );
     expect(navigateAfterLogin).not.toHaveBeenCalled();
+  });
+
+  it('navigateAfterAuth：有待审核入驻申请 → pending 页', async () => {
+    vi.resetModules();
+    shouldRedirectToStoreEntryPendingMock.mockReturnValue(true);
+    fetchStoreEntryLatestCachedMock.mockResolvedValue({
+      application: { id: 'app-1', status: 'PENDING' },
+    });
+    const redirectTo = vi.fn();
+    (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
+
+    const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
+    await navigateAfterAuth(
+      baseProfile({
+        name: '新用户',
+        nickname: '新用户',
+        identities: [
+          {
+            id: 'identity-1',
+            role: 'principal',
+            organizationId: '',
+            organizationName: '',
+            isDefault: true,
+          },
+        ],
+        currentContext: { identityId: 'identity-1', role: 'principal', organizationId: '' },
+      }),
+    );
+
+    expect(redirectTo).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/package-settings/pages/store-entry/pending/index' }),
+    );
   });
 });

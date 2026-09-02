@@ -29,6 +29,7 @@ import {
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
+import { useBatchRender } from '@/utils/use-batch-render';
 
 /** 顶部 Tab 类型 */
 type MainTab = 'member' | 'lead';
@@ -314,6 +315,18 @@ const Students: React.FC = () => {
     return result;
   }, [students, debouncedKeyword, memberSubTab, sortBy, remoteResults, useRemoteSearch]);
 
+  // ====== 分批渲染（P-02）：长列表首屏仅渲染前 50 条，上拉追加 ======
+  const {
+    visibleList: visibleStudents,
+    hasMore: hasMoreStudents,
+    onScrollToLower: onStudentsScrollToLower,
+    reset: resetStudentBatch,
+  } = useBatchRender(filteredStudents);
+  // 筛选/搜索/排序变化时重置回首批（避免旧批次残留）
+  useEffect(() => {
+    resetStudentBatch();
+  }, [debouncedKeyword, memberSubTab, sortBy, resetStudentBatch]);
+
   // ====== 线索 Tab：搜索过滤 ======
   const filteredLeads = useMemo(() => {
     if (!debouncedKeyword) return leadList;
@@ -557,9 +570,9 @@ const Students: React.FC = () => {
 
       {/* ====== 会员 Tab：学员卡片列表 ====== */}
       {mainTab === 'member' && (
-        <ScrollView scrollY className="flex-1">
+        <ScrollView scrollY className="flex-1" onScrollToLower={onStudentsScrollToLower}>
           <View className="px-[32rpx] pt-[24rpx] pb-[24rpx]">
-            {filteredStudents.map((student) => {
+            {visibleStudents.map((student) => {
               const cardStatus = getStudentCardStatus(student);
               const borderColorClass = getCardBorderColorClass(cardStatus);
               const progress = calcStudentProgress(student);
@@ -771,6 +784,13 @@ const Students: React.FC = () => {
                     </View>
                   )}
               </>
+            )}
+
+            {/* 分批渲染：还有更多时显示加载提示（上拉自动追加） */}
+            {hasMoreStudents && (
+              <View className="py-[24rpx] text-center text-[24rpx] text-muted-foreground">
+                上拉加载更多…
+              </View>
             )}
           </View>
         </ScrollView>

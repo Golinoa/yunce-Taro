@@ -7,6 +7,7 @@ import { getSession } from '@/services/auth';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { useSubscribeAuthStore } from '@/stores/subscribe-auth';
 import type { SubscribeTemplateGroup } from '@/types/subscribe-message';
+import { isSubscribeContextReady } from '@/utils/auth-onboarding';
 import { logError } from '@/utils/logger';
 import {
   canShowDepletedPrompt,
@@ -34,6 +35,7 @@ export async function consumeSubscribeOnShow(options?: {
   try {
     const { profile } = await getSession();
     if (!profile?.id) return;
+    if (!isSubscribeContextReady(profile)) return;
 
     // 新用户：若注册手势内未完成授权，进站再试一次微信原生面板（无自定义弹框）
     const handledLoginOptIn = await subscribeMessageService.maybeRunLoginOptIn({

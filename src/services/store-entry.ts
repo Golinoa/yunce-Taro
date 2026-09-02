@@ -15,7 +15,7 @@ import type {
   StoreEntryLatestResult,
   StoreEntryResult,
 } from '@/types/store-entry';
-import { get, post } from '@/utils/request';
+import { get, post, ApiError } from '@/utils/request';
 import { getPendingStoreReferralCode } from '@/utils/invite-store-referral-link';
 
 /** 门店入驻表单草稿 key：未登录提交前 / 驳回重提均可恢复 */
@@ -70,6 +70,18 @@ export const storeEntryService = {
   /** 查询最新申请状态（PENDING / APPROVED / REJECTED + 拒绝原因） */
   queryLatest: async (): Promise<StoreEntryLatestResult> => {
     return get<StoreEntryLatestResult>('/store-entry/applications/latest');
+  },
+
+  /** 无申请记录时返回 null（404），其它错误继续抛出 */
+  queryLatestSafe: async (): Promise<StoreEntryLatestResult | null> => {
+    try {
+      return await get<StoreEntryLatestResult>('/store-entry/applications/latest');
+    } catch (err) {
+      if (err instanceof ApiError && (err.code === 404 || err.message.includes('暂无入驻申请'))) {
+        return null;
+      }
+      throw err;
+    }
   },
 
   /** 被拒绝后重新提交（复用原机构，原地 UPDATE 申请单） */

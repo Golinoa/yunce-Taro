@@ -10,13 +10,13 @@
     "framework": "React"
   },
   "scripts": {
-    "build:weapp": "taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
+    "build:weapp": "taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs && node scripts/verify-shared-modules.mjs",
     "build:weapp:mock": "node -e \"console.error('[removed] build:weapp:mock 已废弃，请用 npm run build:weapp:dev'); process.exit(1)\"",
     "dev:weapp:mock": "node -e \"console.error('[removed] dev:weapp:mock 已废弃，请用 npm run dev:weapp:dev'); process.exit(1)\"",
     "generate:mock-stubs": "node -e \"console.error('[removed] generate:mock-stubs 已废弃（src/data 已删除）'); process.exit(1)\"",
     "build:weapp:prod": "node scripts/build-weapp-prod.mjs",
     "build:weapp:dev": "node scripts/build-weapp-dev.mjs",
-    "build:weapp:clean": "node scripts/clean-weapp-cache.mjs && taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs",
+    "build:weapp:clean": "node scripts/clean-weapp-cache.mjs && taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs && node scripts/verify-shared-modules.mjs",
     "build:swan": "taro build --type swan",
     "build:alipay": "taro build --type alipay",
     "build:tt": "taro build --type tt",

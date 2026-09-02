@@ -7,7 +7,7 @@
  * 开发/生产同一套代码，仅 API/CDN 域名随环境配置切换。
  */
 import { View, Text, Button, Image, Input } from '@tarojs/components';
-import Taro from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useState } from 'react';
 import { BRAND_LOGO, BRAND_NAME_ZH } from '@/constants/brand';
@@ -15,6 +15,7 @@ import { getSession } from '@/services/auth';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterProfileSetup } from '@/utils/auth-onboarding';
 import { resolveAvatarSrc } from '@/utils/avatar-src';
+import { handleChooseAvatarError } from '@/utils/choose-avatar-error';
 import {
   isImageCancelError,
   isLocalWechatFilePath,
@@ -22,10 +23,17 @@ import {
   uploadImage,
 } from '@/utils/image-upload';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import { usePrivacyForProfileFields } from '@/utils/use-privacy-for-profile-fields';
 
 const ProfileSetup: React.FC = () => {
   const { profile, updateProfile, refreshProfile } = useAuth();
   const navHeight = useNavSafeHeight();
+  const { privacyReady, privacyChecking, ensurePrivacy } = usePrivacyForProfileFields();
+
+  useDidShow(() => {
+    Taro.hideLoading();
+  });
+
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
   const [nickname, setNickname] = useState(profile?.nickname || profile?.name || '');
   const [submitting, setSubmitting] = useState(false);
@@ -73,11 +81,32 @@ const ProfileSetup: React.FC = () => {
   }, []);
 
   const handleNicknameFocus = useCallback(
-    (event: { detail: { height?: number } }) => {
+    async (event: { detail: { height?: number } }) => {
+      await ensurePrivacy();
       syncKeyboardInset(event.detail?.height ?? 0);
     },
-    [syncKeyboardInset],
+    [ensurePrivacy, syncKeyboardInset],
   );
+
+  const handleAvatarTap = useCallback(async () => {
+    const ok = await ensurePrivacy();
+    if (!ok) {
+      Taro.showToast({
+        title: '需要同意隐私保护指引后才能选择头像',
+        icon: 'none',
+        duration: 2800,
+      });
+    }
+  }, [ensurePrivacy]);
+
+  const avatarVisual = avatarUrl ? (
+    <Image src={resolveAvatarSrc(avatarUrl)} className="w-full h-full" mode="aspectFill" />
+  ) : (
+    <Image src={BRAND_LOGO} className="w-full h-full" mode="aspectFill" />
+  );
+
+  const avatarButtonClass =
+    'w-[220rpx] h-[220rpx] rounded-full overflow-hidden bg-muted flex items-center justify-center border-[4rpx] border-solid border-primary/20 p-0 m-0 after:border-none active:opacity-90';
 
   const handleNicknameKeyboardHeightChange = useCallback(
     (event: { detail: { height: number } }) => {
@@ -91,6 +120,16 @@ const ProfileSetup: React.FC = () => {
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    const privacyOk = await ensurePrivacy();
+    if (!privacyOk) {
+      Taro.showToast({
+        title: '请先同意隐私保护指引后才能继续',
+        icon: 'none',
+        duration: 2800,
+      });
+      return;
+    }
+
     const trimmedNickname = nickname.trim();
     if (!trimmedNickname) {
       Taro.showToast({ title: '请填写昵称', icon: 'none' });
@@ -131,7 +170,7 @@ const ProfileSetup: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [avatarUrl, nickname, profile, refreshProfile, updateProfile]);
+  }, [avatarUrl, ensurePrivacy, nickname, profile, refreshProfile, updateProfile]);
 
   return (
     <View
@@ -153,26 +192,40 @@ const ProfileSetup: React.FC = () => {
         <Text className="text-[26rpx] text-muted-foreground block">
           设置头像和昵称，完成{BRAND_NAME_ZH}注册
         </Text>
+        {!privacyReady ? (
+          <View
+            className="mt-[20rpx] px-[24rpx] py-[20rpx] rounded-[20rpx] bg-primary/8 active:opacity-80"
+            onClick={() => {
+              void ensurePrivacy();
+            }}
+          >
+            <Text className="text-[26rpx] text-primary block">
+              {privacyChecking
+                ? '正在请求隐私授权…'
+                : '使用头像/昵称前需同意隐私保护指引，点此授权'}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View className="relative z-10 flex-1 flex flex-col items-stretch justify-center px-[48rpx]">
         <View className="flex flex-col items-center mb-[48rpx]">
-          <Button
-            className="w-[220rpx] h-[220rpx] rounded-full overflow-hidden bg-muted flex items-center justify-center border-[4rpx] border-solid border-primary/20 p-0 m-0 after:border-none active:opacity-90"
-            plain
-            openType="chooseAvatar"
-            onChooseAvatar={handleWechatAvatar}
-          >
-            {avatarUrl ? (
-              <Image
-                src={resolveAvatarSrc(avatarUrl)}
-                className="w-full h-full"
-                mode="aspectFill"
-              />
-            ) : (
-              <Image src={BRAND_LOGO} className="w-full h-full" mode="aspectFill" />
-            )}
-          </Button>
+          {privacyReady ? (
+            <Button
+              className={avatarButtonClass}
+              plain
+              hoverClass="none"
+              openType="chooseAvatar"
+              onChooseAvatar={handleWechatAvatar}
+              onError={handleChooseAvatarError}
+            >
+              {avatarVisual}
+            </Button>
+          ) : (
+            <View className={avatarButtonClass} onClick={handleAvatarTap}>
+              {avatarVisual}
+            </View>
+          )}
           <Text className="text-[26rpx] text-muted-foreground mt-[20rpx]">点击选择头像</Text>
           <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">
             使用微信头像、相册或拍照
@@ -182,37 +235,64 @@ const ProfileSetup: React.FC = () => {
         <View className="bg-card rounded-[28rpx] px-[28rpx] py-[8rpx] border border-border shadow-soft">
           <View className="flex flex-row items-center min-h-[112rpx]">
             <Text className="text-[28rpx] text-muted-foreground w-[120rpx]">昵称</Text>
-            <Input
-              type="nickname"
-              className="flex-1 text-[30rpx] text-foreground text-right"
-              placeholder="点选微信昵称，或自行填写"
-              adjustPosition={false}
-              value={nickname}
-              onInput={(event) => setNickname(event.detail.value)}
-              onFocus={handleNicknameFocus}
-              onKeyboardHeightChange={handleNicknameKeyboardHeightChange}
-              onBlur={handleNicknameBlur}
-              maxlength={20}
-            />
+            {privacyReady ? (
+              <Input
+                key={`nickname-ready-${profile?.id ?? 'setup'}`}
+                type="nickname"
+                className="flex-1 text-[30rpx] text-foreground text-right"
+                placeholder="点选微信昵称，或自行填写"
+                adjustPosition={false}
+                defaultValue={nickname}
+                onInput={(event) => setNickname(event.detail.value)}
+                onFocus={handleNicknameFocus}
+                onKeyboardHeightChange={handleNicknameKeyboardHeightChange}
+                onBlur={handleNicknameBlur}
+                maxlength={20}
+              />
+            ) : (
+              <View
+                className="flex-1 flex items-center justify-end"
+                onClick={() => {
+                  void ensurePrivacy();
+                }}
+              >
+                <Text className="text-[30rpx] text-muted-foreground">请先同意隐私指引</Text>
+              </View>
+            )}
           </View>
         </View>
         <Text className="text-[22rpx] text-muted-foreground mt-[16rpx] px-[8rpx]">
-          昵称栏支持一键使用微信昵称，也可直接输入自定义昵称
+          {privacyReady
+            ? '昵称栏支持一键使用微信昵称，也可直接输入自定义昵称'
+            : '同意隐私保护指引后，可使用微信头像与微信昵称'}
         </Text>
       </View>
 
       <View className="relative z-10 px-[48rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))] flex-shrink-0">
-        <View
-          className={cn(
-            'h-[96rpx] rounded-full flex items-center justify-center bg-primary shadow-login-btn active:opacity-90',
-            submitting && 'opacity-60',
+          {privacyReady ? (
+            <View
+              className={cn(
+                'h-[96rpx] rounded-full flex items-center justify-center bg-primary shadow-login-btn active:opacity-90',
+                submitting && 'opacity-60',
+              )}
+              onClick={handleSubmit}
+            >
+              <Text className="text-[32rpx] font-semibold text-white">
+                {submitting ? '保存中...' : '完成并继续'}
+              </Text>
+            </View>
+          ) : (
+            <View
+              className="h-[96rpx] rounded-full flex items-center justify-center bg-muted active:opacity-90"
+              onClick={() => {
+                void ensurePrivacy();
+              }}
+            >
+              <Text className="text-[30rpx] font-semibold text-muted-foreground">
+                {privacyChecking ? '正在请求隐私授权…' : '请先同意隐私保护指引'}
+              </Text>
+            </View>
           )}
-          onClick={handleSubmit}
-        >
-          <Text className="text-[32rpx] font-semibold text-white">
-            {submitting ? '保存中...' : '完成并继续'}
-          </Text>
-        </View>
       </View>
     </View>
   );

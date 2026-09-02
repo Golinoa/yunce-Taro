@@ -33,6 +33,8 @@ import { syncTabBarByProfile } from '@/utils/tab-bar';
  * - 右下角悬浮「记一笔」按钮
  */
 const DataCenter: React.FC = () => {
+  /** 构建期常量：生产构建恒为 false，DCE 整棵移除 MockIdentitySwitcher（P-05/B-02） */
+  const isDebugBuild = process.env.TARO_ENABLE_LOCAL_DEBUG === 'true';
   const { activeTheme } = useThemeStore();
   const { profile } = useAuth();
   const campuses = useCampusStore((s) => s.campuses);
@@ -558,7 +560,8 @@ const DataCenter: React.FC = () => {
         </View>
       </View>
 
-      <MockIdentitySwitcher />
+      {/* 仅 debug 构建挂载；生产构建常量折叠后整棵子树被移除 */}
+      {isDebugBuild && <MockIdentitySwitcher />}
     </View>
   );
 };

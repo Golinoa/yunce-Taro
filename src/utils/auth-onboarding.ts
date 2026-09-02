@@ -11,6 +11,12 @@ import {
 import { consumePendingInviteCode, markShareAttached, consumeShareAttached } from '@/utils/invite-parent-link';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
+import {
+  fetchStoreEntryLatestCached,
+  isStoreEntryManagerRole,
+  shouldRedirectToStoreEntryPending,
+  STORE_ENTRY_PENDING_PATH,
+} from '@/utils/store-entry-onboarding';
 import { isUuidOrganizationId } from '@/utils/tenant-id';
 
 export const LAST_LOGIN_IS_NEW_USER_KEY = 'yunce:last-login-is-new-user';
@@ -186,10 +192,10 @@ function redirectWithFailFallback(url: string): void {
   });
 }
 
-export function navigateAfterAuth(
+export async function navigateAfterAuth(
   profile: Profile | null,
   options?: { isNewUser?: boolean; shareAttached?: boolean },
-): void {
+): Promise<void> {
   if (!profile) {
     return;
   }
@@ -199,13 +205,11 @@ export function navigateAfterAuth(
   }
 
   if (needsProfileSetup(profile, options?.isNewUser)) {
-    // Keep identity-select pending across profile-setup (production funnel)
     markIdentitySelectionPending();
     redirectWithFailFallback('/package-auth/pages/profile-setup/index');
     return;
   }
 
-  // 员工招生归属成功：跳过 identity-select（即使家长尚未绑定孩子）
   if (consumeShareAttached()) {
     consumePendingInviteCode();
     consumeIdentitySelectionPending();
@@ -213,8 +217,20 @@ export function navigateAfterAuth(
     return;
   }
 
-  // 已有真实机构 / 已完成家长绑定：清残留 pending，进业务首页
-  // （修复：误标 isNewUser 或上次卡在「选择身份」的老种子账号被错误拦下）
+  // 门店入驻 PENDING/驳回/已批未注入自有店：以 queryLatest 为准（demo org 不能代替）
+  if (isStoreEntryManagerRole(profile)) {
+    try {
+      const latest = await fetchStoreEntryLatestCached();
+      if (shouldRedirectToStoreEntryPending({ profile, latest })) {
+        clearIdentitySelectionPending();
+        redirectWithFailFallback(STORE_ENTRY_PENDING_PATH);
+        return;
+      }
+    } catch {
+      /* 查询失败则走下方默认漏斗 */
+    }
+  }
+
   if (!needsOnboarding(profile)) {
     clearIdentitySelectionPending();
     if (isSubscribeContextReady(profile)) {
@@ -224,12 +240,11 @@ export function navigateAfterAuth(
     return;
   }
 
-  // 未绑定机构：选择身份（门店入驻 | 绑定机构）
   markIdentitySelectionPending();
   redirectWithFailFallback('/package-auth/pages/identity-select/index');
 }
 
 /** After profile-setup: continue production funnel via pending identity flag */
 export function navigateAfterProfileSetup(profile: Profile | null): void {
-  navigateAfterAuth(profile, { isNewUser: false });
+  void navigateAfterAuth(profile, { isNewUser: false });
 }

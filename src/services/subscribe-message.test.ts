@@ -79,6 +79,13 @@ vi.mock('@/utils/request', () => ({
 
 const USER = 'service-test-user';
 
+const MOCK_SUBSCRIBE_PROFILE = {
+  id: USER,
+  name: '测试用户',
+  nickname: '测试用户',
+  currentContext: { organizationId: 'org-yunce' },
+} as const;
+
 function resetStore() {
   useSubscribeAuthStore.setState({
     prompt: { visible: false, presetId: 'student_created' },
@@ -96,7 +103,7 @@ describe('subscribeMessageService', () => {
     getMock.mockImplementation(async () => mockBootstrap(0));
     postMock.mockClear();
     vi.mocked(getSession).mockResolvedValue({
-      profile: { id: USER } as never,
+      profile: MOCK_SUBSCRIBE_PROFILE as never,
       session: null,
     });
     vi.mocked(requestSubscribeMessageAuth).mockReset();

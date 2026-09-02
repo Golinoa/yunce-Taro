@@ -11,6 +11,13 @@ vi.mock('@/services/auth', () => ({
 
 const USER = 'onshow-test-user';
 
+const MOCK_SUBSCRIBE_PROFILE = {
+  id: USER,
+  name: '测试用户',
+  nickname: '测试用户',
+  currentContext: { organizationId: 'org-yunce' },
+} as const;
+
 describe('consumeSubscribeOnShow', () => {
   beforeEach(() => {
     __resetConsumeSubscribeOnShowForTest();
@@ -22,10 +29,26 @@ describe('consumeSubscribeOnShow', () => {
       banner: { visible: false, message: '' },
     });
     vi.mocked(getSession).mockResolvedValue({
-      profile: { id: USER } as never,
+      profile: MOCK_SUBSCRIBE_PROFILE as never,
       session: null,
     });
     vi.spyOn(subscribeMessageService, 'maybeRunLoginOptIn').mockResolvedValue(false);
+  });
+
+  it('无机构上下文时不请求 bootstrap', async () => {
+    vi.mocked(getSession).mockResolvedValue({
+      profile: {
+        id: USER,
+        name: '未命名用户',
+        currentContext: { organizationId: '' },
+      } as never,
+      session: null,
+    });
+    const bootstrapSpy = vi.spyOn(subscribeMessageService, 'bootstrap');
+
+    await consumeSubscribeOnShow();
+
+    expect(bootstrapSpy).not.toHaveBeenCalled();
   });
 
   it('T-F-04: pending 空队列时不展示弹框', async () => {

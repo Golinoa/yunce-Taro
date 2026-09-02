@@ -12,8 +12,10 @@ import PageContainer from '@/components/PageContainer';
 import { feedbackService, uploadService } from '@/services';
 import type { FeedbackType } from '@/services/feedback';
 import { useAuth } from '@/utils/auth';
+import { chooseImageTemp } from '@/utils/image-upload';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
+import { runImageUploadFlow } from '@/utils/upload-flow';
 
 const MAX_IMAGES = 3;
 const MAX_CONTENT_LENGTH = 500;
@@ -33,34 +35,19 @@ const Feedback: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // 选择并上传图片
+  // 选择并上传图片（统一流程：chooseMedia + 隐私预检 + 压缩；取消静默、失败有提示）
   const handleAddImage = useCallback(async () => {
-    if (images.length >= MAX_IMAGES) {
-      Taro.showToast({ title: `最多上传${MAX_IMAGES}张图片`, icon: 'none' });
-      return;
-    }
-    let tempFilePath = '';
-    try {
-      const res = await Taro.chooseImage({
-        count: 1,
-        sizeType: ['compressed'],
-        sourceType: ['album', 'camera'],
-      });
-      if (!res.tempFilePaths?.length) return;
-      tempFilePath = res.tempFilePaths[0];
-
-      setUploading(true);
-      const result = await uploadService.upload(tempFilePath);
-      setImages((prev) => [...prev, result.url]);
-    } catch (err) {
-      // 用户取消选择不提示（chooseImage 取消会进入 catch）
-      // 上传失败需要明确提示
-      if (tempFilePath) {
-        Taro.showToast({ title: '图片上传失败，请重试', icon: 'none' });
-      }
-    } finally {
-      setUploading(false);
-    }
+    await runImageUploadFlow({
+      currentCount: images.length,
+      maxCount: MAX_IMAGES,
+      choose: () => chooseImageTemp({ maxSizeMB: 5, cropScale: '1:1' }),
+      upload: async (path) => {
+        const result = await uploadService.upload(path);
+        return result.url;
+      },
+      onSuccess: (url) => setImages((prev) => [...prev, url]),
+      onUploadingChange: setUploading,
+    });
   }, [images.length]);
 
   // 删除图片
@@ -185,7 +172,7 @@ const Feedback: React.FC = () => {
                     key={idx}
                     className="relative w-[160rpx] h-[160rpx] rounded-md overflow-hidden shadow-soft"
                   >
-                    <Image className="w-full h-full" src={src} mode="aspectFill" />
+                    <Image className="w-full h-full" src={src} mode="aspectFill" lazyLoad />
                     <View
                       className="absolute top-0 right-0 w-[40rpx] h-[40rpx] bg-destructive/80 rounded-bl-sm flex items-center justify-center"
                       onClick={() => handleRemoveImage(idx)}

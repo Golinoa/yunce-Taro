@@ -1,26 +1,37 @@
 /**
  * 门店入驻申请中页 pages/store-entry/pending/index（R3）
  *
- * 进页查询真实申请状态（兼容 PENDING/pending 大小写）：
- * - pending  → 审核中（展示申请信息 + 联系客服）
- * - approved → 入驻成功（刷会话注入 organizationId 后进入机构端）
- * - rejected → 展示拒绝原因 + 重新提交
- *
- * 产品：获批后用户 = 管理员（OWNER）；校区岗「校长」≠ 本页身份。
+ * 中间页三态：
+ * - pending  → 提交成功等待审核（双按钮：演示门店 / 客服催办）
+ * - approved → 入驻成功（进入机构端）
+ * - rejected → 驳回 + 重新提交
  */
 import { View, Text, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import { STORE_ENTRY_PENDING_COPY } from '@/constants/store-entry-copy';
 import { refreshSessionForTenant } from '@/services/auth';
-import { readStoreEntryDraft, storeEntryService } from '@/services/store-entry';
+import {
+  invalidateStoreEntryLatestCache,
+  readStoreEntryDraft,
+  storeEntryService,
+} from '@/services/store-entry';
 import type { StoreEntryLatestResult } from '@/types/store-entry';
 import { useAuth } from '@/utils/auth';
+import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { navigateAfterLogin, withRouteGuard } from '@/utils/route-guard';
 import {
+  resolveStoreEntrySubmitError,
+  writeStoreEntryLatestCache,
+} from '@/utils/store-entry-onboarding';
+import {
   isStoreEntryApproved,
+  isStoreEntryPending,
   isStoreEntryRejected,
   normalizeStoreEntryStatus,
 } from '@/utils/store-entry-status';
@@ -33,9 +44,12 @@ const StoreEntryPendingPage: React.FC = () => {
   usePrimaryNavigationBar();
   const { refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [latest, setLatest] = useState<StoreEntryLatestResult | null>(null);
   const [resubmitting, setResubmitting] = useState(false);
   const [entering, setEntering] = useState(false);
+  const [enteringDemo, setEnteringDemo] = useState(false);
+  const [expediteVisible, setExpediteVisible] = useState(false);
 
   const status = normalizeStoreEntryStatus(latest?.application?.status || 'pending');
   const rejectReason =
@@ -44,57 +58,88 @@ const StoreEntryPendingPage: React.FC = () => {
 
   const isOpened = isStoreEntryApproved(status);
   const isRejected = isStoreEntryRejected(status);
+  const isPending = isStoreEntryPending(status);
+
+  const loadLatest = useCallback(async () => {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const result = await storeEntryService.queryLatestSafe();
+      setLatest(result);
+      writeStoreEntryLatestCache(result);
+      if (result?.application?.status && isStoreEntryPending(result.application.status)) {
+        clearIdentitySelectionPending();
+      }
+    } catch {
+      setLatest(null);
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLatest();
+  }, [loadLatest]);
 
   useEffect(() => {
     void Taro.setNavigationBarTitle({
-      title: isOpened ? '入驻成功' : isRejected ? '申请被驳回' : '申请中',
+      title: isOpened
+        ? STORE_ENTRY_PENDING_COPY.titleApproved
+        : isRejected
+          ? STORE_ENTRY_PENDING_COPY.titleRejected
+          : STORE_ENTRY_PENDING_COPY.navTitlePending,
     });
   }, [isOpened, isRejected]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const result = await storeEntryService.queryLatest();
-        if (!cancelled) setLatest(result);
-      } catch {
-        if (!cancelled) setLatest(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const tip = useMemo(() => {
     if (isOpened) {
       return storeName
-        ? `门店入驻成功，默认主校区「${storeName}」已创建。您已是该机构管理员，可进入机构端开始管理。`
+        ? `${STORE_ENTRY_PENDING_COPY.descApprovedPrefix}，默认主校区「${storeName}」已创建。您已是该机构管理员，可进入机构端开始管理。`
         : '门店入驻成功，您已是机构管理员，可进入机构端开始管理。';
     }
     if (isRejected) {
-      return '很抱歉，您的入驻申请未通过运营审核，可修改资料后重新提交。';
+      return STORE_ENTRY_PENDING_COPY.descRejected;
     }
-    return '您的门店入驻申请已提交，需运营审核通过后开通（通常 1-3 个工作日）。';
+    return STORE_ENTRY_PENDING_COPY.descPending;
   }, [isOpened, isRejected, storeName]);
 
   const handlePreviewQr = useCallback(() => {
     void Taro.previewImage({ current: WX_QR_CODE, urls: [WX_QR_CODE] });
   }, []);
 
-  const handleEnterOrg = useCallback(async () => {
-    if (entering) return;
-    setEntering(true);
+  const handleEnterDemo = useCallback(async () => {
+    if (enteringDemo) return;
+    setEnteringDemo(true);
     try {
-      // 批准前会话可能无 organizationId；强制 refresh 注入 ACTIVE 主租户
       const refreshed = await refreshSessionForTenant();
       if (!refreshed.ok) {
         Taro.showToast({ title: refreshed.error?.message || '请重新登录', icon: 'none' });
         return;
       }
       await refreshProfile();
+      clearIdentitySelectionPending();
+      Taro.showToast({ title: STORE_ENTRY_PENDING_COPY.demoToast, icon: 'none', duration: 2800 });
+      void Taro.switchTab({ url: '/pages/home/index' });
+    } catch {
+      Taro.showToast({ title: '进入演示门店失败，请重试', icon: 'none' });
+    } finally {
+      setEnteringDemo(false);
+    }
+  }, [enteringDemo, refreshProfile]);
+
+  const handleEnterOrg = useCallback(async () => {
+    if (entering) return;
+    setEntering(true);
+    try {
+      const refreshed = await refreshSessionForTenant();
+      if (!refreshed.ok) {
+        Taro.showToast({ title: refreshed.error?.message || '请重新登录', icon: 'none' });
+        return;
+      }
+      await refreshProfile();
+      clearIdentitySelectionPending();
+      invalidateStoreEntryLatestCache();
       navigateAfterLogin();
     } catch {
       Taro.showToast({ title: '进入失败，请重新登录后再试', icon: 'none' });
@@ -113,25 +158,45 @@ const StoreEntryPendingPage: React.FC = () => {
     try {
       await storeEntryService.resubmit(draft);
       consumePendingStoreReferralCode();
+      invalidateStoreEntryLatestCache();
       Taro.showToast({ title: '已重新提交', icon: 'success' });
-      setLatest(null);
-      setLoading(true);
-      const result = await storeEntryService.queryLatest();
-      setLatest(result);
-      setLoading(false);
-    } catch {
-      Taro.showToast({ title: '重新提交失败，请重试', icon: 'none' });
-      setLoading(false);
+      await loadLatest();
+    } catch (err) {
+      const action = resolveStoreEntrySubmitError(err);
+      Taro.showToast({
+        title: action.kind === 'toast' ? action.message : '重新提交失败，请重试',
+        icon: 'none',
+      });
     } finally {
       setResubmitting(false);
     }
-  }, []);
+  }, [loadLatest]);
 
   if (loading) {
     return (
       <PageContainer safeBottom className="px-[32rpx] py-[32rpx]">
         <View className="flex items-center justify-center py-[120rpx]">
-          <Text className="text-[28rpx] text-muted-foreground">查询申请状态中...</Text>
+          <Text className="text-[28rpx] text-muted-foreground">
+            {STORE_ENTRY_PENDING_COPY.loading}
+          </Text>
+        </View>
+      </PageContainer>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <PageContainer safeBottom className="px-[32rpx] py-[32rpx]">
+        <View className="flex flex-col items-center justify-center py-[120rpx] gap-[24rpx]">
+          <Text className="text-[28rpx] text-muted-foreground">
+            {STORE_ENTRY_PENDING_COPY.loadFailed}
+          </Text>
+          <View
+            className="h-[80rpx] px-[40rpx] rounded-full bg-primary flex items-center justify-center"
+            onClick={() => void loadLatest()}
+          >
+            <Text className="text-[28rpx] text-white font-semibold">重试</Text>
+          </View>
         </View>
       </PageContainer>
     );
@@ -154,14 +219,54 @@ const StoreEntryPendingPage: React.FC = () => {
           />
         </View>
         <Text className="text-[36rpx] font-semibold text-foreground block mb-[10rpx]">
-          {isOpened ? '入驻成功' : isRejected ? '申请被驳回' : '申请审核中'}
+          {isOpened
+            ? STORE_ENTRY_PENDING_COPY.titleApproved
+            : isRejected
+              ? STORE_ENTRY_PENDING_COPY.titleRejected
+              : STORE_ENTRY_PENDING_COPY.titlePending}
         </Text>
         <Text className="text-[28rpx] leading-[1.7] text-muted-foreground block">{tip}</Text>
+
+        {storeName && isPending ? (
+          <View className="mt-[20rpx] rounded-[16rpx] bg-muted/40 px-[20rpx] py-[16rpx]">
+            <Text className="text-[24rpx] text-muted-foreground">申请门店：{storeName}</Text>
+          </View>
+        ) : null}
 
         {isRejected && rejectReason ? (
           <View className="mt-[24rpx] rounded-[20rpx] bg-destructive/10 px-[24rpx] py-[20rpx]">
             <Text className="text-[26rpx] leading-[1.6] text-destructive">
               拒绝原因：{rejectReason}
+            </Text>
+          </View>
+        ) : null}
+
+        {isPending ? (
+          <View className="mt-[32rpx] flex flex-col gap-[20rpx]">
+            <View
+              className={cn(
+                'h-[92rpx] rounded-full bg-primary flex items-center justify-center active:opacity-90',
+                enteringDemo && 'opacity-70',
+              )}
+              onClick={enteringDemo ? undefined : handleEnterDemo}
+            >
+              <Text className="text-[30rpx] font-semibold text-white">
+                {enteringDemo ? '进入中...' : STORE_ENTRY_PENDING_COPY.btnDemo}
+              </Text>
+            </View>
+            <Text className="text-[22rpx] text-muted-foreground text-center -mt-[8rpx]">
+              {STORE_ENTRY_PENDING_COPY.btnDemoHint}
+            </Text>
+            <View
+              className="h-[92rpx] rounded-full border-[2rpx] border-primary flex items-center justify-center active:opacity-90"
+              onClick={() => setExpediteVisible(true)}
+            >
+              <Text className="text-[30rpx] font-semibold text-primary">
+                {STORE_ENTRY_PENDING_COPY.btnExpedite}
+              </Text>
+            </View>
+            <Text className="text-[22rpx] text-muted-foreground text-center -mt-[8rpx]">
+              {STORE_ENTRY_PENDING_COPY.btnExpediteHint}
             </Text>
           </View>
         ) : null}
@@ -172,7 +277,7 @@ const StoreEntryPendingPage: React.FC = () => {
             onClick={handleEnterOrg}
           >
             <Text className="text-[30rpx] font-semibold text-white">
-              {entering ? '进入中...' : '进入机构端首页'}
+              {entering ? '进入中...' : STORE_ENTRY_PENDING_COPY.btnEnterOrg}
             </Text>
           </View>
         )}
@@ -183,31 +288,36 @@ const StoreEntryPendingPage: React.FC = () => {
             onClick={handleResubmit}
           >
             <Text className="text-[30rpx] font-semibold text-white">
-              {resubmitting ? '提交中...' : '修改资料重新提交'}
+              {resubmitting ? '提交中...' : STORE_ENTRY_PENDING_COPY.btnResubmit}
             </Text>
           </View>
         )}
       </View>
 
-      <View className="rounded-[32rpx] bg-white px-[32rpx] py-[40rpx] shadow-[0_16rpx_48rpx_rgba(59,110,245,0.08)]">
-        <View className="flex flex-row items-center gap-[12rpx] mb-[24rpx]">
-          <Icon name="headset" size={40} className="text-primary" />
-          <Text className="text-[32rpx] font-semibold text-foreground">联系客服</Text>
-          <Text className="text-[24rpx] text-muted-foreground">在线客服</Text>
-        </View>
-
-        <View className="flex flex-col items-center" onClick={handlePreviewQr}>
-          <Image
-            src={WX_QR_CODE}
-            mode="aspectFit"
-            className="w-[320rpx] h-[320rpx] rounded-[28rpx] border-[2rpx] border-border"
-            showMenuByLongpress
-          />
-          <Text className="text-[24rpx] text-muted-foreground text-center block mt-[24rpx] leading-[1.7]">
-            点击图片放大，长按可保存微信二维码
+      <BottomSheet
+        visible={expediteVisible}
+        title={STORE_ENTRY_PENDING_COPY.expediteSheetTitle}
+        onClose={() => setExpediteVisible(false)}
+        height="auto"
+        maxHeightLimit="75vh"
+      >
+        <View className="px-[8rpx] pb-[16rpx] flex flex-col items-center">
+          <Text className="text-[26rpx] leading-relaxed text-muted-foreground text-center mb-[24rpx]">
+            {STORE_ENTRY_PENDING_COPY.expediteSheetDesc}
           </Text>
+          <View className="flex flex-col items-center" onClick={handlePreviewQr}>
+            <Image
+              src={WX_QR_CODE}
+              mode="aspectFit"
+              className="w-[320rpx] h-[320rpx] rounded-[28rpx] border-[2rpx] border-border"
+              showMenuByLongpress
+            />
+            <Text className="text-[24rpx] text-muted-foreground text-center block mt-[24rpx] leading-[1.7]">
+              {STORE_ENTRY_PENDING_COPY.expediteQrHint}
+            </Text>
+          </View>
         </View>
-      </View>
+      </BottomSheet>
     </PageContainer>
   );
 };

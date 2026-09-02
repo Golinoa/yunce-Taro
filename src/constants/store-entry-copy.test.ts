@@ -11,8 +11,18 @@ describe('STORE_ENTRY_IDENTITY_COPY', () => {
     expect(STORE_ENTRY_IDENTITY_COPY.footerHint).toContain('选择身份');
     expect(STORE_ENTRY_IDENTITY_COPY.formTitle).toBe('门店入驻');
     expect(STORE_ENTRY_IDENTITY_COPY.formTitle).not.toMatch(/注册门店账户/);
-    expect(STORE_ENTRY_IDENTITY_COPY.formSubtitle).toContain('运营审核');
+    expect(STORE_ENTRY_IDENTITY_COPY.formSubtitle).toMatch(/审核|1.?3.*工作日/);
     expect(STORE_ENTRY_IDENTITY_COPY.aboutCta).not.toMatch(/免审|校长独立创建/);
     expect(STORE_ENTRY_IDENTITY_COPY.aboutShareSlogan).not.toMatch(/免审|5 分钟免费开通/);
+  });
+});
+
+describe('STORE_ENTRY_PENDING_COPY', () => {
+  it('待审核中间页文案含 1–3 工作日与双按钮', async () => {
+    const { STORE_ENTRY_PENDING_COPY } = await import('./store-entry-copy');
+    expect(STORE_ENTRY_PENDING_COPY.titlePending).toContain('等待审核');
+    expect(STORE_ENTRY_PENDING_COPY.descPending).toMatch(/1.?3.*工作日/);
+    expect(STORE_ENTRY_PENDING_COPY.btnDemo).toContain('演示门店');
+    expect(STORE_ENTRY_PENDING_COPY.btnExpedite).toContain('客服');
   });
 });
