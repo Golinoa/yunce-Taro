@@ -65,7 +65,7 @@
 | Q2-3 | ✅ 保存路径 | `e2df5b8` · `backup/taro-a-plus-q2-3-save-2026-09-03`：页约 1992 行 |
 | Q2-4 | ✅ | student 神文件已拆完：package / lesson-record / class / **schedule** / leave / notification / parents |
 | Q2-2 | ✅ | Checkin + submit handlers + **attendance load helpers** |
-| Q2-2 | ✅ 面板抽出 | `backup/taro-a-plus-q2-2-panels-2026-09-03`：Header/Single/Class/Footer + datetime；页 **2426 → ~1887**（−539） |
+| Q2-2 | ✅ 面板抽出 | `5d7c57f` · `backup/taro-a-plus-q2-2-panels-2026-09-03`：Header/Single/Class/Footer + datetime；页 **2426 → 1887**（−539） |
 | Q2-5 | ✅ | `82567c0` · … |
 
 ### Wave 3 进度
