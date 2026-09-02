@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { getTeacherSelectionInfo } from './teacher-selection';
 import type { Class } from '@/types/class';
 import type { TeacherUIModel } from '@/types/teacher';
+import { getTeacherSelectionInfo } from './teacher-selection';
 
 const teachers: Record<string, TeacherUIModel> = {
   t1: { id: 't1', name: '主讲甲', role: 'lead' } as TeacherUIModel,

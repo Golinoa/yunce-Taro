@@ -52,7 +52,7 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
   }, [inviteLink]);
 
   const handleShare = useCallback(() => {
-    Taro.showShareMenu({ withShareTicket: true, menus: ['shareAppMessage'] });
+    Taro.showShareMenu({ withShareTicket: true, showShareItems: ['shareAppMessage'] });
     Taro.showToast({ title: '请点击右上角转发', icon: 'none' });
   }, []);
 
@@ -96,7 +96,9 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
       </View>
 
       <View className="w-full bg-muted rounded-[16rpx] px-4 py-3 mb-4">
-        <Text className="text-[22rpx] text-foreground-secondary break-all">{inviteLink || '—'}</Text>
+        <Text className="text-[22rpx] text-foreground-secondary break-all">
+          {inviteLink || '—'}
+        </Text>
       </View>
 
       <View className="flex gap-3 w-full">

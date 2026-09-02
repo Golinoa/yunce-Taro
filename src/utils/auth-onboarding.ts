@@ -8,7 +8,11 @@ import {
   IDENTITY_SELECT_PENDING_KEY,
   isIdentityOnboardingAllowlistedPath,
 } from '@/utils/identity-path-allowlist';
-import { consumePendingInviteCode, markShareAttached, consumeShareAttached } from '@/utils/invite-parent-link';
+import {
+  consumePendingInviteCode,
+  markShareAttached,
+  consumeShareAttached,
+} from '@/utils/invite-parent-link';
 import {
   buildCampusInvitePath,
   getPendingCampusInviteCode,
@@ -161,7 +165,10 @@ export function needsOnboarding(profile: Profile | null): boolean {
 }
 
 /** 新用户漏斗进行中（完善资料 / 选身份 / 未绑机构）— 此阶段不应调订阅 bootstrap */
-export function isOnboardingFunnelActive(profile: Profile | null, options?: { isNewUser?: boolean }): boolean {
+export function isOnboardingFunnelActive(
+  profile: Profile | null,
+  options?: { isNewUser?: boolean },
+): boolean {
   if (!profile) return false;
   if (needsProfileSetup(profile, options?.isNewUser)) return true;
   if (hasIdentitySelectionPending()) return true;

@@ -2,12 +2,6 @@ import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/types/profile';
 import { ApiError } from '@/utils/request';
-
-vi.mock('@/services/store-entry', () => ({
-  storeEntryService: {
-    queryLatestSafe: vi.fn(async () => null),
-  },
-}));
 import {
   getLatestApplicationStatus,
   hasOwnOrganizationContext,
@@ -19,6 +13,12 @@ import {
   shouldRedirectToStoreEntryPending,
   writeStoreEntryLatestCache,
 } from './store-entry-onboarding';
+
+vi.mock('@/services/store-entry', () => ({
+  storeEntryService: {
+    queryLatestSafe: vi.fn(async () => null),
+  },
+}));
 
 const ORG_UUID = '11111111-1111-4111-8111-111111111111';
 

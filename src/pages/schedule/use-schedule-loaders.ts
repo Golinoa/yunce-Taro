@@ -18,10 +18,10 @@ import {
 } from '@/services';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
-import type { UserRole } from '@/types/profile';
 import type { BookableVenue } from '@/types/venue-booking';
 import { logError } from '@/utils/logger';
 import type { ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';

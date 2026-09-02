@@ -5,6 +5,7 @@ node_modules/
 dist/
 .temp/
 .rn_temp/
+coverage/
 
 # IDE
 .idea/
@@ -24,6 +25,11 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# WeChat miniprogram-ci upload key（勿提交）
+private.key
+**/private.*.key
+*privatekey*.key
 
 # Taro
 .swc/

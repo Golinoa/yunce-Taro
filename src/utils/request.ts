@@ -4,10 +4,10 @@
  * 联调时只需修改 BASE_URL 和拦截器逻辑
  */
 import Taro from '@tarojs/taro';
-import { getApiBaseUrl } from '@/utils/build-env';
 import { mapGatewayErrorMessage, mapNetworkFailMessage } from '@/utils/api-gateway-error';
-import { logRequestIssue } from '@/utils/logger';
+import { getApiBaseUrl } from '@/utils/build-env';
 import { reportLocalDebug } from '@/utils/local-debug';
+import { logRequestIssue } from '@/utils/logger';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
 // 必须用 getApiBaseUrl()：小程序运行时通常没有 process，

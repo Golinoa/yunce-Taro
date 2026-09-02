@@ -2,13 +2,13 @@
  * 课表 → 点名/消课页导航（Q2-1）
  * 统一 URL 与前置校验，避免 pages/schedule 内多处手拼 query。
  */
-import type dayjs from 'dayjs';
-import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import {
   isHistoricalClassCard,
   type ScheduleCardActionFields,
 } from '@/utils/schedule-card-actions';
 import type { ScheduleCardStatus } from '@/utils/schedule-card-status';
+import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
+import type dayjs from 'dayjs';
 
 export type LessonFormNavFields = {
   id: string;
@@ -152,10 +152,7 @@ export function buildScheduleFormEditPath(scheduleId: string): string {
   return `/package-course/pages/schedule-form/index?id=${encodeURIComponent(scheduleId)}`;
 }
 
-export function buildScheduleFormReschedulePath(
-  scheduleId: string,
-  lessonDate: string,
-): string {
+export function buildScheduleFormReschedulePath(scheduleId: string, lessonDate: string): string {
   return (
     `/package-course/pages/schedule-form/index?id=${encodeURIComponent(scheduleId)}` +
     `&mode=reschedule&lessonDate=${encodeURIComponent(lessonDate)}`
@@ -168,7 +165,10 @@ export function buildBookingPagePath(date: string): string {
 
 /** 编辑前校验文案；null 表示可跳转 */
 export function validateEditScheduleNav(
-  item: Pick<ScheduleCardActionFields, 'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'>,
+  item: Pick<
+    ScheduleCardActionFields,
+    'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'
+  >,
   selectedDate: dayjs.Dayjs,
   now: dayjs.Dayjs,
   visibility: { showEditAndReschedule: boolean },

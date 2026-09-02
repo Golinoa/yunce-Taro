@@ -2,11 +2,11 @@
  * 自定义 TabBar 同步 — 按角色真正隐藏「数据」Tab（非仅改文案）
  */
 import Taro from '@tarojs/taro';
+import type { Profile, UserRole } from '@/types/profile';
+import { isTabBarPage } from '@/utils/navigation';
 
 /** 与 app.config tabBar.custom 保持一致；为 true 时不可调用 setTabBarStyle */
 export const HAS_CUSTOM_TAB_BAR = true;
-import type { Profile, UserRole } from '@/types/profile';
-import { isTabBarPage } from '@/utils/navigation';
 
 export const STATISTICS_TAB_INDEX = 2;
 

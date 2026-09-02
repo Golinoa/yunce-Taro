@@ -3,7 +3,6 @@
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import type dayjs from 'dayjs';
 import React from 'react';
 import Empty from '@/components/Empty';
 import ScheduleActionButton from '@/components/schedule/ScheduleActionButton';
@@ -11,13 +10,14 @@ import ScheduleCard from '@/components/schedule/ScheduleCard';
 import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import type { Class } from '@/types/class';
 import type { LessonSharePayload } from '@/utils/lesson-share';
-import { canOperateHistoricalLesson, canSuspendThisLesson } from '@/utils/schedule-guard';
 import {
   getCardActionVisibility,
   isHistoricalClassCard,
   isUpcomingClassCard,
 } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
+import { canOperateHistoricalLesson, canSuspendThisLesson } from '@/utils/schedule-guard';
+import type dayjs from 'dayjs';
 
 export interface ScheduleDaySummary {
   total: number;
@@ -155,9 +155,7 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
                                 const query = [
                                   studentId ? `studentId=${encodeURIComponent(studentId)}` : '',
                                   `lessonKey=${encodeURIComponent(lessonKey)}`,
-                                  item.classId
-                                    ? `classId=${encodeURIComponent(item.classId)}`
-                                    : '',
+                                  item.classId ? `classId=${encodeURIComponent(item.classId)}` : '',
                                 ]
                                   .filter(Boolean)
                                   .join('&');

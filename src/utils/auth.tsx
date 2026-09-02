@@ -28,7 +28,6 @@ import {
   bindAccountEmail,
   sendBindEmailCode,
 } from '@/services/auth';
-import { performWechatAuth } from '@/utils/wechat-login-coordinator';
 import type {
   AuthSession,
   Identity,
@@ -41,6 +40,7 @@ import type {
 } from '@/types/profile';
 import { markLastLoginAsNewUser } from '@/utils/auth-onboarding';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
+import { performWechatAuth } from '@/utils/wechat-login-coordinator';
 
 // ============================================
 // 类型定义
@@ -71,9 +71,7 @@ export interface AuthState {
     isNewUser?: boolean;
   }>;
   /** 微信一键登录（整链单飞：内部 wx.login + POST） */
-  signInWithWechat: (
-    options?: WechatLoginOptions,
-  ) => Promise<{
+  signInWithWechat: (options?: WechatLoginOptions) => Promise<{
     error: { message: string } | null;
     isNewUser?: boolean;
     shareAttached?: boolean;
@@ -169,6 +167,11 @@ export interface AuthState {
 
   /** 刷新用户资料 */
   refreshProfile: () => Promise<void>;
+  /**
+   * 应用登录态（token + profile）到 AuthProvider 与本地存储。
+   * 用于 switch-context 等已拿到完整 AuthPayload 的场景；失败方勿调用。
+   */
+  applyAuthPayload: (payload: { session: AuthSession; profile: Profile }) => void;
   /** 退出登录 */
   signOut: () => Promise<void>;
 }
@@ -614,6 +617,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [persistAuth, syncUserRole]);
 
+  /** 落盘已成功拿到的 session/profile（跨机构切换门店） */
+  const applyAuthPayload = useCallback(
+    (payload: { session: AuthSession; profile: Profile }) => {
+      setSession(payload.session);
+      setProfile(payload.profile);
+      persistAuth(payload.profile, payload.session);
+      syncUserRole(payload.profile.currentContext?.role || null);
+    },
+    [persistAuth, syncUserRole],
+  );
+
   // 退出登录
   const signOut = useCallback(async () => {
     try {
@@ -659,6 +673,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addIdentity,
       validateInviteCode,
       refreshProfile,
+      applyAuthPayload,
       updateProfile,
       getProfileExtra: getProfileExtraFn,
       signOut,
@@ -688,6 +703,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addIdentity,
       validateInviteCode,
       refreshProfile,
+      applyAuthPayload,
       updateProfile,
       getProfileExtraFn,
       signOut,

@@ -17,6 +17,7 @@ export type UploadType =
   | 'lesson_media'
   | 'prep'
   | 'feedback'
+  | 'campus_brand'
   | 'common';
 
 export interface UploadOptions {

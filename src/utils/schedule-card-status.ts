@@ -3,12 +3,12 @@
  *
  * 从 pages/schedule/index.tsx 抽出：时长文案、倒计时、教师名、状态排序与 resolve。
  */
-import type dayjs from 'dayjs';
 import type { Class } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import { parseTimeToMinutes } from '@/utils/schedule-guard';
+import type dayjs from 'dayjs';
 
 export type ScheduleCardStatus = 'urgent' | 'upcoming' | 'active' | 'done' | 'ended' | 'cancelled';
 

@@ -139,9 +139,7 @@ const About: React.FC = () => {
   usePrimaryNavigationBar();
   const { activeTheme } = useThemeStore();
   const { currentRole, session } = useAuth();
-  const [sharePath, setSharePath] = useState(
-    ABOUT_SHARE_PATH.replace(/^\//, ''),
-  );
+  const [sharePath, setSharePath] = useState(ABOUT_SHARE_PATH.replace(/^\//, ''));
   // 已登录的教师/家长不应再被引导去门店入驻（会被守卫拦回）
   const showStoreEntry = useMemo(() => {
     if (!currentRole) return true;

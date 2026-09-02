@@ -15,8 +15,8 @@ import type {
   StoreEntryLatestResult,
   StoreEntryResult,
 } from '@/types/store-entry';
-import { get, post, ApiError } from '@/utils/request';
 import { getPendingStoreReferralCode } from '@/utils/invite-store-referral-link';
+import { get, post, ApiError } from '@/utils/request';
 
 /** 门店入驻表单草稿 key：未登录提交前 / 驳回重提均可恢复 */
 export const STORE_ENTRY_DRAFT_KEY = 'yunce:store-entry-draft';

@@ -54,7 +54,7 @@
 | G1-2 | ✅ | 砍「全部已签到」假入口 |
 | G1-5 | ✅ | L3 过期/已用满屏分态 |
 | G1-6 | ✅ | DeductResult.fifoSplitKnown=false |
-| G1-3 / G1-4 | ⏳ 真机 | 无法代跑；见 walkthrough X-3/VH/V4T |
+| G1-3 / G1-4 | ⏳ 真机 | 无法代跑；见 `device-walkthrough.html`（已按业务流程扩至登录→L1–L4→入驻→排课/消课） |
 
 ### Wave 2 进度
 
@@ -83,7 +83,7 @@
 | Q3-5 | ✅ | coverage.include + `route-guard.tsx` + `route-guard.test.ts`；lines 门槛 30→35（全量 ~79% 仍过门） |
 | Q3-4 | ⏳ | 次级大页队列 |
 
-下一节点：巨型页 Q2 已收口；**仅剩** G1-3/4 真机门禁 + Q3-4 次级大页（agent 可继续 Q3-4；真机需人工）。
+下一节点：巨型页 Q2 已收口；**仅剩** G1-3/4 真机门禁（打开 `2026-09-02-device-walkthrough.html` 按①–⑫业务流程勾选）+ Q3-4 次级大页（agent 可继续；真机需人工）。
 
 ---
 

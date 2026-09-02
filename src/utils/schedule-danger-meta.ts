@@ -95,10 +95,11 @@ export function buildResumeClassConfirmContent(className: string): {
   };
 }
 
-export function buildSuspendNotifyCopy(input: {
-  className: string;
-  changeTime: string;
-}): { title: string; content: string; changeReason: string } {
+export function buildSuspendNotifyCopy(input: { className: string; changeTime: string }): {
+  title: string;
+  content: string;
+  changeReason: string;
+} {
   return {
     title: `${input.className}停课通知`,
     content: `${input.changeTime} 的课程已临时停课取消，请留意老师后续安排。`,

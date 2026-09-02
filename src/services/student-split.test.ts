@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mapBackendStudentParent } from './student-parents';
 import { __notificationMappersForTest } from './notification';
+import { mapBackendStudentParent } from './student-parents';
 
 describe('mapBackendStudentParent (Q2-4)', () => {
   it('把 profileId 映射为 parent_id 供通知 receiver', () => {

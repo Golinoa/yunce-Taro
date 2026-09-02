@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { copyParentInviteLink, copyTeacherInviteLink, buildTeacherInvitePath } from './invite-parent-link';
+import {
+  copyParentInviteLink,
+  copyTeacherInviteLink,
+  buildTeacherInvitePath,
+} from './invite-parent-link';
 
 const { setClipboardData, showToast, post } = vi.hoisted(() => ({
   setClipboardData: vi.fn().mockResolvedValue({}),

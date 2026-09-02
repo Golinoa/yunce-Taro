@@ -50,7 +50,13 @@ describe('lesson-attendance-load (Q2-2)', () => {
       records: [
         { id: '1', student_id: 'a', class_id: 'c1', lesson_date: '2026-09-02', status: 'leave' },
         { id: '2', student_id: 'b', class_id: 'c1', lesson_date: '2026-09-02', status: 'normal' },
-        { id: '3', student_id: 'b', class_id: 'c1', lesson_date: '2026-09-02', status: 'cancelled' },
+        {
+          id: '3',
+          student_id: 'b',
+          class_id: 'c1',
+          lesson_date: '2026-09-02',
+          status: 'cancelled',
+        },
         { id: '4', student_id: 'x', class_id: 'c1', lesson_date: '2026-09-02', status: 'normal' },
       ] as never[],
     });

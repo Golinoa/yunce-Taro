@@ -14,19 +14,13 @@ describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
 
     it('V2T-4: used + 绑定者 → 成功页', () => {
       expect(
-        resolveParentShareLandingView(
-          { inviteStatus: 'used', usedByUserId: 'user-a' },
-          'user-a',
-        ),
+        resolveParentShareLandingView({ inviteStatus: 'used', usedByUserId: 'user-a' }, 'user-a'),
       ).toBe('success_for_viewer');
     });
 
     it('V2T-5: used + 非绑定者 → 失效页', () => {
       expect(
-        resolveParentShareLandingView(
-          { inviteStatus: 'used', usedByUserId: 'user-a' },
-          'user-b',
-        ),
+        resolveParentShareLandingView({ inviteStatus: 'used', usedByUserId: 'user-a' }, 'user-b'),
       ).toBe('used_invalid');
       expect(
         resolveParentShareLandingView({ inviteStatus: 'used', usedByUserId: 'user-a' }, null),
@@ -63,12 +57,12 @@ describe('invite-landing-view-state (V2T/V3T FE 分态)', () => {
     });
 
     it('V3T-4: 过期 → 不可接受态', () => {
-      expect(
-        resolveCampusInviteLandingView({ status: 'PENDING', expireAt: past }, 'staff-1'),
-      ).toBe('expired');
-      expect(
-        resolveCampusInviteLandingView({ status: 'EXPIRED', expireAt: future }, null),
-      ).toBe('expired');
+      expect(resolveCampusInviteLandingView({ status: 'PENDING', expireAt: past }, 'staff-1')).toBe(
+        'expired',
+      );
+      expect(resolveCampusInviteLandingView({ status: 'EXPIRED', expireAt: future }, null)).toBe(
+        'expired',
+      );
     });
   });
 });

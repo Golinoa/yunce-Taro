@@ -53,7 +53,7 @@ export interface CampusUIModel {
   rentDueDay: number;
   /** 门店介绍 */
   intro?: string;
-  /** 场馆图片 URL 列表 */
+  /** 门店环境图片 URL 列表（首张可作主图） */
   venueImages?: string[];
   /** 地图定位名称（由 wx.chooseLocation 选择） */
   locationName?: string;
@@ -90,8 +90,8 @@ export interface CampusStats {
 /** 校区表单数据（添加/编辑） */
 export interface CampusFormData {
   name: string;
-  /** 校区 Logo URL */
-  logo?: string;
+  /** 校区 Logo URL；传 null 清空 */
+  logo?: string | null;
   /** 营业执照名称 */
   licenseName?: string;
   /** 联系人 */
@@ -114,7 +114,7 @@ export interface CampusFormData {
   rentDueDay?: number;
   /** 门店介绍 */
   intro?: string;
-  /** 场馆图片 URL 列表 */
+  /** 门店环境图片 URL 列表（首张可作主图） */
   venueImages?: string[];
   /** 地图定位名称（由 wx.chooseLocation 选择） */
   locationName?: string;

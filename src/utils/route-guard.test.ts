@@ -1,19 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { getProfileRoles, requireRole } from '@/utils/route-guard';
 import type { Profile, UserRole } from '@/types/profile';
+import { getProfileRoles, requireRole } from '@/utils/route-guard';
 
 function profileWithRoles(roles: UserRole[], current?: UserRole): Profile {
   return {
     identities: roles.map((role, i) => ({
       id: `id-${i}`,
       role,
-      campusId: 'c1',
-      campusName: '校区',
+      organizationId: 'org-1',
+      organizationName: '机构',
+      isDefault: i === 0,
     })),
     currentContext: current
-      ? { role: current, campusId: 'c1', campusName: '校区' }
-      : undefined,
-  } as Profile;
+      ? {
+          identityId: 'id-0',
+          role: current,
+          organizationId: 'org-1',
+          campusId: 'c1',
+        }
+      : ({
+          identityId: 'id-0',
+          role: roles[0],
+          organizationId: 'org-1',
+          campusId: 'c1',
+        } as Profile['currentContext']),
+    id: 'p1',
+    name: '测试',
+    created_at: '',
+    updated_at: '',
+  };
 }
 
 describe('route-guard role helpers (Q3-5)', () => {

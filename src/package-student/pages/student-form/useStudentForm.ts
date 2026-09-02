@@ -10,7 +10,12 @@ import type { CampusUIModel, Subject } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { isAdmin, useAuth } from '@/utils/auth';
-import { chooseImageTemp, isImageCancelError, isLocalWechatFilePath, uploadImage } from '@/utils/image-upload';
+import {
+  chooseImageTemp,
+  isImageCancelError,
+  isLocalWechatFilePath,
+  uploadImage,
+} from '@/utils/image-upload';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 
@@ -497,7 +502,9 @@ export function useStudentForm(): UseStudentFormReturn {
       let newStudent: Student | undefined;
       let packageInitializationFailed = false;
 
-      const resolveAvatarForStudent = async (targetStudentId: string): Promise<string | undefined> => {
+      const resolveAvatarForStudent = async (
+        targetStudentId: string,
+      ): Promise<string | undefined> => {
         const raw = avatarUrl.trim();
         if (!raw) return undefined;
         if (!isLocalWechatFilePath(raw)) return raw;

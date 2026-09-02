@@ -94,6 +94,18 @@ describe('homeService 家长端', () => {
     expect(Array.isArray(data!.todaySchedules)).toBe(true);
   });
 
+  it('getParent：带 campusId 时拼 query', async () => {
+    getMock.mockResolvedValueOnce({
+      students: [],
+      todaySchedules: [],
+      packages: [],
+      unreadCount: 0,
+    });
+    const { homeService } = await import('@/services/home');
+    await homeService.getParent('user-parent-001', 'campus-east');
+    expect(getMock).toHaveBeenCalledWith('/home/parent?campusId=campus-east');
+  });
+
   it('getParent：接口失败返回 null 而非抛错', async () => {
     getMock.mockRejectedValueOnce(new Error('network'));
     const { homeService } = await import('@/services/home');

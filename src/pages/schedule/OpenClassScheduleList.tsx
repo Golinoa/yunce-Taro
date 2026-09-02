@@ -4,7 +4,6 @@
 import { Button, View, Text, ScrollView, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import type dayjs from 'dayjs';
 import React from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
@@ -16,9 +15,10 @@ import { CLASS_LEVEL_LABELS, CLASS_LEVEL_BADGE_WRAP, CLASS_LEVEL_BADGE_TEXT } fr
 import type { TeacherUIModel } from '@/types/teacher';
 import type { LessonSharePayload } from '@/utils/lesson-share';
 import { readParentBookings } from '@/utils/parent-bookings';
-import { canSuspendOpenSlot, parseTimeToMinutes } from '@/utils/schedule-guard';
-import { getDurationText } from '@/utils/schedule-card-status';
 import type { ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
+import { getDurationText } from '@/utils/schedule-card-status';
+import { canSuspendOpenSlot, parseTimeToMinutes } from '@/utils/schedule-guard';
+import type dayjs from 'dayjs';
 
 /** 开放预约卡片最多展示的前 x 个已约学员头像 */
 const OPEN_BOOKING_MAX_VISIBLE_AVATARS = 5;
@@ -101,8 +101,7 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
     .flat()
     .filter((s) => s.status !== 'rest' && !pausedClassIds.has(s.class_id))
     .sort(
-      (left, right) =>
-        parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time),
+      (left, right) => parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time),
     );
   const summaryFullSlots = allSlots.filter((s) => s.status === 'full').length;
   const summaryActiveSlots = allSlots.filter((s) => s.status === 'active').length;

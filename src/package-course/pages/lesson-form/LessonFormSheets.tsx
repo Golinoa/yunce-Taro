@@ -122,9 +122,7 @@ const LessonFormSheets: React.FC<LessonFormSheetsProps> = ({
     }
     return [
       { label: '请选择', value: '' },
-      ...rooms
-        .filter((r) => r.status === 'active')
-        .map((r) => ({ label: r.name, value: r.name })),
+      ...rooms.filter((r) => r.status === 'active').map((r) => ({ label: r.name, value: r.name })),
     ];
   }, [campusOptions, rooms, selector.type, studentActivePackages, teacherOptions]);
 

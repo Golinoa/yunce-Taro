@@ -3,12 +3,7 @@
  */
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import {
-  useCallback,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-} from 'react';
+import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { CourseCategoryMode } from '@/types/course-category';
 import { getCardActionVisibility } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
@@ -24,8 +19,8 @@ import {
   validateRollCallNav,
   validateSupplementNav,
 } from '@/utils/schedule-lesson-nav';
-import type { ScheduleDangerActionState } from './use-schedule-danger-actions';
 import type { ScheduleBatchActionType as BatchActionType } from './ScheduleBatchSheets';
+import type { ScheduleDangerActionState } from './use-schedule-danger-actions';
 
 export interface ScheduleBatchClassOptionLite {
   id: string;
@@ -208,12 +203,7 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
       selectedClassId && selectedClassId !== filterAllClassId ? [selectedClassId] : [];
     setBatchSelectedClassIds(initialSelectedIds);
     setBatchActionSheetVisible(true);
-  }, [
-    filterAllClassId,
-    selectedClassId,
-    setBatchActionSheetVisible,
-    setBatchSelectedClassIds,
-  ]);
+  }, [filterAllClassId, selectedClassId, setBatchActionSheetVisible, setBatchSelectedClassIds]);
 
   const toggleBatchClassSelection = useCallback(
     (classId: string) => {

@@ -15,17 +15,15 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { STORE_ENTRY_PENDING_COPY } from '@/constants/store-entry-copy';
 import { refreshSessionForTenant } from '@/services/auth';
-import {
-  invalidateStoreEntryLatestCache,
-  readStoreEntryDraft,
-  storeEntryService,
-} from '@/services/store-entry';
+import { readStoreEntryDraft, storeEntryService } from '@/services/store-entry';
 import type { StoreEntryLatestResult } from '@/types/store-entry';
 import { useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
+import { consumePendingStoreReferralCode } from '@/utils/invite-store-referral-link';
 import { usePrimaryNavigationBar } from '@/utils/navigation-bar';
 import { navigateAfterLogin, withRouteGuard } from '@/utils/route-guard';
 import {
+  invalidateStoreEntryLatestCache,
   resolveStoreEntrySubmitError,
   writeStoreEntryLatestCache,
 } from '@/utils/store-entry-onboarding';
@@ -35,7 +33,6 @@ import {
   isStoreEntryRejected,
   normalizeStoreEntryStatus,
 } from '@/utils/store-entry-status';
-import { consumePendingStoreReferralCode } from '@/utils/invite-store-referral-link';
 
 /** 分包静态资源，构建时 copy 至 dist/package-settings/assets/ */
 const WX_QR_CODE = '/package-settings/assets/wx.jpg';

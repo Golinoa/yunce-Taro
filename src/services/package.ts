@@ -100,7 +100,6 @@ interface BackendPackageTransactionRecord {
   type?: 'RECHARGE' | 'REFUND';
 }
 
-
 const mapBackendPackageType = (type?: string | null): PackageType | undefined => {
   if (type === 'hour_package' || type === 'term' || type === 'monthly' || type === 'trial') {
     return type;
@@ -192,7 +191,6 @@ function mapBackendPackageTransaction(item: BackendPackageTransactionRecord): Pa
     created_at: item.createdAt,
   };
 }
-
 
 /** 课包列表缓存（当前仅 invalidate；保留 API 供充值/退费后清缓存） */
 const packagesCache = new Map<string, CoursePackage[]>();
@@ -468,7 +466,5 @@ export const packageTemplateService = {
     await del(`/package-templates/${templateId}`);
   },
 };
-
-
 
 export { mapBackendPackageType };

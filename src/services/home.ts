@@ -11,11 +11,7 @@ import {
 } from '@/constants/home-ui';
 import { scheduleService, studentService } from '@/services/student';
 import type { TodoItem } from '@/types/home-todo';
-import type {
-  StatsPeriod,
-  StatsData,
-  QuickEntry,
-} from '@/types/home-ui';
+import type { StatsPeriod, StatsData, QuickEntry } from '@/types/home-ui';
 import type { UserRole } from '@/types/profile';
 import type { Schedule, ScheduleColor } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
@@ -210,7 +206,6 @@ interface BackendTeacherStatsResponse {
 interface BackendUnreadCountResponse {
   count: number;
 }
-
 
 export interface HomeTeacherSummary {
   id: string;
@@ -465,7 +460,6 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
   };
 }
 
-
 export const homeService = {
   /** 获取教师信息 */
   getTeacher: async (
@@ -577,9 +571,10 @@ export const homeService = {
    * 家长端首页聚合：今日课表 + 课包概览 + 孩子列表
    * 对接 GET /home/parent；Mock 用本地学员/排课/课包拼装
    */
-  getParent: async (_profileId: string): Promise<ParentHomeData | null> => {
+  getParent: async (_profileId: string, campusId?: string): Promise<ParentHomeData | null> => {
     try {
-      const data = await get<BackendParentHomeResponse>('/home/parent');
+      const query = campusId?.trim() ? `?campusId=${encodeURIComponent(campusId.trim())}` : '';
+      const data = await get<BackendParentHomeResponse>(`/home/parent${query}`);
       return mapBackendParentHome(data);
     } catch {
       return null;
@@ -587,7 +582,7 @@ export const homeService = {
   },
 
   /** 获取首页运营位内容 */
-  
+
   /**
    * @deprecated 请使用 todoService.getList({ view: 'home', ... })
    */

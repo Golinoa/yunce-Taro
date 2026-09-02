@@ -3,6 +3,17 @@
  */
 import Taro from '@tarojs/taro';
 import { EMAIL_PATTERN } from '@/constants/email-auth';
+import type { LoginResult } from '@/services/auth-login';
+import {
+  mapBackendAuthPayload,
+  mapUserRoleToBackend,
+  type BackendAuthPayload,
+} from '@/services/auth-profile-map';
+import {
+  AUTH_ENDPOINTS,
+  REGISTER_DRAFT_STORAGE_KEY,
+  getErrorMessage,
+} from '@/services/auth-shared';
 import type {
   ParentRoleInfo,
   PrincipalRoleInfo,
@@ -11,17 +22,6 @@ import type {
   UserRole,
 } from '@/types/profile';
 import { get, post } from '@/utils/request';
-import type { LoginResult } from '@/services/auth-login';
-import {
-  AUTH_ENDPOINTS,
-  REGISTER_DRAFT_STORAGE_KEY,
-  getErrorMessage,
-} from '@/services/auth-shared';
-import {
-  mapBackendAuthPayload,
-  mapUserRoleToBackend,
-  type BackendAuthPayload,
-} from '@/services/auth-profile-map';
 
 export type { RegisterDraft };
 

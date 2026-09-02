@@ -1,9 +1,6 @@
 import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
-import {
-  buildScheduleCardsForDate,
-  summarizeScheduleCards,
-} from '@/utils/schedule-card-build';
+import { buildScheduleCardsForDate, summarizeScheduleCards } from '@/utils/schedule-card-build';
 
 const NOW = dayjs('2026-09-02T09:00:00');
 

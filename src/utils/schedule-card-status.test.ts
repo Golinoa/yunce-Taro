@@ -3,6 +3,7 @@
  */
 import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
+import type { LessonRecord } from '@/types/lesson-record';
 import {
   getClassCardStatusRank,
   getCountdownText,
@@ -10,7 +11,6 @@ import {
   isBookingSchedule,
   resolveScheduleStatus,
 } from '@/utils/schedule-card-status';
-import type { LessonRecord } from '@/types/lesson-record';
 
 const NOW = dayjs('2026-09-02T10:00:00');
 

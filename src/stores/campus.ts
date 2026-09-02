@@ -34,6 +34,9 @@ const DEFAULT_ORG_NAME = '松果排课';
 /** 当前选中校区本地存储键 */
 const CURRENT_CAMPUS_ID_KEY = 'yunce_current_campus_id';
 
+/** 当前机构 ID（与 campusId 配对，跨机构切换后校验残留） */
+const CURRENT_ORG_ID_KEY = 'yunce_current_org_id';
+
 /** 上次访问校区本地存储键 */
 const LAST_VISITED_CAMPUS_ID_KEY = 'yunce_last_visited_campus_id';
 
@@ -101,6 +104,8 @@ interface CampusState {
 
   // 当前校区
   setCurrentCampusId: (id: string) => void;
+  /** 写入当前机构 ID（跨机构切换后与 campusId 配对） */
+  setCurrentOrganizationId: (organizationId: string) => void;
   setLastVisitedCampusId: (id: string) => void;
   initCurrentCampus: (identityCampusIds?: string[]) => void;
   setAllowedCampusIds: (ids: string[]) => void;
@@ -484,6 +489,12 @@ export const useCampusStore = create<CampusState>((set) => ({
         lastVisitedCampusId: prevId && prevId !== id ? prevId : state.lastVisitedCampusId,
       };
     });
+  },
+
+  setCurrentOrganizationId: (organizationId: string) => {
+    const orgId = (organizationId || '').trim();
+    if (!orgId) return;
+    Taro.setStorageSync(CURRENT_ORG_ID_KEY, orgId);
   },
 
   setLastVisitedCampusId: (id: string) => {

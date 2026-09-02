@@ -29,9 +29,7 @@ describe('shouldShowCancelLessonAction', () => {
   });
 
   it('已取消/已完成不可取消', () => {
-    expect(
-      shouldShowCancelLessonAction({ ...base, status: 'cancelled' }, NOW, NOW),
-    ).toBe(false);
+    expect(shouldShowCancelLessonAction({ ...base, status: 'cancelled' }, NOW, NOW)).toBe(false);
     expect(shouldShowCancelLessonAction({ ...base, status: 'done' }, NOW, NOW)).toBe(false);
   });
 

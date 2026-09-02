@@ -43,31 +43,19 @@ describe('schedule-lesson-nav (Q2-1)', () => {
 
   it('validateSupplementNav / RollCall', () => {
     expect(
-      validateSupplementNav(
-        { classId: 'c1', status: 'done' },
-        NOW.subtract(1, 'day'),
-        NOW,
-      ),
+      validateSupplementNav({ classId: 'c1', status: 'done' }, NOW.subtract(1, 'day'), NOW),
     ).toBeNull();
     expect(
       validateSupplementNav({ classId: '', status: 'done' }, NOW.subtract(1, 'day'), NOW),
     ).toBe('当前课程缺少班级信息');
     expect(
-      validateSupplementNav(
-        { classId: 'c1', status: 'cancelled' },
-        NOW.subtract(1, 'day'),
-        NOW,
-      ),
+      validateSupplementNav({ classId: 'c1', status: 'cancelled' }, NOW.subtract(1, 'day'), NOW),
     ).toBe('已取消课程无法补录');
+    expect(validateSupplementNav({ classId: 'c1', status: 'upcoming' }, NOW, NOW)).toBe(
+      '未下课课程请先点名',
+    );
     expect(
-      validateSupplementNav({ classId: 'c1', status: 'upcoming' }, NOW, NOW),
-    ).toBe('未下课课程请先点名');
-    expect(
-      validateSupplementNav(
-        { classId: 'c1', status: 'done' },
-        NOW.subtract(40, 'day'),
-        NOW,
-      ),
+      validateSupplementNav({ classId: 'c1', status: 'done' }, NOW.subtract(40, 'day'), NOW),
     ).toBe('已超过 30 天补录期限');
 
     expect(validateRollCallNav({ status: 'cancelled' }, NOW, NOW)).toBe('已取消课程无法点名');
@@ -89,20 +77,12 @@ describe('schedule-lesson-nav (Q2-1)', () => {
     expect(
       resolveSchedulePrimaryActionKind({ bookingTag: '约', status: 'upcoming' }, NOW, NOW),
     ).toBe('booking');
-    expect(
-      resolveSchedulePrimaryActionKind(
-        { status: 'done' },
-        NOW.subtract(1, 'day'),
-        NOW,
-      ),
-    ).toBe('supplement');
-    expect(
-      resolveSchedulePrimaryActionKind(
-        { status: 'done' },
-        NOW.subtract(40, 'day'),
-        NOW,
-      ),
-    ).toBe('view');
+    expect(resolveSchedulePrimaryActionKind({ status: 'done' }, NOW.subtract(1, 'day'), NOW)).toBe(
+      'supplement',
+    );
+    expect(resolveSchedulePrimaryActionKind({ status: 'done' }, NOW.subtract(40, 'day'), NOW)).toBe(
+      'view',
+    );
     expect(resolveSchedulePrimaryActionKind({ status: 'upcoming' }, NOW, NOW)).toBe('checkin');
   });
 

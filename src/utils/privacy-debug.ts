@@ -67,10 +67,7 @@ export function privacyNewFlowId(caller: string): string {
 /**
  * 主 trace 入口 —— 一律 console.warn + 固定前缀，方便过滤
  */
-export function privacyTrace(
-  step: string,
-  detail?: Record<string, unknown>,
-): void {
+export function privacyTrace(step: string, detail?: Record<string, unknown>): void {
   if (!isTraceEnabled()) return;
 
   traceSeq += 1;

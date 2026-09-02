@@ -28,8 +28,6 @@ import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
-import ScheduleMainViews from './ScheduleMainViews';
-import SchedulePageChrome from './SchedulePageChrome';
 import {
   rpxToPx,
   TAB_GAP_RPX,
@@ -37,6 +35,8 @@ import {
   TAB_WIDTH_RPX,
 } from './schedule-tab-layout';
 import { type ScheduleBatchActionType as BatchActionType } from './ScheduleBatchSheets';
+import ScheduleMainViews from './ScheduleMainViews';
+import SchedulePageChrome from './SchedulePageChrome';
 import { useScheduleCardActions } from './use-schedule-card-actions';
 import {
   useScheduleDangerActions,

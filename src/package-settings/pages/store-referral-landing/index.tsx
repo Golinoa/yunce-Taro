@@ -11,7 +11,6 @@ import Loading from '@/components/Loading';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { orgReferralService, type OrgReferralPreview } from '@/services/org-referral';
 import {
-  buildStoreReferralLandingPath,
   normalizeOrgReferralCode,
   storePendingStoreReferralCode,
 } from '@/utils/invite-store-referral-link';
@@ -91,7 +90,9 @@ const StoreReferralLanding: React.FC = () => {
         style={{ paddingTop: navHeight }}
       >
         <Icon name="mdi-link-off" size={64} className="text-muted-foreground mb-[24rpx]" />
-        <Text className="text-[32rpx] font-bold text-foreground text-center">{error || '链接无效'}</Text>
+        <Text className="text-[32rpx] font-bold text-foreground text-center">
+          {error || '链接无效'}
+        </Text>
         <View
           className="mt-[48rpx] px-[48rpx] h-[88rpx] rounded-full bg-primary center press-scale"
           onClick={() => Taro.navigateTo({ url: '/package-settings/pages/about/index' })}

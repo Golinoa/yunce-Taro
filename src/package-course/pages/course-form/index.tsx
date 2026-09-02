@@ -345,8 +345,8 @@ const CourseFormPage: React.FC = () => {
     setStudentSelfCheckin('follow_category');
     setAllowCheckinRoles(['teacher', 'receptionist']);
     setDescription(cls.note || '');
-    setBackgroundImage('');
-    setHomeImage('');
+    setBackgroundImage(cls.backgroundImage || '');
+    setHomeImage(cls.homeImage || '');
     captureBaselineRef.current = true;
   }, []);
 
@@ -1022,6 +1022,8 @@ const CourseFormPage: React.FC = () => {
           student_count: studentIds.length,
           status: 'active',
           campus_id: profile?.currentContext?.campusId || undefined,
+          homeImage: homeImageUrl ?? null,
+          backgroundImage: backgroundImageUrl ?? null,
         };
 
         if (isClassEdit) {

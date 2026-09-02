@@ -4,14 +4,14 @@
  * 创建 24h 临时邀请码 → 调用微信 getwxacodeunlimit 生成真实小程序码。
  * 家长扫码直达 invite-register，scene 携带临时 P 码。
  */
-import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
+import { useDidShow, useShareAppMessage } from '@tarojs/taro';
 import React, { useCallback, useState } from 'react';
 import InviteQrSection from '@/components/lead/InviteQrSection';
 import PageContainer from '@/components/PageContainer';
 import { parentShareInviteService } from '@/services/parent-share-invite';
 import { useAuth } from '@/utils/auth';
-import { buildWxacodeImageSrc } from '@/utils/wxacode-scene';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { buildWxacodeImageSrc } from '@/utils/wxacode-scene';
 
 const InviteQrcodePage: React.FC = () => {
   useCardNavigationBar();
@@ -54,7 +54,7 @@ const InviteQrcodePage: React.FC = () => {
     <PageContainer>
       <InviteQrSection
         teacherName={profile?.name || profile?.nickname || '老师'}
-        campusName={currentIdentity?.campusName || currentIdentity?.organizationName || ''}
+        campusName={currentIdentity?.organizationName || ''}
         inviteLink={inviteLink}
         qrImageSrc={qrImageSrc}
         expireAt={expireAt}

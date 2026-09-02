@@ -2,6 +2,7 @@
  * 隐私合规初始化
  */
 import Taro from '@tarojs/taro';
+import { usePrivacyStore } from '@/stores/privacy';
 import { logDebug } from '@/utils/logger';
 import {
   privacyApiSupport,
@@ -10,7 +11,6 @@ import {
   privacyTraceBootstrap,
   privacyTraceQuerySetting,
 } from '@/utils/privacy-debug';
-import { usePrivacyStore } from '@/stores/privacy';
 
 let listenerReady = false;
 let listenerReadyWaiters: Array<() => void> = [];
@@ -152,10 +152,7 @@ export function debugDumpPrivacySetting(reason: string): void {
 }
 
 function getRequirePrivacyAuthorize():
-  | ((opt: {
-      success?: () => void;
-      fail?: (err: { errMsg?: string }) => void;
-    }) => void)
+  | ((opt: { success?: () => void; fail?: (err: { errMsg?: string }) => void }) => void)
   | undefined {
   return (
     Taro as typeof Taro & {

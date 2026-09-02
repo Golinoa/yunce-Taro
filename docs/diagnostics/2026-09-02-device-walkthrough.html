@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>真机测试清单 · 邀请分享功能</title>
+  <title>真机测试清单 · 上线主路径全流程</title>
   <style>
     :root {
       --bg: #f5f7fa; --card: #fff; --border: #dde3ea; --text: #1a1a2e;
       --muted: #5c6b7a; --pass: #1a7f4b; --fail: #c0392b; --pending: #b8860b;
-      --accent: #2563eb; --frozen: #6d28d9;
+      --accent: #2563eb; --frozen: #6d28d9; --gate: #9a3412;
     }
     * { box-sizing: border-box; }
     body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.6; }
@@ -28,6 +28,7 @@
     .stat strong { font-size: 1.3rem; display: block; }
     section { margin-bottom: 28px; }
     section h2 { font-size: 1.05rem; background: var(--card); padding: 10px 12px; border-radius: 8px 8px 0 0; border: 1px solid var(--border); border-bottom: none; margin: 0; }
+    section .sec-desc { background: var(--card); border-left: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0 12px 10px; margin: 0; font-size: 0.82rem; color: var(--muted); }
     table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--card); border: 1px solid var(--border); border-radius: 0 0 8px 8px; overflow: hidden; }
     th, td { border-bottom: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: top; }
     th { background: #f8fafc; }
@@ -39,6 +40,7 @@
     .session-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
     .badge { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 99px; background: #e2e8f0; color: var(--muted); }
     .badge.lock { background: #ede9fe; color: var(--frozen); }
+    .badge.gate { background: #ffedd5; color: var(--gate); margin-left: 4px; }
     #frozenRegistry { margin-top: 24px; }
     .accounts-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 0.88rem; }
     .accounts-box h3 { margin: 0 0 10px; font-size: 1rem; color: #92400e; }
@@ -46,50 +48,67 @@
     .accounts-box th { background: #fef3c7; }
     .flow-hint { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.9rem; }
     .flow-hint strong { color: #166534; }
+    .flow-hint ol { margin: 8px 0 0; padding-left: 1.2rem; }
     td.account-cell { font-size: 0.82rem; color: #374151; min-width: 140px; }
     td.account-cell code { font-size: 0.8rem; word-break: break-all; }
+    .toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.88rem; }
+    .toc a { color: var(--accent); text-decoration: none; margin-right: 10px; white-space: nowrap; }
+    .toc a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <h1>📱 真机测试清单（邀请 / 分享 / 登录）</h1>
-  <p class="meta">按顺序从上到下测，<strong>从登录页开始，由外到里</strong>。测完一项就在「结果」里选通过或失败，点「保存」不会丢。</p>
+  <h1>📱 真机测试清单（上线主路径 · 按业务流程）</h1>
+  <p class="meta">覆盖 A+ 计划门禁 <strong>G1-3 / G1-4</strong>、主路径（登录 → L1–L4 → 入驻 → 排课/消课），以及 <strong>家长跨机构「切换门店」</strong>（2026-09-03 P0）。测完一项就选结果，点「保存」写入本机浏览器。</p>
 
   <div class="flow-hint">
-    <strong>走查顺序（由外到里）</strong><br>
-    ① 环境确认 → ② <strong>登录页</strong>（最外层入口）→ ③ <strong>外链/扫码落地</strong>（好友分享、二维码）→ ④ <strong>登录后内页</strong>（教师发码、管理员互邀）→ ⑤ <strong>完整业务闭环</strong><br>
-    <span style="color:var(--muted);font-size:0.85rem">第三步里带 ⚠ 的项需要先有分享链接/二维码：若还没有，可先跳到第四步生成，再回来测第三步。</span>
+    <strong>建议走查顺序（按业务闭环）</strong>
+    <ol>
+      <li><strong>环境</strong> → <strong>登录/注册</strong>（能进首页才继续）</li>
+      <li><strong>邀请外链</strong>：L1 试听分享 → L2 招生扫码 → L4 门店互邀落地（未登录侧）</li>
+      <li><strong>邀请内页</strong>：教师发 P 码、管理员发 O 码、校长发员工邀请</li>
+      <li><strong>邀请闭环</strong>：注册绑定 / 已用 / 过期 / 员工接受 / 升会员（G1-4）</li>
+      <li><strong>门店入驻漏斗</strong>：提交 → pending → 演示门店 / 审核结果</li>
+      <li><strong>教务主路径</strong>：课表 → 建排课 → 点名消课（含防重入、无假 CTA）</li>
+      <li><strong>家长端</strong>：看课表 / 约课 → <strong>切换门店</strong>（单机构冒烟 + 多机构跨切，见 ⑫ PS-*）</li>
+      <li><strong>员工回归</strong>：教师/校长「切换门店」仍只切当前机构校区（PS-7）</li>
+    </ol>
+    <span style="color:var(--muted);font-size:0.85rem">带 ⚠ 的项依赖前置生成链接/码；带 <span class="badge gate">上线门禁</span> 的项属 G1-3/G1-4，必须过完才能宣称邀请闭环。PS-* 为家长切机构 P0，上线前建议全绿。</span>
   </div>
+
+  <div class="toc" id="toc"></div>
 
   <div class="accounts-box">
     <h3>🔑 测试账号（dev.chancore.cn 种子数据，密码统一 <code>123456</code>）</h3>
     <table>
       <thead><tr><th>用途</th><th>邮箱</th><th>密码</th><th>角色 / 机构</th></tr></thead>
       <tbody>
-        <tr><td>校长 / 机构管理员（测 O 码互邀、完整流程）</td><td><code>principal1@yunce.com</code></td><td><code>123456</code></td><td>万老师 · 松果排课 / 曦绘艺术 · OWNER</td></tr>
-        <tr><td>教师（测招生二维码 P 码）</td><td><code>teacher1@yunce.com</code></td><td><code>123456</code></td><td>张老师 · 同上机构 · TEACHER</td></tr>
+        <tr><td>校长 / 机构管理员（O 码、员工邀请、排课）</td><td><code>principal1@yunce.com</code></td><td><code>123456</code></td><td>万老师 · OWNER</td></tr>
+        <tr><td>教师（招生 P 码、点名、课表）</td><td><code>teacher1@yunce.com</code></td><td><code>123456</code></td><td>张老师 · TEACHER</td></tr>
         <tr><td>另一校长账号（备用）</td><td><code>teacher2@yunce.com</code></td><td><code>123456</code></td><td>李老师 · PRINCIPAL + ADMIN</td></tr>
-        <tr><td>家长（测非管理员分享）</td><td><code>parent1@yunce.com</code></td><td><code>123456</code></td><td>小明爸爸 · PARENT</td></tr>
-        <tr><td>新用户 B（测互邀入驻 / 家长注册）</td><td>新注册邮箱 或 未绑定的微信号</td><td>自设</td><td>不要用上面已有账号</td></tr>
-        <tr><td>第二台手机扫码</td><td>任意微信（可不登录）</td><td>—</td><td>测扫码 / 点分享卡片</td></tr>
+        <tr><td>家长（看课表 / 单机构切换门店）</td><td><code>parent1@yunce.com</code></td><td><code>123456</code></td><td>小明爸爸 · PARENT</td></tr>
+        <tr><td>跨机构家长（PS-2～PS-5）</td><td>同一微信/账号绑 A+B 两机构学员</td><td>—</td><td>需造数：A 机构 2 个所属校区学员 + B 机构 1 个；或开发协助绑定</td></tr>
+        <tr><td>新用户 B（互邀入驻 / 家长注册 / 员工接受）</td><td>新注册邮箱 或 未绑定微信号</td><td>自设</td><td>不要用上面已有账号</td></tr>
+        <tr><td>第二台手机扫码</td><td>任意微信</td><td>—</td><td>测扫码 / 点分享卡片</td></tr>
       </tbody>
     </table>
-    <p style="margin:10px 0 0;color:var(--muted);font-size:0.82rem;">微信一键登录：需该微信号已在后端绑定对应账号；没绑定的用「账号+密码」更稳。F2 测老用户微信登录时，请用已绑定 <code>principal1@yunce.com</code> 的微信号。</p>
+    <p style="margin:10px 0 0;color:var(--muted);font-size:0.82rem;">微信一键登录：需该微信号已绑定对应账号；没绑定用「账号+密码」更稳。F2 用已绑定 <code>principal1@yunce.com</code> 的微信号。跨机构家长：列表应扁平展示「机构名 · 校区名」，最多 A(2)+B(1)=3 行。</p>
   </div>
 
   <div class="tip-box">
     <strong>启动后端怎么做？</strong><br>
-    ① 双击 <code>start.cmd</code>（会自动开 <strong>tunnel 窗口</strong> + Docker 数据库 + 接口，两个窗口都别关）<br>
-    ② <strong>第一次或刚更新代码后</strong>，还需要同步数据库（见下面 D-1、D-2，或让开发帮你跑一条命令）<br>
-    ③ 小程序用微信开发者工具打开 <code>yunceTaro/dist</code> 目录<br>
-    ④ 真机预览时，接口地址是 <code>dev.chancore.cn</code>（已编译进当前包）
+    ① 双击 <code>start.cmd</code>（tunnel 窗口 + Docker + 接口都别关）<br>
+    ② 第一次或刚更新后：确认 migration（本清单 D-1 / D-2）已跑<br>
+    ③ 微信开发者工具打开 <code>yunceTaro/dist</code>（先 <code>npm run build:weapp:dev</code>）<br>
+    ④ 真机预览接口：<code>dev.chancore.cn</code>
   </div>
 
   <div class="rules">
     <h3>📌 简单说明</h3>
     <ol>
-      <li><strong>测过且选「通过」</strong> = 这条功能算验收好了，以后改代码不能悄悄改坏它。</li>
-      <li><strong>测失败了</strong>：在备注里写清楚现象，发给开发人员修；修完再测一次。</li>
-      <li><strong>全部测完</strong>：点「导出记录文件」，把文件发给 Agent 或开发。</li>
+      <li><strong>测过且选「通过」</strong> = 该业务能力验收冻结，后续改代码不能悄悄改坏。</li>
+      <li><strong>测失败了</strong>：备注写清现象 → 发给开发 → 修完再测。</li>
+      <li><strong>全部测完</strong>：点「导出记录文件」，发给 Agent / 开发；上线门禁项（G1-3/G1-4）须全绿。</li>
+      <li>来源：A+ 计划 Wave1 · invite P0 §11.7 · 入驻漏斗计划 · Q2 巨型页收口 · <strong>家长切换门店 P0（2026-09-03）</strong>。</li>
     </ol>
   </div>
 
@@ -119,72 +138,191 @@
   </section>
 
 <script>
-const STORAGE_KEY = 'yunce-device-walkthrough-v1';
+/** v2：按业务流程扩展后的全量清单；旧 v1 记录导入时会自动补新项 */
+const STORAGE_KEY = 'yunce-device-walkthrough-v2';
 
 const CHAIN_LABELS = {
   'D-1': '家长邀请-数据库', 'D-2': '门店互邀-数据库', 'D-3': '页面发布', 'D-4': '微信环境',
-  'F0': '账号密码登录', 'F1': '新用户微信登录', 'F2': '老用户微信登录', 'F3': '教师/家长登录', 'F4': '邀请页登录', 'F5': '连点登录', 'F6': '失败再试',
-  'VH-2a': '扫码进招生页', 'VH-2b': '杀进程再扫码', 'VH-2c': '旧格式码', 'VH-4': '体验版/正式版',
-  'V4T-R2': '好友打开互邀页', 'V4T-R3': '跳转入驻', 'V4T-R5': '错误邀请码', 'X-4': '转发链接',
-  'VH-1': '教师招生二维码', 'VH-3': '微信未配置提示', 'VH-5': '转发分享卡片',
-  'V4T-R1': '管理员分享互邀', 'V4T-R6': '非管理员分享',
-  'V4T-R4': '记录谁推荐的', 'X-1': '完整招生流程', 'X-2': '链接已用过', 'X-3': '员工邀请(复制+未登录回跳)', 'X-3b': '员工邀请(已登录)', 'X-5': '变成会员',
+  'F0': '账号密码登录', 'F1': '新用户微信登录', 'F2': '老用户微信登录', 'F3': '教师/家长微信登录',
+  'F4': '邀请页内微信登录', 'F5': '连点登录', 'F6': '失败再试', 'F7': '邮箱注册再密码登录', 'F8': '隐私协议勾选',
+  'L1-1': '课表分享试听卡', 'L1-2': '好友打开试听落地', 'L1-3': '试听落地未登录可看',
+  'VH-1': '教师招生二维码', 'VH-2a': '扫码进招生页', 'VH-2b': '杀进程再扫码', 'VH-2c': '旧格式码',
+  'VH-3': '微信未配置提示', 'VH-4': '体验版/正式版', 'VH-5': '转发分享卡片',
+  'V2T-5': 'L2已用满屏', 'V2T-6': 'L2过期满屏',
+  'V4T-R1': '管理员分享互邀', 'V4T-R2': '好友打开互邀页', 'V4T-R3': '跳转入驻',
+  'V4T-R4': '记录谁推荐的', 'V4T-R5': '错误邀请码', 'V4T-R6': '非管理员分享',
+  'X-1': '完整招生流程', 'X-2': '链接已用过', 'X-3': '员工邀请(复制+未登录回跳)',
+  'X-3b': '员工邀请(已登录)', 'X-4': '转发链接', 'X-5': '变成会员',
+  'V3T-4': 'L3过期满屏', 'V3T-5': 'L3已用满屏',
+  'SE-01': '入驻首次提交', 'SE-02': 'pending双按钮', 'SE-03': '进演示门店', 'SE-04': '客服催办',
+  'SE-05': 'PENDING进表拦截', 'SE-06': '弱网连点提交', 'SE-07': '页内绑邮箱', 'SE-08': '杀进程回pending',
+  'SE-09': '审核通过进机构', 'SE-10': '驳回重提', 'SE-11': '未登录预览填表',
+  'S-1': '课表Tab切换', 'S-2': '日滑动换日', 'S-3': '点名入口', 'S-4': '调课入口',
+  'S-5': '停课恢复', 'S-6': '团课开放约', 'S-7': '场地Tab',
+  'SF-1': '新建班课排课', 'SF-2': '编辑排课保存', 'SF-3': '冲突提示',
+  'L-1': '班课点名提交', 'L-2': '消课防重入', 'L-3': '无假签到CTA', 'L-4': '单人消课', 'L-5': '补录学员',
+  'P-1': '家长看课表', 'P-2': '家长约课/取消',
+  'PS-1': '单机构门店列表', 'PS-2': '多机构三行展示', 'PS-3': '跨机构切到B',
+  'PS-4': '切回A城东', 'PS-5': '同机构切校区', 'PS-6': '切换失败/连点', 'PS-7': '教师切换门店回归',
 };
 
 const SECTIONS = [
   {
-    title: '第零步：环境准备（开发先确认，测功能前看一眼）',
+    id: 'env',
+    title: '① 环境准备（部署门禁）',
+    desc: '开发先确认；测功能前扫一眼。对应 invite P0 §11.7 D 项。',
     items: [
-      { id: 'D-1', account: '—（开发操作）', steps: '确认数据库已更新「家长邀请」相关表（开发跑 migrate，或 Staging 已部署）', expected: '后端启动不报错；教师能生成招生码' },
-      { id: 'D-2', account: '—（开发操作）', steps: '确认数据库已更新「门店互邀」相关表（机构推荐码、推荐来源字段）', expected: '关于页能生成 O 开头推荐码' },
-      { id: 'D-3', account: '—', steps: '微信开发者工具 / 体验版里能找到「招生注册页」「门店互邀落地页」', expected: '页面能打开，不是 404' },
-      { id: 'D-4', account: '—', steps: '体验版小程序 + 后端微信配置属于同一环境（都是体验版或都是正式版）', expected: '扫码能打开对应页面' },
+      { id: 'D-1', account: '—（开发操作）', steps: '确认已跑 migration「家长邀请」相关表（如 <code>20260902_parent_share_invite</code>）', expected: '后端启动不报错；教师能生成招生码' },
+      { id: 'D-2', account: '—（开发操作）', steps: '确认已跑 migration「门店互邀」相关表（如 <code>20260902_org_referral_l4</code>）', expected: '关于页能生成 O 开头推荐码' },
+      { id: 'D-3', account: '—', steps: '体验版 / 开发者工具能打开：招生注册页、门店互邀落地页、员工邀请落地页', expected: '页面能打开，不是 404' },
+      { id: 'D-4', account: '—', steps: '体验版小程序 + 后端 <code>WECHAT_MINI_ENV_VERSION</code> 同环境', expected: '扫码能打开对应页面' },
     ]
   },
   {
-    title: '第一步：登录页（由外入内 — 从最外层入口开始）',
+    id: 'auth',
+    title: '② 登录 / 注册 / 鉴权',
+    desc: '主路径最外层。过不了这里，后面邀请与教务都测不了。',
     items: [
-      { id: 'F0', account: '<code>principal1@yunce.com</code><br>密码 <code>123456</code>', steps: '打开登录页 → <strong>手动勾选</strong>用户协议 → 输入邮箱密码 → 点「账号登录」', expected: '进入首页（曦绘艺术），不是空白页；协议默认<strong>不勾选</strong>' },
-      { id: 'F1', account: '未用过的微信号（勿绑种子邮箱）', steps: '退出登录 → 登录页点「微信一键登录」→ 同意隐私弹窗', expected: '进入完善资料或选择身份' },
-      { id: 'F2', account: '已绑定 principal1 的微信号<br>或先 F0 密码登录再测微信', steps: '用已有机构的校长账号微信登录', expected: '直接进首页，不会又让你选身份' },
-      { id: 'F3', account: '<code>teacher1@yunce.com</code> 或 <code>parent1@yunce.com</code><br>密码 <code>123456</code>', steps: '教师/家长账号在登录页点「微信一键登录」', expected: '提示角色不对（已知现象，可跳过）', defaultStatus: 'skip' },
-      { id: 'F5', account: '任意账号', steps: '登录页快速连点「微信登录」好几下', expected: '不会卡死；不会重复报错' },
-      { id: 'F6', account: '<code>principal1@yunce.com</code> / <code>123456</code>', steps: '故意断网点登录失败一次，再连上网重试', expected: '第二次能登录成功' },
+      { id: 'F0', account: '<code>principal1@yunce.com</code><br>密码 <code>123456</code>', steps: '打开登录页 → <strong>手动勾选</strong>用户协议 → 邮箱密码 →「账号登录」', expected: '进入首页（非空白）；协议默认<strong>不勾选</strong>' },
+      { id: 'F8', account: '任意', steps: '登录页不勾选协议就点登录 / 微信登录', expected: '被拦住，提示先同意协议' },
+      { id: 'F1', account: '未用过的微信号（勿绑种子邮箱）', steps: '退出 →「微信一键登录」→ 同意隐私弹窗', expected: '进入完善资料或选择身份' },
+      { id: 'F2', account: '已绑定 principal1 的微信号', steps: '用已有机构校长账号微信登录', expected: '直接进首页，不再强迫选身份' },
+      { id: 'F7', account: '全新邮箱', steps: '注册页发码 → 设密码注册 → 退出 → 再用账号密码登录', expected: '注册成功且密码可再次登录；发码不长时间卡住' },
+      { id: 'F3', account: '<code>teacher1</code> 或 <code>parent1</code>', steps: '教师/家长在登录页点「微信一键登录」', expected: '按产品口径：成功进端，或明确角色提示（勿白屏）', defaultStatus: 'skip' },
+      { id: 'F5', account: '任意', steps: '登录页快速连点「微信登录」', expected: '不卡死、不重复报错刷屏' },
+      { id: 'F6', account: '<code>principal1</code> / <code>123456</code>', steps: '断网失败一次 → 恢复网络重试', expected: '第二次能登录成功' },
+      { id: 'F4', account: '未登录或新用户', steps: '在招生注册页 / 试听落地页内点「微信登录」', expected: '能登进去，且登录后回到业务页（不丢邀请上下文）' },
     ]
   },
   {
-    title: '第二步：外链 / 扫码落地（由外到里 — 从分享链进入，多数未登录）',
+    id: 'l1',
+    title: '③ L1 · 试听课 / 课程卡片分享',
+    desc: '课表分享 → invite-landing。与 L2 临时码独立。',
     items: [
-      { id: 'V4T-R5', account: '无需登录', steps: '手动打开一个瞎编的互邀链接（如 <code>?code=OINVALID1</code>）', expected: '提示链接无效，不会白屏' },
-      { id: 'V4T-R2', account: '第二台手机 / 另一微信（B 用户，未登录）', steps: '等第四步 V4T-R1 分享出卡片后，B 用户点开分享卡片', expected: '看到机构 A 的名字；有「申请入驻」按钮', depends: '需先完成 V4T-R1，或请开发给一条有效 O 码链接' },
-      { id: 'V4T-R3', account: 'B 用户（仍可未登录）', steps: '在互邀落地页点「申请门店入驻」', expected: '进入入驻填表页（未登录也能看表）' },
-      { id: 'VH-2a', account: '第二台手机（未登录）', steps: '等第四步 VH-1 生成码后，用另一台手机扫招生二维码', expected: '进入「招生注册」页；能看到机构和老师信息', depends: '需先完成 VH-1，或请教师先帮你生成码' },
-      { id: 'VH-2b', account: '第二台手机', steps: '完全关闭小程序后再扫码（或从微信「最近使用」进入）', expected: '仍然能识别邀请，信息正常' },
-      { id: 'VH-2c', account: '—（可选）', steps: '开发者工具模拟旧格式扫码 scene=<code>PABC12345</code>', expected: '旧码也能用' },
-      { id: 'VH-4', account: '—', steps: '体验版扫体验码 / 正式版扫正式码', expected: '环境对得上能打开；对不上会失败' },
-      { id: 'X-4', account: '第二台手机', steps: '把招生链接转发到另一台手机再打开', expected: '链接能用，信息对' },
-      { id: 'F4', account: '未登录或新用户', steps: '在招生注册页 / 试听课页里点「微信登录」', expected: '和以前一样能登进去' },
+      { id: 'L1-1', account: '<code>teacher1@yunce.com</code>', steps: '课表找到班课卡片 → 分享试听 / 课程分享给好友', expected: '分享卡片可发出；path 指向试听/邀请落地页' },
+      { id: 'L1-2', account: '第二台手机（可未登录）', steps: '好友点开 L1-1 分享卡片', expected: '进入试听落地页；机构/课程信息正确', depends: '需先完成 L1-1', gate: '回归' },
+      { id: 'L1-3', account: '未登录微信', steps: '未登录打开试听落地页，浏览信息后再登录', expected: '未登录可看关键信息；登录不丢上下文' },
     ]
   },
   {
-    title: '第三步：登录后内页（机构内操作 — 往里走）',
+    id: 'l2-out',
+    title: '④ L2 · 招生拉家长（外链 / 扫码侧）',
+    desc: 'G1-3 真机门禁 · Phase H（VH）。多数用第二台手机、未登录。',
     items: [
-      { id: 'VH-1', account: '<code>teacher1@yunce.com</code><br>密码 <code>123456</code>', steps: '教师登录 → 我的邀请 / 招生 → 打开「招生二维码」页', expected: '出现二维码图片；有过期时间提示' },
-      { id: 'VH-5', account: '<code>teacher1@yunce.com</code>', steps: '仍在二维码页 → 点右上角转发给好友', expected: '好友点开能进招生页（可回第二步 VH-2a 验证）' },
-      { id: 'V4T-R1', account: '<code>principal1@yunce.com</code><br>密码 <code>123456</code>', steps: '机构 A 管理员登录 →「设置」→「关于」→ 点右上角分享', expected: '分享出去的是「门店互邀」链接（带 O 开头码）' },
-      { id: 'V4T-R6', account: '<code>teacher1@yunce.com</code> 或 <code>parent1@yunce.com</code><br>密码 <code>123456</code>', steps: '用教师或家长账号登录 → 关于页点分享', expected: '不会出现管理员的专属 O 码（走普通 about 链接）' },
-      { id: 'VH-3', account: '—（可选，需开发关微信配置）', steps: '后端没配微信时打开二维码页', expected: '有明确错误提示，可以点重试' },
+      { id: 'VH-2a', account: '第二台手机（未登录）', steps: '扫教师生成的招生二维码（先做 ⑤ VH-1）', expected: '进入「招生注册」页；机构和老师信息正确', depends: '需先完成 VH-1', gate: 'G1-3' },
+      { id: 'VH-2b', account: '第二台手机', steps: '完全关闭小程序后再扫同一码', expected: '仍能识别邀请（冷启动 scene 兜底）', gate: 'G1-3' },
+      { id: 'VH-2c', account: '—（可选）', steps: '开发者工具模拟旧格式 scene=<code>PABC12345</code>', expected: '旧码仍可解析' },
+      { id: 'VH-4', account: '—', steps: '体验版扫体验码 / 正式版扫正式码', expected: '环境一致能打开；错环境应失败或进错版', gate: 'G1-3' },
+      { id: 'X-4', account: '第二台手机', steps: '转发 <code>invite-register?code=</code> 到另一台再打开', expected: '链接可用，context 正常', gate: 'G1-4' },
+      { id: 'V2T-6', account: '过期链接（开发造 24h+ 或改库）', steps: '打开已过期的 L2 邀请链', expected: '满屏「已过期」分态，不可再绑定', gate: 'G1-4' },
     ]
   },
   {
-    title: '第四步：完整业务闭环（最里层 — 注册、提交、归因）',
+    id: 'l2-in',
+    title: '⑤ L2 · 招生拉家长（教师发码侧）',
+    desc: '登录后内页操作；生成后再回 ④ 扫码验证。',
     items: [
-      { id: 'V4T-R4', account: 'B 用户：新注册邮箱 或 新微信号<br>（勿用 principal1/teacher1）', steps: 'B 从互邀链进入 → 填入驻表 → 登录/注册 → 提交申请', expected: '提交成功；后台可见「推荐来源 = 机构 A（松果排课）」' },
-      { id: 'X-1', account: '教师 <code>teacher1@yunce.com</code><br>家长：新微信号 / 新邮箱', steps: '完整走一遍：教师发 P 码 → 家长扫码注册 → 绑定机构', expected: '全流程成功；邀请状态变为已使用' },
-      { id: 'X-2', account: '第三人（未参与 X-1 的微信）', steps: '换一个人点 X-1 里已经用过的邀请链接', expected: '提示已失效' },
-      { id: 'X-3', account: '校长 <code>principal1@yunce.com</code><br>员工：新微信号（先退出登录）', steps: '①校长生成邀请 → 点「复制邀请链接」②员工用复制的直链打开（路径含 campus-invite-landing?code=）③未登录点「登录并接受」→ 登录后须回到落地页再接受', expected: '链接为落地页直链（无 index?redirect=）；登录后回到邀请页；接受成功加入校区' },
-      { id: 'X-3b', account: '校长 <code>principal1@yunce.com</code><br>已登录员工', steps: '员工已登录时打开同一类邀请直链 → 点接受', expected: '成功加入；再开链接见成功页' },
-      { id: 'X-5', account: '<code>principal1@yunce.com</code>', steps: '（抽一条）给 X-1 邀请来的学员充值或发卡', expected: '邀请关系升级为「会员」' },
+      { id: 'VH-1', account: '<code>teacher1@yunce.com</code>', steps: '我的邀请 / 招生 →「招生二维码」页', expected: '出现二维码 PNG；有过期时间提示', gate: 'G1-3' },
+      { id: 'VH-5', account: '<code>teacher1@yunce.com</code>', steps: '二维码页右上角转发给好友', expected: '好友可打开招生页（回测 VH-2a）', gate: 'G1-3' },
+      { id: 'VH-3', account: '—（可选，需关微信配置）', steps: '后端无微信凭证时打开二维码页', expected: '明确错误提示 + 可重试' },
+    ]
+  },
+  {
+    id: 'l4',
+    title: '⑥ L4 · 门店互邀入驻',
+    desc: 'G1-3 · Phase C（V4T）。管理员发 O 码 → 好友申请入驻。',
+    items: [
+      { id: 'V4T-R5', account: '无需登录', steps: '打开瞎编互邀链 <code>?code=OINVALID1</code>', expected: '提示链接无效，不白屏', gate: 'G1-3' },
+      { id: 'V4T-R1', account: '<code>principal1@yunce.com</code>', steps: '设置 → 关于 → 右上角分享', expected: '分享 path 含 <code>store-referral-landing?code=O...</code>', gate: 'G1-3' },
+      { id: 'V4T-R2', account: 'B 用户（未登录）', steps: '点开 V4T-R1 分享卡片', expected: '看到机构 A 名称；有「申请入驻」', depends: '需先完成 V4T-R1', gate: 'G1-3' },
+      { id: 'V4T-R3', account: 'B 用户', steps: '落地页点「申请门店入驻」', expected: '进入入驻填表；pending O 码已存', gate: 'G1-3' },
+      { id: 'V4T-R6', account: '<code>teacher1</code> 或 <code>parent1</code>', steps: '非管理员打开关于页分享', expected: '无管理员专属 O 码（普通 about）', gate: 'G1-3' },
+    ]
+  },
+  {
+    id: 'invite-close',
+    title: '⑦ 邀请跨链路闭环（G1-4）',
+    desc: '同一 Staging 会话建议一口气跑完。含 L2 注册、L3 员工邀请、升会员。',
+    items: [
+      { id: 'X-1', account: '教师 teacher1 + 新家长微信/邮箱', steps: '完整：教师发 P 码 → 家长扫码注册 → 绑定机构', expected: '全流程成功；邀请变为已使用；绑定者再开见成功页', gate: 'G1-4' },
+      { id: 'X-2', account: '第三人（未参与 X-1）', steps: '打开 X-1 已用过的邀请链接', expected: '失效 / 已用满屏', gate: 'G1-4' },
+      { id: 'V2T-5', account: '同上', steps: '确认已用态 UI 与 L2 产品分态一致（满屏，非弱提示）', expected: '已用态清晰不可再绑', gate: 'G1-4' },
+      { id: 'X-3', account: '校长 principal1 + 新员工（先退出登录）', steps: '①校长生成员工邀请 →「复制邀请链接」②员工打开直链（<code>campus-invite-landing?code=</code>，无 index?redirect=）③未登录点「登录并接受」→ 登录后须回落地页再接受', expected: '直链无 redirect 壳；登录回跳正确；接受成功加入校区', gate: 'G1-4' },
+      { id: 'X-3b', account: '已登录员工', steps: '已登录打开同类邀请直链 → 接受', expected: '成功加入；再开见成功页', gate: 'G1-4' },
+      { id: 'V3T-4', account: '过期员工邀请链', steps: '打开超过 24h 的 campus 邀请', expected: '满屏过期态，不可 accept（G1-5）', gate: 'G1-4' },
+      { id: 'V3T-5', account: '已用员工邀请链', steps: '打开已接受过的员工邀请', expected: '满屏已用/成功分态，对齐 L2', gate: 'G1-4' },
+      { id: 'V4T-R4', account: 'B：新邮箱/新微信（勿用种子）', steps: '从互邀链进 → 填表 → 登录/注册 → 提交', expected: '提交成功；后台/DB 可见推荐来源=机构 A', gate: 'G1-4' },
+      { id: 'X-5', account: '<code>principal1</code>', steps: '给 X-1 邀请来的学员充值或发卡（抽一条）', expected: '邀请关系升级为会员（LEAD→MEMBER）', gate: 'G1-4' },
+    ]
+  },
+  {
+    id: 'store-entry',
+    title: '⑧ 门店入驻审核漏斗',
+    desc: 'store-entry pending 漏斗；与 L4 衔接。来源：store-entry-pending-funnel-plan。',
+    items: [
+      { id: 'SE-11', account: '未登录', steps: '未登录打开入驻填表页', expected: '可预览填表；提交时引导登录' },
+      { id: 'SE-01', account: '新用户 B（可接 V4T-R3）', steps: '填表 → 申请入驻', expected: '进 pending；主标题含「提交成功，等待审核」' },
+      { id: 'SE-02', account: '同上（PENDING）', steps: '看 pending 页', expected: '有「先体验演示门店」「联系客服催办」；无常驻大 QR' },
+      { id: 'SE-03', account: '同上', steps: '点「先体验演示门店」', expected: '进 home（演示）；有演示环境 Toast' },
+      { id: 'SE-04', account: '同上', steps: '点「联系客服催办」', expected: 'BottomSheet + QR，可放大' },
+      { id: 'SE-05', account: '已有 PENDING', steps: '再次进入填表入口', expected: '自动 redirect 到 pending' },
+      { id: 'SE-06', account: '填表页', steps: '弱网连点提交', expected: '不误报失败 Toast；最终进 pending（409 幂等）' },
+      { id: 'SE-07', account: '需绑邮箱账号', steps: '点「去绑定」', expected: '页内 BindEmailSheet，不跳 profile' },
+      { id: 'SE-08', account: '已登录 + PENDING', steps: '杀进程重开小程序', expected: '不进 identity-select 死循环；回到 pending 或 home 后再检→pending' },
+      { id: 'SE-09', account: 'Admin 批准后', steps: '打开 pending', expected: '成功态 →「进入我的机构」进机构端' },
+      { id: 'SE-10', account: 'Admin 驳回后', steps: '打开 pending', expected: '见驳回原因 + 可重提' },
+    ]
+  },
+  {
+    id: 'schedule',
+    title: '⑨ 教务 · 课表（schedule）',
+    desc: 'Q2-1 巨型页拆分后回归；主交互不能变。',
+    items: [
+      { id: 'S-1', account: '<code>teacher1</code> / <code>principal1</code>', steps: '课表顶栏切换：班课 / 团课 / 私教 / 场地（若开启）', expected: '列表与模式正确切换，无白屏' },
+      { id: 'S-2', account: '同上', steps: '左右滑日 / 点日历换日', expected: '日期与卡片同步；不卡死' },
+      { id: 'S-3', account: '同上', steps: '当日有课卡片 → 点「点名」', expected: '进入 lesson-form，班级/日期正确' },
+      { id: 'S-4', account: '同上', steps: '卡片 → 调课 / 编辑排课', expected: '进入 schedule-form 或调课页，数据预填正确' },
+      { id: 'S-5', account: '同上', steps: '停课一节 → 再恢复（或恢复班级）', expected: '确认弹窗文案正确；操作后列表状态更新' },
+      { id: 'S-6', account: '团课 Tab', steps: '开放预约列表：加载时段 / 代约 / 取消（有数据时）', expected: '加载态与空态正常；操作有反馈' },
+      { id: 'S-7', account: '场地 Tab（若开启）', steps: '打开场地列表 → 点进预约', expected: '有场地卡片；可进预约页' },
+    ]
+  },
+  {
+    id: 'schedule-form',
+    title: '⑩ 教务 · 新建 / 编辑排课（schedule-form）',
+    desc: 'Q2-3 拆分后保存路径回归。',
+    items: [
+      { id: 'SF-1', account: '<code>principal1</code> 或教师', steps: '新建班课排课：选班、时段、老师 → 保存', expected: '保存成功；课表可见新规则' },
+      { id: 'SF-2', account: '同上', steps: '编辑已有排课改时间 → 保存', expected: '保存成功；课表反映新时间' },
+      { id: 'SF-3', account: '同上', steps: '故意制造时间冲突再保存', expected: '出现冲突提示，不会静默写坏数据' },
+    ]
+  },
+  {
+    id: 'lesson',
+    title: '⑪ 教务 · 点名消课（lesson-form）',
+    desc: '主路径终点。含 G1-1 防重入、G1-2 无假 CTA。',
+    items: [
+      { id: 'L-1', account: '<code>teacher1</code>', steps: '班课点名：勾选学员状态 → 提交消课', expected: '提交成功；课时正确扣减；可回课表' },
+      { id: 'L-2', account: '同上', steps: '提交时快速连点「提交」多次', expected: '只成功一次；按钮 loading/禁用，无双扣', gate: 'G1-1' },
+      { id: 'L-3', account: '体验课/试听相关页', steps: '检查是否仍有「签到开发中」等假入口', expected: '无误导 CTA（已隐藏或已接通）', gate: 'G1-2' },
+      { id: 'L-4', account: '同上', steps: '单人消课模式走通一次', expected: '选学员 + 课包 → 提交成功' },
+      { id: 'L-5', account: '班课点名页', steps: '补录学员 → 提交', expected: '补录名单进入点名并可提交' },
+    ]
+  },
+  {
+    id: 'parent',
+    title: '⑫ 家长端 · 课表冒烟 + 切换门店（P0）',
+    desc: 'P-1/P-2 冒烟；PS-* 验收家长跨机构「切换门店」（对齐 parent-switch-org 计划 §7）。PS-2～PS-5 需造「同一家长绑 A+B」数据；仅有 parent1 单机构时先做 PS-1 + PS-7。',
+    items: [
+      { id: 'P-1', account: '<code>parent1@yunce.com</code>', steps: '家长登录 → 课表 Tab', expected: '只看到绑定孩子相关班级；无教师专属操作误露' },
+      { id: 'P-2', account: '同上（有开放约数据时）', steps: '团课开放约：预约 / 取消', expected: '状态正确；教师侧可见预约' },
+      { id: 'PS-1', account: '<code>parent1@yunce.com</code>（单机构）', steps: '首页校区卡片点「切换门店」→ 看列表 → 选当前门店确认进入', expected: '列表至少 1 行，主文案为「机构名 · 校区名」；进入成功无报错；副文案可有学员昵称', gate: '家长切机构' },
+      { id: 'PS-2', account: '跨机构家长（A 两校区学员 + B 一校区）', steps: '打开「切换门店」Sheet', expected: '扁平列表 <strong>3</strong> 行；每行含机构名（勿只显示校区名）；无未绑定校区', depends: '需造数 A(2)+B(1)', gate: '家长切机构' },
+      { id: 'PS-3', account: '同上；当前在 A·总校', steps: '选 <strong>B·总店</strong> →「进入该门店」（可观察「切换中…」）', expected: '成功进入；首页孩子/课包/今日课表仅属 B；杀进程重开仍停在 B（JWT/本地会话一致）', depends: '需先 PS-2', gate: '家长切机构' },
+      { id: 'PS-4', account: '同上（已在 B）', steps: '再打开 Sheet → 选 <strong>A·城东</strong> → 进入', expected: '回到 A；当前门店为城东；首页数据为 A 侧学员，不串 B', depends: '需先 PS-3', gate: '家长切机构' },
+      { id: 'PS-5', account: '同上（当前 A）', steps: '同机构内：A·总校 ↔ A·城东 切换（不必跨机构）', expected: '进入成功；首页/课表按目标校区过滤；过程流畅（可无整页白闪）', depends: '需 A 有 ≥2 可见校区', gate: '家长切机构' },
+      { id: 'PS-6', account: '跨机构家长或断网模拟', steps: '①跨机构切换时快速连点「进入」②（可选）断网后点确认', expected: '连点不双换 token、按钮有切换中态；失败有 Toast，Sheet 不关、不留下半套会话', gate: '家长切机构' },
+      { id: 'PS-7', account: '<code>teacher1</code> 或 <code>principal1</code>（多校区）', steps: '员工首页「切换门店」：列表仍为当前机构校区名；校长多校区仍可见「推荐」位（若适用）→ 切换另一校区', expected: '行为与改前一致：只切本地校区，不要求家长式「机构·校区」文案；课表随校区更新', gate: '回归' },
     ]
   },
 ];
@@ -196,14 +334,20 @@ function defaultState() {
   SECTIONS.forEach(s => s.items.forEach(it => {
     items[it.id] = { status: it.defaultStatus || 'pending', notes: '', testedAt: null };
   }));
-  return { version: 1, session: { tester: '', environment: 'dev.chancore.cn 测试服', testDate: '' }, items, frozen: {}, updatedAt: null };
+  return { version: 2, session: { tester: '', environment: 'dev.chancore.cn 测试服', testDate: '' }, items, frozen: {}, updatedAt: null };
 }
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      // 兼容旧 v1 记录
+      const legacy = localStorage.getItem('yunce-device-walkthrough-v1');
+      if (legacy) raw = legacy;
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
+      parsed.version = 2;
       SECTIONS.forEach(s => s.items.forEach(it => {
         if (!parsed.items[it.id]) {
           parsed.items[it.id] = { status: it.defaultStatus || 'pending', notes: '', testedAt: null };
@@ -228,7 +372,8 @@ function saveAll() {
 function resetAll() {
   if (!confirm('确定清空全部测试记录？')) return;
   state = defaultState();
-  saveAll();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  render();
 }
 
 function setStatus(id, status) {
@@ -237,35 +382,65 @@ function setStatus(id, status) {
   if (status === 'pass') {
     state.frozen[id] = { label: CHAIN_LABELS[id] || id, frozenAt: new Date().toISOString() };
   } else if (state.frozen[id]) delete state.frozen[id];
-  saveAll();
+  saveAllQuiet();
+}
+
+function saveAllQuiet() {
+  state.session.tester = document.getElementById('tester').value;
+  state.session.environment = document.getElementById('environment').value;
+  state.session.testDate = document.getElementById('testDate').value;
+  state.updatedAt = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  render();
 }
 
 function setNotes(id, notes) { state.items[id].notes = notes; }
+
+function gateBadge(gate) {
+  if (!gate) return '';
+  return `<span class="badge gate">${gate}</span>`;
+}
 
 function render() {
   document.getElementById('tester').value = state.session.tester || '';
   document.getElementById('environment').value = state.session.environment || '';
   document.getElementById('testDate').value = state.session.testDate || new Date().toISOString().slice(0, 10);
 
+  document.getElementById('toc').innerHTML = '<strong>目录：</strong> ' + SECTIONS.map((s, i) =>
+    `<a href="#sec-${s.id}">${s.title.replace(/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫]\s*/, '')}</a>${i < SECTIONS.length - 1 ? '·' : ''}`
+  ).join(' ');
+
   const counts = { pending: 0, pass: 0, fail: 0, skip: 0 };
   Object.values(state.items).forEach(i => { counts[i.status] = (counts[i.status]||0)+1; });
+  const gateIds = new Set();
+  SECTIONS.forEach(s => s.items.forEach(it => {
+    if (it.gate === 'G1-3' || it.gate === 'G1-4' || it.gate === 'G1-1' || it.gate === 'G1-2') gateIds.add(it.id);
+  }));
+  let gatePass = 0, gatePending = 0;
+  gateIds.forEach(id => {
+    const st = state.items[id]?.status;
+    if (st === 'pass') gatePass++;
+    else if (st !== 'skip') gatePending++;
+  });
   document.getElementById('stats').innerHTML = `
     <div class="stat"><strong style="color:var(--pass)">${counts.pass||0}</strong>已通过</div>
     <div class="stat"><strong style="color:var(--fail)">${counts.fail||0}</strong>失败</div>
     <div class="stat"><strong style="color:var(--pending)">${counts.pending||0}</strong>还没测</div>
-    <div class="stat"><strong>${counts.skip||0}</strong>跳过</div>`;
+    <div class="stat"><strong>${counts.skip||0}</strong>跳过</div>
+    <div class="stat"><strong style="color:var(--gate)">${gatePass}/${gateIds.size}</strong>上线门禁已过<br><span style="font-size:0.75rem;color:var(--muted)">剩 ${gatePending} 项未过</span></div>`;
 
   document.getElementById('sections').innerHTML = SECTIONS.map(section => `
-    <section>
+    <section id="sec-${section.id}">
       <h2>${section.title}</h2>
+      ${section.desc ? `<p class="sec-desc">${section.desc}</p>` : ''}
       <table>
-        <thead><tr><th style="width:64px">编号</th><th style="width:150px">用哪个账号</th><th>你要做什么</th><th>应该怎样</th><th style="width:100px">结果</th><th style="width:160px">备注（失败必填）</th></tr></thead>
+        <thead><tr><th style="width:72px">编号</th><th style="width:150px">用哪个账号</th><th>你要做什么</th><th>应该怎样</th><th style="width:100px">结果</th><th style="width:160px">备注（失败必填）</th></tr></thead>
         <tbody>${section.items.map(it => {
           const item = state.items[it.id] || { status: 'pending', notes: '' };
           const locked = item.status === 'pass';
           const depNote = it.depends ? `<br><span style="color:var(--pending);font-size:0.78rem">⚠ ${it.depends}</span>` : '';
           return `<tr class="${item.status} ${locked?'frozen-row':''}">
-            <td><code>${it.id}</code>${locked?'<br><span class="badge lock">已验收</span>':''}</td>
+            <td><code>${it.id}</code>${gateBadge(it.gate)}${locked?'<br><span class="badge lock">已验收</span>':''}</td>
             <td class="account-cell">${it.account || '—'}${depNote}</td>
             <td>${it.steps}</td>
             <td>${it.expected}</td>
@@ -275,7 +450,7 @@ function render() {
               <option value="fail" ${item.status==='fail'?'selected':''}>❌ 失败</option>
               <option value="skip" ${item.status==='skip'?'selected':''}>⏭ 跳过</option>
             </select></td>
-            <td><textarea class="notes" placeholder="失败写这里" onchange="setNotes('${it.id}',this.value);saveAll();">${item.notes||''}</textarea></td>
+            <td><textarea class="notes" placeholder="失败写这里" onchange="setNotes('${it.id}',this.value);saveAllQuiet();">${item.notes||''}</textarea></td>
           </tr>`;
         }).join('')}</tbody>
       </table>
@@ -289,7 +464,7 @@ function render() {
 }
 
 function exportJson() {
-  saveAll();
+  saveAllQuiet();
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(state,null,2)], {type:'application/json'}));
   a.download = `真机测试记录-${state.session.testDate||'export'}.json`;
@@ -301,22 +476,42 @@ function importJson() {
   input.type = 'file'; input.accept = '.json';
   input.onchange = e => {
     const r = new FileReader();
-    r.onload = ev => { try { state = JSON.parse(ev.target.result); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); render(); alert('导入成功'); } catch { alert('文件格式不对'); } };
+    r.onload = ev => {
+      try {
+        state = JSON.parse(ev.target.result);
+        state.version = 2;
+        SECTIONS.forEach(s => s.items.forEach(it => {
+          if (!state.items[it.id]) {
+            state.items[it.id] = { status: it.defaultStatus || 'pending', notes: '', testedAt: null };
+          }
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        render();
+        alert('导入成功');
+      } catch { alert('文件格式不对'); }
+    };
     r.readAsText(e.target.files[0]);
   };
   input.click();
 }
 
 function copySummary() {
-  saveAll();
+  saveAllQuiet();
   const failed = Object.entries(state.items).filter(([,v])=>v.status==='fail');
   const passed = Object.entries(state.items).filter(([,v])=>v.status==='pass');
+  const gateItems = [];
+  SECTIONS.forEach(s => s.items.forEach(it => {
+    if (it.gate === 'G1-3' || it.gate === 'G1-4' || it.gate === 'G1-1' || it.gate === 'G1-2') {
+      gateItems.push(`${it.id}:${state.items[it.id]?.status||'pending'}`);
+    }
+  }));
   const text = [
     `真机测试摘要 ${state.session.testDate||''}`,
     `测试人: ${state.session.tester}`,
     `环境: ${state.session.environment}`,
     `通过 ${passed.length} 项: ${passed.map(([k])=>k).join('、')||'无'}`,
     `失败 ${failed.length} 项: ${failed.map(([k,v])=>k+(v.notes?`（${v.notes}）`:'')).join('、')||'无'}`,
+    `上线门禁: ${gateItems.join(' · ')}`,
   ].join('\n');
   navigator.clipboard.writeText(text).then(()=>alert('摘要已复制，可以粘贴发给开发'));
 }

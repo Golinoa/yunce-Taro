@@ -3,8 +3,8 @@
  *
  * 从 pages/schedule/index.tsx 抽出：过去/非过去日期下的取消、编辑改期、删除按钮规则。
  */
-import type dayjs from 'dayjs';
 import type { ScheduleCardStatus } from '@/utils/schedule-card-status';
+import type dayjs from 'dayjs';
 
 /** 按钮可见性判断所需的最小卡片字段 */
 export interface ScheduleCardActionFields {
@@ -67,7 +67,10 @@ export function shouldShowDeleteButton(
 }
 
 export function getCardActionVisibility(
-  item: Pick<ScheduleCardActionFields, 'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'>,
+  item: Pick<
+    ScheduleCardActionFields,
+    'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'
+  >,
   selectedDate: dayjs.Dayjs,
   now: dayjs.Dayjs,
 ) {

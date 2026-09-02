@@ -31,9 +31,13 @@ describe('promptWechatOfficialPrivacyOnPageEnter', () => {
       requireSpy;
     (Taro as unknown as { getPrivacySetting: typeof Taro.getPrivacySetting }).getPrivacySetting = vi
       .fn()
-      .mockImplementation((opt: { success?: (r: { needAuthorization: boolean }) => void }) => {
-        opt.success?.({ needAuthorization: true, privacyContractName: '《测试隐私指引》' });
-      });
+      .mockImplementation(
+        (opt: {
+          success?: (r: { needAuthorization: boolean; privacyContractName?: string }) => void;
+        }) => {
+          opt.success?.({ needAuthorization: true, privacyContractName: '《测试隐私指引》' });
+        },
+      );
 
     const { promptWechatOfficialPrivacyOnPageEnter } = await import('@/utils/privacy-authorize');
     promptWechatOfficialPrivacyOnPageEnter('login.page.show', { delayMs: 450 });
@@ -54,9 +58,13 @@ describe('promptWechatOfficialPrivacyOnPageEnter', () => {
       requireSpy;
     (Taro as unknown as { getPrivacySetting: typeof Taro.getPrivacySetting }).getPrivacySetting = vi
       .fn()
-      .mockImplementation((opt: { success?: (r: { needAuthorization: boolean }) => void }) => {
-        opt.success?.({ needAuthorization: false, privacyContractName: '《测试隐私指引》' });
-      });
+      .mockImplementation(
+        (opt: {
+          success?: (r: { needAuthorization: boolean; privacyContractName?: string }) => void;
+        }) => {
+          opt.success?.({ needAuthorization: false, privacyContractName: '《测试隐私指引》' });
+        },
+      );
 
     const { promptWechatOfficialPrivacyOnPageEnter } = await import('@/utils/privacy-authorize');
     promptWechatOfficialPrivacyOnPageEnter('login.page.show', { delayMs: 0 });
@@ -134,9 +142,11 @@ describe('promptPrivacySyncInHandler (同步栈 → 微信官方 require)', () =
   });
 
   it('同步栈内调 require，success → onAuthorized', async () => {
-    (Taro as unknown as {
-      requirePrivacyAuthorize: (o: { success?: () => void }) => void;
-    }).requirePrivacyAuthorize = vi.fn().mockImplementation((opt) => {
+    (
+      Taro as unknown as {
+        requirePrivacyAuthorize: (o: { success?: () => void }) => void;
+      }
+    ).requirePrivacyAuthorize = vi.fn().mockImplementation((opt) => {
       opt.success?.();
     });
 
@@ -151,9 +161,11 @@ describe('promptPrivacySyncInHandler (同步栈 → 微信官方 require)', () =
 
   it('require fail → onDenied + toast', async () => {
     const showToast = vi.spyOn(Taro, 'showToast').mockResolvedValue(undefined as never);
-    (Taro as unknown as {
-      requirePrivacyAuthorize: (o: { fail?: (e: { errMsg: string }) => void }) => void;
-    }).requirePrivacyAuthorize = vi.fn().mockImplementation((opt) => {
+    (
+      Taro as unknown as {
+        requirePrivacyAuthorize: (o: { fail?: (e: { errMsg: string }) => void }) => void;
+      }
+    ).requirePrivacyAuthorize = vi.fn().mockImplementation((opt) => {
       opt.fail?.({ errMsg: 'requirePrivacyAuthorize:fail disagree' });
     });
 

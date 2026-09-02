@@ -114,6 +114,10 @@ export interface Class {
   hours_per_lesson?: number;
   /** 单次授课扣费（元），消课预填 / 薪资展示用 */
   pricePerLesson?: number;
+  /** 首页图 CDN URL；传 null 清空 */
+  homeImage?: string | null;
+  /** 背景图 CDN URL；传 null 清空 */
+  backgroundImage?: string | null;
 }
 
 /**

@@ -3,14 +3,7 @@
  */
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { formatMinutesToTime, parseTimeToMinutes } from './time';
 import type { SchedulingMode, TimeSlotPair } from './schedule-form-constants';
 
@@ -140,7 +133,14 @@ export function useScheduleFormTime({
       // 仅恢复原滚动位置，不主动滚到时间区（避免弹窗关闭后滚动条跳动）
       restoreScrollAfterSheet();
     },
-    [draftStartTime, editingSlotId, restoreScrollAfterSheet, setTimeSlots, timePickerPhase, timeSlots],
+    [
+      draftStartTime,
+      editingSlotId,
+      restoreScrollAfterSheet,
+      setTimeSlots,
+      timePickerPhase,
+      timeSlots,
+    ],
   );
 
   const closeTimePicker = useCallback(() => {

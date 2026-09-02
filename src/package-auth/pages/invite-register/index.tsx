@@ -14,14 +14,11 @@ import Loading from '@/components/Loading';
 import { organizationService, type ShareContext } from '@/services/organization';
 import { useAgreementStore } from '@/stores/agreement';
 import { useAuth } from '@/utils/auth';
-import {
-  markLastLoginAsNewUser,
-  navigateAfterAuth,
-} from '@/utils/auth-onboarding';
-import { storePendingInviteCode } from '@/utils/invite-parent-link';
-import { resolveInviteCodeFromPageEntry } from '@/utils/wxacode-scene';
+import { markLastLoginAsNewUser, navigateAfterAuth } from '@/utils/auth-onboarding';
 import { resolveParentShareLandingView } from '@/utils/invite-landing-view-state';
+import { storePendingInviteCode } from '@/utils/invite-parent-link';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
+import { resolveInviteCodeFromPageEntry } from '@/utils/wxacode-scene';
 
 function formatExpireAt(iso: string): string {
   const date = new Date(iso);
@@ -99,8 +96,12 @@ const InviteRegisterPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { error: loginError, isNewUser, shareAttached, profile: nextProfile } =
-        await signInWithWechat({ inviteCode, role: 'PARENT' });
+      const {
+        error: loginError,
+        isNewUser,
+        shareAttached,
+        profile: nextProfile,
+      } = await signInWithWechat({ inviteCode, role: 'PARENT' });
       if (loginError) {
         Taro.showToast({ title: loginError.message || '登录失败', icon: 'none' });
         return;
@@ -147,7 +148,9 @@ const InviteRegisterPage: React.FC = () => {
     return (
       <View className="min-h-screen flex flex-col items-center justify-center bg-background px-page-padding">
         <Icon name="mdi-alert-circle-outline" size={64} className="text-destructive mb-4" />
-        <Text className="text-[28rpx] text-muted-foreground text-center">{error || '邀请无效'}</Text>
+        <Text className="text-[28rpx] text-muted-foreground text-center">
+          {error || '邀请无效'}
+        </Text>
       </View>
     );
   }

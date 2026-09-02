@@ -7,8 +7,8 @@ import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
 import { pickBestPackage } from '@/utils/package-helper';
-import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
 import { getLessonRecordPriority, isWithinLessonOperateWindow } from './lesson-operate';
+import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
 
 export function isDateWithinRange(
   targetDate: string,
@@ -129,9 +129,7 @@ export function buildTrialCheckinMap(input: {
   const initMap: Record<string, CheckinStatus> = {};
   input.bookings.forEach((booking) => {
     const matched = trialRecords.find((r) => r.student_id === booking.trial_student_id);
-    initMap[booking.id] = matched
-      ? mapRecordStatusToCheckin(matched.status)
-      : 'absent';
+    initMap[booking.id] = matched ? mapRecordStatusToCheckin(matched.status) : 'absent';
   });
   return initMap;
 }

@@ -33,6 +33,7 @@ import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import { lessonRecordService, todoService } from '@/services';
+import { listParentStorefronts, switchAuthContext } from '@/services/auth';
 import { homeService } from '@/services/home';
 import type { QuickEntry, ParentHomePackageCard } from '@/services/home';
 import { leadService } from '@/services/lead';
@@ -48,10 +49,12 @@ import type { CampusUIModel } from '@/types/campus';
 import type { TodoItem, TodoCollaborationMode } from '@/types/home-todo';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
+import type { ParentStorefrontItem } from '@/types/storefront';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
 import { logError } from '@/utils/logger';
+import { storefrontKey } from '@/utils/parent-storefront';
 import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
@@ -105,12 +108,22 @@ function todayDateKey(): string {
 const Home: React.FC = () => {
   /** 构建期常量：生产构建恒为 false，DCE 整棵移除 MockIdentitySwitcher（P-05/B-02） */
   const isDebugBuild = process.env.TARO_ENABLE_LOCAL_DEBUG === 'true';
-  const { profile, currentRole, currentIdentity } = useAuth();
-  const { campuses, currentCampusId, lastVisitedCampusId, setCurrentCampusId, fetchCampuses } =
-    useCampusStore();
+  const { profile, currentRole, currentIdentity, applyAuthPayload } = useAuth();
+  const {
+    campuses,
+    currentCampusId,
+    lastVisitedCampusId,
+    setCurrentCampusId,
+    setCurrentOrganizationId,
+    setOrgName,
+    setAllowedCampusIds,
+    fetchCampuses,
+  } = useCampusStore();
   const { activeTheme } = useThemeStore();
   const [roleSheetVisible, setRoleSheetVisible] = useState(false);
   const [showCampusSheet, setShowCampusSheet] = useState(false);
+  const [parentStorefronts, setParentStorefronts] = useState<ParentStorefrontItem[]>([]);
+  const [campusConfirming, setCampusConfirming] = useState(false);
   const navSafeHeight = useNavSafeHeight();
 
   // ---- 关系确认弹窗（R11）：绑定/归属完成后进入首页弹一次 ----
@@ -328,17 +341,48 @@ const Home: React.FC = () => {
     return [];
   }, [currentRole, currentIdentity]);
 
-  const handleOpenCampusSheet = useCallback(() => {
+  const currentStorefrontKey = useMemo(() => {
+    const orgId = profile?.currentContext?.organizationId || '';
+    const campusId = currentCampusId || profile?.currentContext?.campusId || '';
+    if (!orgId || !campusId) return '';
+    return storefrontKey(orgId, campusId);
+  }, [profile?.currentContext?.organizationId, profile?.currentContext?.campusId, currentCampusId]);
+
+  const handleOpenCampusSheet = useCallback(async () => {
+    if (isParentRole(currentRole)) {
+      Taro.showLoading({ title: '加载中', mask: true });
+      try {
+        const result = await listParentStorefronts();
+        if (result.error) {
+          Taro.showToast({ title: result.error.message, icon: 'none' });
+          return;
+        }
+        if (result.list.length === 0) {
+          Taro.showToast({ title: '暂无门店', icon: 'none' });
+          return;
+        }
+        setParentStorefronts(result.list);
+        setShowCampusSheet(true);
+      } catch (err) {
+        logError('Home openParentStorefronts', err);
+        Taro.showToast({ title: '门店列表加载失败', icon: 'none' });
+      } finally {
+        Taro.hideLoading();
+      }
+      return;
+    }
+
     if (campuses.length === 0) {
       Taro.showToast({ title: '暂无校区', icon: 'none' });
       return;
     }
     setShowCampusSheet(true);
-  }, [campuses.length]);
+  }, [campuses.length, currentRole]);
 
   const handleCloseCampusSheet = useCallback(() => {
+    if (campusConfirming) return;
     setShowCampusSheet(false);
-  }, []);
+  }, [campusConfirming]);
 
   const handleConfirmCampus = useCallback(
     (campus: CampusUIModel) => {
@@ -366,7 +410,7 @@ const Home: React.FC = () => {
       if (isParentRole(currentRole)) {
         try {
           const [parentData, unread] = await Promise.all([
-            homeService.getParent(profile.id),
+            homeService.getParent(profile.id, campusId),
             homeService.getUnreadCount(profile.id, currentRole),
           ]);
           setUnreadCount(unread || parentData?.unreadCount || 0);
@@ -443,6 +487,63 @@ const Home: React.FC = () => {
       }
     },
     [profile, currentRole],
+  );
+
+  const handleConfirmStorefront = useCallback(
+    async (item: ParentStorefrontItem) => {
+      if (campusConfirming) return;
+      setCampusConfirming(true);
+      try {
+        const switched = await switchAuthContext({
+          organizationId: item.organizationId,
+          campusId: item.campusId,
+        });
+        if (switched.error || !switched.session || !switched.profile) {
+          Taro.showToast({
+            title: switched.error?.message || '切换失败',
+            icon: 'none',
+          });
+          return;
+        }
+
+        // 先落会话与目标校区，再 await，避免 effect 用新 JWT + 旧 campusId
+        applyAuthPayload({ session: switched.session, profile: switched.profile });
+        if (item.organizationName) {
+          setOrgName(item.organizationName);
+        }
+        setCurrentOrganizationId(item.organizationId);
+        setCurrentCampusId(item.campusId);
+        setAllowedCampusIds([item.campusId]);
+
+        await fetchCampuses();
+        const nextCampuses = useCampusStore.getState().campuses;
+        if (nextCampuses.length > 0) {
+          setAllowedCampusIds(nextCampuses.map((c) => c.id));
+          setCurrentCampusId(item.campusId);
+        }
+
+        setShowCampusSheet(false);
+        await loadData(item.campusId);
+      } catch (err) {
+        logError('Home confirmStorefront', err);
+        Taro.showToast({
+          title: err instanceof Error ? err.message : '切换失败',
+          icon: 'none',
+        });
+      } finally {
+        setCampusConfirming(false);
+      }
+    },
+    [
+      applyAuthPayload,
+      campusConfirming,
+      fetchCampuses,
+      loadData,
+      setAllowedCampusIds,
+      setCurrentCampusId,
+      setCurrentOrganizationId,
+      setOrgName,
+    ],
   );
 
   const handlePrivateCheckIn = useCallback(
@@ -1026,8 +1127,12 @@ const Home: React.FC = () => {
           campuses={campuses}
           managedCampusIds={managedCampusIds}
           lastVisitedId={lastVisitedCampusId}
+          storefronts={isParentRole(currentRole) ? parentStorefronts : undefined}
+          currentStorefrontKey={currentStorefrontKey}
+          confirming={campusConfirming}
           onClose={handleCloseCampusSheet}
           onConfirm={handleConfirmCampus}
+          onConfirmStorefront={handleConfirmStorefront}
         />
       )}
 

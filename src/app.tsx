@@ -9,9 +9,6 @@ import { logError } from '@/utils/logger';
 import { privacyTraceBootstrap } from '@/utils/privacy-debug';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import 'uno.css';
-
-privacyTraceBootstrap();
-// 不注册 onNeedPrivacyAuthorization，保留微信系统原生隐私弹窗（图二）
 /**
  * 跨分包共享模块必须被主包引用，否则 Taro MiniSplitChunksPlugin
  * 会将它们提取到 <subpackage>/sub-common/ 目录，导致微信小程序运行时
@@ -42,7 +39,6 @@ import '@/components/campus/CampusSwitcher';
 import '@/components/campus/CampusTrigger';
 import '@/stores/campus';
 import '@/stores/subscribe-auth';
-
 import '@/services/member-card';
 import '@/services/card-type';
 import '@/services/student';
@@ -52,6 +48,9 @@ import '@/components/student/StudentListCard';
 import '@/components/teacher/SalaryEditSheet';
 import '@/components/PageContainer';
 import './app.scss';
+
+privacyTraceBootstrap();
+// 不注册 onNeedPrivacyAuthorization，保留微信系统原生隐私弹窗（图二）
 
 // 模块注入最早痕迹：若桌面启动连这行都没有，说明 JS 尚未执行就退出（非业务代码闪退）
 // eslint-disable-next-line no-console

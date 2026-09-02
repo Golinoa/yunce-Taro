@@ -81,9 +81,7 @@ export function buildScheduleRuleNote(input: {
       ? `次数:${input.endCount}`
       : null,
     input.schedulingMode === 'rule' && input.endMode === 'never' ? '结束:不结束' : null,
-    input.schedulingMode === 'rule'
-      ? `节假日排课:${input.scheduleOnHoliday ? '是' : '否'}`
-      : null,
+    input.schedulingMode === 'rule' ? `节假日排课:${input.scheduleOnHoliday ? '是' : '否'}` : null,
     `消耗课时:${input.consumedHours}`,
   ]
     .filter(Boolean)

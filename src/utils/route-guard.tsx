@@ -17,11 +17,11 @@ import {
 } from '@/utils/identity-path-allowlist';
 import { isColdStartGracePeriod } from '@/utils/launch-scene';
 import { reportLocalDebug } from '@/utils/local-debug';
+import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 import {
   maybeRedirectStoreEntryPendingHub,
   shouldRunStoreEntryColdStartCheck,
 } from '@/utils/store-entry-onboarding';
-import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 
 // 无需登录即可访问的页面
 const PUBLIC_PAGES = [

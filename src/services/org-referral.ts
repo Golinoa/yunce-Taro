@@ -21,7 +21,9 @@ export interface MyOrgReferral {
 
 export const orgReferralService = {
   preview: (inviteCode: string) =>
-    get<OrgReferralPreview>(`/org-referrals/code/${encodeURIComponent(inviteCode.trim().toUpperCase())}`),
+    get<OrgReferralPreview>(
+      `/org-referrals/code/${encodeURIComponent(inviteCode.trim().toUpperCase())}`,
+    ),
 
   getMine: () => get<MyOrgReferral>('/org-referrals/me'),
 };

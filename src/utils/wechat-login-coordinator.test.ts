@@ -1,5 +1,7 @@
 import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { wechatLogin } from '@/services/auth';
+import { performWechatAuth, resetWechatLoginCoordinatorForTests } from './wechat-login-coordinator';
 
 vi.mock('@tarojs/taro', () => ({
   default: {
@@ -10,12 +12,6 @@ vi.mock('@tarojs/taro', () => ({
 vi.mock('@/services/auth', () => ({
   wechatLogin: vi.fn(),
 }));
-
-import {
-  performWechatAuth,
-  resetWechatLoginCoordinatorForTests,
-} from './wechat-login-coordinator';
-import { wechatLogin } from '@/services/auth';
 
 const mockedTaroLogin = vi.mocked(Taro.login);
 const mockedWechatLogin = vi.mocked(wechatLogin);

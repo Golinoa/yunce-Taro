@@ -83,6 +83,8 @@ export {
   restoreRegisterDrafts,
   logout,
   refreshSessionForTenant,
+  listParentStorefronts,
+  switchAuthContext,
   testAccounts,
   testPassword,
   getTestAccounts,

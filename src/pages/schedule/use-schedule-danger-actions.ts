@@ -3,12 +3,7 @@
  */
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
-import {
-  useCallback,
-  useRef,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
   calendarSyncService,
   classBookingService,
@@ -23,15 +18,12 @@ import { subscribeMessageService } from '@/services/subscribe-message';
 import { getThemeHexColors, type ThemeKey } from '@/theme';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
-import type { Schedule } from '@/types/schedule';
 import type { UserRole } from '@/types/profile';
+import type { Schedule } from '@/types/schedule';
 import { createOperationLock, type OperationLock } from '@/utils/batch-operation';
 import { logError } from '@/utils/logger';
-import {
-  canSuspendOpenSlot,
-  canSuspendThisLesson,
-} from '@/utils/schedule-guard';
 import { getCardActionVisibility } from '@/utils/schedule-card-actions';
+import type { ScheduleCardItem } from '@/utils/schedule-card-build';
 import {
   buildCancelLessonNotifyCopy,
   buildCancelLessonRecordContent,
@@ -45,7 +37,7 @@ import {
   formatLessonChangeTime,
   type ScheduleDangerActionType,
 } from '@/utils/schedule-danger-meta';
-import type { ScheduleCardItem } from '@/utils/schedule-card-build';
+import { canSuspendOpenSlot, canSuspendThisLesson } from '@/utils/schedule-guard';
 
 export interface ScheduleDangerActionState {
   visible: boolean;
@@ -64,9 +56,7 @@ export interface UseScheduleDangerActionsParams {
   activeTheme: ThemeKey;
   lessonRecords: LessonRecord[];
   setLessonRecords: Dispatch<SetStateAction<LessonRecord[]>>;
-  setOpenClassSlots: Dispatch<
-    SetStateAction<Record<string, Record<string, ClassBookingSlot[]>>>
-  >;
+  setOpenClassSlots: Dispatch<SetStateAction<Record<string, Record<string, ClassBookingSlot[]>>>>;
   setClasses: Dispatch<SetStateAction<Class[]>>;
   setSchedules: Dispatch<SetStateAction<Schedule[]>>;
   setSelectedClassId: Dispatch<SetStateAction<string>>;
@@ -87,11 +77,7 @@ export interface UseScheduleDangerActionsParams {
   profileId?: string;
   profileName?: string;
   profileRole?: UserRole;
-  notifyStudentAndParents: (
-    studentId: string,
-    title: string,
-    content: string,
-  ) => Promise<void>;
+  notifyStudentAndParents: (studentId: string, title: string, content: string) => Promise<void>;
 }
 
 export function useScheduleDangerActions(params: UseScheduleDangerActionsParams) {

@@ -193,9 +193,9 @@ const CampusDetail: React.FC = () => {
           <Text className="text-[28rpx] text-muted-foreground leading-relaxed">暂无介绍</Text>
         </View>
 
-        {/* 场馆图片 */}
+        {/* 门店环境 */}
         <View className="bg-white rounded-[32rpx] px-[32rpx] py-[28rpx]">
-          <Text className="text-[32rpx] font-semibold text-foreground mb-[16rpx]">场馆图片</Text>
+          <Text className="text-[32rpx] font-semibold text-foreground mb-[16rpx]">门店环境</Text>
           <View className="w-[160rpx] h-[160rpx] rounded-[24rpx] bg-muted flex items-center justify-center">
             <Icon name="mdi-image-plus" size={48} color="muted-foreground" />
           </View>

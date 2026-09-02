@@ -14,13 +14,13 @@ import { getSession } from '@/services/auth';
 import { campusInviteService, type CampusInvitePreview } from '@/services/campus-invite';
 import { useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
+import { resolveCampusInviteLandingView } from '@/utils/invite-landing-view-state';
 import {
   buildCampusInvitePath,
   consumePendingCampusInviteCode,
   storePendingCampusInviteCode,
 } from '@/utils/invite-staff-link';
 import { LOGIN_REDIRECT_KEY, navigateAfterLogin } from '@/utils/route-guard';
-import { resolveCampusInviteLandingView } from '@/utils/invite-landing-view-state';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 function formatExpireAt(iso: string): string {
@@ -208,7 +208,11 @@ const CampusInviteLanding: React.FC = () => {
     return (
       <View className="min-h-screen flex flex-col items-center justify-center bg-background px-[48rpx]">
         <View style={{ height: `${navHeight}px` }} />
-        <Icon name="mdi-clock-alert-outline" size={80} className="text-muted-foreground mb-[24rpx]" />
+        <Icon
+          name="mdi-clock-alert-outline"
+          size={80}
+          className="text-muted-foreground mb-[24rpx]"
+        />
         <Text className="text-[36rpx] font-semibold text-foreground text-center mb-[16rpx]">
           邀请链接已过期
         </Text>

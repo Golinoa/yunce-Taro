@@ -333,4 +333,71 @@ describe('auth service', () => {
     expect(result.profile?.currentContext.organizationId).toBe(orgUuid);
     expect(result.profile?.currentContext.organizationId).not.toBe('星火艺术中心');
   });
+
+  it('listParentStorefronts：GET /auth/parent-storefronts', async () => {
+    const { get } = await import('@/utils/request');
+    vi.mocked(get).mockResolvedValueOnce({
+      list: [
+        {
+          organizationId: 'org-a',
+          organizationName: '云策',
+          organizationStatus: 'ACTIVE',
+          campusId: 'campus-1',
+          campusName: '总校',
+          isMain: true,
+          students: [{ id: 's1', name: '小明' }],
+        },
+      ],
+      current: { organizationId: 'org-a', campusId: 'campus-1' },
+    });
+
+    const { listParentStorefronts, AUTH_ENDPOINTS } = await import('@/services/auth');
+    const result = await listParentStorefronts();
+    expect(get).toHaveBeenCalledWith(AUTH_ENDPOINTS.parentStorefronts);
+    expect(result.error).toBeNull();
+    expect(result.list).toHaveLength(1);
+    expect(result.current?.campusId).toBe('campus-1');
+  });
+
+  it('switchAuthContext：POST /auth/switch-context 映射 AuthPayload', async () => {
+    const { post } = await import('@/utils/request');
+    const orgUuid = '66666666-6666-4666-8666-666666666666';
+    vi.mocked(post).mockResolvedValueOnce({
+      token: 'tok-sw',
+      refreshToken: 'rt-sw',
+      expiresIn: 3600,
+      user: {
+        id: 'biz-parent',
+        profileId: 'profile-parent',
+        nickname: '家长',
+        role: 'PARENT',
+        avatar: null,
+        phone: null,
+        organizationId: orgUuid,
+        campusId: 'campus-b',
+        organizationName: '星河',
+      },
+    });
+
+    const { switchAuthContext, AUTH_ENDPOINTS } = await import('@/services/auth');
+    const result = await switchAuthContext({
+      organizationId: orgUuid,
+      campusId: 'campus-b',
+    });
+    expect(post).toHaveBeenCalledWith(AUTH_ENDPOINTS.switchContext, {
+      organizationId: orgUuid,
+      campusId: 'campus-b',
+    });
+    expect(result.error).toBeNull();
+    expect(result.session?.access_token).toBe('tok-sw');
+    expect(result.profile?.currentContext.organizationId).toBe(orgUuid);
+  });
+
+  it('switchAuthContext：缺 campusId 不发请求', async () => {
+    const { post } = await import('@/utils/request');
+    const { switchAuthContext } = await import('@/services/auth');
+    const result = await switchAuthContext({ organizationId: 'org-a', campusId: '' });
+    expect(post).not.toHaveBeenCalled();
+    expect(result.error?.message).toContain('门店');
+  });
 });

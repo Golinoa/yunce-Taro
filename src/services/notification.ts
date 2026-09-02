@@ -2,7 +2,6 @@
  * 通知 Service（Q2-4，从 student.ts 抽出）
  */
 import type { Notification, NotificationType } from '@/types/notification';
-import type { PaginatedResponse } from '@/utils/pagination';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { get, post, put } from '@/utils/request';
 

@@ -269,30 +269,30 @@ const ProfileSetup: React.FC = () => {
       </View>
 
       <View className="relative z-10 px-[48rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))] flex-shrink-0">
-          {privacyReady ? (
-            <View
-              className={cn(
-                'h-[96rpx] rounded-full flex items-center justify-center bg-primary shadow-login-btn active:opacity-90',
-                submitting && 'opacity-60',
-              )}
-              onClick={handleSubmit}
-            >
-              <Text className="text-[32rpx] font-semibold text-white">
-                {submitting ? '保存中...' : '完成并继续'}
-              </Text>
-            </View>
-          ) : (
-            <View
-              className="h-[96rpx] rounded-full flex items-center justify-center bg-muted active:opacity-90"
-              onClick={() => {
-                void ensurePrivacy();
-              }}
-            >
-              <Text className="text-[30rpx] font-semibold text-muted-foreground">
-                {privacyChecking ? '正在请求隐私授权…' : '请先同意隐私保护指引'}
-              </Text>
-            </View>
-          )}
+        {privacyReady ? (
+          <View
+            className={cn(
+              'h-[96rpx] rounded-full flex items-center justify-center bg-primary shadow-login-btn active:opacity-90',
+              submitting && 'opacity-60',
+            )}
+            onClick={handleSubmit}
+          >
+            <Text className="text-[32rpx] font-semibold text-white">
+              {submitting ? '保存中...' : '完成并继续'}
+            </Text>
+          </View>
+        ) : (
+          <View
+            className="h-[96rpx] rounded-full flex items-center justify-center bg-muted active:opacity-90"
+            onClick={() => {
+              void ensurePrivacy();
+            }}
+          >
+            <Text className="text-[30rpx] font-semibold text-muted-foreground">
+              {privacyChecking ? '正在请求隐私授权…' : '请先同意隐私保护指引'}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

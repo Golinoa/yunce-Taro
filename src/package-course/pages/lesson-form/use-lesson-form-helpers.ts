@@ -1,21 +1,21 @@
 /**
  * 点名页停课 / 图片上传 / 模式派生 / 学员列表过滤（Q2-2 收口）
  */
-import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import Taro from '@tarojs/taro';
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { classService, uploadService } from '@/services';
 import { getThemeHexColors, type ThemeKey } from '@/theme';
+import type { Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { Student } from '@/types/student';
-import type { Subject } from '@/types/campus';
 import { chooseImageTemp } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
 import { runImageUploadFlow } from '@/utils/upload-flow';
-import type { CheckinStatus } from './checkin-status';
 import { formatTime } from './lesson-form-datetime';
 import { isWithinLessonOperateWindow } from './lesson-operate';
+import type { CheckinStatus } from './checkin-status';
 
 export interface UseLessonFormHelpersParams {
   classIdParam: string;

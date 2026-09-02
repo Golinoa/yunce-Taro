@@ -6,43 +6,50 @@ import Icon from '@/components/Icon';
 import { ROLE_LABEL } from '@/components/RoleCard';
 import type { CampusUIModel } from '@/types/campus';
 import type { UserRole } from '@/types/profile';
+import type { ParentStorefrontItem } from '@/types/storefront';
 import { isPrincipalOrAbove } from '@/utils/auth';
+import {
+  formatStorefrontStudents,
+  formatStorefrontTitle,
+  storefrontKeyOf,
+} from '@/utils/parent-storefront';
 
 export interface CampusSelectSheetProps {
   /** 是否显示 */
   visible: boolean;
-  /** 当前选中的校区 ID */
+  /** 当前选中的校区 ID（员工模式） */
   currentId?: string;
   /** 当前用户角色（用于显示身份标签 & 判断是否走推荐逻辑） */
   currentRole?: UserRole | null;
-  /** 校区列表 */
+  /** 校区列表（员工模式） */
   campuses: CampusUIModel[];
   /** 管理员校区 ID 列表（用于决定是否推荐最近一次访问的店） */
   managedCampusIds?: string[];
   /** 上次访问的校区 ID（用于推荐位） */
   lastVisitedId?: string;
+  /**
+   * 家长门店列表。传入非空数组时走家长模式（机构·校区）；
+   * 未传或空数组且 visible 时由页面控制是否打开。
+   */
+  storefronts?: ParentStorefrontItem[];
+  /** 家长模式当前选中 key：organizationId:campusId */
+  currentStorefrontKey?: string;
   /** 关闭回调 */
   onClose: () => void;
-  /** 确认选择回调 */
+  /** 员工确认选择 */
   onConfirm: (campus: CampusUIModel) => void;
+  /** 家长确认选择 */
+  onConfirmStorefront?: (item: ParentStorefrontItem) => void;
+  /** 确认中（防连点） */
+  confirming?: boolean;
 }
 
 const CAMPUS_SELECT_TABBAR_PADDING_BOTTOM = 'calc(100rpx + env(safe-area-inset-bottom))';
 
 /**
- * CampusSelectSheet - 首页校区切换底部弹窗
+ * CampusSelectSheet - 首页校区/门店切换底部弹窗
  *
- * 使用场景：教师端首页点击校区卡片后，切换当前上课校区
- * 功能：展示校区列表，支持单选并确认切换；底部按钮始终固定
- *
- * 列表排序规则：
- *   1. 第一顺位：当前已选中校区（默认选中）
- *   2. 第二顺位：推荐校区 — 仅当满足以下全部条件时存在：
- *      - 当前用户是校长/管理员身份
- *      - 管理的校区 ≥ 2 个
- *      - 最近访问的校区 != 当前已选中校区
- *      - 最近访问的校区在管理范围内
- *   3. 剩余：按原 campuses 数组顺序追加
+ * 员工：校区列表 + 校长推荐位；家长：扁平「机构 · 校区」门店列表。
  */
 const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
   visible,
@@ -51,16 +58,23 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
   campuses,
   managedCampusIds = [],
   lastVisitedId,
+  storefronts,
+  currentStorefrontKey,
   onClose,
   onConfirm,
+  onConfirmStorefront,
+  confirming = false,
 }) => {
   const roleLabel = currentRole ? ROLE_LABEL[currentRole] : null;
+  const isStorefrontMode = Array.isArray(storefronts) && storefronts.length > 0;
 
-  // 计算排序后的校区列表 + 推荐校区 ID
   const { sortedCampuses, recommendId } = useMemo(() => {
+    if (isStorefrontMode) {
+      return { sortedCampuses: [] as CampusUIModel[], recommendId: null as string | null };
+    }
+
     const currentCampus = currentId ? campuses.find((c) => c.id === currentId) : undefined;
 
-    // 决定是否有「推荐校区」
     const canRecommend =
       isPrincipalOrAbove(currentRole) &&
       managedCampusIds.length > 1 &&
@@ -70,7 +84,6 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
 
     const recommendCampus = canRecommend ? campuses.find((c) => c.id === lastVisitedId) : undefined;
 
-    // 已排好头部的校区 ID 集合，避免重复
     const headIds = new Set<string>();
     const headList: CampusUIModel[] = [];
     if (currentCampus) {
@@ -88,23 +101,50 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
       sortedCampuses: [...headList, ...rest],
       recommendId: recommendCampus?.id ?? null,
     };
-  }, [campuses, currentId, currentRole, managedCampusIds, lastVisitedId]);
+  }, [isStorefrontMode, campuses, currentId, currentRole, managedCampusIds, lastVisitedId]);
 
-  // 默认选中：第一顺位（currentId）
-  const initialSelectedId = currentId || sortedCampuses[0]?.id || '';
+  const sortedStorefronts = useMemo(() => {
+    if (!isStorefrontMode || !storefronts) return [] as ParentStorefrontItem[];
+    const current = currentStorefrontKey
+      ? storefronts.find((s) => storefrontKeyOf(s) === currentStorefrontKey)
+      : undefined;
+    if (!current) return storefronts;
+    const rest = storefronts.filter((s) => storefrontKeyOf(s) !== currentStorefrontKey);
+    return [current, ...rest];
+  }, [isStorefrontMode, storefronts, currentStorefrontKey]);
+
+  const initialSelectedId = isStorefrontMode
+    ? currentStorefrontKey || (sortedStorefronts[0] ? storefrontKeyOf(sortedStorefronts[0]) : '')
+    : currentId || sortedCampuses[0]?.id || '';
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
 
   useEffect(() => {
-    if (visible) {
-      setSelectedId(currentId || sortedCampuses[0]?.id || '');
+    if (!visible) return;
+    if (isStorefrontMode) {
+      setSelectedId(
+        currentStorefrontKey || (sortedStorefronts[0] ? storefrontKeyOf(sortedStorefronts[0]) : ''),
+      );
+      return;
     }
-  }, [visible, currentId, sortedCampuses]);
-
-  const handleSelect = (campus: CampusUIModel) => {
-    setSelectedId(campus.id);
-  };
+    setSelectedId(currentId || sortedCampuses[0]?.id || '');
+  }, [
+    visible,
+    isStorefrontMode,
+    currentId,
+    currentStorefrontKey,
+    sortedCampuses,
+    sortedStorefronts,
+  ]);
 
   const handleConfirm = () => {
+    if (confirming) return;
+    if (isStorefrontMode) {
+      const selected = sortedStorefronts.find((item) => storefrontKeyOf(item) === selectedId);
+      if (selected && onConfirmStorefront) {
+        onConfirmStorefront(selected);
+      }
+      return;
+    }
     const selected = sortedCampuses.find((item) => item.id === selectedId);
     if (selected) {
       onConfirm(selected);
@@ -121,80 +161,118 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
       fillHeight
     >
       <View className="px-[32rpx] pb-[24rpx] flex flex-col h-full min-h-0">
-        {/* 校区列表 - 可滚动 */}
         <ScrollView scrollY className="flex-1 min-h-0" showScrollbar={false}>
           <View className="flex flex-col gap-[20rpx] pt-[8rpx] pb-[24rpx]">
-            {sortedCampuses.map((campus) => {
-              const isSelected = selectedId === campus.id;
-              const isRecommended = recommendId === campus.id;
-              return (
-                <View
-                  key={campus.id}
-                  className={cn(
-                    'relative flex items-center gap-[20rpx] p-[24rpx] rounded-[24rpx] border-[2rpx] border-solid transition-all duration-200',
-                    isSelected ? 'bg-primary-bg border-primary' : 'bg-white border-border',
-                  )}
-                  onClick={() => handleSelect(campus)}
-                >
-                  {/* 推荐标签 */}
-                  {isRecommended && (
-                    <View className="absolute top-[12rpx] right-[12rpx] px-[12rpx] py-[2rpx] rounded-[8rpx] bg-primary/15">
-                      <Text className="text-[20rpx] font-medium text-primary">推荐</Text>
+            {isStorefrontMode
+              ? sortedStorefronts.map((item) => {
+                  const key = storefrontKeyOf(item);
+                  const isSelected = selectedId === key;
+                  const subtitle = formatStorefrontStudents(item);
+                  return (
+                    <View
+                      key={key}
+                      className={cn(
+                        'relative flex items-center gap-[20rpx] p-[24rpx] rounded-[24rpx] border-[2rpx] border-solid transition-all duration-200',
+                        isSelected ? 'bg-primary-bg border-primary' : 'bg-white border-border',
+                      )}
+                      onClick={() => setSelectedId(key)}
+                    >
+                      <View className="w-[88rpx] h-[88rpx] rounded-[16rpx] center overflow-hidden shrink-0 bg-muted">
+                        <Text className="text-[40rpx]">店</Text>
+                      </View>
+                      <View className="flex-1 min-w-0 pr-[60rpx]">
+                        <Text className="text-[28rpx] font-semibold text-foreground truncate">
+                          {formatStorefrontTitle(item)}
+                        </Text>
+                        {subtitle ? (
+                          <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
+                            {subtitle}
+                          </Text>
+                        ) : roleLabel ? (
+                          <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
+                            身份：{roleLabel}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View
+                        className={cn(
+                          'w-[44rpx] h-[44rpx] rounded-full center shrink-0 transition-colors duration-200',
+                          isSelected ? 'bg-primary' : 'bg-muted',
+                        )}
+                      >
+                        {isSelected && <Icon name="mdi-check" size="xs" color="white" />}
+                      </View>
                     </View>
-                  )}
+                  );
+                })
+              : sortedCampuses.map((campus) => {
+                  const isSelected = selectedId === campus.id;
+                  const isRecommended = recommendId === campus.id;
+                  return (
+                    <View
+                      key={campus.id}
+                      className={cn(
+                        'relative flex items-center gap-[20rpx] p-[24rpx] rounded-[24rpx] border-[2rpx] border-solid transition-all duration-200',
+                        isSelected ? 'bg-primary-bg border-primary' : 'bg-white border-border',
+                      )}
+                      onClick={() => setSelectedId(campus.id)}
+                    >
+                      {isRecommended && (
+                        <View className="absolute top-[12rpx] right-[12rpx] px-[12rpx] py-[2rpx] rounded-[8rpx] bg-primary/15">
+                          <Text className="text-[20rpx] font-medium text-primary">推荐</Text>
+                        </View>
+                      )}
 
-                  {/* 校区 Logo */}
-                  <View
-                    className="w-[88rpx] h-[88rpx] rounded-[16rpx] center overflow-hidden shrink-0 bg-[var(--campus-logo-gradient)]"
-                    style={
-                      {
-                        '--campus-logo-gradient':
-                          campus.iconGradient || 'linear-gradient(135deg, #5EC8A8, #4AB893)',
-                      } as React.CSSProperties
-                    }
-                  >
-                    {campus.logo ? (
-                      <Image src={campus.logo} className="w-full h-full" mode="aspectFill" />
-                    ) : (
-                      <Text className="text-[40rpx]">{campus.icon || '🏢'}</Text>
-                    )}
-                  </View>
+                      <View
+                        className="w-[88rpx] h-[88rpx] rounded-[16rpx] center overflow-hidden shrink-0 bg-[var(--campus-logo-gradient)]"
+                        style={
+                          {
+                            '--campus-logo-gradient':
+                              campus.iconGradient || 'linear-gradient(135deg, #5EC8A8, #4AB893)',
+                          } as React.CSSProperties
+                        }
+                      >
+                        {campus.logo ? (
+                          <Image src={campus.logo} className="w-full h-full" mode="aspectFill" />
+                        ) : (
+                          <Text className="text-[40rpx]">{campus.icon || '🏢'}</Text>
+                        )}
+                      </View>
 
-                  {/* 校区信息：名称 + 身份 */}
-                  <View className="flex-1 min-w-0 pr-[60rpx]">
-                    <Text className="text-[28rpx] font-semibold text-foreground truncate">
-                      {campus.name}
-                    </Text>
-                    {roleLabel && (
-                      <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
-                        身份：{roleLabel}
-                      </Text>
-                    )}
-                  </View>
+                      <View className="flex-1 min-w-0 pr-[60rpx]">
+                        <Text className="text-[28rpx] font-semibold text-foreground truncate">
+                          {campus.name}
+                        </Text>
+                        {roleLabel && (
+                          <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
+                            身份：{roleLabel}
+                          </Text>
+                        )}
+                      </View>
 
-                  {/* 选中标记 */}
-                  <View
-                    className={cn(
-                      'w-[44rpx] h-[44rpx] rounded-full center shrink-0 transition-colors duration-200',
-                      isSelected ? 'bg-primary' : 'bg-muted',
-                    )}
-                  >
-                    {isSelected && <Icon name="mdi-check" size="xs" color="white" />}
-                  </View>
-                </View>
-              );
-            })}
+                      <View
+                        className={cn(
+                          'w-[44rpx] h-[44rpx] rounded-full center shrink-0 transition-colors duration-200',
+                          isSelected ? 'bg-primary' : 'bg-muted',
+                        )}
+                      >
+                        {isSelected && <Icon name="mdi-check" size="xs" color="white" />}
+                      </View>
+                    </View>
+                  );
+                })}
           </View>
         </ScrollView>
 
-        {/* 底部按钮区 - 固定
-            按钮下方预留 tabBar 高度 + iPhone 安全区 padding，避免被原生 tabBar 遮挡 */}
         <View className="pt-[24rpx]" style={{ paddingBottom: CAMPUS_SELECT_TABBAR_PADDING_BOTTOM }}>
           <View
-            className="py-[28rpx] rounded-2xl text-center text-[30rpx] font-semibold bg-primary text-primary-foreground press-scale"
+            className={cn(
+              'py-[28rpx] rounded-2xl text-center text-[30rpx] font-semibold bg-primary text-primary-foreground press-scale',
+              confirming && 'opacity-60',
+            )}
             onClick={handleConfirm}
           >
-            进入该门店
+            {confirming ? '切换中…' : '进入该门店'}
           </View>
         </View>
       </View>

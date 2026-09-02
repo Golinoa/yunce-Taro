@@ -7,14 +7,11 @@ import {
   EMAIL_SEND_FAILED,
   PASSWORD_RESET_SUCCESS,
 } from '@/constants/email-auth';
+import { maskEmailAddress, resolveLoginEmailInput } from '@/services/auth-email';
+import { mapBackendAuthPayload, type BackendAuthPayload } from '@/services/auth-profile-map';
+import { AUTH_ENDPOINTS, getErrorMessage } from '@/services/auth-shared';
 import type { AuthSession, Profile } from '@/types/profile';
 import { post } from '@/utils/request';
-import { maskEmailAddress, resolveLoginEmailInput } from '@/services/auth-email';
-import { AUTH_ENDPOINTS, getErrorMessage } from '@/services/auth-shared';
-import {
-  mapBackendAuthPayload,
-  type BackendAuthPayload,
-} from '@/services/auth-profile-map';
 
 export { PASSWORD_RESET_SUCCESS };
 
@@ -161,11 +158,9 @@ export async function wechatLogin(
       body.role = options?.role ?? 'PARENT';
     }
 
-    const data = await post<BackendAuthPayload>(
-      AUTH_ENDPOINTS.wechatLogin,
-      body,
-      { skipAuth: true },
-    );
+    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatLogin, body, {
+      skipAuth: true,
+    });
     const mapped = mapBackendAuthPayload(data);
     return {
       session: mapped.session,

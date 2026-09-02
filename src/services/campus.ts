@@ -77,10 +77,12 @@ function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup
 
 interface BackendCampusItem {
   address?: null | string;
+  environmentImages?: string[] | null;
   icon?: string;
   iconGradient?: string;
   id: string;
   isMain?: boolean;
+  logo?: null | string;
   monthlyRent?: number;
   name: string;
   partnerMode?: null | string;
@@ -97,9 +99,14 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
   const campusType: CampusType =
     raw.type === 'main' || raw.type === 'self' || raw.type === 'partner' ? raw.type : 'self';
 
+  const environmentImages = Array.isArray(raw.environmentImages)
+    ? raw.environmentImages.filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : [];
+
   return {
     id: raw.id,
     name: raw.name,
+    logo: raw.logo || undefined,
     type: campusType,
     phone: raw.phone || '',
     address: raw.address || '',
@@ -112,6 +119,8 @@ function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
     businessCategories: [],
     tags: [],
+    /** 前端沿用 venueImages；后端字段为 environmentImages */
+    venueImages: environmentImages,
     hoursAlertThreshold: typeof raw.hoursAlertThreshold === 'number' ? raw.hoursAlertThreshold : 5,
     daysAlertThreshold: typeof raw.daysAlertThreshold === 'number' ? raw.daysAlertThreshold : 7,
     amountAlertThreshold:
@@ -148,18 +157,29 @@ export const campusService = {
 
   /** 新增校区 */
   add: async (data: CampusFormData): Promise<CampusUIModel> => {
-    const raw = await post<BackendCampusItem>('/campuses', {
+    const body: Record<string, unknown> = {
       ...data,
       hoursAlertThreshold: data.hoursAlertThreshold ?? 5,
       daysAlertThreshold: data.daysAlertThreshold ?? 7,
       amountAlertThreshold: data.amountAlertThreshold ?? 200,
-    });
+    };
+    if (data.venueImages !== undefined) {
+      body.environmentImages = data.venueImages;
+      delete body.venueImages;
+    }
+    const raw = await post<BackendCampusItem>('/campuses', body);
     return mapBackendCampus(raw);
   },
 
   /** 更新校区 */
   update: async (id: string, data: Partial<CampusFormData>): Promise<CampusUIModel | null> => {
-    const raw = await put<BackendCampusItem>(`/campuses/${id}`, data);
+    const body: Record<string, unknown> = { ...data };
+    // venueImages → environmentImages（后端字段名）
+    if (data.venueImages !== undefined) {
+      body.environmentImages = data.venueImages;
+      delete body.venueImages;
+    }
+    const raw = await put<BackendCampusItem>(`/campuses/${id}`, body);
     return mapBackendCampus(raw);
   },
 

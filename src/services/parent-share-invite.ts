@@ -66,9 +66,6 @@ export const parentShareInviteService = {
   },
 
   getWxacode: async (inviteCode?: string): Promise<WxacodeResult> => {
-    return get<WxacodeResult>(
-      '/teachers/me/wxacode',
-      inviteCode ? { inviteCode } : undefined,
-    );
+    return get<WxacodeResult>('/teachers/me/wxacode', inviteCode ? { inviteCode } : undefined);
   },
 };

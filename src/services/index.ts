@@ -2,10 +2,7 @@
  * Service 层统一出口
  * 页面只从此文件导入，不直接引用 @/data/*
  */
-export {
-  studentService,
-  formatDateCN,
-} from './student';
+export { studentService, formatDateCN } from './student';
 export { scheduleService } from './schedule';
 export { packageService, packageTemplateService, invalidatePackagesCache } from './package';
 export { lessonRecordService } from './lesson-record';
@@ -44,11 +41,7 @@ export {
 } from './auth';
 export type { LoginResult, RegisterStep1Result, RegisterDraft } from './auth';
 export { homeService } from './home';
-export type {
-  StatsPeriod,
-  StatsData,
-  QuickEntry,
-} from './home';
+export type { StatsPeriod, StatsData, QuickEntry } from './home';
 export { todoService, clearStudentRechargeTodoState } from './todo';
 export type { TodoListParams, TodoListView, TodoListItem } from './todo';
 export { feedbackService } from './feedback';

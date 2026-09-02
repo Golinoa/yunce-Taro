@@ -1,7 +1,6 @@
 import { View } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { createSubmitLock } from '@/utils/submit-lock';
 import PageContainer from '@/components/PageContainer';
 import { useStudentStore, useClassStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
@@ -15,21 +14,22 @@ import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { withRouteGuard } from '@/utils/route-guard';
-import ClassLessonPanel from './ClassLessonPanel';
+import { createSubmitLock } from '@/utils/submit-lock';
 import {
   buildCheckinBaseline,
   type CheckinStatus,
   type ClassAttendanceMode,
 } from './checkin-status';
+import ClassLessonPanel from './ClassLessonPanel';
+import { formatDate, formatTime } from './lesson-form-datetime';
 import LessonFormFooter from './LessonFormFooter';
 import LessonFormHeader from './LessonFormHeader';
 import LessonFormSheets from './LessonFormSheets';
-import { formatDate, formatTime } from './lesson-form-datetime';
-import type { StudentEditSheetTarget } from './StudentEditSheet';
 import SingleLessonPanel from './SingleLessonPanel';
 import { useLessonFormActions } from './use-lesson-form-actions';
 import { useLessonFormHelpers } from './use-lesson-form-helpers';
 import { useLessonFormLoaders } from './use-lesson-form-loaders';
+import type { StudentEditSheetTarget } from './StudentEditSheet';
 
 const LessonForm: React.FC = () => {
   const { profile, currentRole } = useAuth();

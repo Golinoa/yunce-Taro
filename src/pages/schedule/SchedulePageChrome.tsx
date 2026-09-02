@@ -8,10 +8,7 @@ import React from 'react';
 import CalendarWeekSelector, { type CalendarDotType } from '@/components/CalendarWeekSelector';
 import Icon from '@/components/Icon';
 import type { CourseCategoryMode } from '@/types/course-category';
-import {
-  getTabContainerWidth,
-  TAB_WIDTH_RPX,
-} from './schedule-tab-layout';
+import { getTabContainerWidth, TAB_WIDTH_RPX } from './schedule-tab-layout';
 
 export type ScheduleChromeTabType = 'category' | 'venue';
 
@@ -119,11 +116,7 @@ const SchedulePageChrome: React.FC<SchedulePageChromeProps> = ({
               className="flex h-[56rpx] w-[56rpx] items-center justify-center active:opacity-70"
               onClick={onBatchAction}
             >
-              <Icon
-                name="mdi-checkbox-multiple-marked-outline"
-                size={28}
-                color="mutedForeground"
-              />
+              <Icon name="mdi-checkbox-multiple-marked-outline" size={28} color="mutedForeground" />
             </View>
           )}
         </View>

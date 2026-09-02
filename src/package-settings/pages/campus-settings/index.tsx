@@ -3,7 +3,7 @@
  *
  * 以干净表单管理当前校区信息。
  * 支持编辑：门店名称、营业执照名称、联系人、联系方式、所在地区、
- * 详细地址、营业时间、主营业态、门店介绍、场馆图片。
+ * 详细地址、营业时间、主营业态、门店介绍、门店环境图。
  */
 import { View, Text, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -25,6 +25,7 @@ import {
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCampusStore } from '@/stores/campus';
 import type { CampusType, PartnerMode } from '@/types/campus';
+import { uploadImage } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
 import TagEditSheet from './TagEditSheet';
 
@@ -269,9 +270,18 @@ const CampusSettings: React.FC = () => {
 
     setSaving(true);
     try {
-      await useCampusStore.getState().updateCampus(currentCampus.id, {
+      const campusId = currentCampus.id;
+      // 本地临时图先直传七牛，再提交 CDN URL；清空则传 null / []
+      const logoUrl = form.logo
+        ? await uploadImage(form.logo, 'campus_brand', { refId: campusId })
+        : null;
+      const envUrls = await Promise.all(
+        form.venueImages.map((img) => uploadImage(img, 'campus_brand', { refId: campusId })),
+      );
+
+      await useCampusStore.getState().updateCampus(campusId, {
         name: form.name.trim(),
-        logo: form.logo,
+        logo: logoUrl,
         licenseName: form.licenseName.trim() || undefined,
         contactName: form.contactName.trim() || undefined,
         phone: form.phone.trim(),
@@ -280,7 +290,7 @@ const CampusSettings: React.FC = () => {
         businessHours: form.businessHours.trim() || undefined,
         intro: form.intro.trim() || undefined,
         businessCategories: form.businessCategories,
-        venueImages: form.venueImages,
+        venueImages: envUrls.filter((u): u is string => Boolean(u)),
         tags: form.tags,
       });
       await reload();
@@ -516,14 +526,14 @@ const CampusSettings: React.FC = () => {
           />
         </View>
 
-        {/* 门店图片：Logo（小图）+ 背景图（大图）+ 更多场馆图（小图） */}
+        {/* 门店图片：Logo（小图）+ 门店环境（大图 + 更多小图） */}
         <View className="bg-white rounded-[32rpx] p-[32rpx]">
           <View className="flex flex-row items-center justify-between mb-[8rpx]">
             <Text className="text-[32rpx] font-semibold text-foreground">门店图片</Text>
-            <Text className="text-[24rpx] text-muted-foreground">场馆图最多 5 张</Text>
+            <Text className="text-[24rpx] text-muted-foreground">门店环境最多 5 张</Text>
           </View>
           <Text className="text-[22rpx] text-muted-foreground mb-[20rpx]">
-            Logo 建议 200×200px · 场馆图建议 750×420px · 单张不超过 5M
+            Logo 建议 200×200px · 门店环境建议 750×420px · 单张不超过 5M
           </Text>
 
           {/* 门店 Logo：小方图（1:1 裁剪） */}
@@ -539,12 +549,12 @@ const CampusSettings: React.FC = () => {
             />
           </View>
 
-          {/* 门店背景图：首张场馆图，整宽大图（16:9 裁剪） */}
+          {/* 门店环境：首张作主图，整宽大图（16:9 裁剪） */}
           <View className="mb-[24rpx]">
-            <Text className="text-[26rpx] font-medium text-foreground mb-[12rpx]">门店背景图</Text>
+            <Text className="text-[26rpx] font-medium text-foreground mb-[12rpx]">门店环境</Text>
             <CourseImageUploader
               value={form.venueImages[0] || ''}
-              title="上传背景图"
+              title="上传环境图"
               subtitle="750×420 横图效果最佳"
               layout="fullWidth"
               maxSizeMB={5}
@@ -553,17 +563,17 @@ const CampusSettings: React.FC = () => {
                 if (value) {
                   next[0] = value;
                 } else {
-                  next.shift(); // 删除首张（背景）
+                  next.shift(); // 删除首张（主环境图）
                 }
                 updateField('venueImages', next);
               }}
             />
           </View>
 
-          {/* 更多场馆图：小图网格 */}
+          {/* 更多门店环境：小图网格 */}
           <View>
             <Text className="text-[26rpx] font-medium text-foreground mb-[12rpx]">
-              更多场馆图片
+              更多门店环境
             </Text>
             <View className="flex flex-row flex-wrap gap-[20rpx]">
               {form.venueImages.slice(1).map((url, index) => (
@@ -623,9 +633,9 @@ const CampusSettings: React.FC = () => {
         currentStep={1}
         totalSteps={6}
         title="完善门店信息"
-        description="会员在小程序看到的门店首页即此处配置，包含标识、场馆图、联系方式与门店二维码。"
+        description="会员在小程序看到的门店首页即此处配置，包含标识、门店环境、联系方式与门店二维码。"
         bulletPoints={[
-          'Logo + 至少 1 张场馆图，首页展示更完整',
+          'Logo + 至少 1 张门店环境图，首页展示更完整',
           '下载门店二维码用于前台/海报/朋友圈',
           '电话与地址用于会员导航咨询',
         ]}

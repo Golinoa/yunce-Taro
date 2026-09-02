@@ -1,0 +1,108 @@
+name: Release
+
+# 触发约定：
+# - 日常 push / dev-* / ci-*：不跑本流程
+# - 打 v* 发版标签：质量门禁 + prod 构建 + 上传微信（开发版，可在后台设为体验版）
+# - 也可手动 workflow_dispatch
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '上传版本号（如 1.2.0；tag 触发时用标签名）'
+        required: true
+        default: '0.0.0-manual'
+      desc:
+        description: '版本描述'
+        required: false
+        default: 'manual release'
+
+concurrency:
+  group: weapp-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: 发版前 Verify
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run coverage
+
+  build-and-upload:
+    name: 构建 prod + 上传微信体验版
+    needs: [verify]
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Resolve version / desc
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+            DESC="release ${TAG} (${GITHUB_SHA::7})"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+            DESC="${{ github.event.inputs.desc }}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "desc=${DESC}" >> "$GITHUB_OUTPUT"
+          echo "Uploading version=${VERSION}"
+
+      - name: Build weapp prod
+        run: npm run build:weapp:prod
+
+      - name: Check WECHAT_PRIVATE_KEY
+        run: |
+          if [ -z "${{ secrets.WECHAT_PRIVATE_KEY }}" ]; then
+            echo "::error::请在 GitHub Secrets 配置 WECHAT_PRIVATE_KEY（微信公众平台 → 开发管理 → 开发设置 → 小程序代码上传密钥；并关闭 IP 白名单）"
+            exit 1
+          fi
+
+      - name: Upload to WeChat (dev version → 可设为体验版)
+        env:
+          WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_PRIVATE_KEY }}
+          WECHAT_APPID: ${{ secrets.WECHAT_APPID }}
+          WECHAT_CI_ROBOT: ${{ vars.WECHAT_CI_ROBOT }}
+          WECHAT_UPLOAD_VERSION: ${{ steps.meta.outputs.version }}
+          WECHAT_UPLOAD_DESC: ${{ steps.meta.outputs.desc }}
+        run: npm run upload:weapp
+
+      - name: Summary
+        run: |
+          {
+            echo "## 微信小程序已上传"
+            echo ""
+            echo "- 版本: \`${{ steps.meta.outputs.version }}\`"
+            echo "- 描述: ${{ steps.meta.outputs.desc }}"
+            echo "- 产物: \`npm run build:weapp:prod\` → \`dist/\`（api.chancore.cn）"
+            echo ""
+            echo "上传对应微信后台的**开发版本**。请到 [微信公众平台](https://mp.weixin.qq.com/) → 管理 → 版本管理："
+            echo "1. 找到刚上传的开发版本"
+            echo "2. 点击「选为体验版」"
+            echo "3. 体验成员扫码验证"
+          } >> "$GITHUB_STEP_SUMMARY"

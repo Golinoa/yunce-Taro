@@ -58,9 +58,9 @@ describe('lesson-submit helpers (Q2-2)', () => {
 
   it('validate* 覆盖关键前置条件', () => {
     expect(validateHoursUsed(0)).toBe('消课课时必须大于0');
-    expect(validateSupplementSave({ selectedClassId: null, supplementCount: 1, hoursUsed: 1 })).toBe(
-      '请选择班级',
-    );
+    expect(
+      validateSupplementSave({ selectedClassId: null, supplementCount: 1, hoursUsed: 1 }),
+    ).toBe('请选择班级');
     expect(
       validateSupplementSave({ selectedClassId: 'c1', supplementCount: 0, hoursUsed: 1 }),
     ).toBe('请先补录学员');

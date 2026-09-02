@@ -25,6 +25,7 @@ import type {
   SubscribeSheetAction,
   SubscribeTemplateGroup,
 } from '@/types/subscribe-message';
+import { isSubscribeContextReady } from '@/utils/auth-onboarding';
 import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { logError } from '@/utils/logger';
 import {
@@ -43,7 +44,6 @@ import {
 } from '@/utils/subscribe-class-view';
 import { createClientRequestId, requestSubscribeMessageAuth } from '@/utils/subscribe-message';
 import type { SubscribeAuthEntry } from '@/utils/subscribe-message';
-import { isSubscribeContextReady } from '@/utils/auth-onboarding';
 
 const MESSAGE_AUTH_PAGE = '/package-settings/pages/message-auth/index';
 const LOGIN_OPT_IN_GROUPS: SubscribeTemplateGroup[] = [

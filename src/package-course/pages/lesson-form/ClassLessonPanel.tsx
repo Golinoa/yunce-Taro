@@ -13,10 +13,10 @@ import type { LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
-import { CheckinCard } from './CheckinCard';
 import { CHECKIN_OPTION_STYLES, type CheckinStatus } from './checkin-status';
-import type { StudentEditSheetTarget } from './StudentEditSheet';
+import { CheckinCard } from './CheckinCard';
 import { getWeekday } from './lesson-form-datetime';
+import type { StudentEditSheetTarget } from './StudentEditSheet';
 
 const FORM_CARD_CLASS_NAME = 'mx-[24rpx] mb-3 overflow-hidden rounded-[20rpx] bg-white shadow-soft';
 

@@ -1,9 +1,9 @@
 /**
  * 班级 Service（Q2-4，从 student.ts 抽出）
  */
+import { packageService } from '@/services/package';
 import type { Class } from '@/types/class';
 import type { Student } from '@/types/student';
-import { packageService } from '@/services/package';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
 
@@ -79,8 +79,12 @@ interface BackendClassDetailResponse {
   usedLessons?: null | number;
 }
 
-
 /** getScheduledClassIds 仅需 schedules 列表分页壳 */
+interface BackendScheduleListItem {
+  classId?: null | string;
+  class_id?: null | string;
+}
+
 interface BackendScheduleListResponse {
   list: BackendScheduleListItem[];
   pagination: {
@@ -90,7 +94,6 @@ interface BackendScheduleListResponse {
     totalPages: number;
   };
 }
-
 
 const mapBackendGender = (gender?: null | 'FEMALE' | 'MALE'): Student['gender'] => {
   if (gender === 'MALE') return 'male';
@@ -165,7 +168,6 @@ function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
     end_time: item.endTime || item.schedules?.[0]?.endTime,
   };
 }
-
 
 // ============================================
 // 班级 Service
@@ -389,5 +391,3 @@ export const classService = {
     return;
   },
 };
-
-

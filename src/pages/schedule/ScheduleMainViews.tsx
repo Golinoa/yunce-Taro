@@ -14,11 +14,11 @@ import type { LessonSharePayload } from '@/utils/lesson-share';
 import type { ScheduleCardItem, ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
 import type { DangerActionMeta } from '@/utils/schedule-danger-meta';
 import OpenClassScheduleList from './OpenClassScheduleList';
-import ScheduleDaySwiperItem, { type ScheduleDaySummary } from './ScheduleDaySwiperItem';
 import ScheduleBatchSheets, {
   type ScheduleBatchActionType as BatchActionType,
   type ScheduleBatchClassOption,
 } from './ScheduleBatchSheets';
+import ScheduleDaySwiperItem, { type ScheduleDaySummary } from './ScheduleDaySwiperItem';
 import ScheduleVenueTab from './ScheduleVenueTab';
 import type { ScheduleTabItem } from './use-schedule-derived';
 
@@ -336,7 +336,12 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         >
           {scheduleDateWindow.map((date) => (
             <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-              <ScrollView className="h-full bg-schedule-page" scrollY enhanced showScrollbar={false}>
+              <ScrollView
+                className="h-full bg-schedule-page"
+                scrollY
+                enhanced
+                showScrollbar={false}
+              >
                 <ScheduleVenueTab loadingVenues={loadingVenues} venues={venues} />
               </ScrollView>
             </SwiperItem>

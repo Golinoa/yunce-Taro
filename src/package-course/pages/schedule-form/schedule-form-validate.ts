@@ -48,10 +48,12 @@ export function countProjectedLessonsInRange(
   return projected;
 }
 
-export function getLimitedClassRemaining(selectedClass?: {
-  total_lessons?: number;
-  used_lessons?: number;
-} | null): number {
+export function getLimitedClassRemaining(
+  selectedClass?: {
+    total_lessons?: number;
+    used_lessons?: number;
+  } | null,
+): number {
   const total = selectedClass?.total_lessons ?? 0;
   const used = selectedClass?.used_lessons ?? 0;
   return Math.max(0, total - used);

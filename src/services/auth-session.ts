@@ -2,6 +2,23 @@
  * Auth 会话 / 身份 / Profile 更新 / 测试账号
  */
 import Taro from '@tarojs/taro';
+import {
+  mapBackendAuthPayload,
+  mapBackendProfile,
+  mapBackendRole,
+  mergeBackendProfileDetail,
+  type BackendAuthPayload,
+  type BackendProfileDetailPayload,
+  type BackendUserInfo,
+} from '@/services/auth-profile-map';
+import {
+  AUTH_ENDPOINTS,
+  AUTH_TOKEN_KEY,
+  USER_PROFILE_KEY,
+  clearStoredAuth,
+  getErrorMessage,
+  type TestAccount,
+} from '@/services/auth-shared';
 import type {
   AuthSession,
   ParentRoleInfo,
@@ -10,22 +27,9 @@ import type {
   TeacherRoleInfo,
   UserRole,
 } from '@/types/profile';
-import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
+import type { ParentStorefrontItem, ParentStorefrontsResult } from '@/types/storefront';
 import { get, post, put } from '@/utils/request';
-import {
-  AUTH_ENDPOINTS,
-  AUTH_TOKEN_KEY,
-  USER_PROFILE_KEY,
-  clearStoredAuth,
-  type TestAccount,
-} from '@/services/auth-shared';
-import {
-  mapBackendProfile,
-  mapBackendRole,
-  mergeBackendProfileDetail,
-  type BackendProfileDetailPayload,
-  type BackendUserInfo,
-} from '@/services/auth-profile-map';
+import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
 const persistLocalProfile = (profile: Profile | null): void => {
   try {
@@ -209,6 +213,79 @@ export async function logout(): Promise<void> {
     );
   } finally {
     clearStoredAuth();
+  }
+}
+
+/**
+ * 家长可见门店扁平列表（跨机构）。
+ * GET /auth/parent-storefronts
+ */
+export async function listParentStorefronts(): Promise<{
+  list: ParentStorefrontItem[];
+  current: ParentStorefrontsResult['current'];
+  error: { message: string } | null;
+}> {
+  try {
+    const data = await get<ParentStorefrontsResult>(AUTH_ENDPOINTS.parentStorefronts);
+    return {
+      list: Array.isArray(data?.list) ? data.list : [],
+      current: data?.current ?? null,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      list: [],
+      current: null,
+      error: { message: getErrorMessage(error, '门店列表加载失败') },
+    };
+  }
+}
+
+/**
+ * 切换租户上下文（家长跨机构必走；员工本迭代仍用本地校区切换）。
+ * POST /auth/switch-context → LoginResponse
+ */
+export async function switchAuthContext(input: {
+  organizationId: string;
+  campusId: string;
+}): Promise<{
+  session: AuthSession | null;
+  profile: Profile | null;
+  error: { message: string } | null;
+}> {
+  const organizationId = (input.organizationId || '').trim();
+  const campusId = (input.campusId || '').trim();
+  if (!organizationId || !campusId) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: '请选择门店' },
+    };
+  }
+  try {
+    const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.switchContext, {
+      organizationId,
+      campusId,
+    });
+    if (!data?.token || !data.refreshToken || !data.user) {
+      return {
+        session: null,
+        profile: null,
+        error: { message: '切换门店失败' },
+      };
+    }
+    const mapped = mapBackendAuthPayload(data);
+    return {
+      session: mapped.session,
+      profile: mapped.profile,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      session: null,
+      profile: null,
+      error: { message: getErrorMessage(error, '切换门店失败') },
+    };
   }
 }
 

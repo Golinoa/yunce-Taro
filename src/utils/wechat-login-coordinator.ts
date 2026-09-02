@@ -5,8 +5,7 @@
  * code 不落 Storage。
  */
 import Taro from '@tarojs/taro';
-import { wechatLogin, type WechatLoginOptions } from '@/services/auth';
-import type { LoginResult } from '@/services/auth';
+import { wechatLogin, type WechatLoginOptions, LoginResult } from '@/services/auth';
 
 let wechatAuthTask: Promise<LoginResult> | null = null;
 let wxLoginCodeTask: Promise<string> | null = null;

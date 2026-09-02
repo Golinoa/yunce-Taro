@@ -3,20 +3,16 @@
  */
 import Taro from '@tarojs/taro';
 import { lessonRecordService } from '@/services';
+import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
-import type { Subject } from '@/types/campus';
-import type { SubmitLock } from '@/utils/submit-lock';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
+import type { SubmitLock } from '@/utils/submit-lock';
 import { notifyCrossSubjectIfNeeded } from './lesson-persist-attendance';
-import {
-  buildClassAttendanceSummary,
-  validateClassSubmit,
-  withSubmitLock,
-} from './lesson-submit';
+import { buildClassAttendanceSummary, validateClassSubmit, withSubmitLock } from './lesson-submit';
 
 export async function executeClassSubmit(input: {
   selectedClassId?: string | null;

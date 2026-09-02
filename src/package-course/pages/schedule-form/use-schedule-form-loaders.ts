@@ -22,10 +22,10 @@ import {
 import { subjectService } from '@/services/campus';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class, ClassLevel } from '@/types/class';
+import type { UserRole } from '@/types/profile';
 import type { DayOfWeek, Schedule, ScheduleColor } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
-import type { UserRole } from '@/types/profile';
 import { logError } from '@/utils/logger';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { getTeacherSelectionInfo } from './teacher-selection';
@@ -481,7 +481,7 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
             await subscribeMessageService.runFlow('E02A', {
               classId,
               className: selectedClass?.name || '',
-              role: profileRole,
+              role: profileRole ?? undefined,
               navigateUrl: classId
                 ? `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&type=class`
                 : undefined,

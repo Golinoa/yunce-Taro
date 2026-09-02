@@ -6,9 +6,9 @@ import { lessonRecordService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import type { CoursePackage } from '@/types/course-package';
 import type { Student } from '@/types/student';
-import type { SubmitLock } from '@/utils/submit-lock';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
+import type { SubmitLock } from '@/utils/submit-lock';
 import { validateSingleSubmit, withSubmitLock } from './lesson-submit';
 
 export async function executeSingleDeduct(input: {
@@ -70,7 +70,8 @@ export async function executeSingleDeduct(input: {
         senderId: input.profile?.id || '',
         title: `${selectedStudent.name} 课时已消课`,
         content: `本次消课 ${input.hoursUsed} 课时，剩余 ${
-          createdRecord.remaining_hours ?? Math.max(matchedPackage.remaining_hours - input.hoursUsed, 0)
+          createdRecord.remaining_hours ??
+          Math.max(matchedPackage.remaining_hours - input.hoursUsed, 0)
         } 课时`,
         logLabel: 'lesson-form notify parents after single deduct',
       });

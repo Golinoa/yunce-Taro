@@ -8,13 +8,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AgreementDialog from '@/components/AgreementDialog';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
-import {
-  authCapabilities,
-  checkEmailRegistered,
-  resolveLoginEmailInput,
-  sendRegisterEmailCode,
-} from '@/services/auth';
 import { EMAIL_PATTERN } from '@/constants/email-auth';
+import { authCapabilities, checkEmailRegistered, resolveLoginEmailInput } from '@/services/auth';
 import { useAgreementStore } from '@/stores/agreement';
 import { useAuth } from '@/utils/auth';
 import { navigateAfterAuth } from '@/utils/auth-onboarding';

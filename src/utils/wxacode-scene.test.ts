@@ -18,15 +18,13 @@ describe('wxacode-scene', () => {
 
   it('解析 legacy UUID compact scene', () => {
     const scene = 'A1B2C3D4E5F67890ABCDEF1234567890';
-    expect(parseInviteCodeFromWxacodeScene(scene)).toBe(
-      'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    );
+    expect(parseInviteCodeFromWxacodeScene(scene)).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
   });
 
   it('resolveInviteCodeFromPageEntry：code 优先于 scene', () => {
-    expect(
-      resolveInviteCodeFromPageEntry({ code: 'PAAA11111', scene: 'c=PBBB22222' }),
-    ).toBe('PAAA11111');
+    expect(resolveInviteCodeFromPageEntry({ code: 'PAAA11111', scene: 'c=PBBB22222' })).toBe(
+      'PAAA11111',
+    );
   });
 
   it('resolveInviteCodeFromPageEntry：无 code 时读 scene', () => {

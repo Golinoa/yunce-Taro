@@ -1,33 +1,6 @@
 import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/types/profile';
-
-vi.mock('@/utils/route-guard', () => ({
-  navigateAfterLogin: vi.fn(),
-  LOGIN_REDIRECT_KEY: 'loginRedirectPath',
-}));
-
-vi.mock('@/services/store-entry', () => ({
-  storeEntryService: {
-    queryLatestSafe: vi.fn(async () => null),
-  },
-}));
-
-const fetchStoreEntryLatestCachedMock = vi.fn(async () => null as import('@/types/store-entry').StoreEntryLatestResult | null);
-const shouldRedirectToStoreEntryPendingMock = vi.fn(() => false);
-
-vi.mock('@/utils/store-entry-onboarding', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/utils/store-entry-onboarding')>(
-      '@/utils/store-entry-onboarding',
-    );
-  return {
-    ...actual,
-    fetchStoreEntryLatestCached: (...args: unknown[]) => fetchStoreEntryLatestCachedMock(...args),
-    shouldRedirectToStoreEntryPending: (...args: unknown[]) =>
-      shouldRedirectToStoreEntryPendingMock(...args),
-  };
-});
 import {
   consumeLastLoginIsNewUser,
   hasSkippedOnboarding,
@@ -43,6 +16,37 @@ import {
   shouldRedirectToIdentitySelect,
 } from '@/utils/auth-onboarding';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
+
+const { fetchStoreEntryLatestCachedMock, shouldRedirectToStoreEntryPendingMock } = vi.hoisted(
+  () => ({
+    fetchStoreEntryLatestCachedMock: vi.fn(
+      async () => null as import('@/types/store-entry').StoreEntryLatestResult | null,
+    ),
+    shouldRedirectToStoreEntryPendingMock: vi.fn(() => false),
+  }),
+);
+
+vi.mock('@/utils/route-guard', () => ({
+  navigateAfterLogin: vi.fn(),
+  LOGIN_REDIRECT_KEY: 'loginRedirectPath',
+}));
+
+vi.mock('@/services/store-entry', () => ({
+  storeEntryService: {
+    queryLatestSafe: vi.fn(async () => null),
+  },
+}));
+
+vi.mock('@/utils/store-entry-onboarding', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/store-entry-onboarding')>(
+    '@/utils/store-entry-onboarding',
+  );
+  return {
+    ...actual,
+    fetchStoreEntryLatestCached: fetchStoreEntryLatestCachedMock,
+    shouldRedirectToStoreEntryPending: shouldRedirectToStoreEntryPendingMock,
+  };
+});
 
 const ORG_UUID = '11111111-1111-4111-8111-111111111111';
 

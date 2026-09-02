@@ -4,9 +4,8 @@
 import Taro from '@tarojs/taro';
 import { auditLogService } from '@/services/audit-log';
 import type { Student } from '@/types/student';
-import type { SubmitLock } from '@/utils/submit-lock';
 import { logError } from '@/utils/logger';
-import type { CheckinStatus } from './checkin-status';
+import type { SubmitLock } from '@/utils/submit-lock';
 import { persistStudentAttendanceRecord } from './lesson-persist-attendance';
 import {
   filterChangedAttendanceStudents,
@@ -14,9 +13,13 @@ import {
   validateSupplementSave,
   withSubmitLock,
 } from './lesson-submit';
+import type { CheckinStatus } from './checkin-status';
 import type { PersistAttendanceContext } from './lesson-persist-attendance';
 
-type PersistShared = Omit<PersistAttendanceContext, 'student' | 'status' | 'isSupplement' | 'existingRecord'>;
+type PersistShared = Omit<
+  PersistAttendanceContext,
+  'student' | 'status' | 'isSupplement' | 'existingRecord'
+>;
 
 export type BatchSaveUi = {
   submitLock: SubmitLock;

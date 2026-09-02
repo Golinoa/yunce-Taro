@@ -2,12 +2,7 @@
  * 排课表单保存编排：调课 / 冲突检测 / 创建编辑落库 / 通知与回跳（Q2-3）
  */
 import Taro from '@tarojs/taro';
-import {
-  useCallback,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-} from 'react';
+import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import {
   calendarSyncService,
   classService,
@@ -17,22 +12,19 @@ import {
   subscribeMessageService,
   temporaryRescheduleService,
 } from '@/services';
-import type { Class } from '@/types/class';
 import type { Room } from '@/types/campus';
+import type { Class } from '@/types/class';
+import type { UserRole } from '@/types/profile';
 import type { DayOfWeek, Schedule, ScheduleColor } from '@/types/schedule';
 import type { ScheduleConflictResult } from '@/types/schedule-conflict';
-import type { UserRole } from '@/types/profile';
 import { logError } from '@/utils/logger';
-import {
-  formatRescheduleTimeLabel,
-  validateRescheduleSaveInput,
-} from './schedule-form-validate';
 import {
   buildScheduleRuleNote,
   buildScheduleSaveSuccessTitle,
   buildScheduleSaveTargets,
   mergeScheduleConflictResults,
 } from './schedule-form-save';
+import { formatRescheduleTimeLabel, validateRescheduleSaveInput } from './schedule-form-validate';
 import type {
   AutoOpenType,
   EndMode,
@@ -247,7 +239,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
           try {
             await subscribeMessageService.runFlow('E07', {
               className: selectedClass?.name || '',
-              role: profileRole,
+              role: profileRole ?? undefined,
               campusId: profileCampusId,
             });
           } catch (error) {
@@ -258,7 +250,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               userId: currentUserId,
               teacherId: currentUserId,
               campusId: profileCampusId,
-              role: profileRole,
+              role: profileRole ?? undefined,
             });
           } catch (error) {
             logError('calendar prompt after reschedule', error);
@@ -458,7 +450,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
           try {
             await subscribeMessageService.runFlow('E07', {
               className: selectedClass?.name || '',
-              role: profileRole,
+              role: profileRole ?? undefined,
               campusId: profileCampusId,
             });
           } catch (error) {
@@ -469,7 +461,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               userId: currentUserId,
               teacherId: currentUserId,
               campusId: profileCampusId,
-              role: profileRole,
+              role: profileRole ?? undefined,
             });
           } catch (error) {
             logError('calendar prompt after schedule save', error);

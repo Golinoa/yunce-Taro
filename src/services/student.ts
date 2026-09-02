@@ -2,10 +2,10 @@
  * Service 层 — 学员相关 API（真实后端）
  */
 
+import { mapBackendPackageType } from '@/services/package';
+import { studentParentService } from '@/services/student-parents';
 import type { FeeMethod } from '@/types/course-package';
 import type { Student } from '@/types/student';
-import { studentParentService } from '@/services/student-parents';
-import { mapBackendPackageType } from '@/services/package';
 import { notWired } from '@/utils/not-wired';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
@@ -288,7 +288,11 @@ export const studentService = {
 // ============================================
 // 课包 Service（实现见 package.ts）
 // ============================================
-export { packageService, packageTemplateService, invalidatePackagesCache } from '@/services/package';
+export {
+  packageService,
+  packageTemplateService,
+  invalidatePackagesCache,
+} from '@/services/package';
 
 // ============================================
 // 消课记录 Service（实现见 lesson-record.ts）

@@ -34,14 +34,6 @@ import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { withRouteGuard } from '@/utils/route-guard';
-import { getTeacherSelectionInfo } from './teacher-selection';
-import {
-  formatMinutesToTime,
-  getNextDateByDayOfWeek,
-  MIN_DURATION_MINUTES,
-  parseTimeToMinutes,
-} from './time';
-import { getScheduleFormSubmitBlockedReason } from './schedule-form-validate';
 import {
   type AutoOpenType,
   type EndMode,
@@ -49,11 +41,19 @@ import {
   type SchedulingMode,
   type TimeSlotPair,
 } from './schedule-form-constants';
+import { getScheduleFormSubmitBlockedReason } from './schedule-form-validate';
 import ScheduleFormBaseCard from './ScheduleFormBaseCard';
 import ScheduleFormFooter from './ScheduleFormFooter';
 import ScheduleFormRuleCard from './ScheduleFormRuleCard';
 import ScheduleFormSheets from './ScheduleFormSheets';
 import ScheduleFormTimeSlots from './ScheduleFormTimeSlots';
+import { getTeacherSelectionInfo } from './teacher-selection';
+import {
+  formatMinutesToTime,
+  getNextDateByDayOfWeek,
+  MIN_DURATION_MINUTES,
+  parseTimeToMinutes,
+} from './time';
 import { useScheduleFormLoaders } from './use-schedule-form-loaders';
 import { useScheduleFormSave } from './use-schedule-form-save';
 import { useScheduleFormTime } from './use-schedule-form-time';
@@ -171,8 +171,8 @@ const ScheduleForm: React.FC = () => {
   const isGroupMode = scheduleType === 'group';
 
   /* ---- 数据加载 / 班级联动 / 学员同步 ---- */
-  const { loadFormData, handleStudentsChange, selectedClass, teacherById } =
-    useScheduleFormLoaders({
+  const { loadFormData, handleStudentsChange, selectedClass, teacherById } = useScheduleFormLoaders(
+    {
       currentUserId,
       currentTeacherName,
       currentCampusId,
@@ -230,7 +230,8 @@ const ScheduleForm: React.FC = () => {
       fetchStudentsByTeacher,
       fetchClassesByTeacher,
       invalidateStudents,
-    });
+    },
+  );
 
   /* 隔天：仅允许一组上课时间 */
   useEffect(() => {

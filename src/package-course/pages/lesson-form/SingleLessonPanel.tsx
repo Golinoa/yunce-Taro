@@ -231,9 +231,7 @@ const SingleLessonPanel: React.FC<SingleLessonPanelProps> = ({
                     className={`w-[120rpx] h-[120rpx] rounded-xl border-2 border-dashed border-input flex items-center justify-center bg-background ${uploading ? 'state-loading' : 'press-scale'}`}
                     onClick={uploading ? undefined : onUploadImage}
                   >
-                    <Text className="text-xl text-muted-foreground">
-                      {uploading ? '...' : '+'}
-                    </Text>
+                    <Text className="text-xl text-muted-foreground">{uploading ? '...' : '+'}</Text>
                   </View>
                 )}
               </View>

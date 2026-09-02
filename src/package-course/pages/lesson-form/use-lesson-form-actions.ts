@@ -1,8 +1,14 @@
 /**
  * 点名页学员/签到操作 + 提交胶水（Q2-2）
  */
-import { useCallback, useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import Taro from '@tarojs/taro';
+import {
+  useCallback,
+  useMemo,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from 'react';
 import {
   packageService,
   lessonRecordService,
@@ -15,18 +21,15 @@ import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
-import type { SubmitLock } from '@/utils/submit-lock';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
-import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
-import type { StudentEditSheetTarget } from './StudentEditSheet';
+import type { SubmitLock } from '@/utils/submit-lock';
+import { resolveLessonSubmitKind } from './lesson-submit';
 import { executeClassSubmit } from './lesson-submit-class';
 import { executeSingleDeduct } from './lesson-submit-single';
-import {
-  executeIncrementalEditSave,
-  executeSupplementSave,
-} from './lesson-submit-supplement';
-import { resolveLessonSubmitKind } from './lesson-submit';
+import { executeIncrementalEditSave, executeSupplementSave } from './lesson-submit-supplement';
+import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
+import type { StudentEditSheetTarget } from './StudentEditSheet';
 
 const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 
@@ -194,42 +197,45 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   );
 
   /** 切换到指定状态：签到/请假/未到 */
-  const handleSetStudentCheckin = useCallback((studentId: string, nextStatus: CheckinStatus) => {
-    if (nextStatus === 'checked') {
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        next.add(studentId);
-        return next;
-      });
-      setLeaveStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-    } else if (nextStatus === 'leave') {
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-      setLeaveStudentIds((prev) => {
-        const next = new Set(prev);
-        next.add(studentId);
-        return next;
-      });
-    } else {
-      setCheckedStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-      setLeaveStudentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(studentId);
-        return next;
-      });
-    }
-  }, [setCheckedStudentIds, setLeaveStudentIds]);
+  const handleSetStudentCheckin = useCallback(
+    (studentId: string, nextStatus: CheckinStatus) => {
+      if (nextStatus === 'checked') {
+        setCheckedStudentIds((prev) => {
+          const next = new Set(prev);
+          next.add(studentId);
+          return next;
+        });
+        setLeaveStudentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(studentId);
+          return next;
+        });
+      } else if (nextStatus === 'leave') {
+        setCheckedStudentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(studentId);
+          return next;
+        });
+        setLeaveStudentIds((prev) => {
+          const next = new Set(prev);
+          next.add(studentId);
+          return next;
+        });
+      } else {
+        setCheckedStudentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(studentId);
+          return next;
+        });
+        setLeaveStudentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(studentId);
+          return next;
+        });
+      }
+    },
+    [setCheckedStudentIds, setLeaveStudentIds],
+  );
 
   const handleSetTrialCheckin = useCallback(
     (bookingId: string, nextStatus: CheckinStatus) => {
@@ -295,7 +301,13 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       setDetailSheetRemark(studentRemarkDrafts[target.id] || saved);
       setShowStudentDetailSheet(true);
     },
-    [recordByStudentId, setDetailSheetRemark, setDetailSheetTarget, setShowStudentDetailSheet, studentRemarkDrafts],
+    [
+      recordByStudentId,
+      setDetailSheetRemark,
+      setDetailSheetTarget,
+      setShowStudentDetailSheet,
+      studentRemarkDrafts,
+    ],
   );
 
   const handleCloseStudentDetailSheet = useCallback(() => {

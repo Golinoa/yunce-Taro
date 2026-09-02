@@ -175,7 +175,9 @@ const StaffInvitePage: React.FC = () => {
           <Text className="text-[28rpx] font-semibold text-foreground block mb-[12rpx]">
             有效期
           </Text>
-          <Text className="text-[26rpx] text-muted-foreground">24 小时（统一口径，过期后需重新生成）</Text>
+          <Text className="text-[26rpx] text-muted-foreground">
+            24 小时（统一口径，过期后需重新生成）
+          </Text>
         </View>
 
         <ActionButton

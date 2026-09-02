@@ -21,9 +21,7 @@ export interface UseScheduleOpenSlotActionsParams {
   currentCampusId: string;
   profile?: Profile | null;
   loadOpenClassSlots: (date: dayjs.Dayjs, force?: boolean) => Promise<void>;
-  setOpenClassSlots: Dispatch<
-    SetStateAction<Record<string, Record<string, ClassBookingSlot[]>>>
-  >;
+  setOpenClassSlots: Dispatch<SetStateAction<Record<string, Record<string, ClassBookingSlot[]>>>>;
 }
 
 export function useScheduleOpenSlotActions(params: UseScheduleOpenSlotActionsParams) {

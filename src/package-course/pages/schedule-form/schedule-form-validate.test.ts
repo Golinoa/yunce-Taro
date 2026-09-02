@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { DayOfWeek } from '@/types/schedule';
 import {
-  formatRescheduleTimeLabel,
-  getLimitedClassRemaining,
-  getScheduleFormSubmitBlockedReason,
-  validateRescheduleSaveInput,
-} from './schedule-form-validate';
-import {
   buildScheduleRuleNote,
   buildScheduleSaveSuccessTitle,
   buildScheduleSaveTargets,
   mergeScheduleConflictResults,
 } from './schedule-form-save';
+import {
+  formatRescheduleTimeLabel,
+  getLimitedClassRemaining,
+  getScheduleFormSubmitBlockedReason,
+  validateRescheduleSaveInput,
+} from './schedule-form-validate';
 
 describe('schedule-form-validate (Q2-3)', () => {
   const base = {
@@ -42,12 +42,10 @@ describe('schedule-form-validate (Q2-3)', () => {
       '真实联调仅支持班级排课',
     );
     expect(getScheduleFormSubmitBlockedReason({ ...base, classId: '' })).toBe('请选择班级');
-    expect(
-      getScheduleFormSubmitBlockedReason({ ...base, selectedTeachingTeacherId: '' }),
-    ).toBe('请选择主讲老师');
-    expect(getScheduleFormSubmitBlockedReason({ ...base, timeSlots: [] })).toBe(
-      '请添加上课时间',
+    expect(getScheduleFormSubmitBlockedReason({ ...base, selectedTeachingTeacherId: '' })).toBe(
+      '请选择主讲老师',
     );
+    expect(getScheduleFormSubmitBlockedReason({ ...base, timeSlots: [] })).toBe('请添加上课时间');
     expect(
       getScheduleFormSubmitBlockedReason({
         ...base,

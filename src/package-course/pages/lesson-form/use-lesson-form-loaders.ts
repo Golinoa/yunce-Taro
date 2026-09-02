@@ -1,7 +1,13 @@
 /**
  * 点名页数据加载：初始化 / 班级学员 / 试听 / 请假 / 课包 / 教室（Q2-2）
  */
-import { useCallback, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from 'react';
 import {
   studentService,
   packageService,
@@ -22,7 +28,6 @@ import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
-import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
 import {
   buildClassAttendanceState,
   buildTrialCheckinMap,
@@ -30,6 +35,7 @@ import {
   loadPackageMapsForStudents,
   resolveClassAttendanceMode,
 } from './lesson-attendance-load';
+import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
 
 export interface UseLessonFormLoadersParams {
   isEditEntryAttempt: boolean;

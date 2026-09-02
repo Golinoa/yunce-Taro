@@ -5,8 +5,8 @@ import { View, Text, ScrollView, Button } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useState } from 'react';
 import { usePrivacyStore, PRIVACY_AGREE_BUTTON_ID } from '@/stores/privacy';
-import { privacyTrace } from '@/utils/privacy-debug';
 import { promptPrivacyIfNeeded } from '@/utils/privacy-authorize';
+import { privacyTrace } from '@/utils/privacy-debug';
 
 const PrivacyPopup: React.FC = () => {
   const visible = usePrivacyStore((s) => s.visible);

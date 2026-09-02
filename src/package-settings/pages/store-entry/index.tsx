@@ -474,14 +474,7 @@ const StoreEntry: React.FC = () => {
       submitInFlightRef.current = false;
       setSubmitting(false);
     }
-  }, [
-    validate,
-    form,
-    profile,
-    emailPromptSkipped,
-    submitting,
-    redirectToPendingAfterSubmit,
-  ]);
+  }, [validate, form, profile, emailPromptSkipped, submitting, redirectToPendingAfterSubmit]);
 
   if (gateLoading) {
     return (

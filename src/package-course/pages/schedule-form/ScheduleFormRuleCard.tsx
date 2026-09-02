@@ -8,7 +8,6 @@ import React from 'react';
 import Icon from '@/components/Icon';
 import Stepper from '@/components/Stepper';
 import type { DayOfWeek } from '@/types/schedule';
-import YesNoToggle from './YesNoToggle';
 import {
   END_MODE_OPTIONS,
   REPEAT_OPTIONS,
@@ -17,6 +16,7 @@ import {
   type RepeatMode,
   type SchedulingMode,
 } from './schedule-form-constants';
+import YesNoToggle from './YesNoToggle';
 
 export type ScheduleFormRuleCardProps = {
   schedulingMode: SchedulingMode;
@@ -119,9 +119,7 @@ const ScheduleFormRuleCard: React.FC<ScheduleFormRuleCardProps> = ({
                   )}
                   onClick={() => onRepeatModeChange(opt.value)}
                 >
-                  <Text
-                    className={cn('text-[26rpx]', active ? 'text-white' : 'text-foreground')}
-                  >
+                  <Text className={cn('text-[26rpx]', active ? 'text-white' : 'text-foreground')}>
                     {opt.label}
                   </Text>
                 </View>
@@ -145,9 +143,7 @@ const ScheduleFormRuleCard: React.FC<ScheduleFormRuleCardProps> = ({
                     )}
                     onClick={() => onToggleWeekday(opt.value)}
                   >
-                    <Text
-                      className={cn('text-[26rpx]', active ? 'text-white' : 'text-foreground')}
-                    >
+                    <Text className={cn('text-[26rpx]', active ? 'text-white' : 'text-foreground')}>
                       {opt.label}
                     </Text>
                   </View>

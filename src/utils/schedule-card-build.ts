@@ -1,13 +1,11 @@
 /**
  * 课表日卡片构建（Q2-1）：从 pages/schedule 抽出可测纯函数
  */
-import type dayjs from 'dayjs';
 import type { Class } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
-import { parseTimeToMinutes } from '@/utils/schedule-guard';
 import {
   getClassCardStatusRank,
   getTeacherNames,
@@ -15,6 +13,8 @@ import {
   resolveScheduleStatus,
   type ScheduleCardStatus,
 } from '@/utils/schedule-card-status';
+import { parseTimeToMinutes } from '@/utils/schedule-guard';
+import type dayjs from 'dayjs';
 
 export type ScheduleCardStudentAvatar = {
   id: string;
@@ -157,7 +157,7 @@ export function buildScheduleCardsForDate(input: {
         bookingTag: isBookingSchedule(schedule) ? '约' : undefined,
         hasTrialStudent: Boolean(
           schedule.class_id &&
-            input.trialBookingKeys.has(`${schedule.class_id}|${input.date.format('YYYY-MM-DD')}`),
+          input.trialBookingKeys.has(`${schedule.class_id}|${input.date.format('YYYY-MM-DD')}`),
         ),
         canCancelLesson: statusResult.status !== 'cancelled',
         isTemporaryAdjusted: Boolean(schedule.__temporaryAdjusted),

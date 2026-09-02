@@ -2,10 +2,10 @@
  * 单学员出勤落库（补录 / 增量编辑共用）
  */
 import { lessonRecordService, notificationService } from '@/services';
+import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
-import type { Subject } from '@/types/campus';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import type { CheckinStatus } from './checkin-status';
 
@@ -33,9 +33,7 @@ export type PersistAttendanceContext = {
   senderId: string;
 };
 
-export async function persistStudentAttendanceRecord(
-  ctx: PersistAttendanceContext,
-): Promise<void> {
+export async function persistStudentAttendanceRecord(ctx: PersistAttendanceContext): Promise<void> {
   const { student, status } = ctx;
   if (ctx.existingRecord) {
     await lessonRecordService.remove(ctx.existingRecord.id);
