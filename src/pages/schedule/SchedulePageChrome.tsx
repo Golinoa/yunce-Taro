@@ -31,8 +31,8 @@ export interface SchedulePageChromeProps {
   isParent: boolean;
   selectedDate: dayjs.Dayjs;
   scheduleSubMode: 'fixed' | 'open';
-  getDateDotType: (date: dayjs.Dayjs) => CalendarDotType | undefined;
-  getOpenDateDotType: (date: dayjs.Dayjs) => CalendarDotType | undefined;
+  getDateDotType: (date: dayjs.Dayjs) => CalendarDotType;
+  getOpenDateDotType: (date: dayjs.Dayjs) => CalendarDotType;
   onMainTabChange: (tabKey: string, tabIndex: number) => void;
   onBatchAction: () => void;
   onScheduleDateChange: (date: dayjs.Dayjs) => void;

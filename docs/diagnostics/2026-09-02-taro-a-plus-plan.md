@@ -68,6 +68,7 @@
 | Q2-1 | ✅ +batch sheets | `88d9d33` · `ScheduleBatchSheets`；页约 **2053** 行 · `backup/taro-a-plus-q2-1-batch-sheets-2026-09-03` |
 | Q2-1 | ✅ +danger actions | `673e367` · `use-schedule-danger-actions` + `ScheduleVenueTab`；页约 **1486** 行 · `backup/taro-a-plus-q2-1-danger-2026-09-03` |
 | Q2-1 | ✅ +open-slot/card actions + chrome | `99ffa9e` · open-slot/card hooks + `SchedulePageChrome`；页约 **1043** 行（此前 **1486**）· `backup/taro-a-plus-q2-1-actions-2026-09-03` |
+| Q2-1 | ✅ **&lt;800 收口** | derived + `ScheduleMainViews`；页 **632** 行（此前 **1043**）· `backup/taro-a-plus-q2-1-under800-2026-09-03` |
 | Q2-3 | ✅ 保存+时段+卡+弹层/底栏+save+loaders+time | timeslots `7ae9469`；cards；sheets+footer `d751d07`；save `eedbf3f`；loaders `df5b60c`；`use-schedule-form-time` 本提交；页约 **730** 行（&lt;800）· `backup/taro-a-plus-q2-3-under800-2026-09-03` |
 | Q2-4 | ✅ | student 已拆；auth 门面 **89** 行 · `e66787d` |
 | Q2-5 | ✅ | `82567c0` · … |
@@ -82,7 +83,7 @@
 | Q3-5 | ✅ | coverage.include + `route-guard.tsx` + `route-guard.test.ts`；lines 门槛 30→35（全量 ~79% 仍过门） |
 | Q3-4 | ⏳ | 次级大页队列 |
 
-下一节点：Q2-2 lesson-form 已 &lt;800；继续削 schedule 至 &lt;800；真机 G1-3/4；Q3-4。
+下一节点：巨型页 Q2 已收口；**仅剩** G1-3/4 真机门禁 + Q3-4 次级大页（agent 可继续 Q3-4；真机需人工）。
 
 ---
 
@@ -105,7 +106,7 @@
 
 | 文件 | 行数 |
 |------|------|
-| `src/pages/schedule/index.tsx` | 3404 |
+| `src/pages/schedule/index.tsx` | 632（&lt;800 ✅） |
 | `src/package-course/pages/lesson-form/index.tsx` | 738 |
 | `src/package-course/pages/schedule-form/index.tsx` | 730（&lt;800 ✅） |
 | `src/services/student.ts` | 2071 |
