@@ -9,6 +9,11 @@ import {
   isIdentityOnboardingAllowlistedPath,
 } from '@/utils/identity-path-allowlist';
 import { consumePendingInviteCode, markShareAttached, consumeShareAttached } from '@/utils/invite-parent-link';
+import {
+  buildCampusInvitePath,
+  getPendingCampusInviteCode,
+  hasPendingCampusInviteCode,
+} from '@/utils/invite-staff-link';
 import { markLoginOptInPending } from '@/utils/notify-master-settings';
 import { navigateAfterLogin } from '@/utils/route-guard';
 import {
@@ -215,6 +220,16 @@ export async function navigateAfterAuth(
     consumeIdentitySelectionPending();
     navigateAfterLogin(profile);
     return;
+  }
+
+  // B0-2：L3 员工邀请 — 完善资料后优先回落地页接受（避免被 identity-select 截走）
+  if (hasPendingCampusInviteCode()) {
+    const campusCode = getPendingCampusInviteCode();
+    if (campusCode) {
+      clearIdentitySelectionPending();
+      redirectWithFailFallback(buildCampusInvitePath(campusCode));
+      return;
+    }
   }
 
   // 门店入驻 PENDING/驳回/已批未注入自有店：以 queryLatest 为准（demo org 不能代替）

@@ -15,10 +15,11 @@ import { campusInviteService, type CampusInvitePreview } from '@/services/campus
 import { useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending } from '@/utils/auth-onboarding';
 import {
+  buildCampusInvitePath,
   consumePendingCampusInviteCode,
   storePendingCampusInviteCode,
 } from '@/utils/invite-staff-link';
-import { navigateAfterLogin } from '@/utils/route-guard';
+import { LOGIN_REDIRECT_KEY, navigateAfterLogin } from '@/utils/route-guard';
 import { resolveCampusInviteLandingView } from '@/utils/invite-landing-view-state';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
@@ -88,6 +89,12 @@ const CampusInviteLanding: React.FC = () => {
   const handleLogin = useCallback(() => {
     if (inviteCode) {
       storePendingCampusInviteCode(inviteCode);
+      // B0-2：登录后须回到本落地页；仅存 pending 不够（navigateAfterAuth 可能进选身份）
+      try {
+        Taro.setStorageSync(LOGIN_REDIRECT_KEY, buildCampusInvitePath(inviteCode));
+      } catch {
+        /* ignore */
+      }
     }
     Taro.navigateTo({ url: '/package-auth/pages/login/index' });
   }, [inviteCode]);

@@ -280,6 +280,46 @@ describe('auth-onboarding', () => {
     expect(navigateAfterLogin).not.toHaveBeenCalled();
   });
 
+  it('navigateAfterAuth：B0-2 有 pending campus 邀请码时优先回落地页（不进选身份）', async () => {
+    vi.resetModules();
+    fetchStoreEntryLatestCachedMock.mockResolvedValue(null);
+    shouldRedirectToStoreEntryPendingMock.mockReturnValue(false);
+    const redirectTo = vi.fn();
+    (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
+
+    const { storePendingCampusInviteCode, PENDING_CAMPUS_INVITE_CODE_KEY } =
+      await import('@/utils/invite-staff-link');
+    Taro.removeStorageSync(PENDING_CAMPUS_INVITE_CODE_KEY);
+    storePendingCampusInviteCode('EABC12345');
+
+    const { navigateAfterAuth } = await import('@/utils/auth-onboarding');
+    const { navigateAfterLogin } = await import('@/utils/route-guard');
+    await navigateAfterAuth(
+      baseProfile({
+        name: '新员工',
+        nickname: '新员工',
+        identities: [
+          {
+            id: 'identity-1',
+            role: 'teacher',
+            organizationId: '',
+            organizationName: '',
+            isDefault: true,
+          },
+        ],
+        currentContext: { identityId: 'identity-1', role: 'teacher', organizationId: '' },
+      }),
+    );
+
+    expect(redirectTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/package-auth/pages/campus-invite-landing/index?code=EABC12345',
+      }),
+    );
+    expect(navigateAfterLogin).not.toHaveBeenCalled();
+    Taro.removeStorageSync(PENDING_CAMPUS_INVITE_CODE_KEY);
+  });
+
   it('navigateAfterAuth：有待审核入驻申请 → pending 页', async () => {
     vi.resetModules();
     shouldRedirectToStoreEntryPendingMock.mockReturnValue(true);
