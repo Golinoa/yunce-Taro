@@ -46,6 +46,8 @@
     "test:watch": "node node_modules/vitest/vitest.mjs",
     "coverage": "node node_modules/vitest/vitest.mjs run --coverage",
     "check": "npm run typecheck && npm run lint && npm run format:check",
+    "verify:sop": "node scripts/verify-sop.mjs",
+    "ci:local": "npm run verify:sop",
     "upload:weapp": "node scripts/upload-weapp.mjs"
   },
   "browserslist": [

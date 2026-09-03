@@ -30,6 +30,7 @@ import {
   organizationService,
   type OrganizationQuotaUsage,
 } from '@/services/organization';
+import { paymentService, type MembershipSku } from '@/services/payment';
 import { useAuth } from '@/utils/auth';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -118,6 +119,9 @@ const MembershipPage: React.FC = () => {
   const [showRedeem, setShowRedeem] = useState(false);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+  const [payEnabled, setPayEnabled] = useState(false);
+  const [skus, setSkus] = useState<MembershipSku[]>([]);
   const [plansOpen, setPlansOpen] = useState(false);
   const [selectedPlanCode, setSelectedPlanCode] = useState('STANDARD');
   const [matchedTip, setMatchedTip] = useState<MatchedMembershipTip | null>(null);
@@ -137,11 +141,14 @@ const MembershipPage: React.FC = () => {
     }
     setLoading(true);
     try {
-      const [data, remoteTips] = await Promise.all([
+      const [data, remoteTips, catalog] = await Promise.all([
         organizationService.getQuotaUsage(),
         organizationService.getMembershipTips(),
+        paymentService.listSkus(),
       ]);
       setQuotaUsage(data);
+      setPayEnabled(Boolean(catalog.enabled && catalog.skus.length > 0));
+      setSkus(catalog.skus);
       const tips = mergeMembershipTips(DEFAULT_MEMBERSHIP_TIPS, remoteTips);
       setTipDefs(tips);
       const plan = getMembershipPlan(data.versionCode);
@@ -174,17 +181,70 @@ const MembershipPage: React.FC = () => {
     return '生效中';
   }, [lifecycle, loading]);
 
+  const selectedSku = useMemo(
+    () => skus.find((s) => s.versionCode === selectedPlanCode) || null,
+    [skus, selectedPlanCode],
+  );
+
   const primaryDockLabel = useMemo(() => {
+    if (payEnabled && selectedSku) {
+      if (lifecycle === 'expired') return '在线续费';
+      if (lifecycle === 'inactive') return '在线开通';
+      return '在线购买';
+    }
     if (lifecycle === 'expired') return '兑换激活码续费';
     if (lifecycle === 'inactive') return '兑换激活码开通';
     if (lifecycle === 'expiring_7' || lifecycle === 'expiring_30') return '立即续费';
     return '续费 / 升级';
-  }, [lifecycle]);
+  }, [lifecycle, payEnabled, selectedSku]);
 
   const handleOpenRedeem = useCallback(() => {
     setRedeemCode('');
     setShowRedeem(true);
   }, []);
+
+  const handlePurchase = useCallback(async () => {
+    if (!selectedSku) {
+      handleOpenRedeem();
+      return;
+    }
+    if (purchasing) return;
+    const priceText = paymentService.formatPriceYuan(selectedSku.price);
+    const confirm = await Taro.showModal({
+      title: `购买${selectedSku.name}`,
+      content: `¥${priceText} / ${selectedSku.durationDays} 天。支付成功后立即生效。`,
+      confirmText: '去支付',
+      cancelText: '取消',
+    });
+    if (!confirm.confirm) return;
+
+    setPurchasing(true);
+    try {
+      Taro.showLoading({ title: '下单中…', mask: true });
+      const result = await paymentService.purchaseMembership(selectedSku.versionCode);
+      Taro.hideLoading();
+      if (result.ok) {
+        Taro.showToast({ title: result.message || '开通成功', icon: 'success', duration: 2500 });
+        await loadQuotaUsage();
+      } else {
+        Taro.showToast({ title: result.message || '支付未完成', icon: 'none', duration: 2500 });
+      }
+    } catch (err) {
+      Taro.hideLoading();
+      const msg = err instanceof Error ? err.message : '下单失败';
+      Taro.showToast({ title: msg, icon: 'none' });
+    } finally {
+      setPurchasing(false);
+    }
+  }, [handleOpenRedeem, loadQuotaUsage, purchasing, selectedSku]);
+
+  const handlePrimaryDock = useCallback(() => {
+    if (payEnabled && selectedSku) {
+      void handlePurchase();
+      return;
+    }
+    handleOpenRedeem();
+  }, [handleOpenRedeem, handlePurchase, payEnabled, selectedSku]);
 
   useEffect(() => {
     if (autoOpenedRedeem.current || loading) return;
@@ -433,7 +493,11 @@ const MembershipPage: React.FC = () => {
                 <View className="flex flex-row items-center justify-between mb-[8rpx]">
                   <Text className="text-[28rpx] font-bold text-foreground">{previewPlan.name}</Text>
                   <Text className="text-[22rpx] text-primary">
-                    {previewPlan.code === quotaUsage?.versionCode ? '当前' : '预览'}
+                    {selectedSku
+                      ? `¥${paymentService.formatPriceYuan(selectedSku.price)}`
+                      : previewPlan.code === quotaUsage?.versionCode
+                        ? '当前'
+                        : '预览'}
                   </Text>
                 </View>
                 {MEMBERSHIP_FEATURE_ROWS.map((row) => {
@@ -478,23 +542,32 @@ const MembershipPage: React.FC = () => {
         </View>
 
         <Text className="mx-[48rpx] mt-[32rpx] mb-[16rpx] text-[22rpx] leading-[34rpx] text-muted-foreground text-center">
-          激活码由平台运营发放。兑换成功后立即生效，可延长有效期并升级档位。
+          {payEnabled
+            ? '支持在线支付开通/续费；也可使用运营发放的激活码。支付成功后立即生效。'
+            : '激活码由平台运营发放。兑换成功后立即生效，可延长有效期并升级档位。'}
         </Text>
       </View>
 
       <View className="fixed left-0 right-0 bottom-0 z-20 px-[32rpx] pt-[16rpx] pb-[calc(16rpx+env(safe-area-inset-bottom))] bg-background">
         <View className="flex flex-row gap-[16rpx]">
           <View
-            className="flex-1 h-[88rpx] rounded-[24rpx] bg-primary flex items-center justify-center shadow-soft active:opacity-90"
-            onClick={handleOpenRedeem}
+            className={cn(
+              'flex-1 h-[88rpx] rounded-[24rpx] bg-primary flex items-center justify-center shadow-soft active:opacity-90',
+              purchasing && 'opacity-60',
+            )}
+            onClick={handlePrimaryDock}
           >
-            <Text className="text-[28rpx] font-bold text-white">{primaryDockLabel}</Text>
+            <Text className="text-[28rpx] font-bold text-white">
+              {purchasing ? '处理中…' : primaryDockLabel}
+            </Text>
           </View>
           <View
             className="flex-1 h-[88rpx] rounded-[24rpx] bg-card border-[3rpx] border-primary/30 flex items-center justify-center active:opacity-90"
-            onClick={handleContactSupport}
+            onClick={payEnabled ? handleOpenRedeem : handleContactSupport}
           >
-            <Text className="text-[28rpx] font-bold text-primary">联系客服</Text>
+            <Text className="text-[28rpx] font-bold text-primary">
+              {payEnabled ? '激活码' : '联系客服'}
+            </Text>
           </View>
         </View>
       </View>
