@@ -76,16 +76,21 @@ jobs:
       - name: Build weapp prod
         run: npm run build:weapp:prod
 
-      - name: Check WECHAT_PRIVATE_KEY
+      - name: Check WeChat upload secrets
         run: |
-          if [ -z "${{ secrets.WECHAT_PRIVATE_KEY }}" ]; then
-            echo "::error::请在 GitHub Secrets 配置 WECHAT_PRIVATE_KEY（微信公众平台 → 开发管理 → 开发设置 → 小程序代码上传密钥；并关闭 IP 白名单）"
+          if [ -n "${{ secrets.WECHAT_PRIVATE_KEY_BASE64 }}" ]; then
+            echo "Using WECHAT_PRIVATE_KEY_BASE64"
+          elif [ -n "${{ secrets.WECHAT_PRIVATE_KEY }}" ]; then
+            echo "Using WECHAT_PRIVATE_KEY"
+          else
+            echo "::error::请配置 GitHub Secret：WECHAT_PRIVATE_KEY（密钥 PEM 全文）或更稳妥的 WECHAT_PRIVATE_KEY_BASE64（密钥文件 base64）。来源：微信公众平台 → 开发管理 → 开发设置 → 小程序代码上传密钥；并关闭 IP 白名单。"
             exit 1
           fi
 
       - name: Upload to WeChat (dev version → 可设为体验版)
         env:
           WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_PRIVATE_KEY }}
+          WECHAT_PRIVATE_KEY_BASE64: ${{ secrets.WECHAT_PRIVATE_KEY_BASE64 }}
           WECHAT_APPID: ${{ secrets.WECHAT_APPID }}
           WECHAT_CI_ROBOT: ${{ vars.WECHAT_CI_ROBOT }}
           WECHAT_UPLOAD_VERSION: ${{ steps.meta.outputs.version }}

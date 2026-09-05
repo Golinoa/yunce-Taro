@@ -2,7 +2,7 @@
  * 使用 miniprogram-ci 上传微信小程序（开发版本，可在公众平台设为体验版）
  *
  * 环境变量：
- * - WECHAT_PRIVATE_KEY  必填：上传密钥全文（或 WECHAT_PRIVATE_KEY_PATH 指向密钥文件）
+ * - WECHAT_PRIVATE_KEY  必填：上传密钥全文（或 WECHAT_PRIVATE_KEY_PATH / WECHAT_PRIVATE_KEY_BASE64）
  * - WECHAT_APPID        可选：默认读 project.config.json 的 appid
  * - WECHAT_UPLOAD_VERSION 必填：版本号，如 1.2.0
  * - WECHAT_UPLOAD_DESC  可选：版本描述
@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { normalizeWechatPrivateKey } from './upload-weapp-normalize.mjs';
 
 const require = createRequire(import.meta.url);
 const ci = require('miniprogram-ci');
@@ -30,28 +31,61 @@ function readAppId() {
   return String(cfg.appid);
 }
 
+function assertPemLooksValid(pem) {
+  const hasBegin = /-----BEGIN [\w\s]+PRIVATE KEY-----/.test(pem);
+  const hasEnd = /-----END [\w\s]+PRIVATE KEY-----/.test(pem);
+  if (!hasBegin || !hasEnd) {
+    throw new Error(
+      'WECHAT_PRIVATE_KEY 不是合法 PEM（缺少 BEGIN/END PRIVATE KEY）。请从微信公众平台重新下载「代码上传密钥」，' +
+        '全文粘贴到 GitHub Secret（含 -----BEGIN…----- 行），或改用 WECHAT_PRIVATE_KEY_BASE64（密钥文件 base64）。',
+    );
+  }
+  const lines = pem.split('\n').filter(Boolean);
+  console.log(
+    `[upload:weapp] private key ok: lines=${lines.length} bytes=${Buffer.byteLength(pem, 'utf8')} begin=${lines[0]}`,
+  );
+}
+
 function resolvePrivateKeyPath() {
   const keyPath = (process.env.WECHAT_PRIVATE_KEY_PATH || '').trim();
   if (keyPath) {
     if (!fs.existsSync(keyPath)) {
       throw new Error(`WECHAT_PRIVATE_KEY_PATH 不存在: ${keyPath}`);
     }
-    return { keyPath, cleanup: null };
+    const pem = normalizeWechatPrivateKey(fs.readFileSync(keyPath, 'utf8'));
+    assertPemLooksValid(pem);
+    const tmp = path.join(os.tmpdir(), `yunce-weapp-private-${process.pid}.key`);
+    fs.writeFileSync(tmp, pem, { encoding: 'utf8', mode: 0o600 });
+    return {
+      keyPath: tmp,
+      cleanup: () => {
+        try {
+          fs.unlinkSync(tmp);
+        } catch {
+          // ignore
+        }
+      },
+    };
   }
 
-  const keyBody = process.env.WECHAT_PRIVATE_KEY || '';
-  if (!keyBody.trim()) {
+  const b64 = (process.env.WECHAT_PRIVATE_KEY_BASE64 || '').trim();
+  let keyBody = '';
+  if (b64) {
+    keyBody = Buffer.from(b64.replace(/\s+/g, ''), 'base64').toString('utf8');
+  } else {
+    keyBody = process.env.WECHAT_PRIVATE_KEY || '';
+  }
+  if (!String(keyBody).trim()) {
     throw new Error(
-      '请设置 WECHAT_PRIVATE_KEY（密钥全文）或 WECHAT_PRIVATE_KEY_PATH（密钥文件路径）',
+      '请设置 WECHAT_PRIVATE_KEY（密钥全文）、WECHAT_PRIVATE_KEY_BASE64，或 WECHAT_PRIVATE_KEY_PATH',
     );
   }
 
+  const pem = normalizeWechatPrivateKey(keyBody);
+  assertPemLooksValid(pem);
+
   const tmp = path.join(os.tmpdir(), `yunce-weapp-private-${process.pid}.key`);
-  // GitHub Secrets 粘贴时可能把换行变成字面量 \n
-  const normalized = keyBody.includes('-----BEGIN')
-    ? keyBody.replace(/\\n/g, '\n')
-    : keyBody;
-  fs.writeFileSync(tmp, normalized, { encoding: 'utf8', mode: 0o600 });
+  fs.writeFileSync(tmp, pem, { encoding: 'utf8', mode: 0o600 });
   return {
     keyPath: tmp,
     cleanup: () => {
