@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/types/profile';
 import {
+  clearProfileSetupDone,
   consumeLastLoginIsNewUser,
   hasSkippedOnboarding,
   IDENTITY_SELECT_PENDING_KEY,
@@ -9,10 +10,12 @@ import {
   markIdentitySelectionPending,
   markLastLoginAsNewUser,
   markOnboardingSkipped,
+  markProfileSetupDone,
   needsOnboarding,
   needsProfileSetup,
   isSubscribeContextReady,
   ONBOARDING_SKIPPED_KEY,
+  PROFILE_SETUP_DONE_KEY,
   shouldRedirectToIdentitySelect,
 } from '@/utils/auth-onboarding';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
@@ -79,6 +82,8 @@ describe('auth-onboarding', () => {
     shouldRedirectToStoreEntryPendingMock.mockReturnValue(false);
     Taro.removeStorageSync(ONBOARDING_SKIPPED_KEY);
     Taro.removeStorageSync(IDENTITY_SELECT_PENDING_KEY);
+    Taro.removeStorageSync(PROFILE_SETUP_DONE_KEY);
+    clearProfileSetupDone();
     invalidateStoreEntryLatestCache();
   });
 
@@ -91,6 +96,46 @@ describe('auth-onboarding', () => {
     expect(needsProfileSetup(baseProfile({ name: '未命名用户', nickname: undefined }))).toBe(true);
     expect(needsProfileSetup(baseProfile({ name: '', nickname: undefined }))).toBe(true);
     expect(needsProfileSetup(baseProfile({ name: '张老师', nickname: '张老师' }))).toBe(false);
+  });
+
+  it('needsProfileSetup：完善资料页完成后允许保留默认昵称', () => {
+    const profile = baseProfile({ name: '未命名用户', nickname: '未命名用户' });
+    expect(needsProfileSetup(profile)).toBe(true);
+    markProfileSetupDone(profile.id);
+    expect(needsProfileSetup(profile)).toBe(false);
+    expect(needsProfileSetup(profile, true)).toBe(false);
+  });
+
+  it('navigateAfterProfileSetup：保留默认昵称仍进入身份选择', async () => {
+    const redirectTo = vi.fn();
+    (Taro as unknown as { redirectTo: typeof redirectTo }).redirectTo = redirectTo;
+
+    const { navigateAfterProfileSetup } = await import('@/utils/auth-onboarding');
+    const profile = baseProfile({
+      name: '未命名用户',
+      nickname: '未命名用户',
+      identities: [
+        {
+          id: 'identity-1',
+          role: 'principal',
+          organizationId: '',
+          organizationName: '',
+          isDefault: true,
+        },
+      ],
+      currentContext: { identityId: 'identity-1', role: 'principal', organizationId: '' },
+    });
+
+    navigateAfterProfileSetup(profile);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(redirectTo).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/package-auth/pages/identity-select/index' }),
+    );
+    expect(redirectTo).not.toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/package-auth/pages/profile-setup/index' }),
+    );
   });
 
   it('isSubscribeContextReady 无机构或未完善资料时不请求 bootstrap', () => {
@@ -156,7 +201,7 @@ describe('auth-onboarding', () => {
     ).toBe(true);
   });
 
-  it('needsOnboarding 教师无机构名需引导；已有机构则否', () => {
+  it('needsOnboarding 教师无真实机构 id 需引导；已有机构则否（不看 institution 文案）', () => {
     expect(
       needsOnboarding(
         baseProfile({
@@ -165,6 +210,18 @@ describe('auth-onboarding', () => {
         }),
       ),
     ).toBe(true);
+    expect(
+      needsOnboarding(
+        baseProfile({
+          currentContext: {
+            identityId: 'identity-1',
+            role: 'teacher',
+            organizationId: 'org-yunce',
+          },
+          teacher_profile: { id: 't1' } as Profile['teacher_profile'],
+        }),
+      ),
+    ).toBe(false);
     expect(
       needsOnboarding(
         baseProfile({

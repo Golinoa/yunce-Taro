@@ -9,7 +9,7 @@ import { useCampusStore } from '@/stores/campus';
 import type { CampusUIModel } from '@/types/campus';
 import type { Schedule } from '@/types/schedule';
 import { useAuth } from '@/utils/auth';
-import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
+import { parseBusinessHours, getCampusOpenStatus } from '@/utils/campus';
 import { withRouteGuard } from '@/utils/route-guard';
 
 /**
@@ -74,8 +74,8 @@ const Index: React.FC = () => {
     return `${parsed.start}-${parsed.end}`;
   }, [currentCampus?.businessHours]);
 
-  const isOpen = useMemo(
-    () => isCampusOpen(currentCampus?.businessHours),
+  const openStatus = useMemo(
+    () => getCampusOpenStatus(currentCampus?.businessHours),
     [currentCampus?.businessHours],
   );
 
@@ -92,7 +92,7 @@ const Index: React.FC = () => {
           <HomeCampusCard
             campus={currentCampus}
             businessTime={businessTime}
-            isOpen={isOpen}
+            openStatus={openStatus}
             onSwitch={handleOpenCampusSheet}
             className="shadow-card"
           />

@@ -4,10 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import { ROLE_LABEL } from '@/components/RoleCard';
+import { BRAND_LOGO } from '@/constants/brand';
 import type { CampusUIModel } from '@/types/campus';
 import type { UserRole } from '@/types/profile';
 import type { ParentStorefrontItem } from '@/types/storefront';
 import { isPrincipalOrAbove } from '@/utils/auth';
+import { resolveAvatarSrc } from '@/utils/avatar-src';
 import {
   formatStorefrontStudents,
   formatStorefrontTitle,
@@ -177,9 +179,7 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
                       )}
                       onClick={() => setSelectedId(key)}
                     >
-                      <View className="w-[88rpx] h-[88rpx] rounded-[16rpx] center overflow-hidden shrink-0 bg-muted">
-                        <Text className="text-[40rpx]">店</Text>
-                      </View>
+                      <CampusLogoThumb logo={null} />
                       <View className="flex-1 min-w-0 pr-[60rpx]">
                         <Text className="text-[28rpx] font-semibold text-foreground truncate">
                           {formatStorefrontTitle(item)}
@@ -223,21 +223,7 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
                         </View>
                       )}
 
-                      <View
-                        className="w-[88rpx] h-[88rpx] rounded-[16rpx] center overflow-hidden shrink-0 bg-[var(--campus-logo-gradient)]"
-                        style={
-                          {
-                            '--campus-logo-gradient':
-                              campus.iconGradient || 'linear-gradient(135deg, #5EC8A8, #4AB893)',
-                          } as React.CSSProperties
-                        }
-                      >
-                        {campus.logo ? (
-                          <Image src={campus.logo} className="w-full h-full" mode="aspectFill" />
-                        ) : (
-                          <Text className="text-[40rpx]">{campus.icon || '🏢'}</Text>
-                        )}
-                      </View>
+                      <CampusLogoThumb logo={campus.logo} />
 
                       <View className="flex-1 min-w-0 pr-[60rpx]">
                         <Text className="text-[28rpx] font-semibold text-foreground truncate">
@@ -277,6 +263,28 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
         </View>
       </View>
     </BottomSheet>
+  );
+};
+
+/** 校区列表缩略 Logo：无图 / 加载失败 → sgpk，不用 emoji */
+const CampusLogoThumb: React.FC<{ logo?: string | null }> = ({ logo }) => {
+  const preferred = resolveAvatarSrc(logo);
+  const [src, setSrc] = useState(preferred);
+  useEffect(() => {
+    setSrc(resolveAvatarSrc(logo));
+  }, [logo]);
+
+  return (
+    <View className="w-[88rpx] h-[88rpx] rounded-[16rpx] center overflow-hidden shrink-0 bg-white">
+      <Image
+        src={src}
+        className="w-full h-full block"
+        mode="aspectFill"
+        onError={() => {
+          if (src !== BRAND_LOGO) setSrc(BRAND_LOGO);
+        }}
+      />
+    </View>
   );
 };
 

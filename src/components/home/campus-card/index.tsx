@@ -13,17 +13,21 @@
 import { View, Text, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
+import { BRAND_LOGO } from '@/constants/brand';
 import type { CampusUIModel } from '@/types/campus';
+import { resolveAvatarSrc } from '@/utils/avatar-src';
+import type { CampusOpenStatus } from '@/utils/campus';
+import { campusOpenStatusLabel } from '@/utils/campus';
 
 export interface HomeCampusCardProps {
   /** 当前校区 */
   campus: CampusUIModel | null;
   /** 营业时间（已格式化，如 08:00-22:00） */
   businessTime: string;
-  /** 是否营业中 */
-  isOpen: boolean;
+  /** 营业状态：营业中 / 休息中 / 未设置 */
+  openStatus: CampusOpenStatus;
   /** 点击切换门店按钮回调 */
   onSwitch: () => void;
   /** 卡片额外类名（如阴影样式） */
@@ -33,7 +37,7 @@ export interface HomeCampusCardProps {
 const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
   campus,
   businessTime,
-  isOpen,
+  openStatus,
   onSwitch,
   className,
 }) => {
@@ -70,6 +74,13 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
 
   const tags = useMemo(() => campus?.tags || [], [campus?.tags]);
   const hasPhone = Boolean(campus?.phone);
+
+  /** 无 logo / 加载失败 → sgpk，禁止 emoji/「?」占位 */
+  const preferredLogo = resolveAvatarSrc(campus?.logo);
+  const [logoSrc, setLogoSrc] = useState(preferredLogo);
+  useEffect(() => {
+    setLogoSrc(resolveAvatarSrc(campus?.logo));
+  }, [campus?.logo]);
 
   // 标签区布局：尽量单行装下（标签 + 导航 + 电话）；
   // 仅在纯图标仍放不下时才换行（导航+电话整行左对齐，两个一起换，绝不分裂）。
@@ -123,18 +134,16 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
   return (
     <View className={cn('bg-white rounded-[32rpx] p-[24rpx] shadow-card', className)}>
       <View className="flex items-start gap-[20rpx]">
-        {/* 校区 Logo */}
-        <View
-          className="w-[96rpx] h-[96rpx] rounded-[24rpx] center overflow-hidden shrink-0"
-          style={{
-            background: campus?.iconGradient || 'linear-gradient(135deg, #5EC8A8, #4AB893)',
-          }}
-        >
-          {campus?.logo ? (
-            <Image src={campus.logo} className="w-full h-full" mode="aspectFill" />
-          ) : (
-            <Text className="text-[44rpx]">{campus?.icon || '🏢'}</Text>
-          )}
+        {/* 校区 Logo：有图用图，否则品牌 sgpk（不用 emoji，真机易成「?」） */}
+        <View className="w-[96rpx] h-[96rpx] rounded-[24rpx] center overflow-hidden shrink-0 bg-white">
+          <Image
+            src={logoSrc}
+            className="w-full h-full block"
+            mode="aspectFill"
+            onError={() => {
+              if (logoSrc !== BRAND_LOGO) setLogoSrc(BRAND_LOGO);
+            }}
+          />
         </View>
 
         {/* 校区信息 */}
@@ -147,22 +156,22 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
               <View
                 className={cn(
                   'flex items-center gap-[6rpx] px-[12rpx] py-[4rpx] rounded-[10rpx] shrink-0',
-                  isOpen ? 'bg-success-bg' : 'bg-muted',
+                  openStatus === 'open' ? 'bg-success-bg' : 'bg-muted',
                 )}
               >
                 <View
                   className={cn(
                     'w-[12rpx] h-[12rpx] rounded-full',
-                    isOpen ? 'bg-success' : 'bg-muted-foreground',
+                    openStatus === 'open' ? 'bg-success' : 'bg-muted-foreground',
                   )}
                 />
                 <Text
                   className={cn(
                     'text-[22rpx] font-medium',
-                    isOpen ? 'text-success' : 'text-muted-foreground',
+                    openStatus === 'open' ? 'text-success' : 'text-muted-foreground',
                   )}
                 >
-                  {isOpen ? '营业中' : '休息中'}
+                  {campusOpenStatusLabel(openStatus)}
                 </Text>
               </View>
             </View>
@@ -174,8 +183,14 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
             </View>
           </View>
 
-          {businessTime && (
+          {campus?.address ? (
+            <Text className="text-[24rpx] text-muted-foreground truncate">{campus.address}</Text>
+          ) : null}
+
+          {businessTime ? (
             <Text className="text-[24rpx] text-muted-foreground">营业时间 {businessTime}</Text>
+          ) : (
+            <Text className="text-[24rpx] text-muted-foreground">营业时间 未设置</Text>
           )}
         </View>
       </View>

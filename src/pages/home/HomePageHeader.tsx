@@ -8,6 +8,7 @@ import HomeCampusCard from '@/components/home/campus-card';
 import HomeHeroBanner from '@/components/home/HomeHeroBanner';
 import Icon from '@/components/Icon';
 import type { CampusUIModel } from '@/types/campus';
+import type { CampusOpenStatus } from '@/utils/campus';
 
 export interface HomePageHeaderProps {
   showCampusHero: boolean;
@@ -15,7 +16,7 @@ export interface HomePageHeaderProps {
   bellTopPx: number;
   campus: CampusUIModel | null;
   businessTime: string;
-  isOpen: boolean;
+  openStatus: CampusOpenStatus;
   onSwitchCampus: () => void;
 }
 
@@ -25,7 +26,7 @@ const HomePageHeader: React.FC<HomePageHeaderProps> = ({
   bellTopPx,
   campus,
   businessTime,
-  isOpen,
+  openStatus,
   onSwitchCampus,
 }) => {
   if (showCampusHero) {
@@ -42,7 +43,7 @@ const HomePageHeader: React.FC<HomePageHeaderProps> = ({
           <HomeCampusCard
             campus={campus}
             businessTime={businessTime}
-            isOpen={isOpen}
+            openStatus={openStatus}
             onSwitch={onSwitchCampus}
             className="shadow-campus"
           />

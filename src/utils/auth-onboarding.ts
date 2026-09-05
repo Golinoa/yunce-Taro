@@ -30,6 +30,8 @@ import { isUuidOrganizationId } from '@/utils/tenant-id';
 
 export const LAST_LOGIN_IS_NEW_USER_KEY = 'yunce:last-login-is-new-user';
 export const ONBOARDING_SKIPPED_KEY = 'yunce:onboarding-skipped';
+/** 用户已在完善资料页点过「完成并继续」（允许保留默认昵称「未命名用户」） */
+export const PROFILE_SETUP_DONE_KEY = 'yunce:profile-setup-done';
 export { IDENTITY_SELECT_PENDING_KEY };
 
 export { IDENTITY_ONBOARDING_PATH_MARKERS, isIdentityOnboardingAllowlistedPath };
@@ -115,8 +117,38 @@ export function hasSkippedOnboarding(): boolean {
   }
 }
 
+export function markProfileSetupDone(userId: string): void {
+  if (!userId) return;
+  try {
+    Taro.setStorageSync(PROFILE_SETUP_DONE_KEY, userId);
+  } catch {
+    /* 静默 */
+  }
+}
+
+export function hasCompletedProfileSetup(userId?: string | null): boolean {
+  if (!userId) return false;
+  try {
+    return Taro.getStorageSync(PROFILE_SETUP_DONE_KEY) === userId;
+  } catch {
+    return false;
+  }
+}
+
+export function clearProfileSetupDone(): void {
+  try {
+    Taro.removeStorageSync(PROFILE_SETUP_DONE_KEY);
+  } catch {
+    /* 静默 */
+  }
+}
+
 /** 是否需要完善头像昵称（微信一键登录新用户） */
 export function needsProfileSetup(profile: Profile | null, isNewUser?: boolean): boolean {
+  // 已在完善资料页主动完成：允许保留默认头像/「未命名用户」，避免再次 redirect 卡住
+  if (profile?.id && hasCompletedProfileSetup(profile.id)) {
+    return false;
+  }
   if (isNewUser) {
     return true;
   }
@@ -153,7 +185,8 @@ export function needsOnboarding(profile: Profile | null): boolean {
   }
 
   if (role === 'teacher') {
-    return !profile.teacher_profile?.institution;
+    // 与校长一致：以真实 organizationId 为准；institution 仅展示名，种子常为空
+    return !isUuidOrganizationId(profile.currentContext?.organizationId);
   }
 
   if (role === 'principal' || role === 'admin') {
@@ -248,7 +281,7 @@ export async function navigateAfterAuth(
   // 门店入驻 PENDING/驳回/已批未注入自有店：以 queryLatest 为准（demo org 不能代替）
   if (isStoreEntryManagerRole(profile)) {
     try {
-      const latest = await fetchStoreEntryLatestCached();
+      const latest = await fetchStoreEntryLatestCached(profile.id);
       if (shouldRedirectToStoreEntryPending({ profile, latest })) {
         clearIdentitySelectionPending();
         redirectWithFailFallback(STORE_ENTRY_PENDING_PATH);
@@ -274,5 +307,8 @@ export async function navigateAfterAuth(
 
 /** After profile-setup: continue production funnel via pending identity flag */
 export function navigateAfterProfileSetup(profile: Profile | null): void {
+  if (profile?.id) {
+    markProfileSetupDone(profile.id);
+  }
   void navigateAfterAuth(profile, { isNewUser: false });
 }
