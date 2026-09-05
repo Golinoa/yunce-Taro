@@ -181,7 +181,7 @@ export const DEFAULT_MEMBERSHIP_TIPS: MembershipTipDef[] = [
     trigger: 'always',
     versionCodes: ['FREE', 'TRIAL'],
     title: '教务已就绪，招生环节也可一并打通',
-    body: '标准版含线索溯源与营销获客，便于把试听转化留在同一套系统里。',
+    body: '成长版含线索溯源与营销获客，便于把试听转化留在同一套系统里。',
   },
 ];
 

@@ -44,7 +44,7 @@ export const MEMBERSHIP_PLANS: MembershipPlan[] = [
     code: 'FREE',
     name: '众创版',
     shortName: '众创',
-    subtitle: '免费',
+    subtitle: '申请',
     maxMembers: 40,
     maxEmployees: 2,
     maxCampuses: 1,
@@ -63,7 +63,7 @@ export const MEMBERSHIP_PLANS: MembershipPlan[] = [
     shortName: '基础',
     subtitle: '100人',
     maxMembers: 100,
-    maxEmployees: 5,
+    maxEmployees: UNLIMITED_QUOTA,
     maxCampuses: 1,
     features: {
       teaching: true,
@@ -76,12 +76,12 @@ export const MEMBERSHIP_PLANS: MembershipPlan[] = [
   },
   {
     code: 'STANDARD',
-    name: '标准版',
-    shortName: '标准',
-    subtitle: '220人',
+    name: '成长版',
+    shortName: '成长',
+    subtitle: '300人',
     recommended: true,
-    maxMembers: 220,
-    maxEmployees: 8,
+    maxMembers: 300,
+    maxEmployees: UNLIMITED_QUOTA,
     maxCampuses: 1,
     features: {
       teaching: true,
@@ -96,10 +96,10 @@ export const MEMBERSHIP_PLANS: MembershipPlan[] = [
     code: 'FLAGSHIP',
     name: '旗舰版',
     shortName: '旗舰',
-    subtitle: '不限',
-    maxMembers: UNLIMITED_QUOTA,
+    subtitle: '800人·含2校区',
+    maxMembers: 800,
     maxEmployees: UNLIMITED_QUOTA,
-    maxCampuses: 10,
+    maxCampuses: 2,
     features: {
       teaching: true,
       leadTrace: true,
@@ -121,9 +121,12 @@ export const MEMBERSHIP_FEATURE_ROWS: Array<{ key: MembershipFeatureKey; label: 
   { key: 'batchImportExport', label: '批量导入导出' },
 ];
 
+/**
+ * 试用期展示对齐成长版能力；生命周期上 TRIAL 仍视为未付费（见 membership-tips / organization）。
+ */
 export function getMembershipPlan(code?: string | null): MembershipPlan | undefined {
   if (!code) return undefined;
-  if (code === 'TRIAL') return MEMBERSHIP_PLANS.find((p) => p.code === 'FREE');
+  if (code === 'TRIAL') return MEMBERSHIP_PLANS.find((p) => p.code === 'STANDARD');
   return MEMBERSHIP_PLANS.find((p) => p.code === code);
 }
 

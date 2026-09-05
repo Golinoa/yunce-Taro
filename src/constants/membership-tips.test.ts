@@ -19,7 +19,7 @@ function quota(
   return {
     organizationId: 'org-1',
     organizationName: '测试机构',
-    versionName: partial.versionName ?? '标准版',
+    versionName: partial.versionName ?? '成长版',
     expireAt: partial.expireAt ?? null,
     members: partial.members ?? { current: 10, max: 220 },
     employees: partial.employees ?? { current: 1, max: 8 },
