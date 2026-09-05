@@ -17,6 +17,7 @@ import { BRAND_LOGO } from '@/constants/brand';
 import { classBookingService, classService } from '@/services';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import { useAuth } from '@/utils/auth';
+import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 interface PageParams {
@@ -354,7 +355,7 @@ const ClassSlotConfigPage: React.FC = () => {
       const openedIds = await classBookingService.autoOpenSlotsIfNeeded(classId, dateStr);
 
       if (openedIds.length > 0) {
-        Taro.setStorageSync('yunce:schedule:refresh', true);
+        emitScheduleRelatedRefresh();
       }
 
       Taro.showToast({

@@ -18,7 +18,6 @@ import PageContainer from '@/components/PageContainer';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import SwappableCard from '@/components/SwappableCard';
 import { CARD_KIND_LABELS, COURSE_FILTER_TABS } from '@/constants/card-type-ui';
-import { cardTypeService } from '@/services/card-type';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCardTypeStore } from '@/stores/card-type';
 import { useCourseCategoryStore } from '@/stores/course-category';
@@ -49,7 +48,7 @@ interface StatItem {
 
 /** 卡种管理列表页 */
 const CardManagementPage: React.FC = () => {
-  const { cards, loading, error, fetchList, remove } = useCardTypeStore();
+  const { cards, loading, error, fetchList, remove, toggleStatus } = useCardTypeStore();
   const { categories, fetchList: fetchCategories } = useCourseCategoryStore();
 
   // 在售/停售 状态过滤
@@ -136,11 +135,10 @@ const CardManagementPage: React.FC = () => {
         const nextStatus = type === 'stop' ? 'inactive' : 'active';
         const actionText = type === 'stop' ? '停售' : '恢复';
         setTogglingId(card.id);
-        await cardTypeService.toggleStatus(card.id, nextStatus);
+        await toggleStatus(card.id, nextStatus);
         Taro.showToast({ title: `${actionText}成功`, icon: 'success' });
       }
       setConfirmAction(null);
-      await fetchList();
     } catch {
       const errorText = type === 'delete' ? '删除失败' : type === 'stop' ? '停售失败' : '恢复失败';
       Taro.showToast({ title: errorText, icon: 'none' });
@@ -148,7 +146,7 @@ const CardManagementPage: React.FC = () => {
       setConfirmLoading(false);
       setTogglingId(null);
     }
-  }, [confirmAction, fetchList, remove]);
+  }, [confirmAction, remove, toggleStatus]);
 
   const filteredCards = useMemo(() => {
     return cards.filter((card) => {
@@ -182,7 +180,7 @@ const CardManagementPage: React.FC = () => {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchList();
+    await fetchList(true);
     setRefreshing(false);
   }, [fetchList]);
 
@@ -318,7 +316,11 @@ const CardManagementPage: React.FC = () => {
           {/* 卡种列表 */}
           <View className="flex flex-col gap-[24rpx]">
             {error && cards.length === 0 ? (
-              <Empty description={error} actionText="重新加载" onAction={() => void fetchList()} />
+              <Empty
+                description={error}
+                actionText="重新加载"
+                onAction={() => void fetchList(true)}
+              />
             ) : filteredCards.length === 0 ? (
               <Empty
                 icon="mdi-package-variant"

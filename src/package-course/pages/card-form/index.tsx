@@ -28,6 +28,7 @@ import {
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
 import { cardTypeService } from '@/services/card-type';
+import { useCardTypeStore } from '@/stores/card-type';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import type { Subject } from '@/types/campus';
 import type {
@@ -103,6 +104,9 @@ const CardFormPage: React.FC = () => {
   const isCopy = !isEdit && !!copyFromId;
 
   const { categories, fetchList: fetchCategories } = useCourseCategoryStore();
+  const createCard = useCardTypeStore((s) => s.create);
+  const updateCard = useCardTypeStore((s) => s.update);
+  const removeCard = useCardTypeStore((s) => s.remove);
 
   // 加载状态
   const { loading, setLoading } = useDelayedLoading();
@@ -380,10 +384,10 @@ const CardFormPage: React.FC = () => {
 
     try {
       if (isEdit) {
-        await cardTypeService.update(cardId, formData);
+        await updateCard(cardId, formData);
         Taro.showToast({ title: '保存成功', icon: 'success' });
       } else {
-        await cardTypeService.create(formData);
+        await createCard(formData);
         Taro.showToast({ title: isCopy ? '复制成功' : '新增成功', icon: 'success' });
       }
       setTimeout(() => Taro.navigateBack(), 800);
@@ -427,6 +431,8 @@ const CardFormPage: React.FC = () => {
     commissionCalc,
     subjects,
     subjectId,
+    createCard,
+    updateCard,
   ]);
 
   const handleDelete = useCallback(async () => {
@@ -438,7 +444,7 @@ const CardFormPage: React.FC = () => {
     if (!confirm) return;
     setDeleting(true);
     try {
-      await cardTypeService.remove(cardId);
+      await removeCard(cardId);
       Taro.showToast({ title: '已删除', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 800);
     } catch {
@@ -446,7 +452,7 @@ const CardFormPage: React.FC = () => {
     } finally {
       setDeleting(false);
     }
-  }, [cardId, name]);
+  }, [cardId, name, removeCard]);
 
   if (loading) {
     return (

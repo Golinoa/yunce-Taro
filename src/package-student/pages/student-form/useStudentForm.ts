@@ -18,6 +18,7 @@ import {
 } from '@/utils/image-upload';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
+import { setRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 
 /** 支付方式选项 */
 export const FEE_METHOD_OPTIONS = [
@@ -527,7 +528,10 @@ export function useStudentForm(): UseStudentFormReturn {
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
           teacher_id: teacherId,
         });
-        if (updated) updateStudentInCache(currentUserId, updated);
+        if (updated) {
+          updateStudentInCache(currentUserId, updated);
+          setRefreshSignal(REFRESH_SIGNAL.students);
+        }
         Taro.showToast({ title: '更新成功', icon: 'success' });
       } else {
         const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -572,6 +576,7 @@ export function useStudentForm(): UseStudentFormReturn {
 
         if (newStudent) {
           updateStudentInCache(currentUserId, newStudent);
+          setRefreshSignal(REFRESH_SIGNAL.students);
 
           try {
             if (studentType === 'old') {

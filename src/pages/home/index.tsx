@@ -34,10 +34,11 @@ import type { Schedule } from '@/types/schedule';
 import type { ParentStorefrontItem } from '@/types/storefront';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
-import { parseBusinessHours, isCampusOpen } from '@/utils/campus';
+import { parseBusinessHours, getCampusOpenStatus } from '@/utils/campus';
 import { logError } from '@/utils/logger';
 import { storefrontKey } from '@/utils/parent-storefront';
 import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
+import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
@@ -124,8 +125,8 @@ const Home: React.FC = () => {
     return `${parsed.start}-${parsed.end}`;
   }, [currentCampus?.businessHours]);
 
-  const isOpen = useMemo(
-    () => isCampusOpen(currentCampus?.businessHours),
+  const openStatus = useMemo(
+    () => getCampusOpenStatus(currentCampus?.businessHours),
     [currentCampus?.businessHours],
   );
 
@@ -516,7 +517,8 @@ const Home: React.FC = () => {
       isFirstMount.current = false;
       return;
     }
-    if (isWithinRefetchTtl(lastHomeFetchAtRef.current)) {
+    const forceRefresh = consumeRefreshSignal(REFRESH_SIGNAL.home);
+    if (!forceRefresh && isWithinRefetchTtl(lastHomeFetchAtRef.current)) {
       return;
     }
     loadData(currentCampusId);
@@ -656,7 +658,7 @@ const Home: React.FC = () => {
               bellTopPx={navSafeHeight - 4}
               campus={currentCampus}
               businessTime={businessTime}
-              isOpen={isOpen}
+              openStatus={openStatus}
               onSwitchCampus={handleOpenCampusSheet}
             />
 

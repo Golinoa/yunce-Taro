@@ -20,6 +20,7 @@ import type {
   SalaryTemplate,
   SalaryRuleConfig,
 } from '@/types/teacher';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 /** 薪资总额算法（与 mockExecutePay 共用同一实现，消除 B-01 实发≠展示） */
@@ -38,13 +39,17 @@ interface TeacherState {
   error: string | null;
   /** 当前查看/操作的薪资月份 YYYY-MM */
   salaryMonth: string;
+  /** 教师列表按月份的上次拉取时间 */
+  lastTeachersFetchAt: Record<string, number>;
+  lastMetaFetchAt: number;
 
   // 数据加载
-  fetchTeachers: (month?: string) => Promise<void>;
-  fetchSalaryModels: () => Promise<void>;
-  fetchSalaryTemplates: () => Promise<void>;
-  fetchSettings: () => Promise<void>;
-  fetchAll: (month?: string) => Promise<void>;
+  fetchTeachers: (month?: string, force?: boolean) => Promise<void>;
+  fetchSalaryModels: (force?: boolean) => Promise<void>;
+  fetchSalaryTemplates: (force?: boolean) => Promise<void>;
+  fetchSettings: (force?: boolean) => Promise<void>;
+  fetchAll: (month?: string, force?: boolean) => Promise<void>;
+  invalidateCache: () => void;
 
   // 筛选
   setFilter: (filter: Partial<TeacherFilter>) => void;
@@ -123,44 +128,100 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   loading: false,
   error: null,
   salaryMonth: dayjs().format('YYYY-MM'),
+  lastTeachersFetchAt: {},
+  lastMetaFetchAt: 0,
 
   // ===== 数据加载 =====
-  fetchTeachers: async (month) => {
+  fetchTeachers: async (month, force = false) => {
     const targetMonth = month ?? get().salaryMonth;
-    const teachers = await teacherService.getList(undefined, targetMonth);
-    set({ teachers });
+    const { teachers, lastTeachersFetchAt } = get();
+    const now = Date.now();
+    if (
+      !force &&
+      teachers.length > 0 &&
+      lastTeachersFetchAt[targetMonth] &&
+      now - lastTeachersFetchAt[targetMonth] < TTL.list
+    ) {
+      return;
+    }
+    const list = await teacherService.getList(undefined, targetMonth);
+    set((s) => ({
+      teachers: list,
+      lastTeachersFetchAt: { ...s.lastTeachersFetchAt, [targetMonth]: now },
+    }));
   },
 
-  fetchSalaryModels: async () => {
-    const salaryModels = await salaryModelService.getList();
-    set({ salaryModels });
+  fetchSalaryModels: async (force = false) => {
+    const { salaryModels, lastMetaFetchAt } = get();
+    const now = Date.now();
+    if (!force && salaryModels.length > 0 && now - lastMetaFetchAt < TTL.list) {
+      return;
+    }
+    const list = await salaryModelService.getList();
+    set({ salaryModels: list, lastMetaFetchAt: now });
   },
 
-  fetchSalaryTemplates: async () => {
-    const salaryTemplates = await salaryTemplateService.getList();
-    set({ salaryTemplates });
+  fetchSalaryTemplates: async (force = false) => {
+    const { salaryTemplates, lastMetaFetchAt } = get();
+    const now = Date.now();
+    if (!force && salaryTemplates.length > 0 && now - lastMetaFetchAt < TTL.list) {
+      return;
+    }
+    const list = await salaryTemplateService.getList();
+    set({ salaryTemplates: list, lastMetaFetchAt: now });
   },
 
-  fetchSettings: async () => {
+  fetchSettings: async (force = false) => {
+    const { lastMetaFetchAt } = get();
+    const now = Date.now();
+    if (!force && lastMetaFetchAt > 0 && now - lastMetaFetchAt < TTL.list) {
+      return;
+    }
     const settings = await salarySettingsService.get();
-    set({ settings });
+    set({ settings, lastMetaFetchAt: now });
   },
 
-  fetchAll: async (month) => {
+  fetchAll: async (month, force = false) => {
+    const targetMonth = month ?? get().salaryMonth;
+    const { teachers, lastTeachersFetchAt, lastMetaFetchAt } = get();
+    const now = Date.now();
+    const teachersFresh =
+      !force &&
+      teachers.length > 0 &&
+      Boolean(lastTeachersFetchAt[targetMonth]) &&
+      now - lastTeachersFetchAt[targetMonth] < TTL.list;
+    const metaFresh = !force && lastMetaFetchAt > 0 && now - lastMetaFetchAt < TTL.list;
+    if (teachersFresh && metaFresh) {
+      return;
+    }
+
     set({ loading: true, error: null });
     try {
-      const targetMonth = month ?? get().salaryMonth;
-      const [teachers, salaryModels, salaryTemplates, settings] = await Promise.all([
-        teacherService.getList(undefined, targetMonth),
-        salaryModelService.getList(),
-        salaryTemplateService.getList(),
-        salarySettingsService.get(),
+      const [list, salaryModels, salaryTemplates, settings] = await Promise.all([
+        teachersFresh ? Promise.resolve(teachers) : teacherService.getList(undefined, targetMonth),
+        metaFresh ? Promise.resolve(get().salaryModels) : salaryModelService.getList(),
+        metaFresh ? Promise.resolve(get().salaryTemplates) : salaryTemplateService.getList(),
+        metaFresh ? Promise.resolve(get().settings) : salarySettingsService.get(),
       ]);
-      set({ teachers, salaryModels, salaryTemplates, settings, loading: false });
+      set((s) => ({
+        teachers: list,
+        salaryModels,
+        salaryTemplates,
+        settings,
+        loading: false,
+        lastTeachersFetchAt: teachersFresh
+          ? s.lastTeachersFetchAt
+          : { ...s.lastTeachersFetchAt, [targetMonth]: now },
+        lastMetaFetchAt: metaFresh ? s.lastMetaFetchAt : now,
+      }));
     } catch (err) {
       logError('teacher fetchAll', err);
       set({ loading: false, error: '教师数据加载失败，请重试' });
     }
+  },
+
+  invalidateCache: () => {
+    set({ lastTeachersFetchAt: {}, lastMetaFetchAt: 0, teachers: [] });
   },
 
   setSalaryMonth: (month) => set({ salaryMonth: month }),

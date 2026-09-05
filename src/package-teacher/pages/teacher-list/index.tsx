@@ -65,7 +65,7 @@ const TeacherListPage: React.FC = () => {
   const [introVisible, setIntroVisible] = useState(false);
 
   useDidShow(() => {
-    void fetchAll();
+    void fetchAll(undefined, false);
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       if (hidden !== true) {
@@ -190,7 +190,11 @@ const TeacherListPage: React.FC = () => {
           'flex flex-col h-screen bg-background px-[32rpx] items-center justify-center',
         )}
       >
-        <Empty description={error} actionText="重新加载" onAction={() => void fetchAll()} />
+        <Empty
+          description={error}
+          actionText="重新加载"
+          onAction={() => void fetchAll(undefined, true)}
+        />
       </View>
     );
   }

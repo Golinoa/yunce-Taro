@@ -8,6 +8,7 @@
  * GET  /payments/membership/skus
  */
 import Taro from '@tarojs/taro';
+import { TTL } from '@/utils/data-freshness';
 import { get, post } from '@/utils/request';
 
 export type MembershipSku = {
@@ -74,6 +75,19 @@ export type MembershipOrderListResult = {
 
 function formatPriceYuan(fen: number): string {
   return (fen / 100).toFixed(fen % 100 === 0 ? 0 : 2);
+}
+
+type SkuCatalog = {
+  enabled: boolean;
+  showTestSkus?: boolean;
+  skus: MembershipSku[];
+};
+
+let skuCatalogCache: { at: number; data: SkuCatalog } | null = null;
+
+/** 切机构/登出时清空 SKU 短缓存 */
+export function invalidateMembershipSkuCache(): void {
+  skuCatalogCache = null;
 }
 
 /** iOS 虚拟支付需微信 ≥ 8.0.68 */
@@ -191,9 +205,15 @@ async function finishPayFlow(
 export const paymentService = {
   formatPriceYuan,
 
-  listSkus: async (): Promise<{ enabled: boolean; skus: MembershipSku[] }> => {
+  listSkus: async (force = false): Promise<SkuCatalog> => {
+    const now = Date.now();
+    if (!force && skuCatalogCache && now - skuCatalogCache.at < TTL.membershipSku) {
+      return skuCatalogCache.data;
+    }
     try {
-      return await get<{ enabled: boolean; skus: MembershipSku[] }>('/payments/membership/skus');
+      const data = await get<SkuCatalog>('/payments/membership/skus');
+      skuCatalogCache = { at: now, data };
+      return data;
     } catch {
       return { enabled: false, skus: [] };
     }

@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { leadService } from '@/services/lead';
 import type { LeadCardModel, LeadFilterTab, LeadSummary } from '@/types/lead';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 interface LeadState {
@@ -33,8 +34,8 @@ interface LeadState {
   invalidate: (teacherId: string) => void;
 }
 
-/** 缓存有效期 3 分钟 */
-const CACHE_TTL = 3 * 60 * 1000;
+/** 缓存有效期（L2 线索） */
+const CACHE_TTL = TTL.lead;
 
 export const useLeadStore = create<LeadState>((set, get) => ({
   cache: {},

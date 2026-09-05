@@ -216,10 +216,35 @@ interface RequestOptions {
   timeout?: number;
 }
 
+/** 开发环境重复 GET 告警（1s 窗口） */
+const recentGetHits = new Map<string, number>();
+function warnDuplicateGet(url: string): void {
+  const now = Date.now();
+  const prev = recentGetHits.get(url) || 0;
+  if (prev && now - prev < 1000) {
+    // eslint-disable-next-line no-console
+    console.warn(`[request-dedup] duplicate GET within 1s: ${url}`);
+  }
+  recentGetHits.set(url, now);
+  if (recentGetHits.size > 200) {
+    const oldest = [...recentGetHits.entries()].sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (oldest) recentGetHits.delete(oldest);
+  }
+}
+
 /** 核心请求函数 */
 export async function request<T = unknown>(options: RequestOptions): Promise<T> {
   const { url, method = 'GET', data, header = {}, skipAuth = false, timeout = TIMEOUT } = options;
   const startAt = Date.now();
+
+  // 开发环境：1s 内同 method+url 重复 GET 告警（发现无脑重拉）
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.TARO_ENABLE_LOCAL_DEBUG === 'true' &&
+    method === 'GET'
+  ) {
+    warnDuplicateGet(url);
+  }
 
   // 注入 token（过期时尝试 refresh）
   if (!skipAuth) {

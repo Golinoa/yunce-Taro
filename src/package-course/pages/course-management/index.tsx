@@ -9,7 +9,7 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -24,6 +24,8 @@ import { classColorHex } from '@/theme';
 import type { Class } from '@/types/class';
 import type { CourseTemplate } from '@/types/course-template';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.course;
 const CATEGORY_TIP_KEY = 'course_management_category_tip_hidden';
@@ -47,6 +49,18 @@ const CourseManagementPage: React.FC = () => {
   const [activeClasses, setActiveClasses] = useState<Class[]>([]);
   /** 已排课的班级 id 集合（用于判断"未排课"标签） */
   const [scheduledClassIds, setScheduledClassIds] = useState<Set<string>>(new Set());
+  const lastClassAuxFetchAtRef = useRef<number | null>(null);
+
+  const loadClassAux = useCallback(async () => {
+    const teacherKey = currentTeacherId || 'self';
+    const [scheduled, classes] = await Promise.all([
+      classService.getScheduledClassIds().catch(() => [] as string[]),
+      classService.getByTeacher(teacherKey).catch(() => [] as Class[]),
+    ]);
+    setScheduledClassIds(new Set(scheduled));
+    setActiveClasses(classes.filter((c) => c.status === 'active'));
+    markFetched(lastClassAuxFetchAtRef);
+  }, [currentTeacherId]);
 
   // 删除确认弹窗
   const [deleteTarget, setDeleteTarget] = useState<CourseTemplate | null>(null);
@@ -81,16 +95,12 @@ const CourseManagementPage: React.FC = () => {
       Taro.getCurrentInstance()?.router?.params?.categoryId || '',
     );
 
-    // 已排课班级 id 集合（用于未排课标签判断）
-    void classService
-      .getScheduledClassIds()
-      .then((ids) => setScheduledClassIds(new Set(ids)))
-      .catch(() => setScheduledClassIds(new Set()));
-    // 排课中的活跃班级（班课 tab；管理员走机构全量 /classes）
-    void classService
-      .getByTeacher(currentTeacherId || 'self')
-      .then((list) => setActiveClasses(list.filter((c) => c.status === 'active')))
-      .catch(() => setActiveClasses([]));
+    // 班级辅数据：TTL 内跳过；排课写后信号强制刷新
+    const forceClassAux = consumeRefreshSignal(REFRESH_SIGNAL.classes);
+    if (forceClassAux || shouldRefetch(lastClassAuxFetchAtRef.current, TTL.list)) {
+      void loadClassAux();
+    }
+
     void fetchList().then(() => {
       const { categories: latestCategories, activeCategoryId: currentId } =
         useCourseCategoryStore.getState();

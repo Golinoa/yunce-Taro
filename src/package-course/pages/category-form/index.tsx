@@ -27,6 +27,7 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { courseCategoryService } from '@/services/course-category';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';
+import { useCourseTemplateStore } from '@/stores/course-template';
 import type {
   CategoryAutoCheckinValue,
   CategoryTimeValue,
@@ -373,6 +374,7 @@ const CategoryFormPage: React.FC = () => {
     setDeleting(true);
     try {
       await remove(categoryData.id);
+      useCourseTemplateStore.getState().invalidateCache();
       Taro.showToast({ title: '已删除', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 800);
     } catch {

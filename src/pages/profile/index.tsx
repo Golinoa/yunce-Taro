@@ -13,7 +13,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import Avatar from '@/components/Avatar';
 import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
@@ -25,6 +25,7 @@ import ProfileGrid from '@/components/profile/ProfileGrid';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ProfileStats from '@/components/profile/ProfileStats';
 import StoreOnboarding from '@/components/profile/StoreOnboarding';
+import SupportQrDialog from '@/components/SupportQrDialog';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { resolveLifecycle } from '@/constants/membership-tips';
 import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
@@ -40,8 +41,10 @@ import { teacherService } from '@/services/teacher';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
 import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { markStepVisited } from '@/utils/onboarding-storage';
+import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 
@@ -96,6 +99,7 @@ const Profile: React.FC = () => {
   // 弹窗控制
   const [showBindSheet, setShowBindSheet] = useState(false);
   const [showSwitchSheet, setShowSwitchSheet] = useState(false);
+  const [supportQrVisible, setSupportQrVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [binding, setBinding] = useState(false);
 
@@ -239,12 +243,22 @@ const Profile: React.FC = () => {
     }
   }, [isManagerRole, storeOnboardingHidden]);
 
+  const isFirstMount = useRef(true);
+  const lastProfileFetchAtRef = useRef<number | null>(null);
+  const lastQuotaFetchAtRef = useRef<number | null>(null);
+
   React.useEffect(() => {
-    loadStudents();
-    loadTeacherStats();
-    loadStoreOnboardingHidden();
-    loadStoreProgress();
-    loadQuotaUsage();
+    void (async () => {
+      await Promise.all([
+        loadStudents(),
+        loadTeacherStats(),
+        loadStoreProgress(),
+        loadQuotaUsage(),
+      ]);
+      loadStoreOnboardingHidden();
+      markFetched(lastProfileFetchAtRef);
+      markFetched(lastQuotaFetchAtRef);
+    })();
   }, [
     loadStudents,
     loadTeacherStats,
@@ -255,11 +269,22 @@ const Profile: React.FC = () => {
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
-    loadStudents();
-    loadTeacherStats();
     loadStoreOnboardingHidden();
-    loadStoreProgress();
-    loadQuotaUsage();
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    const forceQuota =
+      consumeRefreshSignal(REFRESH_SIGNAL.membership) ||
+      consumeRefreshSignal(REFRESH_SIGNAL.profileQuota);
+    if (forceQuota || shouldRefetch(lastQuotaFetchAtRef.current, TTL.quota)) {
+      void loadQuotaUsage().then(() => markFetched(lastQuotaFetchAtRef));
+    }
+    if (shouldRefetch(lastProfileFetchAtRef.current, TTL.tab)) {
+      void Promise.all([loadStudents(), loadTeacherStats(), loadStoreProgress()]).then(() =>
+        markFetched(lastProfileFetchAtRef),
+      );
+    }
   });
 
   const activeStudent = useMemo(
@@ -506,7 +531,7 @@ const Profile: React.FC = () => {
       {
         label: '平台客服',
         icon: 'mdi-headset',
-        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+        onClick: () => setSupportQrVisible(true),
       },
       {
         label: '消息通知',
@@ -628,7 +653,7 @@ const Profile: React.FC = () => {
       {
         label: '平台客服',
         icon: 'mdi-headset' as const,
-        onClick: () => handleNavigate('/package-settings/pages/feedback/index'),
+        onClick: () => setSupportQrVisible(true),
       },
       {
         label: '消息通知',
@@ -903,6 +928,8 @@ const Profile: React.FC = () => {
             </View>
           </View>
         </BottomSheet>
+
+        <SupportQrDialog visible={supportQrVisible} onClose={() => setSupportQrVisible(false)} />
       </View>
     </PageContainer>
   );

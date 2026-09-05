@@ -38,7 +38,9 @@ import type {
   TeacherRoleInfo,
   UserRole,
 } from '@/types/profile';
-import { markLastLoginAsNewUser } from '@/utils/auth-onboarding';
+import { clearProfileSetupDone, markLastLoginAsNewUser } from '@/utils/auth-onboarding';
+import { resetDomainCaches } from '@/utils/reset-domain-caches';
+import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { performWechatAuth } from '@/utils/wechat-login-coordinator';
 
@@ -557,6 +559,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(result.profile);
         persistAuth(result.profile, session);
         syncUserRole(result.profile.currentContext.role);
+        resetDomainCaches('all');
       }
       return { error: null };
     },
@@ -624,6 +627,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(payload.profile);
       persistAuth(payload.profile, payload.session);
       syncUserRole(payload.profile.currentContext?.role || null);
+      resetDomainCaches('all');
     },
     [persistAuth, syncUserRole],
   );
@@ -638,9 +642,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRegisterDraft(null);
       persistAuth(null, null);
       syncUserRole(null);
+      resetDomainCaches('all');
       try {
         Taro.removeStorageSync(REGISTER_DRAFT_STORAGE_KEY);
         Taro.removeStorageSync('loginRedirectPath');
+        clearProfileSetupDone();
+        // 入驻 latest 缓存按账号隔离；退出时清干净，避免下一账号被踢进「等待审核」
+        invalidateStoreEntryLatestCache();
       } catch {
         /* ignore */
       }

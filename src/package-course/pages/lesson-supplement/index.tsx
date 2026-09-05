@@ -28,9 +28,8 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import { hasTrialPackage, pickBestPackage } from '@/utils/package-helper';
+import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
-
-const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 
 function getRecordPriority(record?: LessonRecord) {
   if (!record) {
@@ -414,11 +413,7 @@ const LessonSupplementPage: React.FC = () => {
       if (currentUserId) {
         invalidateStudents(currentUserId);
       }
-      try {
-        Taro.setStorageSync(SCHEDULE_REFRESH_SIGNAL_KEY, String(Date.now()));
-      } catch (error) {
-        logError('LessonSupplement emit schedule refresh signal', error);
-      }
+      emitScheduleRelatedRefresh();
       setTimeout(() => {
         handleSafeGoBack();
       }, 1600);

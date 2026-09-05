@@ -15,6 +15,7 @@ import type { Class } from '@/types/class';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { setRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 
 const StudentTransferPage: React.FC = () => {
@@ -163,6 +164,7 @@ const StudentTransferPage: React.FC = () => {
       }
       invalidateClasses(currentUserId);
       invalidateStudents(currentUserId);
+      setRefreshSignal(REFRESH_SIGNAL.students);
       Taro.showToast({ title: '调班成功', icon: 'success' });
       setTimeout(() => {
         Taro.navigateBack();

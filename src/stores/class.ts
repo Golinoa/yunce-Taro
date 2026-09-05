@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { classService } from '@/services';
 import type { Class } from '@/types/class';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 interface ClassState {
@@ -18,7 +19,7 @@ interface ClassState {
   removeFromCache: (teacherId: string, classId: string, campusId?: string) => void;
 }
 
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = TTL.list;
 
 export const useClassStore = create<ClassState>((set, get) => ({
   cache: {},

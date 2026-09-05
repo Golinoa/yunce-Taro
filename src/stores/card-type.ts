@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { cardTypeService } from '@/services/card-type';
 import type { CardType, CardTypeFormData, CardTypeStatus } from '@/types/card-type';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 interface CardTypeState {
@@ -16,9 +17,11 @@ interface CardTypeState {
   loading: boolean;
   /** 错误信息 */
   error: string;
+  lastFetchAt: number;
 
   /** 获取卡种列表 */
-  fetchList: () => Promise<void>;
+  fetchList: (force?: boolean) => Promise<void>;
+  invalidateCache: () => void;
   /** 创建卡种 */
   create: (data: CardTypeFormData) => Promise<CardType>;
   /** 更新卡种 */
@@ -31,26 +34,37 @@ interface CardTypeState {
   clearError: () => void;
 }
 
-export const useCardTypeStore = create<CardTypeState>((set) => ({
+export const useCardTypeStore = create<CardTypeState>((set, get) => ({
   cards: [],
   loading: false,
   error: '',
+  lastFetchAt: 0,
 
-  fetchList: async () => {
+  fetchList: async (force = false) => {
+    const { cards, lastFetchAt } = get();
+    const now = Date.now();
+    if (!force && cards.length > 0 && lastFetchAt > 0 && now - lastFetchAt < TTL.list) {
+      return;
+    }
     set({ loading: true, error: '' });
     try {
       const list = await cardTypeService.getList();
-      set({ cards: list, loading: false });
+      set({ cards: list, loading: false, lastFetchAt: now });
     } catch (err) {
       logError('cardType fetchList', err);
       set({ error: '卡种加载失败，请重试', loading: false });
     }
   },
 
+  invalidateCache: () => {
+    set({ lastFetchAt: 0, cards: [] });
+  },
+
   create: async (data) => {
     const created = await cardTypeService.create(data);
     set((state) => ({
       cards: [created, ...state.cards],
+      lastFetchAt: Date.now(),
     }));
     return created;
   },

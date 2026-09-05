@@ -9,7 +9,7 @@
     "enhance": false,
     "compileHotReLoad": false,
     "postcss": false,
-    "preloadBackgroundData": false,
+    "preloadBackgroundData": true,
     "minified": true,
     "newFeature": true,
     "autoAudits": false,

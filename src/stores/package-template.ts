@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { packageTemplateService } from '@/services';
 import type { CoursePackageTemplate } from '@/types/course-package';
+import { TTL } from '@/utils/data-freshness';
 
 interface PackageTemplateState {
   cache: Record<string, CoursePackageTemplate[]>;
@@ -17,7 +18,7 @@ interface PackageTemplateState {
   removeFromCache: (teacherId: string, tplId: string) => void;
 }
 
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = TTL.list;
 
 export const usePackageTemplateStore = create<PackageTemplateState>((set, get) => ({
   cache: {},

@@ -332,3 +332,14 @@ npm run build:weapp
 - [ ] 页面/Store 处理 UI 提示与错误
 - [ ] TypeScript 类型完整，泛型指定返回值类型
 - [ ] 类型从 `@/types` 导入，不重复定义
+
+## 13. 读缓存与写后失效
+
+详细见 `docs/diagnostics/2026-09-06-request-cache-strategy.md`。硬规则：
+
+1. **禁止** 在 `useDidShow` 无脑全量打库；Tab 页用 `TTL.tab` / `shouldRefetch`（`src/utils/data-freshness.ts`）
+2. 列表读走 Store：`fetch...(force?)` + TTL；写成功 **必须** `invalidate` / `invalidateCache`
+3. 支付 / 配额 / 订单态属 L0：禁止长缓存；支付成功用 `setRefreshSignal(REFRESH_SIGNAL.*)`
+4. 切机构 / 登出调用 `resetDomainCaches('all')`；切校区由 `setCurrentCampusId` 触发 `campus` 域清理
+5. 导航按钮本身不要为「点了」再请求；由目标页按分级决定
+6. **不要** 在 Service 层做全局 HTTP 缓存；SKU 等特例用模块内短缓存并提供 `invalidate*`

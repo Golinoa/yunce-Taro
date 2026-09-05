@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { studentService } from '@/services/student';
 import type { Student } from '@/types/student';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 interface StudentState {
@@ -17,18 +18,22 @@ interface StudentState {
 
   /** 获取教师的学员列表（优先缓存） */
   fetchByTeacher: (teacherId: string, campusId?: string, force?: boolean) => Promise<Student[]>;
+  /** 获取家长绑定学员列表（优先缓存） */
+  fetchByParent: (parentId: string, force?: boolean) => Promise<Student[]>;
   /** 获取学员详情（从缓存中查找，未命中则请求） */
   fetchById: (studentId: string, teacherId?: string) => Promise<Student | null>;
   /** 创建学员后 invalidate 缓存 */
   invalidate: (teacherId: string, campusId?: string) => void;
+  /** 清空家长侧缓存 */
+  invalidateParent: (parentId: string) => void;
   /** 更新缓存中的单条学员 */
   updateInCache: (teacherId: string, student: Student, campusId?: string) => void;
   /** 从缓存中移除学员 */
   removeFromCache: (teacherId: string, studentId: string, campusId?: string) => void;
 }
 
-/** 缓存有效期 5 分钟 */
-const CACHE_TTL = 5 * 60 * 1000;
+/** 缓存有效期（L2 列表） */
+const CACHE_TTL = TTL.list;
 
 export const useStudentStore = create<StudentState>((set, get) => ({
   cache: {},
@@ -62,6 +67,32 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     }
   },
 
+  fetchByParent: async (parentId, force = false) => {
+    const { cache, lastFetch } = get();
+    const now = Date.now();
+    const cacheKey = `parent:${parentId}`;
+
+    if (!force && cache[cacheKey] && lastFetch[cacheKey] && now - lastFetch[cacheKey] < CACHE_TTL) {
+      return cache[cacheKey];
+    }
+
+    set((s) => ({ loading: { ...s.loading, [cacheKey]: true } }));
+
+    try {
+      const list = await studentService.getByParent(parentId);
+      set((s) => ({
+        cache: { ...s.cache, [cacheKey]: list },
+        loading: { ...s.loading, [cacheKey]: false },
+        lastFetch: { ...s.lastFetch, [cacheKey]: now },
+      }));
+      return list;
+    } catch (err) {
+      logError('student fetchByParent', err);
+      set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
+      return cache[cacheKey] || [];
+    }
+  },
+
   fetchById: async (studentId, teacherId) => {
     // 先从缓存找
     if (teacherId) {
@@ -88,6 +119,17 @@ export const useStudentStore = create<StudentState>((set, get) => ({
           }
         });
       }
+      return { cache: nextCache, lastFetch: nextLastFetch };
+    });
+  },
+
+  invalidateParent: (parentId) => {
+    const cacheKey = `parent:${parentId}`;
+    set((s) => {
+      const nextCache = { ...s.cache };
+      const nextLastFetch = { ...s.lastFetch };
+      delete nextCache[cacheKey];
+      delete nextLastFetch[cacheKey];
       return { cache: nextCache, lastFetch: nextLastFetch };
     });
   },

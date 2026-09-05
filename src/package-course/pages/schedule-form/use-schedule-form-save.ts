@@ -18,6 +18,7 @@ import type { UserRole } from '@/types/profile';
 import type { DayOfWeek, Schedule, ScheduleColor } from '@/types/schedule';
 import type { ScheduleConflictResult } from '@/types/schedule-conflict';
 import { logError } from '@/utils/logger';
+import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import {
   buildScheduleRuleNote,
   buildScheduleSaveSuccessTitle,
@@ -229,11 +230,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               `${selectedClass?.name || '班级课程'} 已由 ${ot} 调整为 ${nt}，仅本次生效。`,
             );
         }
-        try {
-          Taro.setStorageSync('yunce:schedule:refresh', String(Date.now()));
-        } catch (err) {
-          logError('emit schedule refresh signal', err);
-        }
+        emitScheduleRelatedRefresh();
         Taro.showToast({ title: '调课成功', icon: 'success', duration: 800 });
         void (async () => {
           try {
@@ -332,11 +329,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
 
     const primary = targets[0];
     const emitScheduleRefresh = () => {
-      try {
-        Taro.setStorageSync('yunce:schedule:refresh', String(Date.now()));
-      } catch (err) {
-        logError('emit schedule refresh signal', err);
-      }
+      emitScheduleRelatedRefresh();
     };
     const goBackToSchedule = () => {
       Taro.navigateBack({

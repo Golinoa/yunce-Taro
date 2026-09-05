@@ -1,7 +1,7 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
@@ -19,6 +19,7 @@ import type {
   SalaryDataType,
 } from '@/types/data-center';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
@@ -53,12 +54,6 @@ const DataCenter: React.FC = () => {
     frontColor: '#000000',
   }));
 
-  useDidShow(() => {
-    syncTabBarByProfile(profile);
-    if (campuses.length === 0) {
-      void fetchCampuses();
-    }
-  });
   const [revenueTrend, setRevenueTrend] = useState<RevenueTrendType | null>(null);
   const [financeData, setFinanceData] = useState<FinanceDataType | null>(null);
   const [memberData, setMemberData] = useState<MemberDataType | null>(null);
@@ -66,6 +61,9 @@ const DataCenter: React.FC = () => {
   const [salaryData, setSalaryData] = useState<SalaryDataType | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
   const { setLoading } = useDelayedLoading();
+
+  const lastStatsFetchAtRef = useRef<number | null>(null);
+  const isFirstStatsShow = useRef(true);
 
   /** 加载所有数据 */
   const loadData = useCallback(async () => {
@@ -85,14 +83,30 @@ const DataCenter: React.FC = () => {
       setMemberData(member);
       setCardData(card);
       setSalaryData(salary);
+      markFetched(lastStatsFetchAtRef);
     } finally {
       setLoading(false);
     }
-  }, [trendPeriod]);
+  }, [trendPeriod, setLoading]);
 
+  // 首屏 + 趋势周期切换：即时拉（不受 Tab TTL）
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
+
+  useDidShow(() => {
+    syncTabBarByProfile(profile);
+    if (campuses.length === 0) {
+      void fetchCampuses();
+    }
+    if (isFirstStatsShow.current) {
+      isFirstStatsShow.current = false;
+      return;
+    }
+    if (shouldRefetch(lastStatsFetchAtRef.current, TTL.tab)) {
+      void loadData();
+    }
+  });
 
   /** 切换营收趋势周期 */
   const handlePeriodChange = useCallback((value: string) => {

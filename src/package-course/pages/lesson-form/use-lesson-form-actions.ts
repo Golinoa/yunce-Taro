@@ -23,6 +23,7 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
+import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import type { SubmitLock } from '@/utils/submit-lock';
 import { resolveLessonSubmitKind } from './lesson-submit';
 import { executeClassSubmit } from './lesson-submit-class';
@@ -30,8 +31,6 @@ import { executeSingleDeduct } from './lesson-submit-single';
 import { executeIncrementalEditSave, executeSupplementSave } from './lesson-submit-supplement';
 import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
 import type { StudentEditSheetTarget } from './StudentEditSheet';
-
-const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 
 export interface UseLessonFormActionsParams {
   isEditEntryAttempt: boolean;
@@ -159,11 +158,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   } = params;
 
   const emitScheduleRefreshSignal = useCallback(() => {
-    try {
-      Taro.setStorageSync(SCHEDULE_REFRESH_SIGNAL_KEY, String(Date.now()));
-    } catch (err) {
-      logError('emit schedule refresh signal', err);
-    }
+    emitScheduleRelatedRefresh();
   }, []);
 
   const handleSubmitSuccessReturn = useCallback(

@@ -28,6 +28,7 @@ import {
 } from '@/utils/hours-status';
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useBatchRender } from '@/utils/use-batch-render';
 
@@ -95,6 +96,7 @@ const Students: React.FC = () => {
   const [sortOpen, setSortOpen] = useState(false);
 
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
+  const fetchStudentsByParent = useStudentStore((state) => state.fetchByParent);
 
   // 同步当前校区课时预警阈值（卡片黄标依赖）
   useEffect(() => {
@@ -114,25 +116,28 @@ const Students: React.FC = () => {
       .catch((err) => logError('sync alert threshold', err));
   }, [profile?.currentContext?.campusId]);
 
-  // 加载学员列表
-  const loadStudents = useCallback(async () => {
-    if (!profile?.id) return;
-    setLoading(true);
-    try {
-      let list: Student[];
-      if (isTeacher) {
-        list = await fetchStudentsByTeacher(profile.id);
-      } else {
-        list = await studentService.getByParent(profile.id);
+  // 加载学员列表（force=true：下拉刷新 / 写后）
+  const loadStudents = useCallback(
+    async (force = false) => {
+      if (!profile?.id) return;
+      setLoading(true);
+      try {
+        let list: Student[];
+        if (isTeacher) {
+          list = await fetchStudentsByTeacher(profile.id, undefined, force);
+        } else {
+          list = await fetchStudentsByParent(profile.id, force);
+        }
+        setStudents(list);
+      } catch (err) {
+        logError('loadStudents', err);
+        Taro.showToast({ title: '加载失败', icon: 'none' });
+      } finally {
+        setLoading(false);
       }
-      setStudents(list);
-    } catch (err) {
-      logError('loadStudents', err);
-      Taro.showToast({ title: '加载失败', icon: 'none' });
-    } finally {
-      setLoading(false);
-    }
-  }, [profile, isTeacher, fetchStudentsByTeacher]);
+    },
+    [profile, isTeacher, fetchStudentsByTeacher, fetchStudentsByParent],
+  );
 
   // ====== 线索 Tab 状态 ======
   const teacherId = session?.user.id || '';
@@ -169,8 +174,9 @@ const Students: React.FC = () => {
   }, [loadStudents]);
 
   useDidShow(() => {
+    const forceStudents = consumeRefreshSignal(REFRESH_SIGNAL.students);
     if (mainTab === 'member') {
-      loadStudentsRef.current();
+      void loadStudentsRef.current(forceStudents);
     } else {
       loadLeads();
     }
@@ -179,7 +185,7 @@ const Students: React.FC = () => {
   // 下拉刷新
   usePullDownRefresh(async () => {
     if (mainTab === 'member') {
-      await loadStudents();
+      await loadStudents(true);
     } else {
       if (teacherId) {
         invalidate(teacherId);

@@ -189,11 +189,24 @@ export default defineAppConfig({
    * Guide is live in MP admin — keep enabled for real-device / review builds.
    */
   __usePrivacyCheck__: true,
-  /** 进入课表页后预下载 package-lead、package-course 分包，加速预约相关跳转 */
+  /**
+   * 分包预下载（主包 Tab 页共享 2M 额度；各分包合计约 1.9M）。
+   * 规则按入口拆分且包不重复，避免额度叠加超限。
+   */
   preloadRule: {
-    'pages/schedule/index': {
-      packages: ['package-lead', 'package-course'],
+    'pages/home/index': {
       network: 'all',
+      packages: [
+        'package-settings',
+        'package-student',
+        'package-auth',
+        'package-teacher',
+        'package-statistics',
+      ],
+    },
+    'pages/schedule/index': {
+      network: 'all',
+      packages: ['package-course', 'package-lead'],
     },
   },
   window: {

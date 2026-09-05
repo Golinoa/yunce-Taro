@@ -22,6 +22,7 @@ import {
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
+import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import type { ScheduleCardItem, ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
@@ -47,7 +48,6 @@ import { useScheduleLoaders } from './use-schedule-loaders';
 import { useScheduleOpenSlotActions } from './use-schedule-open-slot-actions';
 
 const FILTER_ALL_CLASS = '';
-const SCHEDULE_REFRESH_SIGNAL_KEY = 'yunce:schedule:refresh';
 const NEW_CATEGORY_ACTIVE_KEY = 'yunce:schedule:new_category_active_id';
 
 /**
@@ -364,10 +364,7 @@ const SchedulePage: React.FC = () => {
     let hasRefreshSignal = false;
     let newCategoryId = '';
     try {
-      hasRefreshSignal = Boolean(Taro.getStorageSync(SCHEDULE_REFRESH_SIGNAL_KEY));
-      if (hasRefreshSignal) {
-        Taro.removeStorageSync(SCHEDULE_REFRESH_SIGNAL_KEY);
-      }
+      hasRefreshSignal = consumeRefreshSignal(REFRESH_SIGNAL.schedule);
     } catch (err) {
       logError('SchedulePage read refresh signal', err);
     }

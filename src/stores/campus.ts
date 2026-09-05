@@ -25,6 +25,7 @@ import type {
   Subject,
   SubjectFormData,
 } from '@/types/campus';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 /** 机构名称本地存储键 */
@@ -58,9 +59,16 @@ interface CampusState {
   subjects: Subject[];
   loading: boolean;
   error: string | null;
+  /** 校区列表上次成功拉取时间 */
+  lastCampusesFetchAt: number;
+  /** 科目列表上次成功拉取时间 */
+  lastSubjectsFetchAt: number;
 
   // 校区操作
-  fetchCampuses: () => Promise<void>;
+  fetchCampuses: (force?: boolean) => Promise<void>;
+  /** 清空校区/科目读缓存时间戳 */
+  invalidateCache: () => void;
+  invalidateSubjectsCache: () => void;
   addCampus: (data: CampusFormData) => Promise<CampusUIModel | null>;
   updateCampus: (id: string, data: Partial<CampusFormData>) => Promise<boolean>;
   deleteCampus: (id: string) => Promise<boolean>;
@@ -95,7 +103,7 @@ interface CampusState {
   toggleNotify: (itemId: string) => Promise<void>;
 
   // 科目操作
-  fetchSubjects: () => Promise<void>;
+  fetchSubjects: (force?: boolean) => Promise<void>;
   addSubject: (data: SubjectFormData) => Promise<Subject | null>;
   deleteSubject: (id: string) => Promise<boolean>;
 
@@ -114,7 +122,7 @@ interface CampusState {
   fetchAll: () => Promise<void>;
 }
 
-export const useCampusStore = create<CampusState>((set) => ({
+export const useCampusStore = create<CampusState>((set, get) => ({
   orgName: Taro.getStorageSync(ORG_NAME_KEY) || DEFAULT_ORG_NAME,
   campuses: [],
   allowedCampusIds: [],
@@ -134,26 +142,46 @@ export const useCampusStore = create<CampusState>((set) => ({
   subjects: [],
   loading: false,
   error: null,
+  lastCampusesFetchAt: 0,
+  lastSubjectsFetchAt: 0,
 
   // ============================================
   // 校区
   // ============================================
-  fetchCampuses: async () => {
+  fetchCampuses: async (force = false) => {
+    const { campuses, lastCampusesFetchAt } = get();
+    const now = Date.now();
+    if (
+      !force &&
+      campuses.length > 0 &&
+      lastCampusesFetchAt > 0 &&
+      now - lastCampusesFetchAt < TTL.campus
+    ) {
+      return;
+    }
     set({ loading: true, error: null });
     try {
-      const campuses = await campusService.getList();
-      set({ campuses, error: null, loading: false });
+      const list = await campusService.getList();
+      set({ campuses: list, error: null, loading: false, lastCampusesFetchAt: now });
     } catch (err) {
       logError('fetchCampuses', err);
       set({ error: '校区数据加载失败', loading: false });
     }
   },
 
+  invalidateCache: () => {
+    set({ lastCampusesFetchAt: 0, lastSubjectsFetchAt: 0, campuses: [], subjects: [] });
+  },
+
+  invalidateSubjectsCache: () => {
+    set({ lastSubjectsFetchAt: 0, subjects: [] });
+  },
+
   addCampus: async (data) => {
     try {
       const campus = await campusService.add(data);
       const campuses = await campusService.getList();
-      set({ campuses, error: null });
+      set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
       return campus;
     } catch (err) {
       logError('addCampus', err);
@@ -167,7 +195,7 @@ export const useCampusStore = create<CampusState>((set) => ({
       const result = await campusService.update(id, data);
       if (result) {
         const campuses = await campusService.getList();
-        set({ campuses, error: null });
+        set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -183,7 +211,7 @@ export const useCampusStore = create<CampusState>((set) => ({
       const success = await campusService.delete(id);
       if (success) {
         const campuses = await campusService.getList();
-        set({ campuses, error: null });
+        set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -199,7 +227,7 @@ export const useCampusStore = create<CampusState>((set) => ({
       const success = await campusService.setMain(id);
       if (success) {
         const campuses = await campusService.getList();
-        set({ campuses, error: null });
+        set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -426,10 +454,20 @@ export const useCampusStore = create<CampusState>((set) => ({
   // ============================================
   // 科目
   // ============================================
-  fetchSubjects: async () => {
+  fetchSubjects: async (force = false) => {
     try {
-      const subjects = await subjectService.getList();
-      set({ subjects, error: null });
+      const { subjects, lastSubjectsFetchAt } = get();
+      const now = Date.now();
+      if (
+        !force &&
+        subjects.length > 0 &&
+        lastSubjectsFetchAt > 0 &&
+        now - lastSubjectsFetchAt < TTL.list
+      ) {
+        return;
+      }
+      const list = await subjectService.getList();
+      set({ subjects: list, error: null, lastSubjectsFetchAt: now });
     } catch (err) {
       logError('fetchSubjects', err);
       set({ error: '科目数据加载失败' });
@@ -440,7 +478,7 @@ export const useCampusStore = create<CampusState>((set) => ({
     try {
       const result = await subjectService.add(data);
       const subjects = await subjectService.getList();
-      set({ subjects, error: null });
+      set({ subjects, error: null, lastSubjectsFetchAt: Date.now() });
       return result;
     } catch (err) {
       logError('addSubject', err);
@@ -454,7 +492,7 @@ export const useCampusStore = create<CampusState>((set) => ({
       const success = await subjectService.delete(id);
       if (success) {
         const subjects = await subjectService.getList();
-        set({ subjects, error: null });
+        set({ subjects, error: null, lastSubjectsFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -478,9 +516,11 @@ export const useCampusStore = create<CampusState>((set) => ({
   // ============================================
   setCurrentCampusId: (id: string) => {
     if (!id) return;
+    let switched = false;
     set((state) => {
       const prevId = state.currentCampusId;
       if (prevId && prevId !== id) {
+        switched = true;
         Taro.setStorageSync(LAST_VISITED_CAMPUS_ID_KEY, prevId);
       }
       Taro.setStorageSync(CURRENT_CAMPUS_ID_KEY, id);
@@ -489,6 +529,11 @@ export const useCampusStore = create<CampusState>((set) => ({
         lastVisitedCampusId: prevId && prevId !== id ? prevId : state.lastVisitedCampusId,
       };
     });
+    if (switched) {
+      void import('@/utils/reset-domain-caches').then(({ resetDomainCaches }) => {
+        resetDomainCaches('campus');
+      });
+    }
   },
 
   setCurrentOrganizationId: (organizationId: string) => {

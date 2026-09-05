@@ -7,14 +7,14 @@
 
 ## 一、技术栈锁定
 
-| 项 | 规范 | 禁止 |
-|---|---|---|
-| 框架 | Taro 4.x + React 18 | 类组件、Vue |
-| 语言 | TypeScript 严格模式 | 隐式 any、@ts-ignore |
+| 项   | 规范                         | 禁止                                               |
+| ---- | ---------------------------- | -------------------------------------------------- |
+| 框架 | Taro 4.x + React 18          | 类组件、Vue                                        |
+| 语言 | TypeScript 严格模式          | 隐式 any、@ts-ignore                               |
 | 样式 | UnoCSS 原子化类名 + rpx 单位 | **禁止新增 SCSS**（遗留待迁）；内联 style、px 单位 |
-| 状态 | Zustand | Redux、MobX、组件内 useState 管理全局状态 |
-| 日期 | dayjs | moment.js、硬编码月份/年份 |
-| 类名 | classnames (cn) | 模板字符串拼接 className |
+| 状态 | Zustand                      | Redux、MobX、组件内 useState 管理全局状态          |
+| 日期 | dayjs                        | moment.js、硬编码月份/年份                         |
+| 类名 | classnames (cn)              | 模板字符串拼接 className                           |
 
 ## 二、样式铁律
 
@@ -51,13 +51,13 @@
 
 ## 六、工程化工具链
 
-| 工具 | 作用 | 触发时机 |
-|------|------|---------|
-| ESLint | 代码规则检查 | `npm run lint` / pre-commit |
-| Prettier | 代码格式化 | `npm run format` / pre-commit |
-| TypeScript | 类型检查 | `npm run typecheck` |
-| husky | Git 钩子管理 | `git commit` 时自动触发 |
-| lint-staged | 只检查暂存文件 | pre-commit 钩子调用 |
+| 工具        | 作用           | 触发时机                      |
+| ----------- | -------------- | ----------------------------- |
+| ESLint      | 代码规则检查   | `npm run lint` / pre-commit   |
+| Prettier    | 代码格式化     | `npm run format` / pre-commit |
+| TypeScript  | 类型检查       | `npm run typecheck`           |
+| husky       | Git 钩子管理   | `git commit` 时自动触发       |
+| lint-staged | 只检查暂存文件 | pre-commit 钩子调用           |
 
 ### 可用命令
 
@@ -104,18 +104,18 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 
 ### 为什么必须这样做？
 
-| 问题 | 原因 |
-|------|------|
+| 问题     | 原因                                                                                                       |
+| -------- | ---------------------------------------------------------------------------------------------------------- |
 | 网络异常 | `npm run build:weapp` 是生产模式，自动禁用 Mock（`VITE_USE_MOCK=false`），而 `BASE_URL` 为空，请求全部失败 |
-| 登录失败 | Mock 数据失效后，登录接口无法响应，导致"网络异常"错误 |
+| 登录失败 | Mock 数据失效后，登录接口无法响应，导致"网络异常"错误                                                      |
 
 ### 正确的编译方式
 
-| 命令 | 说明 |
-|------|------|
-| `$env:VITE_USE_MOCK="true"; npm run build:weapp` | 强制开启 Mock，生产模式编译（推荐） |
+| 命令                                                   | 说明                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| `$env:VITE_USE_MOCK="true"; npm run build:weapp`       | 强制开启 Mock，生产模式编译（推荐）                     |
 | `$env:VITE_USE_MOCK="true"; npm run build:weapp:clean` | 清 dist + 清 webpack 缓存后全量重编（"改了没反应"时用） |
-| `npm run dev:weapp` | 开发模式，自动开启 Mock + 热更新 |
+| `npm run dev:weapp`                                    | 开发模式，自动开启 Mock + 热更新                        |
 
 ### 禁止的做法
 
@@ -123,7 +123,16 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 - ❌ 不删除 dist 目录直接编译（可能残留旧代码）
 - ❌ "改了代码没生效"时只删 dist 不删 webpack 缓存（`node_modules/.cache/webpack/weapp`）——该缓存可能不随源码失效，会把旧代码喂进产物
 
-## 八、审查清单
+## 八、推远程 / 打标签（默认不发体验版）
+
+| 标签             | 触发                                     | 用途                                  |
+| ---------------- | ---------------------------------------- | ------------------------------------- |
+| `dev-*` / `ci-*` | `ci.yml` 质量门禁                        | **默认**：推代码、跑 CI               |
+| `v*`             | `release.yml` prod 构建 + `upload:weapp` | **仅当用户明确要求**发体验版/上传微信 |
+
+AI 代推远程或打标签时：**默认 `dev-*`，禁止擅自打 `v*` 或上传微信**。详见 `.cursor/rules/taro-tag-default-dev.mdc`。
+
+## 九、审查清单
 
 每次代码生成/修改后，AI 必须自检：
 
@@ -138,7 +147,7 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 
 ---
 
-## 九、小程序 PickerView 铁律
+## 十、小程序 PickerView 铁律
 
 所有使用微信原生 `PickerView` / `picker-view` 的滚轮选择器（日期、时间、范围、分类等）必须遵守：
 
@@ -155,7 +164,7 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 
 ---
 
-## 十、交互复用铁律（ScrollView + 多入口同一能力）
+## 十一、交互复用铁律（ScrollView + 多入口同一能力）
 
 **教训来源**：首页待办 FAB「切换视图」与工具栏 icon——工具栏正常，FAB 路径反复改 scroll 锁定仍跳顶。
 **二次教训**：待办详情/添加弹窗「关层触发滚动条」——根因是误用 `scrollTop` 受控。
@@ -171,11 +180,11 @@ $env:VITE_USE_MOCK="true"; npm run build:weapp:clean
 
 ### 固定蒙层弹窗 × ScrollView（硬性，三根因必须同时规避）
 
-| # | 根因 | 正确做法 | 禁止 |
-|---|------|----------|------|
-| 1 | `scroll-into-view` **只要还绑着**（含 `""`），任意 setData 都可能回顶 | idle 用 `scrollIntoViewProps(id)` **完全解绑**；仅定位瞬间传入 | 长期绑 `scrollIntoView={x \|\| undefined}` / 空串 |
-| 2 | 开蒙层 setState 可能让未受控列表丢位置；onScroll 缓存可能过期（ref=0→一点击回顶） | `freeze(() => open())`：先 `scrollOffset` 实测再开层；关层后 `unfreeze()` **延迟解绑** | 先 `setVisible` 再 freeze；关层 `top → top+0.01 → null` |
-| 3 | 页面级滚动 / 弹层内 Input 插入推页 | 页配置 `disableScroll: true`；Input `adjustPosition={false}`；详情可推迟挂载 Input | 为弹层改 `scrollY`；用 `+0.01` 当「保位置」 |
+| #   | 根因                                                                              | 正确做法                                                                               | 禁止                                                    |
+| --- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1   | `scroll-into-view` **只要还绑着**（含 `""`），任意 setData 都可能回顶             | idle 用 `scrollIntoViewProps(id)` **完全解绑**；仅定位瞬间传入                         | 长期绑 `scrollIntoView={x \|\| undefined}` / 空串       |
+| 2   | 开蒙层 setState 可能让未受控列表丢位置；onScroll 缓存可能过期（ref=0→一点击回顶） | `freeze(() => open())`：先 `scrollOffset` 实测再开层；关层后 `unfreeze()` **延迟解绑** | 先 `setVisible` 再 freeze；关层 `top → top+0.01 → null` |
+| 3   | 页面级滚动 / 弹层内 Input 插入推页                                                | 页配置 `disableScroll: true`；Input `adjustPosition={false}`；详情可推迟挂载 Input     | 为弹层改 `scrollY`；用 `+0.01` 当「保位置」             |
 
 **标准钩子**：`useOverlayScrollFreeze('#scroll-id')`（开层 `freeze(() => setVisible(true))`；关层 `unfreeze`；FAB 收起用 `unfreezeNow`）。
 
@@ -198,15 +207,15 @@ const handleFabViewModeToggle = useCallback(() => {
 
 ## 详细规则索引
 
-| 文件 | 内容 |
-|------|------|
-| `Agents/project-structure.md` | 项目目录结构、文件命名、导出规范、新增页面/模块流程 |
-| `Agents/api-service.md` | Service 层规范、接口定义、Mock 数据、请求工具、联调切换 |
-| `Agents/pages.md` | 页面开发规范、生命周期、路由、Tab、列表页、详情页 |
-| `Agents/components.md` | 组件开发规范、组件清单、复用规则 |
-| `Agents/styles.md` | UnoCSS 规范、Token 体系、样式迁移指南 |
-| `Agents/sheets.md` | 弹窗开发规范、BottomSheet 用法、Sheet 组件模板 |
-| `Agents/forms.md` | 表单/输入框规范、FormInput 用法、小程序 Input 陷阱 |
-| `Agents/state.md` | 状态管理规范、Zustand 用法、数据流 |
-| `Agents/types.md` | TypeScript 规范、类型定义模板 |
-| `Agents/review.md` | 代码审查 Checklist、常见问题速查 |
+| 文件                          | 内容                                                    |
+| ----------------------------- | ------------------------------------------------------- |
+| `Agents/project-structure.md` | 项目目录结构、文件命名、导出规范、新增页面/模块流程     |
+| `Agents/api-service.md`       | Service 层规范、接口定义、Mock 数据、请求工具、联调切换 |
+| `Agents/pages.md`             | 页面开发规范、生命周期、路由、Tab、列表页、详情页       |
+| `Agents/components.md`        | 组件开发规范、组件清单、复用规则                        |
+| `Agents/styles.md`            | UnoCSS 规范、Token 体系、样式迁移指南                   |
+| `Agents/sheets.md`            | 弹窗开发规范、BottomSheet 用法、Sheet 组件模板          |
+| `Agents/forms.md`             | 表单/输入框规范、FormInput 用法、小程序 Input 陷阱      |
+| `Agents/state.md`             | 状态管理规范、Zustand 用法、数据流                      |
+| `Agents/types.md`             | TypeScript 规范、类型定义模板                           |
+| `Agents/review.md`            | 代码审查 Checklist、常见问题速查                        |

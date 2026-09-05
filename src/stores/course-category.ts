@@ -15,6 +15,7 @@ import type {
   CourseCategoryFormData,
   CourseCategoryMode,
 } from '@/types/course-category';
+import { TTL } from '@/utils/data-freshness';
 
 interface CourseCategoryState {
   /** 分类列表 */
@@ -25,9 +26,11 @@ interface CourseCategoryState {
   error: string | null;
   /** 当前激活的分类 ID */
   activeCategoryId: string;
+  lastFetchAt: number;
 
   /** 获取分类列表 */
-  fetchList: () => Promise<void>;
+  fetchList: (force?: boolean) => Promise<void>;
+  invalidateCache: () => void;
   /** 设置当前激活分类 ID */
   setActiveCategoryId: (id: string) => void;
   /** 根据分类 ID 获取对应课程模式 */
@@ -45,8 +48,14 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
   loading: false,
   error: null,
   activeCategoryId: DEFAULT_COURSE_CATEGORY_CONFIGS[0]?.id ?? '',
+  lastFetchAt: 0,
 
-  fetchList: async () => {
+  fetchList: async (force = false) => {
+    const { lastFetchAt } = get();
+    const now = Date.now();
+    if (!force && lastFetchAt > 0 && now - lastFetchAt < TTL.list) {
+      return;
+    }
     set({ loading: true, error: null });
     try {
       const list = await courseCategoryService.getList();
@@ -55,13 +64,21 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
       const activeCategoryId = next.some((c) => c.id === currentId)
         ? currentId
         : (next[0]?.id ?? '');
-      set({ categories: next, activeCategoryId });
+      set({ categories: next, activeCategoryId, lastFetchAt: now });
     } catch (err) {
       // 失败时保留已有默认/缓存分类，仅记错误（课表勿因失败清空 tab）
       set({ error: err instanceof Error ? err.message : '加载分类失败' });
     } finally {
       set({ loading: false });
     }
+  },
+
+  invalidateCache: () => {
+    set({
+      lastFetchAt: 0,
+      categories: [...DEFAULT_COURSE_CATEGORY_CONFIGS],
+      activeCategoryId: DEFAULT_COURSE_CATEGORY_CONFIGS[0]?.id ?? '',
+    });
   },
 
   setActiveCategoryId: (id) => {
@@ -76,7 +93,7 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
     const created = await courseCategoryService.create(data);
     set((state) => {
       const next = [...state.categories, created].sort((a, b) => a.sortOrder - b.sortOrder);
-      return { categories: next, activeCategoryId: created.id };
+      return { categories: next, activeCategoryId: created.id, lastFetchAt: Date.now() };
     });
     return created;
   },
@@ -87,7 +104,7 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
       const next = state.categories
         .map((item) => (item.id === id ? updated : item))
         .sort((a, b) => a.sortOrder - b.sortOrder);
-      return { categories: next };
+      return { categories: next, lastFetchAt: Date.now() };
     });
     return updated;
   },
@@ -98,7 +115,7 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
       const next = state.categories.filter((item) => item.id !== id);
       const nextActiveId =
         state.activeCategoryId === id ? (next[0]?.id ?? '') : state.activeCategoryId;
-      return { categories: next, activeCategoryId: nextActiveId };
+      return { categories: next, activeCategoryId: nextActiveId, lastFetchAt: Date.now() };
     });
   },
 }));
