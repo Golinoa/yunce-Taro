@@ -2,6 +2,7 @@
  * 家长首页 service（真 API 契约）
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { homeService } from '@/services/home';
 
 const getMock = vi.fn();
 
@@ -20,12 +21,10 @@ vi.mock('@/utils/request', () => ({
 
 describe('homeService 家长端', () => {
   beforeEach(() => {
-    vi.resetModules();
     getMock.mockReset();
   });
 
-  it('getQuickEntries：家长 / 教师 / 校长分角色金刚区', async () => {
-    const { homeService } = await import('@/services/home');
+  it('getQuickEntries：家长 / 教师 / 校长分角色金刚区', () => {
     const parentEntries = homeService.getQuickEntries('parent');
     const teacherEntries = homeService.getQuickEntries('teacher');
     const managerEntries = homeService.getQuickEntries('principal');
@@ -83,7 +82,6 @@ describe('homeService 家长端', () => {
       ],
     });
 
-    const { homeService } = await import('@/services/home');
     const data = await homeService.getParent('user-parent-001');
 
     expect(getMock).toHaveBeenCalledWith('/home/parent');
@@ -101,14 +99,12 @@ describe('homeService 家长端', () => {
       packages: [],
       unreadCount: 0,
     });
-    const { homeService } = await import('@/services/home');
     await homeService.getParent('user-parent-001', 'campus-east');
     expect(getMock).toHaveBeenCalledWith('/home/parent?campusId=campus-east');
   });
 
   it('getParent：接口失败返回 null 而非抛错', async () => {
     getMock.mockRejectedValueOnce(new Error('network'));
-    const { homeService } = await import('@/services/home');
     const data = await homeService.getParent('user-parent-not-exists');
     expect(data).toBeNull();
   });
