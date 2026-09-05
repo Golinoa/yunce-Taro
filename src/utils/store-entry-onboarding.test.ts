@@ -153,6 +153,32 @@ describe('store-entry-onboarding', () => {
     ).toBe(true);
   });
 
+  it('shouldRedirectToStoreEntryPending：已有机构上下文（种子校长/演示）即使 PENDING 也不踢回', () => {
+    expect(
+      shouldRedirectToStoreEntryPending({
+        profile: managerWithOrg(),
+        latest: { application: { id: 'a1', status: 'PENDING' } },
+      }),
+    ).toBe(false);
+  });
+
+  it('resolveStoreEntryFunnelDestination：PENDING 但已有 org → home', () => {
+    expect(
+      resolveStoreEntryFunnelDestination({
+        profile: managerWithOrg(),
+        latest: { application: { id: 'a1', status: 'PENDING' } },
+      }),
+    ).toBe('home');
+  });
+
+  it('latest 缓存按账号隔离，避免跨账号串 PENDING', () => {
+    writeStoreEntryLatestCache({ application: { id: 'other', status: 'PENDING' } }, 'profile-a');
+    writeStoreEntryLatestCache(null, 'profile-b');
+    expect(readStoreEntryLatestCache('profile-a')?.application?.id).toBe('other');
+    expect(readStoreEntryLatestCache('profile-b')).toBeNull();
+    expect(readStoreEntryLatestCache('profile-c')).toBeUndefined();
+  });
+
   it('hasOwnOrganizationContext 识别 UUID', () => {
     expect(hasOwnOrganizationContext(managerWithOrg())).toBe(true);
     expect(hasOwnOrganizationContext(managerNoOrg())).toBe(false);

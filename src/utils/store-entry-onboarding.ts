@@ -1,7 +1,8 @@
 /**
- * 门店入驻漏斗：queryLatest 真源、409 幂等、latest 轻量缓存（TTL 60s）
+ * 门店入驻漏斗：queryLatest 真源、409 幂等、latest 轻量缓存（按账号隔离，TTL 60s）
  *
  * 产品：已申请未批 → pending 中间页；禁止仅用 JWT/demo organizationId 判断。
+ * 例外：已有可用机构上下文（含「先体验演示门店」）时允许进首页，勿再踢回 pending。
  */
 import Taro from '@tarojs/taro';
 import { storeEntryService } from '@/services/store-entry';
@@ -34,10 +35,43 @@ export type StoreEntrySubmitErrorAction =
   | { kind: 'redirect_pending'; message: string }
   | { kind: 'toast'; message: string };
 
-type LatestCachePayload = {
+type LatestCacheEntry = {
   cachedAt: number;
   result: StoreEntryLatestResult | null;
 };
+
+/** 单 key 多账号：避免全局串缓存，也便于一次清空 */
+type LatestCacheStore = Record<string, LatestCacheEntry>;
+
+const UNSCOPED = '__unscoped__';
+
+function readCacheStore(): LatestCacheStore {
+  try {
+    const raw = Taro.getStorageSync(LATEST_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as LatestCacheStore | LatestCacheEntry;
+    // 兼容旧格式 { cachedAt, result }
+    if (parsed && typeof parsed === 'object' && 'cachedAt' in parsed && 'result' in parsed) {
+      return { [UNSCOPED]: parsed as LatestCacheEntry };
+    }
+    return (parsed as LatestCacheStore) || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCacheStore(store: LatestCacheStore): void {
+  try {
+    Taro.setStorageSync(LATEST_CACHE_KEY, JSON.stringify(store));
+  } catch {
+    /* ignore */
+  }
+}
+
+function scopeKey(scopeId?: string | null): string {
+  const id = String(scopeId || '').trim();
+  return id || UNSCOPED;
+}
 
 export function isStoreEntryManagerRole(profile: Profile | null | undefined): boolean {
   const role = profile?.currentContext?.role;
@@ -72,16 +106,17 @@ export function resolveStoreEntryFunnelDestination(input: {
     return 'identity-select';
   }
 
-  if (isStoreEntryPending(status)) {
-    return 'pending';
+  // 已有机构上下文（含演示门店）：进首页，避免与「先体验演示」打架被踢回 pending
+  if (hasOwnOrganizationContext(profile)) {
+    return 'home';
   }
 
-  if (isStoreEntryRejected(status)) {
+  if (isStoreEntryPending(status) || isStoreEntryRejected(status)) {
     return 'pending';
   }
 
   if (isStoreEntryApproved(status)) {
-    return hasOwnOrganizationContext(profile) ? 'home' : 'pending';
+    return 'pending';
   }
 
   return 'identity-select';
@@ -122,31 +157,48 @@ export function resolveStoreEntrySubmitError(err: unknown): StoreEntrySubmitErro
   return { kind: 'toast', message: '提交失败，请稍后重试' };
 }
 
-export function readStoreEntryLatestCache(): StoreEntryLatestResult | null | undefined {
+export function readStoreEntryLatestCache(
+  scopeId?: string | null,
+): StoreEntryLatestResult | null | undefined {
   try {
-    const raw = Taro.getStorageSync(LATEST_CACHE_KEY);
-    if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as LatestCachePayload;
-    if (!parsed || typeof parsed.cachedAt !== 'number') return undefined;
-    if (Date.now() - parsed.cachedAt > LATEST_CACHE_TTL_MS) return undefined;
-    return parsed.result ?? null;
+    const store = readCacheStore();
+    const entry = store[scopeKey(scopeId)];
+    if (!entry || typeof entry.cachedAt !== 'number') return undefined;
+    if (Date.now() - entry.cachedAt > LATEST_CACHE_TTL_MS) return undefined;
+    return entry.result ?? null;
   } catch {
     return undefined;
   }
 }
 
-export function writeStoreEntryLatestCache(result: StoreEntryLatestResult | null): void {
+export function writeStoreEntryLatestCache(
+  result: StoreEntryLatestResult | null,
+  scopeId?: string | null,
+): void {
   try {
-    const payload: LatestCachePayload = { cachedAt: Date.now(), result };
-    Taro.setStorageSync(LATEST_CACHE_KEY, JSON.stringify(payload));
+    const store = readCacheStore();
+    store[scopeKey(scopeId)] = { cachedAt: Date.now(), result };
+    writeCacheStore(store);
   } catch {
     /* ignore */
   }
 }
 
-export function invalidateStoreEntryLatestCache(): void {
+/** 清除入驻 latest 缓存；传 scopeId 只清该账号，否则全清（含旧格式） */
+export function invalidateStoreEntryLatestCache(scopeId?: string | null): void {
   try {
-    Taro.removeStorageSync(LATEST_CACHE_KEY);
+    if (!scopeId) {
+      Taro.removeStorageSync(LATEST_CACHE_KEY);
+      return;
+    }
+    const store = readCacheStore();
+    delete store[scopeKey(scopeId)];
+    delete store[UNSCOPED];
+    if (Object.keys(store).length === 0) {
+      Taro.removeStorageSync(LATEST_CACHE_KEY);
+    } else {
+      writeCacheStore(store);
+    }
   } catch {
     /* ignore */
   }
@@ -168,26 +220,32 @@ export function shouldRedirectToStoreEntryPending(input: {
   profile: Profile | null | undefined;
   latest: StoreEntryLatestResult | null;
 }): boolean {
-  const status = getLatestApplicationStatus(input.latest);
   if (!input.profile || !isStoreEntryManagerRole(input.profile)) {
     return false;
   }
+  // 已有机构（种子校长 / 演示门店 / 已批自有店）：禁止再踢回 pending，否则首页会秒退
+  if (hasOwnOrganizationContext(input.profile)) {
+    return false;
+  }
+  const status = getLatestApplicationStatus(input.latest);
   if (isStoreEntryPending(status) || isStoreEntryRejected(status)) {
     return true;
   }
-  if (isStoreEntryApproved(status) && !hasOwnOrganizationContext(input.profile)) {
+  if (isStoreEntryApproved(status)) {
     return true;
   }
   return false;
 }
 
-export async function fetchStoreEntryLatestCached(): Promise<StoreEntryLatestResult | null> {
-  const cached = readStoreEntryLatestCache();
+export async function fetchStoreEntryLatestCached(
+  scopeId?: string | null,
+): Promise<StoreEntryLatestResult | null> {
+  const cached = readStoreEntryLatestCache(scopeId);
   if (cached !== undefined) {
     return cached;
   }
   const result = await storeEntryService.queryLatestSafe();
-  writeStoreEntryLatestCache(result);
+  writeStoreEntryLatestCache(result, scopeId);
   return result;
 }
 
@@ -199,7 +257,7 @@ export async function maybeRedirectStoreEntryPendingHub(
     return false;
   }
   try {
-    const latest = await fetchStoreEntryLatestCached();
+    const latest = await fetchStoreEntryLatestCached(profile.id);
     if (!shouldRedirectToStoreEntryPending({ profile, latest })) {
       return false;
     }
