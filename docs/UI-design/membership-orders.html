@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>订单详情</title>
+    <style>
+      :root {
+        --primary: 221 83% 58%;
+        --primary-glow: 217 91% 65%;
+        --primary-dark: 224 76% 48%;
+        --bg: 210 40% 98%;
+        --fg: 222 47% 11%;
+        --muted: 215 16% 47%;
+        --border: 214 32% 91%;
+        --success: 142 71% 45%;
+        --danger: 0 72% 51%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        background: #dbe7f8;
+        color: hsl(var(--fg));
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 28px 16px 48px;
+      }
+      .phone {
+        width: 390px;
+        min-height: 820px;
+        background: hsl(var(--bg));
+        border-radius: 28px;
+        border: 1px solid rgba(59, 110, 245, 0.12);
+        box-shadow: 0 18px 50px rgba(37, 99, 235, 0.16);
+        overflow: hidden;
+      }
+      .nav {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        font-weight: 700;
+        font-size: 16px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.12), hsl(var(--bg)));
+      }
+      .nav .back {
+        position: absolute;
+        left: 14px;
+        color: hsl(var(--primary));
+        font-size: 20px;
+        line-height: 1;
+        font-weight: 500;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        padding: 4px 8px;
+        font-family: inherit;
+      }
+      .scroll {
+        padding: 12px 16px 28px;
+        max-height: 760px;
+        overflow: auto;
+      }
+      .view {
+        display: none;
+      }
+      .view.on {
+        display: block;
+      }
+      .order-card {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.06);
+      }
+      .order-card:active {
+        opacity: 0.92;
+      }
+      .order-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .sku {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .meta {
+        margin-top: 6px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.45;
+      }
+      .badge {
+        flex-shrink: 0;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+      .badge.ok {
+        background: hsl(var(--success) / 0.12);
+        color: hsl(142 71% 32%);
+      }
+      .badge.off {
+        background: hsl(var(--border));
+        color: hsl(var(--muted));
+      }
+      .badge.ref {
+        background: hsl(var(--danger) / 0.1);
+        color: hsl(var(--danger));
+      }
+      .badge.pay {
+        background: hsl(32 95% 44% / 0.14);
+        color: hsl(32 95% 44%);
+      }
+      .order-card.urgent {
+        border-color: hsl(32 95% 44% / 0.45);
+        background: linear-gradient(180deg, hsl(32 100% 98%), #fff 42%);
+      }
+      .countdown-inline {
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: hsl(32 95% 44%);
+        font-variant-numeric: tabular-nums;
+      }
+      .countdown-inline em {
+        font-style: normal;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+        letter-spacing: 0.04em;
+      }
+      .order-bot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid hsl(var(--border));
+      }
+      .price {
+        font-size: 20px;
+        font-weight: 800;
+        color: hsl(var(--primary-dark));
+      }
+      .price small {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .btn-mini {
+        border: 0;
+        background: hsl(var(--primary));
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 7px 14px;
+        border-radius: 999px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .chev {
+        font-size: 18px;
+        color: hsl(var(--muted));
+        font-weight: 300;
+      }
+      .detail-head {
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 20px 16px;
+        text-align: center;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.06);
+      }
+      .detail-head .sku {
+        margin-top: 10px;
+        font-size: 17px;
+      }
+      .detail-head .price {
+        margin-top: 8px;
+        font-size: 28px;
+      }
+      .panel {
+        margin-top: 12px;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 4px 16px;
+      }
+      .panel-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: hsl(var(--muted));
+        padding: 12px 0 4px;
+      }
+      .kv {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+        padding: 11px 0;
+        border-bottom: 1px solid hsl(var(--border));
+      }
+      .kv:last-child {
+        border-bottom: 0;
+      }
+      .kv .k {
+        color: hsl(var(--muted));
+        flex-shrink: 0;
+      }
+      .kv .v {
+        text-align: right;
+        font-weight: 600;
+        word-break: break-all;
+      }
+      .period {
+        margin-top: 12px;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .period .box {
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+        color: hsl(var(--muted));
+      }
+      .period .box b {
+        display: block;
+        margin-top: 4px;
+        font-size: 14px;
+        color: hsl(var(--fg));
+      }
+      .period .mid {
+        font-size: 16px;
+        color: hsl(var(--primary));
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone">
+      <div class="nav">
+        <button type="button" class="back" id="navBack" aria-label="返回">‹</button>
+        <span id="navTitle">订单详情</span>
+      </div>
+
+      <div class="scroll view on" id="viewList">
+        <a class="order-card urgent" href="#detail-pay" data-open-detail="pay">
+          <div class="order-top">
+            <div>
+              <div class="sku">成长版 · 3 年</div>
+              <div class="meta">今天 01:48</div>
+              <div class="countdown-inline"><em id="listCd">01:59:02</em> 后关闭</div>
+            </div>
+            <span class="badge pay">待付款</span>
+          </div>
+          <div class="order-bot">
+            <div class="price"><small>¥</small>999.00</div>
+            <button type="button" class="btn-mini" data-pay>继续支付</button>
+          </div>
+        </a>
+
+        <a class="order-card" href="#detail" data-open-detail>
+          <div class="order-top">
+            <div>
+              <div class="sku">成长版 · 3 年</div>
+              <div class="meta">2026-09-05 21:18</div>
+            </div>
+            <span class="badge ok">已开通</span>
+          </div>
+          <div class="order-bot">
+            <div class="price"><small>¥</small>999.00</div>
+            <div class="chev">›</div>
+          </div>
+        </a>
+
+        <a class="order-card" href="#detail" data-open-detail>
+          <div class="order-top">
+            <div>
+              <div class="sku">基础版 · 2 年</div>
+              <div class="meta">2024-09-05 10:04</div>
+            </div>
+            <span class="badge ok">已开通</span>
+          </div>
+          <div class="order-bot">
+            <div class="price"><small>¥</small>356.00</div>
+            <div class="chev">›</div>
+          </div>
+        </a>
+
+        <a class="order-card" href="#detail" data-open-detail>
+          <div class="order-top">
+            <div>
+              <div class="sku">成长版 · 3 年</div>
+              <div class="meta">2026-08-20 14:22</div>
+            </div>
+            <span class="badge off">已关闭</span>
+          </div>
+          <div class="order-bot">
+            <div class="price"><small>¥</small>999.00</div>
+            <div class="chev">›</div>
+          </div>
+        </a>
+      </div>
+
+      <div class="scroll view" id="viewDetail">
+        <div class="detail-head">
+          <span class="badge ok">已开通</span>
+          <div class="sku">成长版 · 3 年</div>
+          <div class="price"><small>¥</small>999.00</div>
+        </div>
+
+        <div class="period">
+          <div class="box">支付前有效期<b>至 2026-09-05</b></div>
+          <div class="mid">→</div>
+          <div class="box">履约后有效期<b>至 2029-09-05</b></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">订单信息</div>
+          <div class="kv"><span class="k">商户单号</span><span class="v">T1725548123A3F901</span></div>
+          <div class="kv"><span class="k">微信单号</span><span class="v">42000029876543218891</span></div>
+          <div class="kv"><span class="k">套餐编码</span><span class="v">STANDARD_3Y</span></div>
+          <div class="kv"><span class="k">支付方式</span><span class="v">微信支付</span></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">时间</div>
+          <div class="kv"><span class="k">创建时间</span><span class="v">2026-09-05 21:18:02</span></div>
+          <div class="kv"><span class="k">支付时间</span><span class="v">2026-09-05 21:18:41</span></div>
+          <div class="kv"><span class="k">开通时间</span><span class="v">2026-09-05 21:18:42</span></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const from = params.get('from');
+      const backHref =
+        from === 'pricing' ? './membership-pricing.html' : './membership-active.html';
+
+      const viewList = document.getElementById('viewList');
+      const viewDetail = document.getElementById('viewDetail');
+      const navTitle = document.getElementById('navTitle');
+      const navBack = document.getElementById('navBack');
+
+      function show(hash) {
+        const detail = hash === '#detail';
+        viewList.classList.toggle('on', !detail);
+        viewDetail.classList.toggle('on', detail);
+        navTitle.textContent = '订单详情';
+        if (location.hash !== hash) {
+          history.replaceState(null, '', hash || '#list');
+        }
+      }
+
+      navBack.onclick = () => {
+        if (location.hash === '#detail') {
+          location.hash = 'list';
+          show('#list');
+          return;
+        }
+        location.href = backHref;
+      };
+
+      document.querySelectorAll('[data-open-detail]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          if (e.target.closest('[data-pay]')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          e.preventDefault();
+          location.hash = 'detail';
+          show('#detail');
+        });
+      });
+
+      window.addEventListener('hashchange', () => {
+        show(location.hash === '#detail' ? '#detail' : '#list');
+      });
+      show(location.hash === '#detail' ? '#detail' : '#list');
+
+      let left = 7142;
+      const listCd = document.getElementById('listCd');
+      setInterval(() => {
+        if (!listCd || left <= 0) return;
+        left -= 1;
+        const h = String(Math.floor(left / 3600)).padStart(2, '0');
+        const m = String(Math.floor((left % 3600) / 60)).padStart(2, '0');
+        const s = String(left % 60).padStart(2, '0');
+        listCd.textContent = `${h}:${m}:${s}`;
+      }, 1000);
+    </script>
+  </body>
+</html>

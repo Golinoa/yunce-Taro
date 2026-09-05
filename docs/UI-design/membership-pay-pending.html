@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>待付款 · 倒计时与下单限制（设计稿）</title>
+    <style>
+      :root {
+        --primary: 221 83% 58%;
+        --primary-glow: 217 91% 65%;
+        --primary-dark: 224 76% 48%;
+        --bg: 210 40% 98%;
+        --fg: 222 47% 11%;
+        --muted: 215 16% 47%;
+        --border: 214 32% 91%;
+        --success: 142 71% 45%;
+        --warn: 32 95% 44%;
+        --danger: 0 72% 51%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        background: #c9d9f2;
+        color: hsl(var(--fg));
+        min-height: 100vh;
+        padding: 28px 16px 56px;
+      }
+      .page-title {
+        max-width: 1280px;
+        margin: 0 auto 8px;
+        font-size: 22px;
+        font-weight: 800;
+      }
+      .page-sub {
+        max-width: 1280px;
+        margin: 0 auto 24px;
+        font-size: 13px;
+        color: hsl(var(--muted));
+        line-height: 1.55;
+      }
+      .board {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        justify-content: center;
+      }
+      .frame {
+        width: 390px;
+      }
+      .frame-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: hsl(var(--primary-dark));
+        margin-bottom: 8px;
+        letter-spacing: 0.02em;
+      }
+      .phone {
+        width: 390px;
+        min-height: 780px;
+        background: hsl(var(--bg));
+        border-radius: 28px;
+        border: 1px solid rgba(59, 110, 245, 0.12);
+        box-shadow: 0 18px 50px rgba(37, 99, 235, 0.16);
+        overflow: hidden;
+        position: relative;
+      }
+      .nav {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        font-weight: 700;
+        font-size: 16px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.12), hsl(var(--bg)));
+      }
+      .nav .back {
+        position: absolute;
+        left: 14px;
+        color: hsl(var(--primary));
+        font-size: 20px;
+        line-height: 1;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        padding: 4px 8px;
+        font-family: inherit;
+      }
+      .nav-orders {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 600;
+        color: hsl(var(--primary));
+        text-decoration: none;
+        letter-spacing: 0.02em;
+      }
+      .scroll {
+        padding: 12px 16px 28px;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+      .badge.pay {
+        background: hsl(var(--warn) / 0.14);
+        color: hsl(var(--warn));
+      }
+      .badge.ok {
+        background: hsl(var(--success) / 0.12);
+        color: hsl(142 71% 32%);
+      }
+      .badge.off {
+        background: hsl(var(--border));
+        color: hsl(var(--muted));
+      }
+      .order-card {
+        display: block;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.06);
+      }
+      .order-card.urgent {
+        border-color: hsl(var(--warn) / 0.45);
+        background: linear-gradient(180deg, hsl(32 100% 98%), #fff 42%);
+      }
+      .order-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .sku {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .meta {
+        margin-top: 6px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.45;
+      }
+      .countdown-inline {
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: hsl(var(--warn));
+        font-variant-numeric: tabular-nums;
+      }
+      .countdown-inline em {
+        font-style: normal;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+        letter-spacing: 0.04em;
+      }
+      .order-bot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid hsl(var(--border));
+      }
+      .price {
+        font-size: 20px;
+        font-weight: 800;
+        color: hsl(var(--primary-dark));
+      }
+      .price small {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .btn-mini {
+        border: 0;
+        background: hsl(var(--primary));
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 7px 14px;
+        border-radius: 999px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .detail-head {
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 22px 16px 18px;
+        text-align: center;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.06);
+      }
+      .detail-head.urgent {
+        border-color: hsl(var(--warn) / 0.4);
+        background: linear-gradient(180deg, hsl(32 100% 97.5%), #fff 55%);
+      }
+      .detail-head .sku {
+        margin-top: 10px;
+        font-size: 17px;
+      }
+      .detail-head .price {
+        margin-top: 8px;
+        font-size: 28px;
+      }
+      .timer-block {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px dashed hsl(var(--border));
+      }
+      .timer-label {
+        font-size: 12px;
+        color: hsl(var(--muted));
+        font-weight: 600;
+      }
+      .timer-digits {
+        margin-top: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        font-variant-numeric: tabular-nums;
+      }
+      .timer-digits .unit {
+        min-width: 44px;
+        padding: 8px 0;
+        border-radius: 10px;
+        background: hsl(var(--fg));
+        color: #fff;
+        font-size: 20px;
+        font-weight: 800;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+        letter-spacing: 0.06em;
+      }
+      .timer-digits .sep {
+        font-size: 18px;
+        font-weight: 800;
+        color: hsl(var(--fg));
+        padding-bottom: 2px;
+      }
+      .timer-hint {
+        margin-top: 10px;
+        font-size: 12px;
+        color: hsl(var(--warn));
+        font-weight: 600;
+      }
+      .panel {
+        margin-top: 12px;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 4px 16px;
+      }
+      .panel-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: hsl(var(--muted));
+        padding: 12px 0 4px;
+      }
+      .kv {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+        padding: 11px 0;
+        border-bottom: 1px solid hsl(var(--border));
+      }
+      .kv:last-child {
+        border-bottom: 0;
+      }
+      .kv .k {
+        color: hsl(var(--muted));
+        flex-shrink: 0;
+      }
+      .kv .v {
+        text-align: right;
+        font-weight: 600;
+        word-break: break-all;
+      }
+      .dock {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 12px 16px 22px;
+        background: linear-gradient(180deg, transparent, hsl(var(--bg)) 28%);
+        display: flex;
+        gap: 10px;
+      }
+      .dock .ghost,
+      .dock .primary {
+        flex: 1;
+        height: 46px;
+        border-radius: 14px;
+        font-size: 15px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .dock .ghost {
+        border: 1px solid hsl(var(--border));
+        background: #fff;
+        color: hsl(var(--muted));
+      }
+      .dock .primary {
+        border: 0;
+        background: linear-gradient(135deg, hsl(var(--primary-glow)), hsl(var(--primary)));
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+      }
+      .scroll.with-dock {
+        padding-bottom: 96px;
+      }
+
+      /* pricing with pending strip */
+      .hero-mini {
+        margin-top: 8px;
+        border-radius: 18px;
+        padding: 16px;
+        background: linear-gradient(
+          135deg,
+          hsl(var(--primary-glow)),
+          hsl(var(--primary)) 48%,
+          hsl(var(--primary-dark))
+        );
+        color: #fff;
+      }
+      .hero-mini .brand {
+        font-size: 20px;
+        font-weight: 900;
+        font-style: italic;
+      }
+      .hero-mini .sub {
+        margin-top: 4px;
+        font-size: 12px;
+        opacity: 0.88;
+      }
+      .pending-strip {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: hsl(32 100% 96%);
+        border: 1px solid hsl(var(--warn) / 0.35);
+      }
+      .pending-strip .t1 {
+        font-size: 13px;
+        font-weight: 700;
+        color: hsl(var(--fg));
+      }
+      .pending-strip .t2 {
+        margin-top: 3px;
+        font-size: 12px;
+        color: hsl(var(--warn));
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .pending-strip .t2 em {
+        font-style: normal;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+      }
+      .pending-strip .go {
+        flex-shrink: 0;
+        border: 0;
+        background: hsl(var(--warn));
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .sku-row {
+        margin-top: 14px;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .sku-row .name {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .sku-row .desc {
+        margin-top: 4px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+      }
+      .buy-bar {
+        margin-top: 18px;
+        height: 48px;
+        border: 0;
+        width: 100%;
+        border-radius: 14px;
+        background: hsl(var(--primary));
+        color: #fff;
+        font-weight: 700;
+        font-size: 15px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+
+      /* overlays */
+      .mask {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.42);
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        z-index: 5;
+      }
+      .mask.center {
+        align-items: center;
+        padding: 24px;
+      }
+      .sheet {
+        width: 100%;
+        background: #fff;
+        border-radius: 20px 20px 0 0;
+        padding: 20px 18px 28px;
+      }
+      .sheet .h {
+        font-size: 17px;
+        font-weight: 800;
+        text-align: center;
+      }
+      .sheet .p {
+        margin-top: 8px;
+        font-size: 13px;
+        color: hsl(var(--muted));
+        text-align: center;
+        line-height: 1.5;
+      }
+      .sheet .clock {
+        margin: 16px 0 4px;
+        text-align: center;
+        font-size: 28px;
+        font-weight: 800;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+        color: hsl(var(--warn));
+        letter-spacing: 0.04em;
+      }
+      .sheet .actions {
+        margin-top: 18px;
+        display: flex;
+        gap: 10px;
+      }
+      .sheet .actions button {
+        flex: 1;
+        height: 44px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .sheet .actions .sec {
+        border: 1px solid hsl(var(--border));
+        background: #fff;
+        color: hsl(var(--muted));
+      }
+      .sheet .actions .pri {
+        border: 0;
+        background: hsl(var(--primary));
+        color: #fff;
+      }
+      .modal {
+        width: 100%;
+        max-width: 300px;
+        background: #fff;
+        border-radius: 16px;
+        padding: 22px 18px 16px;
+        text-align: center;
+      }
+      .modal .h {
+        font-size: 16px;
+        font-weight: 800;
+      }
+      .modal .p {
+        margin-top: 8px;
+        font-size: 13px;
+        color: hsl(var(--muted));
+        line-height: 1.5;
+      }
+      .modal .actions {
+        margin-top: 16px;
+        display: flex;
+        gap: 8px;
+      }
+      .modal .actions button {
+        flex: 1;
+        height: 40px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 13px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .modal .actions .sec {
+        border: 1px solid hsl(var(--border));
+        background: #fff;
+        color: hsl(var(--muted));
+      }
+      .modal .actions .pri {
+        border: 0;
+        background: hsl(var(--primary));
+        color: #fff;
+      }
+      .toast {
+        position: absolute;
+        left: 50%;
+        top: 42%;
+        transform: translate(-50%, -50%);
+        z-index: 6;
+        background: rgba(15, 23, 42, 0.82);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 12px 18px;
+        border-radius: 10px;
+        max-width: 240px;
+        text-align: center;
+        line-height: 1.45;
+      }
+      .rules {
+        max-width: 1280px;
+        margin: 36px auto 0;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(59, 110, 245, 0.14);
+        border-radius: 16px;
+        padding: 18px 20px;
+      }
+      .rules h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+      }
+      .rules ul {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 13px;
+        color: hsl(222 20% 28%);
+        line-height: 1.7;
+      }
+      .rules code {
+        font-size: 12px;
+        background: hsl(210 40% 96%);
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="page-title">待付款倒计时 · 关单 2 小时 · 防刷下单</h1>
+    <p class="page-sub">
+      纯设计稿，未接业务。倒计时制造紧迫感；关单窗口拉长到 2 小时；同一人短时间不可刷出大量重复待付单，真实用户走「续付同一笔」而不是被硬拦。
+    </p>
+
+    <div class="board">
+      <!-- 1 取消支付后 -->
+      <div class="frame">
+        <div class="frame-label">① 关掉微信支付后 · 底部提示</div>
+        <div class="phone">
+          <div class="nav">
+            <span>会员权益</span>
+            <a class="nav-orders" href="./membership-orders.html?from=pricing#list">订单详情</a>
+          </div>
+          <div class="scroll">
+            <div class="hero-mini">
+              <div class="brand">V 会员卡</div>
+              <div class="sub">支付未完成，订单仍保留</div>
+            </div>
+            <div class="sku-row">
+              <div class="name">成长版 · 3 年</div>
+              <div class="desc">¥999.00 · 支付成功后立即生效</div>
+              <button type="button" class="buy-bar">去支付</button>
+            </div>
+          </div>
+          <div class="mask">
+            <div class="sheet">
+              <div class="h">订单待付款</div>
+              <div class="p">已为你保留订单，请在有效期内完成支付</div>
+              <div class="clock" data-cd="7142">01:59:02</div>
+              <div class="p" style="margin-top: 0">后自动关闭</div>
+              <div class="actions">
+                <button type="button" class="sec">稍后再说</button>
+                <button type="button" class="pri">继续支付</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 选购页待付条 -->
+      <div class="frame">
+        <div class="frame-label">② 选购页 · 待付条（常驻决策入口）</div>
+        <div class="phone">
+          <div class="nav">
+            <span>会员权益</span>
+            <a class="nav-orders" href="./membership-orders.html?from=pricing#list">订单详情</a>
+          </div>
+          <div class="scroll">
+            <div class="hero-mini">
+              <div class="brand">V 会员卡</div>
+              <div class="sub">成长版 · 权益管理</div>
+            </div>
+            <div class="pending-strip">
+              <div>
+                <div class="t1">有一笔待付款 · 成长版 3 年</div>
+                <div class="t2"><em data-cd="7142">01:59:02</em> 后关闭</div>
+              </div>
+              <button type="button" class="go">去支付</button>
+            </div>
+            <div class="sku-row">
+              <div class="name">成长版 · 3 年</div>
+              <div class="desc">¥999.00</div>
+              <button type="button" class="buy-bar">去支付</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 订单列表 -->
+      <div class="frame">
+        <div class="frame-label">③ 订单详情列表 · 待付置顶 + 倒计时</div>
+        <div class="phone">
+          <div class="nav">
+            <button type="button" class="back" aria-label="返回">‹</button>
+            <span>订单详情</span>
+          </div>
+          <div class="scroll">
+            <div class="order-card urgent">
+              <div class="order-top">
+                <div>
+                  <div class="sku">成长版 · 3 年</div>
+                  <div class="meta">今天 01:48</div>
+                  <div class="countdown-inline"><em data-cd="7142">01:59:02</em> 后关闭</div>
+                </div>
+                <span class="badge pay">待付款</span>
+              </div>
+              <div class="order-bot">
+                <div class="price"><small>¥</small>999.00</div>
+                <button type="button" class="btn-mini">继续支付</button>
+              </div>
+            </div>
+            <div class="order-card">
+              <div class="order-top">
+                <div>
+                  <div class="sku">基础版 · 2 年</div>
+                  <div class="meta">2024-09-05 10:04</div>
+                </div>
+                <span class="badge ok">已开通</span>
+              </div>
+              <div class="order-bot">
+                <div class="price"><small>¥</small>356.00</div>
+                <span style="color: hsl(var(--muted)); font-size: 18px">›</span>
+              </div>
+            </div>
+            <div class="order-card">
+              <div class="order-top">
+                <div>
+                  <div class="sku">成长版 · 3 年</div>
+                  <div class="meta">2026-08-20 14:22</div>
+                </div>
+                <span class="badge off">已关闭</span>
+              </div>
+              <div class="order-bot">
+                <div class="price"><small>¥</small>999.00</div>
+                <span style="color: hsl(var(--muted)); font-size: 18px">›</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 订单详情待付 -->
+      <div class="frame">
+        <div class="frame-label">④ 待付详情 · 大倒计时 + 继续支付</div>
+        <div class="phone">
+          <div class="nav">
+            <button type="button" class="back" aria-label="返回">‹</button>
+            <span>订单详情</span>
+          </div>
+          <div class="scroll with-dock">
+            <div class="detail-head urgent">
+              <span class="badge pay">待付款</span>
+              <div class="sku">成长版 · 3 年</div>
+              <div class="price"><small>¥</small>999.00</div>
+              <div class="timer-block">
+                <div class="timer-label">支付剩余时间</div>
+                <div class="timer-digits" data-cd-parts="7142">
+                  <span class="unit">01</span><span class="sep">:</span><span class="unit">59</span
+                  ><span class="sep">:</span><span class="unit">02</span>
+                </div>
+                <div class="timer-hint">超时将自动关闭，需重新下单</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">订单信息</div>
+              <div class="kv"><span class="k">商户单号</span><span class="v">T1725548123A3F901</span></div>
+              <div class="kv"><span class="k">套餐编码</span><span class="v">STANDARD_3Y</span></div>
+              <div class="kv"><span class="k">支付方式</span><span class="v">微信支付</span></div>
+              <div class="kv"><span class="k">关闭时间</span><span class="v">今天 03:48</span></div>
+            </div>
+          </div>
+          <div class="dock">
+            <button type="button" class="ghost">关闭订单</button>
+            <button type="button" class="primary">继续支付</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 重复下单拦截 -->
+      <div class="frame">
+        <div class="frame-label">⑤ 再点「去支付」· 引导续付（不新建单）</div>
+        <div class="phone">
+          <div class="nav">
+            <span>会员权益</span>
+            <a class="nav-orders" href="./membership-orders.html?from=pricing#list">订单详情</a>
+          </div>
+          <div class="scroll">
+            <div class="hero-mini">
+              <div class="brand">V 会员卡</div>
+              <div class="sub">成长版</div>
+            </div>
+            <div class="sku-row">
+              <div class="name">成长版 · 3 年</div>
+              <div class="desc">¥999.00</div>
+              <button type="button" class="buy-bar">去支付</button>
+            </div>
+          </div>
+          <div class="mask center">
+            <div class="modal">
+              <div class="h">你有一笔待付款订单</div>
+              <div class="p">
+                成长版 · 3 年 · ¥999<br />
+                剩余 <strong data-cd="7142">01:59:02</strong>，请先完成支付
+              </div>
+              <div class="actions">
+                <button type="button" class="sec">查看订单</button>
+                <button type="button" class="pri">继续支付</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 频率限制 -->
+      <div class="frame">
+        <div class="frame-label">⑥ 异常刷单 · 软限流文案</div>
+        <div class="phone">
+          <div class="nav">
+            <span>会员权益</span>
+            <a class="nav-orders" href="./membership-orders.html?from=pricing#list">订单详情</a>
+          </div>
+          <div class="scroll">
+            <div class="hero-mini">
+              <div class="brand">V 会员卡</div>
+              <div class="sub">选购套餐</div>
+            </div>
+            <div class="sku-row">
+              <div class="name">基础版 · 2 年</div>
+              <div class="desc">¥356.00</div>
+              <button type="button" class="buy-bar">去支付</button>
+            </div>
+          </div>
+          <div class="toast">下单过于频繁，请稍后再试</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rules">
+      <h2>设计约定（供评审，未实现）</h2>
+      <ul>
+        <li><strong>关单窗口</strong>：待付订单创建后 <code>2 小时</code> 未支付 → 后端标 <code>CLOSED</code>；前端用服务端 <code>expiresAt</code> 跑倒计时（勿用本地估时）。</li>
+        <li><strong>紧迫感</strong>：取消微信支付后出底部 sheet；会员页待付条；订单列表置顶；详情页大倒计时。均展示 <code>HH:MM:SS</code>。</li>
+        <li>
+          <strong>防刷主策略（对真实用户友好）</strong>：同一机构同一用户，存在未过期
+          <code>PAYING</code> 订单时，再次下单<strong>不新建</strong>，返回已有单并引导「继续支付」。换 SKU
+          也先引导处理待付单（避免一人多笔待付）。
+        </li>
+        <li>
+          <strong>防刷兜底</strong>：极端连点/脚本仍可能绕过时，按用户维度软限流（建议
+          <code>10 分钟内最多新建 3 笔</code>，正常续付不算新建）。提示「下单过于频繁，请稍后再试」，不展示技术原因。
+        </li>
+        <li><strong>主动关闭</strong>：详情「关闭订单」可选；关闭后可立刻重新选购，不占用待付槽位。</li>
+        <li><strong>已关闭</strong>：倒计时消失，状态「已关闭」，无继续支付。</li>
+      </ul>
+    </div>
+
+    <script>
+      function fmt(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        const h = String(Math.floor(s / 3600)).padStart(2, '0');
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        return { h, m, ss, text: `${h}:${m}:${ss}` };
+      }
+
+      const nodes = [...document.querySelectorAll('[data-cd]')];
+      const parts = [...document.querySelectorAll('[data-cd-parts]')];
+      let left = 7142;
+
+      function tick() {
+        const t = fmt(left);
+        nodes.forEach((el) => {
+          el.textContent = t.text;
+        });
+        parts.forEach((el) => {
+          const units = el.querySelectorAll('.unit');
+          if (units.length >= 3) {
+            units[0].textContent = t.h;
+            units[1].textContent = t.m;
+            units[2].textContent = t.ss;
+          }
+        });
+        if (left > 0) left -= 1;
+      }
+      tick();
+      setInterval(tick, 1000);
+    </script>
+  </body>
+</html>

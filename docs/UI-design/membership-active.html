@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>会员权益 · 开通后定稿</title>
+    <style>
+      :root {
+        --primary: 221 83% 58%;
+        --primary-glow: 217 91% 65%;
+        --primary-dark: 224 76% 48%;
+        --bg: 210 40% 98%;
+        --card: 0 0% 100%;
+        --fg: 222 47% 11%;
+        --muted: 215 16% 47%;
+        --border: 214 32% 91%;
+        --success: 142 71% 45%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        background: #dbe7f8;
+        color: hsl(var(--fg));
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 28px 16px 48px;
+      }
+      .phone {
+        width: 390px;
+        min-height: 820px;
+        background: hsl(var(--bg));
+        border-radius: 28px;
+        box-shadow: 0 18px 50px rgba(37, 99, 235, 0.18);
+        overflow: hidden;
+        position: relative;
+        border: 1px solid rgba(59, 110, 245, 0.12);
+      }
+      .file-tag {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        z-index: 5;
+        font-size: 10px;
+        font-weight: 700;
+        color: hsl(var(--primary));
+        background: hsl(var(--primary) / 0.1);
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+      .nav {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        font-weight: 700;
+        font-size: 16px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.12), hsl(var(--bg)));
+      }
+      .nav-orders {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 600;
+        color: hsl(var(--primary));
+        text-decoration: none;
+        letter-spacing: 0.02em;
+      }
+      .nav-orders:active {
+        opacity: 0.7;
+      }
+      .scroll {
+        padding: 0 16px 118px;
+        max-height: 760px;
+        overflow: auto;
+      }
+      .hero {
+        margin-top: 8px;
+        border-radius: 18px;
+        padding: 18px 16px 14px;
+        background: linear-gradient(
+          135deg,
+          hsl(var(--primary-glow)),
+          hsl(var(--primary)) 48%,
+          hsl(var(--primary-dark))
+        );
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero.expired {
+        background: linear-gradient(135deg, #7b8494, #5c6678);
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        right: -30px;
+        top: -40px;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero-top {
+        display: flex;
+        justify-content: space-between;
+        position: relative;
+        z-index: 1;
+      }
+      .hero-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 2px;
+      }
+      .hero-brand .v {
+        font-size: 24px;
+        font-weight: 900;
+        font-style: italic;
+        line-height: 1;
+      }
+      .hero-brand .label {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .hero h1 {
+        position: relative;
+        z-index: 1;
+        margin: 16px 0 0;
+        font-size: 22px;
+        font-weight: 800;
+      }
+      .hero p {
+        position: relative;
+        z-index: 1;
+        margin: 8px 0 0;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+      .hero-foot {
+        position: relative;
+        z-index: 1;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.22);
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        opacity: 0.88;
+      }
+      .switch {
+        display: flex;
+        gap: 6px;
+        margin: 10px 0 0;
+        flex-wrap: wrap;
+      }
+      .switch button {
+        border: 1px solid hsl(var(--border));
+        background: #fff;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 11px;
+        cursor: pointer;
+        color: hsl(var(--muted));
+      }
+      .switch button.on {
+        border-color: hsl(var(--primary) / 0.4);
+        background: hsl(var(--primary) / 0.08);
+        color: hsl(var(--primary-dark));
+        font-weight: 700;
+      }
+      .block {
+        margin-top: 12px;
+        background: hsl(var(--card));
+        border-radius: 18px;
+        box-shadow: 0 8px 28px rgba(59, 110, 245, 0.08);
+        padding: 14px 16px;
+      }
+      .block-hd {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+      }
+      .block-hd h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .block-hd span {
+        font-size: 11px;
+        color: hsl(var(--muted));
+      }
+      .quota-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 6px;
+        margin-top: 10px;
+      }
+      .quota-row .muted {
+        color: hsl(var(--muted));
+      }
+      .bar {
+        height: 8px;
+        border-radius: 999px;
+        background: hsl(var(--border));
+        overflow: hidden;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, hsl(var(--primary-glow)), hsl(var(--primary)));
+      }
+      .note {
+        margin-top: 12px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        font-size: 12px;
+        color: #9a3412;
+        line-height: 1.55;
+      }
+      .note b {
+        color: #c2410c;
+      }
+      .tip {
+        margin-top: 12px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: hsl(var(--primary) / 0.06);
+        border: 1px dashed hsl(var(--primary) / 0.28);
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.55;
+      }
+      .tip b {
+        color: hsl(var(--primary-dark));
+      }
+      .path {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .path-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid hsl(var(--border));
+        background: #f8fafc;
+        cursor: pointer;
+      }
+      .path-item:active {
+        opacity: 0.85;
+      }
+      .path-item .ico {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid hsl(var(--border));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 800;
+        color: hsl(var(--primary));
+        flex-shrink: 0;
+      }
+      .path-item .ico.ops {
+        color: #ff6a2b;
+        border-color: #ffd4c2;
+        background: #fff7f2;
+      }
+      .path-item .body {
+        flex: 1;
+        min-width: 0;
+      }
+      .path-item .t {
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .path-item .s {
+        margin-top: 3px;
+        font-size: 11px;
+        color: hsl(var(--muted));
+        line-height: 1.4;
+      }
+      .path-item .go {
+        font-size: 12px;
+        font-weight: 700;
+        color: hsl(var(--primary));
+        flex-shrink: 0;
+      }
+      .feat {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-top: 1px solid hsl(var(--border) / 0.8);
+        font-size: 12px;
+      }
+      .feat:first-child {
+        border-top: 0;
+      }
+      .ok {
+        color: hsl(var(--success));
+        font-weight: 700;
+      }
+      .public {
+        margin: 12px 0 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: #f8fafc;
+        font-size: 11px;
+        color: hsl(var(--muted));
+        line-height: 1.5;
+        text-align: center;
+      }
+      .public b {
+        color: hsl(var(--fg));
+      }
+      .contact-link {
+        color: hsl(var(--primary));
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .dock {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: hsl(var(--bg));
+        display: flex;
+        gap: 10px;
+      }
+      .btn {
+        flex: 1;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .btn-primary {
+        background: hsl(var(--primary));
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(59, 110, 245, 0.28);
+      }
+      .btn-primary .sub {
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0.9;
+      }
+      .btn-ghost {
+        background: #fff;
+        color: hsl(var(--primary));
+        border: 2px solid hsl(var(--primary) / 0.3);
+      }
+      .wx-mask {
+        position: absolute;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(2px);
+      }
+      .wx-mask.show {
+        display: flex;
+      }
+      .wx-shell {
+        width: 100%;
+        max-width: 300px;
+        border-radius: 20px;
+        padding: 14px 14px 18px;
+        background: linear-gradient(180deg, #c8e4ff 0%, #eaf4ff 42%, #fff 100%);
+        box-shadow: 0 12px 32px rgba(59, 110, 245, 0.18);
+      }
+      .wx-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px 18px 18px;
+        text-align: center;
+        box-shadow: 0 4px 14px rgba(59, 110, 245, 0.08);
+      }
+      .wx-card h3 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        color: #ff6a2b;
+        line-height: 1.25;
+      }
+      .wx-qr {
+        margin: 14px auto;
+        width: 168px;
+        height: 168px;
+        border-radius: 12px;
+        background: repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 0 0 / 12px 12px;
+        position: relative;
+      }
+      .wx-qr::after {
+        content: '企微码';
+        position: absolute;
+        inset: 28%;
+        background: #fff;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: #3b6ef5;
+      }
+      .wx-desc {
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .wx-save {
+        margin: 14px auto 0;
+        width: 200px;
+        height: 44px;
+        border-radius: 999px;
+        background: #fff;
+        color: #3b6ef5;
+        font-weight: 700;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(59, 110, 245, 0.12);
+        cursor: pointer;
+      }
+      .wx-close {
+        margin: 18px auto 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.28);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone">
+      <div class="file-tag">定稿 · 开通后</div>
+      <div class="nav">
+        会员权益
+        <a class="nav-orders" href="./membership-orders.html?from=active#list">订单详情</a>
+      </div>
+      <div class="scroll">
+        <div class="hero" id="hero">
+          <div class="hero-top">
+            <div class="hero-brand">
+              <span class="v">V</span>
+              <span class="label">会员卡</span>
+            </div>
+            <div class="pill" id="status">生效中</div>
+          </div>
+          <h1 id="planName">成长版</h1>
+          <p id="expire">有效期至 2029-09-05</p>
+          <div class="hero-foot">
+            <span>机构：示例艺术培训中心</span>
+            <span id="remain">剩余 1095 天</span>
+          </div>
+        </div>
+
+        <div class="switch" id="sceneSwitch">
+          <button type="button" class="on" data-scene="paid">成长 · 已开通</button>
+          <button type="button" data-scene="flagship">旗舰 · 已开通</button>
+          <button type="button" data-scene="free">众创 · 已开通</button>
+          <button type="button" data-scene="trial">试用中</button>
+          <button type="button" data-scene="expired">已到期</button>
+        </div>
+
+        <div class="block">
+          <div class="block-hd">
+            <h2>机构配额</h2>
+            <span id="quotaSub">成长版 · 单校区</span>
+          </div>
+          <div class="quota-row"><span>会员</span><span class="muted" id="qMembers">186 / 300</span></div>
+          <div class="bar"><i id="bMembers" style="width: 62%"></i></div>
+          <div class="quota-row"><span>员工</span><span class="muted" id="qStaff">8 / 不限</span></div>
+          <div class="bar"><i id="bStaff" style="width: 18%"></i></div>
+          <div class="quota-row"><span>校区</span><span class="muted" id="qCampus">1 / 1</span></div>
+          <div class="bar"><i id="bCampus" style="width: 100%"></i></div>
+        </div>
+
+        <div class="note">
+          支付仅支持<strong>货架固定价</strong>（2 年 / 3 年 SKU）。
+          <b>版本升级需联系运营按剩余时长核算补差</b>，后台发放，不支持自助任意金额支付。
+        </div>
+
+        <div class="tip" id="tipBox"></div>
+
+        <div class="block">
+          <div class="block-hd">
+            <h2>变更会员</h2>
+            <span>两条路径</span>
+          </div>
+          <div class="path">
+            <div class="path-item" id="pathRenew">
+              <div class="ico">续</div>
+              <div class="body">
+                <div class="t" id="renewTitle">续费同档</div>
+                <div class="s" id="renewSub">按货架价购买 2 年 / 3 年，自助支付</div>
+              </div>
+              <div class="go">去选购 ›</div>
+            </div>
+            <div class="path-item" id="pathUpgrade">
+              <div class="ico ops">升</div>
+              <div class="body">
+                <div class="t">升级更高版本</div>
+                <div class="s">旗舰含 2 校区 · 联系运营核算补差</div>
+              </div>
+              <div class="go">联系 ›</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-hd">
+            <h2>当前权益</h2>
+            <span>只读</span>
+          </div>
+          <div id="feats"></div>
+        </div>
+
+        <div class="public">
+          若你们在做<strong>公益教学 / 志愿支教 / 残障帮扶</strong>等公益事业，请
+          <a class="contact-link" id="contactPublic" href="#">联系我们</a>——
+          <b>审核通过后免费提供</b>系统使用权。
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="btn btn-primary" id="primaryBtn">
+          <div id="buyMain">续费同档</div>
+          <div class="sub" id="buySub">货架价自助支付</div>
+        </div>
+        <div class="btn btn-ghost" id="opsBtn">联系运营</div>
+      </div>
+
+      <div class="wx-mask" id="wxMask">
+        <div>
+          <div class="wx-shell">
+            <div class="wx-card">
+              <h3 id="wxTitle1">升级补差</h3>
+              <h3 id="wxTitle2">添加运营企微</h3>
+              <div class="wx-qr"></div>
+              <div class="wx-desc" id="wxDesc">
+                添加后说明当前版本与目标版本<br />运营核算补差后为你开通
+              </div>
+            </div>
+            <div class="wx-save">保存图片</div>
+          </div>
+          <div class="wx-close" id="wxClose">×</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const SCENES = {
+        paid: {
+          expired: false,
+          status: '生效中',
+          plan: '成长版',
+          expire: '有效期至 2029-09-05',
+          remain: '剩余 1095 天',
+          quotaSub: '成长版 · 单校区',
+          members: '186 / 300',
+          staff: '8 / 不限',
+          campus: '1 / 1',
+          bm: '62%',
+          bs: '18%',
+          bc: '100%',
+          tip: '当前 <b>成长版</b> 生效中。续费可自助购买同档货架 SKU；升旗舰（含 2 校区 · 800 会员）请联系运营补差。',
+          renewTitle: '续费同档',
+          renewSub: '成长 2 年 ¥716 / 3 年 ¥999，自助支付',
+          main: '续费同档',
+          sub: '货架价自助支付',
+          primary: 'renew',
+          marketing: true,
+          membersCap: '300',
+          staffCap: '不限',
+          campusCap: '1',
+          ledgerSub: '最近：成长·3年 · ¥999 · 已写入权益',
+          lp1t: '续费 · 成长版 3 年',
+          lp1a: '¥999',
+          lp1s: '2026-09-05 · 有效期 +1095 天 → 至 2029-09-05 · 点击看详情',
+          lp2t: '开通 · 基础版 2 年',
+          lp2a: '¥356',
+          lp2s: '2024-09-05 · 首次开通写入会员卡 · 点击看详情',
+        },
+        free: {
+          expired: false,
+          status: '众创',
+          plan: '众创版',
+          expire: '长期有效',
+          remain: '40 人档',
+          quotaSub: '众创版 · 单校区',
+          members: '12 / 40',
+          staff: '1 / 2',
+          campus: '1 / 1',
+          bm: '30%',
+          bs: '50%',
+          bc: '100%',
+          tip: '众创为申请制免费档。开通付费版请走货架价；若已有付费意向需定制方案，可联系运营。',
+          renewTitle: '开通付费版',
+          renewSub: '基础 / 成长 / 旗舰 · 2 年或 3 年自助支付',
+          main: '开通付费版',
+          sub: '去货架选购',
+          primary: 'renew',
+          marketing: false,
+          membersCap: '40',
+          staffCap: '2',
+          campusCap: '1',
+          ledgerSub: '众创为申请制 · 暂无付费开通记录',
+          lp1t: '申请开通 · 众创版',
+          lp1a: '¥0',
+          lp1s: '2026-01-10 · 运营审核通过 · 非自助支付',
+          lp2t: '—',
+          lp2a: '—',
+          lp2s: '付费开通后会出现在此历程',
+        },
+        trial: {
+          expired: false,
+          status: '试用中',
+          plan: '成长版（试用）',
+          expire: '试用剩余 11 天',
+          remain: '剩余 11 天',
+          quotaSub: '试用 · 对齐成长版',
+          members: '28 / 300',
+          staff: '3 / 不限',
+          campus: '1 / 1',
+          bm: '9%',
+          bs: '10%',
+          bc: '100%',
+          tip: '试用对齐成长版能力。正式开通请自助选购货架价；试用期内升旗舰请联系运营。',
+          renewTitle: '正式开通',
+          renewSub: '推荐成长 · 3 年 ¥999，自助支付',
+          main: '正式开通',
+          sub: '成长 · 3 年 ¥999',
+          primary: 'renew',
+          marketing: true,
+          membersCap: '300',
+          staffCap: '不限',
+          campusCap: '1',
+          ledgerSub: '试用发放 · 正式购买后写入付费记录',
+          lp1t: '试用开通 · 成长版能力',
+          lp1a: '¥0',
+          lp1s: '2026-08-26 · 系统发放试用 14 天',
+          lp2t: '—',
+          lp2a: '—',
+          lp2s: '正式付费后显示货架订单',
+        },
+        expired: {
+          expired: true,
+          status: '已到期',
+          plan: '成长版',
+          expire: '已于 2026-08-01 到期',
+          remain: '权益已暂停',
+          quotaSub: '到期回落 · 按众创能力',
+          members: '186 / 40',
+          staff: '8 / 2',
+          campus: '1 / 1',
+          bm: '100%',
+          bs: '100%',
+          bc: '100%',
+          tip: '会员已到期。请自助续费同档货架价，或兑换激活码；换更高版本也请先联系运营说明。',
+          renewTitle: '立即续费',
+          renewSub: '按货架价重新购买 2 年 / 3 年',
+          main: '立即续费',
+          sub: '恢复成长版权益',
+          primary: 'renew',
+          marketing: true,
+          membersCap: '300',
+          staffCap: '不限',
+          campusCap: '1',
+          ledgerSub: '历史记录仍可查看 · 共 2 笔已写入',
+          lp1t: '会员卡到期',
+          lp1a: '—',
+          lp1s: '2026-08-01 · 权益暂停，历史记录保留',
+          lp2t: '开通 · 成长版 3 年',
+          lp2a: '¥999',
+          lp2s: '2023-08-01 · 曾写入至 2026-08-01 · 点击看详情',
+        },
+        flagship: {
+          expired: false,
+          status: '生效中',
+          plan: '旗舰版',
+          expire: '有效期至 2029-09-05',
+          remain: '剩余 1095 天',
+          quotaSub: '旗舰版 · 含 2 校区',
+          members: '420 / 800',
+          staff: '15 / 不限',
+          campus: '2 / 2',
+          bm: '52%',
+          bs: '20%',
+          bc: '100%',
+          tip: '当前 <b>旗舰版</b>（含 2 校区）。续费自助选购；第 3 个校区起 +¥200/年，联系运营开通。',
+          renewTitle: '续费同档',
+          renewSub: '旗舰 2 年 ¥1798 / 3 年 ¥2499，自助支付',
+          main: '续费同档',
+          sub: '货架价自助支付',
+          primary: 'renew',
+          marketing: true,
+          membersCap: '800',
+          staffCap: '不限',
+          campusCap: '含 2',
+          ledgerSub: '最近：旗舰·3年 · ¥2499 · 已写入权益',
+          lp1t: '续费 · 旗舰版 3 年',
+          lp1a: '¥2499',
+          lp1s: '2026-09-05 · 有效期 +1095 天 · 点击看详情',
+          lp2t: '升级补差 · 成长→旗舰',
+          lp2a: '运营核算',
+          lp2s: '2025-03-01 · 后台发放 · 非货架自助价',
+        },
+      };
+
+      let scene = 'paid';
+
+      function openWx(kind) {
+        const t1 = document.getElementById('wxTitle1');
+        const t2 = document.getElementById('wxTitle2');
+        const desc = document.getElementById('wxDesc');
+        if (kind === 'upgrade') {
+          t1.textContent = '升级补差';
+          t2.textContent = '添加运营企微';
+          desc.innerHTML = '添加后说明当前版本与目标版本<br />运营核算补差后为你开通';
+        } else if (kind === 'public') {
+          t1.textContent = '公益合作';
+          t2.textContent = '添加客服企微';
+          desc.innerHTML = '添加后说明公益项目情况<br />审核通过后免费开通';
+        } else {
+          t1.textContent = '联系运营';
+          t2.textContent = '添加企微';
+          desc.innerHTML = '续费 / 升级 / 激活码等问题<br />添加后说明即可';
+        }
+        document.getElementById('wxMask').classList.add('show');
+      }
+
+      function closeWx() {
+        document.getElementById('wxMask').classList.remove('show');
+      }
+
+      function goPricing() {
+        location.href = 'membership-pricing.html';
+      }
+
+      function paint(key) {
+        scene = key;
+        const s = SCENES[key];
+        document.getElementById('hero').classList.toggle('expired', !!s.expired);
+        document.getElementById('status').textContent = s.status;
+        document.getElementById('planName').textContent = s.plan;
+        document.getElementById('expire').textContent = s.expire;
+        document.getElementById('remain').textContent = s.remain;
+        document.getElementById('quotaSub').textContent = s.quotaSub;
+        document.getElementById('qMembers').textContent = s.members;
+        document.getElementById('qStaff').textContent = s.staff;
+        document.getElementById('qCampus').textContent = s.campus;
+        document.getElementById('bMembers').style.width = s.bm;
+        document.getElementById('bStaff').style.width = s.bs;
+        document.getElementById('bCampus').style.width = s.bc;
+        document.getElementById('tipBox').innerHTML = s.tip;
+        document.getElementById('renewTitle').textContent = s.renewTitle;
+        document.getElementById('renewSub').textContent = s.renewSub;
+        document.getElementById('buyMain').textContent = s.main;
+        document.getElementById('buySub').textContent = s.sub;
+        document.getElementById('feats').innerHTML = [
+          ['会员', s.membersCap],
+          ['员工', s.staffCap],
+          ['校区', s.campusCap],
+          ['约课/排课/候补/代课', '✓'],
+          ['会员/课时核销/签到', '✓'],
+          ['基础财务/收款/报表', '✓'],
+          ['移动端（学员/教练）', '✓'],
+          ['营销获客', s.marketing ? '✓' : '—'],
+        ]
+          .map(
+            ([k, v]) =>
+              `<div class="feat"><span>${k}</span><span class="${v === '✓' ? 'ok' : ''}">${v}</span></div>`,
+          )
+          .join('');
+      }
+
+      document.querySelectorAll('#sceneSwitch button').forEach((btn) => {
+        btn.onclick = () => {
+          document.querySelectorAll('#sceneSwitch button').forEach((b) => b.classList.remove('on'));
+          btn.classList.add('on');
+          paint(btn.dataset.scene);
+        };
+      });
+
+      document.getElementById('pathRenew').onclick = goPricing;
+      document.getElementById('pathUpgrade').onclick = () => openWx('upgrade');
+      document.getElementById('primaryBtn').onclick = goPricing;
+      document.getElementById('opsBtn').onclick = () => openWx('upgrade');
+      document.getElementById('contactPublic').onclick = (e) => {
+        e.preventDefault();
+        openWx('public');
+      };
+      document.getElementById('wxClose').onclick = closeWx;
+      document.getElementById('wxMask').onclick = (e) => {
+        if (e.target.id === 'wxMask') closeWx();
+      };
+
+      paint('paid');
+    </script>
+  </body>
+</html>

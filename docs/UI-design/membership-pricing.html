@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>会员权益 · 选购定稿</title>
+    <style>
+      :root {
+        --primary: 221 83% 58%;
+        --primary-glow: 217 91% 65%;
+        --primary-dark: 224 76% 48%;
+        --bg: 210 40% 98%;
+        --card: 0 0% 100%;
+        --fg: 222 47% 11%;
+        --muted: 215 16% 47%;
+        --border: 214 32% 91%;
+        --success: 142 71% 45%;
+        --danger: 0 72% 51%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        background: #dbe7f8;
+        color: hsl(var(--fg));
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 28px 16px 48px;
+      }
+      .phone {
+        width: 390px;
+        min-height: 820px;
+        background: hsl(var(--bg));
+        border-radius: 28px;
+        box-shadow: 0 18px 50px rgba(37, 99, 235, 0.18);
+        overflow: hidden;
+        position: relative;
+        border: 1px solid rgba(59, 110, 245, 0.12);
+      }
+      .nav {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        font-weight: 700;
+        font-size: 16px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.12), hsl(var(--bg)));
+      }
+      .nav-orders {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 600;
+        color: hsl(var(--primary));
+        text-decoration: none;
+        letter-spacing: 0.02em;
+      }
+      .nav-orders:active {
+        opacity: 0.7;
+      }
+      .scroll {
+        padding: 0 16px 118px;
+        max-height: 760px;
+        overflow: auto;
+      }
+      .hero {
+        margin-top: 8px;
+        border-radius: 18px;
+        padding: 18px 16px 14px;
+        background: linear-gradient(
+          135deg,
+          hsl(var(--primary-glow)),
+          hsl(var(--primary)) 48%,
+          hsl(var(--primary-dark))
+        );
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        right: -30px;
+        top: -40px;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        position: relative;
+        z-index: 1;
+      }
+      .hero-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 2px;
+      }
+      .hero-brand .v {
+        font-size: 24px;
+        font-weight: 900;
+        font-style: italic;
+        line-height: 1;
+      }
+      .hero-brand .label {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .hero h1 {
+        position: relative;
+        z-index: 1;
+        margin: 16px 0 0;
+        font-size: 22px;
+        font-weight: 800;
+      }
+      .hero p {
+        position: relative;
+        z-index: 1;
+        margin: 8px 0 0;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+      .hero-foot {
+        position: relative;
+        z-index: 1;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.22);
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        opacity: 0.88;
+      }
+      .hero-ledger {
+        display: none;
+      }
+      .card {
+        margin-top: 12px;
+        background: hsl(var(--card));
+        border-radius: 18px;
+        box-shadow: 0 8px 28px rgba(59, 110, 245, 0.08);
+        overflow: hidden;
+      }
+      .card-hd {
+        padding: 14px 16px 8px;
+      }
+      .card-hd h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        padding: 0 10px 12px;
+      }
+      .plan {
+        position: relative;
+        border: 2px solid hsl(var(--border));
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 10px 2px;
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+      }
+      .plan.on {
+        border-color: hsl(var(--primary) / 0.45);
+        background: hsl(var(--primary) / 0.06);
+      }
+      .plan .name {
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .plan .sub {
+        margin-top: 4px;
+        font-size: 10px;
+        color: hsl(var(--muted));
+      }
+      .plan .rec {
+        position: absolute;
+        top: -8px;
+        right: 4px;
+        font-size: 9px;
+        font-weight: 700;
+        color: #fff;
+        background: #ff6a2b;
+        border-radius: 999px;
+        padding: 2px 6px;
+        line-height: 1.2;
+        z-index: 1;
+      }
+      .term-wrap {
+        padding: 0 12px 12px;
+      }
+      .term-label {
+        font-size: 12px;
+        color: hsl(var(--muted));
+        margin-bottom: 8px;
+      }
+      .terms {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .term {
+        position: relative;
+        border: 2px solid hsl(var(--border));
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px 8px;
+        text-align: center;
+        cursor: pointer;
+      }
+      .term.on {
+        border-color: hsl(var(--primary) / 0.45);
+        background: hsl(var(--primary) / 0.06);
+      }
+      .term .badge {
+        position: absolute;
+        top: -8px;
+        right: 8px;
+        font-size: 10px;
+        background: #ff6a2b;
+        color: #fff;
+        border-radius: 999px;
+        padding: 2px 6px;
+        font-weight: 700;
+      }
+      .term .y {
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .term .hint {
+        margin-top: 4px;
+        font-size: 11px;
+        color: hsl(var(--muted));
+      }
+      .price-box {
+        margin: 0 12px 12px;
+        padding: 14px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.08), #fff);
+        border: 1px solid hsl(var(--primary) / 0.12);
+      }
+      .price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      .price-main {
+        font-size: 32px;
+        font-weight: 900;
+        line-height: 1;
+      }
+      .price-main small {
+        font-size: 16px;
+        margin-right: 2px;
+      }
+      .price-side {
+        text-align: right;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.45;
+      }
+      .strike {
+        text-decoration: line-through;
+        opacity: 0.75;
+      }
+      .save {
+        color: #ff6a2b;
+        font-weight: 700;
+      }
+      .eq {
+        margin-top: 10px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+      }
+      .daily {
+        margin-top: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        color: hsl(var(--primary));
+      }
+      .heart {
+        margin: 0 12px 12px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(210 80% 96%));
+        border: 1px solid hsl(var(--primary) / 0.15);
+        display: none;
+      }
+      .heart.show {
+        display: block;
+      }
+      .heart .title {
+        font-size: 13px;
+        font-weight: 800;
+        color: hsl(var(--primary-dark));
+      }
+      .heart p {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.55;
+      }
+      .campus {
+        margin: 0 12px 12px;
+        border-radius: 14px;
+        border: 1px solid hsl(var(--border));
+        padding: 12px;
+        display: none;
+      }
+      .campus.show {
+        display: block;
+      }
+      .campus .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .campus .lbl {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .campus .desc {
+        margin-top: 4px;
+        font-size: 11px;
+        color: hsl(var(--muted));
+      }
+      .stepper {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .stepper button {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid hsl(var(--border));
+        background: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .stepper span {
+        min-width: 18px;
+        text-align: center;
+        font-weight: 800;
+      }
+      .features {
+        margin: 0 12px 10px;
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 4px 14px;
+      }
+      .feat {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-top: 1px solid hsl(var(--border) / 0.8);
+        font-size: 12px;
+      }
+      .feat:first-child {
+        border-top: 0;
+      }
+      .ok {
+        color: hsl(var(--success));
+        font-weight: 700;
+      }
+      .no {
+        color: hsl(var(--muted));
+      }
+      .dock {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: hsl(var(--bg));
+        display: flex;
+        gap: 10px;
+      }
+      .btn {
+        flex: 1;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        user-select: none;
+      }
+      .btn-primary {
+        background: hsl(var(--primary));
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(59, 110, 245, 0.28);
+        flex-direction: column;
+        gap: 1px;
+      }
+      .btn-primary .sub {
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0.9;
+      }
+      .btn-ghost {
+        background: #fff;
+        color: hsl(var(--primary));
+        border: 2px solid hsl(var(--primary) / 0.3);
+      }
+
+      /* 微信客服弹窗 · 对齐 SupportQrDialog */
+      .wx-mask {
+        position: absolute;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(2px);
+      }
+      .wx-mask.show {
+        display: flex;
+      }
+      .wx-shell {
+        width: 100%;
+        max-width: 300px;
+        border-radius: 20px;
+        padding: 14px 14px 18px;
+        background: linear-gradient(180deg, #c8e4ff 0%, #eaf4ff 42%, #fff 100%);
+        box-shadow: 0 12px 32px rgba(59, 110, 245, 0.18);
+      }
+      .wx-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px 18px 18px;
+        text-align: center;
+        box-shadow: 0 4px 14px rgba(59, 110, 245, 0.08);
+      }
+      .wx-card h3 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        color: #ff6a2b;
+        line-height: 1.25;
+      }
+      .wx-qr {
+        margin: 14px auto;
+        width: 168px;
+        height: 168px;
+        border-radius: 12px;
+        background: repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 0 0 / 12px 12px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+        position: relative;
+      }
+      .wx-qr::after {
+        content: '企微码';
+        position: absolute;
+        inset: 28%;
+        background: #fff;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: #3b6ef5;
+      }
+      .wx-desc {
+        font-size: 13px;
+        color: hsl(var(--fg));
+        line-height: 1.55;
+      }
+      .wx-save {
+        margin: 14px auto 0;
+        width: 200px;
+        height: 44px;
+        border-radius: 999px;
+        background: #fff;
+        color: #3b6ef5;
+        font-weight: 700;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(59, 110, 245, 0.12);
+        cursor: pointer;
+      }
+      .wx-close {
+        margin: 18px auto 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.28);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      .file-tag {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        z-index: 5;
+        font-size: 10px;
+        font-weight: 700;
+        color: hsl(var(--primary));
+        background: hsl(var(--primary) / 0.1);
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone">
+      <div class="file-tag">定稿 · 选购页</div>
+      <div class="nav">
+        会员权益
+        <a class="nav-orders" href="./membership-orders.html?from=pricing#list">订单详情</a>
+      </div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-top">
+            <div class="hero-brand">
+              <span class="v">V</span>
+              <span class="label">会员卡</span>
+            </div>
+            <div class="pill" id="cardStatus">未开通</div>
+          </div>
+          <h1 id="cardPlan">开通机构会员</h1>
+          <p id="cardExpire">选择合适套餐开通</p>
+          <div class="hero-foot">
+            <span>机构：示例艺术培训中心</span>
+            <span id="cardRemain">当前 · 未开通</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><h2>选择版本</h2></div>
+          <div class="plans" id="plans"></div>
+          <div class="term-wrap" id="termWrap">
+            <div class="term-label">开通时长</div>
+            <div class="terms" id="terms"></div>
+          </div>
+          <div class="price-box" id="priceBox"></div>
+          <div class="heart" id="heartBox"></div>
+          <div class="campus" id="campusBox">
+            <div class="row">
+              <div>
+                <div class="lbl">额外校区</div>
+                <div class="desc" id="campusDesc">—</div>
+              </div>
+              <div class="stepper">
+                <button type="button" id="campusMinus">−</button>
+                <span id="campusExtra">0</span>
+                <button type="button" id="campusPlus">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="features" id="features"></div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="btn btn-primary" id="buyBtn">
+          <div id="buyMain">立即开通</div>
+          <div class="sub" id="buySub">—</div>
+        </div>
+        <div class="btn btn-ghost" id="redeemBtn">激活码</div>
+      </div>
+
+      <div class="wx-mask" id="wxMask">
+        <div>
+          <div class="wx-shell">
+            <div class="wx-card">
+              <h3 id="wxTitle1">添加客服</h3>
+              <h3 id="wxTitle2">企微码</h3>
+              <div class="wx-qr" aria-hidden="true"></div>
+              <div class="wx-desc" id="wxDesc">长按识别二维码<br />添加后说明来意即可</div>
+            </div>
+            <div class="wx-save">保存图片</div>
+          </div>
+          <div class="wx-close" id="wxClose">×</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const PLANS = [
+        {
+          code: 'FREE',
+          short: '众创',
+          name: '众创版',
+          year: 0,
+          free: true,
+          pay: {},
+          members: '40',
+          employees: '2',
+          campuses: '1',
+          includedCampuses: 1,
+          marketing: false,
+          campusFee: 0,
+        },
+        {
+          code: 'BASIC',
+          short: '基础',
+          name: '基础版',
+          year: 198,
+          pay: { 2: 356, 3: 499 },
+          members: '100',
+          employees: '不限',
+          campuses: '1',
+          includedCampuses: 1,
+          marketing: false,
+          campusFee: 0,
+        },
+        {
+          code: 'STANDARD',
+          short: '成长',
+          name: '成长版',
+          year: 398,
+          recommended: true,
+          pay: { 2: 716, 3: 999 },
+          members: '300',
+          employees: '不限',
+          campuses: '1',
+          includedCampuses: 1,
+          marketing: true,
+          campusFee: 200,
+        },
+        {
+          code: 'FLAGSHIP',
+          short: '旗舰',
+          name: '旗舰版',
+          year: 999,
+          pay: { 2: 1798, 3: 2499 },
+          members: '800',
+          employees: '不限',
+          campuses: '含 2',
+          includedCampuses: 2,
+          marketing: true,
+          campusFee: 200,
+        },
+      ];
+
+      const TERMS = [
+        { years: 2, label: '2 年', badge: '省10%', hint: '9折' },
+        { years: 3, label: '3 年', badge: '省16%', hint: '约8.3折' },
+      ];
+
+      let planCode = 'STANDARD';
+      let years = 3;
+      let campusExtra = 0;
+
+      function money(n) {
+        return Math.round(n).toLocaleString('zh-CN');
+      }
+
+      function openWx() {
+        document.getElementById('wxTitle1').textContent = '申请众创版';
+        document.getElementById('wxTitle2').textContent = '添加客服企微';
+        document.getElementById('wxDesc').innerHTML =
+          '添加后说明「申请众创」<br />审核通过后为你开通';
+        document.getElementById('wxMask').classList.add('show');
+      }
+
+      function closeWx() {
+        document.getElementById('wxMask').classList.remove('show');
+      }
+
+      function calc() {
+        const plan = PLANS.find((p) => p.code === planCode);
+        const term = TERMS.find((t) => t.years === years);
+        if (plan.free) return { plan, term, mode: 'free' };
+        const basePay = plan.pay[term.years];
+        const list = plan.year * term.years;
+        const campusPay = (plan.campusFee || 0) * campusExtra * term.years;
+        const pay = basePay + campusPay;
+        const save = list - basePay;
+        const perYear = +(pay / term.years).toFixed(1);
+        const daily = +(pay / (term.years * 365)).toFixed(2);
+        return { plan, term, mode: 'paid', basePay, campusPay, pay, list, save, perYear, daily };
+      }
+
+      function render() {
+        const c = calc();
+        const { plan, term } = c;
+        const termDisabled = plan.free;
+
+        document.getElementById('plans').innerHTML = PLANS.map(
+          (p) => `
+          <div class="plan ${p.code === planCode ? 'on' : ''}" data-code="${p.code}">
+            ${p.recommended ? '<div class="rec">荐</div>' : ''}
+            <div class="name">${p.short}</div>
+            <div class="sub">${p.free ? '申请' : '¥' + p.year}</div>
+          </div>`,
+        ).join('');
+
+        document.getElementById('termWrap').style.display = termDisabled ? 'none' : 'block';
+        document.getElementById('terms').innerHTML = TERMS.map(
+          (t) => `
+          <div class="term ${t.years === years ? 'on' : ''}" data-years="${t.years}">
+            ${t.badge ? `<div class="badge">${t.badge}</div>` : ''}
+            <div class="y">${t.label}</div>
+            ${t.hint ? `<div class="hint">${t.hint}</div>` : ''}
+          </div>`,
+        ).join('');
+
+        const campusBox = document.getElementById('campusBox');
+        if (plan.campusFee > 0) {
+          campusBox.classList.add('show');
+          document.getElementById('campusDesc').textContent =
+            `含 ${plan.includedCampuses} 校区 · 第 ${plan.includedCampuses + 1} 个起 +¥${plan.campusFee}/校区/年`;
+          document.getElementById('campusExtra').textContent = String(campusExtra);
+        } else {
+          campusBox.classList.remove('show');
+          campusExtra = 0;
+        }
+
+        if (c.mode === 'free') {
+          document.getElementById('priceBox').innerHTML = `
+            <div class="price-main" style="font-size:22px">¥0</div>
+            <div class="eq">申请开通 · 添加客服企微</div>`;
+          document.getElementById('buyMain').textContent = '申请众创版';
+          document.getElementById('buySub').textContent = '一个人也能开始';
+          document.getElementById('buyBtn').dataset.mode = 'apply-free';
+          const heart = document.getElementById('heartBox');
+          heart.classList.add('show');
+          heart.innerHTML = `
+            <div class="title">众创版，为「一个人先干起来」而设</div>
+            <p>给独立老师、初创小工作室：学员还不多、团队还很小，也值得用上干净的排课与课时。先把教学管清楚，等长大了再升级——我们想陪你们从第一位学员走起。</p>`;
+          document.getElementById('cardStatus').textContent = '需申请';
+          document.getElementById('cardPlan').textContent = '众创版';
+          document.getElementById('cardExpire').textContent = '审批通过后开通';
+          document.getElementById('cardRemain').textContent = '40 人档';
+        } else {
+          document.getElementById('heartBox').classList.remove('show');
+          document.getElementById('heartBox').innerHTML = '';
+          document.getElementById('priceBox').innerHTML = `
+            <div class="price-row">
+              <div><div class="price-main"><small>¥</small>${money(c.pay)}</div></div>
+              <div class="price-side">
+                ${
+                  `<div class="strike">¥${money(c.list)}${c.campusPay ? '+' + money(c.campusPay) + '校区' : ''}</div>
+                   <div class="save">省 ¥${money(c.save)}</div>`
+                }
+              </div>
+            </div>
+            <div class="eq">
+              ${plan.name} · ${term.label}
+              ${campusExtra ? ` · +${campusExtra} 校区` : ''}
+              · ¥${money(c.perYear)}/年
+            </div>
+            ${term.years === 3 ? `<div class="daily">一天约 ¥${c.daily}</div>` : ''}`;
+          document.getElementById('buyMain').textContent = `开通${plan.short} · ${term.label}`;
+          document.getElementById('buySub').textContent = `实付 ¥${money(c.pay)}`;
+          document.getElementById('buyBtn').dataset.mode = 'pay';
+          document.getElementById('cardStatus').textContent = '未开通';
+          document.getElementById('cardPlan').textContent = '开通机构会员';
+          document.getElementById('cardExpire').textContent = '选择合适套餐开通';
+          document.getElementById('cardRemain').textContent = '当前 · 未开通';
+        }
+
+        const rows = [
+          ['会员', plan.members],
+          ['员工', plan.employees],
+          ['校区', plan.campuses],
+          ['约课/排课/候补/代课', '✓'],
+          ['会员/课时核销/签到', '✓'],
+          ['基础财务/收款/报表', '✓'],
+          ['移动端（学员/教练）', '✓'],
+          ['营销获客', plan.marketing ? '✓' : '—'],
+          [
+            '额外校区',
+            plan.campusFee
+              ? `第${plan.includedCampuses + 1}个起 +¥${plan.campusFee}/年`
+              : '—',
+          ],
+        ];
+        document.getElementById('features').innerHTML = rows
+          .map(([k, v]) => {
+            const cls = v === '✓' ? 'ok' : v === '—' ? 'no' : '';
+            return `<div class="feat"><span>${k}</span><span class="${cls}">${v}</span></div>`;
+          })
+          .join('');
+
+        document.querySelectorAll('.plan').forEach((el) =>
+          el.addEventListener('click', () => {
+            planCode = el.dataset.code;
+            const p = PLANS.find((x) => x.code === planCode);
+            if (p.free) {
+              years = 3;
+              campusExtra = 0;
+            } else if (p.recommended) {
+              years = 3;
+            }
+            if (!p.campusFee) campusExtra = 0;
+            render();
+          }),
+        );
+        document.querySelectorAll('.term').forEach((el) =>
+          el.addEventListener('click', () => {
+            if (termDisabled) return;
+            years = Number(el.dataset.years);
+            render();
+          }),
+        );
+      }
+
+      document.getElementById('campusMinus').onclick = () => {
+        campusExtra = Math.max(0, campusExtra - 1);
+        render();
+      };
+      document.getElementById('campusPlus').onclick = () => {
+        campusExtra = Math.min(9, campusExtra + 1);
+        render();
+      };
+      document.getElementById('buyBtn').onclick = () => {
+        if (document.getElementById('buyBtn').dataset.mode === 'apply-free') openWx();
+      };
+      document.getElementById('wxClose').onclick = closeWx;
+      document.getElementById('wxMask').onclick = (e) => {
+        if (e.target.id === 'wxMask') closeWx();
+      };
+
+      render();
+    </script>
+  </body>
+</html>

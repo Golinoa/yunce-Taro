@@ -37,8 +37,7 @@ const PUBLIC_PAGES = [
   '/package-settings/pages/feedback/index',
   /**
    * 门店入驻填表页：未登录可预览/填表（产品真源）。
-   * 角色矩阵 PAGE_ROLE_REQUIREMENTS 仅在已登录时生效，勿误伤未登录预览；
-   * 已登录非管理员（教师/家长）仍会被拦。提交强制登录在页内处理。
+   * 角色矩阵不限制已登录教师/家长（身份选择「门店入驻」入口）；提交强制登录在页内处理。
    */
   '/package-settings/pages/store-entry/index',
   '/package-student/pages/parent-bind/index',
@@ -71,7 +70,8 @@ const STAFF_ROLES: UserRole[] = ['admin', 'principal', 'teacher', 'assistant'];
  * 页面 → 允许访问的角色集合（2026-08-22 用户口径确认）。
  * 未列出的页面对所有已登录用户开放（含家长端页面）；列出的页面仅允许其中角色访问。
  * 说明：`package-auth/pages/identity-select/index`（选择身份页）面向所有已登录新用户，
- * 不在此做角色限制；门店入驻相关页（store-entry）仅管理角色可见。
+ * 不在此做角色限制；门店入驻填表/进度页面向「申请开店」漏斗（含未登录预填），
+ * 不要求当前已是 admin/principal（获批后才是 OWNER）。
  * 权限体系的类型基座与规划见 types/permission.ts（ROLE_PERMISSION_MAP/DataScope/DataModule），
  * 待「权限分配 UI」落地后，页面访问将由 grantedModules 开关动态推导，本矩阵届时收敛为入口清单。
  * 数据范围过滤（teacher 看自己的学生、家长只看绑定孩子）由数据层 filterXxxByActor 承担。
@@ -125,11 +125,13 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-settings/pages/threshold-config/index': ['admin'],
   // 主题颜色：全员个人偏好（本地缓存），不限制角色
   'package-settings/pages/todo-settings/index': MANAGER_ROLES,
-  // —— 门店入驻（仅 admin/principal；UI 称管理员，库角色仍为 principal） ——
-  'package-settings/pages/store-entry/index': MANAGER_ROLES,
-  'package-settings/pages/store-entry/pending/index': MANAGER_ROLES,
+  // —— 门店入驻填表/审核进度：入驻漏斗页，申请人获批前未必是 admin/principal ——
+  // 不放进 MANAGER_ROLES；「关于」页对已入驻教师/家长隐藏入口。角色越权由页内/后端约束。
+  // 'package-settings/pages/store-entry/index' — 公开可填（见 PUBLIC_PATHS）
+  // 'package-settings/pages/store-entry/pending/index' — 申请人本人
   // —— 机构会员权益（仅 admin/principal） ——
   'package-settings/pages/membership/index': MANAGER_ROLES,
+  'package-settings/pages/membership-orders/index': MANAGER_ROLES,
   // —— 家长专属页 ——
   'package-student/pages/children/index': ['parent'],
   'package-student/pages/child-detail/index': ['parent'],

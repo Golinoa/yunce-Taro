@@ -127,6 +127,7 @@ export default defineAppConfig({
         'pages/agreement/index',
         'pages/about/index',
         'pages/membership/index',
+        'pages/membership-orders/index',
         'pages/store-entry/index',
         'pages/store-entry/pending/index',
         'pages/store-referral-landing/index',
