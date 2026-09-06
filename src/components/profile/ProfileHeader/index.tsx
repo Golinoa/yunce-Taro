@@ -5,11 +5,13 @@
  * - default: 白色圆角卡片，用于传统布局
  * - gradient: 沉浸式橙色头部，头像 + 名称 + 手机号/机构 + 我的资料
  */
-import { View, Text } from '@tarojs/components';
+import { View, Text, Image } from '@tarojs/components';
 import cn from 'classnames';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
+import { BRAND_LOGO } from '@/constants/brand';
+import { resolveAvatarSrc } from '@/utils/avatar-src';
 
 export type ProfileHeaderVariant = 'default' | 'gradient';
 
@@ -34,6 +36,10 @@ export interface ProfileHeaderProps {
   className?: string;
 }
 
+/** 头像外框 96rpx ≈ 姓名行 + 店铺名行总高；内图 80rpx 留白边 */
+const HEADER_AVATAR_RING = 'w-[96rpx] h-[96rpx]';
+const HEADER_AVATAR_IMG = 'w-[80rpx] h-[80rpx]';
+
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   avatarUrl,
   name,
@@ -45,6 +51,12 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   variant = 'default',
   className,
 }) => {
+  const preferred = resolveAvatarSrc(avatarUrl);
+  const [avatarSrc, setAvatarSrc] = useState(preferred);
+  useEffect(() => {
+    setAvatarSrc(resolveAvatarSrc(avatarUrl));
+  }, [avatarUrl]);
+
   if (variant === 'gradient') {
     return (
       <View
@@ -53,22 +65,37 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           className,
         )}
       >
-        {/* 用户信息：头像 + 名称 + 手机号/机构 + 我的资料 */}
+        {/* 用户信息：头像高度与右侧「姓名 + 店铺/手机」两行齐平 */}
         <View className="absolute bottom-[120rpx] left-0 right-0 px-page-padding flex items-center gap-[24rpx]">
-          {/* 头像：白色圆形底 + 灰色外边框，头像缩小后自然留出白色内边 */}
-          <View className="relative flex-shrink-0 w-[96rpx] h-[96rpx] rounded-full border-[4rpx] border-solid border-border bg-card flex items-center justify-center overflow-hidden">
-            <Avatar name={name} avatarUrl={avatarUrl} size="lg" className="w-[80rpx] h-[80rpx]" />
+          <View
+            className={cn(
+              'relative flex-shrink-0 rounded-full border-[4rpx] border-solid border-border bg-card flex items-center justify-center',
+              HEADER_AVATAR_RING,
+            )}
+            style={{ borderRadius: '50%' }}
+          >
+            <Image
+              src={avatarSrc}
+              mode="aspectFill"
+              className={cn(HEADER_AVATAR_IMG, 'rounded-full flex-shrink-0')}
+              style={{ borderRadius: '50%' }}
+              onError={() => {
+                if (avatarSrc !== BRAND_LOGO) setAvatarSrc(BRAND_LOGO);
+              }}
+            />
           </View>
 
-          <View className="flex-1 min-w-0">
-            <Text className="text-[34rpx] font-bold text-foreground truncate block">{name}</Text>
+          <View className="flex-1 min-w-0 flex flex-col justify-center">
+            <Text className="text-[34rpx] font-bold text-foreground truncate leading-[1.25] block">
+              {name}
+            </Text>
             {phone && (
-              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-muted-foreground truncate block">
+              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-muted-foreground truncate leading-[1.25] block">
                 {phone}
               </Text>
             )}
             {!phone && orgName && (
-              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-muted-foreground truncate block">
+              <Text className="mt-[8rpx] text-[26rpx] font-semibold text-muted-foreground truncate leading-[1.25] block">
                 {orgName}
               </Text>
             )}

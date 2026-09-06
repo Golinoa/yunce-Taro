@@ -46,7 +46,7 @@ const SCOPE_LABELS: Record<DataScope, string> = {
 const SCOPES: DataScope[] = ['own', 'campus', 'all'];
 
 const ROLE_DESC: Record<string, string> = {
-  admin: '机构创建者：拥有全部权限，可分配权限（本页操作者）',
+  admin: '拥有全部权限，可分配权限',
   principal: '默认查看校区全部数据，可由管理员开关授权',
   teacher: '默认仅本人名下学员数据，可由管理员/校长开关授权',
   assistant: '默认仅本人名下数据（无薪资），可由管理员/校长开关授权',

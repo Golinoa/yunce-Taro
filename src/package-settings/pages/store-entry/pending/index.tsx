@@ -6,14 +6,15 @@
  * - approved → 入驻成功（进入机构端）
  * - rejected → 驳回 + 重新提交
  */
-import { View, Text, Image } from '@tarojs/components';
+import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
+import SupportQrDialog from '@/components/SupportQrDialog';
 import { STORE_ENTRY_PENDING_COPY } from '@/constants/store-entry-copy';
+import { SUPPORT_QR_EXPEDITE_COPY } from '@/constants/support-qr';
 import { refreshSessionForTenant } from '@/services/auth';
 import { readStoreEntryDraft, storeEntryService } from '@/services/store-entry';
 import type { StoreEntryLatestResult } from '@/types/store-entry';
@@ -27,19 +28,11 @@ import {
   resolveStoreEntrySubmitError,
   writeStoreEntryLatestCache,
 } from '@/utils/store-entry-onboarding';
-import {
-  isStoreEntryApproved,
-  isStoreEntryPending,
-  isStoreEntryRejected,
-  normalizeStoreEntryStatus,
-} from '@/utils/store-entry-status';
-
-/** 分包静态资源，构建时 copy 至 dist/package-settings/assets/ */
-const WX_QR_CODE = '/package-settings/assets/wx.jpg';
+import { isStoreEntryPending, normalizeStoreEntryStatus } from '@/utils/store-entry-status';
 
 const StoreEntryPendingPage: React.FC = () => {
   usePrimaryNavigationBar();
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [latest, setLatest] = useState<StoreEntryLatestResult | null>(null);
@@ -48,14 +41,17 @@ const StoreEntryPendingPage: React.FC = () => {
   const [enteringDemo, setEnteringDemo] = useState(false);
   const [expediteVisible, setExpediteVisible] = useState(false);
 
-  const status = normalizeStoreEntryStatus(latest?.application?.status || 'pending');
+  const status = latest?.application?.status
+    ? normalizeStoreEntryStatus(latest.application.status)
+    : null;
   const rejectReason =
     latest?.application?.rejectReason || latest?.organization?.rejectReason || '';
   const storeName = latest?.organization?.name || '';
 
-  const isOpened = isStoreEntryApproved(status);
-  const isRejected = isStoreEntryRejected(status);
-  const isPending = isStoreEntryPending(status);
+  const isOpened = status === 'approved';
+  const isRejected = status === 'rejected';
+  const isPending = status === 'pending';
+  const hasApplication = Boolean(latest?.application?.id);
 
   const loadLatest = useCallback(async () => {
     setLoading(true);
@@ -63,7 +59,7 @@ const StoreEntryPendingPage: React.FC = () => {
     try {
       const result = await storeEntryService.queryLatestSafe();
       setLatest(result);
-      writeStoreEntryLatestCache(result);
+      writeStoreEntryLatestCache(result, profile?.id);
       if (result?.application?.status && isStoreEntryPending(result.application.status)) {
         clearIdentitySelectionPending();
       }
@@ -73,7 +69,7 @@ const StoreEntryPendingPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile?.id]);
 
   useEffect(() => {
     void loadLatest();
@@ -101,10 +97,6 @@ const StoreEntryPendingPage: React.FC = () => {
     return STORE_ENTRY_PENDING_COPY.descPending;
   }, [isOpened, isRejected, storeName]);
 
-  const handlePreviewQr = useCallback(() => {
-    void Taro.previewImage({ current: WX_QR_CODE, urls: [WX_QR_CODE] });
-  }, []);
-
   const handleEnterDemo = useCallback(async () => {
     if (enteringDemo) return;
     setEnteringDemo(true);
@@ -116,6 +108,7 @@ const StoreEntryPendingPage: React.FC = () => {
       }
       await refreshProfile();
       clearIdentitySelectionPending();
+      invalidateStoreEntryLatestCache(profile?.id);
       Taro.showToast({ title: STORE_ENTRY_PENDING_COPY.demoToast, icon: 'none', duration: 2800 });
       void Taro.switchTab({ url: '/pages/home/index' });
     } catch {
@@ -123,7 +116,7 @@ const StoreEntryPendingPage: React.FC = () => {
     } finally {
       setEnteringDemo(false);
     }
-  }, [enteringDemo, refreshProfile]);
+  }, [enteringDemo, profile?.id, refreshProfile]);
 
   const handleEnterOrg = useCallback(async () => {
     if (entering) return;
@@ -136,14 +129,20 @@ const StoreEntryPendingPage: React.FC = () => {
       }
       await refreshProfile();
       clearIdentitySelectionPending();
-      invalidateStoreEntryLatestCache();
+      invalidateStoreEntryLatestCache(profile?.id);
       navigateAfterLogin();
     } catch {
       Taro.showToast({ title: '进入失败，请重新登录后再试', icon: 'none' });
     } finally {
       setEntering(false);
     }
-  }, [entering, refreshProfile]);
+  }, [entering, profile?.id, refreshProfile]);
+
+  const handleGoHome = useCallback(() => {
+    invalidateStoreEntryLatestCache(profile?.id);
+    clearIdentitySelectionPending();
+    void Taro.switchTab({ url: '/pages/home/index' });
+  }, [profile?.id]);
 
   const handleResubmit = useCallback(async () => {
     const draft = readStoreEntryDraft();
@@ -193,6 +192,26 @@ const StoreEntryPendingPage: React.FC = () => {
             onClick={() => void loadLatest()}
           >
             <Text className="text-[28rpx] text-white font-semibold">重试</Text>
+          </View>
+        </View>
+      </PageContainer>
+    );
+  }
+
+  // 无申请记录（如种子校长被错误踢进本页）：勿伪装成「等待审核」
+  if (!hasApplication) {
+    return (
+      <PageContainer safeBottom className="px-[32rpx] py-[32rpx]">
+        <View className="flex flex-col items-center justify-center py-[120rpx] gap-[24rpx]">
+          <Text className="text-[30rpx] font-semibold text-foreground">暂无入驻申请</Text>
+          <Text className="text-[26rpx] text-muted-foreground text-center leading-relaxed px-[24rpx]">
+            当前账号没有待审核的门店入驻记录，可直接返回首页继续使用。
+          </Text>
+          <View
+            className="h-[80rpx] px-[48rpx] rounded-full bg-primary flex items-center justify-center"
+            onClick={handleGoHome}
+          >
+            <Text className="text-[28rpx] text-white font-semibold">返回首页</Text>
           </View>
         </View>
       </PageContainer>
@@ -291,30 +310,14 @@ const StoreEntryPendingPage: React.FC = () => {
         )}
       </View>
 
-      <BottomSheet
+      <SupportQrDialog
         visible={expediteVisible}
-        title={STORE_ENTRY_PENDING_COPY.expediteSheetTitle}
         onClose={() => setExpediteVisible(false)}
-        height="auto"
-        maxHeightLimit="75vh"
-      >
-        <View className="px-[8rpx] pb-[16rpx] flex flex-col items-center">
-          <Text className="text-[26rpx] leading-relaxed text-muted-foreground text-center mb-[24rpx]">
-            {STORE_ENTRY_PENDING_COPY.expediteSheetDesc}
-          </Text>
-          <View className="flex flex-col items-center" onClick={handlePreviewQr}>
-            <Image
-              src={WX_QR_CODE}
-              mode="aspectFit"
-              className="w-[320rpx] h-[320rpx] rounded-[28rpx] border-[2rpx] border-border"
-              showMenuByLongpress
-            />
-            <Text className="text-[24rpx] text-muted-foreground text-center block mt-[24rpx] leading-[1.7]">
-              {STORE_ENTRY_PENDING_COPY.expediteQrHint}
-            </Text>
-          </View>
-        </View>
-      </BottomSheet>
+        titleLine1={SUPPORT_QR_EXPEDITE_COPY.titleLine1}
+        titleLine2={SUPPORT_QR_EXPEDITE_COPY.titleLine2}
+        description={SUPPORT_QR_EXPEDITE_COPY.description}
+        saveLabel={SUPPORT_QR_EXPEDITE_COPY.saveLabel}
+      />
     </PageContainer>
   );
 };

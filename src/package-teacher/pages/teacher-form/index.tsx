@@ -23,9 +23,11 @@ import Loading from '@/components/Loading';
 import PageIntroSheet from '@/components/PageIntroSheet';
 import PickerSheet from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
-import { GENDER_OPTIONS, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
+import { buildTeacherIdentityOptions } from '@/constants/role-glossary';
+import { GENDER_OPTIONS } from '@/constants/teacher-ui';
 import { auditLogService } from '@/services/audit-log';
 import { subscribeMessageService } from '@/services/subscribe-message';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
@@ -48,7 +50,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  identity: 'teacher',
+  identity: 'principal',
   name: '',
   phone: '',
   birthday: '',
@@ -57,11 +59,12 @@ const EMPTY_FORM: FormState = {
   showInPrivateList: false,
 };
 
+/** identity → Teacher.role 落库值（与后端 resolveStaffRoleBundle 对齐） */
 const DEFAULT_IDENTITY_TO_ROLE: Record<TeacherIdentity, TeacherUIModel['role']> = {
-  principal: 'lead',
-  teacher: 'lead',
+  principal: 'principal',
+  teacher: 'teacher',
   assistant: 'assist',
-  reception: 'parttime',
+  reception: 'reception',
 };
 
 const TeacherFormPage: React.FC = () => {
@@ -134,9 +137,16 @@ const TeacherFormPage: React.FC = () => {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }, []);
 
+  const titles = useRoleGlossaryStore((s) => s.titles);
+  const identityOptions = useMemo(() => buildTeacherIdentityOptions(titles), [titles]);
+
+  useEffect(() => {
+    void useRoleGlossaryStore.getState().load();
+  }, []);
+
   const displayIdentity = useMemo(
-    () => TEACHER_IDENTITY_OPTIONS.find((o) => o.value === form.identity)?.label || '请选择',
-    [form.identity],
+    () => identityOptions.find((o) => o.value === form.identity)?.label || '请选择',
+    [form.identity, identityOptions],
   );
   const displayGender = useMemo(
     () => GENDER_OPTIONS.find((o) => o.value === form.gender)?.label || '请选择',
@@ -176,7 +186,7 @@ const TeacherFormPage: React.FC = () => {
     setSaving(true);
     try {
       const identityLabel =
-        TEACHER_IDENTITY_OPTIONS.find((o) => o.value === form.identity)?.label || '老师';
+        identityOptions.find((o) => o.value === form.identity)?.label || titles.teacher;
       const base: Partial<TeacherUIModel> = {
         name: form.name.trim(),
         phone: form.phone.trim(),
@@ -507,7 +517,7 @@ const TeacherFormPage: React.FC = () => {
       <PickerSheet
         visible={picker.visible}
         title={picker.type === 'identity' ? '选择身份' : '选择性别'}
-        options={picker.type === 'identity' ? TEACHER_IDENTITY_OPTIONS : GENDER_OPTIONS}
+        options={picker.type === 'identity' ? identityOptions : GENDER_OPTIONS}
         value={picker.type === 'identity' ? form.identity : form.gender}
         onClose={() => setPicker((prev) => ({ ...prev, visible: false }))}
         onConfirm={(value) => {
@@ -529,7 +539,7 @@ const TeacherFormPage: React.FC = () => {
         description="如果该员工不教私教课，请关闭下方「展示在私教老师列表」开关，避免首页私教老师列表出现无关员工。"
         bulletPoints={[
           '只有真的教私教课的员工，才建议保留开启。',
-          '老师角色默认开启；前台和店长默认关闭。',
+          '授课默认开启；前台与管理层默认关闭。',
           '如果后续角色变化，可再手动调整这个开关。',
         ]}
         themeColor="primary"

@@ -17,7 +17,6 @@ import {
   promptOfficialPrivacyOnUserAction,
   promptWechatOfficialPrivacyOnPageEnter,
 } from '@/utils/privacy';
-import { privacyTrace } from '@/utils/privacy-debug';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 type PendingAction = 'wechat' | 'password' | null;
@@ -39,7 +38,6 @@ const Login: React.FC = () => {
 
   useDidShow(() => {
     setLoginAgreed(false);
-    privacyTrace('login.page.show', { loginAgreed: false, loading, hasProfile: Boolean(profile) });
     cancelPrivacyPromptRef.current?.();
     cancelPrivacyPromptRef.current = promptWechatOfficialPrivacyOnPageEnter('login.page.show', {
       delayMs: 450,
@@ -60,10 +58,8 @@ const Login: React.FC = () => {
   });
 
   useEffect(() => {
-    privacyTrace('login.page.mount');
     return () => {
       cancelPrivacyPromptRef.current?.();
-      privacyTrace('login.page.unmount');
     };
   }, []);
 
@@ -75,15 +71,7 @@ const Login: React.FC = () => {
   }, [loading, profile, passwordSubmitting, wechatSubmitting]);
 
   const runAfterOfficialPrivacy = useCallback((reason: string, action: () => void) => {
-    privacyTrace('login.runAfterOfficialPrivacy', { reason });
-    promptOfficialPrivacyOnUserAction(
-      reason,
-      () => {
-        privacyTrace('login.runAfterOfficialPrivacy.ok', { reason });
-        action();
-      },
-      () => privacyTrace('login.runAfterOfficialPrivacy.denied', { reason }),
-    );
+    promptOfficialPrivacyOnUserAction(reason, action);
   }, []);
 
   const finishLoginNavigation = useCallback(
@@ -98,17 +86,10 @@ const Login: React.FC = () => {
   const executeWechatLogin = useCallback(async () => {
     if (wechatSubmitting) return;
 
-    privacyTrace('login.executeWechatLogin.start');
     setWechatSubmitting(true);
     try {
       Taro.showLoading({ title: '登录中...', mask: true });
-      privacyTrace('login.executeWechatLogin.taroLogin.call');
       const { error, isNewUser, profile: nextProfile } = await signInWithWechat();
-      privacyTrace('login.executeWechatLogin.signIn', {
-        hasError: Boolean(error),
-        hasProfile: Boolean(nextProfile),
-        isNewUser,
-      });
       if (error) {
         Taro.hideLoading();
         Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
@@ -120,12 +101,10 @@ const Login: React.FC = () => {
       } else {
         Taro.hideLoading();
       }
-    } catch (err) {
-      privacyTrace('login.executeWechatLogin.catch', { err });
+    } catch {
       Taro.hideLoading();
       Taro.showToast({ title: '微信登录失败', icon: 'none' });
     } finally {
-      privacyTrace('login.executeWechatLogin.finally');
       setWechatSubmitting(false);
       setPendingAction(null);
     }
@@ -220,14 +199,8 @@ const Login: React.FC = () => {
   ]);
 
   const handleWechatLogin = useCallback(() => {
-    privacyTrace('login.handleWechatLogin.click', {
-      loginAgreed,
-      wechatSubmitting,
-      passwordSubmitting,
-    });
     if (wechatSubmitting || passwordSubmitting) return;
     if (!authCapabilities.supportsWechatLogin) {
-      privacyTrace('login.handleWechatLogin.unsupported');
       Taro.showToast({ title: '当前环境暂不支持微信登录', icon: 'none' });
       return;
     }
@@ -236,7 +209,6 @@ const Login: React.FC = () => {
       void executeWechatLogin();
     });
   }, [
-    loginAgreed,
     ensureAgreement,
     executeWechatLogin,
     passwordSubmitting,
@@ -245,7 +217,6 @@ const Login: React.FC = () => {
   ]);
 
   const handleAgreementConfirm = useCallback(() => {
-    privacyTrace('login.handleAgreementConfirm', { pendingAction });
     setLoginAgreed(true);
     setAgreed(true);
     setShowAgreementDialog(false);
@@ -350,7 +321,7 @@ const Login: React.FC = () => {
 
         <View
           className={cn(
-            'h-[88rpx] rounded-[28rpx] flex items-center justify-center bg-primary active:opacity-90',
+            'h-[88rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90',
             passwordSubmitting && 'opacity-60',
           )}
           onClick={handlePasswordLogin}
@@ -362,7 +333,7 @@ const Login: React.FC = () => {
 
         <View
           className={cn(
-            'mt-[24rpx] h-[88rpx] rounded-[28rpx] flex flex-row items-center justify-center gap-[16rpx] border-login-email-btn active:bg-primary/5',
+            'mt-[24rpx] h-[88rpx] rounded-button flex flex-row items-center justify-center gap-[16rpx] border-login-email-btn active:bg-primary/5',
             wechatSubmitting && 'opacity-60',
           )}
           onClick={handleWechatLogin}

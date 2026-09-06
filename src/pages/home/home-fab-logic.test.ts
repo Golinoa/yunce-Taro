@@ -3,8 +3,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  CUSTOM_TAB_BAR_HEIGHT_RPX,
+  FAB_ABOVE_TAB_MARGIN_RPX,
   FAB_REVEAL_BOTTOM_OFFSET_RPX,
   FAB_REVEAL_TAB_GAP_RPX,
+  FAB_SCREEN_BOTTOM_OFFSET_RPX,
   FAB_VIEW_TOGGLE_DELAY_MS,
   fabViewToggleIcon,
   fabViewToggleLabel,
@@ -13,10 +16,13 @@ import {
 } from './home-fab-logic';
 
 describe('FAB constants', () => {
-  it('保持与 ExpandableFabMenu / 首页既有口径一致', () => {
+  it('保持与 ExpandableFabMenu / 自定义 TabBar 口径一致', () => {
     expect(FAB_REVEAL_BOTTOM_OFFSET_RPX).toBe(48);
     expect(FAB_REVEAL_TAB_GAP_RPX).toBe(300);
     expect(FAB_VIEW_TOGGLE_DELAY_MS).toBe(220);
+    expect(CUSTOM_TAB_BAR_HEIGHT_RPX).toBe(98);
+    expect(FAB_ABOVE_TAB_MARGIN_RPX).toBe(32);
+    expect(FAB_SCREEN_BOTTOM_OFFSET_RPX).toBe(130);
   });
 });
 

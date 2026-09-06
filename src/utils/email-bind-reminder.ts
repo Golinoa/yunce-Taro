@@ -1,5 +1,6 @@
 /**
- * 邮箱绑定：首页/我的轻量提醒（已绑孩子或员工且无邮箱；稍后静默 7 天）
+ * 邮箱绑定：首页/我的轻量提醒
+ * 仅根据「是否已绑邮箱」决定是否提醒；点「稍后」静默 7 天。
  */
 import Taro from '@tarojs/taro';
 import type { Profile } from '@/types/profile';
@@ -7,12 +8,10 @@ import type { Profile } from '@/types/profile';
 const SNOOZE_UNTIL_KEY = 'yunce:email-bind-snooze-until';
 export const EMAIL_BIND_SNOOZE_DAYS = 7;
 
+/** 已登录且未绑邮箱 → 需要提醒（与手机号 needsPhoneBind 同构） */
 export function needsEmailBind(profile: Profile | null | undefined): boolean {
   if (!profile) return false;
-  if (profile.email?.trim()) return false;
-  const role = profile.currentContext?.role;
-  // 已入驻员工或家长（绑孩子后）才提醒；纯游客不烦
-  return role === 'parent' || role === 'teacher' || role === 'principal' || role === 'admin';
+  return !profile.email?.trim();
 }
 
 export function isEmailBindSnoozed(): boolean {

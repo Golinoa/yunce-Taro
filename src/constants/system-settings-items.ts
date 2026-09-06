@@ -31,6 +31,11 @@ export const SYSTEM_SETTING_ITEMS: SystemSettingItemDef[] = [
     managerOnly: true,
   },
   {
+    title: '角色称呼',
+    route: '/package-settings/pages/role-titles/index',
+    adminOnly: true,
+  },
+  {
     title: '角色权限',
     route: '/package-settings/pages/permission-settings/index',
     adminOnly: true,

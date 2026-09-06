@@ -162,7 +162,10 @@ export const organizationService = {
   },
 
   /** 更新机构设置（校长/管理员） */
-  updateSettings: async (input: { leaveAutoApprove?: boolean }): Promise<OrganizationSettings> => {
+  updateSettings: async (input: {
+    leaveAutoApprove?: boolean;
+    roleTitles?: OrganizationSettings['roleTitles'];
+  }): Promise<OrganizationSettings> => {
     return put<OrganizationSettings>('/organization/settings', input);
   },
 
@@ -250,6 +253,12 @@ export const organizationService = {
 export interface OrganizationSettings {
   /** 家长请假自动审批，默认 true */
   leaveAutoApprove: boolean;
+  /** 机构角色称呼 */
+  roleTitles?: {
+    manager: '校长' | '店长' | '馆长';
+    teacher: '老师' | '教练';
+    parent: '家长' | '会员';
+  };
 }
 
 /** 机构配额使用率（P1） */

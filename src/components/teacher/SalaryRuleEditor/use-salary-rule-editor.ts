@@ -27,8 +27,8 @@ import {
   isCourseGroupFeesChanged,
   uid,
 } from './builders';
-import type { SalaryRuleEditorErrors } from './types';
 import { isSalaryRuleValid, validateSalaryRule } from './validate';
+import type { SalaryRuleEditorErrors } from './types';
 
 export function useSalaryRuleEditor(
   value: SalaryRuleConfig,

@@ -66,6 +66,13 @@ describe('route-guard role helpers (Q3-5)', () => {
     expect(requireRole(childrenReq, parent)).toBe(true);
   });
 
+  it('门店入驻页不对已登录教师做管理员角色拦截（入驻漏斗申请人未必是 principal）', () => {
+    expect(PAGE_ROLE_REQUIREMENTS['package-settings/pages/store-entry/index']).toBeUndefined();
+    expect(
+      PAGE_ROLE_REQUIREMENTS['package-settings/pages/store-entry/pending/index'],
+    ).toBeUndefined();
+  });
+
   it('未登录语义：null profile 对任何角色要求均失败', () => {
     expect(requireRole(['admin'], null)).toBe(false);
     expect(requireRole(['parent'], undefined)).toBe(false);

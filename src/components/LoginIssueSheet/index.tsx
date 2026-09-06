@@ -36,7 +36,7 @@ const LoginIssueSheet: React.FC<LoginIssueSheetProps> = ({
     {
       key: 'contact-support',
       label: '联系客服',
-      description: '查看客服二维码，占位图后续替换正式二维码',
+      description: '扫码添加客服微信，对接维修与售后',
       icon: 'headset' as const,
       onClick: onContactSupport,
     },

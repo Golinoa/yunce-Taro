@@ -1,5 +1,6 @@
 /**
  * 未绑定邮箱时的轻量提醒：首页/我的顶条，可稍后静默 7 天
+ * 展示条件仅依据「是否已绑邮箱」+ 稍后静默，与手机号提醒同构。
  */
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -20,7 +21,7 @@ export interface EmailBindReminderProps {
 const EmailBindReminder: React.FC<EmailBindReminderProps> = ({ className }) => {
   const { profile, bindAccountEmail, sendBindEmailCode } = useAuth();
   const [visible, setVisible] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ const EmailBindReminder: React.FC<EmailBindReminderProps> = ({ className }) => {
 
   const handleSnooze = useCallback(() => {
     snoozeEmailBindReminder();
-    setSheetOpen(false);
+    setDialogOpen(false);
     setVisible(false);
   }, []);
 
@@ -44,7 +45,7 @@ const EmailBindReminder: React.FC<EmailBindReminderProps> = ({ className }) => {
           return;
         }
         clearEmailBindSnooze();
-        setSheetOpen(false);
+        setDialogOpen(false);
         setVisible(false);
         Taro.showToast({ title: '邮箱已绑定', icon: 'success' });
       } finally {
@@ -66,7 +67,7 @@ const EmailBindReminder: React.FC<EmailBindReminderProps> = ({ className }) => {
       >
         <View
           className="flex-1 flex items-center gap-[12rpx] active:opacity-80"
-          onClick={() => setSheetOpen(true)}
+          onClick={() => setDialogOpen(true)}
         >
           <Icon name="mdi-email-outline" size="sm" color="primary" />
           <View className="flex-1 min-w-0">
@@ -77,17 +78,22 @@ const EmailBindReminder: React.FC<EmailBindReminderProps> = ({ className }) => {
           </View>
           <Text className="text-[24rpx] text-primary shrink-0">去绑定</Text>
         </View>
-        <Text
-          className="text-[22rpx] text-muted-foreground shrink-0 px-[8rpx]"
-          onClick={handleSnooze}
+        <View
+          className="p-[8rpx] active:opacity-60 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation?.();
+            handleSnooze();
+          }}
         >
-          稍后
-        </Text>
+          <Icon name="mdi-close" size="sm" color="muted" />
+        </View>
       </View>
+
       <BindEmailSheet
-        visible={sheetOpen}
+        visible={dialogOpen}
         submitting={submitting}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => setDialogOpen(false)}
+        onLater={handleSnooze}
         onSendCode={sendBindEmailCode}
         onSubmit={handleSubmit}
       />

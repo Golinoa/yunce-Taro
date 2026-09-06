@@ -103,6 +103,7 @@ const MembershipOrdersPage: React.FC = () => {
   const focusId = router.params?.orderId || '';
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [items, setItems] = useState<PaymentOrderStatusResult[]>([]);
   const [detail, setDetail] = useState<PaymentOrderStatusResult | null>(null);
   const [paying, setPaying] = useState(false);
@@ -111,11 +112,18 @@ const MembershipOrdersPage: React.FC = () => {
 
   const loadList = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const data = await paymentService.listOrders({ page: 1, pageSize: 50 });
-      setItems(data.items || []);
+      const data = await Promise.race([
+        paymentService.listOrders({ page: 1, pageSize: 50 }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('加载超时')), 15000);
+        }),
+      ]);
+      const list = Array.isArray(data?.items) ? data.items : [];
+      setItems(list);
       if (focusId) {
-        const hit = (data.items || []).find((x) => x.orderId === focusId);
+        const hit = list.find((x) => x.orderId === focusId);
         if (hit) {
           setDetail(hit);
         } else {
@@ -127,6 +135,8 @@ const MembershipOrdersPage: React.FC = () => {
         }
       }
     } catch {
+      setItems([]);
+      setLoadError(true);
       Taro.showToast({ title: '加载失败', icon: 'none' });
     } finally {
       setLoading(false);
@@ -213,6 +223,22 @@ const MembershipOrdersPage: React.FC = () => {
       <PageContainer>
         <View className="min-h-screen flex items-center justify-center">
           <Loading text="加载订单…" />
+        </View>
+      </PageContainer>
+    );
+  }
+
+  if (!detail && loadError && items.length === 0) {
+    return (
+      <PageContainer safeBottom>
+        <View className="px-[32rpx] pt-[80rpx] flex flex-col items-center">
+          <Empty icon="mdi-alert-circle-outline" description="订单加载失败" />
+          <View
+            className="mt-[32rpx] px-[40rpx] py-[20rpx] rounded-full bg-primary"
+            onClick={() => void loadList()}
+          >
+            <Text className="text-[28rpx] font-semibold text-white">重新加载</Text>
+          </View>
         </View>
       </PageContainer>
     );
@@ -322,7 +348,7 @@ const MembershipOrdersPage: React.FC = () => {
     <PageContainer safeBottom>
       <View className="px-[32rpx] pt-[24rpx] pb-[48rpx]">
         {items.length === 0 ? (
-          <Empty icon="mdi-receipt-text-outline" description="暂无订单" />
+          <Empty icon="mdi-file-document-outline" description="暂无订单" />
         ) : (
           items.map((order) => (
             <OrderCard

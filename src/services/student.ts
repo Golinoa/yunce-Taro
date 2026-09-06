@@ -258,6 +258,29 @@ export const studentService = {
     return;
   },
 
+  /** 家长自助添加子女（建档 + 绑定） */
+  createMyChild: async (data: {
+    name: string;
+    nickname?: string;
+    gender?: 'male' | 'female' | 'other';
+    birthday?: string;
+    age?: number | string;
+    relation?: string;
+  }): Promise<Student & { reused?: boolean }> => {
+    const created = await post<BackendStudentListItem & { reused?: boolean }>(
+      '/students/my-children',
+      {
+        name: data.name.trim(),
+        nickname: data.nickname?.trim() || undefined,
+        gender: data.gender || undefined,
+        birthday: data.birthday || undefined,
+        age: data.age,
+        relation: data.relation || '子女',
+      },
+    );
+    return { ...mapBackendStudentListItem(created), reused: created.reused };
+  },
+
   /** 获取学员关联数据统计（用于删除确认弹窗） */
   getDependencies: async (_studentId: string) => notWired('student.getDependencies'),
 

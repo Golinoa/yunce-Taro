@@ -29,8 +29,8 @@ import EditorSection from './EditorSection';
 import GradientRow from './GradientRow';
 import PerfTierEditor from './PerfTierEditor';
 import TierGroupCard from './TierGroupCard';
-import type { SalaryRuleEditorProps } from './types';
 import { useSalaryRuleEditor } from './use-salary-rule-editor';
+import type { SalaryRuleEditorProps } from './types';
 
 export type { SalaryRuleEditorProps } from './types';
 

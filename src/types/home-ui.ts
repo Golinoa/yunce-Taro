@@ -10,7 +10,10 @@ export interface StatsData {
 
 export interface QuickEntry {
   label: string;
+  /** mdi 回退图标（无 image 时使用） */
   icon: string;
+  /** 3D 瓷片图：优先于 icon */
+  image?: string;
   color: string;
   url: string;
 }

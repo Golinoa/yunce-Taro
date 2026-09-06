@@ -14,6 +14,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet from '@/components/PickerSheet';
+import TimeRangePicker from '@/components/TimeRangePicker';
 import { BRAND_NAME_ZH } from '@/constants/brand';
 import { STORE_ENTRY_IDENTITY_COPY } from '@/constants/store-entry-copy';
 import { auditLogService } from '@/services/audit-log';
@@ -62,6 +63,7 @@ interface FormState {
   longitude: number;
   contactName: string;
   contactPhone: string;
+  businessHours: string;
   agreed: boolean;
 }
 
@@ -72,6 +74,7 @@ interface FormErrors {
   address?: string;
   contactName?: string;
   contactPhone?: string;
+  businessHours?: string;
   agreed?: string;
 }
 
@@ -203,11 +206,13 @@ const StoreEntry: React.FC = () => {
     longitude: 0,
     contactName: '',
     contactPhone: '',
+    businessHours: '09:00:00至21:00:00',
     agreed: false,
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [typePickerVisible, setTypePickerVisible] = useState(false);
+  const [hoursPickerVisible, setHoursPickerVisible] = useState(false);
   /** 本会话已点「下次再说」：不再反复软挡邮箱 */
   const [emailPromptSkipped, setEmailPromptSkipped] = useState(false);
   const [gateLoading, setGateLoading] = useState(false);
@@ -229,6 +234,7 @@ const StoreEntry: React.FC = () => {
       longitude: draft.longitude ?? prev.longitude,
       contactName: draft.contactName || prev.contactName,
       contactPhone: draft.contactPhone || prev.contactPhone,
+      businessHours: draft.businessHours || prev.businessHours,
     }));
   }, []);
 
@@ -240,7 +246,7 @@ const StoreEntry: React.FC = () => {
       try {
         const latest = await storeEntryService.queryLatestSafe();
         if (cancelled) return;
-        writeStoreEntryLatestCache(latest);
+        writeStoreEntryLatestCache(latest, profile.id);
         const gate = resolveStoreEntryFormGate({
           isLoggedIn: true,
           latest,
@@ -288,6 +294,11 @@ const StoreEntry: React.FC = () => {
       next.contactPhone = '请输入负责人手机号';
     } else if (!/^1[3-9]\d{9}$/.test(form.contactPhone.trim())) {
       next.contactPhone = '手机号格式不正确';
+    }
+    if (!form.businessHours.trim()) {
+      next.businessHours = '请选择营业时间';
+    } else if (!/^\d{2}:\d{2}:\d{2}至\d{2}:\d{2}:\d{2}$/.test(form.businessHours.trim())) {
+      next.businessHours = '营业时间格式不正确';
     }
     if (!form.agreed) {
       next.agreed = '请阅读并同意入驻协议';
@@ -386,6 +397,7 @@ const StoreEntry: React.FC = () => {
       longitude: form.longitude || undefined,
       contactName: form.contactName.trim(),
       contactPhone: form.contactPhone.trim(),
+      businessHours: form.businessHours.trim(),
     };
 
     const gate = resolveStoreEntrySubmitGate({
@@ -643,6 +655,19 @@ const StoreEntry: React.FC = () => {
               type="number"
               maxlength={11}
             />
+
+            {/* 营业时间 */}
+            <FormSelect
+              label="营业时间"
+              required
+              placeholder="请选择营业时间"
+              value={
+                form.businessHours.replace(/(\d{2}:\d{2}):\d{2}至(\d{2}:\d{2}):\d{2}/, '$1-$2') ||
+                ''
+              }
+              error={errors.businessHours}
+              onClick={() => setHoursPickerVisible(true)}
+            />
           </View>
 
           {/* 协议同意 */}
@@ -696,6 +721,17 @@ const StoreEntry: React.FC = () => {
         value={form.type || ''}
         onClose={() => setTypePickerVisible(false)}
         onConfirm={(v) => updateForm('type', v as StoreType | '')}
+      />
+
+      <TimeRangePicker
+        visible={hoursPickerVisible}
+        title="营业时间"
+        value={form.businessHours}
+        onCancel={() => setHoursPickerVisible(false)}
+        onConfirm={(value) => {
+          updateForm('businessHours', value);
+          setHoursPickerVisible(false);
+        }}
       />
 
       <BindEmailSheet

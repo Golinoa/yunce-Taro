@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>松果排课 · 虚拟支付道具 / 后台 / 权限清单</title>
+    <style>
+      :root {
+        --bg: #f1f5f9;
+        --card: #fff;
+        --fg: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --primary: #3b6ef5;
+        --ok: #16a34a;
+        --warn: #c2410c;
+        --test: #7c3aed;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.55;
+        padding: 28px 16px 64px;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+      }
+      h2 {
+        margin: 0 0 12px;
+        font-size: 17px;
+      }
+      h3 {
+        margin: 16px 0 8px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f8fafc;
+        white-space: nowrap;
+      }
+      code {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 12px;
+        background: #f1f5f9;
+        padding: 1px 6px;
+        border-radius: 6px;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        color: #fff;
+      }
+      .tag-prod {
+        background: var(--primary);
+      }
+      .tag-test {
+        background: var(--test);
+      }
+      .tag-skip {
+        background: #94a3b8;
+      }
+      .note {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: var(--warn);
+        font-size: 13px;
+      }
+      .okbox {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+        font-size: 13px;
+      }
+      ul {
+        margin: 8px 0 0;
+        padding-left: 1.2em;
+        font-size: 13px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 800px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .check {
+        list-style: none;
+        padding-left: 0;
+      }
+      .check li::before {
+        content: '☐ ';
+        font-weight: 700;
+        color: var(--primary);
+      }
+      tr.test-row td {
+        background: #f5f3ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>虚拟支付 · 道具 / 后台 / 权限清单</h1>
+      <p class="sub">
+        定稿日期 2026-09-06 · 含 <strong>6 个正式货架道具 + 2 个测试道具</strong> ·
+        对齐小程序会员选购页（仅 2 年 / 3 年自助付）
+      </p>
+
+      <div class="card">
+        <h2>0. 结论（你要做什么）</h2>
+        <ol>
+          <li>微信虚拟支付创建下表 <strong>8 个道具</strong>（6 正式 + 2 测试）。</li>
+          <li>
+            运营后台「机构版本」为每条填：<code>code</code> /
+            <code>price</code>（分）/ <code>durationDays</code> /
+            <code>virtualProductId</code>，状态 active。
+          </li>
+          <li>服务端配置 <code>VIRTUAL_PAY_*</code>；小程序校长/管理员可下单。</li>
+        </ol>
+        <div class="note">
+          当前后端按「一条 OrganizationVersion = 一个可购 SKU」；要 2 年+3
+          年都能自助付，建议建 <strong>6+2 条版本行</strong>（正式 6 + 测试 2），不要只改原来的
+          BASIC/STANDARD/FLAGSHIP 三条硬塞。两个测试道具都保留：原 ¥1 联调 + 你新建的 1 分
+          <code>sku_test_1fen</code>。
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>1. 微信道具表（申请 / 创建时填写）</h2>
+        <p style="font-size: 13px; color: var(--muted); margin: 0 0 10px">
+          图片要求常见为方图（如 200×200、&lt;200KB）。权益说明已压到 ≤20
+          字，点选下表 <code>灰色块</code> 即可复制。
+        </p>
+        <div
+          class="okbox"
+          style="margin-bottom: 12px; font-family: ui-monospace, Consolas, monospace"
+        >
+          基础版100学员2年<br />
+          基础版100学员3年<br />
+          成长版300学员2年<br />
+          成长版300学员3年<br />
+          旗舰800学员含2校区2年<br />
+          旗舰800学员含2校区3年<br />
+          支付联调测试勿买<br />
+          sku test 1分勿买
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>类型</th>
+              <th>建议内部标识</th>
+              <th>用户可见名称</th>
+              <th>售价（元）</th>
+              <th>权益说明（≤20字·可复制）</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><span class="tag tag-prod">正式</span></td>
+              <td><code>yunce_basic_2y</code></td>
+              <td>松果排课·基础版-2年</td>
+              <td><b>356</b></td>
+              <td><code>基础版100学员2年</code></td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><span class="tag tag-prod">正式</span></td>
+              <td><code>yunce_basic_3y</code></td>
+              <td>松果排课·基础版-3年</td>
+              <td><b>499</b></td>
+              <td><code>基础版100学员3年</code></td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><span class="tag tag-prod">正式</span></td>
+              <td><code>yunce_growth_2y</code></td>
+              <td>松果排课·成长版-2年</td>
+              <td><b>716</b></td>
+              <td><code>成长版300学员2年</code></td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><span class="tag tag-prod">正式</span></td>
+              <td><code>yunce_growth_3y</code></td>
+              <td>松果排课·成长版-3年</td>
+              <td><b>999</b></td>
+              <td><code>成长版300学员3年</code></td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td><span class="tag tag-prod">正式</span></td>
+              <td><code>yunce_flagship_2y</code></td>
+              <td>松果排课·旗舰版-2年</td>
+              <td><b>1798</b></td>
+              <td><code>旗舰800学员含2校区2年</code></td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td><span class="tag tag-prod">正式</span></td>
+              <td><code>yunce_flagship_3y</code></td>
+              <td>松果排课·旗舰版-3年</td>
+              <td><b>2499</b></td>
+              <td><code>旗舰800学员含2校区3年</code></td>
+            </tr>
+            <tr class="test-row">
+              <td>7</td>
+              <td><span class="tag tag-test">测试</span></td>
+              <td><code>yunce_test_pay_1y</code></td>
+              <td>松果排课·支付联调测试</td>
+              <td><b>1</b>（或平台最低价）</td>
+              <td><code>支付联调测试勿买</code></td>
+            </tr>
+            <tr class="test-row">
+              <td>8</td>
+              <td><span class="tag tag-test">测试</span></td>
+              <td><code>sku_test_1fen</code></td>
+              <td>sku test</td>
+              <td><b>0.01</b>（1 分）</td>
+              <td><code>sku test 1分勿买</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="okbox">
+          申请通过后：把微信返回的「商品/道具 ID」抄到下一表
+          <code>virtualProductId</code> 列。两条测试都保留，勿互相覆盖。测试道具勿上架到生产用户可见货架（可用独立 code +
+          小程序不展示，或仅 MOCK/沙箱环境启用）。
+        </div>
+        <div class="note" style="margin-top: 12px">
+          <b>发货推送（消息推送）· 现网已就绪</b><br />
+          MP → 开发 → 开发管理 → 消息推送（或虚拟支付「发货推送配置」）填写：<br />
+          · URL：<code>https://api.chancore.cn/api/app/v1/payments/virtual/notify</code><br />
+          · Token：与服务器 <code>WECHAT_PUSH_TOKEN</code> 一致（现网已配
+          <code>yunce_vp_697123d79c86744aff007904e22d2b0b</code>）<br />
+          · 加解密：必须选<strong>安全模式</strong>；EncodingAESKey 填服务器
+          <code>WECHAT_PUSH_ENCODING_AES_KEY</code>（43 字符，与 Token 一并配置）<br />
+          · 数据格式：<strong>XML</strong>；后端拒绝明文/兼容推送<br />
+          · 提交后微信会 GET 校验 Token；发货 POST 走 AES 解密 + 加密回包。
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. 运营后台 · 机构版本配置表</h2>
+        <p style="font-size: 13px; color: var(--muted); margin: 0 0 10px">
+          路径：运营后台 → 机构版本（Organization Versions）。可购条件：
+          <code>status=active</code> + <code>price &gt; 0</code> +
+          <code>virtualProductId</code> 非空。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>code</th>
+              <th>名称</th>
+              <th>price（分）</th>
+              <th>durationDays</th>
+              <th>会员</th>
+              <th>员工</th>
+              <th>校区</th>
+              <th>virtualProductId</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>BASIC_2Y</code></td>
+              <td>基础版-2年</td>
+              <td>35600</td>
+              <td>730</td>
+              <td>100</td>
+              <td>不限/-1</td>
+              <td>1</td>
+              <td>（填微信ID）</td>
+              <td>正式</td>
+            </tr>
+            <tr>
+              <td><code>BASIC_3Y</code></td>
+              <td>基础版-3年</td>
+              <td>49900</td>
+              <td>1095</td>
+              <td>100</td>
+              <td>不限/-1</td>
+              <td>1</td>
+              <td>（填微信ID）</td>
+              <td>正式</td>
+            </tr>
+            <tr>
+              <td><code>STANDARD_2Y</code></td>
+              <td>成长版-2年</td>
+              <td>71600</td>
+              <td>730</td>
+              <td>300</td>
+              <td>不限/-1</td>
+              <td>1</td>
+              <td>（填微信ID）</td>
+              <td>正式 · 建议开营销/线索</td>
+            </tr>
+            <tr>
+              <td><code>STANDARD_3Y</code></td>
+              <td>成长版-3年</td>
+              <td>99900</td>
+              <td>1095</td>
+              <td>300</td>
+              <td>不限/-1</td>
+              <td>1</td>
+              <td>（填微信ID）</td>
+              <td>正式 · <b>主推</b></td>
+            </tr>
+            <tr>
+              <td><code>FLAGSHIP_2Y</code></td>
+              <td>旗舰版-2年</td>
+              <td>179800</td>
+              <td>730</td>
+              <td>800</td>
+              <td>不限/-1</td>
+              <td><b>2</b></td>
+              <td>（填微信ID）</td>
+              <td>正式 · multiCampus</td>
+            </tr>
+            <tr>
+              <td><code>FLAGSHIP_3Y</code></td>
+              <td>旗舰版-3年</td>
+              <td>249900</td>
+              <td>1095</td>
+              <td>800</td>
+              <td>不限/-1</td>
+              <td><b>2</b></td>
+              <td>（填微信ID）</td>
+              <td>正式 · multiCampus</td>
+            </tr>
+            <tr class="test-row">
+              <td><code>TEST_PAY</code></td>
+              <td>支付联调测试</td>
+              <td>100（¥1）</td>
+              <td>1</td>
+              <td>20</td>
+              <td>2</td>
+              <td>1</td>
+              <td><code>yunce_test_pay_1y</code></td>
+              <td>
+                <span class="tag tag-test">测试</span> 原 ¥1 联调；保留，勿删
+              </td>
+            </tr>
+            <tr class="test-row">
+              <td><code>TEST_PAY_1FEN</code></td>
+              <td>sku test</td>
+              <td>1（¥0.01）</td>
+              <td>1</td>
+              <td>20</td>
+              <td>2</td>
+              <td>1</td>
+              <td><code>sku_test_1fen</code></td>
+              <td>
+                <span class="tag tag-test">测试</span> 你新建的 1 分道具；另建一行，勿覆盖
+                <code>TEST_PAY</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          前端选购页货架仍按 BASIC / STANDARD / FLAGSHIP + 2/3 年展示。若后台 code
+          使用上表 <code>*_2Y/*_3Y</code>，需前端下单匹配这些 code（或临时过渡：只上
+          <code>STANDARD_3Y</code> 等 3 年三条并对齐前端）。配置前与研发确认一版 code 命名。
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>3. 权限</h2>
+          <h3>小程序</h3>
+          <ul>
+            <li><b>查看会员页 / 下单</b>：仅 <code>principal</code>（校长）或 <code>admin</code>（管理员）</li>
+            <li>其它角色：提示「仅校长/管理员可查看会员权益」</li>
+            <li>API：<code>POST /payments/membership/orders</code> 校验校长机构，否则 403</li>
+          </ul>
+          <h3>运营后台</h3>
+          <ul>
+            <li>配置机构版本 / <code>virtualProductId</code>：运营人员（后台登录权限）</li>
+            <li>给机构改档、发激活码、补差升级：运营人工</li>
+            <li>众创申请 / 试用发放 / 校区加购：不走虚拟支付</li>
+          </ul>
+          <h3>不开放自助的</h3>
+          <ul>
+            <li>版本升级补差（任意金额）</li>
+            <li>额外校区 +¥200</li>
+            <li>众创 / 试用 / 公益免费</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>4. 服务端环境</h2>
+          <ul>
+            <li><code>VIRTUAL_PAY_OFFER_ID</code></li>
+            <li><code>VIRTUAL_PAY_APP_KEY</code></li>
+            <li>可选本地：<code>VIRTUAL_PAY_MOCK=true</code>（生产禁止）</li>
+            <li>支付结果推送：微信消息推送 URL / Token / EncodingAESKey（按现网支付文档）</li>
+          </ul>
+          <h3>可购判定（代码）</h3>
+          <ul>
+            <li><code>GET /payments/membership/skus</code> 只返回有道具 ID 且 price&gt;0 的 active 版本</li>
+            <li>小程序：有匹配 <code>durationDays</code>（≈730/1095）的 SKU 才显示「实付」</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>5. 验收清单</h2>
+        <ul class="check">
+          <li>微信 6 正式 + 2 测试道具已创建（含 <code>yunce_test_pay_1y</code> 与 <code>sku_test_1fen</code>），价格与表一致</li>
+          <li>后台 8 行版本已填 virtualProductId / price / durationDays（含 <code>TEST_PAY</code> + <code>TEST_PAY_1FEN</code>）</li>
+          <li>生产未开启 VIRTUAL_PAY_MOCK</li>
+          <li>校长账号：选「成长-3年」可下单并履约（或 MOCK 通）</li>
+          <li>两条测试道具均保留；仅测试机构/测试账号可测；测完可各自下架或清空道具 ID</li>
+          <li>员工/教练账号：无法进入会员购买</li>
+          <li>升级 / 加校区：走企微，无任意金额支付入口</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>6. 明确不做进虚拟支付的项</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>项目</th>
+              <th>标签</th>
+              <th>履约方式</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>众创版</td>
+              <td><span class="tag tag-skip">非支付</span></td>
+              <td>申请 → 企微 / 后台发放</td>
+            </tr>
+            <tr>
+              <td>试用（成长 14 天）</td>
+              <td><span class="tag tag-skip">非支付</span></td>
+              <td>审批后点激活起算</td>
+            </tr>
+            <tr>
+              <td>额外校区 +200/年</td>
+              <td><span class="tag tag-skip">非支付</span></td>
+              <td>运营 / 激活码（二期再道具）</td>
+            </tr>
+            <tr>
+              <td>升级补差</td>
+              <td><span class="tag tag-skip">非支付</span></td>
+              <td>联系运营核算</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

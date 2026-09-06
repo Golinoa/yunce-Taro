@@ -17,6 +17,7 @@ import { isParentRole, useAuth } from '@/utils/auth';
 import {
   clearIdentitySelectionPending,
   navigateAfterAuth,
+  needsOnboarding,
   needsProfileSetup,
 } from '@/utils/auth-onboarding';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
@@ -45,8 +46,15 @@ const IdentitySelect: React.FC = () => {
 
   useDidShow(() => {
     Taro.hideLoading();
-    if (profile && needsProfileSetup(profile)) {
+    if (!profile) return;
+    if (needsProfileSetup(profile)) {
       Taro.redirectTo({ url: '/package-auth/pages/profile-setup/index' });
+      return;
+    }
+    // 已有真实机构（如种子教师 org-yunce）却残留 pending：直接进业务端，避免误点「门店入驻」
+    if (!needsOnboarding(profile)) {
+      clearIdentitySelectionPending();
+      void navigateAfterAuth(profile, { isNewUser: false });
     }
   });
 

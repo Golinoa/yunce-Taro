@@ -6,7 +6,6 @@ import { scheduleDeferredAppStartup } from '@/utils/app-startup';
 import { AuthProvider } from '@/utils/auth';
 import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import { logError } from '@/utils/logger';
-import { privacyTraceBootstrap } from '@/utils/privacy-debug';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import 'uno.css';
 /**
@@ -49,12 +48,7 @@ import '@/components/teacher/SalaryEditSheet';
 import '@/components/PageContainer';
 import './app.scss';
 
-privacyTraceBootstrap();
 // 不注册 onNeedPrivacyAuthorization，保留微信系统原生隐私弹窗（图二）
-
-// 模块注入最早痕迹：若桌面启动连这行都没有，说明 JS 尚未执行就退出（非业务代码闪退）
-// eslint-disable-next-line no-console
-console.warn('[App] module loaded');
 
 // H-02：全局未捕获错误兜底上报（经 utils/logger 门控，生产可剥离）
 if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {

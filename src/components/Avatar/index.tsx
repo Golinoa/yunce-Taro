@@ -1,4 +1,4 @@
-import { Image } from '@tarojs/components';
+import { Image, View } from '@tarojs/components';
 import cn from 'classnames';
 import React, { useEffect, useState } from 'react';
 import { BRAND_LOGO } from '@/constants/brand';
@@ -8,7 +8,11 @@ import { resolveAvatarSrc } from '@/utils/avatar-src';
  * Avatar - 全局统一头像组件
  *
  * 未上传头像 / 图片加载失败 → 统一品牌 Logo（sgpk.png），禁止空态问号或姓氏色块冒充默认头像。
+ * 圆形：外层 View overflow-hidden + Image borderRadius:50%（Image 勿再 overflow，易裁切不全）。
  */
+
+/** 微信小程序可靠圆形：容器 overflow + 图片 borderRadius（勿给 Image 再加 overflow，易裁切不全） */
+const CIRCLE_STYLE = { borderRadius: '50%' as const };
 
 export interface AvatarProps {
   /** 显示名称（兼容旧调用；默认头像不再依赖首字） */
@@ -27,12 +31,13 @@ export interface AvatarProps {
   onClick?: () => void;
 }
 
+/** 全部用 rpx，避免 w-20/rem 在小程序里尺寸漂移 */
 const SIZE_MAP = {
-  sm: { container: 'w-12 h-12' },
+  sm: { container: 'w-[48rpx] h-[48rpx]' },
   md: { container: 'w-[68rpx] h-[68rpx]' },
   mlg: { container: 'w-[72rpx] h-[72rpx]' },
-  lg: { container: 'w-20 h-20' },
-  xl: { container: 'w-40 h-40' },
+  lg: { container: 'w-[80rpx] h-[80rpx]' },
+  xl: { container: 'w-[160rpx] h-[160rpx]' },
 } as const;
 
 const Avatar: React.FC<AvatarProps> = ({
@@ -52,17 +57,23 @@ const Avatar: React.FC<AvatarProps> = ({
   }, [avatarUrl]);
 
   return (
-    <Image
-      src={src}
-      mode="aspectFill"
-      className={cn('rounded-full flex-shrink-0 bg-white', container, className)}
+    <View
+      className={cn('rounded-full flex-shrink-0 overflow-hidden bg-white', container, className)}
+      style={CIRCLE_STYLE}
       onClick={onClick}
-      onError={() => {
-        if (src !== BRAND_LOGO) {
-          setSrc(BRAND_LOGO);
-        }
-      }}
-    />
+    >
+      <Image
+        src={src}
+        mode="aspectFill"
+        className="h-full w-full block rounded-full"
+        style={CIRCLE_STYLE}
+        onError={() => {
+          if (src !== BRAND_LOGO) {
+            setSrc(BRAND_LOGO);
+          }
+        }}
+      />
+    </View>
   );
 };
 

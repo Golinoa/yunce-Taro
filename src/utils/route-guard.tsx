@@ -122,6 +122,7 @@ export const PAGE_ROLE_REQUIREMENTS: Record<string, UserRole[]> = {
   'package-statistics/pages/alert-detail/index': MANAGER_ROLES,
   // —— 机构配置类系统设置（运行前角色校验） ——
   'package-settings/pages/permission-settings/index': ['admin'],
+  'package-settings/pages/role-titles/index': ['admin'],
   'package-settings/pages/threshold-config/index': ['admin'],
   // 主题颜色：全员个人偏好（本地缓存），不限制角色
   'package-settings/pages/todo-settings/index': MANAGER_ROLES,

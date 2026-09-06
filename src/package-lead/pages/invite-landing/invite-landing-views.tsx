@@ -8,6 +8,8 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO, ORG_COVER_IMAGE } from '@/constants/brand';
 import type { CampusUIModel } from '@/types/campus';
+import type { CampusOpenStatus } from '@/utils/campus';
+import { campusOpenStatusLabel } from '@/utils/campus';
 import type { TrialInviteDockAction } from '@/utils/invite-landing-flow';
 import type { InviteLandingChildGender } from '@/utils/invite-landing-params';
 
@@ -47,7 +49,7 @@ export const InviteLandingLoginGate: React.FC<{
 export const InviteLandingSuccessView: React.FC<{
   homeBtnTop: number;
   campus: CampusUIModel | null;
-  campusOpen: boolean;
+  campusOpenStatus: CampusOpenStatus;
   businessTime: string;
   courseTitle: string;
   childName: string;
@@ -62,7 +64,7 @@ export const InviteLandingSuccessView: React.FC<{
 }> = ({
   homeBtnTop,
   campus,
-  campusOpen,
+  campusOpenStatus,
   businessTime,
   courseTitle,
   childName,
@@ -110,30 +112,28 @@ export const InviteLandingSuccessView: React.FC<{
               <View
                 className={cn(
                   'flex items-center gap-[6rpx] rounded-[10rpx] px-[12rpx] py-[4rpx]',
-                  campusOpen ? 'bg-success-bg' : 'bg-muted',
+                  campusOpenStatus === 'open' ? 'bg-success-bg' : 'bg-muted',
                 )}
               >
                 <View
                   className={cn(
                     'h-[12rpx] w-[12rpx] rounded-full',
-                    campusOpen ? 'bg-success' : 'bg-muted-foreground',
+                    campusOpenStatus === 'open' ? 'bg-success' : 'bg-muted-foreground',
                   )}
                 />
                 <Text
                   className={cn(
                     'text-[22rpx] font-medium',
-                    campusOpen ? 'text-success' : 'text-muted-foreground',
+                    campusOpenStatus === 'open' ? 'text-success' : 'text-muted-foreground',
                   )}
                 >
-                  {campusOpen ? '营业中' : '休息中'}
+                  {campusOpenStatusLabel(campusOpenStatus)}
                 </Text>
               </View>
             </View>
-            {businessTime ? (
-              <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
-                营业时间 {businessTime}
-              </Text>
-            ) : null}
+            <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
+              营业时间 {businessTime || '未设置'}
+            </Text>
           </View>
         </View>
 
@@ -190,7 +190,7 @@ export const InviteLandingSuccessView: React.FC<{
         </View>
         <Text className="mt-[24rpx] text-[40rpx] font-bold text-foreground">预约成功</Text>
         <Text className="mt-[12rpx] text-center text-[24rpx] leading-relaxed text-muted-foreground">
-          试听名额已锁定。可导航到店或电话联系校区。
+          试听名额已锁定。孩子资料已写入「我的 → 子女资料」，可导航到店或电话联系校区。
         </Text>
       </View>
 

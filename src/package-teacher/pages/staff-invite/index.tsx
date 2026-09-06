@@ -16,15 +16,10 @@ import {
   type CampusInviteRoleCode,
   type CreateCampusInviteResult,
 } from '@/services/campus-invite';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useAuth } from '@/utils/auth';
 import { copyCampusInviteLink } from '@/utils/invite-staff-link';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
-
-const ROLE_OPTIONS: { code: CampusInviteRoleCode; label: string; desc: string }[] = [
-  { code: 'campus_teacher', label: '授课教师', desc: '排课、消课、查看本人薪资' },
-  { code: 'campus_reception', label: '前台', desc: '预约签到、开卡续费' },
-  { code: 'campus_principal', label: '校区校长', desc: '校区管理与邀请权限' },
-];
 
 const EXPIRE_MINUTES = 24 * 60;
 
@@ -38,13 +33,36 @@ function formatExpireAt(iso: string): string {
 const StaffInvitePage: React.FC = () => {
   useCardNavigationBar();
   const { profile } = useAuth();
+  const titles = useRoleGlossaryStore((s) => s.titles);
+  const loadTitles = useRoleGlossaryStore((s) => s.load);
+
+  const ROLE_OPTIONS: { code: CampusInviteRoleCode; label: string; desc: string }[] = useMemo(
+    () => [
+      {
+        code: 'campus_principal',
+        label: titles.manager,
+        desc: '校区管理与邀请',
+      },
+      {
+        code: 'campus_teacher',
+        label: titles.teacher,
+        desc: '排课、消课、本人薪资',
+      },
+      {
+        code: 'campus_reception',
+        label: '前台',
+        desc: '预约签到、开卡续费',
+      },
+    ],
+    [titles],
+  );
   const router = useRouter();
   const targetTeacherId = decodeURIComponent(router.params?.teacherId || '').trim();
   const isPointToPoint = Boolean(targetTeacherId);
 
   const [campusId, setCampusId] = useState('');
   const [campusName, setCampusName] = useState('');
-  const [roleCode, setRoleCode] = useState<CampusInviteRoleCode>('campus_teacher');
+  const [roleCode, setRoleCode] = useState<CampusInviteRoleCode>('campus_principal');
   const [creating, setCreating] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [invites, setInvites] = useState<CampusInviteItem[]>([]);
@@ -75,6 +93,7 @@ const StaffInvitePage: React.FC = () => {
   }, [isPointToPoint, targetTeacherId]);
 
   useDidShow(() => {
+    void loadTitles();
     void loadContext();
     void loadInvites();
   });

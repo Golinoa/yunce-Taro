@@ -1,14 +1,15 @@
 /**
  * BindEmailSheet - 绑定邮箱（邮箱验证码 + 登录密码）
+ * 视觉对齐 WechatBindDialog：居中弹窗 + 稍后提醒，非底部 Sheet。
  * 发码：POST /auth/email-code purpose=BIND
  * 绑定：POST /auth/wechat-bind { email, code, password }
  */
-import { View, Text } from '@tarojs/components';
+import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
-import BottomSheet from '@/components/BottomSheet';
 import FormInput from '@/components/FormInput';
+import Icon from '@/components/Icon';
 import { EMAIL_PATTERN } from '@/constants/email-auth';
 import { useEmailOtpSend } from '@/utils/use-email-otp-send';
 
@@ -19,6 +20,8 @@ export interface BindEmailSheetProps {
   visible: boolean;
   submitting?: boolean;
   onClose: () => void;
+  /** 稍后提醒（关闭并静默一段时间）；未传则等同 onClose */
+  onLater?: () => void;
   /** 发送绑定验证码 */
   onSendCode: (
     email: string,
@@ -30,6 +33,7 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
   visible,
   submitting = false,
   onClose,
+  onLater,
   onSendCode,
   onSubmit,
 }) => {
@@ -100,84 +104,123 @@ const BindEmailSheet: React.FC<BindEmailSheetProps> = ({
     void onSubmit({ email: trimmed, code: code.trim(), password });
   }, [code, confirmPassword, email, onSubmit, password]);
 
+  if (!visible) return null;
+
   return (
-    <BottomSheet
-      visible={visible}
-      title="绑定邮箱"
-      onClose={onClose}
-      height="auto"
-      maxHeightLimit="85vh"
-      keyboardAware
-      scrollable
-    >
-      <View className="flex flex-col gap-[24rpx] px-[8rpx] pb-[16rpx]">
-        <Text className="text-[26rpx] leading-relaxed text-muted-foreground">
-          绑定后可用邮箱登录与找回密码。请先获取邮箱验证码，再设置登录密码。
-        </Text>
-        <FormInput
-          label="邮箱"
-          type="text"
-          placeholder="请输入邮箱"
-          value={email}
-          onInput={(e) => setEmail(e.detail.value)}
-          required
-        />
-        <View>
-          <FormInput
-            label="验证码"
-            type="number"
-            maxlength={6}
-            placeholder="请输入验证码"
-            value={code}
-            onInput={(e) => setCode(e.detail.value)}
-            required
-          />
-          <View className="mt-[12rpx] flex items-center justify-between">
-            <Text className="text-[22rpx] text-muted-foreground">
-              {maskedHint ? `已发送至 ${maskedHint}` : '验证码 5 分钟内有效'}
-            </Text>
-            <Text
-              className={cn(
-                'text-[26rpx] font-semibold',
-                sendDisabled ? 'text-muted-foreground' : 'text-primary',
-              )}
-              onClick={sendDisabled ? undefined : () => void handleSendCode()}
-            >
-              {sendLabel}
-            </Text>
+    <View className="fixed inset-0 z-200 flex items-center justify-center">
+      <View
+        className="absolute inset-0 bg-black/45"
+        catchMove
+        onClick={() => {
+          if (!submitting) onClose();
+        }}
+      />
+
+      <View className="relative mx-[48rpx] w-[640rpx] max-h-[82vh] rounded-[24rpx] bg-white overflow-hidden shadow-elegant">
+        <View className="relative px-[40rpx] pt-[40rpx] pb-[16rpx]">
+          <View
+            className={cn(
+              'absolute right-[16rpx] top-[16rpx] p-[12rpx] active:opacity-70',
+              submitting && 'opacity-40 pointer-events-none',
+            )}
+            onClick={() => {
+              if (!submitting) onClose();
+            }}
+          >
+            <Icon name="mdi-close" size="md" color="muted" />
           </View>
-        </View>
-        <FormInput
-          label="登录密码"
-          password
-          placeholder={`${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} 位密码`}
-          value={password}
-          onInput={(e) => setPassword(e.detail.value)}
-          maxlength={MAX_PASSWORD_LENGTH}
-          required
-        />
-        <FormInput
-          label="确认密码"
-          password
-          placeholder="再次输入密码"
-          value={confirmPassword}
-          onInput={(e) => setConfirmPassword(e.detail.value)}
-          maxlength={MAX_PASSWORD_LENGTH}
-          required
-        />
-        <View
-          className={cn(
-            'mt-[8rpx] center h-[96rpx] rounded-[28rpx] bg-gradient-primary active:opacity-90',
-            submitting && 'opacity-60',
-          )}
-          onClick={submitting ? undefined : handleSubmit}
-        >
-          <Text className="text-[32rpx] font-bold text-white">
-            {submitting ? '绑定中...' : '确认绑定'}
+          <Text className="text-[34rpx] font-semibold text-foreground text-center block">
+            绑定邮箱
+          </Text>
+          <Text className="text-[26rpx] text-muted-foreground text-center block leading-[1.6] mt-[16rpx]">
+            建议绑定，便于登录与找回账号；先获取验证码，再设置密码，可随时跳过
           </Text>
         </View>
+
+        <ScrollView scrollY className="max-h-[52vh]">
+          <View className="px-[40rpx] pb-[24rpx]">
+            <FormInput
+              label="邮箱"
+              type="text"
+              placeholder="请输入邮箱"
+              value={email}
+              onInput={(e) => setEmail(e.detail.value)}
+              className="mb-[20rpx]"
+            />
+            <View className="mb-[20rpx]">
+              <FormInput
+                label="验证码"
+                type="number"
+                maxlength={6}
+                placeholder="请输入验证码"
+                value={code}
+                onInput={(e) => setCode(e.detail.value)}
+              />
+              <View className="mt-[12rpx] flex items-center justify-between">
+                <Text className="text-[22rpx] text-muted-foreground">
+                  {maskedHint ? `已发送至 ${maskedHint}` : '验证码 5 分钟内有效'}
+                </Text>
+                <Text
+                  className={cn(
+                    'text-[26rpx] font-semibold',
+                    sendDisabled ? 'text-muted-foreground' : 'text-primary',
+                  )}
+                  onClick={sendDisabled ? undefined : () => void handleSendCode()}
+                >
+                  {sendLabel}
+                </Text>
+              </View>
+            </View>
+            <FormInput
+              label="设置密码"
+              password
+              placeholder="请设置登录密码"
+              value={password}
+              onInput={(e) => setPassword(e.detail.value)}
+              maxlength={MAX_PASSWORD_LENGTH}
+              hint={`${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH}位，后续可用邮箱登录`}
+              className="mb-[20rpx]"
+            />
+            <FormInput
+              label="确认密码"
+              password
+              placeholder="请再次输入密码"
+              value={confirmPassword}
+              onInput={(e) => setConfirmPassword(e.detail.value)}
+              maxlength={MAX_PASSWORD_LENGTH}
+            />
+          </View>
+        </ScrollView>
+
+        <View className="px-[40rpx] pb-[40rpx] pt-[8rpx]">
+          <View
+            className={cn(
+              'h-[88rpx] rounded-full flex items-center justify-center',
+              'bg-primary active:opacity-90',
+              submitting && 'opacity-50',
+            )}
+            onClick={submitting ? undefined : handleSubmit}
+          >
+            <Text className="text-[32rpx] font-semibold text-white">
+              {submitting ? '提交中…' : '确认绑定'}
+            </Text>
+          </View>
+          <View
+            className={cn(
+              'h-[72rpx] mt-[12rpx] rounded-full flex items-center justify-center active:opacity-70',
+              submitting && 'opacity-40 pointer-events-none',
+            )}
+            onClick={() => {
+              if (submitting) return;
+              if (onLater) onLater();
+              else onClose();
+            }}
+          >
+            <Text className="text-[28rpx] text-muted-foreground">稍后提醒</Text>
+          </View>
+        </View>
       </View>
-    </BottomSheet>
+    </View>
   );
 };
 

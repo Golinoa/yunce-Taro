@@ -1,14 +1,13 @@
 # 微信授权 + 日历同步 · 实施提示词（已拍板）
 
-> **拍板结论**：`Q1 A1 Q2 B1 Q3 C1 Q4 D1 Q5 E2 Q6 F1`  
-> **决策页**：[wechat-auth-decision.html](../PM/wechat-auth-decision.html)  
+> **拍板结论**：`Q1 A1 Q2 B1 Q3 C1 Q4 D1 Q5 E2 Q6 F1`（决策 HTML 已归档删除，以本文件为准）  
 > **Git 起点**：FE `1614ee8`（动手前 `git status` 确认是否有未提交改动）
 
 ---
 
 ## Agent 提示词（复制以下全文）
 
-```
+````
 任务：按已拍板方案实现微信官方授权 + 日历权限引导，最小 diff，FE/BE 对齐，CI 全绿。
 
 ## 拍板（不可偏离）
@@ -84,7 +83,7 @@ Q6 F1  课表/排课 showModal 说明保留（不改文案/流程）
 npm run check
 npm test
 npm run coverage    # lines ≥ 30%，禁止下调 vitest.config.ts thresholds
-```
+````
 
 新增/更新单测（最小）：
 
@@ -93,6 +92,7 @@ npm run coverage    # lines ≥ 30%，禁止下调 vitest.config.ts thresholds
 - 若动 profile-edit 逻辑：仅在有现成 test 时更新；无则不强造页面 test
 
 **后端**：本任务 **默认不改**。若第 0 步发现 calendar-sync 契约缺口：
+
 - 在 `yunce-back/yunce-backend` 最小修 validator/controller
 - 跑 `npm run verify:sop` 全绿
 - FE report 字段与 BE schema 一致
@@ -111,6 +111,7 @@ npm run coverage    # lines ≥ 30%，禁止下调 vitest.config.ts thresholds
 - 扩大 scope 重构、改无关业务、下调 coverage 门槛
 - 未跑 CI 就声称完成
 - 未经用户要求 git commit
+
 ```
 
 ---
@@ -141,6 +142,7 @@ npm run coverage    # lines ≥ 30%，禁止下调 vitest.config.ts thresholds
 
 ## 真机 smoke（改完后）
 
-1. 完善资料 / 个人中心改头像 → 原生 sheet 含相册；选相册未授权会弹隐私/权限  
-2. 学员建档选头像 → 仍走相册（非 chooseAvatar）  
+1. 完善资料 / 个人中心改头像 → 原生 sheet 含相册；选相册未授权会弹隐私/权限
+2. 学员建档选头像 → 仍走相册（非 chooseAvatar）
 3. 设置开启同步日历 → 可拒订阅仍写入；拒系统日历权限 → 出现「去设置」
+```

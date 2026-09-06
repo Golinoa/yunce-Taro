@@ -3,15 +3,15 @@ import path from 'node:path';
 import { defineConfig, type UserConfigExport } from '@tarojs/cli';
 import UnoCSS from '@unocss/webpack';
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
+import packageJson from '../package.json';
 import devConfig from './dev';
-import prodConfig from './prod';
 import { applyMockExcludeWebpack } from './mock-exclude';
+import prodConfig from './prod';
 
-const packageJson = require('../package.json') as { version: string };
 const PROD_API_BASE_URL = 'https://api.chancore.cn/api/app/v1';
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
-export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
+export default defineConfig<'webpack5'>(async (merge) => {
   // 默认生产模式：Mock 关、API 指向线上。测环境用 build:weapp:dev / dev:weapp:dev。
   // *:weapp:mock 脚本已移除；生产构建若误带 VITE_USE_MOCK=true 会被强制关闭并告警（G-01 守卫）。
   let useMock = process.env.VITE_USE_MOCK ?? 'false';
@@ -70,6 +70,56 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
         {
           from: 'src/assets/images/cover-home.webp',
           to: 'dist/assets/images/cover-home.webp',
+        },
+        // 维修企微码：原 PNG ~78KB 过大；压缩 WebP ~26KB（≤封面量级）可进主包，展示/保存仍优先 CDN 原图
+        {
+          from: 'src/assets/images/support-repair-qr.webp',
+          to: 'dist/assets/images/support-repair-qr.webp',
+        },
+        {
+          from: 'src/assets/images/qr-point-hand.png',
+          to: 'dist/assets/images/qr-point-hand.png',
+        },
+        // 首页金刚区 3D 瓷片（单张约 6–11KB，合计约 80KB）
+        {
+          from: 'src/assets/images/icon-book.webp',
+          to: 'dist/assets/images/icon-book.webp',
+        },
+        {
+          from: 'src/assets/images/icon-calendar-check.webp',
+          to: 'dist/assets/images/icon-calendar-check.webp',
+        },
+        {
+          from: 'src/assets/images/icon-crown.webp',
+          to: 'dist/assets/images/icon-crown.webp',
+        },
+        {
+          from: 'src/assets/images/icon-customer-service.webp',
+          to: 'dist/assets/images/icon-customer-service.webp',
+        },
+        {
+          from: 'src/assets/images/icon-lightning.webp',
+          to: 'dist/assets/images/icon-lightning.webp',
+        },
+        {
+          from: 'src/assets/images/icon-rocket.webp',
+          to: 'dist/assets/images/icon-rocket.webp',
+        },
+        {
+          from: 'src/assets/images/icon-users.webp',
+          to: 'dist/assets/images/icon-users.webp',
+        },
+        {
+          from: 'src/assets/images/icon-wallet-pink.webp',
+          to: 'dist/assets/images/icon-wallet-pink.webp',
+        },
+        {
+          from: 'src/assets/images/icon-wallet-purple.webp',
+          to: 'dist/assets/images/icon-wallet-purple.webp',
+        },
+        {
+          from: 'src/assets/images/icon-wallet-yen.webp',
+          to: 'dist/assets/images/icon-wallet-yen.webp',
         },
         {
           from: 'src/package-settings/assets/wx.webp',

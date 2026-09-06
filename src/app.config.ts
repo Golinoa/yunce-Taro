@@ -121,6 +121,7 @@ export default defineAppConfig({
         'pages/todo-collaborator/index',
         'pages/audit-log/index',
         'pages/theme-settings/index',
+        'pages/role-titles/index',
         'pages/feedback/index',
         'pages/help/index',
         'pages/notification-send/index',

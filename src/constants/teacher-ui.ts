@@ -50,9 +50,9 @@ export const STATUS_OPTIONS = [
   { label: '全部状态', value: 'all' },
 ];
 
-/** 员工身份预设选项 */
+/** 员工身份预设选项（店长=校区管理岗 Org ADMIN，≠ 机构 OWNER「管理员」） */
 export const TEACHER_IDENTITY_OPTIONS = [
-  { label: '校长', value: 'principal' },
+  { label: '店长', value: 'principal' },
   { label: '老师', value: 'teacher' },
   { label: '助教', value: 'assistant' },
   { label: '前台', value: 'reception' },

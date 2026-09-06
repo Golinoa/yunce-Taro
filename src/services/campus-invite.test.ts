@@ -11,7 +11,7 @@ describe('campus-invite point-to-point payload', () => {
     ).toEqual({
       campusId: '11111111-1111-1111-1111-111111111111',
       targetTeacherId: '22222222-2222-2222-2222-222222222222',
-      roleCode: 'campus_teacher',
+      roleCode: 'campus_principal',
       expireMinutes: 24 * 60,
     });
   });

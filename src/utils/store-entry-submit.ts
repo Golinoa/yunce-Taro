@@ -43,5 +43,6 @@ export function applyStoreEntryDraftToForm(
     longitude: draft.longitude,
     contactName: draft.contactName || '',
     contactPhone: draft.contactPhone || '',
+    businessHours: draft.businessHours || '',
   };
 }

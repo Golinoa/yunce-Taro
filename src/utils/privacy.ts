@@ -4,13 +4,6 @@
 import Taro from '@tarojs/taro';
 import { usePrivacyStore } from '@/stores/privacy';
 import { logDebug } from '@/utils/logger';
-import {
-  privacyApiSupport,
-  privacyNewFlowId,
-  privacyTrace,
-  privacyTraceBootstrap,
-  privacyTraceQuerySetting,
-} from '@/utils/privacy-debug';
 
 let listenerReady = false;
 let listenerReadyWaiters: Array<() => void> = [];
@@ -22,7 +15,6 @@ export interface InitPrivacyOptions {
 
 function markListenerReady(): void {
   listenerReady = true;
-  privacyTrace('listener.ready');
   const waiters = listenerReadyWaiters;
   listenerReadyWaiters = [];
   waiters.forEach((w) => w());
@@ -33,17 +25,13 @@ export function waitPrivacyListenerReady(timeoutMs = 5000): Promise<void> {
   if (listenerReady) return Promise.resolve();
   if (process.env.TARO_ENV !== 'weapp') return Promise.resolve();
 
-  privacyTrace('listener.wait.start', { timeoutMs });
-
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       listenerReadyWaiters = listenerReadyWaiters.filter((w) => w !== onReady);
-      privacyTrace('listener.wait.timeout', { timeoutMs });
       resolve();
     }, timeoutMs);
     const onReady = () => {
       clearTimeout(timer);
-      privacyTrace('listener.wait.resolved');
       resolve();
     };
     listenerReadyWaiters.push(onReady);
@@ -57,16 +45,10 @@ export function isPrivacyListenerReady(): boolean {
 export function getPrivacyNeedAuthorization(): Promise<boolean> {
   if (process.env.TARO_ENV !== 'weapp') return Promise.resolve(false);
 
-  privacyTrace('getPrivacyNeedAuthorization.start');
-
   return new Promise((resolve) => {
     Taro.getPrivacySetting({
       success: (res) => {
         logDebug('privacy.getPrivacySetting', {
-          needAuthorization: res.needAuthorization,
-          privacyContractName: res.privacyContractName,
-        });
-        privacyTrace('getPrivacyNeedAuthorization.success', {
           needAuthorization: res.needAuthorization,
           privacyContractName: res.privacyContractName,
         });
@@ -79,7 +61,6 @@ export function getPrivacyNeedAuthorization(): Promise<boolean> {
       },
       fail: (err) => {
         logDebug('privacy.getPrivacySetting.fail', err);
-        privacyTrace('getPrivacyNeedAuthorization.fail', { err });
         usePrivacyStore.getState().setNeedAuthorization(true);
         usePrivacyStore.getState().setStatus('need');
         resolve(true);
@@ -89,31 +70,21 @@ export function getPrivacyNeedAuthorization(): Promise<boolean> {
 }
 
 export function registerPrivacyListener(): void {
-  privacyTraceBootstrap();
-
   if (process.env.TARO_ENV !== 'weapp') {
     markListenerReady();
     return;
   }
   if (listenerReady) {
-    privacyTrace('registerListener.skip', { reason: 'already-ready' });
     return;
   }
 
   if (typeof Taro.onNeedPrivacyAuthorization !== 'function') {
     logDebug('privacy.registerListener', '当前基础库/Taro 不支持 onNeedPrivacyAuthorization');
-    privacyTrace('registerListener.unsupported', { apis: privacyApiSupport() });
     markListenerReady();
     return;
   }
 
-  privacyTrace('registerListener.attach');
-
-  Taro.onNeedPrivacyAuthorization((resolve, eventInfo) => {
-    privacyTrace('onNeedPrivacyAuthorization.fired', {
-      referrer: (eventInfo as { referrer?: string } | undefined)?.referrer,
-      eventInfo,
-    });
+  Taro.onNeedPrivacyAuthorization((resolve) => {
     usePrivacyStore.getState().enqueue(resolve);
   });
   markListenerReady();
@@ -122,14 +93,8 @@ export function registerPrivacyListener(): void {
 export function initPrivacy(_options?: InitPrivacyOptions): void {
   if (process.env.TARO_ENV !== 'weapp') return;
 
-  privacyTrace('initPrivacy.start', { options: _options });
-
   Taro.getPrivacySetting({
     success: (res) => {
-      privacyTrace('initPrivacy.getPrivacySetting.success', {
-        needAuthorization: res.needAuthorization,
-        privacyContractName: res.privacyContractName,
-      });
       const store = usePrivacyStore.getState();
       store.setContractName(res.privacyContractName);
       store.setNeedAuthorization(res.needAuthorization);
@@ -139,16 +104,10 @@ export function initPrivacy(_options?: InitPrivacyOptions): void {
         store.setStatus('need');
       }
     },
-    fail: (err) => {
-      privacyTrace('initPrivacy.getPrivacySetting.fail', { err });
+    fail: () => {
       usePrivacyStore.getState().setStatus('unknown');
     },
   });
-}
-
-/** 登录页等场景：主动 dump 一次微信侧隐私状态（不改变业务逻辑） */
-export function debugDumpPrivacySetting(reason: string): void {
-  privacyTraceQuerySetting(reason);
 }
 
 function getRequirePrivacyAuthorize():
@@ -188,21 +147,13 @@ function showPrivacyDeniedToast(): void {
   });
 }
 
-function invokeOfficialPrivacyRequire(
-  reason: string,
-  flowId: string,
-  handlers: {
-    tracePrefix: string;
-    showDeniedToast?: boolean;
-    onSuccess?: () => void;
-    onFail?: (err: { errMsg?: string }) => void;
-  },
-): void {
-  privacyTrace(handlers.tracePrefix, { reason, flowId });
-
+function invokeOfficialPrivacyRequire(handlers: {
+  showDeniedToast?: boolean;
+  onSuccess?: () => void;
+  onFail?: (err: { errMsg?: string }) => void;
+}): void {
   const requirePrivacyAuthorize = getRequirePrivacyAuthorize();
   if (typeof requirePrivacyAuthorize !== 'function') {
-    privacyTrace('officialPrivacy.unsupported', { reason, flowId });
     if (handlers.showDeniedToast) {
       showPrivacyDeniedToast();
     }
@@ -212,12 +163,10 @@ function invokeOfficialPrivacyRequire(
 
   requirePrivacyAuthorize({
     success: () => {
-      privacyTrace(`${handlers.tracePrefix}.success`, { reason, flowId });
       markPrivacyAuthorized();
       handlers.onSuccess?.();
     },
     fail: (err) => {
-      privacyTrace(`${handlers.tracePrefix}.fail`, { reason, flowId, errMsg: err?.errMsg, err });
       markPrivacyDenied();
       if (handlers.showDeniedToast) {
         showPrivacyDeniedToast();
@@ -236,8 +185,7 @@ export function promptOfficialPrivacyOnUserAction(
   onAuthorized: () => void,
   onDenied?: () => void,
 ): void {
-  const flowId = privacyNewFlowId('userAction');
-  privacyTrace('officialPrivacy.userAction', { reason, flowId });
+  void reason;
 
   if (process.env.TARO_ENV !== 'weapp') {
     onAuthorized();
@@ -246,13 +194,11 @@ export function promptOfficialPrivacyOnUserAction(
 
   const store = usePrivacyStore.getState();
   if (store.status === 'authorized' && !store.needAuthorization) {
-    privacyTrace('officialPrivacy.userAction.skip.alreadyAuthorized', { reason, flowId });
     onAuthorized();
     return;
   }
 
-  invokeOfficialPrivacyRequire(reason, flowId, {
-    tracePrefix: 'officialPrivacy.userAction',
+  invokeOfficialPrivacyRequire({
     showDeniedToast: true,
     onSuccess: onAuthorized,
     onFail: () => onDenied?.(),
@@ -269,16 +215,13 @@ export function promptWechatOfficialPrivacyOnPageEnter(
   options?: OfficialPrivacyPageEnterOptions,
 ): () => void {
   if (process.env.TARO_ENV !== 'weapp') return () => {};
+  void reason;
 
   const delayMs = options?.delayMs ?? 450;
-  const flowId = privacyNewFlowId('pageEnter');
-  privacyTrace('officialPrivacy.pageEnter.schedule', { reason, flowId, delayMs });
 
   const timer = setTimeout(() => {
     if (typeof Taro.getPrivacySetting !== 'function') {
-      invokeOfficialPrivacyRequire(reason, flowId, {
-        tracePrefix: 'officialPrivacy.pageEnter',
-      });
+      invokeOfficialPrivacyRequire({});
       return;
     }
 
@@ -286,22 +229,16 @@ export function promptWechatOfficialPrivacyOnPageEnter(
       success: (res) => {
         usePrivacyStore.getState().setContractName(res.privacyContractName);
         if (!res.needAuthorization) {
-          privacyTrace('officialPrivacy.pageEnter.skip.alreadyAuthorized', { reason, flowId });
           usePrivacyStore.getState().setNeedAuthorization(false);
           usePrivacyStore.getState().setStatus('authorized');
           return;
         }
         usePrivacyStore.getState().setNeedAuthorization(true);
         usePrivacyStore.getState().setStatus('need');
-        invokeOfficialPrivacyRequire(reason, flowId, {
-          tracePrefix: 'officialPrivacy.pageEnter',
-        });
+        invokeOfficialPrivacyRequire({});
       },
-      fail: (err) => {
-        privacyTrace('officialPrivacy.pageEnter.queryFail', { reason, flowId, err });
-        invokeOfficialPrivacyRequire(reason, flowId, {
-          tracePrefix: 'officialPrivacy.pageEnter',
-        });
+      fail: () => {
+        invokeOfficialPrivacyRequire({});
       },
     });
   }, delayMs);

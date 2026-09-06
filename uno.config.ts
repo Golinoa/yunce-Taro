@@ -150,8 +150,7 @@ export default defineConfig({
           '{0% { box-shadow: 0 0 0 0 rgba(255,160,108,0.5) } 70% { box-shadow: 0 0 0 24rpx rgba(255,160,108,0) } 100% { box-shadow: 0 0 0 0 rgba(255,160,108,0) }}',
         'radar-scale':
           '{0% { transform: scale(1); opacity: 0.6 } 70% { transform: scale(2.2); opacity: 0 } 100% { transform: scale(2.2); opacity: 0 }}',
-        'badge-scale':
-          '{0%, 100% { transform: scale(1) } 50% { transform: scale(1.12) }}',
+        'badge-scale': '{0%, 100% { transform: scale(1) } 50% { transform: scale(1.12) }}',
         'radar-ring':
           '{0% { transform: scale(1); opacity: 0 } 20% { opacity: 0.45 } 100% { transform: scale(2.4); opacity: 0 }}',
         'popover-in':
@@ -352,7 +351,10 @@ export default defineConfig({
     // ===== 个人中心橙色主题（接入主题系统，随 theme class 切换） =====
     [
       'bg-profile-orange',
-      { background: 'linear-gradient(135deg, var(--profile-primary) 0%, var(--profile-primary) 100%)' },
+      {
+        background:
+          'linear-gradient(135deg, var(--profile-primary) 0%, var(--profile-primary) 100%)',
+      },
     ],
     ['text-profile-orange', { color: 'var(--profile-primary)' }],
     ['text-profile-orange-soft', { color: 'var(--profile-primary-soft)' }],
@@ -379,10 +381,7 @@ export default defineConfig({
     ['bg-progress-purple-track', { background: 'hsl(var(--accent) / 0.15)' }],
 
     // ===== 店铺管理 onboarding 橙色进度条 =====
-    [
-      'bg-progress-orange',
-      { background: 'linear-gradient(90deg, #FF8A2A 0%, #FCA45C 100%)' },
-    ],
+    ['bg-progress-orange', { background: 'linear-gradient(90deg, #FF8A2A 0%, #FCA45C 100%)' }],
     ['bg-progress-orange-track', { background: 'rgba(255, 138, 42, 0.15)' }],
 
     // ===== 进度条 6 等分宽度兜底（确保微信小程序生成） =====
@@ -489,18 +488,9 @@ export default defineConfig({
     ['text-amber-500', { color: 'hsl(var(--warning))' }],
 
     // ===== 班级颜色主题（统一色板，用户口径 2026-08-23：与课程管理/今日课表 classColorHex 一致） =====
-    [
-      'bg-class-primary',
-      { background: 'linear-gradient(135deg, #5EC8A8, #7dd8bc)' },
-    ],
-    [
-      'bg-class-red',
-      { background: 'linear-gradient(135deg, #E57373, #f2a0a0)' },
-    ],
-    [
-      'bg-class-amber',
-      { background: 'linear-gradient(135deg, #D4A24E, #e8c47a)' },
-    ],
+    ['bg-class-primary', { background: 'linear-gradient(135deg, #5EC8A8, #7dd8bc)' }],
+    ['bg-class-red', { background: 'linear-gradient(135deg, #E57373, #f2a0a0)' }],
+    ['bg-class-amber', { background: 'linear-gradient(135deg, #D4A24E, #e8c47a)' }],
     [
       'bg-gradient-amber',
       {
@@ -508,18 +498,9 @@ export default defineConfig({
         'box-shadow': '0 3px 10px rgba(212,162,78,0.35)',
       },
     ],
-    [
-      'bg-class-purple',
-      { background: 'linear-gradient(135deg, #9B7ED8, #bda4e8)' },
-    ],
-    [
-      'bg-class-info',
-      { background: 'linear-gradient(135deg, #6BA3D6, #93c5e8)' },
-    ],
-    [
-      'bg-class-teal',
-      { background: 'linear-gradient(135deg, #4FC3B7, #8adfd6)' },
-    ],
+    ['bg-class-purple', { background: 'linear-gradient(135deg, #9B7ED8, #bda4e8)' }],
+    ['bg-class-info', { background: 'linear-gradient(135deg, #6BA3D6, #93c5e8)' }],
+    ['bg-class-teal', { background: 'linear-gradient(135deg, #4FC3B7, #8adfd6)' }],
     ['text-purple', { color: 'hsl(var(--accent))' }],
     ['bg-purple-10', { background: 'hsl(var(--accent) / 0.1)' }],
     ['bg-purple-50', { background: 'hsl(var(--accent) / 0.5)' }],
@@ -746,8 +727,7 @@ export default defineConfig({
     [
       'course-type-normal-bg',
       {
-        background:
-          'linear-gradient(135deg, hsl(var(--primary)/0.08), hsl(var(--primary)/0.15))',
+        background: 'linear-gradient(135deg, hsl(var(--primary)/0.08), hsl(var(--primary)/0.15))',
       },
     ],
     ['course-type-normal-text', { color: 'hsl(var(--primary))' }],
@@ -830,10 +810,7 @@ export default defineConfig({
     ['course-btn-view', { background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }],
 
     // 课程状态 — 标签（使用 theme token）
-    [
-      'course-tag-booking',
-      { background: 'hsl(var(--primary)/0.1)', color: 'hsl(var(--primary))' },
-    ],
+    ['course-tag-booking', { background: 'hsl(var(--primary)/0.1)', color: 'hsl(var(--primary))' }],
     ['course-tag-done', { background: 'hsl(var(--success)/0.1)', color: 'hsl(var(--success))' }],
     [
       'course-tag-ended',
@@ -906,10 +883,10 @@ export default defineConfig({
     'state-loading': 'opacity-50 pointer-events-none',
 
     // ===== 全局按钮规范 =====
-    // 主按钮（确认/提交）：h-[96rpx] + 圆角
-    'btn-primary': 'h-[96rpx] rounded-2xl flex items-center justify-center press-scale',
-    // 次按钮（选择/更换）：h-[88rpx] + 圆角
-    'btn-secondary': 'h-[88rpx] rounded-2xl flex items-center justify-center press-scale',
+    // 主按钮（确认/提交）：h-[96rpx] + Token 圆角（--radius-button / rounded-button = 48rpx）
+    'btn-primary': 'h-[96rpx] rounded-button flex items-center justify-center press-scale',
+    // 次按钮（选择/更换）：h-[88rpx] + 同上圆角，与登录主/次 CTA 一致
+    'btn-secondary': 'h-[88rpx] rounded-button flex items-center justify-center press-scale',
 
     // ===== 全局标签规范 =====
     // 状态标签：统一 padding + 圆角 + 不换行防挤压（2026-08-23：rounded 在 applet 不生成，改 rounded-full）
@@ -1044,14 +1021,16 @@ export default defineConfig({
       background: 'linear-gradient(180deg, #F0F4FF 0%, #F5F8FF 35%, #FFFFFF 100%)',
     },
     'bg-login-glow': {
-      background: 'radial-gradient(circle, rgba(59,110,245,0.12) 0%, rgba(59,110,245,0.03) 55%, transparent 70%)',
+      background:
+        'radial-gradient(circle, rgba(59,110,245,0.12) 0%, rgba(59,110,245,0.03) 55%, transparent 70%)',
       filter: 'blur(12rpx)',
     },
     'bg-login-orb': {
       'background-color': 'rgba(255,255,255,0.55)',
       'backdrop-filter': 'blur(24rpx)',
       border: '2rpx solid rgba(255,255,255,0.7)',
-      'box-shadow': 'inset 0 0 60rpx rgba(255,255,255,0.9), 0 32rpx 80rpx -28rpx rgba(59,110,245,0.18)',
+      'box-shadow':
+        'inset 0 0 60rpx rgba(255,255,255,0.9), 0 32rpx 80rpx -28rpx rgba(59,110,245,0.18)',
     },
     'shadow-login-btn': { 'box-shadow': '0 16rpx 44rpx rgba(59,110,245,0.25)' },
     'shadow-wechat-btn': { 'box-shadow': '0 16rpx 40rpx rgba(7,193,96,0.28)' },

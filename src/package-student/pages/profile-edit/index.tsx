@@ -350,6 +350,7 @@ const ProfileEdit: React.FC = () => {
 
   // 添加子女弹窗
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [addingChild, setAddingChild] = useState(false);
   const [childForm, setChildForm] = useState({
     name: '',
     nickname: '',
@@ -377,11 +378,40 @@ const ProfileEdit: React.FC = () => {
     });
   }, []);
 
-  // 添加子女：家长不可自建档案，引导使用机构邀请码绑定
+  // 添加子女：手动建档 + StudentParent(BOUND)；也可通过邀请码绑定
   const handleAddChild = useCallback(async () => {
-    setShowAddSheet(false);
-    resetChildForm();
-  }, [resetChildForm]);
+    const name = childForm.name.trim();
+    if (!name) {
+      Taro.showToast({ title: '请填写孩子姓名', icon: 'none' });
+      return;
+    }
+    if (addingChild) return;
+    setAddingChild(true);
+    try {
+      const created = await studentService.createMyChild({
+        name,
+        nickname: childForm.nickname.trim() || undefined,
+        gender: childForm.gender || undefined,
+        birthday: childForm.birthday || undefined,
+        relation: childForm.relation || '子女',
+      });
+      setShowAddSheet(false);
+      resetChildForm();
+      Taro.showToast({
+        title: created.reused ? '已关联同名子女' : '添加成功',
+        icon: 'success',
+      });
+      await loadChildren();
+    } catch (err) {
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message?: string }).message || '')
+          : '';
+      Taro.showToast({ title: msg || '添加失败', icon: 'none' });
+    } finally {
+      setAddingChild(false);
+    }
+  }, [addingChild, childForm, loadChildren, resetChildForm]);
 
   return (
     <View className="min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]">
@@ -431,6 +461,7 @@ const ProfileEdit: React.FC = () => {
                     {privacyReady ? (
                       <Button
                         className="w-[120rpx] h-[120rpx] rounded-full overflow-hidden p-0 m-0 after:border-none border-none bg-transparent active:opacity-90"
+                        style={{ borderRadius: '50%', overflow: 'hidden' }}
                         plain
                         hoverClass="none"
                         openType="chooseAvatar"
@@ -440,17 +471,20 @@ const ProfileEdit: React.FC = () => {
                         <Image
                           src={resolveAvatarSrc(draft.avatar_url || BRAND_LOGO)}
                           className="w-full h-full rounded-full"
+                          style={{ borderRadius: '50%' }}
                           mode="aspectFill"
                         />
                       </Button>
                     ) : (
                       <View
                         className="w-[120rpx] h-[120rpx] rounded-full overflow-hidden active:opacity-90"
+                        style={{ borderRadius: '50%', overflow: 'hidden' }}
                         onClick={handleAvatarTap}
                       >
                         <Image
                           src={resolveAvatarSrc(draft.avatar_url || BRAND_LOGO)}
                           className="w-full h-full rounded-full"
+                          style={{ borderRadius: '50%' }}
                           mode="aspectFill"
                         />
                       </View>
@@ -470,15 +504,20 @@ const ProfileEdit: React.FC = () => {
                 label="昵称"
                 right={
                   privacyReady ? (
-                    <Input
-                      key={`nickname-ready-${profile?.id ?? 'edit'}`}
-                      type="nickname"
-                      className="flex-1 text-[30rpx] text-foreground text-right"
-                      placeholder="点选微信昵称，或自行填写"
-                      defaultValue={draft.nickname}
-                      onInput={(e) => updateField('nickname', e.detail.value || '')}
-                      maxlength={20}
-                    />
+                    <View className="flex-1 flex flex-col items-end gap-[4rpx]">
+                      <Input
+                        key={`nickname-ready-${profile?.id ?? 'edit'}`}
+                        type="nickname"
+                        className="w-full text-[30rpx] text-foreground text-right"
+                        placeholder="点此选用微信昵称，或直接输入"
+                        defaultValue={draft.nickname}
+                        onInput={(e) => updateField('nickname', e.detail.value || '')}
+                        maxlength={20}
+                      />
+                      <Text className="text-[22rpx] text-muted-foreground">
+                        可手改；点输入框可拉取微信昵称
+                      </Text>
+                    </View>
                   ) : (
                     <View
                       className="flex-1 flex items-center justify-end"
@@ -692,23 +731,98 @@ const ProfileEdit: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* ====== 添加子女：引导邀请码绑定（禁止家长自建档案） ====== */}
+      {/* ====== 添加子女：手动建档 ====== */}
       <BottomSheet
         visible={showAddSheet}
         title="添加子女"
-        onClose={() => setShowAddSheet(false)}
+        onClose={() => {
+          if (addingChild) return;
+          setShowAddSheet(false);
+        }}
         height="auto"
         maxHeightLimit="75vh"
       >
         <View className="px-[32rpx] pb-[40rpx]">
-          <Text className="text-[28rpx] text-muted-foreground leading-[1.6]">
-            添加孩子请向机构索取学员邀请码，在「我的」页使用邀请码绑定。家长不可自行建档。
+          <View className="bg-muted/40 rounded-2xl overflow-hidden mb-[24rpx]">
+            <FieldRow
+              label="姓名"
+              right={
+                <FormInput
+                  variant="ghost"
+                  placeholder="必填"
+                  value={childForm.name}
+                  maxlength={20}
+                  onInput={(e) => setChildForm((prev) => ({ ...prev, name: e.detail.value || '' }))}
+                />
+              }
+            />
+            <FieldRow
+              label="昵称"
+              right={
+                <FormInput
+                  variant="ghost"
+                  placeholder="选填"
+                  value={childForm.nickname}
+                  maxlength={20}
+                  onInput={(e) =>
+                    setChildForm((prev) => ({ ...prev, nickname: e.detail.value || '' }))
+                  }
+                />
+              }
+            />
+            <FieldRow
+              label="关系"
+              right={
+                <View
+                  className="flex items-center justify-end gap-[8rpx] press-scale"
+                  onClick={() => setSelector({ visible: true, type: 'relation' })}
+                >
+                  <SelectValue value={childForm.relation || undefined} placeholder="请选择" />
+                  <RowArrow />
+                </View>
+              }
+            />
+            <FieldRow
+              label="性别"
+              right={
+                <View
+                  className="flex items-center justify-end gap-[8rpx] press-scale"
+                  onClick={() => setSelector({ visible: true, type: 'childGender' })}
+                >
+                  <SelectValue
+                    value={childForm.gender ? GENDER_LABEL[childForm.gender] : undefined}
+                    placeholder="请选择"
+                  />
+                  <RowArrow />
+                </View>
+              }
+            />
+            <FieldRow
+              label="生日"
+              right={
+                <View
+                  className="flex items-center justify-end gap-[8rpx] press-scale"
+                  onClick={() => setDatePickerTarget('childBirthday')}
+                >
+                  <SelectValue value={childForm.birthday || undefined} placeholder="选填" />
+                  <RowArrow />
+                </View>
+              }
+            />
+          </View>
+          <Text className="text-[24rpx] text-muted-foreground leading-[1.5] mb-[24rpx] block">
+            也可通过机构学员邀请码在「我的」页绑定已有档案。约课填写孩子后会自动出现在此列表。
           </Text>
           <View
-            className="h-[96rpx] rounded-2xl center press-scale mt-[24rpx] bg-gradient-primary shadow-elegant"
+            className={cn(
+              'h-[96rpx] rounded-2xl center press-scale bg-gradient-primary shadow-elegant',
+              addingChild && 'opacity-60',
+            )}
             onClick={() => void handleAddChild()}
           >
-            <Text className="text-[30rpx] font-semibold text-white">我知道了</Text>
+            <Text className="text-[30rpx] font-semibold text-white">
+              {addingChild ? '提交中…' : '确认添加'}
+            </Text>
           </View>
         </View>
       </BottomSheet>

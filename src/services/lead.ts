@@ -210,6 +210,7 @@ export async function submitInviteLanding(params: {
   message: string;
   lead_id: string;
   booking_id: string | null;
+  student_id?: string | null;
   status: string;
   booking_status: string | null;
   lesson_expired: boolean;

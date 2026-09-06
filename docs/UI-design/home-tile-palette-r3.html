@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>首页瓷片区 · 配色第三轮（灵感检索后）</title>
+  <style>
+    :root {
+      --page-bg: #f6f4f1;
+      --ink: #1a2230;
+      --muted: #667085;
+      --card: #fff;
+      --line: rgba(26, 34, 48, 0.08);
+      --pick: #3b6ef5;
+      --keep: #0d9488;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(900px 480px at 5% -5%, #e8eefc 0%, transparent 50%),
+        radial-gradient(800px 420px at 100% 0%, #fce8f3 0%, transparent 45%),
+        var(--page-bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    header {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: blur(12px);
+      background: rgba(246, 244, 241, 0.92);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 20px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 700; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 720px; }
+    .picked {
+      font-size: 13px; padding: 8px 12px; border-radius: 999px;
+      background: #fff; border: 1px solid var(--line); min-width: 200px;
+    }
+    .picked strong { color: var(--pick); }
+    .sources {
+      margin: 12px 20px 0; padding: 12px 14px; border-radius: 14px;
+      background: #fff; border: 1px solid var(--line); font-size: 12px; color: var(--muted);
+      max-width: 1140px;
+    }
+    .sources b { color: var(--ink); }
+    .sources a { color: var(--pick); }
+    nav.dirs {
+      display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px 0;
+      max-width: 1180px; margin: 0 auto;
+    }
+    nav.dirs a {
+      text-decoration: none; color: var(--ink); font-size: 12px; font-weight: 600;
+      padding: 6px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line);
+    }
+    nav.dirs a.keep { border-color: rgba(13,148,136,.35); color: var(--keep); }
+    main { max-width: 1180px; margin: 0 auto; padding: 8px 20px 64px; }
+    section { margin-top: 28px; }
+    section > h2 { margin: 0 0 6px; font-size: 18px; }
+    section > .desc { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+    }
+    .opt {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 12px;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s;
+      text-align: left; width: 100%; font: inherit; color: inherit;
+    }
+    .opt:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(26,34,48,.08); }
+    .opt.is-on { border-color: var(--pick); box-shadow: 0 0 0 2px rgba(59,110,245,.25); }
+    .opt.is-keep { border-color: rgba(13,148,136,.45); }
+    .opt-meta { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; align-items: baseline; }
+    .opt-meta .id { font-size: 11px; font-weight: 700; color: var(--pick); }
+    .opt.is-keep .opt-meta .id { color: var(--keep); }
+    .opt-meta .name { font-size: 13px; font-weight: 700; }
+    .opt-meta .note { font-size: 11px; color: var(--muted); }
+    .tag-keep {
+      display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 800;
+      color: #fff; background: var(--keep); padding: 1px 6px; border-radius: 999px;
+    }
+    .tiles {
+      display: flex; gap: 0; min-height: 148px; align-items: stretch;
+      background: #f3f1ec; border-radius: 14px; padding: 10px; overflow: hidden;
+    }
+    .left {
+      flex: 1.35; margin-right: -8px; border-radius: 18px; overflow: hidden;
+      clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+      padding: 12px 10px 10px 12px;
+      display: flex; flex-direction: column; min-height: 148px;
+      position: relative;
+    }
+    .right { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+    .side {
+      flex: 1; border-radius: 14px; overflow: hidden;
+      padding: 8px 8px 8px 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      min-height: 66px; position: relative;
+    }
+    .side.top { clip-path: polygon(14px 0, 100% 0, 100% 100%, 8px 100%); }
+    .side.bot { clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%); }
+    .clayish {
+      box-shadow:
+        4px 6px 14px rgba(80, 70, 140, 0.12),
+        inset 0 1px 0 rgba(255,255,255,.55),
+        inset 0 -6px 12px rgba(80, 70, 140, 0.08);
+    }
+    .t-title { font-size: 13px; font-weight: 800; color: #1a2230; }
+    .t-sub { font-size: 10px; font-weight: 600; margin-top: 2px; white-space: pre-line; line-height: 1.25; }
+    .badge {
+      display: inline-block; margin-left: 6px; font-size: 9px; font-weight: 800; color: #fff;
+      background: linear-gradient(90deg, #ef4444, #f97316); padding: 1px 5px; border-radius: 4px;
+    }
+    .go {
+      margin-top: auto; align-self: flex-start;
+      background: #fff; border-radius: 999px; padding: 4px 14px;
+      font-size: 12px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .ico {
+      width: 42px; height: 42px; object-fit: contain; flex-shrink: 0;
+      filter: drop-shadow(0 4px 8px rgba(26,34,48,.12));
+    }
+    .left .ico { width: 56px; height: 56px; align-self: flex-end; transform: rotate(18deg); }
+    .row-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; gap: 6px; }
+    .swatches { display: flex; gap: 4px; margin-top: 8px; }
+    .swatches i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.08); display: block; }
+    footer {
+      margin-top: 36px; padding: 16px; border-radius: 14px; background: #fff; border: 1px solid var(--line);
+      font-size: 12px; color: var(--muted);
+    }
+    code { background: #f0f2f7; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>瓷片配色 · 第三轮（联网灵感后重做）</h1>
+      <p>仅保留 <b>A5</b> / <b>F2</b>。其余按「瓷片规范 · Clay 色票 · Aurora/Mesh · 白瓷叠色」四条线索重开，不再沿用第二轮方向。</p>
+    </div>
+    <div class="picked">当前选择：<strong id="picked">未选</strong></div>
+  </header>
+
+  <div class="sources" style="margin-left:auto;margin-right:auto">
+    <b>灵感来源（摘要）</b>：
+    优设/站酷「瓷片区」— 高明度低饱和、颜色向白过渡、同色系/邻近色渐变、局部配图；
+    <a href="https://www.setproduct.com/blog/claymorphism-design-guide" target="_blank" rel="noreferrer">Claymorphism 色票</a>
+   （lavender / sky / peach / pink / mint）；
+    教育向 Soft Pastel Mesh（peach · blush · sky · lavender）；
+    Glass 白透明叠在有色晕上。
+  </div>
+
+  <nav class="dirs">
+    <a class="keep" href="#keep">保留 A5 / F2</a>
+    <a href="#m">M · 瓷片经典向白</a>
+    <a href="#n">N · Clay 糖果面</a>
+    <a href="#o">O · Aurora Mesh</a>
+    <a href="#p">P · 白瓷叠色晕</a>
+    <a href="#q">Q · 运营纯色块</a>
+  </nav>
+
+  <main>
+    <section id="keep">
+      <h2>保留</h2>
+      <p class="desc">上一轮你明确留下的两套，继续作对照基准。</p>
+      <div class="grid" id="grid-keep"></div>
+    </section>
+
+    <section id="m">
+      <h2>M · 瓷片经典：颜色 → 白色过渡</h2>
+      <p class="desc">站酷要点：选定一色向白过渡 / 同色系饱和变化 / 邻近色。预约不用脏绿，改邻近暖粉或雾蓝。</p>
+      <div class="grid" id="grid-m"></div>
+    </section>
+
+    <section id="n">
+      <h2>N · Clay 糖果面（Setproduct 色票落地）</h2>
+      <p class="desc">lavender / sky / peach / pink 等 pastel 表面 + 同色相阴影感（预览用轻 inset）。教育/友好产品常用。</p>
+      <div class="grid" id="grid-n"></div>
+    </section>
+
+    <section id="o">
+      <h2>O · Aurora / Soft Mesh 浅落</h2>
+      <p class="desc">多层径向叠加模拟 mesh：peach ↔ blush ↔ sky ↔ lavender，中心留白保证可读。</p>
+      <div class="grid" id="grid-o"></div>
+    </section>
+
+    <section id="p">
+      <h2>P · 白瓷 + 角落色晕（Glass 思路）</h2>
+      <p class="desc">卡片本体接近白，只在角上放有色弥散；接近玻璃卡叠在彩色底上的感觉，但斜切角度不变。</p>
+      <div class="grid" id="grid-p"></div>
+    </section>
+
+    <section id="q">
+      <h2>Q · 运营纯色块（高明度低饱和）</h2>
+      <p class="desc">电商瓷片常见：几乎平涂的浅色块区分模块，渐变极弱，靠 icon 出彩。</p>
+      <div class="grid" id="grid-q"></div>
+    </section>
+
+    <footer>
+      文件 <code>yunceTaro/docs/UI-design/home-tile-palette-r3.html</code>
+      · 选定后回编号（如 <b>N3</b> / <b>O2</b>，或继续 <b>A5</b> / <b>F2</b>）。
+    </footer>
+  </main>
+
+  <script>
+    const ICO = {
+      rocket: '../../src/assets/images/icon-rocket.webp',
+      cal: '../../src/assets/images/icon-calendar-check.webp',
+      users: '../../src/assets/images/icon-users.webp',
+    };
+
+    const KEEP = [
+      {
+        id: 'A5', name: '火箭带橙高光', note: '保留', keep: true,
+        left: 'linear-gradient(145deg,#EEF2FF 0%,#E0E9FF 55%,#FFE8E0 120%)',
+        side1: 'linear-gradient(145deg,#EAF8F4,#D2EFE8)',
+        side2: 'linear-gradient(145deg,#ECF3FB,#D6E6F7)',
+        a1: '#2563EB', a2: '#0F766E', a3: '#3B82F6',
+      },
+      {
+        id: 'F2', name: '蓝紫姊妹', note: '保留', keep: true,
+        left: 'linear-gradient(145deg,#EEF3FF,#D8E4FF)',
+        side1: 'linear-gradient(145deg,#F3F0FF,#E4DCFF)',
+        side2: 'linear-gradient(145deg,#F0EEFF,#DDD8FF)',
+        a1: '#3B6EF5', a2: '#7C3AED', a3: '#6D28D9',
+      },
+    ];
+
+    const DATA = {
+      /* M: 向白过渡 / 邻近色 — UISDC/ZCOOL */
+      m: [
+        {
+          id: 'M1', name: '蓝→白 / 粉→白 / 靛→白', note: '经典向白',
+          left: 'linear-gradient(160deg,#C9DAFF 0%,#F7F9FF 72%)',
+          side1: 'linear-gradient(160deg,#FFD0DE 0%,#FFF8FA 72%)',
+          side2: 'linear-gradient(160deg,#D4D0FF 0%,#F8F7FF 72%)',
+          a1: '#2563EB', a2: '#DB2777', a3: '#6366F1',
+        },
+        {
+          id: 'M2', name: '同色系蓝三阶', note: '饱和递减',
+          left: 'linear-gradient(160deg,#A8C4FF 0%,#F5F8FF 75%)',
+          side1: 'linear-gradient(160deg,#C5D8FF 0%,#F7F9FF 75%)',
+          side2: 'linear-gradient(160deg,#DCE7FF 0%,#FAFBFF 75%)',
+          a1: '#1D4ED8', a2: '#3B6EF5', a3: '#60A5FA',
+        },
+        {
+          id: 'M3', name: '邻近：蓝-青瓷-紫', note: '相邻色相',
+          left: 'linear-gradient(160deg,#B8D0FF 0%,#F6F9FF 70%)',
+          side1: 'linear-gradient(160deg,#B8E8E4 0%,#F5FBFA 70%)',
+          side2: 'linear-gradient(160deg,#D0C8FF 0%,#F7F5FF 70%)',
+          a1: '#2563EB', a2: '#0E8A9A', a3: '#7C3AED',
+        },
+        {
+          id: 'M4', name: '邻近：靛-桃-雾蓝', note: '去脏绿',
+          left: 'linear-gradient(160deg,#C8C4FF 0%,#F7F6FF 70%)',
+          side1: 'linear-gradient(160deg,#FFD4C4 0%,#FFF8F5 70%)',
+          side2: 'linear-gradient(160deg,#C8DCFF 0%,#F6F9FF 70%)',
+          a1: '#4F46E5', a2: '#E85D3A', a3: '#3B82F6',
+        },
+        {
+          id: 'M5', name: '浅灰底+色头', note: '近似乳白底板',
+          left: 'linear-gradient(180deg,#DCE6FF 0%,#F4F2EF 55%)',
+          side1: 'linear-gradient(180deg,#FFDCE8 0%,#F4F2EF 55%)',
+          side2: 'linear-gradient(180deg,#E0DCFF 0%,#F4F2EF 55%)',
+          a1: '#3B6EF5', a2: '#E11D48', a3: '#7C3AED',
+        },
+        {
+          id: 'M6', name: '火箭橙邻接', note: 'icon 暖高光入底',
+          left: 'linear-gradient(160deg,#B8CCFF 0%,#FFE8DC 55%,#FFF9F6 85%)',
+          side1: 'linear-gradient(160deg,#FFD0E0 0%,#FFF7FA 75%)',
+          side2: 'linear-gradient(160deg,#D0DCFF 0%,#F7F9FF 75%)',
+          a1: '#2563EB', a2: '#DB2777', a3: '#4F46E5',
+        },
+      ],
+      /* N: clay tokens from setproduct */
+      n: [
+        {
+          id: 'N1', name: 'Lavender · Pink · Sky', note: '官方色票组合',
+          left: 'linear-gradient(145deg,#D4C8FF,#B8A6FF)',
+          side1: 'linear-gradient(145deg,#F8C8DC,#F5B8D0)',
+          side2: 'linear-gradient(145deg,#B8D8F5,#9EC9F0)',
+          a1: '#4C3D99', a2: '#9D3F66', a3: '#2F6FA0', clay: true,
+        },
+        {
+          id: 'N2', name: 'Sky · Peach · Lavender', note: '教育友好',
+          left: 'linear-gradient(145deg,#B8D8F5,#9EC9F0)',
+          side1: 'linear-gradient(145deg,#FFCBB8,#FFB59E)',
+          side2: 'linear-gradient(145deg,#D4C8FF,#B8A6FF)',
+          a1: '#2F6FA0', a2: '#C45C3E', a3: '#4C3D99', clay: true,
+        },
+        {
+          id: 'N3', name: 'Peach · Pink · Sky', note: '暖主场',
+          left: 'linear-gradient(145deg,#FFCBB8,#FFB59E)',
+          side1: 'linear-gradient(145deg,#F8C8DC,#F5B8D0)',
+          side2: 'linear-gradient(145deg,#B8D8F5,#9EC9F0)',
+          a1: '#C45C3E', a2: '#9D3F66', a3: '#2F6FA0', clay: true,
+        },
+        {
+          id: 'N4', name: '浅化 Clay（更耐看）', note: '色票 × 向白',
+          left: 'linear-gradient(145deg,#E8E0FF,#F7F5FF)',
+          side1: 'linear-gradient(145deg,#FFE4EC,#FFF8FA)',
+          side2: 'linear-gradient(145deg,#DCECF8,#F6FAFD)',
+          a1: '#5B4BB5', a2: '#C04570', a3: '#3B7EB0', clay: true,
+        },
+        {
+          id: 'N5', name: 'Lemon 点缀左卡', note: 'attention',
+          left: 'linear-gradient(145deg,#F8E8A8,#F5D77A)',
+          side1: 'linear-gradient(145deg,#F8C8DC,#F5B8D0)',
+          side2: 'linear-gradient(145deg,#D4C8FF,#B8A6FF)',
+          a1: '#8A6A10', a2: '#9D3F66', a3: '#4C3D99', clay: true,
+        },
+        {
+          id: 'N6', name: 'Mint 克制版', note: 'mint 仅学员',
+          left: 'linear-gradient(145deg,#D4C8FF,#B8A6FF)',
+          side1: 'linear-gradient(145deg,#FFCBB8,#FFB59E)',
+          side2: 'linear-gradient(145deg,#A8E4C8,#7DD4A8)',
+          a1: '#4C3D99', a2: '#C45C3E', a3: '#2F7A55', clay: true,
+        },
+      ],
+      /* O: aurora / soft mesh */
+      o: [
+        {
+          id: 'O1', name: 'Aurora Blush', note: '粉紫peach',
+          left: 'radial-gradient(90% 80% at 100% 100%,#FFD0B8 0%,#E8ECFF 45%,#F8F7FF 100%)',
+          side1: 'radial-gradient(90% 80% at 100% 0%,#FFB8D0 0%,#FFF5F8 50%,#FFFFFF 100%)',
+          side2: 'radial-gradient(90% 80% at 100% 0%,#C8B8FF 0%,#F4F0FF 50%,#FFFFFF 100%)',
+          a1: '#4F46E5', a2: '#DB2777', a3: '#7C3AED',
+        },
+        {
+          id: 'O2', name: 'Cloud Peach-Sky', note: '云雾过渡',
+          left: 'radial-gradient(80% 70% at 80% 90%,#FFD8C0 0%,transparent 55%),linear-gradient(160deg,#EAF2FF,#FFFFFF)',
+          side1: 'radial-gradient(80% 70% at 95% 10%,#FFC0D4 0%,transparent 55%),linear-gradient(160deg,#FFF5F8,#FFFFFF)',
+          side2: 'radial-gradient(80% 70% at 95% 10%,#B8D4FF 0%,transparent 55%),linear-gradient(160deg,#F2F7FF,#FFFFFF)',
+          a1: '#2563EB', a2: '#E11D48', a3: '#3B82F6',
+        },
+        {
+          id: 'O3', name: 'Dreamy Purple', note: '安眠紫浅落',
+          left: 'radial-gradient(100% 90% at 0% 0%,#D8D0FF 0%,#F6F4FF 55%,#FFFFFF 100%)',
+          side1: 'radial-gradient(100% 90% at 100% 0%,#F5C8DC 0%,#FFF6FA 55%,#FFFFFF 100%)',
+          side2: 'radial-gradient(100% 90% at 100% 100%,#C8D8FF 0%,#F4F7FF 55%,#FFFFFF 100%)',
+          a1: '#5B21B6', a2: '#BE185D', a3: '#4338CA',
+        },
+        {
+          id: 'O4', name: '双层 mesh 蓝橙', note: '贴近 A5 精神',
+          left: 'radial-gradient(70% 60% at 100% 100%,#FFC8A8 0%,transparent 50%),radial-gradient(70% 60% at 0% 0%,#A8C4FF 0%,#F5F8FF 60%)',
+          side1: 'radial-gradient(70% 60% at 100% 0%,#FFB0C8 0%,transparent 50%),linear-gradient(#FFF8FA,#FFFFFF)',
+          side2: 'radial-gradient(70% 60% at 100% 0%,#B0C0FF 0%,transparent 50%),linear-gradient(#F6F8FF,#FFFFFF)',
+          a1: '#2563EB', a2: '#DB2777', a3: '#4F46E5',
+        },
+        {
+          id: 'O5', name: 'Lavender Dream', note: 'spa 感',
+          left: 'radial-gradient(90% 80% at 50% 120%,#C8B8FF 0%,#F3F0FF 50%,#FFFFFF 100%)',
+          side1: 'radial-gradient(90% 80% at 100% -10%,#FFD0E0 0%,#FFF7FA 50%,#FFFFFF 100%)',
+          side2: 'radial-gradient(90% 80% at 100% -10%,#D0E0FF 0%,#F5F8FF 50%,#FFFFFF 100%)',
+          a1: '#6D28D9', a2: '#DB2777', a3: '#3B82F6',
+        },
+        {
+          id: 'O6', name: 'Twilight 浅版', note: '紫青交汇',
+          left: 'radial-gradient(80% 70% at 100% 80%,#A8B8FF 0%,transparent 45%),radial-gradient(80% 70% at 0% 20%,#E0C8FF 0%,#F8F6FF 55%)',
+          side1: 'radial-gradient(80% 70% at 90% 0%,#FFC0D8 0%,#FFF5F8 55%)',
+          side2: 'radial-gradient(80% 70% at 90% 0%,#B0E0F0 0%,#F4FBFC 55%)',
+          a1: '#4338CA', a2: '#BE185D', a3: '#0E7490',
+        },
+      ],
+      /* P: glass white + corner tint */
+      p: [
+        {
+          id: 'P1', name: '白瓷角晕 · 蓝粉靛', note: 'Glass 思路',
+          left: 'radial-gradient(90% 80% at 100% 100%,rgba(59,110,245,.22),rgba(255,255,255,.96) 55%)',
+          side1: 'radial-gradient(90% 80% at 100% 0%,rgba(225,29,72,.18),rgba(255,255,255,.96) 55%)',
+          side2: 'radial-gradient(90% 80% at 100% 0%,rgba(99,102,241,.2),rgba(255,255,255,.96) 55%)',
+          a1: '#2563EB', a2: '#E11D48', a3: '#6366F1',
+        },
+        {
+          id: 'P2', name: '白瓷角晕 · 贴近 F2', note: '蓝紫姊妹浅版',
+          left: 'radial-gradient(85% 75% at 90% 90%,rgba(59,110,245,.2),#FFFFFF 58%)',
+          side1: 'radial-gradient(85% 75% at 95% 15%,rgba(124,58,237,.18),#FFFFFF 58%)',
+          side2: 'radial-gradient(85% 75% at 95% 15%,rgba(109,40,217,.16),#FFFFFF 58%)',
+          a1: '#3B6EF5', a2: '#7C3AED', a3: '#6D28D9',
+        },
+        {
+          id: 'P3', name: '白瓷对角光', note: '边框感弱',
+          left: 'linear-gradient(135deg,rgba(255,255,255,.98),rgba(200,214,255,.35))',
+          side1: 'linear-gradient(135deg,rgba(255,255,255,.98),rgba(255,200,220,.32))',
+          side2: 'linear-gradient(135deg,rgba(255,255,255,.98),rgba(210,200,255,.32))',
+          a1: '#3B6EF5', a2: '#DB2777', a3: '#7C3AED',
+        },
+        {
+          id: 'P4', name: '磨砂白统一', note: '几乎同色',
+          left: 'linear-gradient(160deg,rgba(255,255,255,.97),rgba(232,238,250,.85))',
+          side1: 'linear-gradient(160deg,rgba(255,255,255,.97),rgba(250,232,240,.85))',
+          side2: 'linear-gradient(160deg,rgba(255,255,255,.97),rgba(236,232,250,.85))',
+          a1: '#3B6EF5', a2: '#C2255C', a3: '#7048E8',
+        },
+        {
+          id: 'P5', name: '白瓷 + 火箭橙晕', note: '呼应 A5',
+          left: 'radial-gradient(80% 70% at 100% 100%,rgba(255,160,110,.28),rgba(255,255,255,.97) 52%)',
+          side1: 'radial-gradient(80% 70% at 100% 0%,rgba(255,140,180,.2),rgba(255,255,255,.97) 52%)',
+          side2: 'radial-gradient(80% 70% at 100% 0%,rgba(120,150,255,.2),rgba(255,255,255,.97) 52%)',
+          a1: '#EA580C', a2: '#DB2777', a3: '#3B6EF5',
+        },
+        {
+          id: 'P6', name: '高透彩边', note: '色只在边缘',
+          left: 'radial-gradient(60% 50% at 100% 100%,rgba(37,99,235,.28),transparent 70%),#FFFFFF',
+          side1: 'radial-gradient(60% 50% at 100% 0%,rgba(219,39,119,.22),transparent 70%),#FFFFFF',
+          side2: 'radial-gradient(60% 50% at 100% 0%,rgba(124,58,237,.22),transparent 70%),#FFFFFF',
+          a1: '#2563EB', a2: '#DB2777', a3: '#7C3AED',
+        },
+      ],
+      /* Q: flat high-lightness low-sat blocks */
+      q: [
+        {
+          id: 'Q1', name: '运营三色平涂', note: '高明度低饱和',
+          left: '#E8EEFF',
+          side1: '#FFE8F0',
+          side2: '#EEE8FF',
+          a1: '#3B6EF5', a2: '#E11D48', a3: '#7C3AED',
+        },
+        {
+          id: 'Q2', name: '蓝阶平涂', note: '同相三明度',
+          left: '#D6E4FF',
+          side1: '#E8F0FF',
+          side2: '#F0F5FF',
+          a1: '#1D4ED8', a2: '#3B6EF5', a3: '#60A5FA',
+        },
+        {
+          id: 'Q3', name: '桃粉靛平涂', note: '电商常见',
+          left: '#EAF2FF',
+          side1: '#FFE4D6',
+          side2: '#EDE6FF',
+          a1: '#2563EB', a2: '#E85D3A', a3: '#7C3AED',
+        },
+        {
+          id: 'Q4', name: '极浅运营位', note: '几乎白',
+          left: '#F2F5FC',
+          side1: '#FBF2F5',
+          side2: '#F4F2FB',
+          a1: '#3B6EF5', a2: '#C2255C', a3: '#7048E8',
+        },
+        {
+          id: 'Q5', name: '天空校园平涂', note: '教育清爽',
+          left: '#E3F2FF',
+          side1: '#FFE8F0',
+          side2: '#EDE9FE',
+          a1: '#0284C7', a2: '#DB2777', a3: '#6D28D9',
+        },
+        {
+          id: 'Q6', name: '灰蓝运营', note: '最克制',
+          left: '#E8ECF2',
+          side1: '#F0EAEB',
+          side2: '#ECEAF0',
+          a1: '#475569', a2: '#9F1239', a3: '#5B21B6',
+        },
+      ],
+    };
+
+    function swatches(o) {
+      return [o.left, o.side1, o.side2].map((bg) => {
+        const m = String(bg).match(/#([0-9A-Fa-f]{6})/g);
+        const c = m ? m[m.length > 1 ? 1 : 0] : (String(bg).startsWith('#') ? bg : '#e5e7eb');
+        return `<i style="background:${c}"></i>`;
+      }).join('');
+    }
+
+    function card(o) {
+      const keepCls = o.keep ? ' is-keep' : '';
+      const keepTag = o.keep ? '<span class="tag-keep">保留</span>' : '';
+      const clayCls = o.clay ? ' clayish' : '';
+      return `
+        <button type="button" class="opt${keepCls}" data-id="${o.id}">
+          <div class="opt-meta">
+            <span><span class="id">${o.id}</span> <span class="name">${o.name}</span>${keepTag}</span>
+            <span class="note">${o.note}</span>
+          </div>
+          <div class="tiles">
+            <div class="left${clayCls}" style="background:${o.left}">
+              <div>
+                <span class="t-title">快速消课</span><span class="badge">HOT</span>
+                <div class="t-sub" style="color:${o.a1}">快速核销学员或班级课时</div>
+              </div>
+              <div class="row-bottom">
+                <span class="go" style="color:${o.a1}">Go</span>
+                <img class="ico" src="${ICO.rocket}" alt="" />
+              </div>
+            </div>
+            <div class="right">
+              <div class="side top${clayCls}" style="background:${o.side1}">
+                <div>
+                  <div class="t-title">我的预约</div>
+                  <div class="t-sub" style="color:${o.a2}">查看关联
+预约</div>
+                </div>
+                <img class="ico" src="${ICO.cal}" alt="" />
+              </div>
+              <div class="side bot${clayCls}" style="background:${o.side2}">
+                <div>
+                  <div class="t-title">学员管理</div>
+                  <div class="t-sub" style="color:${o.a3}">查看全部
+学员</div>
+                </div>
+                <img class="ico" src="${ICO.users}" alt="" />
+              </div>
+            </div>
+          </div>
+          <div class="swatches">${swatches(o)}</div>
+        </button>`;
+    }
+
+    function mount(list, id) {
+      document.getElementById(id).innerHTML = list.map(card).join('');
+    }
+
+    mount(KEEP, 'grid-keep');
+    mount(DATA.m, 'grid-m');
+    mount(DATA.n, 'grid-n');
+    mount(DATA.o, 'grid-o');
+    mount(DATA.p, 'grid-p');
+    mount(DATA.q, 'grid-q');
+
+    const picked = document.getElementById('picked');
+    document.querySelectorAll('.opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.opt').forEach((b) => b.classList.remove('is-on'));
+        btn.classList.add('is-on');
+        picked.textContent = btn.dataset.id;
+        try { localStorage.setItem('tile-palette-pick-r3', btn.dataset.id); } catch (_) {}
+      });
+    });
+    try {
+      const saved = localStorage.getItem('tile-palette-pick-r3');
+      if (saved) {
+        const el = document.querySelector(`.opt[data-id="${saved}"]`);
+        if (el) { el.classList.add('is-on'); picked.textContent = saved; }
+      }
+    } catch (_) {}
+  </script>
+</body>
+</html>

@@ -4,7 +4,19 @@
  */
 import type { TodoViewMode } from '@/components/home/TodoToolbar';
 
-/** FAB 距屏幕底的安全边距（rpx），与 ExpandableFabMenu 对齐 */
+/**
+ * 自定义 TabBar 内容区高度（rpx，不含 safe-area）
+ * 与 `src/custom-tab-bar/index.scss` 的 min-height / item height 对齐
+ */
+export const CUSTOM_TAB_BAR_HEIGHT_RPX = 98;
+/** FAB 相对 TabBar 顶缘再上浮的间距（rpx） */
+export const FAB_ABOVE_TAB_MARGIN_RPX = 32;
+/**
+ * FAB 距屏幕底的偏移（rpx，另加 safe-area）
+ * = TabBar 高度 + 上浮间距；供 ExpandableFabMenu 使用，避免被 Tab 遮挡
+ */
+export const FAB_SCREEN_BOTTOM_OFFSET_RPX = CUSTOM_TAB_BAR_HEIGHT_RPX + FAB_ABOVE_TAB_MARGIN_RPX;
+/** 判定显隐时：相对 ScrollView 视口底的内缩（rpx），约等于 FAB 落在内容区底部的余量 */
 export const FAB_REVEAL_BOTTOM_OFFSET_RPX = 48;
 /** Tab 标签行下方禁区（rpx）：视口底到 Tab 底不足该高度时不显示 FAB */
 export const FAB_REVEAL_TAB_GAP_RPX = 300;

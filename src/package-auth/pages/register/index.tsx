@@ -252,7 +252,7 @@ const Register: React.FC = () => {
 
         <View
           className={cn(
-            'h-[88rpx] rounded-[28rpx] flex items-center justify-center bg-primary active:opacity-90',
+            'h-[88rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90',
             submitting && 'opacity-60',
           )}
           onClick={handleRegister}

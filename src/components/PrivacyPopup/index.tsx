@@ -3,10 +3,9 @@
  */
 import { View, Text, ScrollView, Button } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { usePrivacyStore, PRIVACY_AGREE_BUTTON_ID } from '@/stores/privacy';
 import { promptPrivacyIfNeeded } from '@/utils/privacy-authorize';
-import { privacyTrace } from '@/utils/privacy-debug';
 
 const PrivacyPopup: React.FC = () => {
   const visible = usePrivacyStore((s) => s.visible);
@@ -20,34 +19,11 @@ const PrivacyPopup: React.FC = () => {
   const denied = status === 'denied';
   const busy = prompting || retrying;
 
-  useEffect(() => {
-    privacyTrace('PrivacyPopup.renderState', {
-      visible,
-      status,
-      pendingCount,
-      hasPending,
-      denied,
-      prompting,
-      retrying,
-      buttonMode: hasPending ? 'native-agreePrivacyAuthorization' : 'view-retry(非原生)',
-    });
-  }, [visible, status, pendingCount, hasPending, denied, prompting, retrying]);
-
-  useEffect(() => {
-    if (visible) {
-      privacyTrace('PrivacyPopup.mounted', { hasPending, denied });
-    } else {
-      privacyTrace('PrivacyPopup.hidden');
-    }
-  }, [visible, hasPending, denied]);
-
   const handleAgree = () => {
-    privacyTrace('PrivacyPopup.handleAgree', { pendingCount });
     usePrivacyStore.getState().agree();
   };
 
   const handleDisagree = () => {
-    privacyTrace('PrivacyPopup.handleDisagree', { pendingCount });
     usePrivacyStore.getState().disagree();
     Taro.showToast({
       title: '不同意隐私保护指引将无法使用本小程序',
@@ -58,11 +34,9 @@ const PrivacyPopup: React.FC = () => {
 
   const handleRetry = useCallback(async () => {
     if (retrying) return;
-    privacyTrace('PrivacyPopup.handleRetry.start');
     setRetrying(true);
     try {
       const ok = await promptPrivacyIfNeeded();
-      privacyTrace('PrivacyPopup.handleRetry.done', { ok });
       if (!ok) {
         Taro.showToast({
           title: '请同意隐私保护指引后继续使用',
@@ -76,11 +50,8 @@ const PrivacyPopup: React.FC = () => {
   }, [retrying]);
 
   const openContract = () => {
-    privacyTrace('PrivacyPopup.openContract');
     Taro.openPrivacyContract({
-      success: () => privacyTrace('PrivacyPopup.openContract.success'),
-      fail: (err) => {
-        privacyTrace('PrivacyPopup.openContract.fail', { err });
+      fail: () => {
         Taro.showToast({ title: '暂无法打开隐私协议', icon: 'none' });
       },
     });

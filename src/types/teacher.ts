@@ -19,8 +19,8 @@ export interface Teacher {
 /** 教师身份（员工身份预设） */
 export type TeacherIdentity = 'principal' | 'teacher' | 'assistant' | 'reception';
 
-/** 教师角色（薪资/排课维度） */
-export type TeacherRole = 'lead' | 'assist' | 'parttime';
+/** 教师角色（含身份派生与薪资兼容值） */
+export type TeacherRole = 'lead' | 'assist' | 'parttime' | 'principal' | 'teacher' | 'reception';
 
 /** 教师数据权限档位 */
 export type TeacherAccessScope = 'self' | 'subject' | 'org';
@@ -407,6 +407,8 @@ export interface TeacherUIModel {
   avatar?: string;
   /** 员工身份预设 */
   identity?: TeacherIdentity;
+  /** 机构成员角色：OWNER 展示固定为「管理员」 */
+  orgRole?: 'OWNER' | 'ADMIN' | 'MEMBER' | string | null;
   /** 教师角色（薪资/排课维度） */
   role: TeacherRole;
   roleText: string;

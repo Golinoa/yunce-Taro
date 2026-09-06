@@ -12,11 +12,9 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useMemo, useState } from 'react';
-import Dialog from '@/components/Dialog';
 import Icon from '@/components/Icon';
+import SupportQrDialog from '@/components/SupportQrDialog';
 import { useThemeStore } from '@/stores/theme';
-
-const CUSTOMER_WECHAT = 'by3737337';
 
 interface FAQItem {
   id: string;
@@ -199,7 +197,7 @@ const Help: React.FC = () => {
   // 展开全部 / 收起全部
   const [expandAll, setExpandAll] = useState(false);
 
-  const [serviceVisible, setServiceVisible] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
 
   const activeModule = useMemo(
     () => FAQ_MODULES.find((m) => m.id === activeModuleId) ?? FAQ_MODULES[0],
@@ -234,13 +232,6 @@ const Help: React.FC = () => {
     (id: string) => expandAll || expandedId === id,
     [expandAll, expandedId],
   );
-
-  const handleCopyWechat = useCallback(() => {
-    Taro.setClipboardData({
-      data: CUSTOMER_WECHAT,
-      success: () => setServiceVisible(false),
-    });
-  }, []);
 
   return (
     <View className={cn('min-h-screen bg-background flex flex-col', themeClass)}>
@@ -378,15 +369,15 @@ const Help: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* ====== 底部：电话客服 + 在线咨询（轻量统一） ====== */}
+      {/* ====== 底部：联系客服 + 在线咨询 ====== */}
       <View className="px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[20rpx] border-t border-border/40 bg-background">
         <View className="flex gap-[24rpx]">
           <View
             className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
-            onClick={() => setServiceVisible(true)}
+            onClick={() => setQrVisible(true)}
           >
-            <Icon name="mdi-phone" size={28} color="foreground" />
-            <Text className="text-[28rpx] font-medium text-foreground">电话客服</Text>
+            <Icon name="mdi-headset" size={28} color="foreground" />
+            <Text className="text-[28rpx] font-medium text-foreground">联系客服</Text>
           </View>
           <View
             className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
@@ -398,27 +389,7 @@ const Help: React.FC = () => {
         </View>
       </View>
 
-      {/* ====== 客服微信号弹框 ====== */}
-      <Dialog visible={serviceVisible} onClose={() => setServiceVisible(false)} maskClosable>
-        <View className="bg-card rounded-[32rpx] w-[560rpx] px-[40rpx] py-[44rpx] flex flex-col items-center">
-          <Text className="text-[32rpx] font-bold text-foreground">联系客服</Text>
-          <Text className="mt-[24rpx] text-[26rpx] text-muted-foreground leading-relaxed text-center">
-            请添加客服微信，备注你的问题即可获得帮助
-          </Text>
-          <View
-            className="mt-[32rpx] w-full bg-background rounded-[20rpx] py-[28rpx] flex items-center justify-center gap-[16rpx] press-scale"
-            onClick={handleCopyWechat}
-          >
-            <Text className="text-[36rpx] font-bold text-primary tracking-wide">
-              {CUSTOMER_WECHAT}
-            </Text>
-            <Icon name="mdi-content-copy" size={32} color="primary" />
-          </View>
-          <Text className="mt-[20rpx] text-[22rpx] text-muted-foreground">
-            点击上方微信号即可复制
-          </Text>
-        </View>
-      </Dialog>
+      <SupportQrDialog visible={qrVisible} onClose={() => setQrVisible(false)} />
     </View>
   );
 };

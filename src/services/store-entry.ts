@@ -63,6 +63,7 @@ export const storeEntryService = {
       longitude: data.longitude,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
+      businessHours: data.businessHours,
       referralCode,
     });
   },
@@ -97,6 +98,7 @@ export const storeEntryService = {
       longitude: data.longitude,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
+      businessHours: data.businessHours,
       referralCode,
     });
   },

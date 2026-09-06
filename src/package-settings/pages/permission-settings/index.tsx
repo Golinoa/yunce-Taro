@@ -15,36 +15,40 @@ import React, { useCallback } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { usePermissionStore } from '@/stores/permission';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { isAdmin, useAuth } from '@/utils/auth';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: '校长·机构创建者',
-  principal: '校长',
-  teacher: '老师',
-  assistant: '前台',
-};
-
-const ROLE_DESC: Record<string, string> = {
-  admin: '机构创建者：拥有全部权限，可分配权限（本页操作者）',
-  principal: '默认查看校区全部数据，可由管理员开关授权',
-  teacher: '默认仅本人名下学员数据，可由管理员/校长开关授权',
-  assistant: '默认仅本人名下数据（无薪资），可由管理员/校长开关授权',
-};
-
 const PermissionSettings: React.FC = () => {
   useCardNavigationBar();
   const { currentRole } = useAuth();
   const { activeTheme } = useThemeStore();
+  const titles = useRoleGlossaryStore((s) => s.titles);
+  const loadTitles = useRoleGlossaryStore((s) => s.load);
   const config = usePermissionStore((s) => s.config);
   const removeCustomRole = usePermissionStore((s) => s.removeCustomRole);
   const save = usePermissionStore((s) => s.save);
 
   useDidShow(() => {
     usePermissionStore.getState().load();
+    void loadTitles();
   });
+
+  const ROLE_LABELS: Record<string, string> = {
+    admin: '管理员',
+    principal: titles.manager,
+    teacher: titles.teacher,
+    assistant: '前台',
+  };
+
+  const ROLE_DESC: Record<string, string> = {
+    admin: '拥有全部权限，可分配权限',
+    principal: '默认查看校区全部数据，可开关授权',
+    teacher: '默认仅本人名下学员数据，可开关授权',
+    assistant: '默认仅本人名下数据（无薪资），可开关授权',
+  };
 
   const goForm = useCallback((mode: 'create' | 'edit', key: string) => {
     Taro.navigateTo({
@@ -117,9 +121,7 @@ const PermissionSettings: React.FC = () => {
     <PageContainer safeBottom>
       <View className="px-[32rpx] pt-[32rpx] pb-[160rpx]">
         <Text className="text-[32rpx] font-semibold text-foreground">角色权限</Text>
-        <Text className="mt-[8rpx] block text-[26rpx] text-muted-foreground">
-          管理员编辑系统角色授权与自定义角色
-        </Text>
+        <Text className="mt-[8rpx] block text-[26rpx] text-muted-foreground">点选角色编辑授权</Text>
 
         {/* 系统角色 */}
         <View className="bg-card rounded-[28rpx] shadow-soft overflow-hidden mt-[32rpx]">

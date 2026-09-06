@@ -4,6 +4,7 @@ import type {
   SalarySettings,
   SalaryStatus,
   SalaryTemplate,
+  TeacherIdentity,
   TeacherRole,
   TeacherStatus,
   TeacherUIModel,
@@ -19,6 +20,19 @@ function str(value: unknown): string | undefined {
 function num(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/** Teacher.role / API identity → UI TeacherIdentity（禁止把所有人写成老师） */
+export function mapTeacherRoleToIdentity(
+  roleOrIdentity: string | null | undefined,
+): TeacherIdentity {
+  if (roleOrIdentity === 'principal') return 'principal';
+  if (roleOrIdentity === 'reception') return 'reception';
+  if (roleOrIdentity === 'assist' || roleOrIdentity === 'assistant') return 'assistant';
+  if (roleOrIdentity === 'teacher' || roleOrIdentity === 'lead' || roleOrIdentity === 'parttime') {
+    return 'teacher';
+  }
+  return 'teacher';
 }
 
 export function mapBackendSalaryModel(raw: RawRecord): SalaryModel {
@@ -87,12 +101,17 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
   const gender =
     genderRaw === 'male' || genderRaw === 'female' || genderRaw === 'other' ? genderRaw : undefined;
 
+  const teacherRole = String(raw.role ?? 'teacher') as TeacherRole;
+  const identity =
+    (str(raw.identity) as TeacherIdentity | undefined) || mapTeacherRoleToIdentity(teacherRole);
+
   return {
     id: String(raw.id ?? ''),
     name,
     avatar: str(raw.avatar) ?? undefined,
-    identity: 'teacher',
-    role: (raw.role ?? 'lead') as TeacherRole,
+    identity,
+    orgRole: str(raw.orgRole) ?? null,
+    role: teacherRole,
     roleText: String(raw.roleText ?? raw.role ?? ''),
     accessScope: 'self',
     accessScopeText: '本人',
@@ -146,6 +165,7 @@ export function mapUiTeacherToCreatePayload(teacher: TeacherUIModel) {
   return {
     name: teacher.name,
     phone: teacher.phone,
+    identity: teacher.identity || mapTeacherRoleToIdentity(teacher.role),
     role: teacher.role,
     subject: teacher.subject || undefined,
     institution: teacher.campus || undefined,
@@ -161,6 +181,7 @@ export function mapUiTeacherToCreatePayload(teacher: TeacherUIModel) {
 export function mapUiTeacherToUpdatePayload(updates: Partial<TeacherUIModel>) {
   return {
     name: updates.name,
+    identity: updates.identity,
     role: updates.role,
     subject: updates.subject,
     institution: updates.campus,

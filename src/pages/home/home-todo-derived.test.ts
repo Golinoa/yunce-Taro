@@ -91,7 +91,7 @@ describe('resolveTodoEmptyPanelStyle / formatTabBadgeText', () => {
 });
 
 describe('TODO_EMPTY_PANEL_MIN_HEIGHT_RPX', () => {
-  it('保持既有空态高度口径', () => {
-    expect(TODO_EMPTY_PANEL_MIN_HEIGHT_RPX).toBe(520);
+  it('空态高度需覆盖工具栏与 FAB 显隐禁区', () => {
+    expect(TODO_EMPTY_PANEL_MIN_HEIGHT_RPX).toBe(640);
   });
 });

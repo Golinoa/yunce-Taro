@@ -10,6 +10,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import type { ITouchEvent } from '@tarojs/components';
 
+/**
+ * 抬到自定义 TabBar 上方（TabBar 内容区 98rpx + 间距 32rpx，另加 safe-area）
+ * 与 `home-fab-logic.FAB_SCREEN_BOTTOM_OFFSET_RPX` / custom-tab-bar 对齐
+ */
+const FAB_SCREEN_BOTTOM_OFFSET_RPX = 130;
+
 export interface ExpandableFabMenuAction {
   key: string;
   label: string;
@@ -88,10 +94,14 @@ const ExpandableFabMenu: React.FC<ExpandableFabMenuProps> = ({
 
       <View
         className={cn(
-          'fixed right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] z-100 fab-menu-root',
+          'fixed right-[32rpx] z-100 fab-menu-root',
           visible ? 'fab-menu-root--visible' : 'fab-menu-root--hidden',
           className,
         )}
+        style={{
+          // 抬到自定义 TabBar 上方，避免 z-index 更低被挡住
+          bottom: `calc(${FAB_SCREEN_BOTTOM_OFFSET_RPX}rpx + env(safe-area-inset-bottom))`,
+        }}
         onClick={(event) => event.stopPropagation?.()}
       >
         <View className="relative min-w-[96rpx] h-[96rpx]">

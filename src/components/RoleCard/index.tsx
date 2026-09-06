@@ -70,7 +70,7 @@ const ROLE_META: Record<
 };
 
 const ROLE_LABEL: Record<UserRole, string> = {
-  admin: '校长·机构创建者',
+  admin: '管理员',
   principal: '校长',
   teacher: '教师',
   assistant: '助教',

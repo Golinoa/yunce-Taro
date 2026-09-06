@@ -8,8 +8,10 @@ import { isTodoVisibleOnTimelineToday } from '@/utils/todo-timeline';
 /** Tab 类型（与首页一致） */
 export type HomeTab = 'schedule' | 'todo' | 'recent';
 
-/** 待办空状态 Tab 面板兜底高度（rpx @375） */
-export const TODO_EMPTY_PANEL_MIN_HEIGHT_RPX = 520;
+/** 待办空状态 Tab 面板兜底高度（rpx @375）
+ * 需 ≥ 工具栏 + 空文案 +「查看更多」+ FAB 显隐禁区，避免空态轻滑就露出却仍贴底被 Tab 挡
+ */
+export const TODO_EMPTY_PANEL_MIN_HEIGHT_RPX = 640;
 
 export interface HomeTabOption {
   key: HomeTab;

@@ -67,7 +67,7 @@ export const DEV_SWITCH_ACCOUNTS: DevSwitchAccount[] = [
     email: 'parent1@yunce.com',
     password: '123456',
     userId: 'user-parent-001',
-    name: '张老师',
+    name: '小明爸爸',
     roleLabel: '家长',
   },
   {
@@ -86,15 +86,35 @@ export const DEV_SWITCH_ACCOUNTS: DevSwitchAccount[] = [
     name: '李子轩爸爸',
     roleLabel: '家长',
   },
+  {
+    username: 'parent-unbound',
+    email: 'parent-unbound@yunce.com',
+    password: '123456',
+    userId: 'user-parent-unbound-001',
+    name: '待绑定家长',
+    roleLabel: '家长·未绑',
+  },
+  {
+    username: 'teacher-unbound',
+    email: 'teacher-unbound@yunce.com',
+    password: '123456',
+    userId: 'user-teacher-unbound-001',
+    name: '待入驻老师',
+    roleLabel: '教师·未入驻',
+  },
 ];
 
 /** @deprecated 使用 DEV_SWITCH_ACCOUNTS */
 export const MOCK_SWITCH_ACCOUNTS = DEV_SWITCH_ACCOUNTS;
 
-/** 常见误输入 → 种子邮箱（避免 principal@ 与 principal1@ 混淆） */
+/** 常见误输入 → 种子邮箱（避免 principal@ / teacher@ 漏数字） */
 const DEV_LOGIN_EMAIL_ALIASES: Record<string, string> = {
   principal: 'principal1@yunce.com',
   'principal@yunce.com': 'principal1@yunce.com',
+  teacher: 'teacher1@yunce.com',
+  'teacher@yunce.com': 'teacher1@yunce.com',
+  parent: 'parent1@yunce.com',
+  'parent@yunce.com': 'parent1@yunce.com',
 };
 
 /** 短用户名或邮箱 → 登录邮箱 */

@@ -1,7 +1,9 @@
-import { View, Text } from '@tarojs/components';
+import { View, Text, Image } from '@tarojs/components';
 import cn from 'classnames';
 import React, { useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
+import SupportQrDialog from '@/components/SupportQrDialog';
+import { SUPPORT_REPAIR_QR_URL } from '@/constants/support-qr';
 
 export interface LoginHelpDialogProps {
   visible: boolean;
@@ -11,6 +13,7 @@ export interface LoginHelpDialogProps {
 const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) => {
   const [mounted, setMounted] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -21,6 +24,7 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
       });
     } else {
       setAnimating(false);
+      setQrVisible(false);
     }
 
     return () => {
@@ -90,21 +94,25 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
           </Text>
         </View>
 
-        <View className="rounded-[28rpx] border-[2rpx] border-dashed border-primary/35 bg-primary/3 px-[28rpx] py-[28rpx] mb-[28rpx]">
+        <View
+          className="rounded-[28rpx] border-[2rpx] border-primary/20 bg-primary/3 px-[28rpx] py-[28rpx] mb-[28rpx] active:opacity-90"
+          onClick={() => setQrVisible(true)}
+        >
           <Text className="text-[30rpx] font-semibold text-foreground text-center block mb-[12rpx]">
             未能解决，联系客服
           </Text>
           <Text className="text-[24rpx] leading-[1.7] text-foreground-secondary text-center block mb-[20rpx]">
-            这里预留客服二维码位置，后续替换为正式客服二维码图片即可。
+            扫码添加客服微信，1对1对接维修与售后
           </Text>
-          <View className="w-[240rpx] h-[240rpx] mx-auto rounded-[24rpx] border-[2rpx] border-dashed border-primary/45 bg-white flex items-center justify-center">
-            <View className="flex flex-col items-center">
-              <Icon name="mdi-qrcode-scan" size={56} className="text-primary/60" />
-              <Text className="text-[22rpx] text-muted-foreground mt-[12rpx]">
-                客服二维码占位图
-              </Text>
-            </View>
-          </View>
+          <Image
+            src={SUPPORT_REPAIR_QR_URL}
+            mode="aspectFit"
+            className="w-[200rpx] h-[200rpx] mx-auto rounded-[16rpx]"
+            showMenuByLongpress
+          />
+          <Text className="text-[22rpx] text-primary text-center block mt-[16rpx]">
+            点击查看完整企微码
+          </Text>
         </View>
 
         <View
@@ -114,6 +122,8 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
           <Text className="text-[32rpx] font-semibold text-white">我知道了</Text>
         </View>
       </View>
+
+      <SupportQrDialog visible={qrVisible} onClose={() => setQrVisible(false)} />
     </View>
   );
 };

@@ -25,6 +25,8 @@ export interface StoreEntryFormData {
   contactName: string;
   /** 负责人手机号 */
   contactPhone: string;
+  /** 营业时间，格式 HH:mm:00至HH:mm:00 */
+  businessHours: string;
 }
 
 /** 门店入驻申请结果 */

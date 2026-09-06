@@ -3,8 +3,9 @@ import cn from 'classnames';
 import React, { useEffect, useMemo, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Icon from '@/components/Icon';
-import { ROLE_LABEL } from '@/components/RoleCard';
 import { BRAND_LOGO } from '@/constants/brand';
+import { displayUserRoleLabel } from '@/constants/role-glossary';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import type { CampusUIModel } from '@/types/campus';
 import type { UserRole } from '@/types/profile';
 import type { ParentStorefrontItem } from '@/types/storefront';
@@ -67,7 +68,8 @@ const CampusSelectSheet: React.FC<CampusSelectSheetProps> = ({
   onConfirmStorefront,
   confirming = false,
 }) => {
-  const roleLabel = currentRole ? ROLE_LABEL[currentRole] : null;
+  const titles = useRoleGlossaryStore((s) => s.titles);
+  const roleLabel = currentRole ? displayUserRoleLabel(currentRole, titles) : null;
   const isStorefrontMode = Array.isArray(storefronts) && storefronts.length > 0;
 
   const { sortedCampuses, recommendId } = useMemo(() => {

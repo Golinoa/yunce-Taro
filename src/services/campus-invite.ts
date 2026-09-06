@@ -9,6 +9,8 @@
  * - POST /campus-invites/:id/cancel         取消邀请
  */
 import Taro from '@tarojs/taro';
+import { DEFAULT_ROLE_TITLES } from '@/constants/role-glossary';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { type PaginatedResponse, unwrapPaginatedList } from '@/utils/pagination';
 import { get, post } from '@/utils/request';
 
@@ -83,14 +85,25 @@ export interface AcceptCampusInviteResult {
 
 const ROLE_LABEL: Record<CampusInviteRoleCode, string> = {
   campus_teacher: '授课教师',
-  campus_principal: '校区校长',
+  campus_principal: '店长',
   campus_reception: '前台',
 };
 
+export function campusInviteRoleLabel(
+  code: CampusInviteRoleCode,
+  managerTitle = DEFAULT_ROLE_TITLES.manager,
+  teacherTitle = DEFAULT_ROLE_TITLES.teacher,
+): string {
+  if (code === 'campus_principal') return managerTitle;
+  if (code === 'campus_teacher') return teacherTitle;
+  return ROLE_LABEL[code] ?? code;
+}
+
 function enrichInviteItem(item: CampusInviteItem): CampusInviteItem {
+  const titles = useRoleGlossaryStore.getState().titles;
   return {
     ...item,
-    roleLabel: ROLE_LABEL[item.roleCode] ?? item.roleCode,
+    roleLabel: campusInviteRoleLabel(item.roleCode, titles.manager, titles.teacher),
   };
 }
 
@@ -122,7 +135,7 @@ export function buildPointToPointInvitePayload(input: {
   return {
     campusId: input.campusId,
     targetTeacherId: input.teacherId,
-    roleCode: input.roleCode ?? 'campus_teacher',
+    roleCode: input.roleCode ?? 'campus_principal',
     expireMinutes: input.expireMinutes ?? 24 * 60,
   };
 }

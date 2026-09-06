@@ -20,9 +20,11 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import ResignSheet from '@/components/teacher/ResignSheet';
 import { BRAND_LOGO } from '@/constants/brand';
-import { IDENTITY_TAG_MAP, TEACHER_IDENTITY_OPTIONS } from '@/constants/teacher-ui';
+import { displayStaffIdentityLabel } from '@/constants/role-glossary';
+import { IDENTITY_TAG_MAP } from '@/constants/teacher-ui';
 import { auditLogService } from '@/services/audit-log';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { ResignType, TeacherStatus, TeacherUIModel } from '@/types/teacher';
@@ -65,6 +67,7 @@ const TeacherListPage: React.FC = () => {
   const [introVisible, setIntroVisible] = useState(false);
 
   useDidShow(() => {
+    void useRoleGlossaryStore.getState().load();
     void fetchAll(undefined, false);
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
@@ -319,7 +322,7 @@ const TeacherListPage: React.FC = () => {
         bulletPoints={[
           '授课人员：只能看自己排到的课、签到 / 取消签到、查自己的工资',
           '前台：可帮所有会员预约 / 签到、开卡续费收银，但看不到工资 / 门店设置',
-          '店长：拥有门店全部权限，包括员工、卡种、营销、财务',
+          '管理层：拥有门店全部权限，包括员工、卡种、营销、财务',
           '一个手机号只能绑 1 个员工身份，不能既当授课人员又当前台 —— 同一人多角色请用不同手机号',
         ]}
       />
@@ -337,10 +340,13 @@ const SwappableTeacherCard: React.FC<{
   onRestore: () => void;
   onDelete: () => void;
 }> = ({ teacher, openCardId, onOpenChange, onClick, onResign, onRestore, onDelete }) => {
+  const titles = useRoleGlossaryStore((s) => s.titles);
   const identityKey = teacher.identity || 'teacher';
-  const identityOption = TEACHER_IDENTITY_OPTIONS.find((o) => o.value === identityKey);
-  const identityLabel = identityOption?.label || '老师';
-  const tagStyle = IDENTITY_TAG_MAP[identityKey];
+  const identityLabel = displayStaffIdentityLabel(identityKey, titles, teacher.orgRole);
+  const tagStyle =
+    teacher.orgRole === 'OWNER'
+      ? { bg: 'bg-primary-10', text: 'text-primary' }
+      : IDENTITY_TAG_MAP[identityKey];
   const isActive = teacher.status === 'active';
 
   /** 左滑操作按钮：在职显示「离职+删除」，已离职显示「恢复+删除」 */

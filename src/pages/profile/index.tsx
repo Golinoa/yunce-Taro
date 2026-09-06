@@ -28,6 +28,7 @@ import StoreOnboarding from '@/components/profile/StoreOnboarding';
 import SupportQrDialog from '@/components/SupportQrDialog';
 import { BRAND_FALLBACK_ORG_NAME } from '@/constants/brand';
 import { resolveLifecycle } from '@/constants/membership-tips';
+import { displayUserRoleLabel } from '@/constants/role-glossary';
 import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
@@ -38,6 +39,7 @@ import {
 } from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { teacherService } from '@/services/teacher';
+import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import type { StoreOnboardingProgress, StoreOnboardingStep } from '@/types/onboarding';
 import type { Student } from '@/types/student';
 import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
@@ -47,17 +49,6 @@ import { markStepVisited } from '@/utils/onboarding-storage';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
-
-// ============================================
-// 角色标签映射
-// ============================================
-const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员',
-  principal: '校长',
-  teacher: '教师',
-  assistant: '助教',
-  parent: '家长',
-};
 
 // ============================================
 // 占位提示：未实现入口统一提示
@@ -77,6 +68,8 @@ function formatMembershipExpire(iso?: string | null): string {
 const Profile: React.FC = () => {
   const { profile, currentRole, currentIdentity } = useAuth();
   const isTeacher = isStaffRole(currentRole);
+  const roleTitles = useRoleGlossaryStore((s) => s.titles);
+  const loadRoleTitles = useRoleGlossaryStore((s) => s.load);
 
   // 家长端：学生列表与当前选中
   const [students, setStudents] = useState<Student[]>([]);
@@ -269,6 +262,7 @@ const Profile: React.FC = () => {
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
+    void loadRoleTitles();
     loadStoreOnboardingHidden();
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -688,7 +682,7 @@ const Profile: React.FC = () => {
           variant="gradient"
           avatarUrl={profile?.avatar_url}
           name={profile?.name || '用户'}
-          role={isTeacher ? ROLE_LABEL[currentRole || 'teacher'] : undefined}
+          role={isTeacher ? displayUserRoleLabel(currentRole || 'teacher', roleTitles) : undefined}
           phone={profile?.phone}
           orgName={currentIdentity?.organizationName || BRAND_FALLBACK_ORG_NAME}
           onSettings={handleProfile}

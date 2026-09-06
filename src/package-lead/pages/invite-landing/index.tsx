@@ -17,7 +17,7 @@ import { useAgreementStore } from '@/stores/agreement';
 import type { CampusUIModel } from '@/types/campus';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending, markOnboardingSkipped } from '@/utils/auth-onboarding';
-import { isCampusOpen, parseBusinessHours } from '@/utils/campus';
+import { getCampusOpenStatus, parseBusinessHours } from '@/utils/campus';
 import {
   TRIAL_INVITE_FORM_TOAST,
   resolveTrialInviteAccess,
@@ -326,7 +326,10 @@ const InviteLandingPage: React.FC = () => {
     return `${parsed.start}-${parsed.end}`;
   }, [campus?.businessHours]);
 
-  const campusOpen = useMemo(() => isCampusOpen(campus?.businessHours), [campus?.businessHours]);
+  const campusOpenStatus = useMemo(
+    () => getCampusOpenStatus(campus?.businessHours),
+    [campus?.businessHours],
+  );
 
   const courseTitle = resolveInviteLandingCourseTitle(params);
   const dateLabel = formatInviteLandingDateLabel(params.date);
@@ -645,7 +648,7 @@ const InviteLandingPage: React.FC = () => {
         <InviteLandingSuccessView
           homeBtnTop={homeBtnTop}
           campus={campus}
-          campusOpen={campusOpen}
+          campusOpenStatus={campusOpenStatus}
           businessTime={businessTime}
           courseTitle={courseTitle}
           childName={childName}

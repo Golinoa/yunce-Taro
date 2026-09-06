@@ -12,8 +12,6 @@ import {
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
-import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
-import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import { lessonRecordService, todoService } from '@/services';
 import { listParentStorefronts, switchAuthContext } from '@/services/auth';
 import { homeService } from '@/services/home';
@@ -663,8 +661,6 @@ const Home: React.FC = () => {
             />
 
             <View className="relative z-10 bg-transparent mx-[28rpx] pt-[0] pb-[100rpx]">
-              <WechatBindReminder className="mb-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
-              <EmailBindReminder className="mb-[16rpx] px-[24rpx] py-[20rpx] rounded-[16rpx] bg-primary/8 flex items-center gap-[16rpx]" />
               {isStaffRole(currentRole) && <KingKongSection entries={quickEntries} />}
 
               {isParentRole(currentRole) && (

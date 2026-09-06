@@ -65,10 +65,12 @@ describe('applyStoreEntryDraftToForm', () => {
       locationName: '星火中心',
       contactName: '张三',
       contactPhone: '13800138000',
+      businessHours: '09:00:00至21:00:00',
     });
     expect(restored?.name).toBe('星火');
     expect(restored?.region).toEqual(['广东省', '深圳市', '南山区']);
     expect(restored?.contactPhone).toBe('13800138000');
+    expect(restored?.businessHours).toBe('09:00:00至21:00:00');
   });
 
   it('空草稿返回 null', () => {
@@ -81,6 +83,7 @@ describe('applyStoreEntryDraftToForm', () => {
         address: '',
         contactName: '',
         contactPhone: '',
+        businessHours: '',
       }),
     ).toBeNull();
   });

@@ -2,7 +2,6 @@
  * 隐私授权 Store — Zustand
  */
 import { create } from 'zustand';
-import { privacyStoreSnapshot, privacyTrace } from '@/utils/privacy-debug';
 
 /** 微信 onNeedPrivacyAuthorization 回调注入的 resolve 函数 */
 export type PrivacyResolve = (params: { event: 'agree' | 'disagree'; buttonId?: string }) => void;
@@ -40,11 +39,9 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
   pendingResolves: [],
 
   setContractName: (name) => {
-    privacyTrace('store.setContractName', { name });
     set({ contractName: name || '《隐私保护指引》' });
   },
   setNeedAuthorization: (need) => {
-    privacyTrace('store.setNeedAuthorization', { need, before: privacyStoreSnapshot() });
     set((s) => ({
       needAuthorization: need,
       status: need ? (s.status === 'denied' ? 'denied' : 'need') : 'authorized',
@@ -52,38 +49,31 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     }));
   },
   setStatus: (status) => {
-    privacyTrace('store.setStatus', { status });
     set({ status });
   },
   setPrompting: (prompting) => {
-    privacyTrace('store.setPrompting', { prompting });
     set({ prompting });
   },
   setVisible: (visible) => {
-    privacyTrace('store.setVisible', { visible });
     set({ visible });
   },
 
   enqueue: (resolve) => {
-    privacyTrace('store.enqueue', { beforePending: get().pendingResolves.length });
     set((s) => ({
       pendingResolves: [...s.pendingResolves, resolve],
       visible: true,
       status: s.status === 'denied' ? 'denied' : 'need',
       needAuthorization: true,
     }));
-    privacyTrace('store.enqueue.done', { afterPending: get().pendingResolves.length });
   },
 
   agree: () => {
     const resolves = get().pendingResolves;
-    privacyTrace('store.agree', { resolveCount: resolves.length });
-    resolves.forEach((r, index) => {
+    resolves.forEach((r) => {
       try {
         r({ event: 'agree', buttonId: PRIVACY_AGREE_BUTTON_ID });
-        privacyTrace('store.agree.resolve.ok', { index });
-      } catch (err) {
-        privacyTrace('store.agree.resolve.error', { index, err });
+      } catch {
+        // ignore resolve errors
       }
     });
     set({
@@ -92,18 +82,15 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       needAuthorization: false,
       status: 'authorized',
     });
-    privacyTrace('store.agree.done');
   },
 
   disagree: () => {
     const resolves = get().pendingResolves;
-    privacyTrace('store.disagree', { resolveCount: resolves.length });
-    resolves.forEach((r, index) => {
+    resolves.forEach((r) => {
       try {
         r({ event: 'disagree' });
-        privacyTrace('store.disagree.resolve.ok', { index });
-      } catch (err) {
-        privacyTrace('store.disagree.resolve.error', { index, err });
+      } catch {
+        // ignore resolve errors
       }
     });
     set({
@@ -112,17 +99,14 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       needAuthorization: true,
       status: 'denied',
     });
-    privacyTrace('store.disagree.done');
   },
 
   showBlockedGate: () => {
-    privacyTrace('store.showBlockedGate', { before: privacyStoreSnapshot() });
     set({
       visible: true,
       needAuthorization: true,
       status:
         get().status === 'authorized' ? 'need' : get().status === 'denied' ? 'denied' : 'need',
     });
-    privacyTrace('store.showBlockedGate.done');
   },
 }));
