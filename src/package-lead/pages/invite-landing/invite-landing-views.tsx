@@ -9,7 +9,12 @@ import Icon from '@/components/Icon';
 import { BRAND_LOGO, ORG_COVER_IMAGE } from '@/constants/brand';
 import type { CampusUIModel } from '@/types/campus';
 import type { CampusOpenStatus } from '@/utils/campus';
-import { campusOpenStatusLabel } from '@/utils/campus';
+import {
+  campusOpenStatusLabel,
+  clampCampusDisplayName,
+  clampCampusSingleLine,
+  estimateCampusAddressMaxChars,
+} from '@/utils/campus';
 import type { TrialInviteDockAction } from '@/utils/invite-landing-flow';
 import type { InviteLandingChildGender } from '@/utils/invite-landing-params';
 
@@ -104,14 +109,19 @@ export const InviteLandingSuccessView: React.FC<{
               </View>
             )}
           </View>
-          <View className="min-w-0 flex-1">
-            <View className="flex flex-wrap items-center gap-[12rpx]">
-              <Text className="text-[34rpx] font-bold text-foreground">
-                {campus?.name || '校区'}
-              </Text>
+          <View className="min-w-0 flex-1 overflow-hidden">
+            <View className="flex min-w-0 items-center gap-[12rpx] overflow-hidden">
+              <View className="min-w-0 flex-1 overflow-hidden">
+                <Text
+                  numberOfLines={1}
+                  className="block w-full text-[34rpx] font-bold text-foreground"
+                >
+                  {clampCampusDisplayName(campus?.name || '校区', campusOpenStatus)}
+                </Text>
+              </View>
               <View
                 className={cn(
-                  'flex items-center gap-[6rpx] rounded-[10rpx] px-[12rpx] py-[4rpx]',
+                  'flex shrink-0 items-center gap-[6rpx] rounded-[10rpx] px-[12rpx] py-[4rpx]',
                   campusOpenStatus === 'open' ? 'bg-success-bg' : 'bg-muted',
                 )}
               >
@@ -131,20 +141,24 @@ export const InviteLandingSuccessView: React.FC<{
                 </Text>
               </View>
             </View>
-            <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
-              营业时间 {businessTime || '未设置'}
-            </Text>
+            <View className="mt-[8rpx] w-full min-w-0 overflow-hidden">
+              <Text numberOfLines={1} className="block w-full text-[24rpx] text-muted-foreground">
+                {businessTime ? `营业时间 ${businessTime}` : '营业时间'}
+              </Text>
+            </View>
           </View>
         </View>
 
         {campus?.address ? (
-          <View className="mt-[16rpx] flex items-start gap-[8rpx]">
-            <View className="mt-[2rpx] flex h-[36rpx] w-[36rpx] shrink-0 items-center justify-center rounded-[8rpx] bg-primary">
+          <View className="mt-[16rpx] flex min-w-0 items-center gap-[8rpx]">
+            <View className="flex h-[36rpx] w-[36rpx] shrink-0 items-center justify-center rounded-[8rpx] bg-primary">
               <Icon name="mdi-map-marker" size={20} color="white" />
             </View>
-            <Text className="flex-1 text-[26rpx] leading-relaxed text-foreground">
-              {campus.address}
-            </Text>
+            <View className="min-w-0 flex-1 overflow-hidden">
+              <Text numberOfLines={1} className="block w-full text-[26rpx] text-foreground">
+                {clampCampusSingleLine(campus.address, estimateCampusAddressMaxChars())}
+              </Text>
+            </View>
           </View>
         ) : null}
 

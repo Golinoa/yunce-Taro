@@ -1,6 +1,6 @@
 /**
- * 机构会员套餐目录（对齐设计稿定稿）
- * 后端 OrganizationVersion 为权威；本文件作展示兜底与 mock。
+ * 机构会员套餐：类型与展示工具。
+ * 配额/功能真源为后端 OrganizationVersion；本文件仅保留离线兜底与格式化。
  */
 export type MembershipPlanCode = 'FREE' | 'BASIC' | 'STANDARD' | 'FLAGSHIP' | 'TRIAL';
 
@@ -39,6 +39,10 @@ export function isUnlimitedQuota(max: number): boolean {
   return max < 0 || max >= 99999;
 }
 
+/**
+ * 离线兜底（接口失败时）；正式展示请用 payment listSkus.plans / quotaUsage。
+ * 勿再作为价目/矩阵真源。
+ */
 export const MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
     code: 'FREE',
@@ -122,12 +126,41 @@ export const MEMBERSHIP_FEATURE_ROWS: Array<{ key: MembershipFeatureKey; label: 
 ];
 
 /**
- * 试用期展示对齐成长版能力；生命周期上 TRIAL 仍视为未付费（见 membership-tips / organization）。
+ * 试用期展示对齐成长版能力；生命周期上 TRIAL 仍视为未付费。
+ * 优先用接口 plans；否则离线兜底。
  */
-export function getMembershipPlan(code?: string | null): MembershipPlan | undefined {
+export function getMembershipPlan(
+  code?: string | null,
+  catalog?: Array<{ code: string; name: string }>,
+): MembershipPlan | undefined {
   if (!code) return undefined;
-  if (code === 'TRIAL') return MEMBERSHIP_PLANS.find((p) => p.code === 'STANDARD');
-  return MEMBERSHIP_PLANS.find((p) => p.code === code);
+  const normalized = code === 'TRIAL' ? 'STANDARD' : code;
+  if (catalog?.length) {
+    const hit = catalog.find((p) => p.code === normalized || p.code === code);
+    if (hit) {
+      const fallback = MEMBERSHIP_PLANS.find((p) => p.code === hit.code);
+      return (
+        fallback || {
+          code: hit.code as MembershipPlanCode,
+          name: hit.name,
+          shortName: hit.name.replace(/版$/u, ''),
+          subtitle: '',
+          maxMembers: 0,
+          maxEmployees: 0,
+          maxCampuses: 1,
+          features: {
+            teaching: true,
+            leadTrace: false,
+            marketing: false,
+            multiCampus: false,
+            batchImportExport: false,
+          },
+          sort: 99,
+        }
+      );
+    }
+  }
+  return MEMBERSHIP_PLANS.find((p) => p.code === normalized);
 }
 
 export function getPlanFeatureDisplay(plan: MembershipPlan, key: MembershipFeatureKey): string {

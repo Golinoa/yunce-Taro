@@ -9,6 +9,7 @@
  *  - 仅在纯图标仍放不下时才换行：标签第一行均匀铺开，导航+电话整行换到下一行左对齐（两个一起换，绝不分裂）
  *  - 标签/按钮间统一最小间隔（≥4rpx，取 12rpx 保证美观，绝不贴在一起）
  * 高保真还原设计稿：左侧校区 Logo，中间为校区名/营业状态/地址，右侧为切换门店与营业时间。
+ * 营业时间只出现在右列；未设置时右列不展示时段文案（状态标签已兜底），禁止挤到中间换行。
  */
 import { View, Text, Image } from '@tarojs/components';
 import Taro from '@tarojs/taro';
@@ -19,7 +20,21 @@ import { BRAND_LOGO } from '@/constants/brand';
 import type { CampusUIModel } from '@/types/campus';
 import { resolveAvatarSrc } from '@/utils/avatar-src';
 import type { CampusOpenStatus } from '@/utils/campus';
-import { campusOpenStatusLabel } from '@/utils/campus';
+import {
+  campusOpenStatusLabel,
+  clampCampusDisplayName,
+  clampCampusSingleLine,
+  estimateCampusAddressMaxChars,
+} from '@/utils/campus';
+
+/** 微信 Text 单行省略：需显式 nowrap，仅靠 class 常失效 */
+const SINGLE_LINE_TEXT_STYLE: React.CSSProperties = {
+  overflow: 'hidden',
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+  width: '100%',
+  display: 'block',
+};
 
 export interface HomeCampusCardProps {
   /** 当前校区 */
@@ -74,6 +89,17 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
 
   const tags = useMemo(() => campus?.tags || [], [campus?.tags]);
   const hasPhone = Boolean(campus?.phone);
+
+  const displayName = useMemo(() => {
+    const raw = campus?.name || '未设置校区';
+    return clampCampusDisplayName(raw, openStatus);
+  }, [campus?.name, openStatus]);
+
+  const displayAddress = useMemo(() => {
+    const raw = campus?.address?.trim();
+    if (!raw) return '';
+    return clampCampusSingleLine(raw, estimateCampusAddressMaxChars());
+  }, [campus?.address]);
 
   /** 无 logo / 加载失败 → sgpk，禁止 emoji/「?」占位 */
   const preferredLogo = resolveAvatarSrc(campus?.logo);
@@ -134,11 +160,11 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
   return (
     <View className={cn('bg-white rounded-[32rpx] p-[24rpx] shadow-card', className)}>
       <View className="flex items-start gap-[20rpx]">
-        {/* 校区 Logo：有图用图，否则品牌 sgpk（不用 emoji，真机易成「?」） */}
-        <View className="w-[96rpx] h-[96rpx] rounded-[24rpx] center overflow-hidden shrink-0 bg-white">
+        {/* 校区 Logo */}
+        <View className="h-[96rpx] w-[96rpx] shrink-0 overflow-hidden rounded-[24rpx] bg-white center">
           <Image
             src={logoSrc}
-            className="w-full h-full block"
+            className="block h-full w-full"
             mode="aspectFill"
             onError={() => {
               if (logoSrc !== BRAND_LOGO) setLogoSrc(BRAND_LOGO);
@@ -146,22 +172,31 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
           />
         </View>
 
-        {/* 校区信息 */}
-        <View className="flex-1 min-w-0 flex flex-col gap-[8rpx]">
-          <View className="flex items-start justify-between gap-[12rpx]">
-            <View className="flex items-center gap-[12rpx] min-w-0">
-              <Text className="text-[34rpx] font-bold text-foreground truncate">
-                {campus?.name || '未设置校区'}
-              </Text>
+        {/*
+          中间：店名+状态 / 地址（单行省略）
+          右侧：切换门店 / 营业时间（与设计稿一致，禁止把营业时间挤到中间第三行）
+        */}
+        <View className="flex min-w-0 flex-1 items-start justify-between gap-[12rpx]">
+          <View className="flex min-w-0 flex-1 flex-col gap-[8rpx] overflow-hidden">
+            <View className="flex min-w-0 items-center gap-[12rpx] overflow-hidden">
+              <View className="min-w-0 flex-1 overflow-hidden">
+                <Text
+                  numberOfLines={1}
+                  className="block w-full text-[34rpx] font-bold text-foreground"
+                  style={SINGLE_LINE_TEXT_STYLE}
+                >
+                  {displayName}
+                </Text>
+              </View>
               <View
                 className={cn(
-                  'flex items-center gap-[6rpx] px-[12rpx] py-[4rpx] rounded-[10rpx] shrink-0',
+                  'flex shrink-0 items-center gap-[6rpx] rounded-[10rpx] px-[12rpx] py-[4rpx]',
                   openStatus === 'open' ? 'bg-success-bg' : 'bg-muted',
                 )}
               >
                 <View
                   className={cn(
-                    'w-[12rpx] h-[12rpx] rounded-full',
+                    'h-[12rpx] w-[12rpx] rounded-full',
                     openStatus === 'open' ? 'bg-success' : 'bg-muted-foreground',
                   )}
                 />
@@ -176,22 +211,33 @@ const HomeCampusCard: React.FC<HomeCampusCardProps> = ({
               </View>
             </View>
 
-            {/* 切换门店 */}
-            <View className="flex items-center gap-[2rpx] shrink-0 press-scale" onClick={onSwitch}>
+            {displayAddress ? (
+              <View className="w-full min-w-0 overflow-hidden">
+                <Text
+                  numberOfLines={1}
+                  className="block w-full text-[24rpx] text-muted-foreground"
+                  style={SINGLE_LINE_TEXT_STYLE}
+                >
+                  {displayAddress}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View className="flex shrink-0 flex-col items-end gap-[8rpx]">
+            <View className="flex items-center gap-[2rpx] press-scale" onClick={onSwitch}>
               <Text className="text-[28rpx] font-semibold text-foreground">切换门店</Text>
               <Icon name="mdi-chevron-down" size="sm" color="foreground" />
             </View>
+            {/* 未设置用短横占位，不写「未设置」以免换行 */}
+            <Text
+              numberOfLines={1}
+              className="max-w-[220rpx] text-right text-[22rpx] text-muted-foreground"
+              style={SINGLE_LINE_TEXT_STYLE}
+            >
+              {businessTime || '—'}
+            </Text>
           </View>
-
-          {campus?.address ? (
-            <Text className="text-[24rpx] text-muted-foreground truncate">{campus.address}</Text>
-          ) : null}
-
-          {businessTime ? (
-            <Text className="text-[24rpx] text-muted-foreground">营业时间 {businessTime}</Text>
-          ) : (
-            <Text className="text-[24rpx] text-muted-foreground">营业时间 未设置</Text>
-          )}
         </View>
       </View>
 

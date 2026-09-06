@@ -1,6 +1,7 @@
 /**
  * 切机构 / 切校区 / 登出时清空 L1–L3 领域缓存，避免串租户假数据
  */
+import { invalidateMembershipBootstrapCache } from '@/services/membership-cache';
 import { invalidateMembershipSkuCache } from '@/services/payment';
 import { useCampusStore } from '@/stores/campus';
 import { useCardTypeStore } from '@/stores/card-type';
@@ -37,6 +38,7 @@ export function resetDomainCaches(scope: ResetDomainCachesScope = 'all'): void {
   if (scope === 'all') {
     useCampusStore.getState().invalidateCache();
     invalidateMembershipSkuCache();
+    invalidateMembershipBootstrapCache();
   } else {
     useCampusStore.getState().invalidateSubjectsCache();
   }

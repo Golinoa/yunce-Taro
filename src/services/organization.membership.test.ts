@@ -57,6 +57,38 @@ describe('isOrgMembershipActive', () => {
   });
 });
 
+describe('isOrgMembershipEntitled', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('未到期试用算已发放权益；无到期试用 / 众创不算', async () => {
+    const { isOrgMembershipEntitled } = await import('@/services/organization');
+    expect(isOrgMembershipEntitled(null)).toBe(false);
+    expect(isOrgMembershipEntitled(baseQuota({ versionCode: 'FREE' }))).toBe(false);
+    expect(isOrgMembershipEntitled(baseQuota({ versionCode: 'TRIAL', expireAt: null }))).toBe(
+      false,
+    );
+    expect(
+      isOrgMembershipEntitled(
+        baseQuota({
+          versionCode: 'TRIAL',
+          versionName: '试用版',
+          expireAt: new Date(Date.now() + 86400000).toISOString(),
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isOrgMembershipEntitled(
+        baseQuota({
+          versionCode: 'TRIAL',
+          expireAt: new Date(Date.now() - 86400000).toISOString(),
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe('organizationService.redeemActivationCode', () => {
   beforeEach(() => {
     vi.resetModules();

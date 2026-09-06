@@ -193,10 +193,21 @@ export function resolveLifecycle(
   const expireAt = quota.expireAt ? new Date(quota.expireAt).getTime() : null;
   const now = Date.now();
 
-  if (code === 'FREE' || code === 'TRIAL') {
+  // 众创：无付费期，始终走开通漏斗
+  if (code === 'FREE') {
     if (expireAt && expireAt < now) return 'expired';
     return 'inactive';
   }
+
+  // 试用：有未到期日 = 已发放权益（含联调履约）；过期/无到期日才算未开通
+  if (code === 'TRIAL') {
+    if (!expireAt || expireAt < now) return expireAt && expireAt < now ? 'expired' : 'inactive';
+    const days = Math.ceil((expireAt - now) / (24 * 60 * 60 * 1000));
+    if (days <= 7) return 'expiring_7';
+    if (days <= 30) return 'expiring_30';
+    return 'active';
+  }
+
   if (expireAt && expireAt < now) return 'expired';
   if (expireAt) {
     const days = Math.ceil((expireAt - now) / (24 * 60 * 60 * 1000));

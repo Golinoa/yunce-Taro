@@ -9,14 +9,15 @@ import Dialog from '@/components/Dialog';
 import FormInput from '@/components/FormInput';
 import PageContainer from '@/components/PageContainer';
 import SupportQrDialog from '@/components/SupportQrDialog';
-import { getMembershipPlan, isUnlimitedQuota } from '@/constants/membership-plans';
+import { isUnlimitedQuota } from '@/constants/membership-plans';
 import {
   MEMBERSHIP_MARKETING_RED,
-  MEMBERSHIP_SHELF_PLANS,
-  MEMBERSHIP_SHELF_TERMS,
+  buildShelfPlans,
+  buildShelfTerms,
   calcShelfPay,
   getShelfPlan,
   matchShelfSku,
+  shelfBaseVersionCode,
   shelfFeatureRows,
   type ShelfPlanCode,
   type ShelfTermYears,
@@ -35,12 +36,20 @@ import {
   SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY,
 } from '@/constants/support-qr';
 import {
-  isOrgMembershipActive,
+  isMembershipQuotaCacheFresh,
+  peekMembershipQuotaCache,
+  peekMembershipSkuCache,
+  writeMembershipQuotaCache,
+  writeMembershipSkuCache,
+} from '@/services/membership-cache';
+import {
+  isOrgMembershipEntitled,
   organizationService,
   type OrganizationQuotaUsage,
 } from '@/services/organization';
 import {
   paymentService,
+  type MembershipCatalogPlan,
   type MembershipSku,
   type PaymentOrderStatusResult,
 } from '@/services/payment';
@@ -144,29 +153,43 @@ type QrCopy = {
 const MembershipPage: React.FC = () => {
   useCardNavigationBar();
   const router = useRouter();
-  const { currentRole } = useAuth();
+  const { currentRole, currentIdentity } = useAuth();
   const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
+  const orgNameHint = currentIdentity?.organizationName || '';
 
-  const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
+  const cachedQuota = peekMembershipQuotaCache();
+  const cachedSku = peekMembershipSkuCache();
+
+  const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(cachedQuota);
   const [tipDefs, setTipDefs] = useState(DEFAULT_MEMBERSHIP_TIPS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedQuota);
+  const [shelfLoading, setShelfLoading] = useState(!(cachedSku && cachedSku.skus.length > 0));
   const [showRedeem, setShowRedeem] = useState(false);
   const [redeemCode, setRedeemCode] = useState('');
+  const [redeemFocus, setRedeemFocus] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
-  const [payEnabled, setPayEnabled] = useState(false);
-  const [skus, setSkus] = useState<MembershipSku[]>([]);
+  const [payEnabled, setPayEnabled] = useState(
+    Boolean(cachedSku?.enabled && (cachedSku?.skus.length || 0) > 0),
+  );
+  const [skus, setSkus] = useState<MembershipSku[]>(cachedSku?.skus || []);
+  const [catalogPlans, setCatalogPlans] = useState<MembershipCatalogPlan[]>(cachedSku?.plans || []);
   const [supportQrVisible, setSupportQrVisible] = useState(false);
   const [qrCopy, setQrCopy] = useState<QrCopy>(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY);
-  const [selectedPlanCode, setSelectedPlanCode] = useState<ShelfPlanCode>('STANDARD');
+  const [selectedPlanCode, setSelectedPlanCode] = useState<ShelfPlanCode>(() => {
+    if (!cachedQuota) return 'STANDARD';
+    const base = shelfBaseVersionCode(cachedQuota.versionCode);
+    if (base && base !== 'FREE' && cachedQuota.versionCode !== 'TRIAL') return base;
+    return 'STANDARD';
+  });
   const [years, setYears] = useState<ShelfTermYears>(3);
-  const [campusExtra, setCampusExtra] = useState(0);
   const [viewMode, setViewMode] = useState<'manage' | 'purchase'>('purchase');
   const [matchedTip, setMatchedTip] = useState<MatchedMembershipTip | null>(null);
   const [pendingOrder, setPendingOrder] = useState<PaymentOrderStatusResult | null>(null);
   const [pendingCd, setPendingCd] = useState<string | null>(null);
   const autoOpenedRedeem = useRef(false);
   const viewSeeded = useRef(false);
+  const hasQuotaRef = useRef(Boolean(cachedQuota));
 
   const refreshTip = useCallback(
     (quota: OrganizationQuotaUsage | null, tips = tipDefs) => {
@@ -189,46 +212,76 @@ const MembershipPage: React.FC = () => {
     }
   }, [isManagerRole]);
 
-  const loadQuotaUsage = useCallback(async () => {
-    if (!isManagerRole) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      // 先拉配额，尽快点亮会员卡；tips / SKU / 待付单后台补齐，不挡首屏
-      const data = await organizationService.getQuotaUsage();
+  const applyQuota = useCallback(
+    (data: OrganizationQuotaUsage) => {
+      hasQuotaRef.current = true;
       setQuotaUsage(data);
-      const plan = getMembershipPlan(data.versionCode);
-      if (plan && plan.code !== 'FREE' && plan.code !== 'TRIAL') {
-        setSelectedPlanCode(plan.code as ShelfPlanCode);
+      writeMembershipQuotaCache(data);
+      const base = shelfBaseVersionCode(data.versionCode);
+      if (base && base !== 'FREE' && data.versionCode !== 'TRIAL') {
+        setSelectedPlanCode(base);
       } else {
         setSelectedPlanCode('STANDARD');
       }
-      setLoading(false);
+      refreshTip(data);
+    },
+    [refreshTip],
+  );
 
-      void Promise.all([
-        organizationService.getMembershipTips().then((remoteTips) => {
+  const loadQuotaUsage = useCallback(
+    async (options?: { soft?: boolean; forceSku?: boolean }) => {
+      if (!isManagerRole) {
+        setLoading(false);
+        setShelfLoading(false);
+        return null;
+      }
+      const soft = options?.soft ?? hasQuotaRef.current;
+      if (!soft) setLoading(true);
+
+      // 卡面只等配额；tips / 待付单延后，不挡首屏
+      const quotaPromise = organizationService.getQuotaUsage();
+      const skuPromise = paymentService.listSkus(Boolean(options?.forceSku));
+
+      try {
+        const data = await quotaPromise;
+        applyQuota(data);
+        setLoading(false);
+
+        void organizationService.getMembershipTips().then((remoteTips) => {
           const tips = mergeMembershipTips(DEFAULT_MEMBERSHIP_TIPS, remoteTips);
           setTipDefs(tips);
           refreshTip(data, tips);
-        }),
-        paymentService.listSkus().then((catalog) => {
-          setPayEnabled(Boolean(catalog.enabled && catalog.skus.length > 0));
-          setSkus(catalog.skus);
-        }),
-        loadPendingOrder(),
-      ]).catch(() => {
-        /* 次要数据失败不挡卡面 */
-      });
-    } catch {
-      Taro.showToast({ title: '加载会员信息失败', icon: 'none' });
-      setLoading(false);
-    }
-  }, [isManagerRole, loadPendingOrder, refreshTip]);
+        });
+        void loadPendingOrder();
+
+        const catalog = await skuPromise;
+        setPayEnabled(Boolean(catalog.enabled && catalog.skus.length > 0));
+        setSkus(catalog.skus);
+        setCatalogPlans(catalog.plans || []);
+        writeMembershipSkuCache({
+          enabled: catalog.enabled,
+          showTestSkus: catalog.showTestSkus,
+          plans: catalog.plans,
+          skus: catalog.skus,
+        });
+        setShelfLoading(false);
+        return data;
+      } catch {
+        if (!hasQuotaRef.current) {
+          Taro.showToast({ title: '加载会员信息失败', icon: 'none' });
+        }
+        setLoading(false);
+        setShelfLoading(false);
+        return null;
+      }
+    },
+    [applyQuota, isManagerRole, loadPendingOrder, refreshTip],
+  );
 
   useDidShow(() => {
-    void loadQuotaUsage();
+    // 有新鲜缓存：后台静默刷新；无缓存才转圈
+    const soft = hasQuotaRef.current || isMembershipQuotaCacheFresh();
+    void loadQuotaUsage({ soft });
   });
 
   useEffect(() => {
@@ -249,20 +302,62 @@ const MembershipPage: React.FC = () => {
   const notifyMembershipPaid = useCallback(async () => {
     setRefreshSignal(REFRESH_SIGNAL.membership);
     setRefreshSignal(REFRESH_SIGNAL.profileQuota);
-    await loadQuotaUsage();
+    return loadQuotaUsage({ soft: true, forceSku: true });
   }, [loadQuotaUsage]);
+
+  const showPaidResult = useCallback(
+    async (result: { message: string; order?: PaymentOrderStatusResult; fulfilled?: boolean }) => {
+      if (result.fulfilled === false) {
+        await loadPendingOrder();
+        await loadQuotaUsage({ soft: true, forceSku: true });
+        await Taro.showModal({
+          title: '支付成功',
+          content:
+            result.message ||
+            '权益正在开通中。可稍后下拉刷新会员页，或在「订单详情」查看履约状态。',
+          showCancel: false,
+          confirmText: '知道了',
+        });
+        return;
+      }
+      setViewMode('manage');
+      const refreshed = await notifyMembershipPaid();
+      const versionName =
+        refreshed?.versionName || result.order?.versionName || refreshed?.versionCode || '';
+      const expire =
+        formatExpireDate(
+          refreshed?.expireAt || result.order?.orgExpireAt || result.order?.fulfilledAt,
+        ) || '已更新';
+      await Taro.showModal({
+        title: result.message || '开通成功',
+        content: versionName
+          ? `当前权益：${versionName}\n到期：${expire}`
+          : `到期：${expire}\n若卡片未变，请下拉或重新进入会员页`,
+        showCancel: false,
+        confirmText: '知道了',
+      });
+    },
+    [loadPendingOrder, loadQuotaUsage, notifyMembershipPaid],
+  );
+
+  const payHooks = useMemo(
+    () => ({
+      onOrderCreated: () => {
+        Taro.hideLoading();
+      },
+    }),
+    [],
+  );
 
   const continuePendingPay = useCallback(async () => {
     if (!pendingOrder || purchasing) return;
     setPurchasing(true);
     try {
-      Taro.showLoading({ title: '拉起支付…', mask: true });
-      const result = await paymentService.continuePay(pendingOrder.orderId);
+      Taro.showLoading({ title: '下单中…', mask: true });
+      const result = await paymentService.continuePay(pendingOrder.orderId, payHooks);
       Taro.hideLoading();
       if (result.ok) {
-        Taro.showToast({ title: result.message || '开通成功', icon: 'success', duration: 2500 });
-        setViewMode('manage');
-        await notifyMembershipPaid();
+        await showPaidResult(result);
       } else {
         Taro.showToast({ title: result.message || '支付未完成', icon: 'none', duration: 2500 });
         await loadPendingOrder();
@@ -276,14 +371,20 @@ const MembershipPage: React.FC = () => {
     } finally {
       setPurchasing(false);
     }
-  }, [loadPendingOrder, notifyMembershipPaid, pendingOrder, purchasing]);
+  }, [loadPendingOrder, payHooks, pendingOrder, purchasing, showPaidResult]);
 
-  const active = isOrgMembershipActive(quotaUsage);
+  const entitled = isOrgMembershipEntitled(quotaUsage);
   const lifecycle = resolveLifecycle(quotaUsage);
   const expireText = formatExpireDate(quotaUsage?.expireAt);
   const remainDays = daysUntil(quotaUsage?.expireAt);
-  const currentPlan = getMembershipPlan(quotaUsage?.versionCode);
+  const shelfPlans = useMemo(() => buildShelfPlans(catalogPlans, skus), [catalogPlans, skus]);
+  const currentPlan = useMemo(() => {
+    const code = quotaUsage?.versionCode === 'TRIAL' ? 'STANDARD' : quotaUsage?.versionCode || '';
+    return getShelfPlan(shelfPlans, shelfBaseVersionCode(code));
+  }, [quotaUsage?.versionCode, shelfPlans]);
   const isTrial = quotaUsage?.versionCode === 'TRIAL';
+  /** 卡面「已生效」：付费或未到期试用（含联调履约） */
+  const active = entitled;
 
   useEffect(() => {
     if (loading || viewSeeded.current) return;
@@ -296,11 +397,33 @@ const MembershipPage: React.FC = () => {
     }
   }, [lifecycle, loading, router.params?.action]);
 
-  const shelfPlan = getShelfPlan(selectedPlanCode) || MEMBERSHIP_SHELF_PLANS[2];
-  const shelfCalc = useMemo(
-    () => calcShelfPay({ plan: shelfPlan, years, campusExtra }),
-    [shelfPlan, years, campusExtra],
-  );
+  const shelfPlan = getShelfPlan(shelfPlans, selectedPlanCode) ||
+    getShelfPlan(shelfPlans, 'STANDARD') ||
+    shelfPlans[0] || {
+      code: 'STANDARD',
+      shortName: '成长',
+      name: '成长版',
+      yearPrice: 0,
+      pay: {},
+      terms: [],
+      membersLabel: '—',
+      employeesLabel: '—',
+      campusesLabel: '—',
+      includedCampuses: 1,
+      marketing: false,
+      features: {},
+    };
+
+  // 当前档可用时长变化时，钳制 years
+  useEffect(() => {
+    if (!shelfPlan.terms?.length) return;
+    if (!shelfPlan.terms.includes(years)) {
+      setYears(shelfPlan.terms.includes(3) ? 3 : shelfPlan.terms[shelfPlan.terms.length - 1]);
+    }
+  }, [shelfPlan.terms, years]);
+
+  const shelfCalc = useMemo(() => calcShelfPay({ plan: shelfPlan, years }), [shelfPlan, years]);
+  const shelfTerms = useMemo(() => buildShelfTerms(shelfPlan), [shelfPlan]);
   const matchedSku = useMemo(
     () => (shelfPlan.free ? null : matchShelfSku(skus, selectedPlanCode, years)),
     [skus, selectedPlanCode, years, shelfPlan.free],
@@ -335,8 +458,8 @@ const MembershipPage: React.FC = () => {
       return '开通机构会员';
     }
     if (viewMode === 'purchase' && shelfPlan.free) return shelfPlan.name;
-    if (isTrial) return '成长版（试用）';
-    return currentPlan?.name || quotaUsage?.versionName || '会员';
+    if (isTrial) return '试用版';
+    return quotaUsage?.versionName || currentPlan?.name || '会员';
   }, [
     viewMode,
     lifecycle,
@@ -359,14 +482,24 @@ const MembershipPage: React.FC = () => {
   }, [loading, quotaUsage, viewMode, shelfPlan.free, lifecycle, expireText, isTrial, remainDays]);
 
   const cardRemain = useMemo(() => {
-    if (viewMode === 'purchase' && shelfPlan.free) return '40 人档';
+    if (viewMode === 'purchase' && shelfPlan.free) {
+      return `${shelfPlan.membersLabel} 人档`;
+    }
     if (viewMode === 'purchase' && lifecycle === 'inactive') {
-      return `当前 · ${currentPlan?.name || '未开通'}`;
+      return `当前 · ${quotaUsage?.versionName || currentPlan?.name || '未开通'}`;
     }
     if (lifecycle === 'expired') return '权益已暂停';
     if (remainDays != null && remainDays >= 0) return `剩余 ${remainDays} 天`;
     return '长期有效';
-  }, [viewMode, shelfPlan.free, lifecycle, currentPlan?.name, remainDays]);
+  }, [
+    viewMode,
+    shelfPlan.free,
+    shelfPlan.membersLabel,
+    lifecycle,
+    currentPlan?.name,
+    quotaUsage?.versionName,
+    remainDays,
+  ]);
 
   const openQr = useCallback((copy: QrCopy) => {
     setQrCopy(copy);
@@ -375,17 +508,23 @@ const MembershipPage: React.FC = () => {
 
   const handleOpenRedeem = useCallback(() => {
     setRedeemCode('');
+    setRedeemFocus(false);
     setShowRedeem(true);
   }, []);
+
+  // 弹框打开后再拉焦点（微信需先 false→true）
+  useEffect(() => {
+    if (!showRedeem) {
+      setRedeemFocus(false);
+      return;
+    }
+    const timer = setTimeout(() => setRedeemFocus(true), 80);
+    return () => clearTimeout(timer);
+  }, [showRedeem]);
 
   const handlePurchase = useCallback(async () => {
     if (shelfPlan.free) {
       openQr(SUPPORT_QR_MEMBERSHIP_FREE_COPY);
-      return;
-    }
-    if (campusExtra > 0) {
-      openQr(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY);
-      Taro.showToast({ title: '校区加购请联系运营', icon: 'none' });
       return;
     }
     if (!matchedSku) {
@@ -409,12 +548,10 @@ const MembershipPage: React.FC = () => {
     setPurchasing(true);
     try {
       Taro.showLoading({ title: '下单中…', mask: true });
-      const result = await paymentService.purchaseMembership(matchedSku.versionCode);
+      const result = await paymentService.purchaseMembership(matchedSku.versionCode, payHooks);
       Taro.hideLoading();
       if (result.ok) {
-        Taro.showToast({ title: result.message || '开通成功', icon: 'success', duration: 2500 });
-        setViewMode('manage');
-        await notifyMembershipPaid();
+        await showPaidResult(result);
       } else if (result.message === '已取消支付') {
         await loadPendingOrder();
         const go = await Taro.showModal({
@@ -426,17 +563,11 @@ const MembershipPage: React.FC = () => {
         if (go.confirm && result.order?.orderId) {
           setPurchasing(true);
           try {
-            Taro.showLoading({ title: '拉起支付…', mask: true });
-            const again = await paymentService.continuePay(result.order.orderId);
+            Taro.showLoading({ title: '下单中…', mask: true });
+            const again = await paymentService.continuePay(result.order.orderId, payHooks);
             Taro.hideLoading();
             if (again.ok) {
-              Taro.showToast({
-                title: again.message || '开通成功',
-                icon: 'success',
-                duration: 2500,
-              });
-              setViewMode('manage');
-              await notifyMembershipPaid();
+              await showPaidResult(again);
             } else {
               Taro.showToast({
                 title: again.message || '支付未完成',
@@ -467,13 +598,13 @@ const MembershipPage: React.FC = () => {
       setPurchasing(false);
     }
   }, [
-    campusExtra,
     loadPendingOrder,
     matchedSku,
-    notifyMembershipPaid,
     openQr,
+    payHooks,
     purchasing,
     shelfPlan.free,
+    showPaidResult,
     years,
   ]);
 
@@ -491,13 +622,13 @@ const MembershipPage: React.FC = () => {
       setPurchasing(true);
       try {
         Taro.showLoading({ title: '下单中…', mask: true });
-        const result = await paymentService.purchaseMembership(sku.versionCode);
+        const result = await paymentService.purchaseMembership(sku.versionCode, payHooks);
         Taro.hideLoading();
         if (result.ok) {
-          Taro.showToast({ title: result.message || '联调成功', icon: 'success', duration: 2500 });
-          await notifyMembershipPaid();
+          await showPaidResult(result);
         } else {
           Taro.showToast({ title: result.message || '支付未完成', icon: 'none', duration: 2500 });
+          await loadPendingOrder();
         }
       } catch (err) {
         Taro.hideLoading();
@@ -507,7 +638,7 @@ const MembershipPage: React.FC = () => {
         setPurchasing(false);
       }
     },
-    [notifyMembershipPaid, purchasing],
+    [loadPendingOrder, payHooks, purchasing, showPaidResult],
   );
 
   useEffect(() => {
@@ -546,32 +677,42 @@ const MembershipPage: React.FC = () => {
     }
   }, [notifyMembershipPaid, redeemCode]);
 
-  const handleSelectPlan = useCallback((code: ShelfPlanCode) => {
-    setSelectedPlanCode(code);
-    const p = getShelfPlan(code);
-    if (p?.free) {
-      setCampusExtra(0);
-    } else if (p?.recommended) {
-      setYears(3);
-    }
-    if (!p?.campusFeePerYear) setCampusExtra(0);
-  }, []);
+  const handleSelectPlan = useCallback(
+    (code: ShelfPlanCode) => {
+      setSelectedPlanCode(code);
+      const p = getShelfPlan(shelfPlans, code);
+      if (p?.recommended && p.terms.includes(3)) {
+        setYears(3);
+      } else if (p?.terms?.length) {
+        setYears(p.terms.includes(3) ? 3 : p.terms[p.terms.length - 1]);
+      }
+    },
+    [shelfPlans],
+  );
 
   const manageTip = useMemo(() => {
     if (lifecycle === 'expired') {
       return '会员已到期。请自助续费同档货架价，或兑换激活码；换更高版本请联系运营。';
     }
     if (isTrial) {
-      return '试用对齐成长版能力。正式开通请自助选购货架价；升旗舰请联系运营。';
+      return '试用版生效中（标准功能 · 体验配额）。正式开通请自助选购货架价；升旗舰请联系运营。';
     }
     if (quotaUsage?.versionCode === 'FREE') {
       return '众创为申请制免费档。开通付费版请走货架价。';
     }
     if (quotaUsage?.versionCode === 'FLAGSHIP') {
-      return '当前旗舰版（含 2 校区）。续费自助选购；第 3 个校区起联系运营。';
+      return `当前${quotaUsage.versionName || '旗舰版'}（含 ${
+        currentPlan?.includedCampuses || 2
+      } 校区）。续费自助选购；更多校区请联系运营。`;
     }
     return '当前成长/付费档生效中。续费可自助购买同档货架 SKU；升级请联系运营补差。';
-  }, [isTrial, lifecycle, quotaUsage?.versionCode]);
+  }, [
+    isTrial,
+    lifecycle,
+    quotaUsage?.versionCode,
+    quotaUsage?.versionName,
+    currentPlan?.includedCampuses,
+  ]);
 
   if (!isManagerRole) {
     return (
@@ -583,7 +724,6 @@ const MembershipPage: React.FC = () => {
     );
   }
 
-  const showCampusStepper = shelfPlan.campusFeePerYear > 0 && !shelfPlan.free;
   const featureRows = shelfFeatureRows(shelfPlan);
 
   return (
@@ -627,7 +767,7 @@ const MembershipPage: React.FC = () => {
           </View>
           <View className="relative z-10 mt-[24rpx] pt-[20rpx] flex flex-row justify-between border-t border-white/20">
             <Text className="text-[24rpx] text-white/80">
-              机构：{quotaUsage?.organizationName || '—'}
+              机构：{quotaUsage?.organizationName || orgNameHint || (loading ? '加载中…' : '—')}
             </Text>
             <Text className="text-[24rpx] text-white/80">{cardRemain}</Text>
           </View>
@@ -762,43 +902,51 @@ const MembershipPage: React.FC = () => {
             </View>
 
             <View className="px-[20rpx] pb-[24rpx] flex flex-row gap-[10rpx]">
-              {MEMBERSHIP_SHELF_PLANS.map((p) => {
-                const on = p.code === selectedPlanCode;
-                return (
-                  <View
-                    key={p.code}
-                    className={cn(
-                      'flex-1 min-w-0 relative rounded-[24rpx] px-[4rpx] py-[20rpx] border-[3rpx] text-center',
-                      on ? 'border-primary/45 bg-primary/6' : 'border-border bg-bg-card',
-                    )}
-                    onClick={() => handleSelectPlan(p.code)}
-                  >
-                    {p.recommended ? (
-                      <View
-                        className="absolute -top-[14rpx] right-[8rpx] px-[12rpx] py-[4rpx] rounded-full z-10"
-                        style={{ backgroundColor: MEMBERSHIP_MARKETING_RED }}
-                      >
-                        <Text className="text-[18rpx] text-white font-bold">荐</Text>
-                      </View>
-                    ) : null}
-                    <Text className="text-[24rpx] font-extrabold text-foreground block">
-                      {p.shortName}
-                    </Text>
-                    <Text className="text-[20rpx] text-muted-foreground mt-[8rpx] block">
-                      {p.free ? '申请' : `¥${p.yearPrice}`}
-                    </Text>
-                  </View>
-                );
-              })}
+              {shelfPlans.length === 0 ? (
+                <View className="flex-1 rounded-[24rpx] border border-dashed border-border px-[16rpx] py-[28rpx] text-center">
+                  <Text className="text-[24rpx] text-muted-foreground">
+                    {shelfLoading ? '套餐加载中…' : '暂无在线套餐，请用激活码或联系运营'}
+                  </Text>
+                </View>
+              ) : (
+                shelfPlans.map((p) => {
+                  const on = p.code === selectedPlanCode;
+                  return (
+                    <View
+                      key={p.code}
+                      className={cn(
+                        'flex-1 min-w-0 relative rounded-[24rpx] px-[4rpx] py-[20rpx] border-[3rpx] text-center',
+                        on ? 'border-primary/45 bg-primary/6' : 'border-border bg-bg-card',
+                      )}
+                      onClick={() => handleSelectPlan(p.code)}
+                    >
+                      {p.recommended ? (
+                        <View
+                          className="absolute -top-[14rpx] right-[8rpx] px-[12rpx] py-[4rpx] rounded-full z-10"
+                          style={{ backgroundColor: MEMBERSHIP_MARKETING_RED }}
+                        >
+                          <Text className="text-[18rpx] text-white font-bold">荐</Text>
+                        </View>
+                      ) : null}
+                      <Text className="text-[24rpx] font-extrabold text-foreground block">
+                        {p.shortName}
+                      </Text>
+                      <Text className="text-[20rpx] text-muted-foreground mt-[8rpx] block">
+                        {p.free ? '申请' : p.yearPrice > 0 ? `¥${p.yearPrice}` : '询价'}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
             </View>
 
-            {!shelfPlan.free ? (
+            {!shelfPlan.free && shelfTerms.length > 0 ? (
               <View className="px-[24rpx] pb-[24rpx]">
                 <Text className="text-[24rpx] text-muted-foreground mb-[16rpx] block">
                   开通时长
                 </Text>
                 <View className="flex flex-row gap-[16rpx]">
-                  {MEMBERSHIP_SHELF_TERMS.map((t) => {
+                  {shelfTerms.map((t) => {
                     const on = t.years === years;
                     return (
                       <View
@@ -850,20 +998,19 @@ const MembershipPage: React.FC = () => {
                     <View className="items-end">
                       <Text className="text-[24rpx] text-muted-foreground line-through block">
                         ¥{moneyYuan(shelfCalc.list)}
-                        {shelfCalc.campusPay ? `+${moneyYuan(shelfCalc.campusPay)}校区` : ''}
                       </Text>
-                      <Text
-                        className="text-[24rpx] font-bold mt-[4rpx] block"
-                        style={{ color: MEMBERSHIP_MARKETING_RED }}
-                      >
-                        省 ¥{moneyYuan(shelfCalc.save)}
-                      </Text>
+                      {shelfCalc.save > 0 ? (
+                        <Text
+                          className="text-[24rpx] font-bold mt-[4rpx] block"
+                          style={{ color: MEMBERSHIP_MARKETING_RED }}
+                        >
+                          省 ¥{moneyYuan(shelfCalc.save)}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                   <Text className="text-[24rpx] text-muted-foreground mt-[16rpx] block">
-                    {shelfPlan.name} · {years} 年{campusExtra ? ` · +${campusExtra} 校区` : ''} · ¥
-                    {moneyYuan(shelfCalc.perYear)}
-                    /年
+                    {shelfPlan.name} · {years} 年 · ¥{moneyYuan(shelfCalc.perYear)}/年
                   </Text>
                   {years === 3 ? (
                     <Text className="text-[26rpx] font-bold text-primary mt-[12rpx] block">
@@ -885,32 +1032,18 @@ const MembershipPage: React.FC = () => {
               </View>
             ) : null}
 
-            {showCampusStepper ? (
-              <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-border px-[28rpx] py-[24rpx] flex flex-row items-center justify-between">
+            {!shelfPlan.free ? (
+              <View
+                className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-border px-[28rpx] py-[24rpx] flex flex-row items-center justify-between active:opacity-80"
+                onClick={() => openQr(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY)}
+              >
                 <View className="flex-1 min-w-0 pr-[16rpx]">
                   <Text className="text-[26rpx] font-bold text-foreground block">额外校区</Text>
                   <Text className="text-[22rpx] text-muted-foreground mt-[8rpx] block">
-                    含 {shelfPlan.includedCampuses} 校区 · 第 {shelfPlan.includedCampuses + 1} 个起
-                    +¥{shelfPlan.campusFeePerYear}/校区/年
+                    含 {shelfPlan.includedCampuses} 校区 · 加购请联系运营（不在线计价）
                   </Text>
                 </View>
-                <View className="flex flex-row items-center gap-[16rpx]">
-                  <View
-                    className="w-[56rpx] h-[56rpx] rounded-[16rpx] border border-border bg-card flex items-center justify-center"
-                    onClick={() => setCampusExtra((n) => Math.max(0, n - 1))}
-                  >
-                    <Text className="text-[32rpx] text-foreground">−</Text>
-                  </View>
-                  <Text className="text-[28rpx] font-extrabold w-[36rpx] text-center">
-                    {campusExtra}
-                  </Text>
-                  <View
-                    className="w-[56rpx] h-[56rpx] rounded-[16rpx] border border-border bg-card flex items-center justify-center"
-                    onClick={() => setCampusExtra((n) => Math.min(9, n + 1))}
-                  >
-                    <Text className="text-[32rpx] text-foreground">+</Text>
-                  </View>
-                </View>
+                <Text className="text-[24rpx] font-bold text-primary">联系 ›</Text>
               </View>
             ) : null}
 
@@ -1004,13 +1137,13 @@ const MembershipPage: React.FC = () => {
                 <Text className="text-[20rpx] text-white/90 mt-[2rpx]">
                   {shelfPlan.free
                     ? '一个人也能开始'
-                    : matchedSku && campusExtra === 0
+                    : matchedSku
                       ? `实付 ¥${paymentService.formatPriceYuan(matchedSku.price)}`
-                      : campusExtra > 0
-                        ? '校区加购请联系运营'
-                        : payEnabled
-                          ? '时长未上架·可用激活码'
-                          : `货架 ¥${moneyYuan(shelfCalc.pay)}`}
+                      : payEnabled
+                        ? '时长未上架·可用激活码'
+                        : shelfCalc.pay > 0
+                          ? `货架 ¥${moneyYuan(shelfCalc.pay)}`
+                          : '加载货架中…'}
                 </Text>
               </View>
               <View
@@ -1035,13 +1168,15 @@ const MembershipPage: React.FC = () => {
         <Text className="text-[34rpx] font-extrabold text-foreground text-center block">
           {lifecycle === 'expired' || active ? '续费 / 兑换' : '开通会员'}
         </Text>
-        <Text className="mt-[16rpx] text-[26rpx] text-muted-foreground text-center block leading-[40rpx]">
-          请输入运营发放的激活码。兑换成功后将更新机构会员有效期与套餐档位。
+        <Text className="mt-[16rpx] text-[26rpx] text-muted-foreground text-center block">
+          输入激活码即可
         </Text>
         <FormInput
           variant="capsule"
-          placeholder="请输入激活码"
+          placeholder="激活码"
           value={redeemCode}
+          focus={redeemFocus}
+          adjustPosition={false}
           onInput={(e) => setRedeemCode(e.detail.value.trim().toUpperCase())}
           maxlength={64}
           className="mt-[28rpx] mb-[28rpx]"

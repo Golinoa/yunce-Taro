@@ -33,8 +33,12 @@ import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
 import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
 import {
+  prefetchMembershipBootstrap,
+  writeMembershipQuotaCache,
+} from '@/services/membership-cache';
+import {
   organizationService,
-  isOrgMembershipActive,
+  isOrgMembershipEntitled,
   type OrganizationQuotaUsage,
 } from '@/services/organization';
 import { subscribeMessageService } from '@/services/subscribe-message';
@@ -105,10 +109,11 @@ const Profile: React.FC = () => {
   const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
   const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
 
-  // 会员开通状态（众创/试用/已到期 → 开通或续费；付费未过期 → 立即查看）
-  const isMembershipActive = useMemo(() => isOrgMembershipActive(quotaUsage), [quotaUsage]);
+  // 已有可用权益（含未到期试用 / 联调履约）才算「已开通态」
+  const isMembershipEntitled = useMemo(() => isOrgMembershipEntitled(quotaUsage), [quotaUsage]);
   const membershipLifecycle = useMemo(() => resolveLifecycle(quotaUsage), [quotaUsage]);
   const membershipExpired = membershipLifecycle === 'expired';
+  const isTrialEntitled = quotaUsage?.versionCode === 'TRIAL' && isMembershipEntitled;
 
   const membershipExpireLabel = useMemo(
     () => formatMembershipExpire(quotaUsage?.expireAt),
@@ -116,7 +121,9 @@ const Profile: React.FC = () => {
   );
 
   const handleOpenMembership = useCallback(() => {
-    const action = isOrgMembershipActive(quotaUsage) ? 'view' : 'redeem';
+    const action = isOrgMembershipEntitled(quotaUsage) ? 'view' : 'redeem';
+    // 点击瞬间预热，导航与请求并行 → 会员页首帧尽量已有卡面/货架
+    void prefetchMembershipBootstrap();
     Taro.navigateTo({
       url: `/package-settings/pages/membership/index?action=${action}`,
     });
@@ -129,10 +136,14 @@ const Profile: React.FC = () => {
       // entitlements 与 quota-usage 同源，多带 features 全量 map，便于藏入口
       const data = await organizationService.getEntitlements();
       setQuotaUsage(data);
+      writeMembershipQuotaCache(data);
+      void prefetchMembershipBootstrap();
     } catch {
       try {
         const data = await organizationService.getQuotaUsage();
         setQuotaUsage(data);
+        writeMembershipQuotaCache(data);
+        void prefetchMembershipBootstrap();
       } catch {
         /* 非阻塞：会员到期信息加载失败不影响页面 */
       }
@@ -711,8 +722,10 @@ const Profile: React.FC = () => {
                 <Text className="text-[32rpx] font-bold text-primary ml-[6rpx]">会员卡</Text>
               </View>
               <Text className="text-[24rpx] text-muted-foreground mt-[14rpx]">
-                {isMembershipActive
-                  ? `${quotaUsage?.versionName || '会员'} · 有效期至 ${membershipExpireLabel}`
+                {isMembershipEntitled
+                  ? isTrialEntitled
+                    ? `试用中 · 有效期至 ${membershipExpireLabel}`
+                    : `${quotaUsage?.versionName || '会员'} · 有效期至 ${membershipExpireLabel}`
                   : membershipExpired
                     ? '会员已到期，兑换激活码续费'
                     : '兑换激活码，开通机构会员权益'}
@@ -727,10 +740,10 @@ const Profile: React.FC = () => {
               }}
             >
               <Text className="text-[30rpx] font-bold text-primary-foreground">
-                {isMembershipActive ? '立即查看' : membershipExpired ? '立即续费' : '立即开通'}
+                {isMembershipEntitled ? '立即查看' : membershipExpired ? '立即续费' : '立即开通'}
               </Text>
               <Text className="text-[20rpx] mt-[10rpx] text-primary-foreground/75">
-                {isMembershipActive
+                {isMembershipEntitled
                   ? `至 ${membershipExpireLabel}`
                   : membershipExpired
                     ? '激活码一键续费'

@@ -1,6 +1,6 @@
 {
   "name": "yunce-edu",
-  "version": "1.0.0",
+  "version": "1.0.3-membership-orders",
   "private": true,
   "description": "云策教务 - 教务管理小程序",
   "templateInfo": {

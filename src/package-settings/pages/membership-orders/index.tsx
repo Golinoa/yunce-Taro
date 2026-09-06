@@ -9,8 +9,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
+import {
+  prefetchMembershipBootstrap,
+  writeMembershipQuotaCache,
+} from '@/services/membership-cache';
+import { organizationService } from '@/services/organization';
 import { paymentService, type PaymentOrderStatusResult } from '@/services/payment';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 
 function formatDateTime(iso?: string | null): string {
@@ -156,17 +162,46 @@ const MembershipOrdersPage: React.FC = () => {
     }
   }, []);
 
+  const notifyMembershipPaid = useCallback(async () => {
+    setRefreshSignal(REFRESH_SIGNAL.membership);
+    setRefreshSignal(REFRESH_SIGNAL.profileQuota);
+    try {
+      const quota = await organizationService.getQuotaUsage();
+      writeMembershipQuotaCache(quota);
+    } catch {
+      /* ignore */
+    }
+    void prefetchMembershipBootstrap({ force: true });
+  }, []);
+
   const handleContinue = useCallback(async () => {
     if (!detail || detail.status !== 'PAYING' || paying) return;
     setPaying(true);
     try {
-      Taro.showLoading({ title: '拉起支付…', mask: true });
-      const result = await paymentService.continuePay(detail.orderId);
+      Taro.showLoading({ title: '下单中…', mask: true });
+      const result = await paymentService.continuePay(detail.orderId, {
+        onOrderCreated: () => Taro.hideLoading(),
+      });
       Taro.hideLoading();
-      if (result.ok) {
+      if (result.ok && result.fulfilled) {
         Taro.showToast({ title: result.message || '开通成功', icon: 'success' });
+        await notifyMembershipPaid();
         setDetail(null);
         await loadList();
+      } else if (result.ok && !result.fulfilled) {
+        await Taro.showModal({
+          title: '支付成功',
+          content: result.message || '权益开通中，请稍后刷新订单状态',
+          showCancel: false,
+        });
+        await loadList();
+        if (result.order?.orderId) {
+          try {
+            setDetail(await paymentService.getOrder(result.order.orderId));
+          } catch {
+            /* keep */
+          }
+        }
       } else {
         Taro.showToast({ title: result.message || '支付未完成', icon: 'none' });
         await loadList();
@@ -187,7 +222,7 @@ const MembershipOrdersPage: React.FC = () => {
     } finally {
       setPaying(false);
     }
-  }, [detail, loadList, paying]);
+  }, [detail, loadList, notifyMembershipPaid, paying]);
 
   const handleClose = useCallback(async () => {
     if (!detail || detail.status !== 'PAYING' || paying) return;
@@ -359,11 +394,21 @@ const MembershipOrdersPage: React.FC = () => {
                 if (paying) return;
                 setPaying(true);
                 try {
-                  Taro.showLoading({ title: '拉起支付…', mask: true });
-                  const result = await paymentService.continuePay(order.orderId);
+                  Taro.showLoading({ title: '下单中…', mask: true });
+                  const result = await paymentService.continuePay(order.orderId, {
+                    onOrderCreated: () => Taro.hideLoading(),
+                  });
                   Taro.hideLoading();
-                  if (result.ok) {
+                  if (result.ok && result.fulfilled) {
                     Taro.showToast({ title: result.message || '开通成功', icon: 'success' });
+                    await notifyMembershipPaid();
+                    await loadList();
+                  } else if (result.ok) {
+                    await Taro.showModal({
+                      title: '支付成功',
+                      content: result.message || '权益开通中，请稍后刷新',
+                      showCancel: false,
+                    });
                     await loadList();
                   } else {
                     Taro.showToast({ title: result.message || '支付未完成', icon: 'none' });

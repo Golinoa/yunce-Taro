@@ -24,6 +24,18 @@ export type MembershipSku = {
   maxCampuses: number;
 };
 
+/** 货架权益档（OrganizationVersion，运营可改） */
+export type MembershipCatalogPlan = {
+  code: string;
+  name: string;
+  description?: string | null;
+  maxMembers: number;
+  maxEmployees: number;
+  maxCampuses: number;
+  features: Record<string, boolean>;
+  sort: number;
+};
+
 export type VirtualPayData = {
   signData: string;
   mode: 'short_series_goods';
@@ -80,6 +92,8 @@ function formatPriceYuan(fen: number): string {
 type SkuCatalog = {
   enabled: boolean;
   showTestSkus?: boolean;
+  /** 权益档货架；缺省时前端仅从 skus 推导付费档 */
+  plans?: MembershipCatalogPlan[];
   skus: MembershipSku[];
 };
 
@@ -88,6 +102,11 @@ let skuCatalogCache: { at: number; data: SkuCatalog } | null = null;
 /** 切机构/登出时清空 SKU 短缓存 */
 export function invalidateMembershipSkuCache(): void {
   skuCatalogCache = null;
+}
+
+/** 用预取/落盘结果灌入内存，避免进页再打一枪 */
+export function seedMembershipSkuCache(data: SkuCatalog, at = Date.now()): void {
+  skuCatalogCache = { at, data };
 }
 
 /** iOS 虚拟支付需微信 ≥ 8.0.68 */
@@ -145,7 +164,8 @@ function invokeRequestVirtualPayment(payData: VirtualPayData): Promise<void> {
 
 async function pollOrderUntilDone(
   orderId: string,
-  maxAttempts = 12,
+  maxAttempts = 20,
+  intervalMs = 800,
 ): Promise<PaymentOrderStatusResult> {
   let last: PaymentOrderStatusResult | null = null;
   for (let i = 0; i < maxAttempts; i += 1) {
@@ -153,22 +173,42 @@ async function pollOrderUntilDone(
     if (last.status === 'FULFILLED' || last.status === 'CLOSED' || last.status === 'REFUNDED') {
       return last;
     }
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, intervalMs));
   }
   return last!;
 }
 
+export type PurchaseMembershipHooks = {
+  /** 下单成功、即将拉起微信支付前（用于关掉「下单中」loading） */
+  onOrderCreated?: () => void;
+};
+
+export type PurchaseMembershipResult = {
+  /** 微信收银台成功（或 mock 完成）；取消/拉起失败为 false */
+  ok: boolean;
+  /** 订单已 FULFILLED；ok 且未履约时为 false（支付成功权益开通中） */
+  fulfilled: boolean;
+  message: string;
+  order?: PaymentOrderStatusResult;
+};
+
 async function finishPayFlow(
   created: CreateMembershipOrderResult,
-): Promise<{ ok: boolean; message: string; order?: PaymentOrderStatusResult }> {
+  hooks?: PurchaseMembershipHooks,
+): Promise<PurchaseMembershipResult> {
   if (created.mock) {
+    hooks?.onOrderCreated?.();
     const done = await paymentService.mockComplete(created.orderId);
+    const fulfilled = done.status === 'FULFILLED';
     return {
-      ok: done.status === 'FULFILLED',
-      message: done.status === 'FULFILLED' ? '开通成功' : `状态：${done.status}`,
+      ok: fulfilled,
+      fulfilled,
+      message: fulfilled ? '开通成功' : `状态：${done.status}`,
       order: done,
     };
   }
+
+  hooks?.onOrderCreated?.();
 
   try {
     await invokeRequestVirtualPayment(created.payData);
@@ -177,6 +217,7 @@ async function finishPayFlow(
     if (/cancel|取消/i.test(msg)) {
       return {
         ok: false,
+        fulfilled: false,
         message: '已取消支付',
         order: {
           orderId: created.orderId,
@@ -188,16 +229,25 @@ async function finishPayFlow(
         },
       };
     }
-    return { ok: false, message: msg };
+    return { ok: false, fulfilled: false, message: msg };
   }
 
   const done = await pollOrderUntilDone(created.orderId);
   if (done.status === 'FULFILLED') {
-    return { ok: true, message: '开通成功', order: done };
+    return { ok: true, fulfilled: true, message: '开通成功', order: done };
+  }
+  if (done.status === 'PAID') {
+    return {
+      ok: true,
+      fulfilled: false,
+      message: '支付成功，权益开通中，请稍后在订单详情确认',
+      order: done,
+    };
   }
   return {
-    ok: false,
-    message: '支付结果确认中，请稍后刷新会员页',
+    ok: true,
+    fulfilled: false,
+    message: '支付已完成，权益同步中，请稍后刷新或查看订单',
     order: done,
   };
 }
@@ -215,7 +265,7 @@ export const paymentService = {
       skuCatalogCache = { at: now, data };
       return data;
     } catch {
-      return { enabled: false, skus: [] };
+      return { enabled: false, skus: [], plans: [] };
     }
   },
 
@@ -267,22 +317,24 @@ export const paymentService = {
    */
   purchaseMembership: async (
     versionCode: string,
-  ): Promise<{ ok: boolean; message: string; order?: PaymentOrderStatusResult }> => {
+    hooks?: PurchaseMembershipHooks,
+  ): Promise<PurchaseMembershipResult> => {
     if (!checkIosWechatVersionForVirtualPay()) {
-      return { ok: false, message: '请更新微信后再支付' };
+      return { ok: false, fulfilled: false, message: '请更新微信后再支付' };
     }
     const created = await paymentService.createOrder(versionCode);
-    return finishPayFlow(created);
+    return finishPayFlow(created, hooks);
   },
 
   /** 继续支付既有待付单 */
   continuePay: async (
     orderId: string,
-  ): Promise<{ ok: boolean; message: string; order?: PaymentOrderStatusResult }> => {
+    hooks?: PurchaseMembershipHooks,
+  ): Promise<PurchaseMembershipResult> => {
     if (!checkIosWechatVersionForVirtualPay()) {
-      return { ok: false, message: '请更新微信后再支付' };
+      return { ok: false, fulfilled: false, message: '请更新微信后再支付' };
     }
     const resumed = await paymentService.resumeOrder(orderId);
-    return finishPayFlow(resumed);
+    return finishPayFlow(resumed, hooks);
   },
 };

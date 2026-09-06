@@ -39,11 +39,17 @@ describe('resolveLifecycle', () => {
     expect(resolveLifecycle(undefined)).toBe('inactive');
   });
 
-  it('FREE / TRIAL 视为未开通；带过期日走 expired', () => {
+  it('FREE 未开通；TRIAL 无到期未开通，有未到期日为生效态', () => {
     expect(resolveLifecycle(quota({ versionCode: 'FREE' }))).toBe('inactive');
     expect(resolveLifecycle(quota({ versionCode: 'TRIAL' }))).toBe('inactive');
     expect(resolveLifecycle(quota({ versionCode: 'FREE', expireAt: daysFromNow(-2) }))).toBe(
       'expired',
+    );
+    expect(resolveLifecycle(quota({ versionCode: 'TRIAL', expireAt: daysFromNow(3) }))).toBe(
+      'expiring_7',
+    );
+    expect(resolveLifecycle(quota({ versionCode: 'TRIAL', expireAt: daysFromNow(90) }))).toBe(
+      'active',
     );
   });
 

@@ -291,16 +291,33 @@ export interface RedeemActivationResult {
   error: { message: string } | null;
 }
 
-/** 是否视为「已开通有效会员」（非免费档且未过期） */
+/** 是否视为「已开通有效付费会员」（不含众创 / 试用） */
 export function isOrgMembershipActive(quota: OrganizationQuotaUsage | null | undefined): boolean {
   if (!quota) return false;
   if (quota.expireAt) {
     const t = new Date(quota.expireAt).getTime();
     if (Number.isFinite(t) && t < Date.now()) return false;
   }
-  // 众创 / 试用视为未开通付费会员，引导兑换激活码
+  // 众创 / 试用不是付费档
   if (quota.versionCode === 'FREE' || quota.versionCode === 'TRIAL') return false;
-  // 付费档：有到期日则需未过期；无到期日视为长期有效
+  return true;
+}
+
+/**
+ * 是否已有可用机构权益（付费有效，或试用未到期）。
+ * 支付履约后必须为 true，禁止再当「未开通」误导用户。
+ */
+export function isOrgMembershipEntitled(quota: OrganizationQuotaUsage | null | undefined): boolean {
+  if (!quota) return false;
+  if (quota.expireAt) {
+    const t = new Date(quota.expireAt).getTime();
+    if (Number.isFinite(t) && t < Date.now()) return false;
+  }
+  if (quota.versionCode === 'FREE') return false;
+  if (quota.versionCode === 'TRIAL') {
+    // 试用须有未到期日，才算已发放权益（联调/试用履约）
+    return Boolean(quota.expireAt);
+  }
   return true;
 }
 

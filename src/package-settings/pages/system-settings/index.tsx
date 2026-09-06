@@ -18,7 +18,6 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import { SYSTEM_SETTING_ITEMS } from '@/constants/system-settings-items';
-import { APP_VERSION } from '@/constants/version';
 import { calendarSyncService } from '@/services/calendar-sync';
 import { campusService } from '@/services/campus';
 import { clearVisitedMap } from '@/services/onboarding';
@@ -32,6 +31,7 @@ import {
   getCalendarSyncSettings,
   isCalendarSyncEnabled,
 } from '@/utils/calendar-sync-settings';
+import { getDisplayAppVersion } from '@/utils/mini-program-env';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
 
@@ -277,10 +277,10 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {/* 当前版本（仅展示，无隐藏入口） */}
+          {/* 当前版本：正式版读微信线上号；开发/体验回退 package.json */}
           <View className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">
             <Text className="text-[30rpx] text-foreground">当前版本</Text>
-            <Text className="text-[28rpx] text-muted-foreground">v{APP_VERSION}</Text>
+            <Text className="text-[28rpx] text-muted-foreground">v{getDisplayAppVersion()}</Text>
           </View>
         </View>
       </View>
