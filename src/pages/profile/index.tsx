@@ -109,7 +109,7 @@ const Profile: React.FC = () => {
   const isManagerRole = currentRole === 'principal' || currentRole === 'admin';
   const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(null);
 
-  // 已有可用权益（含未到期试用 / 联调履约）才算「已开通态」
+  // 已有可用权益（含未到期试用）才算「已开通态」
   const isMembershipEntitled = useMemo(() => isOrgMembershipEntitled(quotaUsage), [quotaUsage]);
   const membershipLifecycle = useMemo(() => resolveLifecycle(quotaUsage), [quotaUsage]);
   const membershipExpired = membershipLifecycle === 'expired';

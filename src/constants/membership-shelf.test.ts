@@ -3,6 +3,8 @@ import {
   buildShelfPlans,
   buildShelfTerms,
   calcShelfPay,
+  defaultShelfTerm,
+  filterShelfPlansByEntitlement,
   getShelfPlan,
   matchShelfSku,
   shelfFeatureRows,
@@ -119,32 +121,94 @@ describe('membership-shelf (from catalog)', () => {
 
   it('calcShelfPay：实付取 SKU；校区不加价', () => {
     const plan = getShelfPlan(buildShelfPlans(samplePlans, sampleSkus), 'STANDARD')!;
-    const y3 = calcShelfPay({ plan, years: 3 });
+    const y3 = calcShelfPay({ plan, term: 3 });
     expect(y3.mode).toBe('paid');
     expect(y3.pay).toBe(999);
     expect(y3.campusPay).toBe(0);
     expect(y3.daily).toBe(0.91);
+    // 年标价按 2 年约 9 折反推，2/3 年都应能显示立省
+    expect(plan.yearPrice).toBe(398);
+    const y2 = calcShelfPay({ plan, term: 2 });
+    expect(y2.save).toBeGreaterThan(0);
+    expect(y3.save).toBeGreaterThan(y2.save);
   });
 
   it('众创 free；matchShelfSku 按 durationDays；terms 由 SKU 推导', () => {
     const shelf = buildShelfPlans(samplePlans, sampleSkus);
-    expect(calcShelfPay({ plan: getShelfPlan(shelf, 'FREE')!, years: 3 }).mode).toBe('free');
+    expect(calcShelfPay({ plan: getShelfPlan(shelf, 'FREE')!, term: 3 }).mode).toBe('free');
     expect(matchShelfSku(sampleSkus, 'STANDARD', 3)?.productId).toBe('yunce_growth_3y');
     expect(matchShelfSku(sampleSkus, 'STANDARD', 2)?.versionCode).toBe('STANDARD_2Y');
     expect(matchShelfSku(sampleSkus, 'BASIC', 3)).toBeNull();
-    expect(buildShelfTerms(getShelfPlan(shelf, 'STANDARD')).map((t) => t.years)).toEqual([2, 3]);
+    expect(buildShelfTerms(getShelfPlan(shelf, 'STANDARD')).map((t) => t.term)).toEqual([2, 3]);
   });
 
-  it('shelfFeatureRows 营销与额外校区文案', () => {
+  it('TEST_PAY 并入成长版 1 天时长，不单独成档', () => {
+    const withTest: MembershipSku[] = [
+      ...sampleSkus,
+      {
+        versionCode: 'TEST_PAY',
+        name: '成长版-1天',
+        price: 100,
+        durationDays: 1,
+        productId: 'yunce_test_pay_1y',
+        maxMembers: 300,
+        maxEmployees: 99999,
+        maxCampuses: 1,
+      },
+    ];
+    const shelf = buildShelfPlans(samplePlans, withTest);
+    const growth = getShelfPlan(shelf, 'STANDARD')!;
+    expect(growth.terms).toEqual(['1d', 2, 3]);
+    expect(growth.pay['1d']).toBe(1);
+    expect(matchShelfSku(withTest, 'STANDARD', '1d')?.versionCode).toBe('TEST_PAY');
+    expect(calcShelfPay({ plan: growth, term: '1d' }).pay).toBe(1);
+    expect(buildShelfTerms(growth)[0]).toMatchObject({ term: '1d', label: '1 天开通' });
+    const y3 = buildShelfTerms(growth).find((t) => t.term === 3)!;
+    expect(y3.save).toBeGreaterThan(0);
+    expect(y3.bestSave).toBe(true);
+    expect(y3.badge).toBe('更划算');
+    expect(defaultShelfTerm(growth.terms)).toBe(3);
+  });
+
+  it('shelfFeatureRows 营销文案', () => {
     const flagship = getShelfPlan(buildShelfPlans(samplePlans, sampleSkus), 'FLAGSHIP')!;
     const rows = shelfFeatureRows(flagship);
     expect(rows.find((r) => r[0] === '营销获客')?.[1]).toBe('✓');
-    expect(rows.find((r) => r[0] === '额外校区')?.[1]).toBe('联系运营');
+    expect(rows.find((r) => r[0] === '额外校区')).toBeUndefined();
   });
 
   it('无 plans 时仍可从 skus 推导付费档', () => {
     const shelf = buildShelfPlans(undefined, sampleSkus);
     expect(shelf.some((p) => p.code === 'FREE')).toBe(false);
     expect(getShelfPlan(shelf, 'STANDARD')?.pay[3]).toBe(999);
+  });
+
+  it('filterShelfPlansByEntitlement：有效期内隐藏众创与更低档', () => {
+    const shelf = buildShelfPlans(samplePlans, sampleSkus);
+    expect(
+      filterShelfPlansByEntitlement(shelf, { versionCode: 'STANDARD', entitled: true }).map(
+        (p) => p.code,
+      ),
+    ).toEqual(['STANDARD', 'FLAGSHIP']);
+    expect(
+      filterShelfPlansByEntitlement(shelf, { versionCode: 'FLAGSHIP', entitled: true }).map(
+        (p) => p.code,
+      ),
+    ).toEqual(['FLAGSHIP']);
+    expect(
+      filterShelfPlansByEntitlement(shelf, { versionCode: 'STANDARD', entitled: false }).map(
+        (p) => p.code,
+      ),
+    ).toEqual(['FREE', 'BASIC', 'STANDARD', 'FLAGSHIP']);
+    expect(
+      filterShelfPlansByEntitlement(shelf, { versionCode: 'TRIAL', entitled: true }).map(
+        (p) => p.code,
+      ),
+    ).toEqual(['BASIC', 'STANDARD', 'FLAGSHIP']);
+    expect(
+      filterShelfPlansByEntitlement(shelf, { versionCode: 'STANDARD_2Y', entitled: true }).map(
+        (p) => p.code,
+      ),
+    ).toEqual(['STANDARD', 'FLAGSHIP']);
   });
 });

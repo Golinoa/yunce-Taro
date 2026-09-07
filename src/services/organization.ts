@@ -315,7 +315,7 @@ export function isOrgMembershipEntitled(quota: OrganizationQuotaUsage | null | u
   }
   if (quota.versionCode === 'FREE') return false;
   if (quota.versionCode === 'TRIAL') {
-    // 试用须有未到期日，才算已发放权益（联调/试用履约）
+    // 试用须有未到期日，才算已发放权益
     return Boolean(quota.expireAt);
   }
   return true;

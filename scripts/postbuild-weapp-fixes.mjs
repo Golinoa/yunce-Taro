@@ -258,6 +258,112 @@ function verifySubpackageChunkRequires() {
   return true;
 }
 
+/**
+ * Taro copy.patterns 在 dist 被微信开发者工具占用、或 clean 跳过删 dist 时，
+ * 偶发漏拷静态资源 → 首页 3D 瓷片 / tabBar 图标空白。
+ * 构建后强制同步白名单资源并校验存在。
+ */
+function ensureStaticAssetsCopied() {
+  const projectRoot = path.resolve(distRoot, '..');
+  const copies = [
+    {
+      fromDir: path.join(projectRoot, 'src/assets/icons'),
+      toDir: path.join(distRoot, 'assets/icons'),
+      allFiles: true,
+    },
+  ];
+
+  const imageFiles = [
+    'sgpk.png',
+    'cover-home.webp',
+    'support-repair-qr.webp',
+    'qr-point-hand.png',
+    'icon-book.webp',
+    'icon-calendar-check.webp',
+    'icon-crown.webp',
+    'icon-customer-service.webp',
+    'icon-lightning.webp',
+    'icon-rocket.webp',
+    'icon-users.webp',
+    'icon-wallet-pink.webp',
+    'icon-wallet-purple.webp',
+    'icon-wallet-yen.webp',
+  ];
+
+  let copied = 0;
+  const missing = [];
+
+  const iconsFrom = path.join(projectRoot, 'src/assets/icons');
+  const iconsTo = path.join(distRoot, 'assets/icons');
+  fs.mkdirSync(iconsTo, { recursive: true });
+  if (fs.existsSync(iconsFrom)) {
+    for (const name of fs.readdirSync(iconsFrom)) {
+      const src = path.join(iconsFrom, name);
+      if (!fs.statSync(src).isFile()) continue;
+      fs.copyFileSync(src, path.join(iconsTo, name));
+      copied += 1;
+    }
+  } else {
+    missing.push('src/assets/icons');
+  }
+
+  const imagesFrom = path.join(projectRoot, 'src/assets/images');
+  const imagesTo = path.join(distRoot, 'assets/images');
+  fs.mkdirSync(imagesTo, { recursive: true });
+  for (const name of imageFiles) {
+    const src = path.join(imagesFrom, name);
+    const dest = path.join(imagesTo, name);
+    if (!fs.existsSync(src)) {
+      missing.push(`src/assets/images/${name}`);
+      continue;
+    }
+    fs.copyFileSync(src, dest);
+    copied += 1;
+  }
+
+  const wxFrom = path.join(projectRoot, 'src/package-settings/assets/wx.webp');
+  const wxTo = path.join(distRoot, 'package-settings/assets/wx.webp');
+  if (fs.existsSync(wxFrom)) {
+    fs.mkdirSync(path.dirname(wxTo), { recursive: true });
+    fs.copyFileSync(wxFrom, wxTo);
+    copied += 1;
+  }
+
+  // 运行时路径硬校验（与 brand.ts MEDIA_IMAGE_BASE、app.config tabBar 对齐）
+  const required = [
+    'assets/icons/home_selected.png',
+    'assets/icons/home_unselected.png',
+    'assets/icons/schedule_selected.png',
+    'assets/icons/schedule_unselected.png',
+    'assets/icons/checkin_selected.png',
+    'assets/icons/checkin_unselected.png',
+    'assets/icons/profile_selected.png',
+    'assets/icons/profile_unselected.png',
+    'assets/images/icon-rocket.webp',
+    'assets/images/icon-users.webp',
+    'assets/images/icon-calendar-check.webp',
+    'assets/images/sgpk.png',
+  ];
+  for (const rel of required) {
+    const full = path.join(distRoot, rel);
+    if (!fs.existsSync(full) || fs.statSync(full).size <= 0) {
+      missing.push(`dist/${rel}`);
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error('[postbuild-weapp-fixes] ERROR: static assets missing after copy:');
+    missing.forEach((item) => console.error(`  - ${item}`));
+    console.error(
+      '[postbuild-weapp-fixes] 请关闭微信开发者工具后重跑 npm run build:weapp:dev（dist 被占用时 copy 会漏）',
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`[postbuild-weapp-fixes] ensured ${copied} static asset file(s) in dist/assets`);
+}
+
 if (!fs.existsSync(distBaseWxmlPath)) {
   console.warn('[postbuild-weapp-fixes] dist/base.wxml not found, skip patch');
   process.exit(0);
@@ -293,4 +399,5 @@ if (wxssCreated > 0) {
 ensureLazyCodeLoading();
 cleanupDistArtifacts();
 verifySubpackageChunkRequires();
+ensureStaticAssetsCopied();
 auditPackageSize();

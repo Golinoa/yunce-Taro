@@ -15,26 +15,17 @@ import {
   buildShelfPlans,
   buildShelfTerms,
   calcShelfPay,
+  filterShelfPlansByEntitlement,
   getShelfPlan,
   matchShelfSku,
   shelfBaseVersionCode,
   shelfFeatureRows,
   type ShelfPlanCode,
-  type ShelfTermYears,
+  type ShelfTermKey,
+  defaultShelfTerm,
 } from '@/constants/membership-shelf';
-import {
-  DEFAULT_MEMBERSHIP_TIPS,
-  dismissMembershipTip,
-  loadDismissedTipIds,
-  matchMembershipTip,
-  mergeMembershipTips,
-  resolveLifecycle,
-  type MatchedMembershipTip,
-} from '@/constants/membership-tips';
-import {
-  SUPPORT_QR_MEMBERSHIP_FREE_COPY,
-  SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY,
-} from '@/constants/support-qr';
+import { resolveLifecycle } from '@/constants/membership-tips';
+import { SUPPORT_QR_MEMBERSHIP_FREE_COPY } from '@/constants/support-qr';
 import {
   isMembershipQuotaCacheFresh,
   peekMembershipQuotaCache,
@@ -112,37 +103,6 @@ const QuotaBar: React.FC<{ label: string; current: number; max: number }> = ({
   );
 };
 
-const TipBanner: React.FC<{ tip: MatchedMembershipTip; onClose: () => void }> = ({
-  tip,
-  onClose,
-}) => {
-  const wrap =
-    tip.tone === 'urgent'
-      ? 'bg-destructive/8 border-destructive/20 text-destructive'
-      : tip.tone === 'warn'
-        ? 'bg-warning/10 border-warning/25 text-warning'
-        : 'bg-primary/8 border-primary/20 text-primary';
-  return (
-    <View
-      className={cn(
-        'mx-[32rpx] mt-[16rpx] rounded-[24rpx] border px-[24rpx] py-[22rpx] flex flex-row gap-[12rpx]',
-        wrap,
-      )}
-    >
-      <View className="flex-1 min-w-0">
-        <Text className="text-[26rpx] font-bold block">{tip.title}</Text>
-        <Text className="text-[24rpx] mt-[6rpx] block leading-[36rpx] opacity-90">{tip.body}</Text>
-      </View>
-      <View
-        className="w-[44rpx] h-[44rpx] flex items-center justify-center active:opacity-60"
-        onClick={onClose}
-      >
-        <Text className="text-[32rpx] leading-none">×</Text>
-      </View>
-    </View>
-  );
-};
-
 type QrCopy = {
   titleLine1: string;
   titleLine2: string;
@@ -161,7 +121,6 @@ const MembershipPage: React.FC = () => {
   const cachedSku = peekMembershipSkuCache();
 
   const [quotaUsage, setQuotaUsage] = useState<OrganizationQuotaUsage | null>(cachedQuota);
-  const [tipDefs, setTipDefs] = useState(DEFAULT_MEMBERSHIP_TIPS);
   const [loading, setLoading] = useState(!cachedQuota);
   const [shelfLoading, setShelfLoading] = useState(!(cachedSku && cachedSku.skus.length > 0));
   const [showRedeem, setShowRedeem] = useState(false);
@@ -175,28 +134,20 @@ const MembershipPage: React.FC = () => {
   const [skus, setSkus] = useState<MembershipSku[]>(cachedSku?.skus || []);
   const [catalogPlans, setCatalogPlans] = useState<MembershipCatalogPlan[]>(cachedSku?.plans || []);
   const [supportQrVisible, setSupportQrVisible] = useState(false);
-  const [qrCopy, setQrCopy] = useState<QrCopy>(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY);
+  const [qrCopy, setQrCopy] = useState<QrCopy>(SUPPORT_QR_MEMBERSHIP_FREE_COPY);
   const [selectedPlanCode, setSelectedPlanCode] = useState<ShelfPlanCode>(() => {
     if (!cachedQuota) return 'STANDARD';
     const base = shelfBaseVersionCode(cachedQuota.versionCode);
     if (base && base !== 'FREE' && cachedQuota.versionCode !== 'TRIAL') return base;
     return 'STANDARD';
   });
-  const [years, setYears] = useState<ShelfTermYears>(3);
+  const [term, setTerm] = useState<ShelfTermKey>(3);
   const [viewMode, setViewMode] = useState<'manage' | 'purchase'>('purchase');
-  const [matchedTip, setMatchedTip] = useState<MatchedMembershipTip | null>(null);
   const [pendingOrder, setPendingOrder] = useState<PaymentOrderStatusResult | null>(null);
   const [pendingCd, setPendingCd] = useState<string | null>(null);
   const autoOpenedRedeem = useRef(false);
   const viewSeeded = useRef(false);
   const hasQuotaRef = useRef(Boolean(cachedQuota));
-
-  const refreshTip = useCallback(
-    (quota: OrganizationQuotaUsage | null, tips = tipDefs) => {
-      setMatchedTip(matchMembershipTip(quota, tips, loadDismissedTipIds()));
-    },
-    [tipDefs],
-  );
 
   const loadPendingOrder = useCallback(async () => {
     if (!isManagerRole) {
@@ -212,21 +163,17 @@ const MembershipPage: React.FC = () => {
     }
   }, [isManagerRole]);
 
-  const applyQuota = useCallback(
-    (data: OrganizationQuotaUsage) => {
-      hasQuotaRef.current = true;
-      setQuotaUsage(data);
-      writeMembershipQuotaCache(data);
-      const base = shelfBaseVersionCode(data.versionCode);
-      if (base && base !== 'FREE' && data.versionCode !== 'TRIAL') {
-        setSelectedPlanCode(base);
-      } else {
-        setSelectedPlanCode('STANDARD');
-      }
-      refreshTip(data);
-    },
-    [refreshTip],
-  );
+  const applyQuota = useCallback((data: OrganizationQuotaUsage) => {
+    hasQuotaRef.current = true;
+    setQuotaUsage(data);
+    writeMembershipQuotaCache(data);
+    const base = shelfBaseVersionCode(data.versionCode);
+    if (base && base !== 'FREE' && data.versionCode !== 'TRIAL') {
+      setSelectedPlanCode(base);
+    } else {
+      setSelectedPlanCode('STANDARD');
+    }
+  }, []);
 
   const loadQuotaUsage = useCallback(
     async (options?: { soft?: boolean; forceSku?: boolean }) => {
@@ -238,7 +185,6 @@ const MembershipPage: React.FC = () => {
       const soft = options?.soft ?? hasQuotaRef.current;
       if (!soft) setLoading(true);
 
-      // 卡面只等配额；tips / 待付单延后，不挡首屏
       const quotaPromise = organizationService.getQuotaUsage();
       const skuPromise = paymentService.listSkus(Boolean(options?.forceSku));
 
@@ -247,11 +193,6 @@ const MembershipPage: React.FC = () => {
         applyQuota(data);
         setLoading(false);
 
-        void organizationService.getMembershipTips().then((remoteTips) => {
-          const tips = mergeMembershipTips(DEFAULT_MEMBERSHIP_TIPS, remoteTips);
-          setTipDefs(tips);
-          refreshTip(data, tips);
-        });
         void loadPendingOrder();
 
         const catalog = await skuPromise;
@@ -275,7 +216,7 @@ const MembershipPage: React.FC = () => {
         return null;
       }
     },
-    [applyQuota, isManagerRole, loadPendingOrder, refreshTip],
+    [applyQuota, isManagerRole, loadPendingOrder],
   );
 
   useDidShow(() => {
@@ -305,21 +246,65 @@ const MembershipPage: React.FC = () => {
     return loadQuotaUsage({ soft: true, forceSku: true });
   }, [loadQuotaUsage]);
 
+  const waitOrderFulfilled = useCallback(async (orderId: string) => {
+    Taro.showLoading({ title: '开通确认中…', mask: true });
+    try {
+      for (let i = 0; i < 30; i += 1) {
+        const order = await paymentService.getOrder(orderId);
+        if (order.status === 'FULFILLED') return order;
+        if (order.status === 'CLOSED' || order.status === 'REFUNDED') return order;
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      return paymentService.getOrder(orderId);
+    } finally {
+      Taro.hideLoading();
+    }
+  }, []);
+
   const showPaidResult = useCallback(
     async (result: { message: string; order?: PaymentOrderStatusResult; fulfilled?: boolean }) => {
-      if (result.fulfilled === false) {
-        await loadPendingOrder();
-        await loadQuotaUsage({ soft: true, forceSku: true });
-        await Taro.showModal({
+      // 支付成功即刷信号，避免履约延迟时个人中心卡面陈旧
+      await notifyMembershipPaid();
+      await loadPendingOrder();
+
+      if (result.fulfilled === false && result.order?.orderId) {
+        const choice = await Taro.showModal({
           title: '支付成功',
-          content:
-            result.message ||
-            '权益正在开通中。可稍后下拉刷新会员页，或在「订单详情」查看履约状态。',
-          showCancel: false,
-          confirmText: '知道了',
+          content: result.message || '权益开通中。可点「刷新权益」再确认，或打开订单详情查看进度。',
+          confirmText: '刷新权益',
+          cancelText: '订单详情',
         });
+        if (choice.confirm) {
+          const latest = await waitOrderFulfilled(result.order.orderId);
+          if (latest.status === 'FULFILLED') {
+            setViewMode('manage');
+            const refreshed = await notifyMembershipPaid();
+            const versionName =
+              refreshed?.versionName || latest.versionName || refreshed?.versionCode || '';
+            const expire =
+              formatExpireDate(refreshed?.expireAt || latest.orgExpireAt || latest.fulfilledAt) ||
+              '已更新';
+            await Taro.showModal({
+              title: '开通成功',
+              content: versionName
+                ? `当前权益：${versionName}\n到期：${expire}`
+                : `到期：${expire}`,
+              showCancel: false,
+              confirmText: '知道了',
+            });
+            return;
+          }
+          Taro.showToast({
+            title: '仍在开通中，请稍后再试或查看订单',
+            icon: 'none',
+            duration: 2800,
+          });
+          return;
+        }
+        goOrders();
         return;
       }
+
       setViewMode('manage');
       const refreshed = await notifyMembershipPaid();
       const versionName =
@@ -330,14 +315,12 @@ const MembershipPage: React.FC = () => {
         ) || '已更新';
       await Taro.showModal({
         title: result.message || '开通成功',
-        content: versionName
-          ? `当前权益：${versionName}\n到期：${expire}`
-          : `到期：${expire}\n若卡片未变，请下拉或重新进入会员页`,
+        content: versionName ? `当前权益：${versionName}\n到期：${expire}` : `到期：${expire}`,
         showCancel: false,
         confirmText: '知道了',
       });
     },
-    [loadPendingOrder, loadQuotaUsage, notifyMembershipPaid],
+    [goOrders, loadPendingOrder, notifyMembershipPaid, waitOrderFulfilled],
   );
 
   const payHooks = useMemo(
@@ -377,14 +360,32 @@ const MembershipPage: React.FC = () => {
   const lifecycle = resolveLifecycle(quotaUsage);
   const expireText = formatExpireDate(quotaUsage?.expireAt);
   const remainDays = daysUntil(quotaUsage?.expireAt);
-  const shelfPlans = useMemo(() => buildShelfPlans(catalogPlans, skus), [catalogPlans, skus]);
+  const shelfPlansAll = useMemo(() => buildShelfPlans(catalogPlans, skus), [catalogPlans, skus]);
+  const shelfPlans = useMemo(
+    () =>
+      filterShelfPlansByEntitlement(shelfPlansAll, {
+        versionCode: quotaUsage?.versionCode,
+        entitled,
+      }),
+    [shelfPlansAll, quotaUsage?.versionCode, entitled],
+  );
   const currentPlan = useMemo(() => {
     const code = quotaUsage?.versionCode === 'TRIAL' ? 'STANDARD' : quotaUsage?.versionCode || '';
-    return getShelfPlan(shelfPlans, shelfBaseVersionCode(code));
-  }, [quotaUsage?.versionCode, shelfPlans]);
-  const isTrial = quotaUsage?.versionCode === 'TRIAL';
-  /** 卡面「已生效」：付费或未到期试用（含联调履约） */
+    return getShelfPlan(shelfPlansAll, shelfBaseVersionCode(code));
+  }, [quotaUsage?.versionCode, shelfPlansAll]);
+  /** 卡面「已生效」：付费或未到期试用 */
   const active = entitled;
+
+  // 有效期过滤后，选中档可能已被隐藏 → 钳到货架首个可购档
+  useEffect(() => {
+    if (!shelfPlans.length) return;
+    if (getShelfPlan(shelfPlans, selectedPlanCode)) return;
+    const next =
+      getShelfPlan(shelfPlans, 'STANDARD') ||
+      shelfPlans.find((p) => p.recommended) ||
+      shelfPlans[0];
+    if (next?.code) setSelectedPlanCode(next.code);
+  }, [shelfPlans, selectedPlanCode]);
 
   useEffect(() => {
     if (loading || viewSeeded.current) return;
@@ -414,27 +415,19 @@ const MembershipPage: React.FC = () => {
       features: {},
     };
 
-  // 当前档可用时长变化时，钳制 years
+  // 当前档可用时长变化时，钳制 term
   useEffect(() => {
     if (!shelfPlan.terms?.length) return;
-    if (!shelfPlan.terms.includes(years)) {
-      setYears(shelfPlan.terms.includes(3) ? 3 : shelfPlan.terms[shelfPlan.terms.length - 1]);
+    if (!shelfPlan.terms.includes(term)) {
+      setTerm(defaultShelfTerm(shelfPlan.terms));
     }
-  }, [shelfPlan.terms, years]);
+  }, [shelfPlan.terms, term]);
 
-  const shelfCalc = useMemo(() => calcShelfPay({ plan: shelfPlan, years }), [shelfPlan, years]);
+  const shelfCalc = useMemo(() => calcShelfPay({ plan: shelfPlan, term }), [shelfPlan, term]);
   const shelfTerms = useMemo(() => buildShelfTerms(shelfPlan), [shelfPlan]);
   const matchedSku = useMemo(
-    () => (shelfPlan.free ? null : matchShelfSku(skus, selectedPlanCode, years)),
-    [skus, selectedPlanCode, years, shelfPlan.free],
-  );
-  const testPaySkus = useMemo(
-    () =>
-      skus
-        .filter((s) => s.versionCode === 'TEST_PAY' || s.versionCode === 'TEST_PAY_1FEN')
-        // 1 元联调优先展示
-        .sort((a, b) => (a.versionCode === 'TEST_PAY' ? -1 : b.versionCode === 'TEST_PAY' ? 1 : 0)),
-    [skus],
+    () => (shelfPlan.free ? null : matchShelfSku(skus, shelfPlan.code, term)),
+    [skus, shelfPlan.code, term, shelfPlan.free],
   );
 
   const cardTone =
@@ -442,7 +435,6 @@ const MembershipPage: React.FC = () => {
 
   const statusLabel = useMemo(() => {
     if (loading && !quotaUsage) return '加载中';
-    if (isTrial && active) return '试用中';
     if (lifecycle === 'expired') return '已到期';
     if (lifecycle === 'expiring_7') return '即将到期';
     if (lifecycle === 'inactive') {
@@ -451,21 +443,20 @@ const MembershipPage: React.FC = () => {
     }
     if (quotaUsage?.versionCode === 'FREE') return '众创';
     return '生效中';
-  }, [isTrial, active, lifecycle, loading, quotaUsage, shelfPlan.free, viewMode]);
+  }, [lifecycle, loading, quotaUsage, shelfPlan.free, viewMode]);
 
   const cardTitle = useMemo(() => {
     if (viewMode === 'purchase' && lifecycle === 'inactive' && !shelfPlan.free) {
       return '开通机构会员';
     }
     if (viewMode === 'purchase' && shelfPlan.free) return shelfPlan.name;
-    if (isTrial) return '试用版';
-    return quotaUsage?.versionName || currentPlan?.name || '会员';
+    // 与付费档同一套：TRIAL 已映射到成长档 currentPlan，不单独写「试用版」
+    return currentPlan?.name || quotaUsage?.versionName || '会员';
   }, [
     viewMode,
     lifecycle,
     shelfPlan.free,
     shelfPlan.name,
-    isTrial,
     currentPlan?.name,
     quotaUsage?.versionName,
   ]);
@@ -476,10 +467,9 @@ const MembershipPage: React.FC = () => {
     if (viewMode === 'purchase' && shelfPlan.free) return ['审批通过后开通'];
     if (viewMode === 'purchase' && lifecycle === 'inactive') return ['选择合适套餐', '开通'];
     if (lifecycle === 'expired') return [`已于 ${expireText} 到期`];
-    if (isTrial && remainDays != null) return [`试用剩余 ${Math.max(remainDays, 0)} 天`];
     if (quotaUsage?.versionCode === 'FREE' && !quotaUsage.expireAt) return ['长期有效'];
     return [`有效期至 ${expireText}`];
-  }, [loading, quotaUsage, viewMode, shelfPlan.free, lifecycle, expireText, isTrial, remainDays]);
+  }, [loading, quotaUsage, viewMode, shelfPlan.free, lifecycle, expireText]);
 
   const cardRemain = useMemo(() => {
     if (viewMode === 'purchase' && shelfPlan.free) {
@@ -529,7 +519,7 @@ const MembershipPage: React.FC = () => {
     }
     if (!matchedSku) {
       Taro.showToast({
-        title: '该时长暂未开放在线支付，请用激活码或联系运营',
+        title: '该时长暂未开放在线支付，请使用激活码',
         icon: 'none',
         duration: 2800,
       });
@@ -537,9 +527,10 @@ const MembershipPage: React.FC = () => {
     }
     if (purchasing) return;
     const priceText = paymentService.formatPriceYuan(matchedSku.price);
+    const termLabel = term === '1d' ? '1 天' : `${term} 年`;
     const confirm = await Taro.showModal({
       title: `购买${matchedSku.name}`,
-      content: `¥${priceText} · ${years} 年。支付成功后立即生效。`,
+      content: `¥${priceText} · ${termLabel}。支付成功后立即生效。`,
       confirmText: '去支付',
       cancelText: '取消',
     });
@@ -605,41 +596,8 @@ const MembershipPage: React.FC = () => {
     purchasing,
     shelfPlan.free,
     showPaidResult,
-    years,
+    term,
   ]);
-
-  const handleTestPay = useCallback(
-    async (sku: MembershipSku) => {
-      if (!sku || purchasing) return;
-      const priceText = paymentService.formatPriceYuan(sku.price);
-      const confirm = await Taro.showModal({
-        title: `联调支付 · ${sku.name}`,
-        content: `¥${priceText}（测试道具 ${sku.productId}）。仅用于支付链路验证。`,
-        confirmText: '去支付',
-        cancelText: '取消',
-      });
-      if (!confirm.confirm) return;
-      setPurchasing(true);
-      try {
-        Taro.showLoading({ title: '下单中…', mask: true });
-        const result = await paymentService.purchaseMembership(sku.versionCode, payHooks);
-        Taro.hideLoading();
-        if (result.ok) {
-          await showPaidResult(result);
-        } else {
-          Taro.showToast({ title: result.message || '支付未完成', icon: 'none', duration: 2500 });
-          await loadPendingOrder();
-        }
-      } catch (err) {
-        Taro.hideLoading();
-        const msg = err instanceof Error ? err.message : '下单失败';
-        Taro.showToast({ title: msg, icon: 'none' });
-      } finally {
-        setPurchasing(false);
-      }
-    },
-    [loadPendingOrder, payHooks, purchasing, showPaidResult],
-  );
 
   useEffect(() => {
     if (autoOpenedRedeem.current || loading) return;
@@ -681,38 +639,16 @@ const MembershipPage: React.FC = () => {
     (code: ShelfPlanCode) => {
       setSelectedPlanCode(code);
       const p = getShelfPlan(shelfPlans, code);
-      if (p?.recommended && p.terms.includes(3)) {
-        setYears(3);
-      } else if (p?.terms?.length) {
-        setYears(p.terms.includes(3) ? 3 : p.terms[p.terms.length - 1]);
-      }
+      setTerm(defaultShelfTerm(p?.terms));
     },
     [shelfPlans],
   );
 
-  const manageTip = useMemo(() => {
-    if (lifecycle === 'expired') {
-      return '会员已到期。请自助续费同档货架价，或兑换激活码；换更高版本请联系运营。';
-    }
-    if (isTrial) {
-      return '试用版生效中（标准功能 · 体验配额）。正式开通请自助选购货架价；升旗舰请联系运营。';
-    }
-    if (quotaUsage?.versionCode === 'FREE') {
-      return '众创为申请制免费档。开通付费版请走货架价。';
-    }
-    if (quotaUsage?.versionCode === 'FLAGSHIP') {
-      return `当前${quotaUsage.versionName || '旗舰版'}（含 ${
-        currentPlan?.includedCampuses || 2
-      } 校区）。续费自助选购；更多校区请联系运营。`;
-    }
-    return '当前成长/付费档生效中。续费可自助购买同档货架 SKU；升级请联系运营补差。';
-  }, [
-    isTrial,
-    lifecycle,
-    quotaUsage?.versionCode,
-    quotaUsage?.versionName,
-    currentPlan?.includedCampuses,
-  ]);
+  const primaryActionLabel = useMemo(() => {
+    if (lifecycle === 'inactive') return '购买开通';
+    if (lifecycle === 'expired') return '立即续费';
+    return '续费';
+  }, [lifecycle]);
 
   if (!isManagerRole) {
     return (
@@ -792,16 +728,6 @@ const MembershipPage: React.FC = () => {
           </View>
         ) : null}
 
-        {matchedTip && viewMode === 'manage' ? (
-          <TipBanner
-            tip={matchedTip}
-            onClose={() => {
-              dismissMembershipTip(matchedTip.tipId);
-              setMatchedTip(null);
-            }}
-          />
-        ) : null}
-
         {viewMode === 'manage' ? (
           <>
             {quotaUsage ? (
@@ -833,65 +759,37 @@ const MembershipPage: React.FC = () => {
               </View>
             ) : null}
 
-            <View className="mx-[32rpx] mt-[24rpx] rounded-[28rpx] border border-[#fed7aa] bg-[#fff7ed] px-[28rpx] py-[24rpx]">
-              <Text className="text-[24rpx] leading-[38rpx] text-[#9a3412]">
-                支付仅支持货架固定价（2 年 / 3 年 SKU）。
-                <Text className="font-bold text-[#c2410c]">
-                  版本升级需联系运营按剩余时长核算补差
-                </Text>
-                ，后台发放，不支持自助任意金额支付。
-              </Text>
-            </View>
-
-            <View className="mx-[32rpx] mt-[24rpx] rounded-[28rpx] border border-dashed border-primary/30 bg-primary/6 px-[28rpx] py-[24rpx]">
-              <Text className="text-[24rpx] leading-[38rpx] text-muted-foreground">
-                {manageTip}
-              </Text>
-            </View>
-
             <View className="mx-[32rpx] mt-[24rpx] rounded-[36rpx] bg-card shadow-soft p-[28rpx]">
-              <View className="flex flex-row items-center justify-between mb-[8rpx]">
-                <Text className="text-[30rpx] font-semibold text-foreground">变更会员</Text>
-                <Text className="text-[22rpx] text-muted-foreground">两条路径</Text>
-              </View>
+              <Text className="text-[30rpx] font-semibold text-foreground mb-[8rpx] block">
+                变更会员
+              </Text>
               <View
                 className="mt-[16rpx] flex flex-row items-center rounded-[28rpx] border border-border bg-bg-card px-[24rpx] py-[24rpx] active:opacity-85"
                 onClick={() => setViewMode('purchase')}
               >
                 <View className="w-[80rpx] h-[80rpx] rounded-[24rpx] bg-card border border-border flex items-center justify-center">
-                  <Text className="text-[26rpx] font-extrabold text-primary">续</Text>
+                  <Text className="text-[26rpx] font-extrabold text-primary">
+                    {lifecycle === 'inactive' ? '购' : '续'}
+                  </Text>
                 </View>
                 <View className="flex-1 ml-[20rpx] min-w-0">
                   <Text className="text-[28rpx] font-extrabold text-foreground block">
-                    {lifecycle === 'expired' ? '立即续费' : isTrial ? '正式开通' : '续费同档'}
-                  </Text>
-                  <Text className="text-[22rpx] text-muted-foreground mt-[6rpx] block">
-                    按货架价购买 2 年 / 3 年，自助支付
+                    {primaryActionLabel}
                   </Text>
                 </View>
                 <Text className="text-[24rpx] font-bold text-primary">去选购 ›</Text>
               </View>
               <View
                 className="mt-[16rpx] flex flex-row items-center rounded-[28rpx] border border-border bg-bg-card px-[24rpx] py-[24rpx] active:opacity-85"
-                onClick={() => openQr(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY)}
+                onClick={handleOpenRedeem}
               >
-                <View className="w-[80rpx] h-[80rpx] rounded-[24rpx] bg-[#fff7f2] border border-[#ffd4c2] flex items-center justify-center">
-                  <Text
-                    className="text-[26rpx] font-extrabold"
-                    style={{ color: MEMBERSHIP_MARKETING_RED }}
-                  >
-                    升
-                  </Text>
+                <View className="w-[80rpx] h-[80rpx] rounded-[24rpx] bg-card border border-border flex items-center justify-center">
+                  <Text className="text-[26rpx] font-extrabold text-primary">码</Text>
                 </View>
                 <View className="flex-1 ml-[20rpx] min-w-0">
-                  <Text className="text-[28rpx] font-extrabold text-foreground block">
-                    升级更高版本
-                  </Text>
-                  <Text className="text-[22rpx] text-muted-foreground mt-[6rpx] block">
-                    旗舰含 2 校区 · 联系运营核算补差
-                  </Text>
+                  <Text className="text-[28rpx] font-extrabold text-foreground block">激活码</Text>
                 </View>
-                <Text className="text-[24rpx] font-bold text-primary">联系 ›</Text>
+                <Text className="text-[24rpx] font-bold text-primary">兑换 ›</Text>
               </View>
             </View>
           </>
@@ -905,7 +803,7 @@ const MembershipPage: React.FC = () => {
               {shelfPlans.length === 0 ? (
                 <View className="flex-1 rounded-[24rpx] border border-dashed border-border px-[16rpx] py-[28rpx] text-center">
                   <Text className="text-[24rpx] text-muted-foreground">
-                    {shelfLoading ? '套餐加载中…' : '暂无在线套餐，请用激活码或联系运营'}
+                    {shelfLoading ? '套餐加载中…' : '暂无在线套餐，请使用激活码'}
                   </Text>
                 </View>
               ) : (
@@ -932,7 +830,7 @@ const MembershipPage: React.FC = () => {
                         {p.shortName}
                       </Text>
                       <Text className="text-[20rpx] text-muted-foreground mt-[8rpx] block">
-                        {p.free ? '申请' : p.yearPrice > 0 ? `¥${p.yearPrice}` : '询价'}
+                        {p.free ? '申请' : p.yearPrice > 0 ? `¥${p.yearPrice}/年` : '询价'}
                       </Text>
                     </View>
                   );
@@ -941,36 +839,102 @@ const MembershipPage: React.FC = () => {
             </View>
 
             {!shelfPlan.free && shelfTerms.length > 0 ? (
-              <View className="px-[24rpx] pb-[24rpx]">
-                <Text className="text-[24rpx] text-muted-foreground mb-[16rpx] block">
-                  开通时长
+              <View className="px-[24rpx] pb-[16rpx]">
+                <Text className="text-[24rpx] text-muted-foreground mb-[20rpx] block">
+                  开通时长 · 原价与实付并排可见
                 </Text>
-                <View className="flex flex-row gap-[16rpx]">
+                <View className="flex flex-col gap-[20rpx]">
                   {shelfTerms.map((t) => {
-                    const on = t.years === years;
+                    const on = t.term === term;
                     return (
                       <View
-                        key={t.years}
+                        key={String(t.term)}
                         className={cn(
-                          'flex-1 relative rounded-[24rpx] px-[16rpx] py-[24rpx] border-[3rpx] text-center',
-                          on ? 'border-primary/45 bg-primary/6' : 'border-border bg-bg-card',
+                          'relative rounded-[28rpx] px-[28rpx] py-[24rpx] border-[3rpx]',
+                          on ? 'border-primary/55 bg-primary/8' : 'border-border bg-bg-card',
                         )}
-                        onClick={() => setYears(t.years)}
+                        onClick={() => setTerm(t.term)}
                       >
-                        {t.badge ? (
-                          <View
-                            className="absolute -top-[14rpx] right-[16rpx] px-[12rpx] py-[4rpx] rounded-full"
-                            style={{ backgroundColor: MEMBERSHIP_MARKETING_RED }}
-                          >
-                            <Text className="text-[20rpx] text-white font-bold">{t.badge}</Text>
+                        <View className="flex flex-row items-center justify-between gap-[12rpx]">
+                          <View className="flex flex-row items-center min-w-0">
+                            <View
+                              className={cn(
+                                'w-[36rpx] h-[36rpx] rounded-full border-[3rpx] mr-[16rpx] flex items-center justify-center',
+                                on ? 'border-primary' : 'border-border bg-white',
+                              )}
+                            >
+                              {on ? (
+                                <View className="w-[18rpx] h-[18rpx] rounded-full bg-primary" />
+                              ) : null}
+                            </View>
+                            <Text className="text-[30rpx] font-extrabold text-foreground">
+                              {t.label}
+                            </Text>
+                          </View>
+                          {t.badge ? (
+                            <View
+                              className="shrink-0 px-[16rpx] py-[6rpx] rounded-full"
+                              style={{
+                                backgroundColor: t.bestSave ? '#16a34a' : MEMBERSHIP_MARKETING_RED,
+                              }}
+                            >
+                              <Text className="text-[20rpx] text-white font-extrabold">
+                                {t.badge}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+
+                        {t.term === '1d' ? (
+                          <View className="mt-[20rpx] rounded-[24rpx] border border-border/80 bg-white/90 px-[20rpx] py-[20rpx] flex flex-row items-center justify-between">
+                            <Text className="text-[22rpx] text-muted-foreground">实付</Text>
+                            <Text className="text-[34rpx] font-black text-foreground">
+                              ¥{moneyYuan(t.pay)}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View className="mt-[20rpx] rounded-[24rpx] border border-border/80 bg-white/90 px-[12rpx] py-[20rpx] flex flex-row items-center">
+                            <View className="flex-1 items-center">
+                              <Text className="text-[20rpx] text-muted-foreground block">原价</Text>
+                              <Text className="text-[26rpx] font-bold text-muted-foreground line-through mt-[8rpx] block">
+                                ¥{moneyYuan(t.list)}
+                              </Text>
+                            </View>
+                            <Text className="text-[24rpx] text-muted-foreground font-bold px-[4rpx]">
+                              →
+                            </Text>
+                            <View className="flex-1 items-center">
+                              <Text className="text-[20rpx] text-muted-foreground block">实付</Text>
+                              <Text className="text-[34rpx] font-black text-foreground mt-[4rpx] block">
+                                ¥{moneyYuan(t.pay)}
+                              </Text>
+                            </View>
+                            <Text className="text-[24rpx] text-muted-foreground font-bold px-[4rpx]">
+                              =
+                            </Text>
+                            <View className="flex-1 items-center">
+                              <Text className="text-[20rpx] text-muted-foreground block">立省</Text>
+                              <Text
+                                className="text-[30rpx] font-extrabold mt-[4rpx] block"
+                                style={{ color: MEMBERSHIP_MARKETING_RED }}
+                              >
+                                ¥{moneyYuan(t.save)}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {t.term !== '1d' ? (
+                          <View className="mt-[16rpx] flex flex-row items-center justify-between">
+                            <Text className="text-[20rpx] text-muted-foreground">
+                              {t.hint || `¥${shelfPlan.yearPrice}/年 × ${t.term}`}
+                            </Text>
+                            <Text className="text-[20rpx] text-muted-foreground">
+                              ≈ ¥{moneyYuan(t.perYear)}/年
+                              {t.savePct > 0 ? ` · 省 ${t.savePct}%` : ''}
+                            </Text>
                           </View>
                         ) : null}
-                        <Text className="text-[28rpx] font-extrabold text-foreground block">
-                          {t.label}
-                        </Text>
-                        <Text className="text-[22rpx] text-muted-foreground mt-[8rpx] block">
-                          {t.hint}
-                        </Text>
                       </View>
                     );
                   })}
@@ -978,74 +942,43 @@ const MembershipPage: React.FC = () => {
               </View>
             ) : null}
 
-            <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-primary/12 bg-primary/8 px-[28rpx] py-[28rpx]">
-              {shelfPlan.free ? (
-                <>
-                  <Text className="text-[44rpx] font-black text-foreground">¥0</Text>
-                  <Text className="text-[24rpx] text-muted-foreground mt-[12rpx] block">
-                    申请开通 · 添加客服企微
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <View className="flex flex-row items-end justify-between">
-                    <View className="flex flex-row items-baseline">
-                      <Text className="text-[32rpx] font-bold text-foreground mr-[4rpx]">¥</Text>
-                      <Text className="text-[64rpx] font-black leading-none text-foreground">
-                        {moneyYuan(shelfCalc.pay)}
-                      </Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-[24rpx] text-muted-foreground line-through block">
-                        ¥{moneyYuan(shelfCalc.list)}
-                      </Text>
-                      {shelfCalc.save > 0 ? (
-                        <Text
-                          className="text-[24rpx] font-bold mt-[4rpx] block"
-                          style={{ color: MEMBERSHIP_MARKETING_RED }}
-                        >
-                          省 ¥{moneyYuan(shelfCalc.save)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                  <Text className="text-[24rpx] text-muted-foreground mt-[16rpx] block">
-                    {shelfPlan.name} · {years} 年 · ¥{moneyYuan(shelfCalc.perYear)}/年
-                  </Text>
-                  {years === 3 ? (
-                    <Text className="text-[26rpx] font-bold text-primary mt-[12rpx] block">
-                      一天约 ¥{shelfCalc.daily}
-                    </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
-
             {shelfPlan.free ? (
-              <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-primary/15 bg-primary/8 px-[28rpx] py-[24rpx]">
-                <Text className="text-[26rpx] font-extrabold text-primary block">
-                  众创版，为「一个人先干起来」而设
-                </Text>
-                <Text className="text-[24rpx] text-muted-foreground mt-[12rpx] leading-[38rpx] block">
-                  给独立老师、初创小工作室：学员还不多、团队还很小，也值得用上干净的排课与课时。先把教学管清楚，等长大了再升级——我们想陪你们从第一位学员走起。
+              <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-primary/12 bg-primary/8 px-[28rpx] py-[28rpx]">
+                <Text className="text-[44rpx] font-black text-foreground">¥0</Text>
+                <Text className="text-[24rpx] text-muted-foreground mt-[12rpx] block">
+                  申请开通
                 </Text>
               </View>
-            ) : null}
-
-            {!shelfPlan.free ? (
-              <View
-                className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-border px-[28rpx] py-[24rpx] flex flex-row items-center justify-between active:opacity-80"
-                onClick={() => openQr(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY)}
-              >
-                <View className="flex-1 min-w-0 pr-[16rpx]">
-                  <Text className="text-[26rpx] font-bold text-foreground block">额外校区</Text>
-                  <Text className="text-[22rpx] text-muted-foreground mt-[8rpx] block">
-                    含 {shelfPlan.includedCampuses} 校区 · 加购请联系运营（不在线计价）
-                  </Text>
+            ) : (
+              <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-primary/14 bg-primary/7 px-[28rpx] py-[28rpx]">
+                <View className="flex flex-row items-end justify-between">
+                  <View className="flex flex-row items-baseline">
+                    <Text className="text-[30rpx] font-bold text-foreground mr-[4rpx]">¥</Text>
+                    <Text className="text-[60rpx] font-black leading-none text-foreground">
+                      {moneyYuan(shelfCalc.pay)}
+                    </Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-[24rpx] text-muted-foreground block">
+                      原价 ¥{moneyYuan(shelfCalc.list)}
+                    </Text>
+                    {shelfCalc.save > 0 ? (
+                      <Text
+                        className="text-[24rpx] font-extrabold mt-[4rpx] block"
+                        style={{ color: MEMBERSHIP_MARKETING_RED }}
+                      >
+                        本次立省 ¥{moneyYuan(shelfCalc.save)}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
-                <Text className="text-[24rpx] font-bold text-primary">联系 ›</Text>
+                <Text className="text-[24rpx] text-muted-foreground mt-[16rpx] block">
+                  {term === '1d'
+                    ? `${shelfPlan.name} · 1 天`
+                    : `${shelfPlan.name} · ${term} 年 · 一天约 ¥${shelfCalc.daily}`}
+                </Text>
               </View>
-            ) : null}
+            )}
 
             <View className="mx-[24rpx] mb-[28rpx] rounded-[28rpx] bg-bg-card px-[28rpx] py-[8rpx]">
               {featureRows.map(([k, v]) => (
@@ -1080,40 +1013,20 @@ const MembershipPage: React.FC = () => {
       </View>
 
       <View className="fixed left-0 right-0 bottom-0 z-20 px-[32rpx] pt-[16rpx] pb-[calc(16rpx+env(safe-area-inset-bottom))] bg-background">
-        {viewMode === 'purchase' && testPaySkus.length > 0 ? (
-          <View className="mb-[12rpx] flex flex-col gap-[8rpx]">
-            {testPaySkus.map((sku) => (
-              <View
-                key={sku.versionCode}
-                className="h-[64rpx] rounded-[20rpx] border border-dashed border-warning/50 bg-warning/8 flex flex-row items-center justify-center active:opacity-80"
-                onClick={() => {
-                  void handleTestPay(sku);
-                }}
-              >
-                <Text className="text-[24rpx] font-semibold text-warning">
-                  联调 · {sku.name} ¥{paymentService.formatPriceYuan(sku.price)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
         <View className="flex flex-row gap-[16rpx]">
           {viewMode === 'manage' ? (
             <>
               <View
-                className="flex-1 h-[96rpx] rounded-[28rpx] bg-primary flex flex-col items-center justify-center shadow-soft active:opacity-90"
+                className="flex-1 h-[96rpx] rounded-[28rpx] bg-primary flex items-center justify-center shadow-soft active:opacity-90"
                 onClick={() => setViewMode('purchase')}
               >
-                <Text className="text-[28rpx] font-extrabold text-white">
-                  {lifecycle === 'expired' ? '立即续费' : isTrial ? '正式开通' : '续费同档'}
-                </Text>
-                <Text className="text-[20rpx] text-white/90 mt-[2rpx]">货架价自助支付</Text>
+                <Text className="text-[28rpx] font-extrabold text-white">{primaryActionLabel}</Text>
               </View>
               <View
                 className="flex-1 h-[96rpx] rounded-[28rpx] bg-card border-[3rpx] border-primary/30 flex items-center justify-center active:opacity-90"
-                onClick={() => openQr(SUPPORT_QR_MEMBERSHIP_UPGRADE_COPY)}
+                onClick={handleOpenRedeem}
               >
-                <Text className="text-[28rpx] font-extrabold text-primary">联系运营</Text>
+                <Text className="text-[28rpx] font-extrabold text-primary">激活码</Text>
               </View>
             </>
           ) : (
@@ -1132,13 +1045,15 @@ const MembershipPage: React.FC = () => {
                     ? '处理中…'
                     : shelfPlan.free
                       ? '申请众创版'
-                      : `开通${shelfPlan.shortName} · ${years} 年`}
+                      : `开通${shelfPlan.shortName} · ${term === '1d' ? '1 天' : `${term} 年`}`}
                 </Text>
                 <Text className="text-[20rpx] text-white/90 mt-[2rpx]">
                   {shelfPlan.free
-                    ? '一个人也能开始'
+                    ? '免费档'
                     : matchedSku
-                      ? `实付 ¥${paymentService.formatPriceYuan(matchedSku.price)}`
+                      ? shelfCalc.save > 0
+                        ? `实付 ¥${paymentService.formatPriceYuan(matchedSku.price)} · 省 ¥${moneyYuan(shelfCalc.save)}`
+                        : `实付 ¥${paymentService.formatPriceYuan(matchedSku.price)}`
                       : payEnabled
                         ? '时长未上架·可用激活码'
                         : shelfCalc.pay > 0

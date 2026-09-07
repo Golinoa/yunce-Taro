@@ -164,16 +164,37 @@ function invokeRequestVirtualPayment(payData: VirtualPayData): Promise<void> {
 
 async function pollOrderUntilDone(
   orderId: string,
-  maxAttempts = 20,
-  intervalMs = 800,
+  options?: {
+    maxAttempts?: number;
+    intervalMs?: number;
+    fulfillAttempts?: number;
+    fulfillIntervalMs?: number;
+  },
 ): Promise<PaymentOrderStatusResult> {
+  const maxAttempts = options?.maxAttempts ?? 25;
+  const intervalMs = options?.intervalMs ?? 800;
+  const fulfillAttempts = options?.fulfillAttempts ?? 40;
+  const fulfillIntervalMs = options?.fulfillIntervalMs ?? 1500;
+
   let last: PaymentOrderStatusResult | null = null;
   for (let i = 0; i < maxAttempts; i += 1) {
     last = await paymentService.getOrder(orderId);
     if (last.status === 'FULFILLED' || last.status === 'CLOSED' || last.status === 'REFUNDED') {
       return last;
     }
+    if (last.status === 'PAID') break;
     await new Promise((r) => setTimeout(r, intervalMs));
+  }
+
+  // 微信已付但履约滞后：继续轮询直到 FULFILLED / 终态
+  if (last?.status === 'PAID' || last?.status === 'PAYING') {
+    for (let i = 0; i < fulfillAttempts; i += 1) {
+      last = await paymentService.getOrder(orderId);
+      if (last.status === 'FULFILLED' || last.status === 'CLOSED' || last.status === 'REFUNDED') {
+        return last;
+      }
+      await new Promise((r) => setTimeout(r, fulfillIntervalMs));
+    }
   }
   return last!;
 }
@@ -232,24 +253,29 @@ async function finishPayFlow(
     return { ok: false, fulfilled: false, message: msg };
   }
 
-  const done = await pollOrderUntilDone(created.orderId);
-  if (done.status === 'FULFILLED') {
-    return { ok: true, fulfilled: true, message: '开通成功', order: done };
-  }
-  if (done.status === 'PAID') {
+  try {
+    await Taro.showLoading({ title: '确认开通中…', mask: true });
+    const done = await pollOrderUntilDone(created.orderId);
+    if (done.status === 'FULFILLED') {
+      return { ok: true, fulfilled: true, message: '开通成功', order: done };
+    }
+    if (done.status === 'PAID') {
+      return {
+        ok: true,
+        fulfilled: false,
+        message: '支付成功，权益开通中。可点「刷新权益」或稍后打开订单详情确认。',
+        order: done,
+      };
+    }
     return {
       ok: true,
       fulfilled: false,
-      message: '支付成功，权益开通中，请稍后在订单详情确认',
+      message: '支付已完成，权益同步中。可点「刷新权益」或打开订单详情确认。',
       order: done,
     };
+  } finally {
+    Taro.hideLoading();
   }
-  return {
-    ok: true,
-    fulfilled: false,
-    message: '支付已完成，权益同步中，请稍后刷新或查看订单',
-    order: done,
-  };
 }
 
 export const paymentService = {

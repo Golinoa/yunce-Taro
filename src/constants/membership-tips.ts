@@ -199,7 +199,7 @@ export function resolveLifecycle(
     return 'inactive';
   }
 
-  // 试用：有未到期日 = 已发放权益（含联调履约）；过期/无到期日才算未开通
+  // 试用：有未到期日 = 已发放权益；过期/无到期日才算未开通
   if (code === 'TRIAL') {
     if (!expireAt || expireAt < now) return expireAt && expireAt < now ? 'expired' : 'inactive';
     const days = Math.ceil((expireAt - now) / (24 * 60 * 60 * 1000));

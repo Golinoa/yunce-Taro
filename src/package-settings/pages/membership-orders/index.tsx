@@ -189,19 +189,40 @@ const MembershipOrdersPage: React.FC = () => {
         setDetail(null);
         await loadList();
       } else if (result.ok && !result.fulfilled) {
-        await Taro.showModal({
+        await notifyMembershipPaid();
+        const orderId = result.order?.orderId;
+        const choice = await Taro.showModal({
           title: '支付成功',
-          content: result.message || '权益开通中，请稍后刷新订单状态',
-          showCancel: false,
+          content: result.message || '权益开通中。可点「刷新状态」再确认。',
+          confirmText: '刷新状态',
+          cancelText: '关闭',
         });
-        await loadList();
-        if (result.order?.orderId) {
+        if (choice.confirm && orderId) {
+          Taro.showLoading({ title: '开通确认中…', mask: true });
           try {
-            setDetail(await paymentService.getOrder(result.order.orderId));
+            let latest = result.order!;
+            for (let i = 0; i < 20; i += 1) {
+              latest = await paymentService.getOrder(orderId);
+              if (latest.status === 'FULFILLED' || latest.status === 'CLOSED') break;
+              await new Promise((r) => setTimeout(r, 1500));
+            }
+            setDetail(latest);
+            if (latest.status === 'FULFILLED') {
+              await notifyMembershipPaid();
+              Taro.showToast({ title: '开通成功', icon: 'success' });
+              setDetail(null);
+            }
+          } finally {
+            Taro.hideLoading();
+          }
+        } else if (orderId) {
+          try {
+            setDetail(await paymentService.getOrder(orderId));
           } catch {
             /* keep */
           }
         }
+        await loadList();
       } else {
         Taro.showToast({ title: result.message || '支付未完成', icon: 'none' });
         await loadList();
@@ -248,8 +269,10 @@ const MembershipOrdersPage: React.FC = () => {
 
   const titleSku = useMemo(() => {
     if (!detail) return '';
-    const years = detail.durationDays ? Math.round(detail.durationDays / 365) : 0;
     const name = detail.versionName || detail.versionCode;
+    const days = detail.durationDays || 0;
+    if (days > 0 && days <= 3) return `${name} · ${days} 天`;
+    const years = days ? Math.round(days / 365) : 0;
     return years > 0 ? `${name} · ${years} 年` : name;
   }, [detail]);
 

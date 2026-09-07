@@ -36,7 +36,9 @@ for (const t of targets) {
     const isDistLocked =
       t.endsWith('dist') && (errCode === 'EBUSY' || errCode === 'EPERM');
     if (isDistLocked) {
-      console.warn('[clean] dist is locked (close WeChat DevTools preview?), skip removing dist');
+      console.warn(
+        '[clean] dist is locked (close WeChat DevTools preview?), skip removing dist — static assets will be force-copied in postbuild',
+      );
       continue;
     }
     throw error;
