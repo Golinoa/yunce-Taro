@@ -21,8 +21,6 @@ import type { CampusUIModel } from '@/types/campus';
 export interface CampusCardProps {
   /** 校区数据 */
   campus: CampusUIModel;
-  /** 点击运营数据入口 */
-  onDataClick?: (id: string) => void;
   /** 设为主校区 */
   onSetMain?: (id: string) => void;
   /** 编辑校区 */

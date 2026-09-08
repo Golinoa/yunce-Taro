@@ -4,7 +4,8 @@ import { getNotifyGroupTitle } from '@/services/campus';
 describe('notify group titles', () => {
   it('返回可读中文分组标题', () => {
     expect(getNotifyGroupTitle('parent')).toBe('家长通知');
-    expect(getNotifyGroupTitle('teacher')).toBe('教师通知');
+    expect(getNotifyGroupTitle('teacher')).toBe('通知老师');
+    expect(getNotifyGroupTitle('student')).toBe('通知学员');
     expect(getNotifyGroupTitle('student_parent')).toBe('学员家长');
     expect(getNotifyGroupTitle('unknown')).toBe('unknown');
   });

@@ -25,6 +25,9 @@ describe('campus-mapper', () => {
       contactName: '王五',
       region: '广东省-深圳市-南山区',
       intro: '介绍',
+      locationName: '星火中心',
+      latitude: 22.5,
+      longitude: 113.9,
       businessCategories: [{ categoryId: 'yoga', subIds: ['yoga_normal'] }],
       tags: ['瑜伽'],
     });
@@ -32,6 +35,9 @@ describe('campus-mapper', () => {
     expect(campus.contactName).toBe('王五');
     expect(campus.region).toBe('广东省-深圳市-南山区');
     expect(campus.intro).toBe('介绍');
+    expect(campus.locationName).toBe('星火中心');
+    expect(campus.latitude).toBe(22.5);
+    expect(campus.longitude).toBe(113.9);
     expect(campus.businessCategories).toEqual([{ categoryId: 'yoga', subIds: ['yoga_normal'] }]);
     expect(campus.tags).toEqual(['瑜伽']);
   });

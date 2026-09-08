@@ -18,8 +18,11 @@ export interface BackendCampusItem {
   id: string;
   intro?: null | string;
   isMain?: boolean;
+  latitude?: null | number;
   licenseName?: null | string;
+  locationName?: null | string;
   logo?: null | string;
+  longitude?: null | number;
   monthlyRent?: number;
   name: string;
   partnerMode?: null | string;
@@ -80,6 +83,9 @@ export function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
     type: campusType,
     phone: raw.phone || '',
     address: raw.address || '',
+    locationName: raw.locationName || undefined,
+    latitude: typeof raw.latitude === 'number' ? raw.latitude : undefined,
+    longitude: typeof raw.longitude === 'number' ? raw.longitude : undefined,
     icon: raw.icon || '🏫',
     iconGradient: raw.iconGradient || 'from-blue-400 to-blue-600',
     isMain: Boolean(raw.isMain),

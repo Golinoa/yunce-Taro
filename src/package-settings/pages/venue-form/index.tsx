@@ -101,12 +101,15 @@ const VenueFormPage: React.FC = () => {
     if (!validate() || saving || !currentCampus) return;
     setSaving(true);
     try {
-      const venues = await venueService.getList(currentCampus.id);
-      const venue = venues[0];
+      let venue = (await venueService.getList(currentCampus.id))[0];
+      // 存量校区可能无默认场馆：自动补建后再挂教室
       if (!venue) {
-        Taro.showToast({ title: '当前校区暂无场馆，请先创建场馆', icon: 'none' });
-        setSaving(false);
-        return;
+        venue = await venueService.add({
+          campusId: currentCampus.id,
+          name: `${currentCampus.name}·默认场馆`,
+          address: currentCampus.address || undefined,
+          status: 'active',
+        });
       }
 
       const payload = {

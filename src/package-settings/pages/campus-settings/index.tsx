@@ -55,6 +55,9 @@ interface FormState {
   phone: string;
   region: string;
   address: string;
+  locationName: string;
+  latitude?: number;
+  longitude?: number;
   businessHours: string;
   intro: string;
   businessCategories: SelectedBusinessCategory[];
@@ -73,11 +76,19 @@ const EMPTY_FORM: FormState = {
   phone: '',
   region: '',
   address: '',
+  locationName: '',
+  latitude: undefined,
+  longitude: undefined,
   businessHours: '',
   intro: '',
   businessCategories: [],
   venueImages: [],
   tags: [],
+};
+
+const emptyToNull = (value: string): string | null => {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 };
 
 const CampusSettings: React.FC = () => {
@@ -124,6 +135,9 @@ const CampusSettings: React.FC = () => {
         phone: currentCampus.phone,
         region: currentCampus.region || '',
         address: currentCampus.address,
+        locationName: currentCampus.locationName || '',
+        latitude: currentCampus.latitude,
+        longitude: currentCampus.longitude,
         businessHours: currentCampus.businessHours || '',
         intro: currentCampus.intro || '',
         businessCategories: currentCampus.businessCategories || [],
@@ -262,6 +276,9 @@ const CampusSettings: React.FC = () => {
       phone: currentCampus.phone,
       region: currentCampus.region || '',
       address: currentCampus.address,
+      locationName: currentCampus.locationName || '',
+      latitude: currentCampus.latitude,
+      longitude: currentCampus.longitude,
       businessHours: currentCampus.businessHours || '',
       intro: currentCampus.intro || '',
       businessCategories: currentCampus.businessCategories || [],
@@ -293,20 +310,30 @@ const CampusSettings: React.FC = () => {
         form.venueImages.map((img) => uploadImage(img, 'campus_brand', { refId: campusId })),
       );
 
-      await useCampusStore.getState().updateCampus(campusId, {
+      const ok = await useCampusStore.getState().updateCampus(campusId, {
         name: form.name.trim(),
         logo: logoUrl,
-        licenseName: form.licenseName.trim() || undefined,
-        contactName: form.contactName.trim() || undefined,
-        phone: form.phone.trim(),
-        region: form.region.trim() || undefined,
-        address: form.address.trim(),
-        businessHours: form.businessHours.trim() || undefined,
-        intro: form.intro.trim() || undefined,
+        licenseName: emptyToNull(form.licenseName),
+        contactName: emptyToNull(form.contactName),
+        phone: emptyToNull(form.phone),
+        region: emptyToNull(form.region),
+        address: emptyToNull(form.address),
+        locationName: emptyToNull(form.locationName),
+        latitude: form.latitude ?? null,
+        longitude: form.longitude ?? null,
+        businessHours: emptyToNull(form.businessHours),
+        intro: emptyToNull(form.intro),
         businessCategories: form.businessCategories,
         venueImages: envUrls.filter((u): u is string => Boolean(u)),
         tags: form.tags,
       });
+      if (!ok) {
+        Taro.showToast({
+          title: useCampusStore.getState().error || '保存失败',
+          icon: 'none',
+        });
+        return;
+      }
       await reload(true);
       // 保存成功后重新初始化表单（用最新数据回填）
       formInitializedRef.current = false;
@@ -420,6 +447,28 @@ const CampusSettings: React.FC = () => {
             placeholder="请输入"
             value={form.address}
             onChange={(value) => updateField('address', value)}
+          />
+          <FormCell
+            label="地图定位"
+            placeholder="点击选择门店位置"
+            value={
+              form.latitude != null && form.longitude != null ? form.locationName || '已选定位' : ''
+            }
+            editable={false}
+            showArrow
+            onClick={() => {
+              void Taro.chooseLocation({
+                success: (res) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    address: res.address || res.name || prev.address,
+                    locationName: res.name || res.address || prev.locationName,
+                    latitude: res.latitude,
+                    longitude: res.longitude,
+                  }));
+                },
+              });
+            }}
           />
           <FormCell
             label="营业时间"

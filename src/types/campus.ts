@@ -87,41 +87,41 @@ export interface CampusStats {
   revenueUnit?: string;
 }
 
-/** 校区表单数据（添加/编辑） */
+/** 校区表单数据（添加/编辑）；可清空字段传 null 落库 */
 export interface CampusFormData {
   name: string;
   /** 校区 Logo URL；传 null 清空 */
   logo?: string | null;
-  /** 营业执照名称 */
-  licenseName?: string;
-  /** 联系人 */
-  contactName?: string;
+  /** 营业执照名称；传 null 清空 */
+  licenseName?: string | null;
+  /** 联系人；传 null 清空 */
+  contactName?: string | null;
   type: CampusType;
   /** 是否主校区 */
   isMain?: boolean;
-  partnerMode?: PartnerMode;
-  phone: string;
-  /** 所在地区 */
-  region?: string;
-  address: string;
-  /** 营业时间 */
-  businessHours?: string;
-  icon: string;
-  iconGradient: string;
+  partnerMode?: PartnerMode | null;
+  phone?: string | null;
+  /** 所在地区；传 null 清空 */
+  region?: string | null;
+  address?: string | null;
+  /** 营业时间；传 null 清空 */
+  businessHours?: string | null;
+  icon?: string;
+  iconGradient?: string;
   /** 月租金（元） */
   monthlyRent?: number;
   /** 租金到期日（每月几号） */
   rentDueDay?: number;
-  /** 门店介绍 */
-  intro?: string;
+  /** 门店介绍；传 null 清空 */
+  intro?: string | null;
   /** 门店环境图片 URL 列表（首张可作主图） */
   venueImages?: string[];
-  /** 地图定位名称（由 wx.chooseLocation 选择） */
-  locationName?: string;
-  /** 纬度 */
-  latitude?: number;
-  /** 经度 */
-  longitude?: number;
+  /** 地图定位名称；传 null 清空 */
+  locationName?: string | null;
+  /** 纬度；传 null 清空 */
+  latitude?: number | null;
+  /** 经度；传 null 清空 */
+  longitude?: number | null;
   /** 主营业态 */
   businessCategories?: SelectedBusinessCategory[];
   /** 门店标签（首页校区卡片展示，最多 4 个，每标签最多 5 字） */

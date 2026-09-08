@@ -120,7 +120,7 @@ const SubCampus: React.FC = () => {
     const data: CampusFormData = {
       name: form.name.trim(),
       type: form.type,
-      partnerMode: form.type === 'partner' ? form.partnerMode : undefined,
+      partnerMode: form.type === 'partner' ? form.partnerMode : null,
       phone: form.phone.trim(),
       address: form.address.trim(),
       icon: iconItem.icon,
@@ -176,7 +176,7 @@ const SubCampus: React.FC = () => {
     const data: Partial<CampusFormData> = {
       name: form.name.trim(),
       type: form.type,
-      partnerMode: form.type === 'partner' ? form.partnerMode : undefined,
+      partnerMode: form.type === 'partner' ? form.partnerMode : null,
       phone: form.phone.trim(),
       address: form.address.trim(),
       icon: iconItem.icon,
@@ -259,13 +259,6 @@ const SubCampus: React.FC = () => {
   }, [settingMainId, setMainCampus, settingMain]);
 
   // ============================================
-  // 运营数据
-  // ============================================
-  const handleDataClick = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-settings/pages/campus-settings/campus-data/index?id=${id}` });
-  }, []);
-
-  // ============================================
   // 表单更新
   // ============================================
   const updateForm = useCallback((field: keyof CampusFormState, value: string | number) => {
@@ -321,7 +314,6 @@ const SubCampus: React.FC = () => {
               onSetMain={handleSetMain}
               onEdit={handleOpenEdit}
               onDelete={handleDelete}
-              onDataClick={handleDataClick}
             />
           ))}
         </View>
@@ -337,7 +329,6 @@ const SubCampus: React.FC = () => {
               campus={campus}
               onEdit={handleOpenEdit}
               onDelete={handleDelete}
-              onDataClick={handleDataClick}
             />
           ))}
         </View>

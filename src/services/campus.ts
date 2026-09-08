@@ -39,10 +39,25 @@ interface BackendNotifySettingItem {
 
 const NOTIFY_GROUP_TITLE_MAP: Record<string, string> = {
   parent: '家长通知',
-  student: '学员通知',
+  student: '通知学员',
   student_parent: '学员家长',
-  teacher: '教师通知',
+  teacher: '通知老师',
   default: '其他通知',
+};
+
+/** label 存机器码时，展示中文名 */
+const NOTIFY_ITEM_LABEL_MAP: Record<string, string> = {
+  'student-class-one-day': '上课前一天提醒',
+  'student-class-same-day': '上课当天提醒',
+  'student-checkin': '学员点名通知',
+  'student-comment': '课堂点评提醒',
+  'student-renewal': '学员课时不足续费提醒',
+  'student-birthday': '学员生日提醒',
+  'student-schedule-change': '调课通知',
+  'teacher-class-remind': '上课提醒',
+  'teacher-leave-audit': '请假审核结果通知',
+  'teacher-salary': '薪资提醒',
+  'teacher-weekly': '周报推送',
 };
 
 function mapNotifyGroupTitle(group: string): string {
@@ -53,6 +68,10 @@ export function getNotifyGroupTitle(group: string): string {
   return mapNotifyGroupTitle(group);
 }
 
+function mapNotifyItemLabel(label: string): string {
+  return NOTIFY_ITEM_LABEL_MAP[label] || label;
+}
+
 function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup[] {
   const grouped = new Map<string, NotifyGroup>();
 
@@ -61,7 +80,7 @@ function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup
     const existing = grouped.get(key);
     const nextItem = {
       id: item.id,
-      label: item.label,
+      label: mapNotifyItemLabel(item.label),
       sub: item.sub || undefined,
       enabled: item.enabled,
     };
@@ -303,24 +322,64 @@ export const campusDataService = {
 export const subjectService = {
   getList: async (): Promise<Subject[]> => {
     const data = await get<unknown>('/subjects');
-    if (Array.isArray(data)) return data as Subject[];
-    const page = asPaginatedResponse<Subject>(
-      data as PaginatedResponse<Subject> | Subject[] | null,
-      1,
-      100,
-    );
-    return page.list;
+    const rows = Array.isArray(data)
+      ? (data as Record<string, unknown>[])
+      : asPaginatedResponse<Record<string, unknown>>(
+          data as PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[] | null,
+          1,
+          100,
+        ).list;
+    return rows.map((raw) => ({
+      id: String(raw.id),
+      name: String(raw.name ?? ''),
+      icon: String(raw.icon ?? '📚'),
+      color: String(raw.color ?? '#5EC8A8'),
+      iconGradient: String(raw.iconGradient ?? 'from-green-400 to-green-600'),
+      studentCount: Number(raw.studentCount ?? 0),
+      teacherCount: Number(raw.teacherCount ?? 0),
+      courseCount: Number(raw.courseCount ?? 0),
+      createdAt: String(raw.createdAt ?? ''),
+      updatedAt: String(raw.updatedAt ?? ''),
+    })) as Subject[];
   },
   getById: async (id: string): Promise<Subject | null> => {
     try {
-      return await get<Subject>(`/subjects/${id}`);
+      const raw = await get<Record<string, unknown>>(`/subjects/${id}`);
+      return {
+        id: String(raw.id),
+        name: String(raw.name ?? ''),
+        icon: String(raw.icon ?? '📚'),
+        color: String(raw.color ?? '#5EC8A8'),
+        iconGradient: String(raw.iconGradient ?? 'from-green-400 to-green-600'),
+        studentCount: Number(raw.studentCount ?? 0),
+        teacherCount: Number(raw.teacherCount ?? 0),
+        courseCount: Number(raw.courseCount ?? 0),
+        createdAt: String(raw.createdAt ?? ''),
+        updatedAt: String(raw.updatedAt ?? ''),
+      } as Subject;
     } catch {
       return null;
     }
   },
-  add: async (data: SubjectFormData): Promise<Subject> => post<Subject>('/subjects', { ...data }),
-  update: async (id: string, data: Partial<SubjectFormData>): Promise<Subject | null> =>
-    put<Subject>(`/subjects/${id}`, data as Record<string, unknown>),
+  add: async (data: SubjectFormData): Promise<Subject> => {
+    const raw = await post<Record<string, unknown>>('/subjects', { ...data });
+    return {
+      id: String(raw.id),
+      name: String(raw.name ?? data.name),
+      icon: String(raw.icon ?? data.icon),
+      color: String(raw.color ?? data.color),
+      iconGradient: String(raw.iconGradient ?? data.iconGradient),
+      studentCount: Number(raw.studentCount ?? 0),
+      teacherCount: Number(raw.teacherCount ?? 0),
+      courseCount: Number(raw.courseCount ?? 0),
+      createdAt: String(raw.createdAt ?? ''),
+      updatedAt: String(raw.updatedAt ?? ''),
+    } as Subject;
+  },
+  update: async (id: string, data: Partial<SubjectFormData>): Promise<Subject | null> => {
+    await put(`/subjects/${id}`, data as Record<string, unknown>);
+    return subjectService.getById(id);
+  },
   delete: async (id: string): Promise<boolean> => {
     await del(`/subjects/${id}`);
     return true;
@@ -419,6 +478,7 @@ export const roomService = {
       page: 1,
       pageSize: 100,
       ...(options?.venueId ? { venueId: options.venueId } : {}),
+      ...(options?.campusId ? { campusId: options.campusId } : {}),
     });
     const page = asPaginatedResponse<Record<string, unknown>>(
       data as PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[] | null,
@@ -464,6 +524,7 @@ export const roomService = {
       venueId: body.venueId,
       name: body.name,
       capacity: body.capacity ?? 20,
+      status: body.status === 'inactive' ? 'INACTIVE' : 'ACTIVE',
     });
     return {
       id: String(raw.id),
@@ -471,7 +532,7 @@ export const roomService = {
       campusId: data.campusId,
       name: String(raw.name ?? data.name),
       capacity: Number(raw.capacity ?? data.capacity ?? 20),
-      status: 'active',
+      status: String(raw.status ?? 'ACTIVE').toLowerCase() === 'inactive' ? 'inactive' : 'active',
       createdAt: String(raw.createdAt ?? ''),
       updatedAt: String(raw.updatedAt ?? ''),
     } as Room;
