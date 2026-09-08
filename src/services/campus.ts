@@ -1,6 +1,7 @@
 /**
  * Service 层 — 校区相关 API
  */
+import { mapBackendCampus, type BackendCampusItem } from '@/services/campus-mapper';
 import type {
   CampusUIModel,
   CampusFormData,
@@ -16,8 +17,6 @@ import type {
   VenueFormData,
   Room,
   RoomFormData,
-  CampusType,
-  PartnerMode,
 } from '@/types/campus';
 import { notWired } from '@/utils/not-wired';
 import {
@@ -28,6 +27,8 @@ import {
 } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
 
+export { mapBackendCampus, mapBusinessCategories, mapCampusTags } from '@/services/campus-mapper';
+
 interface BackendNotifySettingItem {
   enabled: boolean;
   group: string;
@@ -37,15 +38,19 @@ interface BackendNotifySettingItem {
 }
 
 const NOTIFY_GROUP_TITLE_MAP: Record<string, string> = {
-  parent: '????',
-  student: '????',
-  student_parent: '????',
-  teacher: '????',
-  default: '????',
+  parent: '家长通知',
+  student: '学员通知',
+  student_parent: '学员家长',
+  teacher: '教师通知',
+  default: '其他通知',
 };
 
 function mapNotifyGroupTitle(group: string): string {
-  return NOTIFY_GROUP_TITLE_MAP[group] || group || '????';
+  return NOTIFY_GROUP_TITLE_MAP[group] || group || '其他通知';
+}
+
+export function getNotifyGroupTitle(group: string): string {
+  return mapNotifyGroupTitle(group);
 }
 
 function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup[] {
@@ -75,62 +80,8 @@ function mapBackendNotifySettings(list: BackendNotifySettingItem[]): NotifyGroup
   return Array.from(grouped.values());
 }
 
-interface BackendCampusItem {
-  address?: null | string;
-  environmentImages?: string[] | null;
-  icon?: string;
-  iconGradient?: string;
-  id: string;
-  isMain?: boolean;
-  logo?: null | string;
-  monthlyRent?: number;
-  name: string;
-  partnerMode?: null | string;
-  phone?: null | string;
-  rentDueDay?: number;
-  type?: string;
-  hoursAlertThreshold?: number;
-  daysAlertThreshold?: number;
-  amountAlertThreshold?: number;
-  businessHours?: string | null;
-}
-
-function mapBackendCampus(raw: BackendCampusItem): CampusUIModel {
-  const campusType: CampusType =
-    raw.type === 'main' || raw.type === 'self' || raw.type === 'partner' ? raw.type : 'self';
-
-  const environmentImages = Array.isArray(raw.environmentImages)
-    ? raw.environmentImages.filter((u): u is string => typeof u === 'string' && u.length > 0)
-    : [];
-
-  return {
-    id: raw.id,
-    name: raw.name,
-    logo: raw.logo || undefined,
-    type: campusType,
-    phone: raw.phone || '',
-    address: raw.address || '',
-    icon: raw.icon || '🏫',
-    iconGradient: raw.iconGradient || 'from-blue-400 to-blue-600',
-    isMain: Boolean(raw.isMain),
-    monthlyRent: raw.monthlyRent ?? 0,
-    rentDueDay: raw.rentDueDay ?? 1,
-    partnerMode: raw.partnerMode as PartnerMode | undefined,
-    stats: { students: 0, teachers: 0, revenue: 0, revenueUnit: '' },
-    businessCategories: [],
-    tags: [],
-    /** 前端沿用 venueImages；后端字段为 environmentImages */
-    venueImages: environmentImages,
-    hoursAlertThreshold: typeof raw.hoursAlertThreshold === 'number' ? raw.hoursAlertThreshold : 5,
-    daysAlertThreshold: typeof raw.daysAlertThreshold === 'number' ? raw.daysAlertThreshold : 7,
-    amountAlertThreshold:
-      typeof raw.amountAlertThreshold === 'number' ? raw.amountAlertThreshold : 200,
-    businessHours: raw.businessHours || undefined,
-  };
-}
-
 // ============================================
-// ?? Service
+// Campus Service
 // ============================================
 export const campusService = {
   /** 校区列表（分批拉全） */
@@ -449,6 +400,19 @@ export const venueService = {
   },
 };
 
+/** 教室写入体：仅落库字段，剥离预约/价格等未接通能力 */
+export function buildRoomWriteBody(
+  data: Partial<RoomFormData> & { venueId?: string; campusId?: string; name?: string },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (data.venueId !== undefined) body.venueId = data.venueId;
+  if (data.campusId !== undefined) body.campusId = data.campusId;
+  if (data.name !== undefined) body.name = data.name;
+  if (data.capacity !== undefined) body.capacity = data.capacity;
+  if (data.status !== undefined) body.status = data.status;
+  return body;
+}
+
 export const roomService = {
   getList: async (options?: { campusId?: string; venueId?: string }): Promise<Room[]> => {
     const data = await get<unknown>('/venues/rooms', {
@@ -495,10 +459,11 @@ export const roomService = {
     }
   },
   add: async (data: RoomFormData): Promise<Room> => {
+    const body = buildRoomWriteBody(data);
     const raw = await post<Record<string, unknown>>('/venues/rooms', {
-      venueId: data.venueId,
-      name: data.name,
-      capacity: data.capacity ?? 20,
+      venueId: body.venueId,
+      name: body.name,
+      capacity: body.capacity ?? 20,
     });
     return {
       id: String(raw.id),
@@ -512,10 +477,13 @@ export const roomService = {
     } as Room;
   },
   update: async (id: string, data: Partial<RoomFormData>): Promise<Room | null> => {
+    const prepared = buildRoomWriteBody(data);
     const body: Record<string, unknown> = {};
-    if (data.name !== undefined) body.name = data.name;
-    if (data.capacity !== undefined) body.capacity = data.capacity;
-    if (data.status !== undefined) body.status = data.status === 'inactive' ? 'INACTIVE' : 'ACTIVE';
+    if (prepared.name !== undefined) body.name = prepared.name;
+    if (prepared.capacity !== undefined) body.capacity = prepared.capacity;
+    if (prepared.status !== undefined) {
+      body.status = prepared.status === 'inactive' ? 'INACTIVE' : 'ACTIVE';
+    }
     await put(`/venues/rooms/${id}`, body);
     return roomService.getById(id);
   },

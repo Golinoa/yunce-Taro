@@ -31,13 +31,7 @@ export interface CampusCardProps {
   onDelete?: (id: string) => void;
 }
 
-const CampusCard: React.FC<CampusCardProps> = ({
-  campus,
-  onDataClick,
-  onSetMain,
-  onEdit,
-  onDelete,
-}) => {
+const CampusCard: React.FC<CampusCardProps> = ({ campus, onSetMain, onEdit, onDelete }) => {
   const typeInfo = useMemo(
     () => CAMPUS_TYPE_MAP[campus.type] || CAMPUS_TYPE_MAP.self,
     [campus.type],
@@ -46,28 +40,6 @@ const CampusCard: React.FC<CampusCardProps> = ({
   const partnerModeText = useMemo(
     () => (campus.partnerMode ? PARTNER_MODE_MAP[campus.partnerMode] : ''),
     [campus.partnerMode],
-  );
-
-  /** 格式化营收数字 */
-  const formatRevenue = useCallback((revenue: number, unit?: string) => {
-    if (unit === '万') {
-      const wan = revenue / 10000;
-      return wan >= 1 ? `${wan.toFixed(1)}` : `${wan}`;
-    }
-    if (revenue >= 10000) {
-      return `${(revenue / 10000).toFixed(1)}`;
-    }
-    return `${revenue}`;
-  }, []);
-
-  const revenueDisplay = useMemo(
-    () => formatRevenue(campus.stats.revenue, campus.stats.revenueUnit),
-    [campus.stats.revenue, campus.stats.revenueUnit, formatRevenue],
-  );
-
-  const revenueUnit = useMemo(
-    () => campus.stats.revenueUnit || (campus.stats.revenue >= 10000 ? '万' : ''),
-    [campus.stats.revenueUnit, campus.stats.revenue],
   );
 
   /** 三点菜单 — 使用原生 ActionSheet */
@@ -103,10 +75,6 @@ const CampusCard: React.FC<CampusCardProps> = ({
       // 用户取消，不做处理
     }
   }, [campus.id, campus.isMain, onSetMain, onEdit, onDelete]);
-
-  const handleDataClick = useCallback(() => {
-    onDataClick?.(campus.id);
-  }, [campus.id, onDataClick]);
 
   /** 点击地址/定位图标，打开地图查看位置 */
   const handleOpenLocation = useCallback(() => {
@@ -239,40 +207,17 @@ const CampusCard: React.FC<CampusCardProps> = ({
         </View>
       )}
 
-      {/* 统计行 — 设计稿：.stats-row / grid 3列 / gap:10px / pt:14px / border-top / stat-val:20px 800 / stat-label:11px */}
-      <View className="grid grid-cols-3 gap-[20rpx] mt-[24rpx] pt-[28rpx] border-t-d5e8e0">
-        <View className="flex flex-col items-center">
-          <Text className="text-[40rpx] font-extrabold text-foreground">
-            {campus.stats.students}
-          </Text>
-          <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">学生</Text>
-        </View>
-        <View className="flex flex-col items-center">
-          <Text className="text-[40rpx] font-extrabold text-foreground">
-            {campus.stats.teachers}
-          </Text>
-          <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">教师</Text>
-        </View>
-        <View className="flex flex-col items-center">
-          <View className="flex flex-row items-baseline justify-center">
-            <Text className="text-[40rpx] font-extrabold text-foreground">{revenueDisplay}</Text>
-            {revenueUnit && (
-              <Text className="text-[22rpx] text-muted-foreground ml-[4rpx]">{revenueUnit}</Text>
-            )}
-          </View>
-          <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">
-            {campus.type === 'partner' ? '本月分成' : '月营收'}
-          </Text>
-        </View>
+      {/* 统计：后端尚未提供校区维度聚合，避免展示全 0 假数据 */}
+      <View className="mt-[24rpx] pt-[28rpx] border-t-d5e8e0 flex flex-col items-center">
+        <Text className="text-[26rpx] text-muted-foreground">暂无统计</Text>
+        <Text className="text-[22rpx] text-muted-foreground mt-[8rpx]">
+          学员 / 教师 / 营收汇总即将开放
+        </Text>
       </View>
 
-      {/* 底部：运营数据入口 — 设计稿：.data-row / justify-end / gap:4px / pt:14px / mt:14px / data-text:11px/500/primary */}
-      <View
-        className="flex flex-row items-center justify-end gap-[8rpx] pt-[28rpx] mt-[28rpx] border-t-d5e8e0"
-        onClick={handleDataClick}
-      >
-        <Text className="text-[22rpx] text-primary font-medium">运营数据</Text>
-        <Icon name="mdi-arrow-right" size={28} color="primary" />
+      {/* 底部：运营数据入口（只读提示，避免假成功页） */}
+      <View className="flex flex-row items-center justify-end gap-[8rpx] pt-[28rpx] mt-[28rpx] border-t-d5e8e0">
+        <Text className="text-[22rpx] text-muted-foreground font-medium">运营数据 · 即将开放</Text>
       </View>
     </View>
   );

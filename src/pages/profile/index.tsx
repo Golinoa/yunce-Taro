@@ -440,7 +440,7 @@ const Profile: React.FC = () => {
       {
         label: '门店管理',
         icon: 'mdi-office-building-outline' as const,
-        onClick: handlePlaceholder,
+        onClick: () => handleNavigate('/package-settings/pages/campus-settings/index'),
       },
       {
         label: '场地管理',

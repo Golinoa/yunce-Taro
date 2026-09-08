@@ -96,6 +96,7 @@ const CampusSettings: React.FC = () => {
   const [editingTag, setEditingTag] = useState('');
   /** 标记表单是否已初始化，避免 useEffect 反复覆盖用户输入 */
   const formInitializedRef = React.useRef(false);
+  const hasChangedRef = React.useRef(false);
 
   const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.campus;
 
@@ -136,12 +137,21 @@ const CampusSettings: React.FC = () => {
     }
   }, [currentCampus]);
 
-  const reload = useCallback(async () => {
-    await fetchCampuses();
-  }, [fetchCampuses]);
+  const reload = useCallback(
+    async (force = false) => {
+      await fetchCampuses(force);
+    },
+    [fetchCampuses],
+  );
 
   Taro.useDidShow(() => {
-    void reload();
+    void (async () => {
+      await fetchCampuses(true);
+      // 无未保存改动时用服务端数据回填（含标签）；避免选图触发 didShow 冲掉编辑
+      if (!hasChangedRef.current) {
+        formInitializedRef.current = false;
+      }
+    })();
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       setShowIntro(hidden !== true);
@@ -261,6 +271,10 @@ const CampusSettings: React.FC = () => {
     return JSON.stringify(form) !== JSON.stringify(origin);
   }, [form, currentCampus]);
 
+  useEffect(() => {
+    hasChangedRef.current = hasChanged;
+  }, [hasChanged]);
+
   const handleSave = useCallback(async () => {
     if (!currentCampus || !hasChanged) return;
     if (!form.name.trim()) {
@@ -293,7 +307,7 @@ const CampusSettings: React.FC = () => {
         venueImages: envUrls.filter((u): u is string => Boolean(u)),
         tags: form.tags,
       });
-      await reload();
+      await reload(true);
       // 保存成功后重新初始化表单（用最新数据回填）
       formInitializedRef.current = false;
       Taro.showToast({ title: '保存成功', icon: 'success' });

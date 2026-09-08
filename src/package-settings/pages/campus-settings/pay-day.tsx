@@ -33,7 +33,6 @@ const PayDay: React.FC = () => {
   } = useCampusStore();
 
   const [fixedDay, setFixedDay] = useState(payDaySettings.fixedDay || 15);
-  const [pushDays, setPushDays] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [savingPayDay, setSavingPayDay] = useState(false);
@@ -288,22 +287,18 @@ const PayDay: React.FC = () => {
           <View className="flex flex-row items-center justify-between px-[28rpx] py-[24rpx] border-b-d5e8e0">
             <Text className="text-[28rpx] text-foreground">课时报表推送</Text>
             <View className="flex flex-row items-center gap-[12rpx]">
-              <Text className="text-[26rpx] text-muted-foreground">
-                当前仅展示能力边界，联调后补充推送配置
-              </Text>
+              <Text className="text-[26rpx] text-muted-foreground">能力预留，暂未开放配置</Text>
               <View className="text-[24rpx] text-muted-foreground font-medium px-[16rpx] py-[8rpx] bg-muted rounded-[12rpx]">
-                <Text className="text-[24rpx] text-muted-foreground font-medium">待联调</Text>
+                <Text className="text-[24rpx] text-muted-foreground font-medium">即将开放</Text>
               </View>
             </View>
           </View>
 
-          {/* 自动确认 — 设计稿：左侧标题+说明，右侧开关 */}
+          {/* 自动确认 — 只读，避免假保存 */}
           <View className="flex flex-row items-center justify-between px-[28rpx] py-[24rpx]">
             <View className="flex-1 mr-[20rpx]">
               <Text className="text-[28rpx] text-foreground">自动确认</Text>
-              <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block">
-                当前后端尚未提供自动确认配置
-              </Text>
+              <Text className="text-[22rpx] text-muted-foreground mt-[4rpx] block">即将开放</Text>
             </View>
             <View
               className={cn('w-[88rpx] h-[52rpx] rounded-full relative transition-all', 'bg-muted')}
@@ -449,15 +444,11 @@ const PayDay: React.FC = () => {
             </View>
           </View>
 
-          {/* 查看详情 */}
-          <View
-            className="flex flex-row items-center justify-center mt-[24rpx] py-[16rpx]"
-            onClick={() =>
-              Taro.navigateTo({ url: '/package-settings/pages/campus-settings/campus-data/index' })
-            }
-          >
-            <Text className="text-[26rpx] text-primary font-medium">查看数据</Text>
-            <Icon name="mdi-chevron-right" size={28} color="primary" />
+          {/* 查看运营数据（即将开放） */}
+          <View className="flex flex-row items-center justify-center mt-[24rpx] py-[16rpx]">
+            <Text className="text-[26rpx] text-muted-foreground font-medium">
+              运营数据 · 即将开放
+            </Text>
           </View>
         </View>
       </View>
@@ -493,36 +484,6 @@ const PayDay: React.FC = () => {
               >
                 <Text className="text-[32rpx] text-primary font-bold">＋</Text>
               </View>
-            </View>
-          </View>
-
-          <View className="mb-4">
-            <Text className="text-sm text-muted-foreground font-medium mb-3">课时报表推送</Text>
-            <View className="flex flex-row gap-[12rpx]">
-              {[
-                { label: '当天', val: 0 },
-                { label: '提前1天', val: 1 },
-                { label: '提前3天', val: 3 },
-                { label: '提前7天', val: 7 },
-              ].map((opt) => (
-                <View
-                  key={opt.val}
-                  className={cn(
-                    'flex-1 py-[16rpx] rounded-[16rpx] border-[3rpx] items-center',
-                    pushDays === opt.val ? 'border-primary bg-primary/5' : 'border-d5e8e0',
-                  )}
-                  onClick={() => setPushDays(opt.val)}
-                >
-                  <Text
-                    className={cn(
-                      'text-[24rpx] font-medium',
-                      pushDays === opt.val ? 'text-primary' : 'text-muted-foreground',
-                    )}
-                  >
-                    {opt.label}
-                  </Text>
-                </View>
-              ))}
             </View>
           </View>
 
