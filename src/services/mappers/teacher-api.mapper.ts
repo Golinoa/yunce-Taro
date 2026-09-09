@@ -77,6 +77,23 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
   const latestPay = Array.isArray(raw.payHistory)
     ? (raw.payHistory[0] as RawRecord | undefined)
     : undefined;
+  const hasSelectedSalaryRecord = Object.prototype.hasOwnProperty.call(raw, 'salaryRecord');
+  const selectedSalaryRaw = raw.salaryRecord as RawRecord | null | undefined;
+  const selectedSalaryRecord = hasSelectedSalaryRecord
+    ? selectedSalaryRaw
+      ? {
+          id: String(selectedSalaryRaw.id ?? ''),
+          teacherId: String(selectedSalaryRaw.teacherId ?? raw.id ?? ''),
+          month: String(selectedSalaryRaw.month ?? '').slice(0, 7),
+          amount: num(selectedSalaryRaw.amount),
+          status: normalizeSalaryStatus(String(selectedSalaryRaw.status ?? 'pending')),
+          remark: str(selectedSalaryRaw.remark),
+          paidAt: str(selectedSalaryRaw.paidAt ?? selectedSalaryRaw.paid_at),
+          payMethod: selectedSalaryRaw.payMethod as TeacherUIModel['payMethod'],
+          serialNo: str(selectedSalaryRaw.serialNo ?? selectedSalaryRaw.serial_no),
+        }
+      : null
+    : undefined;
 
   const payHistory = Array.isArray(raw.payHistory)
     ? raw.payHistory.map((item) => {
@@ -130,7 +147,11 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
     rate: num(salaryModel?.rate),
     attend: num(salaryModel?.attend),
     perf: num(salaryModel?.perf),
-    salaryStatus: normalizeSalaryStatus(String(latestPay?.status ?? raw.salaryStatus ?? 'pending')),
+    salaryStatus:
+      selectedSalaryRecord?.status ??
+      (selectedSalaryRecord === null
+        ? 'pending'
+        : normalizeSalaryStatus(String(latestPay?.status ?? raw.salaryStatus ?? 'pending'))),
     modelIdx,
     color: String(raw.color ?? '#3B6EF5'),
     initial: name.slice(0, 1),
@@ -141,9 +162,16 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
     resignType: raw.resignType as TeacherUIModel['resignType'],
     resignDate: str(raw.resignDate ?? raw.resign_date),
     resignReason: str(raw.resignReason ?? raw.resign_reason),
-    paidAt: str(latestPay?.paidAt ?? latestPay?.paid_at),
-    serialNo: str(latestPay?.serialNo ?? latestPay?.serial_no),
+    paidAt:
+      selectedSalaryRecord?.paidAt ??
+      (selectedSalaryRecord === null ? undefined : str(latestPay?.paidAt ?? latestPay?.paid_at)),
+    serialNo:
+      selectedSalaryRecord?.serialNo ??
+      (selectedSalaryRecord === null
+        ? undefined
+        : str(latestPay?.serialNo ?? latestPay?.serial_no)),
     payHistory,
+    selectedSalaryRecord,
   };
 }
 

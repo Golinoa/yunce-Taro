@@ -1,7 +1,7 @@
 /**
  * 校区设置 Store — Zustand
  *
- * 管理校区列表、薪资模板、发薪日、节假日、营业时间等状态
+ * 管理校区列表、薪资模板、发薪日、节假日等状态；营业时间随校区资料读写。
  */
 import Taro from '@tarojs/taro';
 import { create } from 'zustand';
@@ -10,7 +10,6 @@ import {
   salaryModelCampusService,
   payDaySettingsService,
   holidayService,
-  businessHoursService,
   notifyService,
   subjectService,
 } from '@/services';
@@ -20,7 +19,6 @@ import type {
   SalaryModel,
   PayDaySettings,
   Holiday,
-  BusinessHours,
   NotifyGroup,
   Subject,
   SubjectFormData,
@@ -54,7 +52,6 @@ interface CampusState {
   salaryModels: SalaryModel[];
   payDaySettings: PayDaySettings;
   holidays: Holiday[];
-  businessHours: BusinessHours;
   notifyGroups: NotifyGroup[];
   subjects: Subject[];
   loading: boolean;
@@ -94,10 +91,6 @@ interface CampusState {
   clearHolidays: () => Promise<boolean>;
   generateStatutoryHolidays: (year?: number) => Promise<number>;
 
-  // 营业时间操作
-  fetchBusinessHours: () => Promise<void>;
-  updateBusinessHours: (updates: Partial<BusinessHours>) => Promise<void>;
-
   // 通知设置操作
   fetchNotifySettings: () => Promise<void>;
   toggleNotify: (itemId: string) => Promise<void>;
@@ -131,13 +124,6 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   salaryModels: [],
   payDaySettings: { mode: 'fixed', fixedDay: 15 },
   holidays: [],
-  businessHours: {
-    weekdayStart: '09:00',
-    weekdayEnd: '21:00',
-    weekendStart: '08:30',
-    weekendEnd: '21:30',
-    specialDates: [],
-  },
   notifyGroups: [],
   subjects: [],
   loading: false,
@@ -406,29 +392,6 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   },
 
   // ============================================
-  // 营业时间
-  // ============================================
-  fetchBusinessHours: async () => {
-    try {
-      const businessHours = await businessHoursService.get();
-      set({ businessHours, error: null });
-    } catch (err) {
-      logError('fetchBusinessHours', err);
-      set({ error: '营业时间加载失败' });
-    }
-  },
-
-  updateBusinessHours: async (updates) => {
-    try {
-      const businessHours = await businessHoursService.update(updates);
-      set({ businessHours, error: null });
-    } catch (err) {
-      logError('updateBusinessHours', err);
-      set({ error: '更新营业时间失败' });
-    }
-  },
-
-  // ============================================
   // 通知设置
   // ============================================
   fetchNotifySettings: async () => {
@@ -589,21 +552,18 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   fetchAll: async () => {
     set({ loading: true, error: null });
     try {
-      const [campuses, salaryModels, payDaySettings, holidays, businessHours, notifyGroups] =
-        await Promise.all([
-          campusService.getList(),
-          salaryModelCampusService.getList(),
-          payDaySettingsService.get(),
-          holidayService.getList(),
-          businessHoursService.get(),
-          notifyService.getList(),
-        ]);
+      const [campuses, salaryModels, payDaySettings, holidays, notifyGroups] = await Promise.all([
+        campusService.getList(),
+        salaryModelCampusService.getList(),
+        payDaySettingsService.get(),
+        holidayService.getList(),
+        notifyService.getList(),
+      ]);
       set({
         campuses,
         salaryModels,
         payDaySettings,
         holidays,
-        businessHours,
         notifyGroups,
         loading: false,
       });

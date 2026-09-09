@@ -399,6 +399,12 @@ export interface PayHistoryRecord {
   serialNo?: string;
 }
 
+/** 后端按所选月份返回的工资快照；为空表示该月尚无工资记录。 */
+export type SelectedSalaryRecord = PayHistoryRecord & {
+  id: string;
+  teacherId: string;
+};
+
 /** 教师管理 UI 完整数据模型 */
 export interface TeacherUIModel {
   id: string;
@@ -466,6 +472,8 @@ export interface TeacherUIModel {
   resignReason?: string;
   classRateOverrides?: ClassRateOverride[];
   payHistory?: PayHistoryRecord[];
+  /** 所选月份工资快照金额；存在时优先于当前薪资模型计算。 */
+  selectedSalaryRecord?: SelectedSalaryRecord | null;
   /** 薪资规则配置（新结构，优先使用） */
   salaryRule?: SalaryRuleConfig;
   /** 套用的薪资模板ID */

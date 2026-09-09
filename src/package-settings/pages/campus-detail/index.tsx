@@ -153,13 +153,13 @@ const CampusDetail: React.FC = () => {
         {/* 基本信息 */}
         <View className="bg-white rounded-[32rpx] px-[32rpx] mb-[24rpx]">
           <InfoRow label="门店名称" value={campus.name} />
-          <InfoRow label="营业执照名称" placeholder="请输入" />
-          <InfoRow label="联系人" value={campus.name} />
+          <InfoRow label="营业执照名称" value={campus.licenseName} placeholder="请输入" />
+          <InfoRow label="联系人" value={campus.contactName} />
           <InfoRow label="类型" value={campus.isMain ? '总店' : '分店'} />
           <InfoRow label="联系方式" value={campus.phone} />
-          <InfoRow label="所在地区" value="河南省-郑州市-惠济区" showArrow />
+          <InfoRow label="所在地区" value={campus.region} showArrow />
           <InfoRow label="详细地址" value={campus.address} />
-          <InfoRow label="营业时间" value="08:00:00至22:00:00" />
+          <InfoRow label="营业时间" value={campus.businessHours} />
         </View>
 
         {/* 主营业态 */}
@@ -190,7 +190,9 @@ const CampusDetail: React.FC = () => {
           <Text className="text-[32rpx] font-semibold text-foreground mb-[16rpx]">
             {campus.name}的介绍
           </Text>
-          <Text className="text-[28rpx] text-muted-foreground leading-relaxed">暂无介绍</Text>
+          <Text className="text-[28rpx] text-muted-foreground leading-relaxed">
+            {campus.intro || '暂无介绍'}
+          </Text>
         </View>
 
         {/* 门店环境 */}

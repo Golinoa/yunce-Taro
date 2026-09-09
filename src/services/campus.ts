@@ -8,7 +8,6 @@ import type {
   SalaryModel,
   PayDaySettings,
   Holiday,
-  BusinessHours,
   NotifyGroup,
   CampusOperationalData,
   Subject,
@@ -18,7 +17,6 @@ import type {
   Room,
   RoomFormData,
 } from '@/types/campus';
-import { notWired } from '@/utils/not-wired';
 import {
   API_PAGE_SIZE_BATCH,
   asPaginatedResponse,
@@ -279,29 +277,22 @@ export const holidayService = {
   },
 };
 
-export const businessHoursService = {
-  get: async (): Promise<BusinessHours> => notWired('GET /business-hours'),
-
-  update: async (_updates: Partial<BusinessHours>): Promise<BusinessHours> =>
-    notWired('PUT /business-hours'),
-};
-
 // ============================================
-// ???? Service
+// 通知设置 Service
 // ============================================
 export const notifyService = {
-  /** ?????? */
+  /** 获取通知分组及开关状态。 */
   getList: async (): Promise<NotifyGroup[]> => {
     const list = await get<BackendNotifySettingItem[]>('/notify-settings');
     return mapBackendNotifySettings(list);
   },
 
-  /** ??????? */
+  /** 切换已有通知项，保存后重新读取；配置不存在时不发送更新请求。 */
   toggle: async (itemId: string): Promise<NotifyGroup[]> => {
     const currentGroups = await notifyService.getList();
     const target = currentGroups.flatMap((group) => group.items).find((item) => item.id === itemId);
     if (!target) {
-      throw new Error('???????');
+      throw new Error('通知设置不存在，请刷新后重试');
     }
 
     await put(`/notify-settings/${itemId}`, {
@@ -313,7 +304,7 @@ export const notifyService = {
 };
 
 // ============================================
-// ???? Service
+// 校区经营数据 Service
 // ============================================
 export const campusDataService = {
   get: async (_campusId: string): Promise<CampusOperationalData | null> => null,

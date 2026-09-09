@@ -2,6 +2,8 @@ import type { TeacherUIModel, SalaryRuleConfig } from '@/types/teacher';
 
 /** 计算教师薪资总额（含扣款/补发）；UI 展示与 mockExecutePay 实发共用同一算法 */
 export function calcTotal(t: TeacherUIModel): number {
+  if (t.selectedSalaryRecord) return Math.max(0, Number(t.selectedSalaryRecord.amount) || 0);
+  if (t.selectedSalaryRecord === null) return 0;
   const categorySum = t.categoryLessonFees?.reduce(
     (sum, item) => sum + (Number(item.amount) || 0),
     0,

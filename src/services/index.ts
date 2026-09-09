@@ -53,7 +53,6 @@ export {
   salaryModelCampusService,
   payDaySettingsService,
   holidayService,
-  businessHoursService,
   notifyService,
   campusDataService,
   subjectService,
