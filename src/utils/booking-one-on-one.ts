@@ -86,24 +86,33 @@ export function readTeacherBookingConfig(teacherId: string): TeacherBookingConfi
   return configs[teacherId] || null;
 }
 
-export function writeTeacherBookingConfig(config: TeacherBookingConfig) {
+function writeTeacherBookingConfigLocal(config: TeacherBookingConfig) {
   const configs = readTeacherBookingConfigs();
   configs[config.teacherId] = {
     ...config,
     updatedAt: new Date().toISOString(),
   };
   writeTeacherBookingConfigs(configs);
-  void put(
+}
+
+export function writeTeacherBookingConfig(config: TeacherBookingConfig) {
+  writeTeacherBookingConfigLocal(config);
+  return put<TeacherBookingConfig>(
     `/booking-config/teachers/${config.teacherId}`,
     config as unknown as Record<string, unknown>,
-  ).catch(() => undefined);
+  )
+    .then((saved) => {
+      writeTeacherBookingConfigLocal(saved);
+      return saved;
+    })
+    .catch(() => undefined);
 }
 
 export async function fetchTeacherBookingConfig(
   teacherId: string,
 ): Promise<TeacherBookingConfig | null> {
   const config = await get<TeacherBookingConfig | null>(`/booking-config/teachers/${teacherId}`);
-  if (config) writeTeacherBookingConfig(config);
+  if (config) writeTeacherBookingConfigLocal(config);
   return config;
 }
 
@@ -114,7 +123,7 @@ export async function saveTeacherBookingConfig(
     `/booking-config/teachers/${config.teacherId}`,
     config as unknown as Record<string, unknown>,
   );
-  writeTeacherBookingConfig(saved);
+  writeTeacherBookingConfigLocal(saved);
   return saved;
 }
 
