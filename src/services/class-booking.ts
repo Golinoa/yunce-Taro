@@ -105,6 +105,9 @@ export const classBookingService = {
         lesson_date: string;
         start_time: string;
         end_time: string;
+        max_count?: number;
+        current_count?: number;
+        status?: ClassBookingSlot['status'];
         room?: string | null;
         booking_kind?: string;
       };
@@ -131,6 +134,9 @@ export const classBookingService = {
           lesson_date: string;
           start_time: string;
           end_time: string;
+          max_count?: number;
+          current_count?: number;
+          status?: ClassBookingSlot['status'];
           room?: string | null;
           booking_kind?: string;
         };
@@ -166,9 +172,9 @@ export const classBookingService = {
           lesson_date: record.slot.lesson_date,
           start_time: record.slot.start_time,
           end_time: record.slot.end_time,
-          max_count: 0,
-          current_count: 0,
-          status: 'active',
+          max_count: record.slot.max_count ?? 0,
+          current_count: record.slot.current_count ?? 0,
+          status: record.slot.status ?? 'active',
           created_at: record.created_at,
           updated_at: record.updated_at,
         } as unknown as ClassBookingSlot,
