@@ -180,31 +180,37 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   fetchSalaryModels: async (force = false) => {
     const { salaryModels, lastMetaFetchAt } = get();
+    const contextVersion = teacherContextVersion;
     const now = Date.now();
     if (!force && salaryModels.length > 0 && now - lastMetaFetchAt < TTL.list) {
       return;
     }
     const list = await salaryModelService.getList();
+    if (contextVersion !== teacherContextVersion) return;
     set({ salaryModels: list, lastMetaFetchAt: now });
   },
 
   fetchSalaryTemplates: async (force = false) => {
     const { salaryTemplates, lastMetaFetchAt } = get();
+    const contextVersion = teacherContextVersion;
     const now = Date.now();
     if (!force && salaryTemplates.length > 0 && now - lastMetaFetchAt < TTL.list) {
       return;
     }
     const list = await salaryTemplateService.getList();
+    if (contextVersion !== teacherContextVersion) return;
     set({ salaryTemplates: list, lastMetaFetchAt: now });
   },
 
   fetchSettings: async (force = false) => {
     const { lastMetaFetchAt } = get();
+    const contextVersion = teacherContextVersion;
     const now = Date.now();
     if (!force && lastMetaFetchAt > 0 && now - lastMetaFetchAt < TTL.list) {
       return;
     }
     const settings = await salarySettingsService.get();
+    if (contextVersion !== teacherContextVersion) return;
     set({ settings, lastMetaFetchAt: now });
   },
 
@@ -548,47 +554,60 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   // ===== 设置 =====
   updateSettings: async (updates) => {
+    const contextVersion = teacherContextVersion;
     await salarySettingsService.update(updates);
     const settings = await salarySettingsService.get();
+    if (contextVersion !== teacherContextVersion) return;
     set({ settings });
   },
 
   // ===== 工资模型 =====
   createSalaryModel: async (model) => {
+    const contextVersion = teacherContextVersion;
     await salaryModelService.create(model);
     const salaryModels = await salaryModelService.getList();
+    if (contextVersion !== teacherContextVersion) return;
     set({ salaryModels });
   },
 
   updateSalaryModel: async (id, updates) => {
+    const contextVersion = teacherContextVersion;
     await salaryModelService.update(id, updates);
     const salaryModels = await salaryModelService.getList();
+    if (contextVersion !== teacherContextVersion) return;
     set({ salaryModels });
   },
 
   // ===== 薪资模板 =====
   createSalaryTemplate: async (data) => {
+    const contextVersion = teacherContextVersion;
     await salaryTemplateService.create(data);
     const salaryTemplates = await salaryTemplateService.getList();
+    if (contextVersion !== teacherContextVersion) return;
     set({ salaryTemplates });
   },
 
   updateSalaryTemplate: async (id, updates) => {
+    const contextVersion = teacherContextVersion;
     await salaryTemplateService.update(id, updates);
     const salaryTemplates = await salaryTemplateService.getList();
+    if (contextVersion !== teacherContextVersion) return;
     set({ salaryTemplates });
   },
 
   deleteSalaryTemplate: async (id) => {
+    const contextVersion = teacherContextVersion;
     const ok = await salaryTemplateService.remove(id);
     if (ok) {
       const salaryTemplates = await salaryTemplateService.getList();
+      if (contextVersion !== teacherContextVersion) return ok;
       set({ salaryTemplates });
     }
     return ok;
   },
 
   applySalaryTemplate: async (templateId, teacherIds) => {
+    const contextVersion = teacherContextVersion;
     try {
       const result = await salaryTemplateService.apply(templateId, teacherIds);
       if (result.success) {
@@ -596,6 +615,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
           teacherService.getList(undefined, get().salaryMonth),
           salaryTemplateService.getList(),
         ]);
+        if (contextVersion !== teacherContextVersion) return result.success;
         set({ teachers, salaryTemplates });
       }
       return result.success;
@@ -607,23 +627,30 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
 
   // ===== 教师薪资规则 =====
   fetchTeacherSalaryRule: async (teacherId) => {
+    const contextVersion = teacherContextVersion;
     const rule = await teacherSalaryRuleService.get(teacherId);
+    if (contextVersion !== teacherContextVersion) return null;
     return rule;
   },
 
   updateTeacherSalaryRule: async (teacherId, config, templateId) => {
+    const contextVersion = teacherContextVersion;
     const ok = await teacherSalaryRuleService.update(teacherId, config, templateId);
     if (ok) {
       const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      if (contextVersion !== teacherContextVersion) return false;
       set({ teachers });
     }
     return ok;
   },
 
   copySalaryRuleToTeachers: async (sourceTeacherId, targetTeacherIds) => {
+    const contextVersion = teacherContextVersion;
     const result = await teacherSalaryRuleService.copyToTeachers(sourceTeacherId, targetTeacherIds);
     if (result.success) {
       const teachers = await teacherService.getList(undefined, get().salaryMonth);
+      if (contextVersion !== teacherContextVersion)
+        return { ...result, success: false, message: '当前机构已切换，请重新加载' };
       set({ teachers });
     }
     return result;

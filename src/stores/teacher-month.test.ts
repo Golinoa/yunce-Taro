@@ -113,6 +113,19 @@ describe('教师月份加载竞态', () => {
     expect(state.loading).toBe(false);
   });
 
+  it('清缓存后忽略在途薪资模型响应', async () => {
+    const oldRequest = deferred<SalaryModel[]>();
+    services.getSalaryModels.mockReturnValueOnce(oldRequest.promise);
+    const { useTeacherStore } = await import('@/stores/teacher');
+
+    const load = useTeacherStore.getState().fetchSalaryModels(true);
+    useTeacherStore.getState().invalidateCache();
+    oldRequest.resolve([{ id: 'previous-org-model' } as SalaryModel]);
+    await load;
+
+    expect(useTeacherStore.getState().salaryModels).toEqual([]);
+  });
+
   it('fetchTeachers 不取消 fetchAll，且旧聚合列表不会覆盖较新的列表结果', async () => {
     const aggregateList = deferred<unknown[]>();
     const directList = deferred<unknown[]>();
