@@ -54,7 +54,7 @@ export function mapBackendSalarySettings(raw: RawRecord): SalarySettings {
     payDay: num(raw.payDay ?? raw.pay_day, 15),
     pushDaysBefore: num(raw.pushDaysBefore ?? raw.push_days_before, 3),
     autoConfirm: Boolean(raw.autoConfirm ?? raw.auto_confirm),
-    pushEnabled: Boolean(raw.pushEnabled ?? raw.push_enabled ?? true),
+    pushEnabled: Boolean(raw.pushEnabled ?? raw.push_enabled ?? false),
   };
 }
 
