@@ -1,6 +1,6 @@
 # Batch 5 真机验收路线
 
-候选包：执行 Batch 5 时生成的 `dev-*` 构建；验收前由 reviewer 填入最终 Taro SHA、后端 SHA、后台 gitlink、日期和环境。
+候选包：`dev-batch5-review-20260910`；Taro SHA `6f67e89ad184bffc1bf17791d0e11f97fe52bc07`，后端 SHA `f0e2d45d67f2d8ba1dd2ebf34904d1fef9ff99c9`，后台 gitlink `1a033c815336222885dfedca3a56b307e7db6291`。复核日期：2026-09-10。正式部署证据仍待 Batch 5 阻断解除后补齐。
 
 请使用真实微信开发者工具预览或实际测试设备，清空本机缓存后执行。每一步记录 tester、日期、设备/网络、候选 SHA、实际结果和截图/录屏路径；任何失败都记录阻断原因，不要用预览成功代替业务结果。
 
