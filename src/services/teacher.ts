@@ -22,7 +22,6 @@ import type {
   SendResult,
   TeacherUIModel,
 } from '@/types/teacher';
-import { notWired } from '@/utils/not-wired';
 import {
   type PaginatedResponse,
   API_PAGE_SIZE_BATCH,
@@ -60,7 +59,11 @@ function currentSalaryMonth(month?: string): string {
 }
 
 async function resolveSalaryRecordId(teacherId: string, month?: string): Promise<string | null> {
-  const detail = await get<RawRecord>(`/teachers/${teacherId}`);
+  const detail = await get<RawRecord>(`/teachers/${teacherId}`, month ? { month } : undefined);
+  if (month && Object.prototype.hasOwnProperty.call(detail, 'salaryRecord')) {
+    const selected = detail.salaryRecord as RawRecord | null | undefined;
+    return selected ? String(selected.id ?? '') || null : null;
+  }
   const monthKey = currentSalaryMonth(month);
   const history = Array.isArray(detail.payHistory) ? detail.payHistory : [];
   const matched = history.find((item) => String((item as RawRecord).month ?? '') === monthKey) as
@@ -85,6 +88,7 @@ export const teacherService = {
           page,
           pageSize,
           status: undefined,
+          month: _month,
         }),
       API_PAGE_SIZE_BATCH,
     );
@@ -133,33 +137,33 @@ export const teacherService = {
   },
 
   batchConfirm: async (ids: string[], month?: string) => {
-    const recordIds = (
-      await Promise.all(ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)))
-    ).filter((item): item is string => Boolean(item));
+    const resolvedIds = await Promise.all(
+      ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)),
+    );
+    if (resolvedIds.some((item) => !item)) return false;
+    const recordIds = resolvedIds as string[];
     if (recordIds.length === 0) return false;
     await post('/teachers/salary/batch-confirm', { ids: recordIds });
     return true;
   },
 
   executePay: async (ids: string[], remark?: string, _payMethod?: string, month?: string) => {
-    const recordIds = (
-      await Promise.all(ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)))
-    ).filter((item): item is string => Boolean(item));
+    const resolvedIds = await Promise.all(
+      ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)),
+    );
+    if (resolvedIds.some((item) => !item)) return false;
+    const recordIds = resolvedIds as string[];
     if (recordIds.length === 0) return false;
     await post('/teachers/salary/execute-pay', { ids: recordIds, remark });
     return true;
   },
 
-  sendSalarySlip: async (ids: string[], remark?: string, month?: string): Promise<SendResult> => {
-    // 后端暂无独立「推送工资条」接口：与发放同源走 execute-pay，避免 notWired 空点
-    const ok = await teacherService.executePay(ids, remark, undefined, month);
-    if (ok) {
-      return { success: ids, failed: [] };
-    }
+  sendSalarySlip: async (ids: string[], _remark?: string, _month?: string): Promise<SendResult> => {
+    // 后端暂无独立「推送工资条」接口，不能用发放接口代替以免错误改变状态。
     const failed: SendFailure[] = ids.map((id) => ({
       id,
       name: id,
-      reason: '发放失败',
+      reason: '推送工资条功能尚未开通',
     }));
     return { success: [], failed };
   },
@@ -296,12 +300,14 @@ export const salaryTemplateService = {
 };
 
 export const teacherSalaryRuleService = {
-  get: async (_teacherId: string) => {
-    return notWired('teacherSalaryRule.get');
+  get: async (teacherId: string) => {
+    const result = await get<RawRecord>(`/teachers/${teacherId}/salary-rule`);
+    return (result.config ?? createDefaultSalaryRule()) as SalaryRuleConfig;
   },
 
-  update: async (_teacherId: string, _config: SalaryRuleConfig, _templateId?: string) => {
-    return notWired('teacherSalaryRule.update');
+  update: async (teacherId: string, config: SalaryRuleConfig, _templateId?: string) => {
+    await put(`/teachers/${teacherId}/salary-rule`, { config });
+    return true;
   },
 
   copyToTeachers: async (
