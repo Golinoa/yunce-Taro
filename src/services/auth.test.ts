@@ -122,6 +122,35 @@ describe('auth service', () => {
     expect(result.status).toBe('ready');
   });
 
+  it('账号找回复用 RESET 邮箱验证码并调用后端恢复接口', async () => {
+    const { post } = await import('@/utils/request');
+    vi.mocked(post)
+      .mockResolvedValueOnce({ sent: true })
+      .mockResolvedValueOnce({ account: 'user@example.com', maskedEmail: 'u***@example.com' });
+    const { prepareAccountRecovery, recoverAccountByEmailCode } = await import('@/services/auth');
+    await expect(prepareAccountRecovery('USER@example.com')).resolves.toMatchObject({
+      status: 'ready',
+      email: 'user@example.com',
+    });
+    await expect(recoverAccountByEmailCode('USER@example.com', '123456')).resolves.toEqual({
+      account: 'user@example.com',
+      maskedEmail: 'u***@example.com',
+      error: null,
+    });
+    expect(post).toHaveBeenNthCalledWith(
+      1,
+      '/auth/email-code',
+      { email: 'user@example.com', purpose: 'RESET' },
+      { skipAuth: true },
+    );
+    expect(post).toHaveBeenNthCalledWith(
+      2,
+      '/auth/recover-account-email',
+      { email: 'user@example.com', code: '123456' },
+      { skipAuth: true },
+    );
+  });
+
   it('registerWithEmailPassword 两次密码由页面校验；服务提交 code+password', async () => {
     const { post } = await import('@/utils/request');
     vi.mocked(post).mockResolvedValueOnce({

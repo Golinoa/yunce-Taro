@@ -68,17 +68,17 @@ describe('auditLogService 可见范围', () => {
     expect(isAuditLogManager('parent')).toBe(false);
   });
 
-  it('record 返回本地合成条目（后端暂无写入）', async () => {
+  it('record 不再生成本地假成功，写入由业务接口后端审计', async () => {
     const { auditLogService } = await import('@/services/audit-log');
-    const entry = await auditLogService.record({
-      action: 'lesson.edit_hours',
-      operatorId: 'u-admin',
-      operatorName: '万老师',
-      operatorRole: 'admin',
-      targetType: 'lesson_record',
-      detail: '编辑课时',
-    });
-    expect(entry.operatorId).toBe('u-admin');
-    expect(entry.id).toMatch(/^local-audit-/);
+    await expect(
+      auditLogService.record({
+        action: 'lesson.edit_hours',
+        operatorId: 'u-admin',
+        operatorName: '万老师',
+        operatorRole: 'admin',
+        targetType: 'lesson_record',
+        detail: '编辑课时',
+      }),
+    ).rejects.toThrow('审计日志由后端业务写接口记录');
   });
 });

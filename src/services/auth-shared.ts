@@ -23,6 +23,7 @@ export const AUTH_ENDPOINTS = {
   checkEmail: '/auth/check-email',
   emailLogin: '/auth/email-login',
   resetPasswordEmail: '/auth/reset-password-email',
+  recoverAccountEmail: '/auth/recover-account-email',
   register: '/auth/register',
   refresh: '/auth/refresh',
   profile: '/profile',

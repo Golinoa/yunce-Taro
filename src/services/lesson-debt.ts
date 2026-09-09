@@ -1,17 +1,13 @@
-/**
- * Service 层 — 欠课记录 API（P1 欠课机制）
- *
- * 后端接口尚未提供，真实环境返回空/抛错，避免假数据。
- */
+/** Service 层 — 欠课记录 API（后端契约尚未提供）。 */
 import type { LessonDebt } from '@/types/lesson-debt';
 
 export const lessonDebtService = {
   getPendingByStudent: async (_studentId: string): Promise<LessonDebt[]> => {
-    return [];
+    throw new Error('[接口未接通] lesson-debt 后端尚未提供欠课查询接口');
   },
 
   getPendingHours: async (_studentId: string): Promise<number> => {
-    return 0;
+    throw new Error('[接口未接通] lesson-debt 后端尚未提供欠课累计接口');
   },
 
   addDebt: async (_params: {

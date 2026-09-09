@@ -375,23 +375,49 @@ export async function loginByEmailCode(email: string, code: string): Promise<Log
   }
 }
 
-export async function prepareAccountRecovery(
-  _email: string,
-): Promise<AccountRecoveryPrepareResult> {
-  return {
-    status: 'email_not_found',
-    error: { message: '账号找回服务暂未接通，请稍后再试' },
-  };
+export async function prepareAccountRecovery(email: string): Promise<AccountRecoveryPrepareResult> {
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return { status: 'email_not_found', error: { message: '请输入正确的邮箱地址' } };
+  }
+  try {
+    await post(AUTH_ENDPOINTS.emailCode, { email: trimmed, purpose: 'RESET' }, { skipAuth: true });
+    return {
+      status: 'ready',
+      email: trimmed,
+      maskedEmail: maskEmailAddress(trimmed),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      status: 'email_not_found',
+      error: { message: getErrorMessage(error, '验证码发送失败') },
+    };
+  }
 }
 
 export async function recoverAccountByEmailCode(
-  _email: string,
-  _code: string,
+  email: string,
+  code: string,
 ): Promise<AccountRecoveryResult> {
-  return {
-    account: null,
-    error: { message: '账号找回服务暂未接通，请稍后再试' },
-  };
+  const trimmed = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return { account: null, error: { message: '请输入正确的邮箱地址' } };
+  }
+  try {
+    const data = await post<{ account?: string; maskedEmail?: string }>(
+      AUTH_ENDPOINTS.recoverAccountEmail,
+      { email: trimmed, code: code.trim() },
+      { skipAuth: true },
+    );
+    return {
+      account: data.account ?? null,
+      maskedEmail: data.maskedEmail ?? maskEmailAddress(trimmed),
+      error: null,
+    };
+  } catch (error) {
+    return { account: null, error: { message: getErrorMessage(error, '账号找回失败') } };
+  }
 }
 
 export async function preparePasswordReset(account: string): Promise<PasswordResetPrepareResult> {

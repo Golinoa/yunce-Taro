@@ -1,8 +1,4 @@
-/**
- * 操作日志 Service 层（审计日志）
- * - 查询走 GET /audit-logs
- * - 写入：后端暂无接口，本地合成条目（不落库、不依赖 mock data）
- */
+/** 操作日志 Service 层（审计查询由后端提供；写入由业务写接口事务审计）。 */
 import type { AuditLogEntry, AuditLogPage, AuditLogQuery } from '@/types/audit-log';
 import { type PaginatedResponse, formatApiDateTime, unwrapPaginatedList } from '@/utils/pagination';
 import { get } from '@/utils/request';
@@ -44,21 +40,8 @@ function mapBackendAuditLog(raw: Record<string, unknown>): AuditLogEntry {
 }
 
 export const auditLogService = {
-  record: async (input: AuditLogInput): Promise<AuditLogEntry> => {
-    // 后端暂无写入接口；返回本地合成条目供调用方展示
-    return {
-      id: `local-audit-${Date.now()}`,
-      action: input.action,
-      actionLabel: input.action,
-      operatorId: input.operatorId,
-      operatorName: input.operatorName,
-      operatorRole: input.operatorRole,
-      targetType: input.targetType,
-      targetId: input.targetId,
-      detail: input.detail,
-      meta: input.meta,
-      createdAt: new Date().toISOString(),
-    };
+  record: async (_input: AuditLogInput): Promise<AuditLogEntry> => {
+    throw new Error('[接口未接通] 审计日志由后端业务写接口记录');
   },
 
   query: async (viewer: AuditLogViewer, query?: AuditLogQuery): Promise<AuditLogPage> => {
