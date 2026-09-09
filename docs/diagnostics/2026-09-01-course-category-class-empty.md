@@ -1,14 +1,16 @@
+> **历史资料（2026-09-08 收口）**：保留问题背景与证据；其中完成度、待办、命令和旧方案未经当前版本复验，不作为开发指令。当前工作从 [模块联调入口](../../../yunce-back/yunce-backend/docs/development/README.md) 开始。
+
 # 诊断短记 · 课程分类 / 班课空列表（2026-09-01）
 
 > 走查问题 1 / 4 定位与修复摘要
 
 ## 结论
 
-| 项 | 结论 |
-|----|------|
-| 课表 tab 消失 | **FE bug**：`courseCategoryService.getList()` stub `[]`，store 覆盖默认三类 → 独立展示 tab 为空 |
-| 课程页无课 | 分类清空 + `courseTemplateService` stub；**团课/私教无独立 BE 模板域**（勿接课包模板）；班课应来自 `GET /classes` |
-| Seed | `prisma/seed.ts` 会创建班级；空列表更可能是 JWT 无 `organizationId` 时校长 list 返回空，或分类 tab 未渲染导致「看起来没课」 |
+| 项            | 结论                                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 课表 tab 消失 | **FE bug**：`courseCategoryService.getList()` stub `[]`，store 覆盖默认三类 → 独立展示 tab 为空                             |
+| 课程页无课    | 分类清空 + `courseTemplateService` stub；**团课/私教无独立 BE 模板域**（勿接课包模板）；班课应来自 `GET /classes`           |
+| Seed          | `prisma/seed.ts` 会创建班级；空列表更可能是 JWT 无 `organizationId` 时校长 list 返回空，或分类 tab 未渲染导致「看起来没课」 |
 
 ## 本轮修复
 

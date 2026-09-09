@@ -3,19 +3,19 @@
 > **用途**：每次修同类问题，先查本表「指纹」是否已出现；写修复记录时给对应 PITFALL 加一行发生次数。  
 > **规则**：同一指纹 **累计 ≥ 4 次（超过 3 次）** → 必须在交接/回复里 **显式提醒产品：此处可能有结构性坑点**，不能再当零散 bug 修。  
 > **产品真源**：[`2026-09-01-store-entry-product-glossary.md`](./2026-09-01-store-entry-product-glossary.md)  
-> **更新方式**：改本 MD 后执行 `node docs/PM/render-current-md.js`，并同步到 `yunceTaro/docs/diagnostics/`。
+> 当前维护：只改本 Markdown，关联统一 ISSUES；不再生成 HTML 或跨端副本。
 
 ---
 
 ## 0. 使用约定
 
-| 字段 | 含义 |
-|------|------|
-| **指纹 ID** | 稳定短码，跨文档引用 |
-| **症状** | 用户/日志可见表现 |
-| **根因模式** | 不要写单次文件名 alone；写「为何会反复」 |
-| **防再发检查** | 改代码前必过的 checklist |
-| **发生次数** | 含历史文档 + 本次；≥4 标 **⚠ 坑点告警** |
+| 字段           | 含义                                     |
+| -------------- | ---------------------------------------- |
+| **指纹 ID**    | 稳定短码，跨文档引用                     |
+| **症状**       | 用户/日志可见表现                        |
+| **根因模式**   | 不要写单次文件名 alone；写「为何会反复」 |
+| **防再发检查** | 改代码前必过的 checklist                 |
+| **发生次数**   | 含历史文档 + 本次；≥4 标 **⚠ 坑点告警**  |
 
 ---
 
@@ -23,25 +23,25 @@
 
 ### PITFALL-001 · 管理员教务读权限「只改一半」⚠ 坑点告警（次数 7）
 
-| 项 | 内容 |
-|----|------|
-| **症状** | 管理员/校长登录后课表、消课、学员、首页等 **403** 或空白当失败；或能看不能改他人班级 |
-| **根因模式** | ① `requireRole` 漏挂 `PRINCIPAL`；② routes 放行但 service `else→家长` / `teacherId=本人`；③ 读列表强制教师档；④ **写路径仍按本人 ownership** |
-| **正确口径** | PRINCIPAL = **本机构读写**；TEACHER = **本人**；无权限 = **空列表**；写时排课归属保持班级原教师 |
-| **防再发检查** | 读+写 API：routes？service 机构分支？单测 PRINCIPAL 代改他人班？ |
+| 项               | 内容                                                                                                                                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **症状**         | 管理员/校长登录后课表、消课、学员、首页等 **403** 或空白当失败；或能看不能改他人班级                                                                                                                  |
+| **根因模式**     | ① `requireRole` 漏挂 `PRINCIPAL`；② routes 放行但 service `else→家长` / `teacherId=本人`；③ 读列表强制教师档；④ **写路径仍按本人 ownership**                                                          |
+| **正确口径**     | PRINCIPAL = **本机构读写**；TEACHER = **本人**；无权限 = **空列表**；写时排课归属保持班级原教师                                                                                                       |
+| **防再发检查**   | 读+写 API：routes？service 机构分支？单测 PRINCIPAL 代改他人班？                                                                                                                                      |
 | **关联修复记录** | [`2026-09-01-fix-admin-org-rw-reschedule.md`](./2026-09-01-fix-admin-org-rw-reschedule.md)、[`2026-09-01-fix-schedule-visibility-principal.md`](./2026-09-01-fix-schedule-visibility-principal.md) 等 |
 
 **发生年表**
 
-| # | 日期 | 出处 | 简述 |
-|---|------|------|------|
-| 1 | 2026-08-31 | emergency-todo E1 | `/students`、班级/排课等仅 TEACHER → 校长 403 |
-| 2 | 2026-08-31 | emergency-todo E2 | `/home/teacher*` 仅 TEACHER |
-| 3 | 2026-08-31 | demock-dev-plan C1 | 角色矩阵补 PRINCIPAL\|TEACHER |
-| 4 | 2026-08-31 | dev-ci-gate | class 等 PRINCIPAL 期望改口径 |
-| 5 | 2026-09-01 | tab-refetch audit | `lesson-records/by-range` routes 缺 PRINCIPAL → 403 |
-| 6 | 2026-09-01 | fix-schedule-visibility | service 当家长 + 列表按本人教师 |
-| 7 | 2026-09-01 | fix-admin-org-rw | **写路径**仍本人 ownership → 管理员不能代改；一并脱坑 |
+| #   | 日期       | 出处                    | 简述                                                  |
+| --- | ---------- | ----------------------- | ----------------------------------------------------- |
+| 1   | 2026-08-31 | emergency-todo E1       | `/students`、班级/排课等仅 TEACHER → 校长 403         |
+| 2   | 2026-08-31 | emergency-todo E2       | `/home/teacher*` 仅 TEACHER                           |
+| 3   | 2026-08-31 | demock-dev-plan C1      | 角色矩阵补 PRINCIPAL\|TEACHER                         |
+| 4   | 2026-08-31 | dev-ci-gate             | class 等 PRINCIPAL 期望改口径                         |
+| 5   | 2026-09-01 | tab-refetch audit       | `lesson-records/by-range` routes 缺 PRINCIPAL → 403   |
+| 6   | 2026-09-01 | fix-schedule-visibility | service 当家长 + 列表按本人教师                       |
+| 7   | 2026-09-01 | fix-admin-org-rw        | **写路径**仍本人 ownership → 管理员不能代改；一并脱坑 |
 
 > **提醒**：已 **7 次**。本轮补「机构内可写」断言；评审须同时查读+写。
 
@@ -49,61 +49,62 @@
 
 ### PITFALL-002 · 临时调课 API 路径死链 ⚠ 坑点告警（次数 6）
 
-| 项 | 内容 |
-|----|------|
-| **症状** | `GET /temporary-reschedules` → **404**；或本地假成功换机丢失 |
-| **根因模式** | FE 错路径；BE 真接口在 `/attendance/reschedules`；本地 storage 当主存 |
-| **正确口径** | 只走 `/attendance/reschedules*`；保存即 approved；禁止本地假成功 |
-| **防再发检查** | FE service 路径？batch 字段适配？列表机构隔离？ |
-| **关联** | [`2026-09-01-fix-admin-org-rw-reschedule.md`](./2026-09-01-fix-admin-org-rw-reschedule.md) |
+| 项             | 内容                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **症状**       | `GET /temporary-reschedules` → **404**；或本地假成功换机丢失                               |
+| **根因模式**   | FE 错路径；BE 真接口在 `/attendance/reschedules`；本地 storage 当主存                      |
+| **正确口径**   | 只走 `/attendance/reschedules*`；保存即 approved；禁止本地假成功                           |
+| **防再发检查** | FE service 路径？batch 字段适配？列表机构隔离？                                            |
+| **关联**       | [`2026-09-01-fix-admin-org-rw-reschedule.md`](./2026-09-01-fix-admin-org-rw-reschedule.md) |
 
 **发生年表**
 
-| # | 日期 | 出处 |
-|---|------|------|
+| #   | 日期               | 出处                                                               |
+| --- | ------------------ | ------------------------------------------------------------------ |
 | 1–5 | 2026-08-27 ~ 09-01 | 见历史（CROSS-CHECK / JOURNEY / PRELAUNCH / MANUAL / tab-refetch） |
-| 6 | 2026-09-01 | 生产级脱坑：FE 改打真接口 + BE 机构隔离 + 即生效 |
+| 6   | 2026-09-01         | 生产级脱坑：FE 改打真接口 + BE 机构隔离 + 即生效                   |
 
 > **提醒**：已 **6 次**。本轮必须验收库表有 approved 记录，不能再靠本地。
+
 ---
 
 ### PITFALL-003 · 空态 / 无权限做成失败打断（次数 2）
 
-| 项 | 内容 |
-|----|------|
-| **症状** | Toast「课表加载失败」「课表记录加载失败」 |
-| **根因模式** | catch 一律 `showToast`；把 403/404/空权限当「系统坏了」 |
-| **正确口径** | 无权限/无数据 = **空白 UI**；仅不可恢复错误才可提示 |
-| **发生** | ① schedule `loadBaseData`；② `refreshDateData` 消课/调课（2026-09-01 已静默） |
-| **状态** | 未满 3 次；再犯一次即升告警 |
+| 项           | 内容                                                                          |
+| ------------ | ----------------------------------------------------------------------------- |
+| **症状**     | Toast「课表加载失败」「课表记录加载失败」                                     |
+| **根因模式** | catch 一律 `showToast`；把 403/404/空权限当「系统坏了」                       |
+| **正确口径** | 无权限/无数据 = **空白 UI**；仅不可恢复错误才可提示                           |
+| **发生**     | ① schedule `loadBaseData`；② `refreshDateData` 消课/调课（2026-09-01 已静默） |
+| **状态**     | 未满 3 次；再犯一次即升告警                                                   |
 
 ---
 
 ### PITFALL-004 · 测环境依赖（Docker MySQL/Redis）掉线被当成业务失败（次数 1）
 
-| 项 | 内容 |
-|----|------|
-| **症状** | 登录 500 `maxRetriesPerRequest`；课表全挂 |
+| 项           | 内容                                                     |
+| ------------ | -------------------------------------------------------- |
+| **症状**     | 登录 500 `maxRetriesPerRequest`；课表全挂                |
 | **根因模式** | `yunce-dev-mysql` / `yunce-dev-redis` Exited，API 仍在跑 |
-| **防再发** | 拉数失败先看 `docker ps`；与业务 403 分开记 |
+| **防再发**   | 拉数失败先看 `docker ps`；与业务 403 分开记              |
 
 ---
 
 ## 2. 登记流程（以后每次修复）
 
-1. 在 glossary 锁定产品口径（若有新规则）。  
-2. 写当日 **fix-*.md**（证据 + 层级 + 方案 + 验收）。  
-3. 在本册对应 PITFALL **+1 次**并链到 fix 文档。  
-4. 若次数 **> 3**：在 fix 文档顶部加红色「坑点告警」段，并口头/聊天提醒产品。  
-5. `node docs/PM/render-current-md.js` → HTML；同步 diagnostics。
+1. 在 glossary 锁定产品口径（若有新规则）。
+2. 写当日 **fix-\*.md**（证据 + 层级 + 方案 + 验收）。
+3. 在本册对应 PITFALL **+1 次**并链到 fix 文档。
+4. 若次数 **> 3**：在 fix 文档顶部加红色「坑点告警」段，并口头/聊天提醒产品。
+   > 当前维护：只改本 Markdown，关联统一 ISSUES；不再生成 HTML 或跨端副本。
 
 ---
 
 ## 3. 索引 · 近期修复记录
 
-| 日期 | 文档 | 关联坑点 |
-|------|------|----------|
-| 2026-09-01 | [fix-admin-org-rw-reschedule](./2026-09-01-fix-admin-org-rw-reschedule.md) | 001, 002 |
-| 2026-09-01 | [fix-schedule-visibility-principal](./2026-09-01-fix-schedule-visibility-principal.md) | 001, 003 |
+| 日期       | 文档                                                                                     | 关联坑点      |
+| ---------- | ---------------------------------------------------------------------------------------- | ------------- |
+| 2026-09-01 | [fix-admin-org-rw-reschedule](./2026-09-01-fix-admin-org-rw-reschedule.md)               | 001, 002      |
+| 2026-09-01 | [fix-schedule-visibility-principal](./2026-09-01-fix-schedule-visibility-principal.md)   | 001, 003      |
 | 2026-09-01 | [tab-refetch-schedule-records-audit](./2026-09-01-tab-refetch-schedule-records-audit.md) | 001, 002, 003 |
-| 2026-08-31 | [emergency-todo](./2026-08-31-emergency-todo.md) | 001 |
+| 2026-08-31 | [emergency-todo](../../../yunce-back/yunce-backend/docs/development/README.md)           | 001           |

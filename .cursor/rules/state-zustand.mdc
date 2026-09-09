@@ -292,7 +292,7 @@ const useThemeStore = create(
 ## 7. 服务层调用
 
 - Store **只能**调用 `teacherService.xxx(...)`，**禁止**直接调用 `@/data/xxx`。
-- Mock/Real 切换由 Service 层封装，Store 无感。
+- 真实 API 与 DTO 适配由 Service 层封装，Store 维护状态与缓存失效。
 
 ## 8. 自检
 

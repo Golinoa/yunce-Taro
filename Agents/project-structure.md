@@ -24,7 +24,7 @@ src/
 │       ├── index.tsx          # 页面组件
 │       └── index.config.ts    # 页面配置（definePageConfig）
 │
-├── services/            # Service 层（接口契约，当前 mock，联调时替换）
+├── services/            # Service 层（接口契约，真实 API，DTO 适配现有 UI）
 │   ├── index.ts         # 统一导出（页面只从此文件导入）
 │   ├── auth.ts
 │   ├── teacher.ts
@@ -40,7 +40,7 @@ src/
 │   ├── teacher.ts
 │   └── ...
 │
-├── data/                # Mock 数据与常量
+├── constants/           # 业务常量（运行数据走真实 API）
 │   ├── index.ts         # 统一导出
 │   ├── teacher.ts       # mock 函数 + 业务常量
 │   └── ...
@@ -61,19 +61,19 @@ src/
 
 ## 二、文件命名规范
 
-| 类型 | 命名规则 | 示例 |
-|------|----------|------|
-| 页面目录 | kebab-case | `teacher-list/`, `student-detail/` |
-| 页面组件 | `index.tsx` | `pages/teacher-list/index.tsx` |
-| 页面配置 | `index.config.ts` | `pages/teacher-list/index.config.ts` |
-| 通用组件目录 | PascalCase | `BottomSheet/`, `FormInput/` |
-| 业务组件目录 | PascalCase | `TeacherCard/`, `AddTeacherSheet/` |
-| 组件文件 | `index.tsx` | `components/BottomSheet/index.tsx` |
-| 类型文件 | kebab-case | `types/teacher.ts`, `types/lesson-record.ts` |
-| Service 文件 | kebab-case | `services/teacher.ts` |
-| Store 文件 | kebab-case | `stores/teacher.ts` |
-| Mock 数据文件 | kebab-case | `data/teacher.ts` |
-| 工具函数文件 | kebab-case | `utils/format.ts` |
+| 类型         | 命名规则          | 示例                                         |
+| ------------ | ----------------- | -------------------------------------------- |
+| 页面目录     | kebab-case        | `teacher-list/`, `student-detail/`           |
+| 页面组件     | `index.tsx`       | `pages/teacher-list/index.tsx`               |
+| 页面配置     | `index.config.ts` | `pages/teacher-list/index.config.ts`         |
+| 通用组件目录 | PascalCase        | `BottomSheet/`, `FormInput/`                 |
+| 业务组件目录 | PascalCase        | `TeacherCard/`, `AddTeacherSheet/`           |
+| 组件文件     | `index.tsx`       | `components/BottomSheet/index.tsx`           |
+| 类型文件     | kebab-case        | `types/teacher.ts`, `types/lesson-record.ts` |
+| Service 文件 | kebab-case        | `services/teacher.ts`                        |
+| Store 文件   | kebab-case        | `stores/teacher.ts`                          |
+| 常量文件     | kebab-case        | `constants/teacher.ts`                       |
+| 工具函数文件 | kebab-case        | `utils/format.ts`                            |
 
 ## 三、导出规范
 
@@ -116,8 +116,8 @@ export interface BottomSheetProps { ... }
 ```typescript
 export default definePageConfig({
   navigationBarTitleText: '页面标题',
-  navigationBarBackgroundColor: '#5EC8A8',  // 或 '#FAFDFB'
-  navigationBarTextStyle: 'white',          // 或 'black'
+  navigationBarBackgroundColor: '#5EC8A8', // 或 '#FAFDFB'
+  navigationBarTextStyle: 'white', // 或 'black'
 });
 ```
 
@@ -140,9 +140,7 @@ const PageName: React.FC = () => {
 
   return (
     <PageContainer title="页面标题">
-      <View className="p-4">
-        {/* 内容 */}
-      </View>
+      <View className="p-4">{/* 内容 */}</View>
     </PageContainer>
   );
 };
@@ -155,7 +153,7 @@ export default PageName;
 新增一个业务模块（如"课程管理"）时：
 
 1. `types/course.ts` — 定义类型
-2. `data/course.ts` — Mock 数据 + 常量
+2. 对照后端路由与 validator 确定契约；常量放 constants
 3. `services/course.ts` — Service 层（接口契约）
 4. `stores/course.ts` — Zustand Store
 5. `components/course/` — 业务组件
@@ -165,8 +163,8 @@ export default PageName;
 
 ## 六、禁止事项
 
-1. **禁止页面内硬编码 mock 数据** — mock 数据放 `src/data/`
-2. **禁止页面直接引用 `@/data/`** — 通过 `@/services` 间接引用
+1. **禁止页面内硬编码 mock 数据** — 测试替身仅放测试文件
+2. **禁止页面直接引用 `@/data/`** — 通过 `@/services` 请求真实 API
 3. **禁止在 `src/styles/` 新增 SCSS 文件** — 使用 UnoCSS，遗留文件待迁移
 4. **禁止在组件目录外创建 `.tsx` 文件** — 页面放 `pages/`，组件放 `components/`
-5. **禁止循环依赖** — types ← data ← services ← stores ← pages/components
+5. **禁止循环依赖** — types ← services ← stores ← pages/components

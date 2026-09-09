@@ -1,3 +1,5 @@
+> **当前联调约束（2026-09-08）**：[统一模块入口](../yunce-back/yunce-backend/docs/development/README.md)。全模块验收；前端 UI 固定，后端优先兼容前端。问题和冲突进统一台账，历史进度数字不代表当前验收。
+
 # 云策教务 - AI 编程工程化硬性要求
 
 > 本文件是 AI 辅助编码时的强制约束，任何代码生成、修改、重构都必须遵守。
@@ -37,15 +39,15 @@
 1. **设计 Token 单一数据源** — `src/theme.ts` → 同步 `app.scss` → 全局生效
 2. **禁止硬编码业务文本** — 月份用 `dayjs().month() + 1`，状态文本用映射表
 3. **状态机严格单向** — 薪资 pending→confirmed→paid，禁止反向跳转
-4. **Mock 数据在 `src/data/`** — 禁止在组件内硬编码 mock 数据
+4. **运行时使用真实 API** — 禁止在页面硬编码业务数据或恢复已删除的 src/data
 5. **页面只引用 `@/services`** — 禁止直接引用 `@/data/`，Service 层是唯一数据出口
-6. **Service 层接口契约** — mock 函数用 `mock` 前缀，联调时只改 Service 一行切换
+6. **Service 层接口契约** — 对照现有 UI 字段、真实路由和 validator；不猜路径、不假成功
 
 ## 五、代码质量
 
 1. **Hooks 规范** — useCallback/useMemo 包裹回调/计算值，依赖数组完整
 2. **事件命名** — handle 前缀（handleSubmit、handleClose）
-3. **常量命名** — UPPER_SNAKE_CASE，提取到文件顶部或 `src/data/`
+3. **常量命名** — UPPER_SNAKE_CASE，提取到文件顶部或 `src/constants/`
 4. **类型定义** — Props 接口必须导出，禁止隐式 any
 5. **JSDoc** — 每个组件必须有使用场景 + 功能说明的 JSDoc 注释
 
@@ -82,46 +84,11 @@ git commit
         → 有 error → 提交被拒绝，修完再提交
 ```
 
-## 七、编译铁律
+## 七、联调编译
 
-### AI 交付必做（每次改代码后）
+运行时数据通过真实 API；src/data 已删除。修改 src 下影响运行的代码后执行 npm run check（至少 typecheck）及 npm run build:weapp:dev，交付注明 dist 是否重编译。
 
-凡修改 `src/` 下影响小程序运行的代码（页面 / 组件 / 样式 / Service / Store），**任务结束前 AI 必须主动执行 Mock 重编译**。用户在微信开发者工具里看的是 `dist` 产物，**只改源码不编译等于用户看不到最新效果**。
-
-- ✅ **必须做**：改完代码 → `npm run check`（或至少 `typecheck`）→ **`npm run build:weapp:mock`**
-- ❌ **禁止**：只提交源码、在回复里写「请自行编译」而不实际执行编译
-- 交付摘要中注明「已重编译 `dist`」；若编译失败须修到通过再交付
-
-**每次代码修改完成后，必须删除 dist 目录并用 Mock 模式重新编译。若"改了代码小程序里没生效"，必须连 webpack 持久化缓存一起清掉再编：**
-
-```bash
-# 常规（仅删除 dist 重编）
-$env:VITE_USE_MOCK="true"; npm run build:weapp
-
-# 干净重编（清 dist + 清 webpack 缓存，遇到"改了没反应"必用）
-$env:VITE_USE_MOCK="true"; npm run build:weapp:clean
-```
-
-### 为什么必须这样做？
-
-| 问题     | 原因                                                                                                       |
-| -------- | ---------------------------------------------------------------------------------------------------------- |
-| 网络异常 | `npm run build:weapp` 是生产模式，自动禁用 Mock（`VITE_USE_MOCK=false`），而 `BASE_URL` 为空，请求全部失败 |
-| 登录失败 | Mock 数据失效后，登录接口无法响应，导致"网络异常"错误                                                      |
-
-### 正确的编译方式
-
-| 命令                                                   | 说明                                                    |
-| ------------------------------------------------------ | ------------------------------------------------------- |
-| `$env:VITE_USE_MOCK="true"; npm run build:weapp`       | 强制开启 Mock，生产模式编译（推荐）                     |
-| `$env:VITE_USE_MOCK="true"; npm run build:weapp:clean` | 清 dist + 清 webpack 缓存后全量重编（"改了没反应"时用） |
-| `npm run dev:weapp`                                    | 开发模式，自动开启 Mock + 热更新                        |
-
-### 禁止的做法
-
-- ❌ 直接使用 `npm run build:weapp`（会禁用 Mock，导致网络异常）
-- ❌ 不删除 dist 目录直接编译（可能残留旧代码）
-- ❌ "改了代码没生效"时只删 dist 不删 webpack 缓存（`node_modules/.cache/webpack/weapp`）——该缓存可能不随源码失效，会把旧代码喂进产物
+测环境脚本自动清理缓存、关闭 Mock 并连接 dev.chancore.cn。实际命令和环境见统一指南 COMMANDS.md；旧 Mock 构建已废弃，不再执行。仅修改文档无需业务编译。
 
 ## 八、推远程 / 打标签（默认不发体验版）
 
@@ -143,7 +110,7 @@ AI 代推远程或打标签时：**默认 `dev-*`，禁止擅自打 `v*` 或上�
 - [ ] 是否有新增 SCSS 文件（应迁移为 UnoCSS）？
 - [ ] 是否有内联 style（应提取为 UnoCSS 规则）？
 - [ ] TypeScript 类型是否完整（无隐式 any）？
-- [ ] **是否已执行 `npm run build:weapp:mock` 重编译**（用户靠 `dist` 验收入口）？
+- [ ] **是否已执行 `npm run build:weapp:dev` 重编译**（用户靠 `dist` 验收入口）？
 
 ---
 

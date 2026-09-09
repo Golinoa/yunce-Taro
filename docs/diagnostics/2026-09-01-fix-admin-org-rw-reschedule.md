@@ -1,3 +1,5 @@
+> **历史资料（2026-09-08 收口）**：保留问题背景与证据；其中完成度、待办、命令和旧方案未经当前版本复验，不作为开发指令。当前工作从 [模块联调入口](../../../yunce-back/yunce-backend/docs/development/README.md) 开始。
+
 # 修复记录 · 管理员全机构读写 + 临时调课真联动（2026-09-01）
 
 > **状态**：已落地  
@@ -12,13 +14,13 @@
 
 ## 验收（2026-09-01 测环境）
 
-| 项 | 结果 |
-|----|------|
-| principal1 排课列表 | 200，机构 5 条 |
-| principal1 `POST /attendance/reschedules/batch` | 201，`status=approved`，`items=1` |
-| principal1 / teacher1 调课列表 | 200，可见 approved 记录 |
-| FE | `temporary-reschedule.ts` 改打 `/attendance/reschedules*`，无本地假成功 |
-| tsc | 通过 |
+| 项                                              | 结果                                                                    |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| principal1 排课列表                             | 200，机构 5 条                                                          |
+| principal1 `POST /attendance/reschedules/batch` | 201，`status=approved`，`items=1`                                       |
+| principal1 / teacher1 调课列表                  | 200，可见 approved 记录                                                 |
+| FE                                              | `temporary-reschedule.ts` 改打 `/attendance/reschedules*`，无本地假成功 |
+| tsc                                             | 通过                                                                    |
 
 ## 代码锚点
 

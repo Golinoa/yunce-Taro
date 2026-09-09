@@ -1,17 +1,13 @@
-# PM/current — live MD + HTML previews
+# 松果排课 · 开发文档入口
 
-Synced with `yunceTaro/docs/diagnostics/` on 2026-09-01.
+[统一模块开发与联调指南](../../../yunce-back/yunce-backend/docs/development/README.md)
 
-- Open **`../mvp-launch-checklist.html`** as the primary dashboard.
-- Open **`../md-viewer.html`** for the full doc list.
-- After editing any `.md` here, run: `node ../render-current-md.js`
+[全部模块](../../../yunce-back/yunce-backend/docs/development/modules/README.md) · [问题台账](../../../yunce-back/yunce-backend/docs/development/ISSUES.md) · [产品口径与待确认](../../../yunce-back/yunce-backend/docs/development/PRODUCT.md) · [验证命令](../../../yunce-back/yunce-backend/docs/development/COMMANDS.md)
 
-## 必读导航
+当前处于三端全模块联调。前端 UI 已确定，后端优先兼容前端。历史计划与 HTML 原型不作为当前实现和完成度依据。
 
-| 文档                                                                                     | 用途                              |
-| ---------------------------------------------------------------------------------------- | --------------------------------- |
-| [store-entry-product-glossary](./2026-09-01-store-entry-product-glossary.md)             | **产品口径唯一真源**              |
-| [recurring-pitfall-registry](./recurring-pitfall-registry.md)                            | **复发坑点长久比对**（>3 次告警） |
-| [fix-schedule-visibility-principal](./2026-09-01-fix-schedule-visibility-principal.md)   | 2026-09-01 管理员课表可见修复记录 |
-| [tab-refetch-schedule-records-audit](./2026-09-01-tab-refetch-schedule-records-audit.md) | Tab 拉库 + 403/404 诊断           |
-| [request-cache-strategy](./2026-09-06-request-cache-strategy.md)                         | 请求分级 / TTL / 写后失效落地说明 |
+[API 对接手册](../../../yunce-back/yunce-backend/docs/INTEGRATION-MANUAL.md)（有冲突时核对路由与 validator）
+
+[架构决策](../../../yunce-back/yunce-backend/docs/adr) · [后端运维 SOP](../../../yunce-back/yunce-backend/docs/SOP)
+
+真机走查、设计草稿、长期愿景保留原始用途；本轮清理明细见统一入口同目录的 CLEANUP.md。

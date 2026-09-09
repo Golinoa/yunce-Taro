@@ -1,24 +1,27 @@
+> **历史资料（2026-09-08 收口）**：保留问题背景与证据；其中完成度、待办、命令和旧方案未经当前版本复验，不作为开发指令。当前工作从 [模块联调入口](../../../yunce-back/yunce-backend/docs/development/README.md) 开始。
+
 # 测环境模拟 CI 门禁结果 · 2026-08-31 20:13（修复后）
 
 > 对齐后端 `verify:sop`（≈ `ci.yml`）+ 测环境 post + FE `check`/`test` + E2E。
 
 ## 总判：**GREEN**
 
-| 层 | 命令 | 结果 |
-|----|------|------|
-| BE typecheck / lint / prisma / compat | `verify:sop` 前半 | **PASS** |
-| BE test:ci | 103 suites / **1271** tests + coverage | **PASS** |
-| BE audit:ci | moderate only → OK | **PASS** |
-| BE verify:sop 整链 | | **PASS** (EXIT 0) |
-| BE perf-smoke @dev | `dev.chancore.cn/health` | **PASS** p95≈407ms |
-| BE headers @dev | | **PASS** |
-| FE check | typecheck + lint + format:check | **PASS** |
-| FE vitest | 132/132 | **PASS** |
-| 测环境 E2E | 42/42 | **PASS** |
+| 层                                    | 命令                                   | 结果               |
+| ------------------------------------- | -------------------------------------- | ------------------ |
+| BE typecheck / lint / prisma / compat | `verify:sop` 前半                      | **PASS**           |
+| BE test:ci                            | 103 suites / **1271** tests + coverage | **PASS**           |
+| BE audit:ci                           | moderate only → OK                     | **PASS**           |
+| BE verify:sop 整链                    |                                        | **PASS** (EXIT 0)  |
+| BE perf-smoke @dev                    | `dev.chancore.cn/health`               | **PASS** p95≈407ms |
+| BE headers @dev                       |                                        | **PASS**           |
+| FE check                              | typecheck + lint + format:check        | **PASS**           |
+| FE vitest                             | 132/132                                | **PASS**           |
+| 测环境 E2E                            | 42/42                                  | **PASS**           |
 
 ## 本轮为绿所做修复（摘要）
 
 **BE**
+
 - 修复 `home.routes.ts` 注释吞掉 `router.get`（operation-content / stats / unread）
 - lead 测试 mock 补 `reassignLead`
 - mockPrisma 补 `todoAssigneeOverride`
@@ -28,6 +31,7 @@
 - 另：课包 PRINCIPAL、finance `student.campusId`（上轮）
 
 **FE**
+
 - typecheck：删未用状态/import、copyToTeachers 返回形状、subscribe 测试 mock 参数
 - prettier CRLF：`lint:fix` + `format`
 

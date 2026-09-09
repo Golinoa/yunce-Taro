@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>会员权益 · 选购价签定稿 v2</title>
+    <style>
+      :root {
+        --primary: 221 83% 58%;
+        --primary-glow: 217 91% 65%;
+        --primary-dark: 224 76% 48%;
+        --bg: 210 40% 98%;
+        --card: 0 0% 100%;
+        --fg: 222 47% 11%;
+        --muted: 215 16% 47%;
+        --border: 214 32% 91%;
+        --success: 142 71% 45%;
+        --save: #ff6a2b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        background: #dbe7f8;
+        color: hsl(var(--fg));
+        min-height: 100vh;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 28px;
+        padding: 28px 16px 48px;
+      }
+      .phone {
+        width: 390px;
+        min-height: 820px;
+        background: hsl(var(--bg));
+        border-radius: 28px;
+        box-shadow: 0 18px 50px rgba(37, 99, 235, 0.18);
+        overflow: hidden;
+        position: relative;
+        border: 1px solid rgba(59, 110, 245, 0.12);
+      }
+      .note {
+        width: min(420px, 100%);
+        align-self: flex-start;
+        background: #fff;
+        border-radius: 18px;
+        padding: 20px 22px;
+        box-shadow: 0 12px 32px rgba(37, 99, 235, 0.12);
+        line-height: 1.55;
+      }
+      .note h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+      .note ol {
+        margin: 0;
+        padding-left: 18px;
+        color: hsl(var(--muted));
+        font-size: 13px;
+      }
+      .note code {
+        font-size: 12px;
+        background: #f1f5f9;
+        padding: 1px 6px;
+        border-radius: 6px;
+      }
+      .nav {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        font-weight: 700;
+        font-size: 16px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.12), hsl(var(--bg)));
+      }
+      .nav-orders {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 600;
+        color: hsl(var(--primary));
+        text-decoration: none;
+      }
+      .scroll {
+        padding: 0 16px 118px;
+        max-height: 760px;
+        overflow: auto;
+      }
+      .hero {
+        margin-top: 8px;
+        border-radius: 18px;
+        padding: 18px 16px 14px;
+        background: linear-gradient(
+          135deg,
+          hsl(var(--primary-glow)),
+          hsl(var(--primary)) 48%,
+          hsl(var(--primary-dark))
+        );
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        right: -30px;
+        top: -40px;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        position: relative;
+        z-index: 1;
+      }
+      .hero-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 2px;
+      }
+      .hero-brand .v {
+        font-size: 24px;
+        font-weight: 900;
+        font-style: italic;
+        line-height: 1;
+      }
+      .hero-brand .label {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .hero h1 {
+        position: relative;
+        z-index: 1;
+        margin: 16px 0 0;
+        font-size: 22px;
+        font-weight: 800;
+      }
+      .hero p {
+        position: relative;
+        z-index: 1;
+        margin: 8px 0 0;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+      .hero-foot {
+        position: relative;
+        z-index: 1;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.22);
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        opacity: 0.88;
+      }
+      .card {
+        margin-top: 12px;
+        background: hsl(var(--card));
+        border-radius: 18px;
+        box-shadow: 0 8px 28px rgba(59, 110, 245, 0.08);
+        overflow: hidden;
+      }
+      .card-hd {
+        padding: 14px 16px 8px;
+      }
+      .card-hd h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        padding: 0 10px 12px;
+      }
+      .plan {
+        position: relative;
+        border: 2px solid hsl(var(--border));
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 10px 2px;
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+      }
+      .plan.on {
+        border-color: hsl(var(--primary) / 0.45);
+        background: hsl(var(--primary) / 0.06);
+      }
+      .plan .name {
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .plan .sub {
+        margin-top: 4px;
+        font-size: 10px;
+        color: hsl(var(--muted));
+      }
+      .plan .rec {
+        position: absolute;
+        top: -8px;
+        right: 4px;
+        font-size: 9px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--save);
+        border-radius: 999px;
+        padding: 2px 6px;
+        line-height: 1.2;
+        z-index: 1;
+      }
+      .term-wrap {
+        padding: 0 12px 12px;
+      }
+      .term-label {
+        font-size: 12px;
+        color: hsl(var(--muted));
+        margin-bottom: 8px;
+      }
+      .terms {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      /* 核心：时长卡自带原价 / 实付 / 省多少，2年3年一眼可比 */
+      .term {
+        position: relative;
+        border: 2px solid hsl(var(--border));
+        background: #f8fafc;
+        border-radius: 14px;
+        padding: 14px 10px 12px;
+        text-align: center;
+        cursor: pointer;
+        min-height: 118px;
+      }
+      .term.on {
+        border-color: hsl(var(--primary) / 0.5);
+        background: hsl(var(--primary) / 0.07);
+        box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12);
+      }
+      .term .save-pill {
+        position: absolute;
+        top: -9px;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 800;
+        background: var(--save);
+        color: #fff;
+        border-radius: 999px;
+        padding: 3px 10px;
+        line-height: 1.2;
+        box-shadow: 0 4px 10px rgba(255, 106, 43, 0.28);
+      }
+      .term .y {
+        margin-top: 6px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .term .pay {
+        margin-top: 8px;
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1;
+        color: hsl(var(--fg));
+      }
+      .term .pay small {
+        font-size: 12px;
+        font-weight: 700;
+        margin-right: 1px;
+      }
+      .term .list {
+        margin-top: 6px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        text-decoration: line-through;
+        opacity: 0.85;
+      }
+      .term .delta {
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--save);
+      }
+      .term .delta.mute {
+        color: hsl(var(--muted));
+        font-weight: 600;
+      }
+      .price-box {
+        margin: 0 12px 12px;
+        padding: 14px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.08), #fff);
+        border: 1px solid hsl(var(--primary) / 0.12);
+      }
+      .price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      .price-main {
+        font-size: 32px;
+        font-weight: 900;
+        line-height: 1;
+      }
+      .price-main small {
+        font-size: 16px;
+        margin-right: 2px;
+      }
+      .price-side {
+        text-align: right;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.45;
+      }
+      .strike {
+        text-decoration: line-through;
+        opacity: 0.75;
+      }
+      .save {
+        color: var(--save);
+        font-weight: 700;
+      }
+      .eq {
+        margin-top: 10px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+      }
+      .daily {
+        margin-top: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        color: hsl(var(--primary));
+      }
+      .compare {
+        margin: 0 12px 12px;
+        border-radius: 14px;
+        border: 1px dashed hsl(var(--border));
+        background: #f8fafc;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: hsl(var(--muted));
+        line-height: 1.5;
+      }
+      .compare strong {
+        color: hsl(var(--fg));
+      }
+      .compare .hl {
+        color: var(--save);
+        font-weight: 800;
+      }
+      .features {
+        margin: 0 12px 10px;
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 4px 14px;
+      }
+      .feat {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-top: 1px solid hsl(var(--border) / 0.8);
+        font-size: 12px;
+      }
+      .feat:first-child {
+        border-top: 0;
+      }
+      .ok {
+        color: hsl(var(--success));
+        font-weight: 700;
+      }
+      .no {
+        color: hsl(var(--muted));
+      }
+      .dock {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: hsl(var(--bg));
+        display: flex;
+        gap: 10px;
+      }
+      .btn {
+        flex: 1;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        user-select: none;
+      }
+      .btn-primary {
+        background: hsl(var(--primary));
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(59, 110, 245, 0.28);
+        flex-direction: column;
+        gap: 1px;
+        flex: 1.4;
+      }
+      .btn-primary .sub {
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0.9;
+      }
+      .btn-ghost {
+        background: #fff;
+        color: hsl(var(--primary));
+        border: 2px solid hsl(var(--primary) / 0.3);
+      }
+      .file-tag {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        z-index: 5;
+        font-size: 10px;
+        font-weight: 700;
+        color: hsl(var(--primary));
+        background: hsl(var(--primary) / 0.1);
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone">
+      <div class="file-tag">v2 · 价签可见「省多少」</div>
+      <div class="nav">
+        会员权益
+        <a class="nav-orders" href="./membership-orders.html?from=pricing#list">订单详情</a>
+      </div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-top">
+            <div class="hero-brand">
+              <span class="v">V</span>
+              <span class="label">会员卡</span>
+            </div>
+            <div class="pill">未开通</div>
+          </div>
+          <h1>开通机构会员</h1>
+          <p>选择合适套餐开通</p>
+          <div class="hero-foot">
+            <span>机构：示例艺术培训中心</span>
+            <span>当前 · 未开通</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><h2>选择版本</h2></div>
+          <div class="plans" id="plans"></div>
+          <div class="term-wrap" id="termWrap">
+            <div class="term-label">开通时长 · 每档都标原价与立省</div>
+            <div class="terms" id="terms"></div>
+          </div>
+          <div class="price-box" id="priceBox"></div>
+          <div class="compare" id="compare"></div>
+          <div class="features" id="features"></div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="btn btn-primary" id="buyBtn">
+          <div id="buyMain">立即开通</div>
+          <div class="sub" id="buySub">—</div>
+        </div>
+        <div class="btn btn-ghost" id="redeemBtn">激活码</div>
+      </div>
+    </div>
+
+    <aside class="note">
+      <h2>v2 价签规则（对齐实现）</h2>
+      <ol>
+        <li>
+          <strong>原价</strong> = 年标价 × 年数（如成长
+          <code>¥398 × 3 = ¥1,194</code>）
+        </li>
+        <li>
+          <strong>实付</strong> = 货架 SKU 价（如
+          <code>STANDARD_3Y = ¥999</code>）
+        </li>
+        <li>
+          <strong>省多少</strong> = 原价 − 实付；2 年 / 3 年
+          <em>各自</em>写在时长卡上，不选也能看见
+        </li>
+        <li>
+          角标优先写金额：<code>省 ¥195</code>；折扣作辅文案
+        </li>
+        <li>
+          下方汇总区再强化当前选中档；对比条提示「选 3 年比 2 年多省多少」
+        </li>
+        <li>无额外校区步进 / 无联系运营入口（购买 · 续费 · 激活码）</li>
+      </ol>
+    </aside>
+
+    <script>
+      const PLANS = [
+        {
+          code: 'FREE',
+          short: '众创',
+          name: '众创版',
+          year: 0,
+          free: true,
+          pay: {},
+          members: '40',
+          employees: '2',
+          campuses: '1',
+          marketing: false,
+        },
+        {
+          code: 'BASIC',
+          short: '基础',
+          name: '基础版',
+          year: 198,
+          pay: { 2: 356, 3: 499 },
+          members: '100',
+          employees: '不限',
+          campuses: '1',
+          marketing: false,
+        },
+        {
+          code: 'STANDARD',
+          short: '成长',
+          name: '成长版',
+          year: 398,
+          recommended: true,
+          pay: { 2: 716, 3: 999 },
+          members: '300',
+          employees: '不限',
+          campuses: '1',
+          marketing: true,
+        },
+        {
+          code: 'FLAGSHIP',
+          short: '旗舰',
+          name: '旗舰版',
+          year: 999,
+          pay: { 2: 1798, 3: 2499 },
+          members: '800',
+          employees: '不限',
+          campuses: '含 2',
+          marketing: true,
+        },
+      ];
+
+      const YEAR_TERMS = [2, 3];
+
+      let planCode = 'STANDARD';
+      let years = 3;
+
+      function money(n) {
+        return Math.round(n).toLocaleString('zh-CN');
+      }
+
+      /** 某档某年：原价 / 实付 / 省 */
+      function termQuote(plan, y) {
+        const pay = plan.pay[y] ?? 0;
+        const list = plan.year * y;
+        const save = Math.max(0, list - pay);
+        const savePct = list > 0 ? Math.round((save / list) * 100) : 0;
+        const discount =
+          list > 0 && pay > 0 ? Math.round((pay / list) * 100) / 10 : 10;
+        return { pay, list, save, savePct, discount };
+      }
+
+      function calc() {
+        const plan = PLANS.find((p) => p.code === planCode);
+        if (plan.free) return { plan, mode: 'free' };
+        const q = termQuote(plan, years);
+        const perYear = +(q.pay / years).toFixed(1);
+        const daily = +(q.pay / (years * 365)).toFixed(2);
+        return { plan, mode: 'paid', years, ...q, perYear, daily };
+      }
+
+      function render() {
+        const c = calc();
+        const { plan } = c;
+        const termDisabled = plan.free;
+
+        document.getElementById('plans').innerHTML = PLANS.map(
+          (p) => `
+          <div class="plan ${p.code === planCode ? 'on' : ''}" data-code="${p.code}">
+            ${p.recommended ? '<div class="rec">荐</div>' : ''}
+            <div class="name">${p.short}</div>
+            <div class="sub">${p.free ? '申请' : '¥' + p.year + '/年'}</div>
+          </div>`,
+        ).join('');
+
+        document.getElementById('termWrap').style.display = termDisabled ? 'none' : 'block';
+        document.getElementById('compare').style.display = termDisabled ? 'none' : 'block';
+
+        if (!termDisabled) {
+          document.getElementById('terms').innerHTML = YEAR_TERMS.map((y) => {
+            const q = termQuote(plan, y);
+            const on = y === years;
+            const pill =
+              q.save > 0
+                ? `<div class="save-pill">省 ¥${money(q.save)}</div>`
+                : '';
+            const delta =
+              q.save > 0
+                ? `<div class="delta">比年付省 ${q.savePct}%</div>`
+                : `<div class="delta mute">正价</div>`;
+            return `
+              <div class="term ${on ? 'on' : ''}" data-years="${y}">
+                ${pill}
+                <div class="y">${y} 年</div>
+                <div class="pay"><small>¥</small>${money(q.pay)}</div>
+                <div class="list">原价 ¥${money(q.list)}</div>
+                ${delta}
+              </div>`;
+          }).join('');
+
+          const q2 = termQuote(plan, 2);
+          const q3 = termQuote(plan, 3);
+          const moreSave = Math.max(0, q3.save - q2.save);
+          document.getElementById('compare').innerHTML =
+            moreSave > 0
+              ? `同选<strong>${plan.name}</strong>：2 年立省 <span class="hl">¥${money(q2.save)}</span> · 3 年立省 <span class="hl">¥${money(q3.save)}</span> · 选 3 年多省 <span class="hl">¥${money(moreSave)}</span>`
+              : `同选<strong>${plan.name}</strong>：按货架实付，原价=年标价×年数`;
+        }
+
+        if (c.mode === 'free') {
+          document.getElementById('priceBox').innerHTML = `
+            <div class="price-main" style="font-size:22px">¥0</div>
+            <div class="eq">申请开通</div>`;
+          document.getElementById('buyMain').textContent = '申请众创版';
+          document.getElementById('buySub').textContent = '免费档';
+        } else {
+          document.getElementById('priceBox').innerHTML = `
+            <div class="price-row">
+              <div><div class="price-main"><small>¥</small>${money(c.pay)}</div></div>
+              <div class="price-side">
+                <div class="strike">原价 ¥${money(c.list)}</div>
+                <div class="save">立省 ¥${money(c.save)}</div>
+              </div>
+            </div>
+            <div class="eq">${plan.name} · ${c.years} 年 · ¥${money(c.perYear)}/年 · 约 ${c.discount} 折</div>
+            <div class="daily">一天约 ¥${c.daily}</div>`;
+          document.getElementById('buyMain').textContent = `开通${plan.short} · ${c.years} 年`;
+          document.getElementById('buySub').textContent = `实付 ¥${money(c.pay)}`;
+        }
+
+        const rows = [
+          ['会员', plan.members],
+          ['员工', plan.employees],
+          ['校区', plan.campuses],
+          ['约课/排课/候补/代课', '✓'],
+          ['会员/课时核销/签到', '✓'],
+          ['基础财务/收款/报表', '✓'],
+          ['移动端（学员/教练）', '✓'],
+          ['营销获客', plan.marketing ? '✓' : '—'],
+        ];
+        document.getElementById('features').innerHTML = rows
+          .map(([k, v]) => {
+            const cls = v === '✓' ? 'ok' : v === '—' ? 'no' : '';
+            return `<div class="feat"><span>${k}</span><span class="${cls}">${v}</span></div>`;
+          })
+          .join('');
+
+        document.querySelectorAll('.plan').forEach((el) =>
+          el.addEventListener('click', () => {
+            planCode = el.dataset.code;
+            const p = PLANS.find((x) => x.code === planCode);
+            if (p.free) years = 3;
+            else if (p.recommended) years = 3;
+            render();
+          }),
+        );
+        document.querySelectorAll('.term').forEach((el) =>
+          el.addEventListener('click', () => {
+            if (termDisabled) return;
+            years = Number(el.dataset.years);
+            render();
+          }),
+        );
+      }
+
+      document.getElementById('redeemBtn').onclick = () => alert('激活码兑换（示意）');
+      document.getElementById('buyBtn').onclick = () => {
+        const c = calc();
+        if (c.mode === 'free') {
+          alert('申请众创（示意）');
+          return;
+        }
+        alert(`购买 ${c.plan.name} ${c.years} 年 · 实付 ¥${money(c.pay)} · 省 ¥${money(c.save)}`);
+      };
+
+      render();
+    </script>
+  </body>
+</html>

@@ -75,25 +75,11 @@ alwaysApply: true
 - [ ] **.ts/.tsx**：`eslint --fix` + `prettier --write`
 - [ ] **.scss/.css/.json/.md**：`prettier --write`
 
-## 7. 编译命令（强制）
+## 7. 联调编译
 
-- [ ] **每次改完 `src/` 小程序相关代码，AI 必须主动执行 `npm run build:weapp:mock`**（用户验收入口是微信开发者工具里的 `dist`）
-- [ ] **禁止直接 `npm run build:weapp`**（生产模式默认禁用 Mock → 网络异常）
-- [ ] **正确编译姿势**（`build:weapp:mock` 脚本已封装删 dist + Mock 环境）：
-
-  ```bash
-  npm run build:weapp:mock
-  ```
-
-  或手动等价：
-
-  ```bash
-  Remove-Item -Recurse -Force .\dist
-  $env:VITE_USE_MOCK="true"; npm run build:weapp
-  ```
-
-- [ ] **开发模式**：`npm run dev:weapp`（自动 Mock + 热更新，用户本地 watch 时可不每次 build）
-- [ ] **dist 目录**每次编译前删除，避免残留旧代码
+- 修改运行代码后执行 `npm run check`（至少 typecheck）与 `npm run build:weapp:dev`。
+- 脚本自动清理缓存、关闭 Mock 并连接真实测环境；纯文档无需重编译。
+- API 目标与本轮后端版本一致后再验收。
 
 ## 8. 性能与体验
 
@@ -123,15 +109,13 @@ alwaysApply: true
 | `npm run lint` | ☐ 通过 |
 | `npm run format:check` | ☐ 通过 |
 | `npm run check` | ☐ 通过 |
-| `npm run build:weapp:mock` | ☐ 通过（**每次改代码后必跑**，用户看 `dist`） |
-| `Remove-Item .\dist -Recurse -Force; $env:VITE_USE_MOCK="true"; npm run build:weapp` | ☐ 通过（与上一行等价） |
+| `npm run build:weapp:dev` | ☐ 通过（**每次改代码后必跑**，用户看 `dist`） |
 
 ## 11. 常见问题速查
 
 ### 11.1 网络异常 / 登录失败
 
-**原因**：直接 `npm run build:weapp` 默认禁用 Mock → 请求失败。
-**解决**：删除 dist + `$env:VITE_USE_MOCK="true"; npm run build:weapp`。
+核对产物 API 地址、后端与隧道、会话及真实响应。不要恢复运行时 Mock 掩盖问题。
 
 ### 11.2 输入框被重置
 

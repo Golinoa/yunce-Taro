@@ -1,3 +1,5 @@
+> **历史资料（2026-09-08 收口）**：保留问题背景与证据；其中完成度、待办、命令和旧方案未经当前版本复验，不作为开发指令。当前工作从 [模块联调入口](../../../yunce-back/yunce-backend/docs/development/README.md) 开始。
+
 # 微信登录优化计划（WechatLoginCoordinator + wechat-login 瘦身）
 
 > 备份日期：2026-09-02  
@@ -13,11 +15,11 @@
 
 ### 1.1 前端 wx.login 调用点（共 3 处，均无全局单飞）
 
-| 文件 | 行 | 模式 |
-|------|-----|------|
-| `src/package-auth/pages/login/index.tsx` | 109 | `Taro.login()` → `signInWithWechat` |
-| `src/package-lead/pages/invite-landing/index.tsx` | 366 | 同上（隐私用 `ensurePrivacyBeforeAuth`） |
-| `src/package-auth/pages/invite-register/index.tsx` | 96 | 同上 |
+| 文件                                               | 行  | 模式                                     |
+| -------------------------------------------------- | --- | ---------------------------------------- |
+| `src/package-auth/pages/login/index.tsx`           | 109 | `Taro.login()` → `signInWithWechat`      |
+| `src/package-lead/pages/invite-landing/index.tsx`  | 366 | 同上（隐私用 `ensurePrivacyBeforeAuth`） |
+| `src/package-auth/pages/invite-register/index.tsx` | 96  | 同上                                     |
 
 页内仅有 `wechatSubmitting` 布尔防抖，**无法防跨页/协议弹窗并发重复 login**。
 
@@ -50,10 +52,10 @@ wechatLogin
 
 因此 **登录页微信一键登录的有效路径**：
 
-| 用户 | 行为 |
-|------|------|
-| 新用户 | 创建 PRINCIPAL → profile-setup / identity-select |
-| 老 PRINCIPAL | organizationId 在 JWT → 可进 home |
+| 用户              | 行为                                               |
+| ----------------- | -------------------------------------------------- |
+| 新用户            | 创建 PRINCIPAL → profile-setup / identity-select   |
+| 老 PRINCIPAL      | organizationId 在 JWT → 可进 home                  |
 | 老 TEACHER/PARENT | **当前即失败（角色冲突）**，非 onboarding 映射问题 |
 
 `invite-landing` 登录成功后调 `markOnboardingSkipped()`（`:377`），与主登录页不同。
@@ -70,10 +72,10 @@ wechatLogin
 
 ## 2. 改造方案（两方案一起做，无冲突）
 
-| 方案 | 层 | 接口契约 |
-|------|-----|----------|
-| A. WechatLoginCoordinator | 前端 | 不变 |
-| B. wechat-login 瘦身 | 后端 only | 响应 schema 不变；`user` 内 **optional 统计字段可省略**；PRINCIPAL 必需字段保留 |
+| 方案                      | 层        | 接口契约                                                                        |
+| ------------------------- | --------- | ------------------------------------------------------------------------------- |
+| A. WechatLoginCoordinator | 前端      | 不变                                                                            |
+| B. wechat-login 瘦身      | 后端 only | 响应 schema 不变；`user` 内 **optional 统计字段可省略**；PRINCIPAL 必需字段保留 |
 
 ---
 
@@ -81,25 +83,25 @@ wechatLogin
 
 ### 方案 A — 前端 Coordinator
 
-| 操作 | 文件 |
-|------|------|
-| **新增** | `src/utils/wechat-login-coordinator.ts` |
-| **新增** | `src/utils/wechat-login-coordinator.test.ts` |
-| **改** | `src/package-auth/pages/login/index.tsx` |
-| **改** | `src/package-lead/pages/invite-landing/index.tsx` |
-| **改** | `src/package-auth/pages/invite-register/index.tsx` |
-| **改** | `src/utils/auth.tsx` — `signInWithWechat` 内聚 `performWechatAuth` |
+| 操作     | 文件                                                               |
+| -------- | ------------------------------------------------------------------ |
+| **新增** | `src/utils/wechat-login-coordinator.ts`                            |
+| **新增** | `src/utils/wechat-login-coordinator.test.ts`                       |
+| **改**   | `src/package-auth/pages/login/index.tsx`                           |
+| **改**   | `src/package-lead/pages/invite-landing/index.tsx`                  |
+| **改**   | `src/package-auth/pages/invite-register/index.tsx`                 |
+| **改**   | `src/utils/auth.tsx` — `signInWithWechat` 内聚 `performWechatAuth` |
 
 **不改**：`request.ts`、隐私模块、后端路由。
 
 ### 方案 B — 后端瘦身（**不改** transaction 对外签名）
 
-| 操作 | 文件 |
-|------|------|
-| **改** | `yunce-backend/src/auth/auth.service.ts` |
+| 操作   | 文件                                                                                         |
+| ------ | -------------------------------------------------------------------------------------------- |
+| **改** | `yunce-backend/src/auth/auth.service.ts`                                                     |
 | **改** | `wechatLogin`：用 `buildMinimalLoginUserInfo(profile, tenant, orgName)` 替代 `buildUserInfo` |
-| **改** | `yunce-backend/src/auth/__tests__/auth.service.test.ts` |
-| **改** | `yunce-backend/src/auth/__tests__/auth.share.test.ts`（回归） |
+| **改** | `yunce-backend/src/auth/__tests__/auth.service.test.ts`                                      |
+| **改** | `yunce-backend/src/auth/__tests__/auth.share.test.ts`（回归）                                |
 
 **不改**：`initializeUserWithTransaction` 返回值结构（稳定性：少动公共事务）、`auth.routes.ts`、`mapBackendProfile`。
 
@@ -118,7 +120,9 @@ export async function performWechatAuth(): Promise<LoginResult> {
   wechatAuthTask = (async () => {
     const code = await obtainWxLoginCode(); // 内层单飞 Taro.login
     return wechatLogin(code);
-  })().finally(() => { wechatAuthTask = null; });
+  })().finally(() => {
+    wechatAuthTask = null;
+  });
   return wechatAuthTask;
 }
 ```
@@ -178,21 +182,21 @@ Phase 3  联调 + 真机验收（与 P0 VH/V4T 一并）     ⏳ 后置
 
 ### 6.1 功能
 
-| # | 场景 | 预期 |
-|---|------|------|
-| F1 | 登录页微信登录（新 PRINCIPAL） | profile-setup 或 identity-select |
-| F2 | 登录页微信登录（老 PRINCIPAL 有 tenant） | 直接 home；不误进 identity-select |
-| F3 | 登录页微信登录（老 TEACHER/PARENT） | **保持现行为**：toast 角色冲突（非回归） |
-| F4 | invite-landing / invite-register | 与原行为一致 |
-| F5 | 快速连点微信登录 | ≤1 次 `wx.login` + ≤1 次 `/wechat-login` |
-| F6 | 首次失败后重试 | 可再次 login 成功 |
+| #   | 场景                                     | 预期                                     |
+| --- | ---------------------------------------- | ---------------------------------------- |
+| F1  | 登录页微信登录（新 PRINCIPAL）           | profile-setup 或 identity-select         |
+| F2  | 登录页微信登录（老 PRINCIPAL 有 tenant） | 直接 home；不误进 identity-select        |
+| F3  | 登录页微信登录（老 TEACHER/PARENT）      | **保持现行为**：toast 角色冲突（非回归） |
+| F4  | invite-landing / invite-register         | 与原行为一致                             |
+| F5  | 快速连点微信登录                         | ≤1 次 `wx.login` + ≤1 次 `/wechat-login` |
+| F6  | 首次失败后重试                           | 可再次 login 成功                        |
 
 ### 6.2 性能
 
-| 指标 | 目标 |
-|------|------|
+| 指标                                   | 目标                                            |
+| -------------------------------------- | ----------------------------------------------- |
 | `/auth/wechat-login` TTFB（PRINCIPAL） | 相对基线下降（少 1 次 profile 重查 + 无 count） |
-| `wx.login` 次数/单次成功登录 | ≤ 1 |
+| `wx.login` 次数/单次成功登录           | ≤ 1                                             |
 
 ### 6.3 稳定性
 
@@ -227,22 +231,22 @@ Phase 3  联调 + 真机验收（与 P0 VH/V4T 一并）     ⏳ 后置
 
 ## 8. 风险与缓解
 
-| 风险 | 缓解 |
-|------|------|
-| 改 transaction 返回值引发连锁 | **不改** transaction；仅在 wechatLogin 内 minimal 组装 |
-| invite 页与 login 页隐私差异 | Coordinator 只管 code，不动隐私 |
-| optional 统计字段被前端依赖 |  grep 确认 mapBackendProfile 不读 count；principal 统计仅 `/me` 等路径 |
-| 其他登录仍用 buildUserInfo | ** intentional **；仅 wechatLogin 瘦身，减少 blast radius |
+| 风险                          | 缓解                                                                  |
+| ----------------------------- | --------------------------------------------------------------------- |
+| 改 transaction 返回值引发连锁 | **不改** transaction；仅在 wechatLogin 内 minimal 组装                |
+| invite 页与 login 页隐私差异  | Coordinator 只管 code，不动隐私                                       |
+| optional 统计字段被前端依赖   | grep 确认 mapBackendProfile 不读 count；principal 统计仅 `/me` 等路径 |
+| 其他登录仍用 buildUserInfo    | ** intentional **；仅 wechatLogin 瘦身，减少 blast radius             |
 
 ---
 
 ## 9. 回滚
 
-| 阶段 | 操作 |
-|------|------|
-| Phase 1 | revert Coordinator 4 文件 |
+| 阶段    | 操作                                   |
+| ------- | -------------------------------------- |
+| Phase 1 | revert Coordinator 4 文件              |
 | Phase 2 | revert auth.service wechatLogin + 测试 |
-| 全量 | 计划初版基线 `661c176` / `78c9ad6` |
+| 全量    | 计划初版基线 `661c176` / `78c9ad6`     |
 
 ---
 
@@ -269,26 +273,26 @@ Phase 3  联调 + 真机验收（与 P0 VH/V4T 一并）     ⏳ 后置
 
 ### 12.1 初版计划偏差（已修正）
 
-| 初版断言 | 交叉验证 | 处置 |
-|----------|----------|------|
-| F3/F4 老 TEACHER/PARENT 微信登录进 home | 默认 role=PRINCIPAL → ConflictError | 移出验收；标为现行为 |
-| Phase 3 必做 mapBackendProfile | 主路径微信登录到不了 TEACHER/PARENT navigate | **移出本计划** |
-| 改 transaction 返回 tenant | 多 caller，blast radius 大 | 改为 wechatLogin 内局部 resolve |
-| invalidate 仅 40029 | 前端无 40029 专用处理 | 改为「登录失败未拿 token」即 invalidate |
+| 初版断言                                | 交叉验证                                     | 处置                                    |
+| --------------------------------------- | -------------------------------------------- | --------------------------------------- |
+| F3/F4 老 TEACHER/PARENT 微信登录进 home | 默认 role=PRINCIPAL → ConflictError          | 移出验收；标为现行为                    |
+| Phase 3 必做 mapBackendProfile          | 主路径微信登录到不了 TEACHER/PARENT navigate | **移出本计划**                          |
+| 改 transaction 返回 tenant              | 多 caller，blast radius 大                   | 改为 wechatLogin 内局部 resolve         |
+| invalidate 仅 40029                     | 前端无 40029 专用处理                        | 改为「登录失败未拿 token」即 invalidate |
 
 ### 12.2 复审结论
 
 - **两方案仍推荐一起做**：无架构冲突；方案 A 可独立交付。
 - **方案 B 收益集中在 PRINCIPAL 路径**，与主登录页微信用户一致，目标对齐。
 - **无需为 perfection 扩 scope**；稳定性边界清晰。
-- **无明显安全漏洞**：不存 code、不改鉴权、不改 JWT  mint 逻辑。
+- **无明显安全漏洞**：不存 code、不改鉴权、不改 JWT mint 逻辑。
 
 ### 12.4 实施记录（2026-09-02）
 
-| Phase | 变更 | 单测 |
-|-------|------|------|
-| 1 | `wechat-login-coordinator.ts` 整链单飞；三页移除 `Taro.login`；`signInWithWechat(options?)` | FE 3 passed |
-| 2 | `buildMinimalLoginUserInfo` 替代 wechatLogin 内 `buildUserInfo`；去掉 count/二次 profile 重查 | BE auth 37 passed |
+| Phase | 变更                                                                                          | 单测              |
+| ----- | --------------------------------------------------------------------------------------------- | ----------------- |
+| 1     | `wechat-login-coordinator.ts` 整链单飞；三页移除 `Taro.login`；`signInWithWechat(options?)`   | FE 3 passed       |
+| 2     | `buildMinimalLoginUserInfo` 替代 wechatLogin 内 `buildUserInfo`；去掉 count/二次 profile 重查 | BE auth 37 passed |
 
 **Git 备份点**：Phase 1（FE）/ Phase 2（BE）各一 commit，验收后再 push。
 
@@ -298,26 +302,26 @@ Phase 3  联调 + 真机验收（与 P0 VH/V4T 一并）     ⏳ 后置
 
 ### 13.1 影响面矩阵
 
-| 模块 / 链路 | 方案 A | 方案 B | 处理 |
-|-------------|--------|--------|------|
-| 登录三页 + `signInWithWechat` | 整链单飞 | 响应更快 | ✅ Phase 1 |
-| `invite-landing` onboarding | 无逻辑改 | 无 | ✅ `markOnboardingSkipped` 保持 |
-| `request.ts` refresh / 401 | 无 | 无 | ✅ 不触及 |
-| `route-guard` / `auth-onboarding` | 无 | PRINCIPAL profile 字段不变 | ✅ F2 |
-| 密码/邮箱/手机登录、register | 无 | 仍 `buildUserInfo` | ✅ 刻意隔离 |
-| `/auth/me`、`getSession` | 无 | 无 | ✅ 不触及 |
-| `home` 统计 | 无 | 走 `/home`，不读 login count | ✅ grep 验证 |
-| `auth.share.test.ts` | 无 | 事务不变；mock 或需微调 | ✅ Phase 2 必跑 |
-| `auth.service.test.ts` TEACHER | 无 | 保留 findFirst，去 count | ✅ §4.2 |
-| Swagger / yunce-admin / E2E | 无 | 无 | ✅ 无影响 |
+| 模块 / 链路                       | 方案 A   | 方案 B                       | 处理                            |
+| --------------------------------- | -------- | ---------------------------- | ------------------------------- |
+| 登录三页 + `signInWithWechat`     | 整链单飞 | 响应更快                     | ✅ Phase 1                      |
+| `invite-landing` onboarding       | 无逻辑改 | 无                           | ✅ `markOnboardingSkipped` 保持 |
+| `request.ts` refresh / 401        | 无       | 无                           | ✅ 不触及                       |
+| `route-guard` / `auth-onboarding` | 无       | PRINCIPAL profile 字段不变   | ✅ F2                           |
+| 密码/邮箱/手机登录、register      | 无       | 仍 `buildUserInfo`           | ✅ 刻意隔离                     |
+| `/auth/me`、`getSession`          | 无       | 无                           | ✅ 不触及                       |
+| `home` 统计                       | 无       | 走 `/home`，不读 login count | ✅ grep 验证                    |
+| `auth.share.test.ts`              | 无       | 事务不变；mock 或需微调      | ✅ Phase 2 必跑                 |
+| `auth.service.test.ts` TEACHER    | 无       | 保留 findFirst，去 count     | ✅ §4.2                         |
+| Swagger / yunce-admin / E2E       | 无       | 无                           | ✅ 无影响                       |
 
 ### 13.2 本次须写入计划的修正
 
-| 缺口 | 适配 |
-|------|------|
-| 仅单飞 wx.login | 改为 `performWechatAuth` 整链单飞（§4.1） |
-| minimal 误删 teacher/parent id 查询 | 只删 count（§4.2） |
-| share.test mock 依赖二次 findUnique | Phase 2 实施时调整 mock |
+| 缺口                                | 适配                                      |
+| ----------------------------------- | ----------------------------------------- |
+| 仅单飞 wx.login                     | 改为 `performWechatAuth` 整链单飞（§4.1） |
+| minimal 误删 teacher/parent id 查询 | 只删 count（§4.2）                        |
+| share.test mock 依赖二次 findUnique | Phase 2 实施时调整 mock                   |
 
 ### 13.3 既有缺口（记录，不纳入本次）
 

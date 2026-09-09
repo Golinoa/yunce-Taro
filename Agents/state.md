@@ -97,31 +97,7 @@ const pendingPayAction = useTeacherStore((s) => s.pendingPayAction);
 
 ## 四、数据流规范
 
-```
-页面/组件 → Zustand Store → Mock Service
-   ↑                              ↓
-   └────── 状态更新 ←──────────────┘
-
-未来接入后端：
-页面/组件 → Zustand Store → API Service → 后端
-   ↑                              ↓
-   └────── 状态更新 ←──────────────┘
-```
-
-### Mock 数据层
-
-```
-src/
-├── data/           # Mock 数据定义
-│   ├── teacher.ts  # 教师相关常量、mock 数据
-│   └── student.ts
-├── services/       # Service 层（当前 mock，未来替换为 API）
-│   ├── teacher.ts
-│   └── student.ts
-└── stores/         # Zustand Store
-    ├── teacher.ts
-    └── student.ts
-```
+页面/组件 → Zustand Store → Service → 真实 API → 状态更新。跨页状态沿用 Zustand；缓存 TTL、写后失效与切机构清理见统一模块指南。src/data 已删除，测试替身仅限测试文件。
 
 ## 五、禁止事项
 
