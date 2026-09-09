@@ -100,11 +100,7 @@ export const cardTypeService = {
   },
 
   getById: async (id: string): Promise<CardType | null> => {
-    try {
-      return mapCardType(await get<BackendCardType>(`/card-types/${id}`));
-    } catch {
-      return null;
-    }
+    return mapCardType(await get<BackendCardType>(`/card-types/${id}`));
   },
 
   create: async (data: CardTypeFormData): Promise<CardType> =>

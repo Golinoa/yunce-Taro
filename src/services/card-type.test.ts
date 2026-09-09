@@ -81,4 +81,10 @@ describe('cardTypeService', () => {
       status: 'inactive',
     });
   });
+
+  it('propagates detail errors instead of converting them to null', async () => {
+    request.get.mockRejectedValue(new Error('network failed'));
+    const { cardTypeService } = await import('@/services/card-type');
+    await expect(cardTypeService.getById('card-type-1')).rejects.toThrow('network failed');
+  });
 });

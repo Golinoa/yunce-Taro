@@ -5,10 +5,14 @@ import type { CourseTemplate, CourseTemplateFormData } from '@/types/course-temp
 
 export const courseTemplateService = {
   /** 获取课程模板列表 */
-  getList: async (_categoryId?: string): Promise<CourseTemplate[]> => [],
+  getList: async (_categoryId?: string): Promise<CourseTemplate[]> => {
+    throw new Error('[接口未接通] course-template 后端尚未提供课程模板列表接口');
+  },
 
   /** 获取课程模板详情 */
-  getById: async (_id: string): Promise<CourseTemplate | null> => null,
+  getById: async (_id: string): Promise<CourseTemplate | null> => {
+    throw new Error('[接口未接通] course-template 后端尚未提供课程模板详情接口');
+  },
 
   /** 创建课程模板 */
   create: async (_data: CourseTemplateFormData): Promise<CourseTemplate> => {
