@@ -647,7 +647,7 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   copySalaryRuleToTeachers: async (sourceTeacherId, targetTeacherIds) => {
     const contextVersion = teacherContextVersion;
     const result = await teacherSalaryRuleService.copyToTeachers(sourceTeacherId, targetTeacherIds);
-    if (result.success) {
+    if (result.copiedIds.length > 0) {
       const teachers = await teacherService.getList(undefined, get().salaryMonth);
       if (contextVersion !== teacherContextVersion)
         return { ...result, success: false, message: '当前机构已切换，请重新加载' };

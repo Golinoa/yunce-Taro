@@ -317,7 +317,7 @@ export const teacherSalaryRuleService = {
   },
 
   copyToTeachers: async (
-    _sourceTeacherId: string,
+    sourceTeacherId: string,
     targetTeacherIds: string[],
   ): Promise<{
     success: boolean;
@@ -325,11 +325,14 @@ export const teacherSalaryRuleService = {
     failedIds: string[];
     message?: string;
   }> => {
-    return {
-      success: false,
-      copiedIds: [],
-      failedIds: targetTeacherIds,
-      message: '复制薪资规则尚未开通',
-    };
+    const result = await post<{
+      sourceTeacherId: string;
+      success: boolean;
+      copiedIds: string[];
+      failedIds: string[];
+      failures?: { id: string; reason: string }[];
+      message?: string;
+    }>(`/teachers/${sourceTeacherId}/salary-rule/copy`, { targetTeacherIds });
+    return result;
   },
 };
