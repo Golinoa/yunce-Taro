@@ -158,14 +158,20 @@ export const teacherService = {
     return true;
   },
 
-  sendSalarySlip: async (ids: string[], _remark?: string, _month?: string): Promise<SendResult> => {
-    // 后端暂无独立「推送工资条」接口，不能用发放接口代替以免错误改变状态。
-    const failed: SendFailure[] = ids.map((id) => ({
-      id,
-      name: id,
-      reason: '推送工资条功能尚未开通',
-    }));
-    return { success: [], failed };
+  sendSalarySlip: async (ids: string[], _remark?: string, month?: string): Promise<SendResult> => {
+    const resolvedIds = await Promise.all(ids.map((id) => resolveSalaryRecordId(id, month)));
+    const missing = ids
+      .map((id, index) => (resolvedIds[index] ? null : { id, name: id, reason: '薪资记录不存在' }))
+      .filter((item): item is SendFailure => item !== null);
+    const recordIds = resolvedIds.filter((id): id is string => Boolean(id));
+    if (!recordIds.length) return { success: [], failed: missing };
+    const result = await post<{ success: string[]; failed: SendFailure[] }>(
+      '/teachers/salary/send-slip',
+      {
+        ids: recordIds,
+      },
+    );
+    return { success: result.success, failed: [...missing, ...result.failed] };
   },
 
   resign: async (id: string, resignType: string, reason?: string) => {
