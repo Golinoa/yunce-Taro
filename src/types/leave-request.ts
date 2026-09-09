@@ -24,6 +24,12 @@ export interface LeaveRequest {
   status: LeaveStatus;
   created_at: string;
   updated_at: string;
+  target_class_id?: string;
+  original_class_id?: string;
+  target_start_time?: string;
+  target_end_time?: string;
+  target_teacher_id?: string;
+  target_teacher_name?: string;
   // 关联查询字段
   student?: {
     name: string;

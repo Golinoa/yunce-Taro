@@ -9,13 +9,17 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
-import { notificationService } from '@/services';
+import { classBookingService, notificationService } from '@/services';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { useAuth } from '@/utils/auth';
-import { getBookingRuleSummaryList, readBookingRules } from '@/utils/booking-rules';
+import {
+  fetchBookingRules,
+  getBookingRuleSummaryList,
+  readBookingRules,
+  type BookingRuleState,
+} from '@/utils/booking-rules';
 import { logError } from '@/utils/logger';
 import {
-  promoteFirstWaitlistBooking,
   readParentBookingById,
   updateParentBookingStatus,
   type ParentBookingItem,
@@ -85,20 +89,61 @@ const BookingRecordDetailPage: React.FC = () => {
   const [status, setStatus] = useState<BookingRecordStatus>(() =>
     booking ? mapParentBookingStatusToRecordStatus(booking.status) : fallbackStatus,
   );
+  const [rules, setRules] = useState<BookingRuleState>(() => readBookingRules());
 
-  const refreshBooking = useCallback(() => {
+  const refreshBooking = useCallback(async () => {
     if (!bookingId) {
       return;
     }
-    const nextBooking = readParentBookingById(bookingId);
+    let nextBooking = readParentBookingById(bookingId);
+    try {
+      const remote = (await classBookingService.listMyRecords()).find(
+        (item) => item.id === bookingId,
+      );
+      if (remote) {
+        const remoteStatus =
+          remote.status === 'cancelled' ? 'cancelled' : remote.fulfillment_status || 'upcoming';
+        nextBooking = {
+          id: remote.id,
+          userId: profile?.id || '',
+          studentId: remote.student_id,
+          studentName: remote.student_name,
+          occurrenceKey: `${remote.class_id}:${remote.slot.lesson_date}:${remote.slot.start_time}`,
+          courseId: remote.class_id,
+          courseName: remote.slot.class_name || '团课',
+          courseType: 'group',
+          classId: remote.class_id,
+          campusId: remote.slot.campus_id,
+          lessonDate: remote.slot.lesson_date,
+          timeRange: `${remote.slot.start_time}-${remote.slot.end_time}`,
+          teacherName: remote.slot.teacher_name || '授课老师',
+          deadline: remote.slot.lesson_date,
+          room: remote.slot.room || undefined,
+          status:
+            remoteStatus === 'completed'
+              ? 'completed'
+              : remoteStatus === 'leave'
+                ? 'leave'
+                : remoteStatus === 'cancelled'
+                  ? 'cancelled'
+                  : 'booked',
+          createdAt: remote.created_at,
+        };
+      }
+    } catch (error) {
+      logError('BookingRecordDetailPage refresh remote booking', error);
+    }
     setBooking(nextBooking);
     if (nextBooking) {
       setStatus(mapParentBookingStatusToRecordStatus(nextBooking.status));
     }
-  }, [bookingId]);
+  }, [bookingId, profile?.id]);
 
   useDidShow(() => {
-    refreshBooking();
+    void refreshBooking();
+    void fetchBookingRules()
+      .then(setRules)
+      .catch(() => undefined);
   });
 
   const studentName = booking?.studentName || fallbackStudentName;
@@ -110,7 +155,6 @@ const BookingRecordDetailPage: React.FC = () => {
   const room = booking?.room || fallbackRoom;
 
   const meta = STATUS_META[status] || STATUS_META.upcoming;
-  const rules = useMemo(() => readBookingRules(), []);
   const ruleSummaryList = useMemo(() => getBookingRuleSummaryList(rules), [rules]);
 
   const actionList = useMemo(() => {
@@ -187,53 +231,47 @@ const BookingRecordDetailPage: React.FC = () => {
       }
 
       if (label === '标记已完成') {
+        await classBookingService.updateRecordStatus(bookingId, 'completed');
         updateParentBookingStatus(bookingId, 'completed');
         await sendNotification({
           receiverId: booking?.userId,
           title: '课程完成通知',
           content: `您预约的「${className}」已完成，时间为 ${lessonDate} ${timeRange}。`,
         });
-        refreshBooking();
+        await refreshBooking();
         Taro.showToast({ title: '已标记为完成', icon: 'success' });
         return;
       }
 
       if (label === '标记请假') {
+        await classBookingService.updateRecordStatus(bookingId, 'leave');
         updateParentBookingStatus(bookingId, 'leave');
         await sendNotification({
           receiverId: booking?.userId,
           title: '课程请假通知',
           content: `您预约的「${className}」已标记为请假，时间为 ${lessonDate} ${timeRange}。`,
         });
-        refreshBooking();
+        await refreshBooking();
         Taro.showToast({ title: '已标记为请假', icon: 'success' });
         return;
       }
 
       if (label === '恢复待上课') {
+        await classBookingService.updateRecordStatus(bookingId, 'upcoming');
         updateParentBookingStatus(bookingId, 'booked');
         await sendNotification({
           receiverId: booking?.userId,
           title: '预约恢复通知',
           content: `您预约的「${className}」已恢复为待上课，时间为 ${lessonDate} ${timeRange}。`,
         });
-        refreshBooking();
+        await refreshBooking();
         Taro.showToast({ title: '已恢复为待上课', icon: 'success' });
         return;
       }
 
       if (label === '取消预约') {
+        await classBookingService.removeBookingRecord(bookingId);
         updateParentBookingStatus(bookingId, 'cancelled');
-        if (rules.waitlistEnabled && booking?.occurrenceKey) {
-          const promotedBooking = promoteFirstWaitlistBooking(booking.occurrenceKey, 'booked');
-          if (promotedBooking) {
-            await sendNotification({
-              receiverId: promotedBooking.userId,
-              title: '候补转正通知',
-              content: `您候补的「${promotedBooking.courseName}」已转为正式预约，时间为 ${promotedBooking.lessonDate} ${promotedBooking.timeRange}。`,
-            });
-          }
-        }
         await sendNotification({
           receiverId: booking?.userId,
           title: '预约取消通知',
@@ -256,7 +294,6 @@ const BookingRecordDetailPage: React.FC = () => {
       className,
       lessonDate,
       refreshBooking,
-      rules.waitlistEnabled,
       sendNotification,
       timeRange,
     ],

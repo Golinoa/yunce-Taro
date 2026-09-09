@@ -4,6 +4,7 @@
  * 通过本地存储控制场地预约模块的显隐，默认开启。
  */
 import Taro from '@tarojs/taro';
+import { get, put } from '@/utils/request';
 
 /** 场地预约开关 storage key */
 export const VENUE_BOOKING_ENABLED_KEY = 'yunce:venue_booking_enabled';
@@ -31,4 +32,16 @@ export function setVenueBookingEnabled(enabled: boolean): void {
   } catch {
     // 忽略写入失败
   }
+}
+
+export async function fetchVenueBookingEnabled(): Promise<boolean> {
+  const config = await get<{ enabled: boolean }>('/booking-config/venue');
+  setVenueBookingEnabled(config.enabled);
+  return config.enabled;
+}
+
+export async function saveVenueBookingEnabled(enabled: boolean): Promise<boolean> {
+  const config = await put<{ enabled: boolean }>('/booking-config/venue', { enabled });
+  setVenueBookingEnabled(config.enabled);
+  return config.enabled;
 }

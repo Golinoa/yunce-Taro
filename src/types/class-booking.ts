@@ -16,6 +16,7 @@ export interface ClassBookingRecord {
   parent_id?: string;
   /** 记录状态 */
   status: 'pending' | 'confirmed' | 'cancelled';
+  fulfillment_status?: 'upcoming' | 'completed' | 'leave';
   created_at: string;
   updated_at: string;
 }

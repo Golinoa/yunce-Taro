@@ -7,11 +7,7 @@
 import { classBookingService } from '@/services/class-booking';
 import { privateBookingService } from '@/services/private-booking';
 import { logError } from '@/utils/logger';
-import {
-  readParentBookings,
-  updateParentBookingStatus,
-  type ParentBookingItem,
-} from '@/utils/parent-bookings';
+import { updateParentBookingStatus } from '@/utils/parent-bookings';
 
 export type MyCourseStatus = 'booked' | 'waiting' | 'pending_evaluate' | 'cancelled';
 
@@ -32,39 +28,17 @@ export interface MyCourseItem {
   source?: 'private' | 'local' | 'class';
 }
 
-function mapParentStatus(status: ParentBookingItem['status']): MyCourseStatus {
-  if (status === 'waitlist') return 'waiting';
-  if (status === 'completed') return 'pending_evaluate';
-  if (status === 'cancelled' || status === 'expired' || status === 'leave') return 'cancelled';
-  return 'booked';
-}
-
-function mapParentToMyCourse(item: ParentBookingItem): MyCourseItem {
-  const [startTime = '', endTime = ''] = (item.timeRange || '').split('-');
-  return {
-    id: item.id,
-    bookingId: item.id,
-    status: mapParentStatus(item.status),
-    courseName: item.courseName,
-    teacherName: item.teacherName,
-    date: item.lessonDate,
-    startTime,
-    endTime,
-    room: item.room ? `${item.campusName || ''} ${item.room}`.trim() : item.campusName,
-    campusName: item.campusName,
-    source: item.courseType === 'oneOnOne' ? 'private' : 'local',
-  };
-}
-
 function mapPrivateStatus(status: string): MyCourseStatus {
   if (status === 'cancelled') return 'cancelled';
   if (status === 'completed') return 'pending_evaluate';
   return 'booked';
 }
 
-function mapClassStatus(status: string): MyCourseStatus {
+function mapClassStatus(status: string, fulfillmentStatus?: string): MyCourseStatus {
   if (status === 'cancelled') return 'cancelled';
   if (status === 'pending') return 'waiting';
+  if (fulfillmentStatus === 'completed') return 'pending_evaluate';
+  if (fulfillmentStatus === 'leave') return 'cancelled';
   return 'booked';
 }
 
@@ -101,7 +75,7 @@ export const myCourseService = {
         ? classResult.value.map((item) => ({
             id: item.id,
             bookingId: item.id,
-            status: mapClassStatus(item.status),
+            status: mapClassStatus(item.status, item.fulfillment_status),
             courseName: item.slot.class_name || '团课',
             teacherName: item.slot.teacher_name || '老师',
             date: item.slot.lesson_date,
@@ -115,13 +89,7 @@ export const myCourseService = {
       logError('myCourse.listClass', classResult.reason);
     }
 
-    const serverIds = new Set([...privateItems, ...classItems].map((item) => item.id));
-    // 本地仅补服务端尚未覆盖的离线草稿（例如旧版本地 id）
-    const localFallback = readParentBookings(userId)
-      .map(mapParentToMyCourse)
-      .filter((item) => !serverIds.has(item.id));
-
-    const merged = [...privateItems, ...classItems, ...localFallback];
+    const merged = [...privateItems, ...classItems];
     merged.sort((a, b) => `${b.date}${b.startTime}`.localeCompare(`${a.date}${a.startTime}`));
     return merged;
   },

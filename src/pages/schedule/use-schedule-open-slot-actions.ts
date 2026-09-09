@@ -97,10 +97,6 @@ export function useScheduleOpenSlotActions(params: UseScheduleOpenSlotActionsPar
         Taro.showToast({ title: '该时段休息中', icon: 'none' });
         return;
       }
-      if (slot.status === 'full' || slot.current_count >= slot.max_count) {
-        Taro.showToast({ title: '名额已满', icon: 'none' });
-        return;
-      }
 
       try {
         const kids = await studentService.getByParent(profile.id);
@@ -145,12 +141,15 @@ export function useScheduleOpenSlotActions(params: UseScheduleOpenSlotActionsPar
           campusName:
             campuses.find((c) => c.id === (slot.campus_id || currentCampusId))?.name || '校区',
           room: slot.room,
-          status: 'booked',
+          status: created.status === 'pending' ? 'waitlist' : 'booked',
           createdAt: created.created_at || new Date().toISOString(),
         });
 
         await loadOpenClassSlots(dayjs(slot.lesson_date), true);
-        Taro.showToast({ title: '预约成功', icon: 'success' });
+        Taro.showToast({
+          title: created.status === 'pending' ? '已加入候补' : '预约成功',
+          icon: 'success',
+        });
       } catch (err) {
         logError('parent book open slot', err);
         Taro.showToast({ title: '预约失败', icon: 'none' });

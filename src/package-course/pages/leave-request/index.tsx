@@ -16,7 +16,6 @@ import {
   homeService,
   scheduleService,
   notificationService,
-  makeupBookingService,
   teacherService,
 } from '@/services';
 import type { Class } from '@/types/class';
@@ -336,24 +335,20 @@ const LeaveRequestPage: React.FC = () => {
             ? `${reason.trim()}（补课至 ${formatLessonOptionLabel(targetLesson)}）`
             : reason.trim(),
         status: 'pending',
+        target_class_id:
+          leaveType === 'reschedule' && targetLesson ? targetLesson.classId : undefined,
+        original_class_id: leaveType === 'reschedule' ? selectedLesson.classId : undefined,
+        target_start_time:
+          leaveType === 'reschedule' && targetLesson ? targetLesson.startTime : undefined,
+        target_end_time:
+          leaveType === 'reschedule' && targetLesson ? targetLesson.endTime : undefined,
+        target_teacher_id:
+          leaveType === 'reschedule' && targetLesson ? targetLesson.teacherId : undefined,
+        target_teacher_name:
+          leaveType === 'reschedule' && targetLesson ? targetLesson.teacherName : undefined,
       });
 
       if (leaveType === 'reschedule' && targetLesson) {
-        await makeupBookingService.create({
-          studentId,
-          classId: targetLesson.classId,
-          lessonDate: targetLesson.date,
-          startTime: targetLesson.startTime,
-          endTime: targetLesson.endTime,
-          teacherId: targetLesson.teacherId,
-          teacherName: targetLesson.teacherName,
-          source: 'parent',
-          leaveRequestId: created.id,
-          originalClassId: selectedLesson.classId,
-          note: reason.trim(),
-          createdBy: currentUserId,
-        });
-
         // 站内通知：原课老师、补课班老师、负责人（校长）
         const receiverIds = new Set<string>();
         if (selectedLesson.teacherId) receiverIds.add(selectedLesson.teacherId);

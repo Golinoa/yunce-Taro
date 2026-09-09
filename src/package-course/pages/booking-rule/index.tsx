@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Switch } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import {
   BOOKING_DEADLINE_OPTIONS,
@@ -9,7 +9,8 @@ import {
   formatBookingDeadline,
   readBookingRules,
   WAITLIST_LIMIT_OPTIONS,
-  writeBookingRules,
+  fetchBookingRules,
+  saveBookingRules,
   type BookingRuleState,
 } from '@/utils/booking-rules';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -100,6 +101,11 @@ const RuleSwitchCell: React.FC<RuleSwitchCellProps> = ({
 
 const BookingRulePage: React.FC = () => {
   const [rules, setRules] = useState<BookingRuleState>(() => readBookingRules());
+  useEffect(() => {
+    void fetchBookingRules()
+      .then(setRules)
+      .catch(() => undefined);
+  }, []);
 
   const updateRule = useCallback(
     <K extends keyof BookingRuleState>(key: K, value: BookingRuleState[K]) => {
@@ -139,9 +145,9 @@ const BookingRulePage: React.FC = () => {
     [rules.dailyLimit],
   );
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     try {
-      writeBookingRules(rules);
+      await saveBookingRules(rules);
       Taro.showToast({ title: '预约规则已保存', icon: 'success' });
     } catch {
       Taro.showToast({ title: '保存失败，请重试', icon: 'none' });

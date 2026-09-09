@@ -33,7 +33,11 @@ import {
 } from '@/utils/calendar-sync-settings';
 import { getDisplayAppVersion } from '@/utils/mini-program-env';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
-import { getVenueBookingEnabled, setVenueBookingEnabled } from '@/utils/venue-booking-config';
+import {
+  fetchVenueBookingEnabled,
+  getVenueBookingEnabled,
+  saveVenueBookingEnabled,
+} from '@/utils/venue-booking-config';
 
 /** 系统设置全量分组（真源：constants/system-settings-items） */
 const ALL_SETTING_ITEMS = SYSTEM_SETTING_ITEMS;
@@ -59,6 +63,11 @@ const SystemSettings: React.FC = () => {
   // 页面显示时读取最新开关状态
   useDidShow(() => {
     setVenueBookingEnabledState(getVenueBookingEnabled());
+    if (isManagerRole) {
+      void fetchVenueBookingEnabled()
+        .then(setVenueBookingEnabledState)
+        .catch(() => undefined);
+    }
     if (currentUserId) {
       setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
     }
@@ -117,9 +126,15 @@ const SystemSettings: React.FC = () => {
     [leaveAutoApprove],
   );
 
-  const handleVenueBookingChange = useCallback((enabled: boolean) => {
+  const handleVenueBookingChange = useCallback(async (enabled: boolean) => {
     setVenueBookingEnabledState(enabled);
-    setVenueBookingEnabled(enabled);
+    try {
+      const saved = await saveVenueBookingEnabled(enabled);
+      setVenueBookingEnabledState(saved);
+    } catch {
+      setVenueBookingEnabledState(!enabled);
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+    }
   }, []);
 
   const handleCalendarSyncChange = useCallback(

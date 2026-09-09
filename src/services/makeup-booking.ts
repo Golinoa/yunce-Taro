@@ -1,12 +1,8 @@
 /**
  * 补课预约 Service
  */
-import Taro from '@tarojs/taro';
 import type { MakeupBooking } from '@/types/makeup-booking';
-
-function storageKey(classId: string, lessonDate: string) {
-  return `yunce:makeup:${classId}:${lessonDate}`;
-}
+import { get, post } from '@/utils/request';
 
 export async function createMakeupBooking(params: {
   studentId: string;
@@ -22,50 +18,30 @@ export async function createMakeupBooking(params: {
   note?: string;
   createdBy: string;
 }): Promise<MakeupBooking> {
-  // 真实联调阶段：本地暂存，点名页可读；后端表就绪后改走 API
-  const booking: MakeupBooking = {
-    id: `makeup-local-${Date.now()}`,
-    student_id: params.studentId,
-    class_id: params.classId,
-    lesson_date: params.lessonDate,
-    start_time: params.startTime,
-    end_time: params.endTime,
-    teacher_id: params.teacherId || '',
-    teacher_name: params.teacherName,
+  return post<MakeupBooking>('/makeup-bookings', {
+    studentId: params.studentId,
+    classId: params.classId,
+    lessonDate: params.lessonDate,
+    startTime: params.startTime,
+    endTime: params.endTime,
+    teacherId: params.teacherId,
+    teacherName: params.teacherName,
     source: params.source,
-    leave_request_id: params.leaveRequestId,
-    original_class_id: params.originalClassId,
+    leaveRequestId: params.leaveRequestId,
+    originalClassId: params.originalClassId,
     note: params.note,
-    status: 'confirmed',
-    created_by: params.createdBy,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  try {
-    const key = storageKey(params.classId, params.lessonDate);
-    const raw = Taro.getStorageSync(key);
-    const list: MakeupBooking[] = raw ? JSON.parse(String(raw)) : [];
-    if (!list.some((b) => b.student_id === booking.student_id && b.status === 'confirmed')) {
-      list.unshift(booking);
-      Taro.setStorageSync(key, JSON.stringify(list));
-    }
-  } catch {
-    /* ignore storage errors */
-  }
-  return booking;
+  });
 }
 
 export async function getMakeupBookingsByClassDate(params: {
   classId: string;
   lessonDate: string;
 }): Promise<MakeupBooking[]> {
-  try {
-    const raw = Taro.getStorageSync(storageKey(params.classId, params.lessonDate));
-    const list: MakeupBooking[] = raw ? JSON.parse(String(raw)) : [];
-    return list.filter((b) => b.status === 'confirmed');
-  } catch {
-    return [];
-  }
+  const data = await get<{ list: MakeupBooking[] }>('/makeup-bookings', {
+    classId: params.classId,
+    lessonDate: params.lessonDate,
+  });
+  return (data.list || []).filter((b) => b.status === 'confirmed');
 }
 
 export const makeupBookingService = {

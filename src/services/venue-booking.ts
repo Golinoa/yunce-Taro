@@ -13,12 +13,14 @@ interface BackendRoomItem {
   capacity?: number;
   status?: string;
   managerUserId?: string | null;
+  campusId?: string;
 }
 
 interface BackendAvailableSlot {
   id: string;
   startTime: string;
   endTime: string;
+  price?: number;
   availableRooms: Array<{ id: string; name: string; capacity?: number }>;
 }
 
@@ -36,6 +38,9 @@ interface BackendVenueBooking {
   status: string;
   remark?: string | null;
   createdAt?: string | Date;
+  peopleCount?: number;
+  unitPriceCents?: number;
+  estimatedTotalCents?: number;
 }
 
 const mapStatus = (status?: string): VenueBookingRecord['status'] => {
@@ -58,7 +63,7 @@ const mapRoomToBookable = (room: BackendRoomItem): BookableVenue => ({
   venueId: room.venueId,
   venueName: room.venueName || '',
   capacity: room.capacity ?? 1,
-  campusId: '',
+  campusId: room.campusId || '',
   status: room.status === 'INACTIVE' ? 'inactive' : 'active',
   currentCount: 0,
   todayEntryCount: 0,
@@ -76,9 +81,9 @@ const mapBooking = (item: BackendVenueBooking): VenueBookingRecord => ({
   date: toDateStr(item.date),
   startTime: item.startTime,
   endTime: item.endTime,
-  peopleCount: 1,
-  unitPrice: 0,
-  totalPrice: 0,
+  peopleCount: item.peopleCount ?? 1,
+  unitPrice: (item.unitPriceCents ?? 0) / 100,
+  totalPrice: (item.estimatedTotalCents ?? 0) / 100,
   status: mapStatus(item.status),
   createdAt:
     typeof item.createdAt === 'string'
@@ -145,7 +150,7 @@ export const venueBookingService = {
         bookedCount: roomAvailable ? 0 : 1,
         maxCount: room.capacity ?? 1,
         status: roomAvailable ? 'available' : 'booked',
-        price: 0,
+        price: (slot.price ?? 0) / 100,
       };
     });
   },
@@ -170,15 +175,9 @@ export const venueBookingService = {
       endTime: record.endTime,
       purpose: record.userName ? `家长预约·${record.userName}` : '场地预约',
       remark: record.peopleCount > 1 ? `人数 ${record.peopleCount}` : undefined,
-    });
-    return {
-      ...mapBooking(created),
-      userId: record.userId,
-      userName: record.userName,
       peopleCount: record.peopleCount,
-      unitPrice: record.unitPrice,
-      totalPrice: record.totalPrice,
-    };
+    });
+    return { ...mapBooking(created), userId: record.userId, userName: record.userName };
   },
 
   /** 取消场地预约 */

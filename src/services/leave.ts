@@ -37,6 +37,7 @@ interface BackendLeaveRequestCreateResponse {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   studentId: string;
   studentName?: null | string;
+  makeupBooking?: unknown;
 }
 
 function mapBackendLeaveStatus(status: BackendLeaveRequestItem['status']): LeaveRequest['status'] {
@@ -108,6 +109,16 @@ export const leaveService = {
       endDate: data.end_date || data.original_date,
       reason: data.reason || '',
       ...(data.type === 'reschedule' ? { type: 'reschedule', newDate: data.new_date } : {}),
+      ...(data.type === 'reschedule'
+        ? {
+            targetClassId: data.target_class_id,
+            originalClassId: data.original_class_id,
+            targetStartTime: data.target_start_time,
+            targetEndTime: data.target_end_time,
+            targetTeacherId: data.target_teacher_id,
+            targetTeacherName: data.target_teacher_name,
+          }
+        : {}),
     });
     return {
       ...mapBackendLeave(created),

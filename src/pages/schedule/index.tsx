@@ -28,7 +28,7 @@ import type { ScheduleCardItem, ScheduleCardStudentAvatar } from '@/utils/schedu
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { useDateSwiperWindow } from '@/utils/use-date-swiper-window';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
-import { getVenueBookingEnabled } from '@/utils/venue-booking-config';
+import { fetchVenueBookingEnabled, getVenueBookingEnabled } from '@/utils/venue-booking-config';
 import {
   rpxToPx,
   TAB_GAP_RPX,
@@ -361,6 +361,9 @@ const SchedulePage: React.FC = () => {
   useDidShow(() => {
     setCurrentTime(dayjs());
     setVenueBookingEnabled(getVenueBookingEnabled());
+    void fetchVenueBookingEnabled()
+      .then(setVenueBookingEnabled)
+      .catch(() => undefined);
     let hasRefreshSignal = false;
     let newCategoryId = '';
     try {

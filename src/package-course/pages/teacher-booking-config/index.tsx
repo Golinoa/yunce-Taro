@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Textarea, Switch } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import {
@@ -8,7 +8,8 @@ import {
   getTeacherBookingNextSlotSummary,
   getTeacherBookingWeekdaySummary,
   readTeacherBookingConfig,
-  writeTeacherBookingConfig,
+  fetchTeacherBookingConfig,
+  saveTeacherBookingConfig,
   type TeacherBookingConfig,
   type TeacherBookingStatus,
   type TeacherBookingTimeSlot,
@@ -108,6 +109,14 @@ const BookingTeacherConfigPage: React.FC = () => {
       })
     );
   });
+  useEffect(() => {
+    if (!teacherId) return;
+    void fetchTeacherBookingConfig(teacherId)
+      .then((remote) => {
+        if (remote) setConfig(remote);
+      })
+      .catch(() => undefined);
+  }, [teacherId]);
   const ruleSummaryList = useMemo(() => getBookingRuleSummaryList(readBookingRules()), []);
 
   const updateConfig = useCallback(
@@ -202,9 +211,13 @@ const BookingTeacherConfigPage: React.FC = () => {
     updateConfig('capacityPerSlot', CAPACITY_OPTIONS[result.tapIndex] || config.capacityPerSlot);
   }, [config.capacityPerSlot, updateConfig]);
 
-  const handleSave = useCallback(() => {
-    writeTeacherBookingConfig(config);
-    Taro.showToast({ title: '老师预约时间已保存', icon: 'success' });
+  const handleSave = useCallback(async () => {
+    try {
+      await saveTeacherBookingConfig(config);
+      Taro.showToast({ title: '老师预约时间已保存', icon: 'success' });
+    } catch {
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+    }
   }, [config]);
 
   return (

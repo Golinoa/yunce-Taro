@@ -21,23 +21,30 @@ export const classBookingService = {
     lessonDate: string,
     slots: Omit<ClassBookingSlot, 'id'>[],
   ): Promise<ClassBookingSlot[]> => {
-    void classId;
-    void lessonDate;
-    void slots;
-    throw new Error('批量配置开放时段尚未开通');
+    const data = await post<{ list: ClassBookingSlot[] }>('/class-booking/slots/batch', {
+      classId,
+      lessonDate,
+      slots: slots.map((slot) => ({
+        teacherId: slot.teacher_id,
+        teacherName: slot.teacher_name,
+        startTime: slot.start_time,
+        endTime: slot.end_time,
+        maxCount: slot.max_count,
+        status: slot.status,
+        room: slot.room,
+      })),
+    });
+    return data.list || [];
   },
 
   /** 删除开放时段 */
   deleteSlot: async (id: string): Promise<void> => {
-    void id;
-    throw new Error('删除开放时段尚未开通');
+    await del(`/class-booking/slots/${id}`);
   },
 
   /** 获取单个开放时段详情 */
   getSlotById: async (id: string): Promise<ClassBookingSlot | null> => {
-    // 后端暂无单条详情：用列表按 id 兜底不可行时返回 null
-    void id;
-    return null;
+    return get<ClassBookingSlot>(`/class-booking/slots/${id}`);
   },
 
   /** 更新开放时段信息 */
@@ -85,6 +92,7 @@ export const classBookingService = {
       student_id: string;
       student_name?: string;
       status: ClassBookingRecord['status'];
+      fulfillment_status?: 'upcoming' | 'completed' | 'leave';
       created_at: string;
       updated_at: string;
       slot: {
@@ -110,6 +118,7 @@ export const classBookingService = {
         student_id: string;
         student_name?: string;
         status: ClassBookingRecord['status'];
+        fulfillment_status?: 'upcoming' | 'completed' | 'leave';
         created_at: string;
         updated_at: string;
         slot: {
@@ -136,22 +145,49 @@ export const classBookingService = {
     actorIds: string[],
     params?: { startDate?: string; endDate?: string },
   ): Promise<Array<{ record: ClassBookingRecord; slot: ClassBookingSlot }>> => {
-    void actorIds;
-    void params;
-    return [];
+    const records = await classBookingService.listMyRecords();
+    return records
+      .filter(
+        (record) =>
+          actorIds.length === 0 ||
+          actorIds.includes(record.slot.teacher_id) ||
+          actorIds.includes(record.student_id),
+      )
+      .filter((record) => !params?.startDate || record.slot.lesson_date >= params.startDate)
+      .filter((record) => !params?.endDate || record.slot.lesson_date <= params.endDate)
+      .map((record) => ({
+        record,
+        slot: {
+          ...record.slot,
+          id: record.slot_id,
+          class_id: record.class_id,
+          teacher_id: record.slot.teacher_id,
+          campus_id: record.slot.campus_id,
+          lesson_date: record.slot.lesson_date,
+          start_time: record.slot.start_time,
+          end_time: record.slot.end_time,
+          max_count: 0,
+          current_count: 0,
+          status: 'active',
+          created_at: record.created_at,
+          updated_at: record.updated_at,
+        } as unknown as ClassBookingSlot,
+      }));
   },
 
   /** 获取指定班级集合存在开放预约时段的日期列表（日历红点用） */
   getOpenSlotDates: async (classIds: string[]): Promise<string[]> => {
-    void classIds;
-    return [];
+    const data = await get<{ dates: string[] }>('/class-booking/open-dates', {
+      classIds: classIds.join(','),
+    });
+    return data.dates || [];
   },
 
   /** 检查并自动开班，返回已开班的 scheduleIds */
   autoOpenSlotsIfNeeded: async (classId: string, lessonDate: string): Promise<string[]> => {
-    void classId;
-    void lessonDate;
-    return [];
+    // 服务端预约记录已经是开班依据；该兼容入口只返回当前可用时段，避免本机伪造排课。
+    const slots = await classBookingService.getSlotsByClass(classId, lessonDate);
+    return slots.filter((slot) => slot.status === 'full').map((slot) => slot.id);
   },
 
   /** 更新时段状态（active/rest/full） */
@@ -161,5 +197,12 @@ export const classBookingService = {
     } catch {
       throw new Error('更新时段状态失败');
     }
+  },
+
+  updateRecordStatus: async (
+    recordId: string,
+    status: 'upcoming' | 'completed' | 'leave',
+  ): Promise<void> => {
+    await post(`/class-booking/records/${recordId}/status`, { status });
   },
 };

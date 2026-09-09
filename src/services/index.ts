@@ -65,6 +65,7 @@ export { leadService } from './lead';
 export type { TrialCourseSlot } from './lead';
 export { classBookingService } from './class-booking';
 export { venueBookingService } from './venue-booking';
+export { bookingConfigService } from './booking-config';
 export { opsAlertService } from './ops-alerts';
 export type { AttendanceAnomalyItem, RenewalReminderItem } from './ops-alerts';
 export type { BookableVenue, VenueBookingRecord, VenueBookingSlot } from '@/types/venue-booking';

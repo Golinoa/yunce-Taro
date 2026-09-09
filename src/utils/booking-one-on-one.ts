@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro';
+import { get, put } from '@/utils/request';
 
 export type TeacherBookingStatus = 'open' | 'rest' | 'unset';
 
@@ -92,6 +93,29 @@ export function writeTeacherBookingConfig(config: TeacherBookingConfig) {
     updatedAt: new Date().toISOString(),
   };
   writeTeacherBookingConfigs(configs);
+  void put(
+    `/booking-config/teachers/${config.teacherId}`,
+    config as unknown as Record<string, unknown>,
+  ).catch(() => undefined);
+}
+
+export async function fetchTeacherBookingConfig(
+  teacherId: string,
+): Promise<TeacherBookingConfig | null> {
+  const config = await get<TeacherBookingConfig | null>(`/booking-config/teachers/${teacherId}`);
+  if (config) writeTeacherBookingConfig(config);
+  return config;
+}
+
+export async function saveTeacherBookingConfig(
+  config: TeacherBookingConfig,
+): Promise<TeacherBookingConfig> {
+  const saved = await put<TeacherBookingConfig>(
+    `/booking-config/teachers/${config.teacherId}`,
+    config as unknown as Record<string, unknown>,
+  );
+  writeTeacherBookingConfig(saved);
+  return saved;
 }
 
 export function getTeacherBookingWeekdaySummary(weekdays: number[]): string {

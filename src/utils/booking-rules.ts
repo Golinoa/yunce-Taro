@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro';
+import { get, put } from '@/utils/request';
 
 export interface BookingRuleState {
   parentVisible: boolean;
@@ -50,6 +51,28 @@ export function readBookingRules(): BookingRuleState {
 
 export function writeBookingRules(rules: BookingRuleState) {
   Taro.setStorageSync(BOOKING_RULE_STORAGE_KEY, rules);
+}
+
+/** 服务端为预约规则唯一真相源；本地值只在请求期间用于首屏展示。 */
+export async function fetchBookingRules(campusId?: string): Promise<BookingRuleState> {
+  const rules = await get<BookingRuleState>(
+    '/booking-config/rules',
+    campusId ? { campusId } : undefined,
+  );
+  writeBookingRules({ ...DEFAULT_BOOKING_RULES, ...rules });
+  return { ...DEFAULT_BOOKING_RULES, ...rules };
+}
+
+export async function saveBookingRules(
+  rules: BookingRuleState,
+  campusId?: string,
+): Promise<BookingRuleState> {
+  const saved = await put<BookingRuleState>(
+    `/booking-config/rules${campusId ? `?campusId=${encodeURIComponent(campusId)}` : ''}`,
+    rules as unknown as Record<string, unknown>,
+  );
+  writeBookingRules(saved);
+  return saved;
 }
 
 export function formatBookingDeadline(minutes: number): string {
