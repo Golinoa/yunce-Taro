@@ -129,7 +129,10 @@ const VenueFormPage: React.FC = () => {
       setTimeout(() => Taro.navigateBack(), 800);
     } catch (err) {
       logError('save room', err);
-      Taro.showToast({ title: '保存失败', icon: 'none' });
+      Taro.showToast({
+        title: err instanceof Error && err.message ? err.message : '保存失败',
+        icon: 'none',
+      });
     } finally {
       setSaving(false);
     }

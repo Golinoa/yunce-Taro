@@ -5,7 +5,7 @@
  * - 有封面：顶部对齐裁切，底部压暗保证铃铛可读
  * - 无封面：主题色实底 + 大写拼音水印（与微信胶囊同行）+ 品牌文案上移排版
  */
-import { View, Text, Image } from '@tarojs/components';
+import { View, Text, Image, Swiper, SwiperItem } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,7 +20,7 @@ import {
 
 export interface HomeHeroBannerProps {
   /** 可选封面图；不传则走品牌文字托底 */
-  coverSrc?: string;
+  coverSrc?: string | string[];
   /** 通知未读数（>0 显示红点） */
   unreadCount?: number;
   /** 通知铃铛距顶（含状态栏，px） */
@@ -89,7 +89,11 @@ const HomeHeroBanner: React.FC<HomeHeroBannerProps> = ({
   className,
 }) => {
   const capsule = useCapsuleRow();
-  const hasCoverSrc = Boolean(coverSrc?.trim());
+  const coverSources = useMemo(
+    () => (Array.isArray(coverSrc) ? coverSrc : coverSrc ? [coverSrc] : []).filter(Boolean),
+    [coverSrc],
+  );
+  const hasCoverSrc = coverSources.length > 0;
   const [status, setStatus] = useState<CoverStatus>(hasCoverSrc ? 'loading' : 'error');
 
   useEffect(() => {
@@ -131,18 +135,47 @@ const HomeHeroBanner: React.FC<HomeHeroBannerProps> = ({
 
       {/* 封面图：加高 + 贴顶，底部多裁、顶部内容优先保留 */}
       {showCover ? (
-        <Image
-          src={coverSrc!}
-          className={cn(
-            'absolute left-0 top-0 w-full transition-opacity duration-300',
-            coverReady ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{ height: '128%' }}
-          mode="aspectFill"
-          lazyLoad={false}
-          onLoad={handleLoad}
-          onError={handleError}
-        />
+        coverSources.length > 1 ? (
+          <Swiper
+            className={cn(
+              'absolute left-0 top-0 w-full transition-opacity duration-300',
+              coverReady ? 'opacity-100' : 'opacity-0',
+            )}
+            style={{ height: '128%' }}
+            indicatorDots
+            autoplay
+            circular
+            interval={4000}
+            duration={300}
+            onAnimationFinish={handleLoad}
+          >
+            {coverSources.map((src, index) => (
+              <SwiperItem key={`${src}-${index}`}>
+                <Image
+                  src={src}
+                  className="h-full w-full"
+                  mode="aspectFill"
+                  lazyLoad={false}
+                  onLoad={handleLoad}
+                  onError={handleError}
+                />
+              </SwiperItem>
+            ))}
+          </Swiper>
+        ) : (
+          <Image
+            src={coverSources[0]}
+            className={cn(
+              'absolute left-0 top-0 w-full transition-opacity duration-300',
+              coverReady ? 'opacity-100' : 'opacity-0',
+            )}
+            style={{ height: '128%' }}
+            mode="aspectFill"
+            lazyLoad={false}
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        )
       ) : null}
 
       {/* 有图时压暗，保证铃铛对比度 */}

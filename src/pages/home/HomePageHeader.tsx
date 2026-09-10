@@ -33,6 +33,7 @@ const HomePageHeader: React.FC<HomePageHeaderProps> = ({
     return (
       <>
         <HomeHeroBanner
+          coverSrc={campus?.venueImages || []}
           unreadCount={unreadCount}
           bellTopPx={bellTopPx}
           onNotify={() => Taro.navigateTo({ url: '/package-settings/pages/notifications/index' })}
