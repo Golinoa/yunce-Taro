@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>松果排课上线前真机走查</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb;line-height:1.55}
+    body{max-width:1100px;margin:0 auto;padding:24px} header,section{background:#fff;border:1px solid #dfe4ee;border-radius:12px;padding:20px;margin:0 0 16px;box-shadow:0 2px 8px #1720330b}
+    h1{margin:0 0 8px;font-size:26px} h2{font-size:19px;margin:0 0 12px} p{margin:7px 0}.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    label{display:block;font-weight:600;font-size:14px} input,textarea,select{box-sizing:border-box;width:100%;margin-top:5px;border:1px solid #cbd3e1;border-radius:7px;padding:9px;font:inherit;background:#fff} textarea{min-height:70px;resize:vertical}
+    .step{border-top:1px solid #e7eaf1;padding-top:16px;margin-top:16px}.step:first-of-type{border-top:0;padding-top:0}.step h3{font-size:16px;margin:0 0 7px}.checks{display:flex;gap:16px;flex-wrap:wrap;margin:9px 0}.checks label{font-weight:500}.checks input{width:auto;margin-right:5px}
+    .note{background:#fff7df;border-left:4px solid #e1a900;padding:10px 12px;border-radius:5px}.danger{color:#9b1c1c}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{border:0;border-radius:7px;padding:10px 14px;background:#1769e0;color:#fff;font:inherit;cursor:pointer}.actions button.secondary{background:#637083}.small{font-size:13px;color:#5c6678}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>松果排课·上线前真机走查</h1>
+    <p>候选包：<strong>dev-batch5-review-20260910</strong>。请在真实设备上完成；这份页面只收集结果，不自动判定通过。</p>
+    <div class="note">范围：只使用“松果排课-演示店”测试数据。场地费用只核对预计提示，不进行收款或支付。切换机构、清缓存、换设备是必做项。</div>
+    <div class="meta">
+      <label>测试人<input id="tester"></label><label>日期<input id="date" type="date"></label><label>设备/系统<input id="device"></label><label>网络<input id="network" placeholder="Wi-Fi/4G/5G"></label>
+    </div>
+  </header>
+  <section>
+    <h2>逐项走查与反馈</h2>
+    <div id="steps"></div>
+  </section>
+  <section>
+    <h2>最终结论</h2>
+    <div class="checks"><label><input type="radio" name="decision" value="通过">全部关键路径通过</label><label><input type="radio" name="decision" value="有阻断">存在上线阻断</label><label><input type="radio" name="decision" value="待补测">需要补测</label></div>
+    <label>总体阻断或补测说明<textarea id="summary"></textarea></label>
+    <p class="small">完成后点击“导出反馈”，把下载的 JSON 文件和截图/录屏路径一起发回。我会据此更新 Batch 5 的人工证据，不会代填。</p>
+    <div class="actions"><button id="export">导出反馈 JSON</button><button class="secondary" id="clear">清空本页</button></div>
+  </section>
+  <script>
+    const items=[
+      ['登录与机构隔离','登录测试账号，进入“松果排课-演示店”；切换另一机构后，列表、详情和缓存不得回填演示店数据。'],
+      ['课程与排课','在后台和小程序打开课程分类、课程模板、课程/课表；创建或编辑隔离记录，刷新后名称、教师、时间、状态一致；无权限账号写入被拒绝。'],
+      ['学员跟进','在学员详情新增、编辑、删除跟进记录；刷新后操作人、学员、机构正确；跨机构 ID 读取被拒绝。'],
+      ['卡种、售卡与会员卡','创建测试卡种并售卡，核对实际销售员工、金额单位、剩余课时和详情；执行允许的冻结/解冻或冲正路径，审计可回显；欠课入口按真实成功或明确失败记录。'],
+      ['教师薪资','核对月份、底薪、课时费、提成、扣款/补发和复制规则；生成 pending 工资时 breakdown 可加总；确认/发放后金额不回退；未配置工资条通道时必须显示真实失败。'],
+      ['家长预约基础链路','使用绑定学员完成请假/补课、团课预约与取消、私教预约、场地预约、班课试听；清缓存或换设备后状态仍来自服务端；场地只核对预计费用提示，不收款。'],
+      ['跨设备恢复','清除小程序缓存并换设备重新进入，确认机构、课程、学员、会员卡、预约和薪资页面可从服务端恢复；再次切机构确认旧数据不残留。']
+    ];
+    const root=document.getElementById('steps');
+    items.forEach((x,i)=>{const n=i+1;root.insertAdjacentHTML('beforeend',`<div class="step"><h3>${n}. ${x[0]}</h3><p>${x[1]}</p><div class="checks"><label><input type="radio" name="s${n}" value="通过">通过</label><label><input type="radio" name="s${n}" value="失败">失败</label><label><input type="radio" name="s${n}" value="未执行">未执行</label></div><label>实际结果、截图/录屏路径、错误信息<textarea id="d${n}"></textarea></label></div>`)});
+    document.getElementById('date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('export').onclick=()=>{const out={tester:tester.value,testDate:date.value,device:device.value,network:network.value,candidate:'dev-batch5-review-20260910',items:items.map((x,i)=>({name:x[0],result:document.querySelector(`input[name=s${i+1}]:checked`)?.value||'',evidence:document.getElementById(`d${i+1}`).value})),decision:document.querySelector('input[name=decision]:checked')?.value||'',summary:summary.value};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:'application/json'}));a.download='device-walkthrough-record.json';a.click();URL.revokeObjectURL(a.href)};
+    document.getElementById('clear').onclick=()=>{if(confirm('清空本页填写内容？')) location.reload()};
+  </script>
+</body>
+</html>
