@@ -154,9 +154,4 @@ export const memberCardService = {
     await del(`/card-types/member-cards/${id}`);
     return true;
   },
-
-  /** Debt deduct not modeled on BE yet — keep honest failure */
-  deductDebt: async (_cardId: string, _hours: number): Promise<number> => {
-    throw new Error('[接口未接通] member-card.deductDebt 后端尚未提供欠课划扣接口');
-  },
 };

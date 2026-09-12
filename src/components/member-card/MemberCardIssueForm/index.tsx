@@ -106,43 +106,67 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
     [purchasePrice, installmentPeriod],
   );
 
-  const handlePendingDebt = useCallback(async (sid: string) => {
-    try {
-      const debts = await lessonDebtService.getPendingByStudent(sid);
-      const totalDebt = debts.reduce((sum, d) => sum + d.hours, 0);
-      if (totalDebt <= 0) return;
+  /**
+   * 开卡后处理欠课（F2-a 诚实反馈）：
+   * - none：无欠课；settled：已处理（可能部分）；skipped：用户取消；failed：处理失败
+   * - 划扣走 settle（后端同事务扣卡 + 销欠），不再单独调 deduct 接口
+   */
+  const handlePendingDebt = useCallback(
+    async (
+      sid: string,
+    ): Promise<{ outcome: 'none' | 'settled' | 'skipped' | 'failed'; message?: string }> => {
+      try {
+        const debts = await lessonDebtService.getPendingByStudent(sid);
+        const totalDebt = debts.reduce((sum, d) => sum + d.hours, 0);
+        if (totalDebt <= 0) return { outcome: 'none' };
 
-      const action = await new Promise<number>((resolve) => {
-        Taro.showActionSheet({
-          itemList: ['划扣抵扣', '平账豁免'],
-          success: (res) => resolve(res.tapIndex),
-          fail: () => resolve(-1),
+        const action = await new Promise<number>((resolve) => {
+          Taro.showActionSheet({
+            itemList: ['划扣抵扣', '平账豁免'],
+            success: (res) => resolve(res.tapIndex),
+            fail: () => resolve(-1),
+          });
         });
-      });
 
-      if (action === 0) {
-        const cards = await memberCardService.getByStudent(sid);
-        const latestCard = cards[0];
-        if (latestCard) {
-          const notCovered = await memberCardService.deductDebt(latestCard.id, totalDebt);
+        if (action === 0) {
+          const cards = await memberCardService.getByStudent(sid);
+          const latestCard = cards[0];
           const settled = await lessonDebtService.settleByStudent(
             sid,
             'deduct',
-            totalDebt - notCovered,
+            undefined,
+            latestCard?.id,
           );
-          Taro.showToast({
-            title: `已划扣 ${settled.settledHours} 课时抵欠课`,
-            icon: 'none',
-          });
+          // 部分划扣 / 余额不足如实提示（禁止只报「已划扣 X」）
+          if (
+            settled.notCovered > 0 ||
+            (settled.settledHours === 0 && settled.remainingDebtHours > 0)
+          ) {
+            return {
+              outcome: 'settled',
+              message: `欠课仅部分处理：已划扣 ${settled.settledHours}，未覆盖 ${settled.notCovered}`,
+            };
+          }
+          return { outcome: 'settled', message: `已划扣 ${settled.settledHours} 课时抵欠课` };
         }
-      } else if (action === 1) {
-        const settled = await lessonDebtService.settleByStudent(sid, 'waive');
-        Taro.showToast({ title: `已平账 ${settled.settledHours} 课时欠课`, icon: 'none' });
+
+        if (action === 1) {
+          const settled = await lessonDebtService.settleByStudent(sid, 'waive');
+          return { outcome: 'settled', message: `已平账 ${settled.settledHours} 课时欠课` };
+        }
+
+        return { outcome: 'skipped' };
+      } catch (err) {
+        // 不吞错：交由调用方提示「开卡成功，欠课未处理」
+        logError('MemberCardIssueForm handlePendingDebt', err);
+        return {
+          outcome: 'failed',
+          message: err instanceof Error ? err.message.slice(0, 40) : undefined,
+        };
       }
-    } catch (err) {
-      logError('MemberCardIssueForm handlePendingDebt', err);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!selectedCardType) {
@@ -199,7 +223,7 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
             .join(' | ') || undefined,
       });
 
-      await handlePendingDebt(student.id);
+      const debtResult = await handlePendingDebt(student.id);
       try {
         await auditLogService.record({
           action: 'card.issue',
@@ -222,7 +246,17 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
       } catch (e) {
         logError('audit card.issue', e);
       }
-      Taro.showToast({ title: '开卡成功', icon: 'success' });
+      if (debtResult.outcome === 'failed' || debtResult.outcome === 'skipped') {
+        // 开卡成功但欠课未处理/跳过：如实提示（DEC-011）
+        Taro.showToast({ title: '开卡成功，欠课未处理', icon: 'none' });
+      } else {
+        Taro.showToast({ title: '开卡成功', icon: 'success' });
+        if (debtResult.message) {
+          setTimeout(() => {
+            Taro.showToast({ title: debtResult.message as string, icon: 'none' });
+          }, 900);
+        }
+      }
       try {
         Taro.hideToast();
         await subscribeMessageService.runFlow('E09', {
