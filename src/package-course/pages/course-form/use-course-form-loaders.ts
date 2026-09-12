@@ -374,6 +374,11 @@ export function useCourseFormLoaders(params: UseCourseFormLoadersParams): void {
           /* 静默 */
         }
       })
+      .catch((err) => {
+        // 加载失败如实反馈，避免以默认值渲染后保存覆盖原数据
+        logError('course-form loadTemplate', err);
+        Taro.showToast({ title: '课程加载失败，请返回重试', icon: 'none' });
+      })
       .finally(() => setLoading(false));
   }, [
     courseId,

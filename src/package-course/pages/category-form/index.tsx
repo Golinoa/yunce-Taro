@@ -28,6 +28,7 @@ import { courseCategoryService } from '@/services/course-category';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useCourseTemplateStore } from '@/stores/course-template';
+import { logError } from '@/utils/logger';
 import type {
   CategoryAutoCheckinValue,
   CategoryTimeValue,
@@ -133,6 +134,11 @@ const CategoryFormPage: React.FC = () => {
           setCategoryData(data);
           fillForm(data);
         }
+      })
+      .catch((err) => {
+        // 加载失败如实反馈，避免以默认值渲染后保存覆盖原数据
+        logError('category-form loadCategory', err);
+        Taro.showToast({ title: '分类加载失败，请返回重试', icon: 'none' });
       })
       .finally(() => setLoading(false));
   }, [categoryId, isEdit, fetchList]);
@@ -358,8 +364,14 @@ const CategoryFormPage: React.FC = () => {
       return;
     }
 
-    // 检测分类下是否还有课程
-    const templates = await courseTemplateService.getList(categoryData.id);
+    let templates;
+    try {
+      templates = await courseTemplateService.getList(categoryData.id);
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : '课程列表加载失败';
+      Taro.showToast({ title: message, icon: 'none' });
+      return;
+    }
     const hasCourses = templates.length > 0;
 
     const { confirm } = await Taro.showModal({
