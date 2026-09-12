@@ -277,6 +277,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (p && s) {
         Taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify(p));
         Taro.setStorageSync(AUTH_TOKEN_KEY, JSON.stringify(s));
+        // 登录 / 切机构 / 切身份后统一预拉权限（所有登录路径都经此处）
+        prefetchPermissionConfig();
       } else {
         clearPersistedAuth();
       }
@@ -567,7 +569,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         persistAuth(result.profile, session);
         syncUserRole(result.profile.currentContext.role);
         resetDomainCaches('all');
-        prefetchPermissionConfig();
       }
       return { error: null };
     },
@@ -636,7 +637,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       persistAuth(payload.profile, payload.session);
       syncUserRole(payload.profile.currentContext?.role || null);
       resetDomainCaches('all');
-      prefetchPermissionConfig();
     },
     [persistAuth, syncUserRole],
   );
