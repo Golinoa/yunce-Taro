@@ -35,17 +35,19 @@ npx vitest run src/constants src/pages src/package-course src/package-student sr
 
 三道合计应覆盖全部 115 文件；若数量对不上说明漏了目录，别直接标"全过"。
 
-## 已知门禁现状：lint 有既存 CRLF 报错（非改动引入）
+## 已知门禁现状（2026-09-12 更新：CRLF 已根治）
 
-`npm run lint` 当前报约 **2038 处 / 52 文件**错误，几乎全是 `Delete ␍`（CRLF 换行）。实测结论：
+**换行规范已统一**：新增 `.gitattributes`（`* text=auto eol=lf`）+ 本地 `core.autocrlf=false` 后，
+`npm run lint` 从 2085 problems / 2038 errors（全是 `Delete ␍`）降至 **0 error**（exit 0，门禁通过）。
+仓库内本存 LF，CRLF 只是 Windows 检出状态；`.gitattributes` 保证各平台检出一致。
 
-- **仓库 blob 里存的就是 CRLF**（`git cat-file -p HEAD:src/theme.ts` 可见），最早可追到 8 月的提交。
-- 成因：`core.autocrlf=true` + `.prettierrc` 的 `endOfLine: "lf"` + **缺 `.gitattributes`** 三者冲突。
-- **不是本次改动引入**：涉及文件（`src/theme.ts`、`src/custom-tab-bar/index.tsx` 等）多为历史文件。
-- CI 跑 `npm run check`（含 lint），所以该问题会让 CI 变红。
+剩余 33 warning 全部是**既存且有意保留**：
+- `react-hooks/exhaustive-deps` × 32：**不要自动修**（改依赖数组可能引入 stale closure / 重复请求，需逐个人工判断）。
+- `import/order` × 1（`src/utils/subscribe-message.test.ts`）：vitest mock hoist 要求，属有意结构。
 
-交付时如实说明"lint 的 CRLF 为既存问题、非本次引入"即可；统一修复（补 `.gitattributes` + `format`）
-是独立课题，会动 52 个文件的换行产生大 diff，**不要夹在业务改动里顺手做**。
+已顺手修清（提交 `ef9f2f4`）：`no-explicit-any` / `no-shadow` / `react/sort-comp` 归零；框架边界处（selectPage 回调、Taro static options）用带说明的 `eslint-disable` 注释处理。
+
+**注意**：不要用 CRLF 保存文件，否则 lint 会重新报 `Delete ␍`；新环境如遇同样报错，先 `git config core.autocrlf false` 再拉取。
 
 ## 编译命令（用户执行）
 
