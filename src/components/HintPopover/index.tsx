@@ -46,7 +46,7 @@ const HintPopover: React.FC<HintPopoverProps> = ({
 
   /** 检测图标位置，决定气泡对齐方向防止超出屏幕 */
   const handleToggle = useCallback(
-    (e: any) => {
+    (e: { stopPropagation: () => void }) => {
       e.stopPropagation();
 
       // 已显示时直接关闭
@@ -58,15 +58,16 @@ const HintPopover: React.FC<HintPopoverProps> = ({
       Taro.nextTick(() => {
         Taro.createSelectorQuery()
           .select(`#${iconId}`)
-          .boundingClientRect((rect: any) => {
-            if (!rect || typeof rect.left !== 'number') {
+          .boundingClientRect((rect) => {
+            const r = Array.isArray(rect) ? rect[0] : rect;
+            if (!r || typeof r.left !== 'number') {
               setAlign('left');
               setVisible(true);
               return;
             }
 
             const screenWidth = Taro.getWindowInfo().windowWidth;
-            const iconCenterX = rect.left + rect.width / 2;
+            const iconCenterX = r.left + (r.width ?? 0) / 2;
             // 气泡宽度 480rpx ≈ 240px
             const BUBBLE_HALF_WIDTH = 120;
 

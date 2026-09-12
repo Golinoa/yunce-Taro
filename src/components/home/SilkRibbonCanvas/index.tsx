@@ -143,7 +143,11 @@ const SilkRibbonCanvas: React.FC = () => {
             return;
           }
 
-          const canvas = res[0].node as any;
+          const canvas = res[0].node as unknown as {
+            getContext: (type: string) => CanvasRenderingContext2D;
+            width: number;
+            height: number;
+          };
           const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
           // 使用新版 getWindowInfo 替代已弃用的 getSystemInfoSync
           const dpr = Taro.getWindowInfo().pixelRatio;

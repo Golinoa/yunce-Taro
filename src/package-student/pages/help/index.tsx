@@ -69,7 +69,7 @@ const Help: React.FC = () => {
                 className="w-[80rpx] h-[80rpx] rounded-[18rpx] center mb-[12rpx]"
                 style={{ backgroundColor: `${item.color}15` }}
               >
-                <Icon name={item.icon} size={36} color={item.color as any} />
+                <Icon name={item.icon} size={36} color={item.color as string} />
               </View>
               <Text className="text-[24rpx] font-medium text-foreground text-center leading-tight">
                 {item.label}

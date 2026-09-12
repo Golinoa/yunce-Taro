@@ -19,11 +19,11 @@ interface ErrorBoundaryState {
 }
 
 export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false, message: '' };
-
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, message: error?.message || '未知错误' };
   }
+
+  state: ErrorBoundaryState = { hasError: false, message: '' };
 
   componentDidCatch(error: Error) {
     logError('ErrorBoundary', error);

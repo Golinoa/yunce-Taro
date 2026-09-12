@@ -167,8 +167,8 @@ export async function executeSupplementSave(input: {
       successTitle: (count) => `已补录 ${count} 人`,
       logPrefix: 'supplement',
     });
-  } catch (error) {
-    logError('handleSupplementSave', error);
+  } catch (innerErr) {
+    logError('handleSupplementSave', innerErr);
     Taro.showToast({ title: '补录失败，请重试', icon: 'none' });
   }
 }
@@ -223,8 +223,8 @@ export async function executeIncrementalEditSave(input: {
       successTitle: (count) => `已更新 ${count} 人`,
       logPrefix: 'incremental edit',
     });
-  } catch (error) {
-    logError('handleIncrementalEditSave', error);
+  } catch (innerErr) {
+    logError('handleIncrementalEditSave', innerErr);
     Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
   }
 }

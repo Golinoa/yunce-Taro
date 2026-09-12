@@ -742,6 +742,7 @@ export function applyTheme(palette: ThemePalette): void {
         (query as any)
           .selectPage()
           .node()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 小程序 selectPage 回调类型不可用
           .exec((res: any) => {
             const node = res?.[0]?.node;
             if (node?.style) {

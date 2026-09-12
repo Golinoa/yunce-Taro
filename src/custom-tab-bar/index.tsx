@@ -72,6 +72,8 @@ interface CustomTabBarState {
 }
 
 export default class CustomTabBar extends Component<object, CustomTabBarState> {
+  // Taro 约定 static options 置于类顶部，绕过 react/sort-comp 默认排序
+  // eslint-disable-next-line react/sort-comp
   static options = {
     addGlobalClass: true,
   };

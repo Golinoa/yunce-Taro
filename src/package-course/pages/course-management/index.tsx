@@ -287,10 +287,10 @@ const CourseManagementPage: React.FC = () => {
       {/* 课程列表（用户口径 2026-08-23：移除统计文案+班级卡片外层包装，直接合并到一个 flex 列表） */}
       <View className="px-[32rpx] pb-[calc(220rpx+env(safe-area-inset-bottom))]">
         {(() => {
-          const isClassTab = activeCategoryItem?.mode === 'class';
+          const curIsClassTab = activeCategoryItem?.mode === 'class';
           // 班课 tab 只展示班级实例；团课/私教仍展示课程模板（避免未排课模板点进「新增/编辑课程」）
-          const showClasses = isClassTab && activeClasses.length > 0;
-          const showTemplates = !isClassTab && templates.length > 0;
+          const showClasses = curIsClassTab && activeClasses.length > 0;
+          const showTemplates = !curIsClassTab && templates.length > 0;
           if (!showClasses && !showTemplates) {
             if (error && templates.length === 0) {
               return (
