@@ -1,188 +1,71 @@
+# AGENTS.md — yunceTaro（云策教务小程序）AI 开发指令面
+
+> **本文件只是地图。** 规则正文**唯一**在 [`.harness/`](.harness/README.md)，动手前先按地图加载，不要凭记忆或猜。
+>
 > **当前联调约束（2026-09-08）**：[统一模块入口](../yunce-back/yunce-backend/docs/development/README.md)。全模块验收；前端 UI 固定，后端优先兼容前端。问题和冲突进统一台账，历史进度数字不代表当前验收。
 
-# 云策教务 - AI 编程工程化硬性要求
-
-> 本文件是 AI 辅助编码时的强制约束，任何代码生成、修改、重构都必须遵守。
-> 详细规则见 `Agents/` 目录下对应文件。
-
 ---
 
-## 一、技术栈锁定
+## 📍 按任务导航
 
-| 项   | 规范                         | 禁止                                               |
-| ---- | ---------------------------- | -------------------------------------------------- |
-| 框架 | Taro 4.x + React 18          | 类组件、Vue                                        |
-| 语言 | TypeScript 严格模式          | 隐式 any、@ts-ignore                               |
-| 样式 | UnoCSS 原子化类名 + rpx 单位 | **禁止新增 SCSS**（遗留待迁）；内联 style、px 单位 |
-| 状态 | Zustand                      | Redux、MobX、组件内 useState 管理全局状态          |
-| 日期 | dayjs                        | moment.js、硬编码月份/年份                         |
-| 类名 | classnames (cn)              | 模板字符串拼接 className                           |
+| 你要做什么 | 加载什么 |
+| --- | --- |
+| 任何代码改动（必读） | [`.harness/rules/README.md`](.harness/rules/README.md) — 规则索引 |
+| 技术栈 / 目录结构 / 工程化 | [`.harness/rules/00-core-stack.md`](.harness/rules/00-core-stack.md) |
+| 邮箱认证 / 隐私授权 | [`.harness/rules/05-auth-and-privacy.md`](.harness/rules/05-auth-and-privacy.md) |
+| 会员 / 原生导航 | [`.harness/rules/06-membership-native-nav.md`](.harness/rules/06-membership-native-nav.md) |
+| 走查冻结链路 | [`.harness/rules/07-walkthrough-frozen-chains.md`](.harness/rules/07-walkthrough-frozen-chains.md) |
+| 写样式 | [`.harness/rules/10-styling.md`](.harness/rules/10-styling.md) + [`wiki/design-tokens.md`](.harness/wiki/design-tokens.md) |
+| 写 / 改组件 | [`.harness/rules/20-components.md`](.harness/rules/20-components.md) + [`wiki/component-catalog.md`](.harness/wiki/component-catalog.md) |
+| 写弹窗或表单 | [`.harness/rules/30-sheets-and-forms.md`](.harness/rules/30-sheets-and-forms.md) → [`skills/new-sheet.md`](.harness/skills/new-sheet.md) |
+| 接接口 / 数据层 | [`.harness/rules/40-data-and-services.md`](.harness/rules/40-data-and-services.md) + [`wiki/api-integration.md`](.harness/wiki/api-integration.md) |
+| 状态管理 / 类型 | [`.harness/rules/50-state-and-types.md`](.harness/rules/50-state-and-types.md) |
+| **角色 / 权限 / 身份（硬性必读）** | [`.harness/rules/60-role-identity.md`](.harness/rules/60-role-identity.md) |
+| 微信平台能力（订阅消息 / 授权） | [`.harness/rules/70-wechat-platform.md`](.harness/rules/70-wechat-platform.md) |
+| 隐私 / 合规 / 提审 | [`.harness/rules/80-compliance.md`](.harness/rules/80-compliance.md) |
+| 滚动 / 蒙层 / PickerView / 手势交互 | [`.harness/rules/90-scroll-interaction.md`](.harness/rules/90-scroll-interaction.md) |
+| 新增页面 | [`.harness/skills/new-page.md`](.harness/skills/new-page.md) |
+| 新增业务模块 | [`.harness/skills/new-module.md`](.harness/skills/new-module.md) |
+| 提交前自检 | [`.harness/skills/code-review.md`](.harness/skills/code-review.md) |
+| 编译与交付 | [`.harness/skills/verify-build.md`](.harness/skills/verify-build.md) |
+| 提交微信审核 | [`.harness/skills/wechat-submit-check.md`](.harness/skills/wechat-submit-check.md) |
+| 沉淀新规则 / 新技能 | [`.harness/skills/rule-capture.md`](.harness/skills/rule-capture.md) |
+| 环境审查 / 文档园丁 / 技术债 | [`environment-review.md`](.harness/skills/environment-review.md) · [`doc-gardening.md`](.harness/skills/doc-gardening.md) · [`tech-debt-sweep.md`](.harness/skills/tech-debt-sweep.md) |
+| 查项目事实 | [`.harness/wiki/README.md`](.harness/wiki/README.md) — 目录 / Token / 组件 / 路由 / 环境 |
+| **查业务在哪（模块地图）** | [`.harness/wiki/module-map.md`](.harness/wiki/module-map.md) — 分包 → 页面 → services/stores + 架构图 |
+| 架构边界（谁依赖谁） | [`.harness/wiki/architecture-boundaries.md`](.harness/wiki/architecture-boundaries.md) |
+| 任务进展（跨会话续接） | [`.harness/changes/<feature>/`](.harness/changes/README.md) |
 
-## 二、样式铁律
+## 🗺️ 结构总览
 
-1. **禁止创建 SCSS 文件** — 所有样式使用 UnoCSS 类名，已有 SCSS 文件应迁移后删除
-2. **禁止内联 style** — 除非动态计算值（如 ECharts 配置），否则必须用 UnoCSS 类名或 Token
-3. **使用设计 Token** — 颜色用 `text-primary`/`bg-card`/`border-border` 等，禁止硬编码色值
-4. **单位用 rpx** — `text-[28rpx]`、`py-[20rpx]`，禁止 `px`/`rem`（UnoCSS presetRemRpx 自动转换）
-5. **新增样式规则** — 在 `uno.config.ts` 的 rules/shortcuts 中定义，禁止散落硬编码值
+```
+.harness/
+├── rules/     # 什么必须永远为真（14 个约束，按任务加载 1-2 个）
+├── skills/    # 这件事按什么步骤做（6 功能交付 + 4 治理，共 11 个）
+├── agents/    # 谁来做、有什么权限（engineer / reviewer / researcher）
+├── wiki/      # 这个项目的事实是什么（按需查询，含模块地图）
+└── changes/   # 当前任务进展到哪（每功能一目录）
+```
 
-## 三、组件铁律
+## ⚠️ 四条底线（违反即返工）
 
-1. **先查后写** — 新增 UI 元素前，必须先检查 `src/components/` 是否已有可复用组件
-2. **弹窗必须封装** — 所有底部弹窗使用 `BottomSheet` 组件，业务弹窗封装为独立 Sheet 组件
-3. **输入框必须用 FormInput** — 禁止直接使用 `<Input>` 组件，必须用 `<FormInput>` 包裹
-4. **BottomSheet 只传 visible** — `visible={state}` 单 prop 模式，禁止 `show={x} visible={x}`
-5. **组件文件结构** — `ComponentName/index.tsx`，组件名 PascalCase，文件名 kebab-case
+1. **先加载后动手**：规则索引没读就改代码 = 默认返工。
+2. **冲突以 `.harness` 为准**：本文件只导航；`.cursor/rules/00-harness-entry.mdc`、`codex.md` 均为一行指针，不复制正文。
+3. **编译由用户执行**：AI 需要编译时先向用户申请并说明命令与用途，**不自行跑构建**。交付前跑 `npm run check`（typecheck + lint）。
+4. **推远程默认 `dev-*`**：**禁止擅自打 `v*` 或上传微信体验版**，除非用户明确要求。详见 [`rules/00-core-stack.md`](.harness/rules/00-core-stack.md)。
 
-## 四、数据铁律
-
-1. **设计 Token 单一数据源** — `src/theme.ts` → 同步 `app.scss` → 全局生效
-2. **禁止硬编码业务文本** — 月份用 `dayjs().month() + 1`，状态文本用映射表
-3. **状态机严格单向** — 薪资 pending→confirmed→paid，禁止反向跳转
-4. **运行时使用真实 API** — 禁止在页面硬编码业务数据或恢复已删除的 src/data
-5. **页面只引用 `@/services`** — 禁止直接引用 `@/data/`，Service 层是唯一数据出口
-6. **Service 层接口契约** — 对照现有 UI 字段、真实路由和 validator；不猜路径、不假成功
-
-## 五、代码质量
-
-1. **Hooks 规范** — useCallback/useMemo 包裹回调/计算值，依赖数组完整
-2. **事件命名** — handle 前缀（handleSubmit、handleClose）
-3. **常量命名** — UPPER_SNAKE_CASE，提取到文件顶部或 `src/constants/`
-4. **类型定义** — Props 接口必须导出，禁止隐式 any
-5. **JSDoc** — 每个组件必须有使用场景 + 功能说明的 JSDoc 注释
-
-## 六、工程化工具链
-
-| 工具        | 作用           | 触发时机                      |
-| ----------- | -------------- | ----------------------------- |
-| ESLint      | 代码规则检查   | `npm run lint` / pre-commit   |
-| Prettier    | 代码格式化     | `npm run format` / pre-commit |
-| TypeScript  | 类型检查       | `npm run typecheck`           |
-| husky       | Git 钩子管理   | `git commit` 时自动触发       |
-| lint-staged | 只检查暂存文件 | pre-commit 钩子调用           |
-
-### 可用命令
+## 🧰 常用命令
 
 ```bash
-npm run lint          # 检查代码规则
-npm run lint:fix      # 自动修复规则问题
-npm run format        # 格式化代码
-npm run format:check  # 检查格式是否合规
 npm run typecheck     # TypeScript 类型检查
+npm run lint          # ESLint
+npm run format:check  # 格式检查
 npm run check         # 全量检查（typecheck + lint + format）
+npm test              # Vitest
 ```
 
-### 提交流程
+## 🔗 相关文档
 
-```
-git commit
-  → husky pre-commit 钩子触发
-    → lint-staged 只检查暂存文件
-      → .ts/.tsx: eslint --fix + prettier --write
-      → .scss/.css/.json/.md: prettier --write
-        → 全部通过 → 提交成功
-        → 有 error → 提交被拒绝，修完再提交
-```
-
-## 七、联调编译
-
-运行时数据通过真实 API；src/data 已删除。修改 src 下影响运行的代码后执行 npm run check（至少 typecheck）及 npm run build:weapp:dev，交付注明 dist 是否重编译。
-
-测环境脚本自动清理缓存、关闭 Mock 并连接 dev.chancore.cn。实际命令和环境见统一指南 COMMANDS.md；旧 Mock 构建已废弃，不再执行。仅修改文档无需业务编译。
-
-## 八、推远程 / 打标签（默认不发体验版）
-
-| 标签             | 触发                                     | 用途                                  |
-| ---------------- | ---------------------------------------- | ------------------------------------- |
-| `dev-*` / `ci-*` | `ci.yml` 质量门禁                        | **默认**：推代码、跑 CI               |
-| `v*`             | `release.yml` prod 构建 + `upload:weapp` | **仅当用户明确要求**发体验版/上传微信 |
-
-AI 代推远程或打标签时：**默认 `dev-*`，禁止擅自打 `v*` 或上传微信**。详见 `.cursor/rules/taro-tag-default-dev.mdc`。
-
-## 九、审查清单
-
-每次代码生成/修改后，AI 必须自检：
-
-- [ ] 是否复用了已有组件（FormInput/BottomSheet/Card 等）？
-- [ ] 样式是否使用 UnoCSS Token（无硬编码色值/尺寸）？
-- [ ] 弹窗是否封装为独立组件（非页面内联）？
-- [ ] 输入框是否使用 FormInput（非裸 Input）？
-- [ ] 是否有新增 SCSS 文件（应迁移为 UnoCSS）？
-- [ ] 是否有内联 style（应提取为 UnoCSS 规则）？
-- [ ] TypeScript 类型是否完整（无隐式 any）？
-- [ ] **是否已执行 `npm run build:weapp:dev` 重编译**（用户靠 `dist` 验收入口）？
-
----
-
-## 十、小程序 PickerView 铁律
-
-所有使用微信原生 `PickerView` / `picker-view` 的滚轮选择器（日期、时间、范围、分类等）必须遵守：
-
-1. **`indicator-style` 的高度必须用 `px` 单位**——
-   写 `rpx` 会被微信**静默忽略**并退回默认 `34px`，导致选中框高度异常、各 item 行高不一致、滚动时选中行不居中、整体"不丝滑/错位"。
-2. **px 与 rpx 的换算**：设计稿 item 高度 `96rpx`（@375 基准）→ 微信须写 `48px`。
-   ```tsx
-   <PickerView indicatorStyle="height: 48px; line-height: 48px;" ... />
-   ```
-3. **`picker-view-column` 内子 view 的高度由 `indicator-style` 自动决定**，在子元素样式里写高度无效，无需（也不该）再写 `h-[96rpx]` 去强行对齐。
-4. 涉及文件（改一处须全改）：`PickerSheet`、`DatePickerSheet`、`TimePickerSheet`、`TimeRangePicker`、`teacher/MonthPickerSheet`。
-
-> 排查方式：`grep -rn 'indicatorStyle' src/` 确认所有命中都是 `px`，无一例 `rpx`。
-
----
-
-## 十一、交互复用铁律（ScrollView + 多入口同一能力）
-
-**教训来源**：首页待办 FAB「切换视图」与工具栏 icon——工具栏正常，FAB 路径反复改 scroll 锁定仍跳顶。
-**二次教训**：待办详情/添加弹窗「关层触发滚动条」——根因是误用 `scrollTop` 受控。
-
-### 原则
-
-1. **同一业务能力只保留一条已验证实现**（如 `handleTodoViewModeChange`），多入口复用，禁止 FAB 再写一套旁路。
-2. **先确认哪条路径可用**，让其它入口串联到该路径，而非为坏路径叠 scroll hack。
-3. **FAB + ScrollView**：沿用 `fabMenuExpanded` + `scrollTopPin` + `scrollY={!fabMenuExpanded}`；勿随意改成 ref-only 等半套方案。
-4. **菜单内操作等价于页面按钮**：菜单先收起，短延迟后调用同一 handler（首页 `FAB_VIEW_TOGGLE_DELAY_MS` ≈ 220ms）。
-5. **禁止**长期保留专用排查 `console.log` / 临时代码文件；问题解决后删除。正式本地调试走 `utils/local-debug.ts`。
-6. **能复用就不扩代码**：每多一层无关 setState 都可能让微信 `ScrollView` 丢滚动位置。
-
-### 固定蒙层弹窗 × ScrollView（硬性，三根因必须同时规避）
-
-| #   | 根因                                                                              | 正确做法                                                                               | 禁止                                                    |
-| --- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 1   | `scroll-into-view` **只要还绑着**（含 `""`），任意 setData 都可能回顶             | idle 用 `scrollIntoViewProps(id)` **完全解绑**；仅定位瞬间传入                         | 长期绑 `scrollIntoView={x \|\| undefined}` / 空串       |
-| 2   | 开蒙层 setState 可能让未受控列表丢位置；onScroll 缓存可能过期（ref=0→一点击回顶） | `freeze(() => open())`：先 `scrollOffset` 实测再开层；关层后 `unfreeze()` **延迟解绑** | 先 `setVisible` 再 freeze；关层 `top → top+0.01 → null` |
-| 3   | 页面级滚动 / 弹层内 Input 插入推页                                                | 页配置 `disableScroll: true`；Input `adjustPosition={false}`；详情可推迟挂载 Input     | 为弹层改 `scrollY`；用 `+0.01` 当「保位置」             |
-
-**标准钩子**：`useOverlayScrollFreeze('#scroll-id')`（开层 `freeze(() => setVisible(true))`；关层 `unfreeze`；FAB 收起用 `unfreezeNow`）。
-
-**FAB 菜单**（已验证）：`fabMenuExpanded` + freeze + `scrollY={!fabMenuExpanded}`，勿与蒙层方案拆成两套互相打架的 pin。
-
-**根因总结**：点卡片跳顶 = idle 仍绑着 `scroll-into-view` + 开层 setData 丢位置；关层抖滚动条 = `+0.01` 解绑舞——两套「修复」互相制造问题。
-
-### 首页待办 FAB 切换视图（标准写法）
-
-```tsx
-const handleTodoViewModeChange = useCallback((mode: TodoViewMode) => {
-  setTodoViewMode(mode);
-}, []);
-
-const handleFabViewModeToggle = useCallback(() => {
-  const next = todoViewModeRef.current === 'timeline' ? 'quadrant' : 'timeline';
-  setTimeout(() => handleTodoViewModeChange(next), FAB_VIEW_TOGGLE_DELAY_MS);
-}, [handleTodoViewModeChange]);
-```
-
-## 详细规则索引
-
-| 文件                          | 内容                                                    |
-| ----------------------------- | ------------------------------------------------------- |
-| `Agents/project-structure.md` | 项目目录结构、文件命名、导出规范、新增页面/模块流程     |
-| `Agents/api-service.md`       | Service 层规范、接口定义、Mock 数据、请求工具、联调切换 |
-| `Agents/pages.md`             | 页面开发规范、生命周期、路由、Tab、列表页、详情页       |
-| `Agents/components.md`        | 组件开发规范、组件清单、复用规则                        |
-| `Agents/styles.md`            | UnoCSS 规范、Token 体系、样式迁移指南                   |
-| `Agents/sheets.md`            | 弹窗开发规范、BottomSheet 用法、Sheet 组件模板          |
-| `Agents/forms.md`             | 表单/输入框规范、FormInput 用法、小程序 Input 陷阱      |
-| `Agents/state.md`             | 状态管理规范、Zustand 用法、数据流                      |
-| `Agents/types.md`             | TypeScript 规范、类型定义模板                           |
-| `Agents/review.md`            | 代码审查 Checklist、常见问题速查                        |
+- 后端工程规则：[`../yunce-back/yunce-backend/.harness/`](../yunce-back/yunce-backend/.harness/README.md)
+- 运营后台工程规则：[`../yunce-back/yunce-admin/apps/web-antd/.harness/`](../yunce-back/yunce-admin/apps/web-antd/.harness/README.md)
+- 联调入口 / 修复计划：[`../yunce-back/yunce-backend/docs/development/README.md`](../yunce-back/yunce-backend/docs/development/README.md)

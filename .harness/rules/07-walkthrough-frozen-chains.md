@@ -1,0 +1,36 @@
+---
+last_updated: 2026-09-12
+status: active
+source: .cursor/rules/invite-walkthrough-frozen-chains.mdc 迁移
+---
+
+# R07 走查冻结链路（业务专项，硬性）
+
+> P0 / P1 邀请 / 登录链路真机走查通过后进入**冻结状态**。优化前必须评估影响范围。
+
+## 走查记录位置
+
+- HTML 清单：`docs/diagnostics/2026-09-02-device-walkthrough.html`
+- JSON 持久化：`docs/diagnostics/device-walkthrough-record.json`
+- 计划 §11.7 / §11.8 / §11.9
+
+## 强制流程
+
+1. **优化前**：读取 `device-walkthrough-record.json` 的 `frozen` 字段，确认是否触及已冻结走查项的关键文件。
+2. **已冻结链路**：标记为 `pass` 的走查 ID 及其 `CHAIN_FILES`（见 HTML）不得静默修改行为。
+3. **影响评估**：若 diff 涉及冻结路径，在 PR / 提交说明中写明：走查 ID、影响面、是否需要重新走查。
+4. **受限即询问**：评估为「可能破坏已验收行为」时，**必须先问用户**，不得直接改。
+
+## 关键冻结域（走查通过后）
+
+| 域 | 走查 ID | 核心路径 |
+| --- | --- | --- |
+| L2 wxacode | VH-* | c=scene → invite-register → share attach |
+| L4 门店互邀 | V4T-R* | O码 → landing → store-entry → referrerOrganizationId |
+| L3 员工邀请 | X-3 | campus-invite-landing → accept |
+| bind-code | X-* | S/E only；O/P 明确拒绝 |
+| P1 登录单飞 | F5/F6 | performWechatAuth 整链单飞 |
+
+## 触发文件 globs
+
+`**/invite*`、`**/wxacode*`、`**/org-referral/**`、`**/parent-share*`、`**/store-entry/**`、`**/store-referral*`、`**/wechat-login-coordinator*`、`**/campus-invite/**`、`**/bind-code*`、`**/organization.service.ts`、`**/auth.service.ts`

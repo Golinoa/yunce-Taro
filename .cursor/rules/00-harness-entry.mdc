@@ -1,0 +1,8 @@
+---
+description: 本仓库所有 AI 编码规则入口。
+alwaysApply: true
+---
+
+# 规则入口
+
+[AGENTS.md](../../AGENTS.md)
