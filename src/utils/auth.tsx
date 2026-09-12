@@ -39,10 +39,17 @@ import type {
   UserRole,
 } from '@/types/profile';
 import { clearProfileSetupDone, markLastLoginAsNewUser } from '@/utils/auth-onboarding';
+import { fetchPermissionConfig } from '@/services/permission';
 import { resetDomainCaches } from '@/utils/reset-domain-caches';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { performWechatAuth } from '@/utils/wechat-login-coordinator';
+import { logError } from '@/utils/logger';
+
+/** 登录 / 切机构 / 切身份后预拉权限配置（服务端为真相源，route-guard 依赖缓存） */
+function prefetchPermissionConfig(): void {
+  void fetchPermissionConfig().catch((err) => logError('prefetch permission config', err));
+}
 
 // ============================================
 // 类型定义
@@ -560,6 +567,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         persistAuth(result.profile, session);
         syncUserRole(result.profile.currentContext.role);
         resetDomainCaches('all');
+        prefetchPermissionConfig();
       }
       return { error: null };
     },
@@ -628,6 +636,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       persistAuth(payload.profile, payload.session);
       syncUserRole(payload.profile.currentContext?.role || null);
       resetDomainCaches('all');
+      prefetchPermissionConfig();
     },
     [persistAuth, syncUserRole],
   );
