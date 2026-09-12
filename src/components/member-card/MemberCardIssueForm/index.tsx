@@ -129,14 +129,9 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
         });
 
         if (action === 0) {
-          const cards = await memberCardService.getByStudent(sid);
-          const latestCard = cards[0];
-          const settled = await lessonDebtService.settleByStudent(
-            sid,
-            'deduct',
-            undefined,
-            latestCard?.id,
-          );
+          // 划扣：settle 内部同事务扣卡 + 销欠。
+          // 不传 memberCardId → 后端按 purchaseAt desc 自选最新卡，避免前端顺序不确定选错卡。
+          const settled = await lessonDebtService.settleByStudent(sid, 'deduct');
           // 部分划扣 / 余额不足如实提示（禁止只报「已划扣 X」）
           if (
             settled.notCovered > 0 ||
