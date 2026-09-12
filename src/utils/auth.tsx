@@ -28,6 +28,7 @@ import {
   bindAccountEmail,
   sendBindEmailCode,
 } from '@/services/auth';
+import { fetchPermissionConfig } from '@/services/permission';
 import type {
   AuthSession,
   Identity,
@@ -39,12 +40,11 @@ import type {
   UserRole,
 } from '@/types/profile';
 import { clearProfileSetupDone, markLastLoginAsNewUser } from '@/utils/auth-onboarding';
-import { fetchPermissionConfig } from '@/services/permission';
+import { logError } from '@/utils/logger';
 import { resetDomainCaches } from '@/utils/reset-domain-caches';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { performWechatAuth } from '@/utils/wechat-login-coordinator';
-import { logError } from '@/utils/logger';
 
 /** 登录 / 切机构 / 切身份后预拉权限配置（服务端为真相源，route-guard 依赖缓存） */
 function prefetchPermissionConfig(): void {

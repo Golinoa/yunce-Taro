@@ -1,0 +1,27 @@
+# 换行统一为 LF
+#
+# 背景：Windows 下 core.autocrlf=true 会把文件检出为 CRLF，而 .prettierrc 的
+# endOfLine 是 "lf"，两者冲突会导致 `npm run lint` / `format:check` 大量
+# `Delete ␍` 报错（并让 CI 的 `npm run check` 变红）。
+#
+# 规则：仓库内一律存 LF，检出时也不转 CRLF（eol=lf），与 prettier 保持一致。
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.bmp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.mp3 binary
+*.mp4 binary
+*.zip binary
+*.pdf binary
+*.xlsx binary

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { lessonDebtService } from './lesson-debt';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -11,8 +12,6 @@ vi.mock('@/utils/request', () => ({
 vi.mock('@/utils/pagination', () => ({
   formatApiDateTime: (v: unknown) => (typeof v === 'string' ? v : '2026-09-11T12:00:00.000Z'),
 }));
-
-import { lessonDebtService } from './lesson-debt';
 
 describe('lessonDebtService', () => {
   beforeEach(() => {

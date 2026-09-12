@@ -28,7 +28,6 @@ import { courseCategoryService } from '@/services/course-category';
 import { courseTemplateService } from '@/services/course-template';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useCourseTemplateStore } from '@/stores/course-template';
-import { logError } from '@/utils/logger';
 import type {
   CategoryAutoCheckinValue,
   CategoryTimeValue,
@@ -36,6 +35,7 @@ import type {
   CourseCategoryFormData,
   CourseCategoryMode,
 } from '@/types/course-category';
+import { logError } from '@/utils/logger';
 
 /**
  * 选择器类型
