@@ -100,7 +100,7 @@ const PermissionForm: React.FC = () => {
     setModules((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (mode === 'create') {
       const trimmed = name.trim();
       if (!trimmed) {
@@ -110,7 +110,7 @@ const PermissionForm: React.FC = () => {
       const role = addCustomRole(trimmed, 'teacher');
       updateGrant(role.id, { scope, modules });
       try {
-        save();
+        await save();
         // 审计日志（用户口径 2026-08-22）：权限配置变更属高权限操作
         void auditLogService
           .record({
@@ -125,8 +125,14 @@ const PermissionForm: React.FC = () => {
           .catch((e) => logError('audit permission.save', e));
         Taro.showToast({ title: '已创建', icon: 'success' });
         setTimeout(() => Taro.navigateBack(), 600);
-      } catch {
-        Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+      } catch (err) {
+        // 版本冲突：刷新缓存并如实提示，禁止静默覆盖
+        if (Number((err as { code?: number })?.code) === 409) {
+          void usePermissionStore.getState().load();
+          Taro.showToast({ title: '权限已被他人修改，已刷新', icon: 'none' });
+        } else {
+          Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+        }
       }
       return;
     }
@@ -142,7 +148,7 @@ const PermissionForm: React.FC = () => {
     const key = isSystemRole ? roleKey : customRole?.id || roleKey;
     updateGrant(key, { scope, modules });
     try {
-      save();
+      await save();
       // 审计日志（用户口径 2026-08-22）：权限配置变更属高权限操作
       void auditLogService
         .record({
@@ -157,8 +163,14 @@ const PermissionForm: React.FC = () => {
         .catch((e) => logError('audit permission.save', e));
       Taro.showToast({ title: '已保存', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 600);
-    } catch {
-      Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+    } catch (err) {
+      // 版本冲突：刷新缓存并如实提示，禁止静默覆盖
+      if (Number((err as { code?: number })?.code) === 409) {
+        void usePermissionStore.getState().load();
+        Taro.showToast({ title: '权限已被他人修改，已刷新', icon: 'none' });
+      } else {
+        Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+      }
     }
   }, [
     mode,

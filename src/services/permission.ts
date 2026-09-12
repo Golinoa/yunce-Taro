@@ -1,8 +1,7 @@
 /**
  * Service 层 — 权限配置 API（授权开关 + 自定义角色）
  *
- * mock 实现：本地 storage 持久化（联调前 admin 的授权在本地即可生效并保存）。
- * 真实实现：待后端 OpenAPI 契约（机构-角色-权限表），届时替换为 request 调用。
+ * 服务端为真相源：`GET/PUT /org-permissions`；本地仅做同步缓存（route-guard 需同步读）。
  */
 import Taro from '@tarojs/taro';
 import {
@@ -14,9 +13,10 @@ import {
   type PermissionConfig,
   type RoleGrant,
 } from '@/types/permission';
+import { get, put } from '@/utils/request';
 
 /** 默认配置：系统角色按 ROLE_PERMISSION_MAP 默认值，无自定义角色 */
-function createDefaultConfig(): PermissionConfig {
+export function createDefaultConfig(): PermissionConfig {
   return {
     version: 1,
     grants: {
@@ -27,6 +27,16 @@ function createDefaultConfig(): PermissionConfig {
     },
     customRoles: [],
   };
+}
+
+/** 写入本地缓存并返回 */
+function cacheConfig(config: PermissionConfig): PermissionConfig {
+  try {
+    Taro.setStorageSync(PERMISSION_CONFIG_KEY, config);
+  } catch {
+    // ignore storage errors
+  }
+  return config;
 }
 
 /** 读取权限配置（同步，供路由守卫/数据层直接消费） */
@@ -42,12 +52,49 @@ export function getPermissionConfig(): PermissionConfig {
   return createDefaultConfig();
 }
 
-/** 保存权限配置 */
-export function savePermissionConfig(config: PermissionConfig): void {
-  Taro.setStorageSync(PERMISSION_CONFIG_KEY, {
-    ...config,
-    version: (config.version || 1) + 1,
+/** 清空本地权限缓存（切机构 / 登出） */
+export function clearPermissionCache(): void {
+  try {
+    Taro.removeStorageSync(PERMISSION_CONFIG_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** 从服务端拉取并写入本地缓存 */
+export async function fetchPermissionConfig(): Promise<PermissionConfig> {
+  const data = await get<PermissionConfig>('/org-permissions');
+  const cfg: PermissionConfig = {
+    version: Number(data?.version ?? 1),
+    grants: (data?.grants as PermissionConfig['grants']) || createDefaultConfig().grants,
+    customRoles: Array.isArray(data?.customRoles) ? data.customRoles : [],
+  };
+  return cacheConfig(cfg);
+}
+
+/** 保存到服务端并更新本地缓存 */
+export async function savePermissionConfigAsync(
+  config: PermissionConfig,
+): Promise<PermissionConfig> {
+  const data = await put<PermissionConfig>('/org-permissions', {
+    version: config.version,
+    grants: config.grants,
+    customRoles: config.customRoles,
   });
+  const cfg: PermissionConfig = {
+    version: Number(data?.version ?? (config.version || 1) + 1),
+    grants: (data?.grants as PermissionConfig['grants']) || config.grants,
+    customRoles: Array.isArray(data?.customRoles) ? data.customRoles : config.customRoles,
+  };
+  return cacheConfig(cfg);
+}
+
+/**
+ * 保存权限配置（设置页使用）：异步写服务端再缓存。
+ * 保留函数名；调用方须 await。
+ */
+export async function savePermissionConfig(config: PermissionConfig): Promise<PermissionConfig> {
+  return savePermissionConfigAsync(config);
 }
 
 /** 读取某角色的实际授权（含系统角色覆盖 + 自定义角色） */

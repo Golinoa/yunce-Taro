@@ -3,6 +3,7 @@
  */
 import { invalidateMembershipBootstrapCache } from '@/services/membership-cache';
 import { invalidateMembershipSkuCache } from '@/services/payment';
+import { clearPermissionCache } from '@/services/permission';
 import { useCampusStore } from '@/stores/campus';
 import { useCardTypeStore } from '@/stores/card-type';
 import { useClassStore } from '@/stores/class';
@@ -39,6 +40,8 @@ export function resetDomainCaches(scope: ResetDomainCachesScope = 'all'): void {
     useCampusStore.getState().invalidateCache();
     invalidateMembershipSkuCache();
     invalidateMembershipBootstrapCache();
+    // 权限配置为机构级：切机构时清本地缓存，避免串租户授权
+    clearPermissionCache();
   } else {
     useCampusStore.getState().invalidateSubjectsCache();
   }

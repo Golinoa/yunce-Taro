@@ -32,7 +32,7 @@ const PermissionSettings: React.FC = () => {
   const save = usePermissionStore((s) => s.save);
 
   useDidShow(() => {
-    usePermissionStore.getState().load();
+    void usePermissionStore.getState().load();
     void loadTitles();
   });
 
@@ -67,11 +67,15 @@ const PermissionSettings: React.FC = () => {
         success: (res) => {
           if (res.confirm) {
             removeCustomRole(id);
-            try {
-              save();
-            } catch {
-              Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
-            }
+            void save().catch((err) => {
+              // 版本冲突：刷新缓存并如实提示，禁止静默覆盖
+              if (Number((err as { code?: number })?.code) === 409) {
+                void usePermissionStore.getState().load();
+                Taro.showToast({ title: '权限已被他人修改，已刷新', icon: 'none' });
+              } else {
+                Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+              }
+            });
           }
         },
       });
