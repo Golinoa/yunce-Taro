@@ -15,6 +15,8 @@ export interface LessonRecord {
   lesson_date: string;
   hours_used: number;
   status?: 'normal' | 'cancelled' | 'makeup' | 'leave' | 'absent';
+  /** 正式学员缺勤时创建欠课；试听缺勤保持 false/undefined */
+  create_debt?: boolean;
   /** 课程内容（老师填写，随记录展示） */
   content?: string;
   /** 单学员备注（本节课该学生的备注，老师填写，学员端不可见；持久化到后端 remark 字段） */

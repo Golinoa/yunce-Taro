@@ -4,7 +4,7 @@
 import type { FeeMethod } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
-import { del, get, post, put } from '@/utils/request';
+import { ApiError, del, get, post, put } from '@/utils/request';
 
 interface BackendLessonRecordListItem {
   classId?: null | string;
@@ -28,7 +28,7 @@ interface BackendLessonRecordListItem {
   operatorTeacherName?: null | string;
   assistantTeacherId?: null | string;
   assistantTeacherName?: null | string;
-  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP';
+  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP' | 'LEAVE' | 'ABSENT';
   studentAvatar?: null | string;
   studentId: string;
   studentName?: null | string;
@@ -58,6 +58,7 @@ interface BackendLessonRecordDetailResponse {
   createdAt: string;
   duration: number;
   homework?: null | string;
+  homeworkImages?: null | string[];
   hoursUsed?: null | number;
   id: string;
   lessonDate: string;
@@ -76,7 +77,7 @@ interface BackendLessonRecordDetailResponse {
     id?: string;
     name: string;
   } | null;
-  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP';
+  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP' | 'LEAVE' | 'ABSENT';
   student?: {
     avatar?: null | string;
     id?: string;
@@ -98,6 +99,9 @@ interface BackendLessonRecordCreateResponse {
   createdAt: string;
   duration: number;
   homework?: null | string;
+  homeworkImages?: null | string[];
+  hoursUsed?: null | number;
+  performance?: null | string;
   id: string;
   lessonDate: string;
   note?: null | string;
@@ -109,7 +113,7 @@ interface BackendLessonRecordCreateResponse {
   packageId?: null | string;
   packageName?: null | string;
   remainingHours?: null | number;
-  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP';
+  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP' | 'LEAVE' | 'ABSENT';
   studentId: string;
   studentName?: null | string;
   teacherId?: null | string;
@@ -124,10 +128,12 @@ const normalizeLessonDate = (value?: null | string): string => {
 };
 
 const mapBackendLessonRecordStatus = (
-  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP',
+  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP' | 'LEAVE' | 'ABSENT',
 ): LessonRecord['status'] => {
   if (status === 'CANCELLED') return 'cancelled';
   if (status === 'MAKEUP') return 'makeup';
+  if (status === 'LEAVE') return 'leave';
+  if (status === 'ABSENT') return 'absent';
   return 'normal';
 };
 
@@ -267,11 +273,14 @@ function buildLessonRecordPayload(
     room: data.room,
     lessonDate: normalizeLessonDate(data.lesson_date) || new Date().toISOString().slice(0, 10),
     duration: Math.max(Math.round(Number(data.hours_used || 0) * 60), 1),
+    hoursUsed: data.hours_used,
     content: data.content,
     homework: data.homework,
+    performance: data.performance,
+    homeworkImages: data.homework_images,
     // 单学员备注 → 后端 remark 字段
     remark: data.note,
-    // 补录等：前端已传；后端 create 目前写死 NORMAL，对齐后落库（见对照文档）
+    createDebt: data.create_debt,
     ...(status ? { status } : {}),
   };
 }
@@ -404,8 +413,9 @@ export const lessonRecordService = {
     try {
       const record = await get<BackendLessonRecordDetailResponse>(`/lesson-records/${recordId}`);
       return mapBackendLessonRecord(record);
-    } catch {
-      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 404) return null;
+      throw error;
     }
   },
 
@@ -415,18 +425,24 @@ export const lessonRecordService = {
     return;
   },
 
-  /** 修改消课记录（P4，2026-08-22）：改课时 → 差额回补/追扣关联课包 */
+  /** 修改消课记录；课时变更由后端在同一事务内同步课包/欠课 */
   update: async (
     recordId: string,
-    updates: { hours?: number; note?: string },
-  ): Promise<LessonRecord | null> => {
-    const updated = await put<BackendLessonRecordDetailResponse>(
-      `/lesson-records/${recordId}`,
-      buildLessonRecordPayload({
-        hours: updates.hours,
-        note: updates.note,
-      } as unknown as Omit<LessonRecord, 'id' | 'created_at' | 'updated_at'>),
-    );
+    updates: {
+      hours?: number;
+      note?: string;
+      content?: string;
+      homework?: string;
+      performance?: string;
+    },
+  ): Promise<LessonRecord> => {
+    const updated = await put<BackendLessonRecordDetailResponse>(`/lesson-records/${recordId}`, {
+      ...(updates.hours !== undefined ? { hoursUsed: updates.hours } : {}),
+      ...(updates.note !== undefined ? { remark: updates.note } : {}),
+      ...(updates.content !== undefined ? { content: updates.content } : {}),
+      ...(updates.homework !== undefined ? { homework: updates.homework } : {}),
+      ...(updates.performance !== undefined ? { performance: updates.performance } : {}),
+    });
     return mapBackendLessonRecord(updated);
   },
 

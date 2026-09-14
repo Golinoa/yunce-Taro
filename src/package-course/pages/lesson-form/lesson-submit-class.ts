@@ -195,8 +195,9 @@ export async function executeClassSubmit(input: {
             ...teacherPayload,
             student_id: student.id,
             package_id: '',
-            hours_used: 0,
+            hours_used: input.hoursUsed,
             status: 'absent',
+            create_debt: true,
             content: '点名未到，待老师后续补录签到',
             note: input.studentRemarkDrafts[student.id] || undefined,
           });
@@ -252,6 +253,7 @@ export async function executeClassSubmit(input: {
             package_id: '',
             hours_used: 0,
             status: 'absent',
+            create_debt: false,
             content: '试听预约未到',
           });
           successCount += 1;

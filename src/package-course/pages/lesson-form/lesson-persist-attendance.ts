@@ -106,8 +106,9 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
   await lessonRecordService.create({
     ...basePayload,
     package_id: '',
-    hours_used: 0,
+    hours_used: ctx.hoursUsed,
     status: 'absent',
+    create_debt: true,
     content: ctx.isSupplement ? '补录未到' : '点名未到，待老师后续补录签到',
     note: ctx.studentRemarkDrafts[student.id] || ctx.existingRecord?.note || undefined,
   });

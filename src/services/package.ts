@@ -14,7 +14,7 @@ import type {
 import { notWired } from '@/utils/not-wired';
 import type { PaginatedResponse } from '@/utils/pagination';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
-import { del, get, post, put } from '@/utils/request';
+import { ApiError, del, get, post, put } from '@/utils/request';
 
 interface BackendPackageListItem {
   createdAt: string;
@@ -28,10 +28,15 @@ interface BackendPackageListItem {
   status?: 'ACTIVE' | 'DEPLETED' | 'EXPIRED';
   studentId: string;
   studentName?: string;
+  subjectId?: null | string;
+  templateId?: null | string;
   totalHours: number;
   usedHours: number;
+  validDays?: null | number;
   validEnd?: null | string;
   validStart?: null | string;
+  installmentEnabled?: boolean | null;
+  installmentPeriod?: null | number;
 }
 
 interface BackendPackageListResponse {
@@ -60,13 +65,18 @@ interface BackendPackageMutationResponse {
   feeMethod?: null | string;
   giftHours?: null | number;
   id: string;
+  installmentEnabled?: boolean | null;
+  installmentPeriod?: null | number;
   name?: string;
   note?: null | string;
   remainingHours: number;
   status?: 'ACTIVE' | 'DEPLETED' | 'EXPIRED';
   studentId?: string;
+  subjectId?: null | string;
+  templateId?: null | string;
   totalHours: number;
   usedHours: number;
+  validDays?: null | number;
   validEnd?: null | string;
   validStart?: null | string;
 }
@@ -167,6 +177,12 @@ function mapBackendPackage(
     note: 'note' in item ? item.note || undefined : undefined,
     gift_hours: split.giftHours || undefined,
     valid_days: 'validDays' in item ? (item.validDays ?? undefined) : undefined,
+    subject_id: 'subjectId' in item ? item.subjectId || undefined : undefined,
+    template_id: 'templateId' in item ? item.templateId || undefined : undefined,
+    installment_enabled:
+      'installmentEnabled' in item ? Boolean(item.installmentEnabled) : undefined,
+    installment_period:
+      'installmentPeriod' in item ? (item.installmentPeriod ?? undefined) : undefined,
     created_at: 'createdAt' in item && item.createdAt ? item.createdAt : new Date().toISOString(),
     updated_at: 'createdAt' in item && item.createdAt ? item.createdAt : new Date().toISOString(),
   };
@@ -191,6 +207,14 @@ function mapBackendPackageTransaction(item: BackendPackageTransactionRecord): Pa
     created_at: item.createdAt,
   };
 }
+
+const mapInstallmentSchedule = (schedule: RechargeFormData['installment_schedule']) =>
+  schedule?.map((item) => ({
+    period: item.period,
+    amount: Number(item.amount),
+    dueDate: item.date,
+    reminder: item.reminder,
+  }));
 
 /** 课包列表缓存（当前仅 invalidate；保留 API 供充值/退费后清缓存） */
 const packagesCache = new Map<string, CoursePackage[]>();
@@ -226,8 +250,11 @@ export const packageService = {
     try {
       const pkg = await get<BackendPackageMutationResponse>(`/course-packages/${packageId}`);
       return mapBackendPackage(pkg);
-    } catch {
-      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 404) {
+        return null;
+      }
+      throw error;
     }
   },
 
@@ -240,28 +267,45 @@ export const packageService = {
       giftHours: data.gift_hours,
       feeAmount: data.fee_amount,
       feeMethod: data.fee_method,
+      note: data.note,
       validStart: data.start_date,
       validEnd: data.end_date || data.expiry_date,
+      validDays: data.valid_days,
+      subjectId: data.subject_id,
+      templateId: data.template_id,
+      installmentEnabled: data.installment_enabled,
+      installmentPeriod: data.installment_period,
+      installmentSchedule: mapInstallmentSchedule(data.installment_schedule),
     });
     return mapBackendPackage(created);
   },
 
   /** 更新课包 */
   update: async (packageId: string, data: Partial<CoursePackage>) => {
-    const updated = await put<BackendPackageMutationResponse>(`/course-packages/${packageId}`, {
+    const body: Record<string, unknown> = {
       name: data.name,
-      totalHours:
-        data.total_hours !== undefined
-          ? data.total_hours + (data.gift_hours || 0)
-          : data.remaining_hours !== undefined
-            ? data.remaining_hours
-            : undefined,
       giftHours: data.gift_hours,
       validEnd: data.end_date || data.expiry_date,
+      validDays: data.valid_days,
       feeAmount: data.fee_amount,
       feeMethod: data.fee_method,
       note: data.note,
-    });
+      subjectId: data.subject_id,
+      templateId: data.template_id,
+      installmentEnabled: data.installment_enabled,
+      installmentPeriod: data.installment_period,
+    };
+
+    if (data.remaining_hours !== undefined) {
+      body.remainingHours = data.remaining_hours;
+    } else if (data.total_hours !== undefined) {
+      body.totalHours = data.total_hours + (data.gift_hours || 0);
+    }
+
+    const updated = await put<BackendPackageMutationResponse>(
+      `/course-packages/${packageId}`,
+      body,
+    );
     return mapBackendPackage(updated);
   },
 
@@ -310,6 +354,12 @@ export const packageService = {
       feeAmount: data.fee_amount,
       feeMethod: data.fee_method,
       note: data.note,
+      validDays: data.valid_days,
+      templateId: data.template_id,
+      subjectId: data.subject_id,
+      installmentEnabled: data.installment_enabled,
+      installmentPeriod: data.installment_period,
+      installmentSchedule: mapInstallmentSchedule(data.installment_schedule),
     }).then(mapBackendPackage),
 
   /** 提交退费记录 */

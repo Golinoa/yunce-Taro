@@ -5,9 +5,11 @@ import { packageService } from '@/services/package';
 import type { Class } from '@/types/class';
 import type { Student } from '@/types/student';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
-import { del, get, post, put } from '@/utils/request';
+import { ApiError, del, get, post, put } from '@/utils/request';
 
 interface BackendClassListItem {
+  backgroundImage?: null | string;
+  campusId?: null | string;
   capacity?: null | number;
   color?: null | string;
   createdAt: string;
@@ -23,6 +25,10 @@ interface BackendClassListItem {
   status?: 'ACTIVE' | 'DISBANDED';
   studentCount?: number;
   subject?: null | string;
+  teachMode?: null | string;
+  teacherId?: null | string;
+  teachers?: null | string[];
+  homeImage?: null | string;
   totalLessons?: null | number;
   type?: null | string;
   usedLessons?: null | number;
@@ -39,6 +45,8 @@ interface BackendClassListResponse {
 }
 
 interface BackendClassDetailResponse {
+  backgroundImage?: null | string;
+  campusId?: null | string;
   capacity?: null | number;
   color?: null | string;
   createdAt: string;
@@ -47,6 +55,9 @@ interface BackendClassDetailResponse {
   location?: null | string;
   name: string;
   note?: null | string;
+  teachMode?: null | string;
+  teachers?: null | string[];
+  homeImage?: null | string;
   recentLessons?: Array<{
     duration?: number;
     id: string;
@@ -115,7 +126,14 @@ function mapBackendClassListItem(item: BackendClassListItem): Class {
   return {
     id: item.id,
     name: item.name,
-    teacher_id: '',
+    teacher_id: item.teacherId || '',
+    campus_id: item.campusId || undefined,
+    subject_id: item.subject || undefined,
+    room: item.location || undefined,
+    teach_mode: (item.teachMode as Class['teach_mode']) || undefined,
+    teachers: item.teachers || undefined,
+    homeImage: item.homeImage ?? undefined,
+    backgroundImage: item.backgroundImage ?? undefined,
     created_at: item.createdAt,
     updated_at: item.createdAt,
     type,
@@ -139,6 +157,13 @@ function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
     id: item.id,
     name: item.name,
     teacher_id: item.teacher?.id || '',
+    campus_id: item.campusId || undefined,
+    subject_id: item.subject || undefined,
+    room: item.location || undefined,
+    teach_mode: (item.teachMode as Class['teach_mode']) || undefined,
+    teachers: item.teachers || undefined,
+    homeImage: item.homeImage ?? undefined,
+    backgroundImage: item.backgroundImage ?? undefined,
     created_at: item.createdAt,
     updated_at: item.createdAt,
     type,
@@ -198,8 +223,9 @@ export const classService = {
     try {
       const cls = await get<BackendClassDetailResponse>(`/classes/${classId}`);
       return mapBackendClassDetail(cls);
-    } catch {
-      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 404) return null;
+      throw error;
     }
   },
   /** 校区班级列表（家长调课选补课班用；真实环境按校区过滤教师可见班级） */
@@ -341,9 +367,13 @@ export const classService = {
       capacity: data.capacity ?? null,
       note: data.note,
       color: data.color,
+      teachMode: data.teach_mode,
       teachers: data.teachers,
+      location: data.room,
       startTime: data.start_time,
       endTime: data.end_time,
+      homeImage: data.homeImage ?? null,
+      backgroundImage: data.backgroundImage ?? null,
     });
     return mapBackendClassListItem(created);
   },
@@ -357,9 +387,13 @@ export const classService = {
       capacity: data.capacity ?? null,
       note: data.note,
       color: data.color,
+      teachMode: data.teach_mode,
       teachers: data.teachers,
+      location: data.room,
       startTime: data.start_time,
       endTime: data.end_time,
+      homeImage: data.homeImage,
+      backgroundImage: data.backgroundImage,
     });
     return mapBackendClassListItem(updated);
   },
