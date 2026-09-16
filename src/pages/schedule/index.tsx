@@ -1,5 +1,6 @@
 import { View } from '@tarojs/components';
 import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
+import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
@@ -14,6 +15,7 @@ import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import type { BookableVenue } from '@/types/venue-booking';
 import { isParentRole, useAuth } from '@/utils/auth';
+import { TTL } from '@/utils/data-freshness';
 import {
   buildLessonSharePath,
   buildLessonShareTitle,
@@ -150,6 +152,22 @@ const SchedulePage: React.FC = () => {
   const [tabScrollLeft, setTabScrollLeft] = useState(0);
   /** 场地预约功能开关 */
   const [venueBookingEnabled, setVenueBookingEnabled] = useState(true);
+  /**
+   * 场地预约开关接入 TanStack Query（B9-2）：
+   * - 原为 useDidShow 每次进页/切 tab 无条件打 /booking-config/venue（计划点名的 over-fetch）；
+   * - 现改为 Query 缓存，staleTime 内（校区级慢变配置）不重复请求；
+   * - 本地存储即时值仍用于首帧兜底，服务端真值经下方 effect 同步回 state。
+   */
+  const venueEnabledQuery = useQuery({
+    queryKey: ['schedule', 'venue-booking-enabled'],
+    queryFn: () => fetchVenueBookingEnabled(),
+    staleTime: TTL.campus,
+  });
+  useEffect(() => {
+    if (venueEnabledQuery.data !== undefined) {
+      setVenueBookingEnabled(venueEnabledQuery.data);
+    }
+  }, [venueEnabledQuery.data]);
   /** 排课 / 预约 视图切换（由 activeTab 派生） */
   const [viewMode, setViewMode] = useState<'schedule' | 'booking'>('schedule');
   /** 排课视图内二级模式：fixed=固定排课, open=开放预约（由 activeTab 派生） */
@@ -360,10 +378,8 @@ const SchedulePage: React.FC = () => {
 
   useDidShow(() => {
     setCurrentTime(dayjs());
+    // 场地预约开关：本地存储即时值兜底；服务端真值由 venueEnabledQuery 在 staleTime 内缓存、不重复请求
     setVenueBookingEnabled(getVenueBookingEnabled());
-    void fetchVenueBookingEnabled()
-      .then(setVenueBookingEnabled)
-      .catch(() => undefined);
     let hasRefreshSignal = false;
     let newCategoryId = '';
     try {
