@@ -1,5 +1,6 @@
 import { View, Text, Input, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
@@ -11,13 +12,13 @@ import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
 import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
-import { useStudentStore } from '@/stores';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFilterTab } from '@/types/lead';
 import type { Student, StudentSort, PackageTag } from '@/types/student';
 import { SORT_OPTIONS } from '@/types/student';
 import { syncAlertThresholdFromCampus } from '@/utils/alert-config';
 import { isStaffRole, useAuth } from '@/utils/auth';
+import { TTL } from '@/utils/data-freshness';
 import {
   getStudentCardStatus,
   getCardBorderColorClass,
@@ -95,8 +96,28 @@ const Students: React.FC = () => {
   const [memberSubTab, setMemberSubTab] = useState<MemberSubTab>('all');
   const [sortOpen, setSortOpen] = useState(false);
 
-  const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
-  const fetchStudentsByParent = useStudentStore((state) => state.fetchByParent);
+  const queryClient = useQueryClient();
+  /**
+   * 学员列表接入 TanStack Query（B9-1）：
+   * 原走 useStudentStore（TTL.list=5min）手写缓存；现统一到与首页（B8）一致的缓存层，
+   * 由 query 拥有缓存 / 去重 / 写后失效。queryKey 复用角色+profileId，staleTime 沿用 TTL.list。
+   */
+  const studentsQuery = useQuery({
+    queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      if (isTeacher) return studentService.getByTeacher(profile.id);
+      return studentService.getByParent(profile.id);
+    },
+    enabled: !!profile?.id,
+    staleTime: TTL.list,
+  });
+  useEffect(() => {
+    setStudents(studentsQuery.data ?? []);
+  }, [studentsQuery.data]);
+  useEffect(() => {
+    setLoading(studentsQuery.isFetching);
+  }, [studentsQuery.isFetching]);
 
   // 同步当前校区课时预警阈值（卡片黄标依赖）
   useEffect(() => {
@@ -115,29 +136,6 @@ const Students: React.FC = () => {
       })
       .catch((err) => logError('sync alert threshold', err));
   }, [profile?.currentContext?.campusId]);
-
-  // 加载学员列表（force=true：下拉刷新 / 写后）
-  const loadStudents = useCallback(
-    async (force = false) => {
-      if (!profile?.id) return;
-      setLoading(true);
-      try {
-        let list: Student[];
-        if (isTeacher) {
-          list = await fetchStudentsByTeacher(profile.id, undefined, force);
-        } else {
-          list = await fetchStudentsByParent(profile.id, force);
-        }
-        setStudents(list);
-      } catch (err) {
-        logError('loadStudents', err);
-        Taro.showToast({ title: '加载失败', icon: 'none' });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [profile, isTeacher, fetchStudentsByTeacher, fetchStudentsByParent],
-  );
 
   // ====== 线索 Tab 状态 ======
   const teacherId = session?.user.id || '';
@@ -164,19 +162,15 @@ const Students: React.FC = () => {
   }, [teacherId, activeFilterTab, fetchCards, fetchSummary]);
 
   // ====== 公共生命周期 ======
-  const loadStudentsRef = useRef(loadStudents);
-  useEffect(() => {
-    loadStudentsRef.current = loadStudents;
-  }, [loadStudents]);
-
-  useEffect(() => {
-    loadStudents();
-  }, [loadStudents]);
-
   useDidShow(() => {
-    const forceStudents = consumeRefreshSignal(REFRESH_SIGNAL.students);
     if (mainTab === 'member') {
-      void loadStudentsRef.current(forceStudents);
+      const forceStudents = consumeRefreshSignal(REFRESH_SIGNAL.students);
+      // 写后（student-form 已 emitRefreshSignal）：失效列表 query，触发刷新
+      if (forceStudents) {
+        void queryClient.invalidateQueries({
+          queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
+        });
+      }
     } else {
       loadLeads();
     }
@@ -185,7 +179,9 @@ const Students: React.FC = () => {
   // 下拉刷新
   usePullDownRefresh(async () => {
     if (mainTab === 'member') {
-      await loadStudents(true);
+      await queryClient.invalidateQueries({
+        queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
+      });
     } else {
       if (teacherId) {
         invalidate(teacherId);
