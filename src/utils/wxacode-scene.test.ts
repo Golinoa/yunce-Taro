@@ -16,6 +16,12 @@ describe('wxacode-scene', () => {
     expect(parseInviteCodeFromWxacodeScene(encodeURIComponent('PABC12345'))).toBe('PABC12345');
   });
 
+  it('解析复合 P 码（机构+校区+老师编号）scene', () => {
+    const composite = 'PORG0002C001T0002';
+    expect(parseInviteCodeFromWxacodeScene(`c=${composite}`)).toBe(composite);
+    expect(parseInviteCodeFromWxacodeScene(composite)).toBe(composite);
+  });
+
   it('解析 legacy UUID compact scene', () => {
     const scene = 'A1B2C3D4E5F67890ABCDEF1234567890';
     expect(parseInviteCodeFromWxacodeScene(scene)).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');

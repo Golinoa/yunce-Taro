@@ -8,7 +8,7 @@ import Taro, { getCurrentInstance } from '@tarojs/taro';
 import { normalizeInviteCodeParam } from './invite-parent-link';
 import { parseLaunchOptions } from './launch-scene';
 
-const PREFIXED_INVITE = /^([SEP])[A-HJ-NP-Z2-9]{9}$/;
+const PREFIXED_INVITE = /^([SEPO])[A-Za-z0-9]+$/;
 
 function decodeSceneRaw(raw: string): string {
   try {
