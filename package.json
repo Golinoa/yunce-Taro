@@ -14,8 +14,8 @@
     "build:weapp:mock": "node -e \"console.error('[removed] build:weapp:mock 已废弃，请用 npm run build:weapp:dev'); process.exit(1)\"",
     "dev:weapp:mock": "node -e \"console.error('[removed] dev:weapp:mock 已废弃，请用 npm run dev:weapp:dev'); process.exit(1)\"",
     "generate:mock-stubs": "node -e \"console.error('[removed] generate:mock-stubs 已废弃（src/data 已删除）'); process.exit(1)\"",
-    "build:weapp:prod": "node scripts/build-weapp-prod.mjs",
-    "build:weapp:dev": "node scripts/build-weapp-dev.mjs",
+    "build:weapp:prod": "node scripts/build-weapp-prod.mjs && npm run verify:pages",
+    "build:weapp:dev": "node scripts/build-weapp-dev.mjs && npm run verify:pages",
     "build:weapp:clean": "node scripts/clean-weapp-cache.mjs && taro build --type weapp && node scripts/postbuild-weapp-fixes.mjs && node scripts/verify-shared-modules.mjs",
     "build:swan": "taro build --type swan",
     "build:alipay": "taro build --type alipay",
@@ -47,6 +47,7 @@
     "coverage": "node node_modules/vitest/vitest.mjs run --coverage",
     "check": "npm run typecheck && npm run lint && npm run format:check",
     "verify:sop": "node scripts/verify-sop.mjs",
+    "verify:pages": "node ./scripts/verify-pages-complete.mjs",
     "ci:local": "npm run verify:sop",
     "upload:weapp": "node scripts/upload-weapp.mjs"
   },
@@ -68,6 +69,7 @@
   "dependencies": {
     "@babel/runtime": "^7.21.5",
     "@mdi/js": "^7.4.47",
+    "@tanstack/react-query": "^5.102.8",
     "@tarojs/components": "4.1.9",
     "@tarojs/helper": "4.1.9",
     "@tarojs/plugin-framework-react": "4.1.9",
