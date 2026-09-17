@@ -30,8 +30,6 @@ export {
   prepareEmailRegister,
   registerWithEmailPassword,
   signUp,
-  verifyCampusCode,
-  verifyStudentCode,
   validateInviteCode,
   getSession,
   switchIdentity,

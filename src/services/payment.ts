@@ -335,6 +335,7 @@ export const paymentService = {
   getOrder: (orderId: string) =>
     get<PaymentOrderStatusResult>(`/payments/membership/orders/${orderId}`),
 
+  /** @deprecated 仅联调使用，生产已有守卫 */
   mockComplete: (orderId: string) =>
     post<PaymentOrderStatusResult>(`/payments/membership/orders/${orderId}/mock-complete`, {}),
 

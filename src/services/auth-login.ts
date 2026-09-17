@@ -274,15 +274,6 @@ export async function phoneLogin(phone: string, code: string): Promise<LoginResu
   }
 }
 
-export async function checkLoginAccount(account: string): Promise<LoginAccountCheckResult> {
-  return {
-    exists: false,
-    account: account.trim(),
-    hasBoundEmail: false,
-    error: { message: '账户校验服务暂未接通，请稍后再试' },
-  };
-}
-
 export async function prepareEmailLogin(
   identifier: string,
   mode: 'account' | 'email',

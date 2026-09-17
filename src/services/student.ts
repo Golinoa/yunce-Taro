@@ -6,7 +6,6 @@ import { mapBackendPackageType } from '@/services/package';
 import { studentParentService } from '@/services/student-parents';
 import type { FeeMethod } from '@/types/course-package';
 import type { Student } from '@/types/student';
-import { notWired } from '@/utils/not-wired';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
 
@@ -25,6 +24,8 @@ interface BackendStudentListItem {
   status?: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
   totalHours?: number;
   usedHours?: number;
+  attendanceCount?: number;
+  remainingBalance?: number;
 }
 
 interface BackendStudentListResponse {
@@ -35,6 +36,12 @@ interface BackendStudentListResponse {
     total: number;
     totalPages: number;
   };
+}
+
+export interface ParentStudentSummary {
+  students: Student[];
+  attendance: number;
+  remainingBalance: number;
 }
 
 interface BackendStudentDetailResponse {
@@ -180,6 +187,14 @@ function mapStudentPayload(data: Partial<Student>) {
   };
 }
 
+export interface InitialStudentPackagePayload {
+  name: string;
+  totalHours: number;
+  subjectId?: string;
+  validEnd?: string;
+  note?: string;
+}
+
 // ============================================
 // 学员 Service
 // ============================================
@@ -212,6 +227,20 @@ export const studentService = {
   getByParent: async (_parentId: string): Promise<Student[]> =>
     (await get<BackendStudentListResponse>('/students')).list.map(mapBackendStudentListItem),
 
+  /** 家长首页一次性读取孩子列表和四格摘要，避免孩子级 N+1 请求。 */
+  getParentSummary: async (_parentId: string): Promise<ParentStudentSummary> => {
+    const response = await get<BackendStudentListResponse>('/students?summary=1&pageSize=100');
+    const students = response.list.map(mapBackendStudentListItem);
+    return {
+      students,
+      attendance: response.list.reduce((sum, item) => sum + Number(item.attendanceCount ?? 0), 0),
+      remainingBalance: response.list.reduce(
+        (sum, item) => sum + Number(item.remainingBalance ?? 0),
+        0,
+      ),
+    };
+  },
+
   /** 获取学员详情 */
   getById: async (studentId: string): Promise<Student | null> => {
     try {
@@ -238,8 +267,14 @@ export const studentService = {
   },
 
   /** 创建学员 */
-  create: async (data: Omit<Student, 'id' | 'created_at' | 'updated_at'>) => {
-    const created = await post<BackendStudentListItem>('/students', mapStudentPayload(data));
+  create: async (
+    data: Omit<Student, 'id' | 'created_at' | 'updated_at'>,
+    initialPackages: InitialStudentPackagePayload[] = [],
+  ) => {
+    const created = await post<BackendStudentListItem>('/students', {
+      ...mapStudentPayload(data),
+      initialPackages,
+    });
     return mapBackendStudentListItem(created);
   },
 
@@ -280,9 +315,6 @@ export const studentService = {
     );
     return { ...mapBackendStudentListItem(created), reused: created.reused };
   },
-
-  /** 获取学员关联数据统计（用于删除确认弹窗） */
-  getDependencies: async (_studentId: string) => notWired('student.getDependencies'),
 
   /** 重名检测 */
   checkDuplicateName: async (_teacherId: string, name: string, excludeId?: string) => {

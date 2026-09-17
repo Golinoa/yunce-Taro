@@ -177,14 +177,6 @@ export async function registerWithEmailPassword(input: {
   }
 }
 
-export async function verifyCampusCode(_code: string) {
-  return { valid: false };
-}
-
-export async function verifyStudentCode(_code: string) {
-  return { valid: false };
-}
-
 export async function validateInviteCode(code: string) {
   try {
     const data = await get<{ valid: boolean; student?: { id: string; name: string } }>(
