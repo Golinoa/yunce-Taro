@@ -1,5 +1,6 @@
 import { View, ScrollView, PageMeta } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { hasShownCampusGuide } from '@/components/home/HomeCampusGuideDialog';
@@ -12,7 +13,7 @@ import {
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
-import { lessonRecordService, todoService } from '@/services';
+import { todoService } from '@/services';
 import { listParentStorefronts, switchAuthContext } from '@/services/auth';
 import { homeService } from '@/services/home';
 import type { QuickEntry, ParentHomePackageCard } from '@/services/home';
@@ -33,9 +34,9 @@ import type { ParentStorefrontItem } from '@/types/storefront';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { parseBusinessHours, getCampusOpenStatus } from '@/utils/campus';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { storefrontKey } from '@/utils/parent-storefront';
-import { isWithinRefetchTtl } from '@/utils/refetch-ttl';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
@@ -63,6 +64,12 @@ import HomePageOverlays from './HomePageOverlays';
 import HomeStaffTabPanels from './HomeStaffTabPanels';
 import { useHomeFab } from './use-home-fab';
 import { useHomeTodoActions } from './use-home-todo-actions';
+
+/** 首页查询缓存根前缀：写后统一按前缀失效（TanStack Query 层级失效） */
+const HOME_QUERY_ROOT = ['home'] as const;
+
+/** 首页查询保鲜期：30s 内切回不重复请求（与 app.tsx 默认值一致，显式写明口径） */
+const HOME_QUERY_STALE_TIME_MS = 30_000;
 
 /**
  * Home - 机构端首页
@@ -162,7 +169,8 @@ const Home: React.FC = () => {
   const [recentRecords, setRecentRecords] = useState<LessonRecord[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const isFirstMount = useRef(true);
-  const lastHomeFetchAtRef = useRef<number>(0);
+  /** 待确认关系远端查询上次成功时间（TTL 节流用） */
+  const lastPendingRelationFetchAtRef = useRef<number | null>(null);
   /** 四象限拖动中锁定首页滚动，避免抢手势 */
   const [quadrantDragging, setQuadrantDragging] = useState(false);
   const {
@@ -276,91 +284,108 @@ const Home: React.FC = () => {
     setCategoryTabs(listTodoCategoryTabs(profile.id));
   }, [profile?.id]);
 
-  const loadData = useCallback(
-    async (campusId?: string) => {
-      if (!profile?.id) return;
+  // ==========================================================================
+  // 首页服务端状态：TanStack Query（Batch 7 POC）
+  //
+  // 承接 Batch 2 的「身份就绪闸门 + key 去重」：
+  // - enabled 等价原来的就绪判定（profile.id + currentRole 未齐不发请求）；
+  // - queryKey 里带身份三元组（profileId / role / campusId），key 未变不重复请求，
+  //   key 变化（切校区、换身份）自动重拉，不再需要手工 ref 记录上次 key。
+  // 数据仍写入原 useState 供既有渲染路径使用（POC 不改 UI 层）。
+  // ==========================================================================
+  const queryClient = useQueryClient();
+  const profileId = profile?.id;
+  const isParent = isParentRole(currentRole);
+  /** 身份就绪：与原 Batch 2 手工闸门一致 */
+  const homeIdentityReady = Boolean(profileId && currentRole);
 
-      if (isParentRole(currentRole)) {
-        try {
-          const [parentData, unread] = await Promise.all([
-            homeService.getParent(profile.id, campusId),
-            homeService.getUnreadCount(profile.id, currentRole),
-          ]);
-          setUnreadCount(unread || parentData?.unreadCount || 0);
-          setParentSchedules(parentData?.todaySchedules || []);
-          setParentPackages(parentData?.packages || []);
-          setParentFallbackStudentId(parentData?.students?.[0]?.id || '');
-          lastHomeFetchAtRef.current = Date.now();
-        } catch (err) {
-          logError('Home loadParentData', err);
-        }
-        return;
-      }
+  /** 校区列表：Store 内自带 TTL，这里再用 staleTime 挡住重复触发 */
+  useQuery({
+    queryKey: ['campuses', currentRole ?? ''],
+    queryFn: () => fetchCampuses(),
+    enabled: Boolean(currentRole),
+    staleTime: HOME_QUERY_STALE_TIME_MS,
+  });
 
-      if (!isStaffRole(currentRole)) {
-        try {
-          const unread = await homeService.getUnreadCount(profile.id, currentRole);
-          setUnreadCount(unread);
-          lastHomeFetchAtRef.current = Date.now();
-        } catch (err) {
-          logError('Home loadUnreadCount', err);
-        }
-        return;
-      }
+  /** 首页聚合（B10 / PERF-14）：教师/家长/课表/未读/消课 一次请求返回 */
+  const aggregateQuery = useQuery({
+    queryKey: ['home', 'aggregate', profileId ?? '', currentRole ?? '', currentCampusId],
+    queryFn: () => homeService.getAggregate(currentCampusId),
+    enabled: homeIdentityReady,
+    staleTime: HOME_QUERY_STALE_TIME_MS,
+  });
+  const agg = aggregateQuery.data;
+  /** teacherId 来自聚合（教师=真实教师 id；无教师档案的员工=userId），供待办/未点名提醒使用 */
+  const teacherId = agg?.teacher?.id ?? '';
 
-      try {
-        const teacherData = await homeService.getTeacher(profile.id, currentRole);
-        if (!teacherData) {
-          return;
-        }
+  /** 首页待办：独立请求（B10 契约确认点 ③ 偏离：保留 todoService 本地 enrichment，零回归） */
+  const todosQuery = useQuery({
+    queryKey: ['home', 'todos', teacherId, currentRole ?? '', currentCampusId, profileId ?? ''],
+    queryFn: () =>
+      todoService.getList({
+        view: 'home',
+        teacherId,
+        role: currentRole,
+        campusId: currentCampusId,
+        userId: profileId ?? '',
+        userName: profile?.nickname || profile?.name || '我',
+      }),
+    enabled: Boolean(teacherId && profileId),
+    staleTime: HOME_QUERY_STALE_TIME_MS,
+  });
 
-        const recentLessonRequest =
-          currentRole === 'teacher'
-            ? lessonRecordService.getByTeacher(teacherData.id, campusId)
-            : lessonRecordService.getAll();
+  /** 查询结果 → 页面展示态同步（保持既有 useState 驱动渲染，行为与改造前一致） */
+  useEffect(() => {
+    if (!agg) return;
+    if (isParent) {
+      setUnreadCount(agg.unreadCount);
+      setParentSchedules(agg.parentSchedules);
+      setParentPackages(agg.parentPackages);
+      setParentFallbackStudentId(agg.parentFallbackStudentId);
+      return;
+    }
+    setUnreadCount(agg.unreadCount);
+  }, [isParent, agg]);
 
-        const userName = profile.nickname || profile.name || '我';
-        const [scheduleList, unread, todoList, lessonRecords] = await Promise.all([
-          homeService.getTodaySchedules(teacherData.id, currentRole, campusId),
-          homeService.getUnreadCount(profile.id, currentRole),
-          todoService.getList({
-            view: 'home',
-            teacherId: teacherData.id,
-            role: currentRole,
-            campusId,
-            userId: profile.id,
-            userName,
-          }),
-          recentLessonRequest,
-        ]);
-        setSchedules(scheduleList);
-        setUnreadCount(unread);
-        setTodoItems(todoList);
-        setRecentRecords(lessonRecords);
-        lastHomeFetchAtRef.current = Date.now();
+  useEffect(() => {
+    if (!agg || isParent) return;
+    setSchedules(agg.schedules);
+    setRecentRecords(agg.recentRecords);
+  }, [agg, isParent]);
 
-        // 未点名提醒（用户口径 2026-08-23）：当天 20:00 后，今日课表存在下课未点名 → 微信订阅消息提醒补点名
-        const now = new Date();
-        if (now.getHours() >= 20) {
-          const todayStr = todayDateKey(now);
-          const unattended = scheduleList.find((s) => s.status === 'unattended');
-          if (unattended && !hasPushedUnattended(todayStr)) {
-            void pushUnattendedReminder(
-              {
-                className: unattended.class_info?.name || '未点名课程',
-                startTime: unattended.start_time,
-                scheduleId: unattended.id,
-              },
-              todayStr,
-            );
-          }
-        }
-      } catch (err) {
-        logError('Home loadData', err);
-      }
-    },
-    [profile, currentRole],
-  );
+  useEffect(() => {
+    if (todosQuery.data === undefined) return;
+    setTodoItems(todosQuery.data);
+  }, [todosQuery.data]);
+
+  // 未点名提醒（用户口径 2026-08-23）：当天 20:00 后，今日课表存在下课未点名 → 微信订阅消息提醒补点名
+  useEffect(() => {
+    const scheduleList = agg?.schedules;
+    if (!scheduleList) return;
+    const now = new Date();
+    if (now.getHours() < 20) return;
+    const todayStr = todayDateKey(now);
+    const unattended = scheduleList.find((s) => s.status === 'unattended');
+    if (unattended && !hasPushedUnattended(todayStr)) {
+      void pushUnattendedReminder(
+        {
+          className: unattended.class_info?.name || '未点名课程',
+          startTime: unattended.start_time,
+          scheduleId: unattended.id,
+        },
+        todayStr,
+      );
+    }
+  }, [agg]);
+
+  /**
+   * 写后 / 强制刷新：统一走查询缓存失效（不再直调取数函数），
+   * 避免「直调 loadData」与「useQuery 缓存」两套机制并存互相覆盖。
+   * 失效后重新拉取当前 key 的全部首页查询（若 key 刚随切校区变化，则复用已在飞的请求，不产生重复请求）。
+   */
+  const refreshHome = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: HOME_QUERY_ROOT });
+  }, [queryClient]);
 
   const handleConfirmStorefront = useCallback(
     async (item: ParentStorefrontItem) => {
@@ -396,7 +421,7 @@ const Home: React.FC = () => {
         }
 
         setShowCampusSheet(false);
-        await loadData(item.campusId);
+        await refreshHome();
       } catch (err) {
         logError('Home confirmStorefront', err);
         Taro.showToast({
@@ -411,7 +436,7 @@ const Home: React.FC = () => {
       applyAuthPayload,
       campusConfirming,
       fetchCampuses,
-      loadData,
+      refreshHome,
       setAllowedCampusIds,
       setCurrentCampusId,
       setCurrentOrganizationId,
@@ -427,9 +452,9 @@ const Home: React.FC = () => {
         return;
       }
       Taro.showToast({ title: '签到成功', icon: 'success' });
-      await loadData(currentCampusId);
+      await refreshHome();
     },
-    [currentCampusId, loadData],
+    [refreshHome],
   );
 
   const handleVenueCheckIn = useCallback(
@@ -440,20 +465,26 @@ const Home: React.FC = () => {
         return;
       }
       Taro.showToast({ title: '已确认到场', icon: 'success' });
-      await loadData(currentCampusId);
+      await refreshHome();
     },
-    [currentCampusId, loadData],
+    [refreshHome],
   );
 
   const checkPendingRelation = useCallback(async () => {
     try {
+      // 本地待确认关系（引导/绑定流程写入）优先消费，不受 TTL 限制
       const local = consumePendingRelation();
       if (local && local.studentParentId) {
         setPendingRelation(local);
         setRelationSheetVisible(true);
         return;
       }
+      // 远端查询按 TTL.tab 节流：原先每次切回首页都会打 /organization/me
+      if (!shouldRefetch(lastPendingRelationFetchAtRef.current, TTL.tab)) {
+        return;
+      }
       const me = await organizationService.getMyOrganization();
+      markFetched(lastPendingRelationFetchAtRef);
       const remote = me?.pendingRelation;
       if (remote && remote.studentParentId) {
         let stored: unknown;
@@ -487,12 +518,7 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     setQuickEntries(homeService.getQuickEntries(currentRole));
-    fetchCampuses();
-  }, [currentRole, fetchCampuses]);
-
-  useEffect(() => {
-    loadData(currentCampusId);
-  }, [profile, currentRole, currentCampusId, loadData]);
+  }, [currentRole]);
 
   useEffect(() => {
     loadCategories();
@@ -515,11 +541,19 @@ const Home: React.FC = () => {
       isFirstMount.current = false;
       return;
     }
-    const forceRefresh = consumeRefreshSignal(REFRESH_SIGNAL.home);
-    if (!forceRefresh && isWithinRefetchTtl(lastHomeFetchAtRef.current)) {
+    // 写后刷新信号：强制重拉，不等保鲜期（原 loadData 直调的等价职责）
+    if (consumeRefreshSignal(REFRESH_SIGNAL.home)) {
+      void refreshHome();
       return;
     }
-    loadData(currentCampusId);
+    // 无信号：只重拉已过保鲜期（staleTime 30s）的查询；
+    // fetchStatus: 'idle' 保证不打断正在飞的请求（否则会取消并重发，反而增加请求数）
+    void queryClient.refetchQueries({
+      queryKey: HOME_QUERY_ROOT,
+      type: 'active',
+      stale: true,
+      fetchStatus: 'idle',
+    });
   });
 
   const todayTodoItems = useMemo(() => filterTodayTodoItems(todoItems), [todoItems]);
@@ -578,7 +612,8 @@ const Home: React.FC = () => {
     profileId: profile?.id,
     profileName: profile?.nickname || profile?.name || '我',
     currentCampusId,
-    loadData,
+    // 写后刷新统一走查询缓存失效（refreshHome），不再直调取数
+    loadData: refreshHome,
     loadCategories,
     freezeHomeScroll,
     unfreezeHomeScroll,

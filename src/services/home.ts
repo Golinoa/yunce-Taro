@@ -12,6 +12,7 @@ import {
 import { scheduleService, studentService } from '@/services/student';
 import type { TodoItem } from '@/types/home-todo';
 import type { StatsPeriod, StatsData, QuickEntry } from '@/types/home-ui';
+import type { LessonRecord } from '@/types/lesson-record';
 import type { UserRole } from '@/types/profile';
 import type { Schedule, ScheduleColor } from '@/types/schedule';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
@@ -460,6 +461,77 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
   };
 }
 
+// ==================== 首页聚合（前端 BFF 消费，B10 / PERF-14） ====================
+// 后端 GET /home/aggregate 一次返回首页首屏全部原始结构（role / teacher / parent /
+// todaySchedules / recentRecords / students / unreadCount / todos）。前端在这里复用
+// 既有 mapBackendTeacherHome / mapBackendParentHome 映射到展示类型；todos 仍由页面
+// 独立走 todoService.getList（含本地 enrichment，详见 B10 契约确认点 ③ 偏离说明）。
+
+interface BackendAggregateRecentRecord {
+  id: string;
+  lessonDate: string;
+  duration?: number;
+  hoursUsed?: number;
+  content?: string | null;
+  performance?: string | null;
+  student?: { id: string; name: string; avatar?: string | null } | null;
+}
+
+interface BackendHomeAggregateResponse {
+  role: 'parent' | 'staff';
+  teacher?: unknown;
+  parent?: unknown;
+  unreadCount: number;
+  todaySchedules?: unknown[];
+  recentRecords?: unknown[];
+  students?: unknown[];
+  packages?: unknown[];
+  todos?: unknown[];
+}
+
+function normalizeAggregateLessonDate(value?: string | null): string {
+  if (!value) return '';
+  return value.includes('T') ? value.slice(0, 10) : value;
+}
+
+/**
+ * 聚合的 recentRecords 为后端 lessonRecord 精简结构（嵌套 student、无 class / createdAt）。
+ * 映射为 LessonRecord 供「最近消课」区块渲染；class_id / class_name 在聚合中未携带，
+ * 该分支下消课记录按个人项展示（不按班聚合），与单接口时代（带 class）存在轻微差异，
+ * 已在 B10 台账登记，待真机验证。
+ */
+function mapAggregateRecentRecord(item: BackendAggregateRecentRecord): LessonRecord {
+  return {
+    id: item.id,
+    teacher_id: '',
+    student_id: item.student?.id || '',
+    package_id: '',
+    lesson_date: normalizeAggregateLessonDate(item.lessonDate),
+    hours_used: Number(item.hoursUsed ?? (item.duration ?? 0) / 60),
+    status: 'normal',
+    content: item.content || undefined,
+    performance: item.performance || undefined,
+    revoke_status: 'none',
+    created_at: normalizeAggregateLessonDate(item.lessonDate),
+    updated_at: normalizeAggregateLessonDate(item.lessonDate),
+    student: item.student?.name
+      ? { name: item.student.name, avatar_url: item.student.avatar || undefined }
+      : undefined,
+  };
+}
+
+export interface HomeAggregate {
+  role: 'parent' | 'staff';
+  teacher: HomeTeacherSummary | null;
+  parent: ParentHomeData | null;
+  unreadCount: number;
+  schedules: HomeScheduleItem[];
+  recentRecords: LessonRecord[];
+  parentSchedules: HomeScheduleItem[];
+  parentPackages: ParentHomePackageCard[];
+  parentFallbackStudentId: string;
+}
+
 export const homeService = {
   /** 获取教师信息 */
   getTeacher: async (
@@ -578,6 +650,84 @@ export const homeService = {
       return mapBackendParentHome(data);
     } catch {
       return null;
+    }
+  },
+
+  /**
+   * 首页聚合（B10 / PERF-14）：一次请求替代教师/家长/课表/未读/消课 5 次独立请求。
+   * 复用既有 mapper 映射到展示类型；失败降级为空结构（与单接口失败语义一致）。
+   * 注意：todos 不在此聚合内（页面独立走 todoService.getList，保留本地 enrichment）。
+   */
+  getAggregate: async (campusId?: string): Promise<HomeAggregate> => {
+    const query = campusId?.trim() ? `?campusId=${encodeURIComponent(campusId.trim())}` : '';
+    try {
+      const data = await get<BackendHomeAggregateResponse>(`/home/aggregate${query}`);
+
+      if (data.role === 'parent') {
+        const parentResp: BackendParentHomeResponse = {
+          parent: (data.parent as BackendParentHomeResponse['parent']) ?? undefined,
+          stats: { unreadNotificationCount: data.unreadCount },
+          students: (data.students as BackendParentHomeResponse['students']) ?? [],
+          todaySchedules:
+            (data.todaySchedules as BackendParentHomeResponse['todaySchedules']) ?? [],
+          recentRecords: (data.recentRecords as BackendParentHomeResponse['recentRecords']) ?? [],
+        };
+        const parent = mapBackendParentHome(parentResp);
+        return {
+          role: 'parent',
+          teacher: null,
+          parent,
+          unreadCount: data.unreadCount,
+          schedules: [],
+          recentRecords: [],
+          parentSchedules: parent.todaySchedules,
+          parentPackages: parent.packages,
+          parentFallbackStudentId: parent.students?.[0]?.id || '',
+        };
+      }
+
+      // 员工端（教师 / 校长 / 管理员 / 助教）：todaySchedules 即 TeacherHomeTodayScheduleItem，
+      // 与 BackendTeacherHomeResponse.todaySchedules 形状一致，可复用 mapBackendTeacherHome。
+      const teacherResp: BackendTeacherHomeResponse = {
+        teacher: data.teacher as BackendTeacherHomeResponse['teacher'],
+        todaySchedules: (data.todaySchedules as BackendTeacherHomeResponse['todaySchedules']) ?? [],
+        recentRecords: (data.recentRecords as BackendTeacherHomeResponse['recentRecords']) ?? [],
+        students: (data.students as BackendTeacherHomeResponse['students']) ?? [],
+        stats: {
+          unreadNotificationCount: data.unreadCount,
+          studentCount: 0,
+          todayRecordCount: 0,
+          todayScheduleCount: 0,
+          activePackageCount: 0,
+          totalRemainingHours: 0,
+        },
+      };
+      const mapped = mapBackendTeacherHome(teacherResp);
+      return {
+        role: 'staff',
+        teacher: mapped.teacher,
+        parent: null,
+        unreadCount: data.unreadCount,
+        schedules: mapped.schedules,
+        recentRecords: (data.recentRecords as BackendAggregateRecentRecord[]).map(
+          mapAggregateRecentRecord,
+        ),
+        parentSchedules: [],
+        parentPackages: [],
+        parentFallbackStudentId: '',
+      };
+    } catch {
+      return {
+        role: 'staff',
+        teacher: null,
+        parent: null,
+        unreadCount: 0,
+        schedules: [],
+        recentRecords: [],
+        parentSchedules: [],
+        parentPackages: [],
+        parentFallbackStudentId: '',
+      };
     }
   },
 
