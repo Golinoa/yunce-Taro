@@ -67,15 +67,16 @@ export default defineConfig<'webpack5'>(async (merge) => {
           from: 'src/assets/images/sgpk.png',
           to: 'dist/assets/images/sgpk.png',
         },
+        // B12 主包瘦身：cover-home.webp（16.6KB）仅被 package-auth / package-lead 使用，下沉到各自分包
         {
           from: 'src/assets/images/cover-home.webp',
-          to: 'dist/assets/images/cover-home.webp',
+          to: 'dist/package-auth/assets/cover-home.webp',
         },
-        // 维修企微码：原 PNG ~78KB 过大；压缩 WebP ~26KB（≤封面量级）可进主包，展示/保存仍优先 CDN 原图
         {
-          from: 'src/assets/images/support-repair-qr.webp',
-          to: 'dist/assets/images/support-repair-qr.webp',
+          from: 'src/assets/images/cover-home.webp',
+          to: 'dist/package-lead/assets/cover-home.webp',
         },
+        // B12 主包瘦身：维修企微码本地回退 WebP（25.1KB）已上云，仅保留七牛 CDN 原图
         {
           from: 'src/assets/images/qr-point-hand.png',
           to: 'dist/assets/images/qr-point-hand.png',
@@ -142,6 +143,13 @@ export default defineConfig<'webpack5'>(async (merge) => {
       optimizeMainPackage: {
         enable: true,
       },
+      // B10：@tanstack/query-core v5 私有类字段（#）需 babel 降级，否则微信开发者工具
+      // 解析报 SyntaxError。将其纳入编译（默认 node_modules 不转译）。
+      // 注意：Taro 远程 schema 拒绝 RegExp，且 webpack Rule.include 按路径匹配，
+      // 故用 @tanstack 的绝对路径字符串（覆盖 query-core / react-query 等）。
+      compile: {
+        include: [path.resolve(__dirname, '../node_modules/@tanstack')],
+      },
       miniCssExtractPluginOption: {
         ignoreOrder: true,
       },
@@ -172,6 +180,7 @@ export default defineConfig<'webpack5'>(async (merge) => {
                 __filename,
                 path.resolve(__dirname, './dev.ts'),
                 path.resolve(__dirname, './prod.ts'),
+                path.resolve(__dirname, '../babel.config.js'),
               ],
             },
           },

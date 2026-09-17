@@ -11,5 +11,11 @@ module.exports = {
       },
     ],
   ],
-  plugins: [],
+  plugins: [
+    // B10 引入 @tanstack/query-core v5 使用 ES2022 私有类字段（#field），
+    // 微信开发者工具解析器不识别。强制降级为 WeakMap/闭包实现，不限 targets。
+    '@babel/plugin-transform-class-properties',
+    '@babel/plugin-transform-private-methods',
+    '@babel/plugin-transform-private-property-in-object',
+  ],
 };
