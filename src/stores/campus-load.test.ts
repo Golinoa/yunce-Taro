@@ -1,5 +1,8 @@
+import Taro from '@tarojs/taro';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCampusStore } from '@/stores/campus';
+
+const CAMPUS_SNAPSHOT_KEY = 'yunce_campus_list_snapshot';
 
 const services = vi.hoisted(() => ({
   campusService: { getList: vi.fn() },
@@ -39,5 +42,35 @@ describe('校区设置聚合加载', () => {
     await useCampusStore.getState().fetchAll();
     expect(useCampusStore.getState().error).toBe('校区设置加载失败，请重试');
     expect(useCampusStore.getState().loading).toBe(false);
+  });
+
+  it('fetchCampuses 成功后落校区快照，失败时保留旧快照（不把内存清空写成"无校区"）', async () => {
+    await useCampusStore.getState().fetchCampuses(true);
+    expect(JSON.parse(String(Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY)))).toHaveLength(1);
+
+    services.campusService.getList.mockRejectedValue(new Error('网络异常'));
+    await useCampusStore.getState().fetchCampuses(true);
+    expect(useCampusStore.getState().error).toBe('校区数据加载失败');
+    expect(JSON.parse(String(Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY)))).toHaveLength(1);
+  });
+
+  it('清缓存（登出/切机构）会移除校区快照，避免下一账号先渲染上一家的校区', async () => {
+    await useCampusStore.getState().fetchCampuses(true);
+    expect(Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY)).not.toBe('');
+
+    useCampusStore.getState().invalidateCache();
+    expect(Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY)).toBe('');
+  });
+
+  it('冷启动：本地有校区快照时 store 初始即有校区，首页不会先渲染「未设置校区」', async () => {
+    vi.resetModules();
+    const taro = (await import('@tarojs/taro')).default;
+    taro.setStorageSync(
+      CAMPUS_SNAPSHOT_KEY,
+      JSON.stringify([{ id: 'c1', name: '松果总校', isMain: true }]),
+    );
+
+    const { useCampusStore: freshStore } = await import('@/stores/campus');
+    expect(freshStore.getState().campuses.map((c) => c.name)).toEqual(['松果总校']);
   });
 });

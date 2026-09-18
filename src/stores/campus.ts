@@ -39,6 +39,39 @@ const CURRENT_ORG_ID_KEY = 'yunce_current_org_id';
 /** 上次访问校区本地存储键 */
 const LAST_VISITED_CAMPUS_ID_KEY = 'yunce_last_visited_campus_id';
 
+/**
+ * 校区列表快照本地存储键。
+ * 冷启动时先用它渲染首页校区卡片，再由后台请求校准——
+ * 否则「登录态已恢复但 /campuses 还没回来」的窗口里，首页会先显示兜底文案「未设置校区」。
+ */
+const CAMPUS_SNAPSHOT_KEY = 'yunce_campus_list_snapshot';
+
+/** 读回校区列表快照；解析失败/非数组一律当空，不影响主链路 */
+function readCampusSnapshot(): CampusUIModel[] {
+  try {
+    const raw = Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as CampusUIModel[];
+  } catch {
+    return [];
+  }
+}
+
+/** 写校区列表快照；列表为空（登出/切机构清缓存）时移除，避免换账号后串上一家的门店 */
+function persistCampusSnapshot(list: CampusUIModel[]): void {
+  try {
+    if (list.length > 0) {
+      Taro.setStorageSync(CAMPUS_SNAPSHOT_KEY, JSON.stringify(list));
+    } else {
+      Taro.removeStorageSync(CAMPUS_SNAPSHOT_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 interface CampusState {
   // 数据
   orgName: string;
@@ -123,7 +156,7 @@ interface CampusState {
 
 export const useCampusStore = create<CampusState>((set, get) => ({
   orgName: Taro.getStorageSync(ORG_NAME_KEY) || DEFAULT_ORG_NAME,
-  campuses: [],
+  campuses: readCampusSnapshot(),
   allowedCampusIds: [],
   currentCampusId: Taro.getStorageSync(CURRENT_CAMPUS_ID_KEY) || '',
   lastVisitedCampusId: Taro.getStorageSync(LAST_VISITED_CAMPUS_ID_KEY) || '',
@@ -157,6 +190,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const list = await campusService.getList();
+      persistCampusSnapshot(list);
       set({ campuses: list, error: null, loading: false, lastCampusesFetchAt: now });
     } catch (err) {
       logError('fetchCampuses', err);
@@ -165,6 +199,8 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   },
 
   invalidateCache: () => {
+    // 清内存列表的同时清快照：切机构/登出后不得让下一个上下文先渲染上一家的校区
+    persistCampusSnapshot([]);
     set({
       lastCampusesFetchAt: 0,
       lastSubjectsFetchAt: 0,
@@ -184,6 +220,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
     try {
       const campus = await campusService.add(data);
       const campuses = await campusService.getList();
+      persistCampusSnapshot(campuses);
       set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
       return campus;
     } catch (err) {
@@ -198,6 +235,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const result = await campusService.update(id, data);
       if (result) {
         const campuses = await campusService.getList();
+        persistCampusSnapshot(campuses);
         set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
         return true;
       }
@@ -214,6 +252,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const success = await campusService.delete(id);
       if (success) {
         const campuses = await campusService.getList();
+        persistCampusSnapshot(campuses);
         set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
         return true;
       }
@@ -230,6 +269,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const success = await campusService.setMain(id);
       if (success) {
         const campuses = await campusService.getList();
+        persistCampusSnapshot(campuses);
         set({ campuses, error: null, lastCampusesFetchAt: Date.now() });
         return true;
       }

@@ -63,18 +63,52 @@ async function waitForRateLimitBackoff(url: string): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, remaining));
 }
 
+/** 登录页路由（getCurrentPages 的 route 不带前导 /；跳转 url 必须带） */
+const LOGIN_PAGE_ROUTE = 'package-auth/pages/login/index';
+const LOGIN_PAGE_URL = `/${LOGIN_PAGE_ROUTE}`;
+/** 跳登录页护栏：并发 401 只跳一次，避免后到的 redirectTo 被前一次导航顶掉后静默失败 */
+const LOGIN_REDIRECT_LOCK_MS = 1000;
+let loginRedirectedAt = 0;
+
+/**
+ * 清本地会话。
+ * 必须连 profile / userRole 一起清：只清 token 会留下「脏 profile」，
+ * 让首页在"已无登录态"时仍拿旧身份继续渲染（FE-11 漏项）。
+ */
 function clearAuthSession(): void {
   Taro.removeStorageSync(AUTH_TOKEN_KEY);
+  Taro.removeStorageSync(USER_PROFILE_KEY);
+  Taro.removeStorageSync('userRole');
 }
 
+/**
+ * 跳登录页（确定终点）：并发/冷启动下多个请求同时 401，只跳一次；
+ * 已在登录页时不重复跳；redirectTo 失败（如栈顶是 TabBar 根页）时 reLaunch 兜底，
+ * 保证一定落到登录页而不是停在中间态。
+ * 整个跳转是 best-effort：跳转本身抛错不允许反噬请求链路（路由守卫会在下次 checkAuth 兜底）。
+ */
 function redirectToLogin(): void {
-  const currentPages = Taro.getCurrentPages();
-  const currentRoute = currentPages[currentPages.length - 1]?.route;
-  if (currentRoute === 'package-auth/pages/login/index') {
-    return;
-  }
+  try {
+    const currentPages = Taro.getCurrentPages();
+    const currentRoute = currentPages[currentPages.length - 1]?.route;
+    if (currentRoute === LOGIN_PAGE_ROUTE) {
+      return;
+    }
+    const now = Date.now();
+    if (now - loginRedirectedAt < LOGIN_REDIRECT_LOCK_MS) {
+      return;
+    }
+    loginRedirectedAt = now;
 
-  Taro.redirectTo({ url: '/package-auth/pages/login/index' });
+    Taro.redirectTo({
+      url: LOGIN_PAGE_URL,
+      fail: () => {
+        Taro.reLaunch({ url: LOGIN_PAGE_URL });
+      },
+    });
+  } catch {
+    /* 跳转失败不阻塞请求层 */
+  }
 }
 
 /** API 统一响应格式 */
@@ -175,6 +209,28 @@ function persistRefreshedSession(token: string, refreshToken: string, expiresIn:
 
 let refreshInFlight: Promise<string | null> | null = null;
 
+/**
+ * 本轮已被判定「不可再用」的 refreshToken。
+ * 后端 refresh 是「单次使用 + 轮换」：每次刷新都会 bump sessionVersion 并 revoke 旧会话，
+ * 同一个已被拒的凭据再打一次只会继续 401。这里记住它，避免冷启动/后续请求反复 POST /auth/refresh。
+ * 重新登录会写入新的 refreshToken，值不同即自动解除，无需显式重置。
+ */
+let rejectedRefreshToken: string | null = null;
+
+/** 会话已收口为「必须重新登录」：不再尝试续期，也不再发注定 401 的业务请求 */
+let sessionTerminated = false;
+
+/**
+ * 会话失效收口（终态，幂等）：清 token + profile + userRole → 明确跳登录页。
+ * 冷启动/多并发下可能有多个请求同时发现会话失效，这里保证只清一次、只跳一次，
+ * 不会留下「脏 profile + 卡在中间态」。
+ */
+function terminateSession(): void {
+  sessionTerminated = true;
+  clearAuthSession();
+  redirectToLogin();
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) {
     return refreshInFlight;
@@ -183,7 +239,15 @@ async function refreshAccessToken(): Promise<string | null> {
   refreshInFlight = (async () => {
     const refreshToken = readRefreshToken();
     if (!refreshToken) {
+      // 本地已无续期凭据：顺手清掉可能残留的脏 profile。
+      // 此处不主动跳登录页——公开页（邀请落地/入驻填表）在未登录时也会发非 skipAuth 请求，
+      // 主动跳会把它们误踢到登录页；真正的鉴权失败由业务 401 分支收口。
       clearAuthSession();
+      return null;
+    }
+
+    if (refreshToken === rejectedRefreshToken) {
+      // 该凭据本轮已被判定不可用：直接按「无会话」返回，不再打后端
       return null;
     }
 
@@ -209,23 +273,37 @@ async function refreshAccessToken(): Promise<string | null> {
         }>;
         if (body.code === 0 || body.code === 200) {
           persistRefreshedSession(body.data.token, body.data.refreshToken, body.data.expiresIn);
+          rejectedRefreshToken = null;
           return body.data.token;
         }
       }
 
-      clearAuthSession();
+      // 非 2xx：有一种「假失败」——并发的另一路刷新（services/auth-session.ts 的
+      // refreshSessionForTenant 未走本单飞）已用同一个 refreshToken 换到了新凭据，
+      // 本轮 401 只是"输给了另一路"。此时本地 refreshToken 已变，直接复用新 access token。
+      const latestRefreshToken = readRefreshToken();
+      if (latestRefreshToken && latestRefreshToken !== refreshToken) {
+        const latestAccessToken = readAccessToken();
+        if (latestAccessToken) {
+          return latestAccessToken;
+        }
+      }
+
+      rejectedRefreshToken = refreshToken;
       logRequestIssue('refresh_fail', {
         path: '/auth/refresh',
         statusCode: res.statusCode,
         errMsg: 'refresh response not ok',
       });
+      terminateSession();
       return null;
     } catch (err) {
-      clearAuthSession();
+      rejectedRefreshToken = refreshToken;
       logRequestIssue('refresh_fail', {
         path: '/auth/refresh',
         errMsg: err instanceof Error ? err.message : String(err),
       });
+      terminateSession();
       return null;
     } finally {
       refreshInFlight = null;
@@ -241,6 +319,8 @@ async function resolveAccessToken(skipAuth: boolean): Promise<string | null> {
   }
   const current = readAccessToken();
   if (current) {
+    // 有可用 access token ⇒ 会话正常（含重新登录后），解除上一次的收口标记
+    sessionTerminated = false;
     return current;
   }
   return refreshAccessToken();
@@ -306,6 +386,10 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
     const token = await resolveAccessToken(skipAuth);
     if (token) {
       header['Authorization'] = `Bearer ${token}`;
+    } else if (sessionTerminated) {
+      // 会话已收口为「必须重新登录」（已清态 + 已跳登录页）：
+      // 不再把注定 401 的请求打到后端，避免冷启动一堆 /auth/me、/org-permissions 401 噪声
+      throw new ApiError(401, '登录已过期，请重新登录');
     }
   }
 
@@ -346,8 +430,7 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
         if (body.code === 401) {
           // 登录/注册等 skipAuth：透传「邮箱或密码错误」，禁止当成会话过期
           if (!skipAuth) {
-            clearAuthSession();
-            redirectToLogin();
+            terminateSession();
           }
         }
         if (isQuotaExceededMessage(body.message)) {
@@ -372,8 +455,7 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
         // password-login / register 等：后端已有「邮箱或密码错误」，勿改成「登录已过期」
         throw new ApiError(401, message || '邮箱或密码错误');
       }
-      clearAuthSession();
-      redirectToLogin();
+      terminateSession();
       throw new ApiError(401, message?.includes('过期') ? message : '登录已过期，请重新登录');
     }
 
