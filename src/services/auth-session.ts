@@ -28,7 +28,7 @@ import type {
   UserRole,
 } from '@/types/profile';
 import type { ParentStorefrontItem, ParentStorefrontsResult } from '@/types/storefront';
-import { get, post, put } from '@/utils/request';
+import { get, post, put, refreshSessionOnce } from '@/utils/request';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
 const persistLocalProfile = (profile: Profile | null): void => {
@@ -292,6 +292,10 @@ export async function switchAuthContext(input: {
 /**
  * 强制用 refresh 换新会话（门店入驻批准后注入 organizationId）。
  * BE refresh 会重新 resolve ACTIVE 主租户；成功后同步本地 Profile 与 JWT 一致。
+ *
+ * 续期必须走 request 层的同一个单飞（refreshSessionOnce）：后端 refresh 是「单次使用 + 轮换」，
+ * 若这里另起一次并发 POST /auth/refresh（例如冷启动多请求 + 切租户同时发生），
+ * 后到的一路会把先到的一路刚换到的票轮换作废，用户随即被踢下线。
  */
 export async function refreshSessionForTenant(): Promise<{
   ok: boolean;
@@ -304,30 +308,26 @@ export async function refreshSessionForTenant(): Promise<{
     return { ok: false, error: { message: '请重新登录后再进入机构端' } };
   }
   try {
-    const data = await post<{
-      token: string;
-      refreshToken: string;
-      expiresIn: number;
-    }>(AUTH_ENDPOINTS.refresh, { refreshToken }, { skipAuth: true });
-    if (!data?.token || !data.refreshToken) {
-      return { ok: false, error: { message: '刷新会话失败' } };
+    const refreshed = await refreshSessionOnce();
+    if (!refreshed.ok) {
+      return {
+        ok: false,
+        error: {
+          message:
+            refreshed.reason === 'rejected' ? '刷新会话失败，请重新登录' : '刷新会话失败，请重试',
+        },
+      };
     }
-    const next = {
-      ...stored,
-      access_token: data.token,
-      refresh_token: data.refreshToken,
-      expires_at: Math.floor(Date.now() / 1000) + (data.expiresIn || 7200),
-    };
-    Taro.setStorageSync(AUTH_TOKEN_KEY, JSON.stringify(next));
+    const nextAccessToken = refreshed.accessToken;
 
     // 用 me + 新 JWT 重映射 Profile，确保 organizationId 与 token 同为真实 UUID
     let profile: Profile | null = null;
     try {
       const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me);
-      profile = mapBackendProfile(user, data.token);
+      profile = mapBackendProfile(user, nextAccessToken);
       persistLocalProfile(profile);
     } catch {
-      const claims = decodeAccessTokenClaims(data.token);
+      const claims = decodeAccessTokenClaims(nextAccessToken);
       const orgId = pickRealTenantId([claims.organizationId]);
       const campusId = pickRealTenantId([claims.campusId]) || undefined;
       try {

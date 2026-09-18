@@ -221,6 +221,17 @@ let rejectedRefreshToken: string | null = null;
 let sessionTerminated = false;
 
 /**
+ * 本轮 refresh 是否因「可重试原因」失败（网络错误 / 超时 / 5xx / 429），值是给用户看的提示文案。
+ *
+ * 为什么必须区分：refresh 失败分两类——
+ * 1. 401：凭据无效（后端轮换后旧票必然被拒）→ 会话终态，清态 + 跳登录；
+ * 2. 网络/超时/5xx/429：后端抖动，凭据本身还没被判定无效 → **不得**踢人下线。
+ * 此时若照旧不带 token 继续发业务请求，后端必然回 401，又会被 401 分支当成会话失效把人踢掉
+ * （弱网自杀）。所以这里记住"这次没换成"，让本次请求按可重试的网络错误失败，下次请求再续期。
+ */
+let refreshTransientFailure: string | null = null;
+
+/**
  * 会话失效收口（终态，幂等）：清 token + profile + userRole → 明确跳登录页。
  * 冷启动/多并发下可能有多个请求同时发现会话失效，这里保证只清一次、只跳一次，
  * 不会留下「脏 profile + 卡在中间态」。
@@ -235,6 +246,9 @@ async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) {
     return refreshInFlight;
   }
+
+  // 每次新的续期尝试先清「可重试失败」标记；只有本次真的失败才重新置上
+  refreshTransientFailure = null;
 
   refreshInFlight = (async () => {
     const refreshToken = readRefreshToken();
@@ -272,14 +286,20 @@ async function refreshAccessToken(): Promise<string | null> {
           expiresIn: number;
         }>;
         if (body.code === 0 || body.code === 200) {
-          persistRefreshedSession(body.data.token, body.data.refreshToken, body.data.expiresIn);
+          persistRefreshedSession(
+            body.data.token,
+            body.data.refreshToken,
+            body.data.expiresIn || 7200,
+          );
           rejectedRefreshToken = null;
+          // 续期成功 ⇒ 会话恢复正常，解除上一次的收口标记
+          sessionTerminated = false;
           return body.data.token;
         }
       }
 
-      // 非 2xx：有一种「假失败」——并发的另一路刷新（services/auth-session.ts 的
-      // refreshSessionForTenant 未走本单飞）已用同一个 refreshToken 换到了新凭据，
+      // 非 2xx：有一种「假失败」——并发的另一路刷新（如 services/auth-session.ts 的
+      // refreshSessionForTenant）已用同一个 refreshToken 换到了新凭据，
       // 本轮 401 只是"输给了另一路"。此时本地 refreshToken 已变，直接复用新 access token。
       const latestRefreshToken = readRefreshToken();
       if (latestRefreshToken && latestRefreshToken !== refreshToken) {
@@ -289,21 +309,34 @@ async function refreshAccessToken(): Promise<string | null> {
         }
       }
 
-      rejectedRefreshToken = refreshToken;
+      // 只有 401 才是「凭据无效」的终态：清态 + 跳登录
+      if (res.statusCode === 401) {
+        rejectedRefreshToken = refreshToken;
+        logRequestIssue('refresh_fail', {
+          path: '/auth/refresh',
+          statusCode: res.statusCode,
+          errMsg: 'refresh rejected',
+        });
+        terminateSession();
+        return null;
+      }
+
+      // 5xx / 429 / 其它非 401：后端抖动，凭据未必失效 —— 不清会话、不跳登录，按可重试处理
+      refreshTransientFailure =
+        res.statusCode === 429 ? RATE_LIMIT_MESSAGE : '服务暂时不可用，请稍后重试';
       logRequestIssue('refresh_fail', {
         path: '/auth/refresh',
         statusCode: res.statusCode,
-        errMsg: 'refresh response not ok',
+        errMsg: 'refresh temporarily failed',
       });
-      terminateSession();
       return null;
     } catch (err) {
-      rejectedRefreshToken = refreshToken;
+      // 网络错误 / 超时：与 5xx 同等对待，保留会话，下次请求仍有机会续期成功
+      refreshTransientFailure = mapNetworkFailMessage(err);
       logRequestIssue('refresh_fail', {
         path: '/auth/refresh',
         errMsg: err instanceof Error ? err.message : String(err),
       });
-      terminateSession();
       return null;
     } finally {
       refreshInFlight = null;
@@ -311,6 +344,27 @@ async function refreshAccessToken(): Promise<string | null> {
   })();
 
   return refreshInFlight;
+}
+
+/** 续期结果：供 services 层区分「必须重新登录」与「可重试失败」，避免两种失败用同一句文案 */
+export type SessionRefreshOutcome =
+  | { ok: true; accessToken: string }
+  | { ok: false; reason: 'rejected' | 'retryable' };
+
+/**
+ * 供 services 层（services/auth-session.ts 的 refreshSessionForTenant）复用的**强制**续期入口。
+ *
+ * - 与静默续期共用同一个 refreshInFlight（单飞）：同一时刻只会发出一次 POST /auth/refresh。
+ *   后端 refresh 是「单次使用 + 轮换」，并发两次会让先到的那张新票立刻作废 → 用户被踢下线。
+ * - 强制：不做「access 仍有效就跳过」的短路，入驻批准后必须重新换票才能拿到带新 organizationId 的 JWT。
+ * - 不抛出：失败一律走返回值，调用方按 reason 决定文案与后续动作。
+ */
+export async function refreshSessionOnce(): Promise<SessionRefreshOutcome> {
+  const accessToken = await refreshAccessToken();
+  if (accessToken) {
+    return { ok: true, accessToken };
+  }
+  return { ok: false, reason: sessionTerminated ? 'rejected' : 'retryable' };
 }
 
 async function resolveAccessToken(skipAuth: boolean): Promise<string | null> {
@@ -390,6 +444,10 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
       // 会话已收口为「必须重新登录」（已清态 + 已跳登录页）：
       // 不再把注定 401 的请求打到后端，避免冷启动一堆 /auth/me、/org-permissions 401 噪声
       throw new ApiError(401, '登录已过期，请重新登录');
+    } else if (refreshTransientFailure) {
+      // 有 refreshToken 但这次没换成（网络/超时/5xx/429）：会话仍有效，禁止踢人下线。
+      // 也绝不能落到「不带 Authorization 发请求」——后端必然回 401，反而触发会话收口。
+      throw new ApiError(-1, refreshTransientFailure);
     }
   }
 

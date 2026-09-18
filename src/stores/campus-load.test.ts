@@ -62,6 +62,22 @@ describe('校区设置聚合加载', () => {
     expect(Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY)).toBe('');
   });
 
+  it('清缓存后 fetchCampuses 不再被 TTL 短路，必然真正重拉（首页 staleTime=0 依赖此语义）', async () => {
+    await useCampusStore.getState().fetchCampuses(true);
+    expect(services.campusService.getList).toHaveBeenCalledTimes(1);
+
+    // TTL 内重复调用被短路：稳态下不会多发网络
+    await useCampusStore.getState().fetchCampuses();
+    expect(services.campusService.getList).toHaveBeenCalledTimes(1);
+
+    // invalidateCache 把 lastCampusesFetchAt 归零 → 下一次（即首页 queryFn）必须真的重拉，
+    // 否则「清了内存 + 清了快照」之后首页会一直停在空列表
+    useCampusStore.getState().invalidateCache();
+    await useCampusStore.getState().fetchCampuses();
+    expect(services.campusService.getList).toHaveBeenCalledTimes(2);
+    expect(useCampusStore.getState().campuses).toHaveLength(1);
+  });
+
   it('冷启动：本地有校区快照时 store 初始即有校区，首页不会先渲染「未设置校区」', async () => {
     vi.resetModules();
     const taro = (await import('@tarojs/taro')).default;

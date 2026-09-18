@@ -6,6 +6,8 @@ vi.mock('@/utils/request', () => ({
   get: vi.fn(),
   put: vi.fn(),
   del: vi.fn(),
+  // refreshSessionForTenant 不再自己 POST /auth/refresh，改为复用 request 层的单飞续期入口
+  refreshSessionOnce: vi.fn(),
 }));
 
 vi.mock('@/services/campus-invite', () => ({
@@ -299,7 +301,7 @@ describe('auth service', () => {
   });
 
   it('refreshSessionForTenant：换 token 后 Profile.organizationId 与 JWT 对齐', async () => {
-    const { post, get } = await import('@/utils/request');
+    const { refreshSessionOnce, get } = await import('@/utils/request');
     const orgUuid = '55555555-5555-4555-8555-555555555555';
     const payload = Buffer.from(JSON.stringify({ organizationId: orgUuid }), 'utf8')
       .toString('base64')
@@ -340,11 +342,8 @@ describe('auth service', () => {
       }),
     );
 
-    vi.mocked(post).mockResolvedValueOnce({
-      token: newToken,
-      refreshToken: 'rt-new',
-      expiresIn: 7200,
-    });
+    // 续期统一走 request 层单飞入口（不再由本模块自己 POST /auth/refresh）
+    vi.mocked(refreshSessionOnce).mockResolvedValueOnce({ ok: true, accessToken: newToken });
     vi.mocked(get).mockResolvedValueOnce({
       id: 'profile-1',
       profileId: 'profile-1',
@@ -358,9 +357,28 @@ describe('auth service', () => {
 
     const { refreshSessionForTenant } = await import('@/services/auth');
     const result = await refreshSessionForTenant();
+    expect(refreshSessionOnce).toHaveBeenCalledTimes(1);
     expect(result.ok).toBe(true);
     expect(result.profile?.currentContext.organizationId).toBe(orgUuid);
     expect(result.profile?.currentContext.organizationId).not.toBe('星火艺术中心');
+  });
+
+  it('refreshSessionForTenant：续期可重试失败时提示「请重试」而不是「请重新登录」', async () => {
+    Taro.setStorageSync(
+      'yunce-edu-auth-token',
+      JSON.stringify({
+        access_token: 'old',
+        refresh_token: 'rt-old',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      }),
+    );
+    const { refreshSessionOnce } = await import('@/utils/request');
+    vi.mocked(refreshSessionOnce).mockResolvedValueOnce({ ok: false, reason: 'retryable' });
+
+    const { refreshSessionForTenant } = await import('@/services/auth');
+    const result = await refreshSessionForTenant();
+    expect(result.ok).toBe(false);
+    expect(result.error?.message).toBe('刷新会话失败，请重试');
   });
 
   it('listParentStorefronts：GET /auth/parent-storefronts', async () => {

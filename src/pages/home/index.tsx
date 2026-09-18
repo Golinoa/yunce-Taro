@@ -72,6 +72,17 @@ const HOME_QUERY_ROOT = ['home'] as const;
 const HOME_QUERY_STALE_TIME_MS = 30_000;
 
 /**
+ * 校区列表保鲜期为 0（每次挂载都让 queryFn 跑一遍）。
+ * 理由：校区列表的真正新鲜度归 Zustand store（TTL.campus = 15min，见 stores/campus.ts），
+ * React Query 只是「触发 store 拉取」的入口。若这里再设 30s staleTime，就会出现两个互相独立的时钟：
+ * 登出/切机构时 store 清了内存 + 快照并把 lastCampusesFetchAt 归零，但 RQ 仍认为 30s 内缓存新鲜
+ * → 不再调用 queryFn → 校区列表停在已清空的状态（首页校区卡片空、「未设置校区」引导误弹）。
+ * 设为 0 后：每次进首页都会走到 store，由 store 自己的 TTL 决定是否真发网络（稳态下不发），
+ * 而被 invalidateCache 归零后必然真正重拉。
+ */
+const CAMPUSES_QUERY_STALE_TIME_MS = 0;
+
+/**
  * Home - 机构端首页
  *
  * 对齐设计稿：
@@ -299,12 +310,16 @@ const Home: React.FC = () => {
   /** 身份就绪：与原 Batch 2 手工闸门一致 */
   const homeIdentityReady = Boolean(profileId && currentRole);
 
-  /** 校区列表：Store 内自带 TTL，这里再用 staleTime 挡住重复触发 */
+  /**
+   * 校区列表：真正的新鲜度由 Store 内 TTL(CAMPUS) 控，这里 staleTime 必须为 0，
+   * 否则 store 的 invalidateCache（登出/切机构清内存 + 清快照 + 归零 lastCampusesFetchAt）
+   * 会被 RQ 的 staleTime 挡住而不重拉 —— 见 CAMPUSES_QUERY_STALE_TIME_MS 注释。
+   */
   useQuery({
     queryKey: ['campuses', currentRole ?? ''],
     queryFn: () => fetchCampuses(),
     enabled: Boolean(currentRole),
-    staleTime: HOME_QUERY_STALE_TIME_MS,
+    staleTime: CAMPUSES_QUERY_STALE_TIME_MS,
   });
 
   /** 首页聚合（B10 / PERF-14）：教师/家长/课表/未读/消课 一次请求返回 */

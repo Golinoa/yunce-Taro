@@ -11,6 +11,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/utils/build-env', () => ({
   getApiBaseUrl: () => 'https://dev.chancore.cn/api/app/v1',
+  // services/auth-shared 的 authCapabilities 在模块初始化时会读这两个开关
+  isDevApiEnv: () => true,
+  isUseMock: () => false,
 }));
 
 vi.mock('@/utils/local-debug', () => ({
@@ -121,5 +124,122 @@ describe('FE-11 refresh 失败收口（清 token + 清 profile + 跳登录页）
       'Bearer fresh-access',
       'Bearer fresh-access',
     ]);
+  });
+
+  it('refresh 5xx：不清会话、不跳登录，本次请求按可重试失败；随后恢复可续期成功', async () => {
+    const taro = await freshTaro();
+    taro.setStorageSync(
+      AUTH_TOKEN_KEY,
+      JSON.stringify({ access_token: 'expired-access', refresh_token: 'R1', expires_at: 1 }),
+    );
+    taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify({ id: 'p1', identities: [] }));
+
+    const redirectTo = vi.fn();
+    (taro as unknown as { redirectTo: unknown }).redirectTo = redirectTo;
+
+    let refreshStatus = 500;
+    const spy = vi.spyOn(taro, 'request').mockImplementation(((opts: { url: string }) => {
+      if (opts.url.endsWith('/auth/refresh')) {
+        if (refreshStatus === 200) {
+          return Promise.resolve(
+            ok({ token: 'fresh-access', refreshToken: 'R2', expiresIn: 7200 }),
+          );
+        }
+        return Promise.resolve({
+          statusCode: refreshStatus,
+          data: { code: 500, message: '服务暂时不可用', data: null },
+          header: {},
+          cookies: [],
+          errMsg: 'ok',
+        });
+      }
+      return Promise.resolve(ok({ ok: 1 }));
+    }) as never);
+
+    const { get } = await import('@/utils/request');
+    await expect(get('/a')).rejects.toMatchObject({ code: -1 });
+
+    // 带 refreshToken 却没换成 token 时，绝不能发「无 Authorization」的业务请求（否则必 401 → 被踢）
+    expect(spy.mock.calls.filter((c) => !c[0].url.endsWith('/auth/refresh'))).toHaveLength(0);
+    // 会话保持原样：token / profile 都在，未跳登录
+    expect(taro.getStorageSync(AUTH_TOKEN_KEY)).not.toBe('');
+    expect(taro.getStorageSync(USER_PROFILE_KEY)).not.toBe('');
+    expect(redirectTo).not.toHaveBeenCalled();
+
+    // 后端恢复后，下一次请求仍有机会续期成功
+    refreshStatus = 200;
+    await expect(get('/b')).resolves.toEqual({ ok: 1 });
+    const stored = JSON.parse(String(taro.getStorageSync(AUTH_TOKEN_KEY)));
+    expect(stored.access_token).toBe('fresh-access');
+    expect(stored.refresh_token).toBe('R2');
+  });
+
+  it('refresh 网络错误/超时：不清会话、不跳登录，按可重试失败', async () => {
+    const taro = await freshTaro();
+    taro.setStorageSync(
+      AUTH_TOKEN_KEY,
+      JSON.stringify({ access_token: 'expired-access', refresh_token: 'R1', expires_at: 1 }),
+    );
+    taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify({ id: 'p1', identities: [] }));
+
+    const redirectTo = vi.fn();
+    (taro as unknown as { redirectTo: unknown }).redirectTo = redirectTo;
+
+    // Taro.request 的 fail 回调没有 statusCode —— 网络类失败只能走 reject
+    const spy = vi.spyOn(taro, 'request').mockImplementation(((opts: { url: string }) => {
+      if (opts.url.endsWith('/auth/refresh')) {
+        return Promise.reject(new Error('request:fail timeout'));
+      }
+      return Promise.resolve(ok({ ok: 1 }));
+    }) as never);
+
+    const { get } = await import('@/utils/request');
+    await expect(get('/a')).rejects.toMatchObject({ code: -1 });
+
+    expect(spy.mock.calls.filter((c) => !c[0].url.endsWith('/auth/refresh'))).toHaveLength(0);
+    expect(taro.getStorageSync(AUTH_TOKEN_KEY)).not.toBe('');
+    expect(taro.getStorageSync(USER_PROFILE_KEY)).not.toBe('');
+    expect(redirectTo).not.toHaveBeenCalled();
+  });
+
+  it('并发续期只发一次：refreshSessionForTenant 与静默续期共用同一单飞', async () => {
+    const taro = await freshTaro();
+    taro.setStorageSync(
+      AUTH_TOKEN_KEY,
+      JSON.stringify({ access_token: 'expired-access', refresh_token: 'R1', expires_at: 1 }),
+    );
+    taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify({ id: 'p1', identities: [] }));
+    (taro as unknown as { redirectTo: unknown }).redirectTo = vi.fn();
+
+    const spy = vi.spyOn(taro, 'request').mockImplementation((async (opts: { url: string }) => {
+      if (opts.url.endsWith('/auth/refresh')) {
+        // 让两路请求真正重叠：若未共用单飞，会看到两次 POST /auth/refresh
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return ok({ token: 'fresh-access', refreshToken: 'R2', expiresIn: 7200 });
+      }
+      if (opts.url.endsWith('/auth/me')) {
+        // /auth/me 故意失败 → refreshSessionForTenant 走 JWT 兜底分支，不影响本用例结论
+        return {
+          statusCode: 500,
+          data: { code: 500, message: 'x', data: null },
+          header: {},
+          cookies: [],
+          errMsg: 'ok',
+        };
+      }
+      return ok({ ok: 1 });
+    }) as never);
+
+    const { get } = await import('@/utils/request');
+    const { refreshSessionForTenant } = await import('@/services/auth-session');
+
+    const [business, refreshed] = await Promise.all([get('/a'), refreshSessionForTenant()]);
+
+    expect(business).toEqual({ ok: 1 });
+    expect(refreshed.ok).toBe(true);
+    expect(spy.mock.calls.filter((c) => c[0].url.endsWith('/auth/refresh'))).toHaveLength(1);
+    expect(spy.mock.calls.filter((c) => c[0].url.endsWith('/a'))[0][0].header?.Authorization).toBe(
+      'Bearer fresh-access',
+    );
   });
 });
