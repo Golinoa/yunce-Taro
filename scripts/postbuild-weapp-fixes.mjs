@@ -378,9 +378,8 @@ function ensureStaticAssetsCopied() {
     'assets/icons/checkin_unselected.png',
     'assets/icons/profile_selected.png',
     'assets/icons/profile_unselected.png',
-    'assets/images/icon-rocket.webp',
-    'assets/images/icon-users.webp',
-    'assets/images/icon-calendar-check.webp',
+    // 瓷片 3D 图（icon-rocket / icon-users / icon-calendar-check .webp）已移除——
+    // 真机不渲染 webp + 主包放不下 PNG，统一改走七牛 CDN（见 constants/brand.ts: HOME_TILE_IMAGE_BASE）
     'assets/images/sgpk.png',
   ];
   for (const rel of required) {

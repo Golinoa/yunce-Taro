@@ -81,47 +81,13 @@ export default defineConfig<'webpack5'>(async (merge) => {
           from: 'src/assets/images/qr-point-hand.png',
           to: 'dist/assets/images/qr-point-hand.png',
         },
-        // 首页金刚区 3D 瓷片（单张约 6–11KB，合计约 80KB）
-        {
-          from: 'src/assets/images/icon-book.webp',
-          to: 'dist/assets/images/icon-book.webp',
-        },
-        {
-          from: 'src/assets/images/icon-calendar-check.webp',
-          to: 'dist/assets/images/icon-calendar-check.webp',
-        },
-        {
-          from: 'src/assets/images/icon-crown.webp',
-          to: 'dist/assets/images/icon-crown.webp',
-        },
-        {
-          from: 'src/assets/images/icon-customer-service.webp',
-          to: 'dist/assets/images/icon-customer-service.webp',
-        },
-        {
-          from: 'src/assets/images/icon-lightning.webp',
-          to: 'dist/assets/images/icon-lightning.webp',
-        },
-        {
-          from: 'src/assets/images/icon-rocket.webp',
-          to: 'dist/assets/images/icon-rocket.webp',
-        },
-        {
-          from: 'src/assets/images/icon-users.webp',
-          to: 'dist/assets/images/icon-users.webp',
-        },
-        {
-          from: 'src/assets/images/icon-wallet-pink.webp',
-          to: 'dist/assets/images/icon-wallet-pink.webp',
-        },
-        {
-          from: 'src/assets/images/icon-wallet-purple.webp',
-          to: 'dist/assets/images/icon-wallet-purple.webp',
-        },
-        {
-          from: 'src/assets/images/icon-wallet-yen.webp',
-          to: 'dist/assets/images/icon-wallet-yen.webp',
-        },
+        // 首页瓷片 3D 图（原 icon-*.webp）已于 2026-09-18 全部移除主包与源目录：
+        // - 它们是带 alpha 的 VP8X，**小程序真机不渲染**（开发者工具能显示、真机空白）；
+        // - 转 PNG 后（10 张约 219KB）远超主包余量，也不能放分包（首页在主包，引用不到分包资源）；
+        // - 因此图片统一走七牛 CDN，基址见 `src/constants/brand.ts` 的 HOME_TILE_IMAGE_BASE，
+        //   未配置时瓷片自动回退为 mdi 渐变图标（`KingKongSection` 内 TileIcon 的 onError 兜底）。
+        // 需要恢复时：上传 PNG 至 `platform/static/home-icons/`（与 support-repair-qr.png 同目录），
+        // 填 HOME_TILE_IMAGE_BASE 即可，无需再往主包塞图（本项为主包/整体包体省下约 104KB）。
         {
           from: 'src/package-settings/assets/wx.webp',
           to: 'dist/package-settings/assets/wx.webp',
