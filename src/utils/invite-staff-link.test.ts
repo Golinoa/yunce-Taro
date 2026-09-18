@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildCampusInvitePath,
-  copyCampusInviteLink,
+  copyCampusInviteCode,
   PENDING_CAMPUS_INVITE_CODE_KEY,
   storePendingCampusInviteCode,
   getPendingCampusInviteCode,
@@ -43,21 +43,20 @@ describe('invite-staff-link (B0-1 L3 直链)', () => {
     );
   });
 
-  it('copyCampusInviteLink 复制落地页直链（不含 index?redirect=）', async () => {
-    await copyCampusInviteLink('EABC12345');
-    expect(setClipboardData).toHaveBeenCalledWith({
-      data: '/package-auth/pages/campus-invite-landing/index?code=EABC12345',
-    });
+  it('copyCampusInviteCode 复制纯邀请码，而非点不开的内部路径', async () => {
+    await copyCampusInviteCode('eabc12345');
+    expect(setClipboardData).toHaveBeenCalledWith({ data: 'EABC12345' });
     const copied = setClipboardData.mock.calls[0][0].data as string;
+    expect(copied).not.toContain('/package-auth/');
+    expect(copied).not.toContain('?code=');
     expect(copied).not.toContain('redirect=');
-    expect(copied).not.toContain('pages/index/index');
     expect(showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: expect.stringContaining('员工邀请链接已复制') }),
+      expect.objectContaining({ title: expect.stringContaining('邀请码已复制') }),
     );
   });
 
-  it('copyCampusInviteLink 空码提示异常', async () => {
-    await copyCampusInviteLink('  ');
+  it('copyCampusInviteCode 空码提示异常', async () => {
+    await copyCampusInviteCode('  ');
     expect(setClipboardData).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ title: '邀请码异常' }));
   });

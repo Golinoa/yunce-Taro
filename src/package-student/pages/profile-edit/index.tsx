@@ -514,9 +514,6 @@ const ProfileEdit: React.FC = () => {
                         onInput={(e) => updateField('nickname', e.detail.value || '')}
                         maxlength={20}
                       />
-                      <Text className="text-[22rpx] text-muted-foreground">
-                        可手改；点输入框可拉取微信昵称
-                      </Text>
                     </View>
                   ) : (
                     <View

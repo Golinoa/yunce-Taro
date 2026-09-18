@@ -7,7 +7,6 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ActionButton from '@/components/ActionButton';
 import Empty from '@/components/Empty';
-import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import { teacherService } from '@/services';
 import { campusService } from '@/services/campus';
@@ -20,7 +19,7 @@ import {
 } from '@/services/campus-invite';
 import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useAuth } from '@/utils/auth';
-import { buildCampusInvitePath, copyCampusInviteLink } from '@/utils/invite-staff-link';
+import { buildCampusInvitePath, copyCampusInviteCode } from '@/utils/invite-staff-link';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const EXPIRE_MINUTES = 24 * 60;
@@ -168,8 +167,8 @@ const StaffInvitePage: React.FC = () => {
       : 'pages/index/index',
   }));
 
-  const handleCopyLink = useCallback(async (code: string) => {
-    await copyCampusInviteLink(code);
+  const handleCopyCode = useCallback(async (code: string) => {
+    await copyCampusInviteCode(code);
   }, []);
 
   const handleCancel = useCallback(
@@ -199,9 +198,7 @@ const StaffInvitePage: React.FC = () => {
             {isPointToPoint ? '邀请绑定微信' : '生成临时邀请码'}
           </Text>
           <Text className="text-[26rpx] text-muted-foreground mt-[8rpx] block">
-            {isPointToPoint
-              ? '员工用微信打开邀请链接后，将绑定到当前已创建的员工资料，不会新建第二份档案。'
-              : '建议从员工详情发起点对点绑定。开放码接受后会新建员工身份。'}
+            {isPointToPoint ? '绑定到已创建的员工资料' : '接受后将新建员工身份'}
           </Text>
         </View>
 
@@ -217,9 +214,6 @@ const StaffInvitePage: React.FC = () => {
             </Text>
             <Text className="text-[30rpx] text-foreground block">
               {targetTeacherName || '加载中...'}
-            </Text>
-            <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] block">
-              身份取自已创建的员工资料，无需再次选择
             </Text>
           </View>
         ) : (
@@ -253,9 +247,7 @@ const StaffInvitePage: React.FC = () => {
           <Text className="text-[28rpx] font-semibold text-foreground block mb-[12rpx]">
             有效期
           </Text>
-          <Text className="text-[26rpx] text-muted-foreground">
-            24 小时（统一口径，过期后需重新生成）
-          </Text>
+          <Text className="text-[26rpx] text-muted-foreground">24 小时，过期后需重新生成</Text>
         </View>
 
         {isPointToPoint && displayCode ? (
@@ -282,22 +274,11 @@ const StaffInvitePage: React.FC = () => {
             <Text className="text-[24rpx] text-muted-foreground block mb-[20rpx]">
               {latest?.roleLabel} · 有效至 {formatExpireAt(latest?.expireAt || '')}
             </Text>
-            <View className="flex flex-row gap-[16rpx]">
-              <View
-                className="flex-1 h-[80rpx] rounded-full bg-primary flex items-center justify-center"
-                onClick={() => void handleCopyLink(displayCode)}
-              >
-                <Text className="text-[28rpx] text-white font-medium">复制邀请链接</Text>
-              </View>
-              <View
-                className="w-[80rpx] h-[80rpx] rounded-full bg-card border border-border flex items-center justify-center"
-                onClick={() => {
-                  Taro.setClipboardData({ data: displayCode });
-                  Taro.showToast({ title: '已复制邀请码', icon: 'success' });
-                }}
-              >
-                <Icon name="mdi-content-copy" size={32} className="text-primary" />
-              </View>
+            <View
+              className="h-[80rpx] rounded-full bg-primary flex items-center justify-center press-scale"
+              onClick={() => void handleCopyCode(displayCode)}
+            >
+              <Text className="text-[28rpx] text-white font-medium">复制邀请码</Text>
             </View>
           </View>
         ) : null}
@@ -330,9 +311,9 @@ const StaffInvitePage: React.FC = () => {
                 <View className="flex flex-row gap-[24rpx] mt-[16rpx]">
                   <Text
                     className="text-[26rpx] text-primary"
-                    onClick={() => void handleCopyLink(item.inviteCode)}
+                    onClick={() => void handleCopyCode(item.inviteCode)}
                   >
-                    复制链接
+                    复制邀请码
                   </Text>
                   <Text
                     className="text-[26rpx] text-destructive"

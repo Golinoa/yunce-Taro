@@ -45,18 +45,17 @@ export function buildCampusInvitePath(inviteCode: string): string {
   return `/package-auth/pages/campus-invite-landing/index?code=${encodeURIComponent(code)}`;
 }
 
-export async function copyCampusInviteLink(inviteCode: string): Promise<void> {
-  if (!(inviteCode || '').trim()) {
+export async function copyCampusInviteCode(inviteCode: string): Promise<void> {
+  const code = (inviteCode || '').trim().toUpperCase();
+  if (!code) {
     Taro.showToast({ title: '邀请码异常', icon: 'none' });
     return;
   }
 
-  /** 直链落地页（与 L2 invite-register 一致）；禁止再包一层 index?redirect=（全仓无消费） */
-  const path = buildCampusInvitePath(inviteCode);
-
-  await Taro.setClipboardData({ data: path });
+  /** 只复制纯邀请码：内部相对路径粘到微信里是纯文本，必然点不开 */
+  await Taro.setClipboardData({ data: code });
   Taro.showToast({
-    title: '员工邀请链接已复制（24h有效）',
+    title: '邀请码已复制（24h有效）',
     icon: 'none',
     duration: 2500,
   });
