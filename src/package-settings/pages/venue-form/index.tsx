@@ -93,6 +93,21 @@ const VenueFormPage: React.FC = () => {
     return true;
   }, [form.name]);
 
+  /**
+   * 写完必须真的回到列表页：列表页只有被重新 onShow 才会消费
+   * REFRESH_SIGNAL.venues 并重拉，若 navigateBack 失败（页面栈异常）就会
+   * 停留在表单页 —— 表现即「保存成功但表单没关、列表也没刷新」。
+   * 兜底用 redirectTo 换成列表页，保证信号一定被消费。
+   */
+  const goBackToList = useCallback(() => {
+    Taro.navigateBack({
+      delta: 1,
+      fail: () => {
+        Taro.redirectTo({ url: '/package-settings/pages/venue-list/index' });
+      },
+    });
+  }, []);
+
   const hasChanged = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(originForm),
     [form, originForm],
@@ -127,9 +142,9 @@ const VenueFormPage: React.FC = () => {
         await roomService.add(payload);
       }
       Taro.showToast({ title: '保存成功', icon: 'success' });
-      // 通知 venue-list 写后强制重拉（列表页按 TTL 节流，不再无条件刷新）
+      // 通知 venue-list 写后强制重拉：列表页 onShow 里「信号优先于 TTL」，有信号必重拉
       setRefreshSignal(REFRESH_SIGNAL.venues);
-      setTimeout(() => Taro.navigateBack(), 800);
+      setTimeout(goBackToList, 800);
     } catch (err) {
       logError('save room', err);
       Taro.showToast({
@@ -139,7 +154,7 @@ const VenueFormPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [form, isEdit, saving, currentCampus, validate, roomId]);
+  }, [form, isEdit, saving, currentCampus, validate, roomId, goBackToList]);
 
   const handleDelete = useCallback(async () => {
     if (!isEdit) return;
@@ -153,12 +168,12 @@ const VenueFormPage: React.FC = () => {
       await roomService.delete(roomId);
       Taro.showToast({ title: '删除成功', icon: 'success' });
       setRefreshSignal(REFRESH_SIGNAL.venues);
-      setTimeout(() => Taro.navigateBack(), 800);
+      setTimeout(goBackToList, 800);
     } catch (err) {
       logError('delete room', err);
       Taro.showToast({ title: '删除失败', icon: 'none' });
     }
-  }, [isEdit, roomId, activeTheme]);
+  }, [isEdit, roomId, activeTheme, goBackToList]);
 
   const statusText = useMemo(
     () => STATUS_OPTIONS.find((opt) => opt.value === form.status)?.label || '',

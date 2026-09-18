@@ -29,7 +29,10 @@ const VenueListPage: React.FC = () => {
   const { currentCampusId } = useCampusStore();
 
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 首屏即视为「加载中」：onShow 里才发起请求，若初值为 false 会先闪一帧「暂无场地」
+  const [loading, setLoading] = useState(true);
+  // 失败必须独立成态：以前失败只弹 toast，界面落回空态，看起来就是「确实无数据」
+  const [loadError, setLoadError] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
   // 上下文键 + TTL 组合守卫：切换校区必须立刻重拉（键不同即视为过期）
   const lastFetchKeyRef = React.useRef('');
@@ -37,6 +40,7 @@ const VenueListPage: React.FC = () => {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const campusKey = currentCampusId || '';
       const list = await roomService.getList({ campusId: currentCampusId || undefined });
@@ -45,6 +49,7 @@ const VenueListPage: React.FC = () => {
       markFetched(lastFetchAtRef);
     } catch (err) {
       logError('load venue list', err);
+      setLoadError(true);
       Taro.showToast({ title: '加载失败', icon: 'none' });
     } finally {
       setLoading(false);
@@ -53,14 +58,17 @@ const VenueListPage: React.FC = () => {
 
   useDidShow(() => {
     // 列表页 TTL 守卫：写入口在子页 venue-form（保存/删除后置 REFRESH_SIGNAL.venues）；
-    // 同一校区且 TTL 内直接跳过，避免切回即全量重拉。
+    // 刷新信号优先级高于 TTL —— 有信号就必须真的重新拉取，否则写后列表不更新。
     const campusKey = currentCampusId || '';
     const force = consumeRefreshSignal(REFRESH_SIGNAL.venues);
     const canSkip =
       !force &&
       campusKey === lastFetchKeyRef.current &&
       !shouldRefetch(lastFetchAtRef.current, TTL.campus);
-    if (!canSkip) {
+    if (canSkip) {
+      // 跳过请求时也要给 loading 终态，否则「跳过 + 初值 true」会变成永久转圈
+      setLoading(false);
+    } else {
       void loadData();
     }
     try {
@@ -86,6 +94,25 @@ const VenueListPage: React.FC = () => {
       <PageContainer safeBottom>
         <View className="min-h-screen flex items-center justify-center">
           <Loading text="加载场地数据中..." />
+        </View>
+      </PageContainer>
+    );
+  }
+
+  // 失败与「确实无数据」分开呈现：失败可重试，不再伪装成空列表
+  if (loadError && rooms.length === 0) {
+    return (
+      <PageContainer safeBottom>
+        <View className="px-[32rpx] pt-[24rpx] pb-[200rpx]">
+          <View className="flex flex-row items-center justify-between py-[24rpx]">
+            <Text className="text-[28rpx] text-muted-foreground">{countText}</Text>
+          </View>
+          <Empty
+            icon="mdi-alert-circle-outline"
+            description="场地加载失败"
+            actionText="重新加载"
+            onAction={() => void loadData()}
+          />
         </View>
       </PageContainer>
     );

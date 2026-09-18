@@ -5,7 +5,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow, useRouter } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -113,10 +113,17 @@ const MembershipOrdersPage: React.FC = () => {
   const [items, setItems] = useState<PaymentOrderStatusResult[]>([]);
   const [detail, setDetail] = useState<PaymentOrderStatusResult | null>(null);
   const [paying, setPaying] = useState(false);
+  /**
+   * 并发闸门：挂载兜底与 useDidShow 可能在同一时刻各触发一次，
+   * 去重可避免重复请求、也避免两次 setLoading 互相覆盖导致状态漂移。
+   */
+  const loadInFlightRef = useRef(false);
 
   const detailCountdown = useCountdown(detail?.status === 'PAYING' ? detail.expiresAt : null);
 
   const loadList = useCallback(async () => {
+    if (loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
     setLoading(true);
     setLoadError(false);
     try {
@@ -145,9 +152,20 @@ const MembershipOrdersPage: React.FC = () => {
       setLoadError(true);
       Taro.showToast({ title: '加载失败', icon: 'none' });
     } finally {
+      loadInFlightRef.current = false;
       setLoading(false);
     }
   }, [focusId]);
+
+  /**
+   * 首屏拉取必须由「挂载」触发，不能只依赖 useDidShow：
+   * 本页被 withRouteGuard 包裹，守卫要等 refreshProfile 异步放行后子组件才挂载，
+   * 而 Taro 的页面 onShow 在首次渲染后即已派发完毕，之后注册的 useDidShow 不会再回调，
+   * 结果就是 loading 永远停在 true（永久转圈，且一个订单接口都不会发）。
+   */
+  useEffect(() => {
+    void loadList();
+  }, [loadList]);
 
   useDidShow(() => {
     void loadList();
