@@ -101,7 +101,13 @@ interface CampusState {
   lastHolidaysFetchAt: number;
 
   // 校区操作
-  fetchCampuses: (force?: boolean) => Promise<void>;
+  /**
+   * 拉取校区列表。
+   * **返回是否成功**：失败时必须让调用方（如 React Query）感知，否则上层会误判为成功而**不再重试**，
+   * 导致空列表常驻、UI 一直空白（2026-09-19 首页/数据页校区不显示的根因）。
+   * 注意：机构确实没有校区时返回 `true`（空列表也是成功），只在请求出错时返回 `false`。
+   */
+  fetchCampuses: (force?: boolean) => Promise<boolean>;
   /** 清空校区/科目读缓存时间戳 */
   invalidateCache: () => void;
   invalidateSubjectsCache: () => void;
@@ -185,16 +191,20 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       lastCampusesFetchAt > 0 &&
       now - lastCampusesFetchAt < TTL.campus
     ) {
-      return;
+      // 缓存新鲜：视为成功（不算失败，避免上层无谓重试）
+      return true;
     }
     set({ loading: true, error: null });
     try {
       const list = await campusService.getList();
       persistCampusSnapshot(list);
       set({ campuses: list, error: null, loading: false, lastCampusesFetchAt: now });
+      return true;
     } catch (err) {
       logError('fetchCampuses', err);
       set({ error: '校区数据加载失败', loading: false });
+      // 把失败暴露给调用方：否则 React Query 认为 queryFn 成功 → 不重试 → 空列表常驻
+      return false;
     }
   },
 

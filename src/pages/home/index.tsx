@@ -317,8 +317,17 @@ const Home: React.FC = () => {
    */
   useQuery({
     queryKey: ['campuses', currentRole ?? ''],
-    queryFn: () => fetchCampuses(),
+    queryFn: async () => {
+      const ok = await fetchCampuses();
+      // 失败必须抛错：store 内部只记 error 不抛，若不抛则 RQ 判定 queryFn 成功 → 不重试
+      // → 空列表常驻 → 首页校区卡片一直空白（2026-09-19 反馈的问题）
+      if (!ok) throw new Error('校区列表加载失败');
+      return true;
+    },
     enabled: Boolean(currentRole),
+    // 早于身份恢复发出时会 401，退避重试可自动补偿
+    retry: 2,
+    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 4000),
     staleTime: CAMPUSES_QUERY_STALE_TIME_MS,
   });
 

@@ -97,7 +97,11 @@ const DataCenter: React.FC = () => {
   useDidShow(() => {
     syncTabBarByProfile(profile);
     if (campuses.length === 0) {
-      void fetchCampuses();
+      // 失败要重试：store 只在内部记 error，不抛错，这里靠返回值判断（首页同理）
+      void (async () => {
+        const ok = await fetchCampuses();
+        if (!ok) await fetchCampuses(true);
+      })();
     }
     if (isFirstStatsShow.current) {
       isFirstStatsShow.current = false;
