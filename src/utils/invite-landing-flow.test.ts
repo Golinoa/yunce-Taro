@@ -113,7 +113,7 @@ describe('invite-landing-flow (L1 态机)', () => {
 
     it('开课中（now 在开课后、结束前）→ lesson_started', () => {
       const inAnHour = new Date(Date.now() + 30 * 60 * 1000);
-      const d = inAnHour.toISOString().slice(0, 10);
+      const d = `${inAnHour.getFullYear()}-${String(inAnHour.getMonth() + 1).padStart(2, '0')}-${String(inAnHour.getDate()).padStart(2, '0')}`;
       const start = `${String(inAnHour.getHours()).padStart(2, '0')}:${String(inAnHour.getMinutes()).padStart(2, '0')}`;
       // now 视为开课时刻 + 5 分钟（开课中）
       const now = new Date(inAnHour.getTime() + 5 * 60 * 1000);
@@ -130,7 +130,7 @@ describe('invite-landing-flow (L1 态机)', () => {
 
     it('达预约截止时间（开课前 <120min）→ booking_deadline', () => {
       const in30 = new Date(Date.now() + 30 * 60 * 1000);
-      const d = in30.toISOString().slice(0, 10);
+      const d = `${in30.getFullYear()}-${String(in30.getMonth() + 1).padStart(2, '0')}-${String(in30.getDate()).padStart(2, '0')}`;
       const start = `${String(in30.getHours()).padStart(2, '0')}:${String(in30.getMinutes()).padStart(2, '0')}`;
       expect(
         resolveTrialInviteBookingClosed({
@@ -145,7 +145,7 @@ describe('invite-landing-flow (L1 态机)', () => {
 
     it('未到截止时间（开课前 >120min）→ 不关闭', () => {
       const in300 = new Date(Date.now() + 300 * 60 * 1000);
-      const d = in300.toISOString().slice(0, 10);
+      const d = `${in300.getFullYear()}-${String(in300.getMonth() + 1).padStart(2, '0')}-${String(in300.getDate()).padStart(2, '0')}`;
       const start = `${String(in300.getHours()).padStart(2, '0')}:${String(in300.getMinutes()).padStart(2, '0')}`;
       expect(
         resolveTrialInviteBookingClosed({
@@ -160,7 +160,7 @@ describe('invite-landing-flow (L1 态机)', () => {
 
     it('截止时间关闭时仍可预约（bookingDeadlineEnabled=false）', () => {
       const in30 = new Date(Date.now() + 30 * 60 * 1000);
-      const d = in30.toISOString().slice(0, 10);
+      const d = `${in30.getFullYear()}-${String(in30.getMonth() + 1).padStart(2, '0')}-${String(in30.getDate()).padStart(2, '0')}`;
       const start = `${String(in30.getHours()).padStart(2, '0')}:${String(in30.getMinutes()).padStart(2, '0')}`;
       expect(
         resolveTrialInviteBookingClosed({
