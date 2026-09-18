@@ -588,4 +588,14 @@ export async function copyCampusInviteLink(inviteCode: string) {
 - 远端：**`main` = `dev` = `007d74b`**；标签 **`ci-20260918-final`** → `007d74b`（流水线跑此提交）
 - ⚠️ 推送时 `main` 反复报 `schannel: failed to receive handshake`，**改用 `git -c http.sslBackend=openssl push` 一次成功**（schannel 后端间歇故障）
 - 顺带修掉一条**既有真 bug**：`invite-landing-flow.test.ts` 用例混用 UTC 日期与本地时间 → **本地时间 ≥19:00 必挂**（CI 在 UTC 下永远是绿的）→ 已修正，现 **16/16 全绿**
-3. B3 报告 `FE-B3-REPORT.md` 按约定**未入 git**（工作区可见）。
+### 🧾 23:20 收尾（后端发版 / dev 包重编 / 文档归档 / 清理）
+
+| 项 | 结果 |
+|---|---|
+| **后端发版** | `package.json` 1.2.20 → **1.2.21**（单文件提交 `f4adaa9`）；`main` = `dev` = `f4adaa9`；注释标签 **`v1.2.21`** → 触发 `release.yml`（verify + 构建并推送镜像 `1.2.21` 与 `:latest` 到 ACR）。**约定：`v*` 才是发版，`ci-*` 只跑质量门禁。** |
+| **前端 dev 包重编** | 编译通过；主包 **1529.0KB / 1536KB**；**128 声明页 0 缺失**；`dist/app.js` 存在；`common.js` 含 dev 域名、**不含**生产域名；`dist` 4.2MB |
+| **文档归档** | 台账 + 本计划 + 5 份批次报告 + `docs/diagnostics/README.md` 索引 → 提交 **`ca554e2`**（前端 `main` = `dev` = `ca554e2`） |
+| **清理** | `_backup/` 下我产生的 7 份 `.git` 副本、补丁目录、整树 tar、fsck 证据、config 快照 + 临时克隆 `_recover_yunceTaro/` **全部删除**；`_backup/` 原有 **19 项未动** |
+| 清理后复核 | 两仓库 `missing 0 / broken 0`；前端工作树干净、`## main...origin/main`；本地标签 25 = 远端 25（缺失 0，并补回 `origin/dev` 跟踪引用） |
+
+**备注**：临时克隆已删 → 以后再需"健康副本"直接 `git clone` 即可。**仍待人工确认**：真机验收 + 两条流水线结果（本机无 `gh`）。
