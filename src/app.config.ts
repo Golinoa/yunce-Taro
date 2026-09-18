@@ -196,7 +196,8 @@ export default defineAppConfig({
    */
   preloadRule: {
     'pages/home/index': {
-      network: 'all',
+      // perf: 蜂窝网络不再预下载，避免与首屏请求抢带宽（WiFi 下仍预热）
+      network: 'wifi',
       packages: [
         'package-settings',
         'package-student',
@@ -206,7 +207,8 @@ export default defineAppConfig({
       ],
     },
     'pages/schedule/index': {
-      network: 'all',
+      // perf: 蜂窝网络不再预下载，避免与首屏请求抢带宽（WiFi 下仍预热）
+      network: 'wifi',
       packages: ['package-course', 'package-lead'],
     },
   },
