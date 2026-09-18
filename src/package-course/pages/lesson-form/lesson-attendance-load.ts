@@ -150,6 +150,36 @@ export async function fetchApprovedLeaveStudentIds(input: {
   });
 }
 
+/** 学员课包/学科加载并发上限：班级大时也不瞬间打爆后端 */
+const PACKAGE_LOAD_CONCURRENCY = 6;
+
+/** 有上限的并发 map：保持入参顺序，具体错误由回调内部消化 */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  task: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(1, limit), items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await task(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * 批量解析学员「最优课包 + 学科」。
+ *
+ * 原实现为 `for` + `await` 串行：N 个学员等价于 N 次包请求 + N 次学科请求串行累加。
+ * 现在：① 课包并发拉取（带上限）；② 同一 subject_id 只查一次（同班同科不再重复拉）。
+ * 结果语义不变：无可用课包的学员不进 map；有课包但无学科的学员 subjects 落 null。
+ */
 export async function loadPackageMapsForStudents(
   students: Student[],
   hoursUsed: number,
@@ -159,17 +189,38 @@ export async function loadPackageMapsForStudents(
 }> {
   const packages = new Map<string, CoursePackage>();
   const subjects = new Map<string, Subject | null>();
-  for (const student of students) {
-    const pkgs = await packageService.getActiveByStudent(student.id);
-    const best = pickBestPackage(pkgs, hoursUsed);
-    if (!best) continue;
-    packages.set(student.id, best);
-    if (best.subject_id) {
-      const sub = await subjectService.getById(best.subject_id);
-      subjects.set(student.id, sub);
-    } else {
-      subjects.set(student.id, null);
-    }
+  if (students.length === 0) {
+    return { packages, subjects };
   }
+
+  const bestByStudent = await mapWithConcurrency(
+    students,
+    PACKAGE_LOAD_CONCURRENCY,
+    async (student) => {
+      const pkgs = await packageService.getActiveByStudent(student.id);
+      return pickBestPackage(pkgs, hoursUsed);
+    },
+  );
+
+  const subjectIds = new Set<string>();
+  bestByStudent.forEach((best, index) => {
+    if (!best) return;
+    packages.set(students[index].id, best);
+    if (best.subject_id) subjectIds.add(best.subject_id);
+  });
+
+  const subjectCache = new Map<string, Subject | null>();
+  await mapWithConcurrency([...subjectIds], PACKAGE_LOAD_CONCURRENCY, async (subjectId) => {
+    subjectCache.set(subjectId, await subjectService.getById(subjectId));
+  });
+
+  bestByStudent.forEach((best, index) => {
+    if (!best) return;
+    subjects.set(
+      students[index].id,
+      best.subject_id ? (subjectCache.get(best.subject_id) ?? null) : null,
+    );
+  });
+
   return { packages, subjects };
 }

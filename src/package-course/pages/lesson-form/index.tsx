@@ -110,6 +110,8 @@ const LessonForm: React.FC = () => {
   const [scheduledClassIds, setScheduledClassIds] = useState<Set<string>>(new Set());
   const [selectedClassId, setSelectedClassId] = useState(classIdParam);
   const [classStudents, setClassStudents] = useState<Student[]>([]);
+  /** 班级学员列表加载态（首次进入 / 切班）：列表为空时展示占位，避免误判「暂无学员」 */
+  const [classStudentsLoading, setClassStudentsLoading] = useState(false);
   const [checkedStudentIds, setCheckedStudentIds] = useState<Set<string>>(new Set());
   const [leaveStudentIds, setLeaveStudentIds] = useState<Set<string>>(new Set());
   const [studentPackages, setStudentPackages] = useState<Map<string, CoursePackage>>(new Map());
@@ -258,6 +260,7 @@ const LessonForm: React.FC = () => {
       setMatchedSubject,
       setSelectedClassId,
       setClassStudents,
+      setClassStudentsLoading,
       setLeaveStudentIds,
       setExistingClassRecords,
       setIsAlreadyChecked,
@@ -638,6 +641,7 @@ const LessonForm: React.FC = () => {
             canEditClass={canEditClass}
             isClassPaused={isClassPaused}
             studentSearchKeyword={studentSearchKeyword}
+            studentsLoading={classStudentsLoading}
             hoursUsed={hoursUsed}
             feeAmount={feeAmount}
             attendanceFilter={attendanceFilter}

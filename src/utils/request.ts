@@ -8,6 +8,7 @@ import { mapGatewayErrorMessage, mapNetworkFailMessage } from '@/utils/api-gatew
 import { getApiBaseUrl } from '@/utils/build-env';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logRequestIssue } from '@/utils/logger';
+import { singleFlight } from '@/utils/single-flight';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
 // 必须用 getApiBaseUrl()：小程序运行时通常没有 process，
@@ -257,35 +258,45 @@ interface RequestOptions {
   timeout?: number;
 }
 
-/** 开发环境重复 GET 告警（1s 窗口） */
-const recentGetHits = new Map<string, number>();
-function warnDuplicateGet(url: string): void {
-  const now = Date.now();
-  const prev = recentGetHits.get(url) || 0;
-  if (prev && now - prev < 1000) {
-    // eslint-disable-next-line no-console
-    console.warn(`[request-dedup] duplicate GET within 1s: ${url}`);
-  }
-  recentGetHits.set(url, now);
-  if (recentGetHits.size > 200) {
-    const oldest = [...recentGetHits.entries()].sort((a, b) => a[1] - b[1])[0]?.[0];
-    if (oldest) recentGetHits.delete(oldest);
-  }
+/**
+ * GET 去重键：同 method + url + query 视为同一请求。
+ * query 按键名排序，避免同参数不同书写顺序漏去重。
+ */
+function buildGetDedupeKey(
+  url: string,
+  data: Record<string, unknown> | undefined,
+  skipAuth: boolean,
+): string {
+  const query = data
+    ? Object.keys(data)
+        .sort()
+        .map((key) => `${key}=${String(data[key])}`)
+        .join('&')
+    : '';
+  return `GET ${url}?${query}${skipAuth ? ' #anon' : ''}`;
 }
 
-/** 核心请求函数 */
+/**
+ * 核心请求函数
+ *
+ * GET 走 in-flight 去重：同一瞬间（同 method+url+query）的重复请求复用同一个 Promise。
+ * 契约（与 utils/single-flight.ts 一致）：
+ * - 只合并并发，响应返回即释放，不做跨页面长期缓存，下次调用照常发请求；
+ * - 失败不驻留，后续重试照常有重新请求的机会；
+ * - 仅 GET，PUT/POST/PATCH/DELETE 一律不去重。
+ */
 export async function request<T = unknown>(options: RequestOptions): Promise<T> {
+  if ((options.method ?? 'GET') === 'GET') {
+    const key = buildGetDedupeKey(options.url, options.data, options.skipAuth === true);
+    return singleFlight(key, () => performRequest<T>(options));
+  }
+  return performRequest<T>(options);
+}
+
+/** 实际发起请求（GET 去重与写请求共用） */
+async function performRequest<T = unknown>(options: RequestOptions): Promise<T> {
   const { url, method = 'GET', data, header = {}, skipAuth = false, timeout = TIMEOUT } = options;
   const startAt = Date.now();
-
-  // 开发环境：1s 内同 method+url 重复 GET 告警（发现无脑重拉）
-  if (
-    process.env.NODE_ENV !== 'production' &&
-    process.env.TARO_ENABLE_LOCAL_DEBUG === 'true' &&
-    method === 'GET'
-  ) {
-    warnDuplicateGet(url);
-  }
 
   // 上一波 429 的退避窗口内，先等再发（/auth/* 除外，保证能重新登录与续期）
   await waitForRateLimitBackoff(url);

@@ -74,6 +74,8 @@ export interface UseLessonFormLoadersParams {
   setMatchedSubject: Dispatch<SetStateAction<Subject | null>>;
   setSelectedClassId: Dispatch<SetStateAction<string>>;
   setClassStudents: Dispatch<SetStateAction<Student[]>>;
+  /** 学员列表加载态（首次进入 / 切班时展示占位，避免空白误判为"无学员"） */
+  setClassStudentsLoading: Dispatch<SetStateAction<boolean>>;
   setLeaveStudentIds: Dispatch<SetStateAction<Set<string>>>;
   setExistingClassRecords: Dispatch<SetStateAction<LessonRecord[]>>;
   setIsAlreadyChecked: Dispatch<SetStateAction<boolean>>;
@@ -139,6 +141,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setMatchedSubject,
     setSelectedClassId,
     setClassStudents,
+    setClassStudentsLoading,
     setLeaveStudentIds,
     setExistingClassRecords,
     setIsAlreadyChecked,
@@ -342,67 +345,74 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       }
 
       if (classIdParam) {
-        const [classInfo, formalStudents] = await Promise.all([
-          classService.getById(classIdParam),
-          classService.getStudents(classIdParam),
-        ]);
-        // 点名入口必须把当天已确认的补课学员并入列表；原初始化路径只拉正式班级学员，
-        // 导致“课表预约成功，但点名页看不到补课学员”。
-        let students = formalStudents;
-        const makeupIds = new Set<string>();
+        setClassStudentsLoading(true);
         try {
-          const makeupBookings = await makeupBookingService.getByClassDate({
+          // 课包由下方 loadPackageMapsForStudents 统一按学员并发拉取；
+          // 这里显式关掉 getStudents 的默认补包，避免同一批学员被重复请求一遍（N+1）。
+          const [classInfo, formalStudents] = await Promise.all([
+            classService.getById(classIdParam),
+            classService.getStudents(classIdParam, { includePackages: false }),
+          ]);
+          // 点名入口必须把当天已确认的补课学员并入列表；原初始化路径只拉正式班级学员，
+          // 导致“课表预约成功，但点名页看不到补课学员”。
+          let students = formalStudents;
+          const makeupIds = new Set<string>();
+          try {
+            const makeupBookings = await makeupBookingService.getByClassDate({
+              classId: classIdParam,
+              lessonDate,
+            });
+            const formalIds = new Set(formalStudents.map((student) => student.id));
+            const extraStudents = await Promise.all(
+              makeupBookings
+                .filter((booking) => {
+                  makeupIds.add(booking.student_id);
+                  return !formalIds.has(booking.student_id);
+                })
+                .map((booking) => studentService.getById(booking.student_id)),
+            );
+            students = [
+              ...extraStudents.filter((student): student is Student => Boolean(student)),
+              ...formalStudents,
+            ];
+          } catch (err) {
+            logError('load initial makeup students', err);
+          }
+          setMakeupStudentIds(makeupIds);
+          setSelectedClassId(classIdParam);
+          setCampusId(classInfo?.campus_id || mainCampusId);
+          applyClassTeacherDefaults(classInfo, teacherList);
+          applyClassLessonDefaults(classInfo);
+          setClassStudents(students);
+          const approvedLeaveIds = await loadApprovedLeaveStudentIds(students);
+
+          const existingRecords = await loadLessonRecordsByDate();
+          const attendance = buildClassAttendanceState({
+            records: existingRecords,
             classId: classIdParam,
             lessonDate,
+            studentIds: students.map((student) => student.id),
           });
-          const formalIds = new Set(formalStudents.map((student) => student.id));
-          const extraStudents = await Promise.all(
-            makeupBookings
-              .filter((booking) => {
-                makeupIds.add(booking.student_id);
-                return !formalIds.has(booking.student_id);
-              })
-              .map((booking) => studentService.getById(booking.student_id)),
+          setExistingClassRecords(attendance.classRecords);
+          setIsAlreadyChecked(attendance.hasRecords);
+          setCheckedStudentIds(attendance.checkedStudentIds);
+          setLeaveStudentIds(new Set([...attendance.leaveStudentIds, ...approvedLeaveIds]));
+          setRecordByStudentId(attendance.recordByStudentId);
+          setSupplementStudentIds(new Set());
+          setAttendanceMode(
+            resolveClassAttendanceMode({
+              hasRecords: attendance.hasRecords,
+              viewOnly: viewOnlyParam,
+              lessonDate,
+            }),
           );
-          students = [
-            ...extraStudents.filter((student): student is Student => Boolean(student)),
-            ...formalStudents,
-          ];
-        } catch (err) {
-          logError('load initial makeup students', err);
+
+          const { packages, subjects } = await loadPackageMapsForStudents(students, hoursUsed);
+          setStudentPackages(packages);
+          setStudentSubjects(subjects);
+        } finally {
+          setClassStudentsLoading(false);
         }
-        setMakeupStudentIds(makeupIds);
-        setSelectedClassId(classIdParam);
-        setCampusId(classInfo?.campus_id || mainCampusId);
-        applyClassTeacherDefaults(classInfo, teacherList);
-        applyClassLessonDefaults(classInfo);
-        setClassStudents(students);
-        const approvedLeaveIds = await loadApprovedLeaveStudentIds(students);
-
-        const existingRecords = await loadLessonRecordsByDate();
-        const attendance = buildClassAttendanceState({
-          records: existingRecords,
-          classId: classIdParam,
-          lessonDate,
-          studentIds: students.map((student) => student.id),
-        });
-        setExistingClassRecords(attendance.classRecords);
-        setIsAlreadyChecked(attendance.hasRecords);
-        setCheckedStudentIds(attendance.checkedStudentIds);
-        setLeaveStudentIds(new Set([...attendance.leaveStudentIds, ...approvedLeaveIds]));
-        setRecordByStudentId(attendance.recordByStudentId);
-        setSupplementStudentIds(new Set());
-        setAttendanceMode(
-          resolveClassAttendanceMode({
-            hasRecords: attendance.hasRecords,
-            viewOnly: viewOnlyParam,
-            lessonDate,
-          }),
-        );
-
-        const { packages, subjects } = await loadPackageMapsForStudents(students, hoursUsed);
-        setStudentPackages(packages);
-        setStudentSubjects(subjects);
       }
     };
     loadData();
@@ -420,6 +430,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     studentIdParam,
     viewOnlyParam,
     lessonDate,
+    setClassStudentsLoading,
   ]);
 
   useEffect(() => {
@@ -494,88 +505,94 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
   const loadClassStudents = useCallback(
     async (classId: string) => {
       setSelectedClassId(classId);
-      const [classInfo, students] = await Promise.all([
-        classService.getById(classId),
-        classService.getStudents(classId),
-      ]);
-      if (classInfo?.campus_id) {
-        setCampusId(classInfo.campus_id);
-      }
-      if (classInfo?.room) {
-        setRoom(classInfo.room);
-      }
-      if (classInfo) {
-        setClasses((prev) => {
-          const index = prev.findIndex((item) => item.id === classId);
-          if (index === -1) {
-            return prev;
-          }
-          const next = [...prev];
-          next[index] = classInfo;
-          return next;
-        });
-      }
-      applyClassTeacherDefaults(classInfo, teacherOptions);
-      applyClassLessonDefaults(classInfo);
-
-      let mergedStudents = students;
-      const nextMakeupIds = new Set<string>();
+      setClassStudentsLoading(true);
       try {
-        const makeupBookings = await makeupBookingService.getByClassDate({
-          classId,
-          lessonDate,
-        });
-        if (makeupBookings.length > 0) {
-          const formalIds = new Set(students.map((s) => s.id));
-          const extra: Student[] = [];
-          for (const booking of makeupBookings) {
-            nextMakeupIds.add(booking.student_id);
-            if (formalIds.has(booking.student_id)) continue;
-            try {
-              const stu = await studentService.getById(booking.student_id);
-              if (stu) {
-                extra.push(stu);
-                formalIds.add(stu.id);
+        // 同上：课包交给 loadPackageMapsForStudents 并发拉，避免 getStudents 默认补包再来一遍。
+        const [classInfo, students] = await Promise.all([
+          classService.getById(classId),
+          classService.getStudents(classId, { includePackages: false }),
+        ]);
+        if (classInfo?.campus_id) {
+          setCampusId(classInfo.campus_id);
+        }
+        if (classInfo?.room) {
+          setRoom(classInfo.room);
+        }
+        if (classInfo) {
+          setClasses((prev) => {
+            const index = prev.findIndex((item) => item.id === classId);
+            if (index === -1) {
+              return prev;
+            }
+            const next = [...prev];
+            next[index] = classInfo;
+            return next;
+          });
+        }
+        applyClassTeacherDefaults(classInfo, teacherOptions);
+        applyClassLessonDefaults(classInfo);
+
+        let mergedStudents = students;
+        const nextMakeupIds = new Set<string>();
+        try {
+          const makeupBookings = await makeupBookingService.getByClassDate({
+            classId,
+            lessonDate,
+          });
+          if (makeupBookings.length > 0) {
+            const formalIds = new Set(students.map((s) => s.id));
+            const extra: Student[] = [];
+            for (const booking of makeupBookings) {
+              nextMakeupIds.add(booking.student_id);
+              if (formalIds.has(booking.student_id)) continue;
+              try {
+                const stu = await studentService.getById(booking.student_id);
+                if (stu) {
+                  extra.push(stu);
+                  formalIds.add(stu.id);
+                }
+              } catch (err) {
+                logError('load makeup student', err);
               }
-            } catch (err) {
-              logError('load makeup student', err);
+            }
+            if (extra.length > 0) {
+              mergedStudents = [...extra, ...students];
             }
           }
-          if (extra.length > 0) {
-            mergedStudents = [...extra, ...students];
-          }
+        } catch (err) {
+          logError('load makeup bookings', err);
         }
-      } catch (err) {
-        logError('load makeup bookings', err);
-      }
-      setMakeupStudentIds(nextMakeupIds);
-      setClassStudents(mergedStudents);
-      const approvedLeaveIds = await loadApprovedLeaveStudentIds(mergedStudents);
+        setMakeupStudentIds(nextMakeupIds);
+        setClassStudents(mergedStudents);
+        const approvedLeaveIds = await loadApprovedLeaveStudentIds(mergedStudents);
 
-      const existing = await loadLessonRecordsByDate();
-      const attendance = buildClassAttendanceState({
-        records: existing,
-        classId,
-        lessonDate,
-        studentIds: mergedStudents.map((student) => student.id),
-      });
-      setExistingClassRecords(attendance.classRecords);
-      setIsAlreadyChecked(attendance.hasRecords);
-      setCheckedStudentIds(attendance.checkedStudentIds);
-      setLeaveStudentIds(new Set([...attendance.leaveStudentIds, ...approvedLeaveIds]));
-      setRecordByStudentId(attendance.recordByStudentId);
-      setSupplementStudentIds(new Set());
-      setAttendanceMode(
-        resolveClassAttendanceMode({
-          hasRecords: attendance.hasRecords,
-          viewOnly: viewOnlyParam,
+        const existing = await loadLessonRecordsByDate();
+        const attendance = buildClassAttendanceState({
+          records: existing,
+          classId,
           lessonDate,
-        }),
-      );
+          studentIds: mergedStudents.map((student) => student.id),
+        });
+        setExistingClassRecords(attendance.classRecords);
+        setIsAlreadyChecked(attendance.hasRecords);
+        setCheckedStudentIds(attendance.checkedStudentIds);
+        setLeaveStudentIds(new Set([...attendance.leaveStudentIds, ...approvedLeaveIds]));
+        setRecordByStudentId(attendance.recordByStudentId);
+        setSupplementStudentIds(new Set());
+        setAttendanceMode(
+          resolveClassAttendanceMode({
+            hasRecords: attendance.hasRecords,
+            viewOnly: viewOnlyParam,
+            lessonDate,
+          }),
+        );
 
-      const { packages, subjects } = await loadPackageMapsForStudents(mergedStudents, hoursUsed);
-      setStudentPackages(packages);
-      setStudentSubjects(subjects);
+        const { packages, subjects } = await loadPackageMapsForStudents(mergedStudents, hoursUsed);
+        setStudentPackages(packages);
+        setStudentSubjects(subjects);
+      } finally {
+        setClassStudentsLoading(false);
+      }
     },
     [
       applyClassTeacherDefaults,
@@ -588,6 +605,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       setCampusId,
       setCheckedStudentIds,
       setClassStudents,
+      setClassStudentsLoading,
       setClasses,
       setExistingClassRecords,
       setIsAlreadyChecked,

@@ -7,6 +7,7 @@ import cn from 'classnames';
 import React from 'react';
 import Icon from '@/components/Icon';
 import ClassSelector from '@/components/lesson/ClassSelector';
+import Loading from '@/components/Loading';
 import Stepper from '@/components/Stepper';
 import type { Class } from '@/types/class';
 import type { LeadBooking } from '@/types/lead';
@@ -46,6 +47,8 @@ export interface ClassLessonPanelProps {
   canEditClass: boolean;
   isClassPaused: boolean;
   studentSearchKeyword: string;
+  /** 学员列表加载中（列表为空时用占位替代"暂无学员"） */
+  studentsLoading: boolean;
   hoursUsed: number;
   feeAmount: string;
   attendanceFilter: 'all' | CheckinStatus;
@@ -91,6 +94,7 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
   canEditClass,
   isClassPaused,
   studentSearchKeyword,
+  studentsLoading,
   hoursUsed,
   feeAmount,
   attendanceFilter,
@@ -319,72 +323,78 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
                   </View>
                 ) : null}
               </View>
-              <View className="grid grid-cols-2 gap-[16rpx]">
-                {mergedStudentList.map((item) => {
-                  if (item.type === 'trial') {
-                    const booking = item.booking;
-                    const status = trialCheckinMap[booking.id] || 'absent';
-                    const info = getTrialCardInfo();
-                    return (
-                      <CheckinCard
-                        key={booking.id}
-                        name={item.name}
-                        status={status}
-                        remaining={info.remaining}
-                        deduct={info.deduct}
-                        isTrial
-                        disabled={isStudentCardDisabled(booking.id)}
-                        onToggleStatus={(next) => onSetTrialCheckin(booking.id, next)}
-                        onOpenDetailSheet={() =>
-                          onOpenStudentDetailSheet({
-                            type: 'trial',
-                            id: booking.id,
-                            name: item.name,
-                            remaining: info.remaining,
-                            deduct: info.deduct,
-                            courseName: '试听',
-                          })
-                        }
-                      />
-                    );
-                  }
-                  const stu = item.student;
-                  const status = studentCheckinStatusMap[stu.id] || 'absent';
-                  const info = getStudentCardInfo(stu);
-                  return (
-                    <CheckinCard
-                      key={stu.id}
-                      name={stu.name}
-                      status={status}
-                      remaining={info.remaining}
-                      deduct={info.deduct}
-                      isMakeup={makeupStudentIds.has(stu.id)}
-                      disabled={isStudentCardDisabled(stu.id)}
-                      highlight={supplementStudentIds.has(stu.id)}
-                      note={studentRemarkDrafts[stu.id] || recordByStudentId.get(stu.id)?.note}
-                      onToggleStatus={(next) => onSetStudentCheckin(stu.id, next)}
-                      onOpenDetailSheet={() =>
-                        onOpenStudentDetailSheet({
-                          type: 'formal',
-                          id: stu.id,
-                          name: stu.name,
-                          remaining: info.remaining,
-                          deduct: info.deduct,
-                          courseName: info.courseName,
-                          student: stu,
-                        })
+              {studentsLoading && mergedStudentList.length === 0 ? (
+                <Loading size="small" />
+              ) : (
+                <>
+                  <View className="grid grid-cols-2 gap-[16rpx]">
+                    {mergedStudentList.map((item) => {
+                      if (item.type === 'trial') {
+                        const booking = item.booking;
+                        const status = trialCheckinMap[booking.id] || 'absent';
+                        const info = getTrialCardInfo();
+                        return (
+                          <CheckinCard
+                            key={booking.id}
+                            name={item.name}
+                            status={status}
+                            remaining={info.remaining}
+                            deduct={info.deduct}
+                            isTrial
+                            disabled={isStudentCardDisabled(booking.id)}
+                            onToggleStatus={(next) => onSetTrialCheckin(booking.id, next)}
+                            onOpenDetailSheet={() =>
+                              onOpenStudentDetailSheet({
+                                type: 'trial',
+                                id: booking.id,
+                                name: item.name,
+                                remaining: info.remaining,
+                                deduct: info.deduct,
+                                courseName: '试听',
+                              })
+                            }
+                          />
+                        );
                       }
-                    />
-                  );
-                })}
-              </View>
-              {mergedStudentList.length === 0 ? (
-                <View className="rounded-[20rpx] bg-white px-[24rpx] py-[32rpx] shadow-soft">
-                  <Text className="text-center text-[24rpx] text-muted-foreground">
-                    暂无匹配学员
-                  </Text>
-                </View>
-              ) : null}
+                      const stu = item.student;
+                      const status = studentCheckinStatusMap[stu.id] || 'absent';
+                      const info = getStudentCardInfo(stu);
+                      return (
+                        <CheckinCard
+                          key={stu.id}
+                          name={stu.name}
+                          status={status}
+                          remaining={info.remaining}
+                          deduct={info.deduct}
+                          isMakeup={makeupStudentIds.has(stu.id)}
+                          disabled={isStudentCardDisabled(stu.id)}
+                          highlight={supplementStudentIds.has(stu.id)}
+                          note={studentRemarkDrafts[stu.id] || recordByStudentId.get(stu.id)?.note}
+                          onToggleStatus={(next) => onSetStudentCheckin(stu.id, next)}
+                          onOpenDetailSheet={() =>
+                            onOpenStudentDetailSheet({
+                              type: 'formal',
+                              id: stu.id,
+                              name: stu.name,
+                              remaining: info.remaining,
+                              deduct: info.deduct,
+                              courseName: info.courseName,
+                              student: stu,
+                            })
+                          }
+                        />
+                      );
+                    })}
+                  </View>
+                  {mergedStudentList.length === 0 ? (
+                    <View className="rounded-[20rpx] bg-white px-[24rpx] py-[32rpx] shadow-soft">
+                      <Text className="text-center text-[24rpx] text-muted-foreground">
+                        暂无匹配学员
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
+              )}
             </View>
           </>
         ) : null}

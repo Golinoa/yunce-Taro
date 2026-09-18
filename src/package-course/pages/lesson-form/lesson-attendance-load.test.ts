@@ -1,12 +1,35 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { packageService, subjectService } from '@/services';
+import type { CoursePackage } from '@/types/course-package';
+import type { Student } from '@/types/student';
 import {
   buildClassAttendanceState,
   buildTrialCheckinMap,
   filterApprovedLeaveStudentIds,
   isDateWithinRange,
+  loadPackageMapsForStudents,
   mapRecordStatusToCheckin,
   resolveClassAttendanceMode,
 } from './lesson-attendance-load';
+
+vi.mock('@/services', () => ({
+  leaveService: { getByTeacher: vi.fn(async () => []) },
+  packageService: { getActiveByStudent: vi.fn() },
+  subjectService: { getById: vi.fn() },
+}));
+
+const student = (id: string) => ({ id }) as Student;
+
+const pkg = (overrides: Partial<CoursePackage>): CoursePackage =>
+  ({
+    id: 'p1',
+    name: '课包',
+    type: 'hour_package',
+    total_hours: 10,
+    remaining_hours: 8,
+    status: 'active',
+    ...overrides,
+  }) as CoursePackage;
 
 describe('lesson-attendance-load (Q2-2)', () => {
   it('isDateWithinRange 含端点', () => {
@@ -190,5 +213,86 @@ describe('lesson-attendance-load (Q2-2)', () => {
     expect(mapRecordStatusToCheckin(undefined)).toBe('absent');
     expect(mapRecordStatusToCheckin(null)).toBe('absent');
     expect(mapRecordStatusToCheckin('')).toBe('absent');
+  });
+});
+
+describe('loadPackageMapsForStudents：并发 + 同学科只查一次', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('同学科的多个学员：subjectService.getById 只调一次，结果与逐学员查一致', async () => {
+    const getActive = vi.mocked(packageService.getActiveByStudent);
+    const getSubject = vi.mocked(subjectService.getById);
+    getActive.mockImplementation(async (studentId: string) => [
+      studentId === 's1'
+        ? pkg({ id: 'p1', subject_id: 'sub-1' })
+        : pkg({ id: 'p2', subject_id: 'sub-1' }),
+    ]);
+    getSubject.mockResolvedValue({ id: 'sub-1', name: '数学' } as never);
+
+    const { packages, subjects } = await loadPackageMapsForStudents(
+      [student('s1'), student('s2'), student('s3')],
+      1,
+    );
+
+    expect(getActive).toHaveBeenCalledTimes(3);
+    expect(getSubject).toHaveBeenCalledTimes(1);
+    expect(packages.get('s1')?.id).toBe('p1');
+    expect(packages.get('s2')?.id).toBe('p2');
+    expect(subjects.get('s1')?.name).toBe('数学');
+    expect(subjects.get('s3')?.name).toBe('数学');
+  });
+
+  it('无可用课包的学员不进 map；有课包无学科时 subjects 落 null', async () => {
+    const getActive = vi.mocked(packageService.getActiveByStudent);
+    const getSubject = vi.mocked(subjectService.getById);
+    getActive.mockImplementation(async (studentId: string) =>
+      studentId === 'empty' ? [] : [pkg({ id: 'p1' })],
+    );
+    getSubject.mockClear();
+
+    const { packages, subjects } = await loadPackageMapsForStudents(
+      [student('empty'), student('s1')],
+      1,
+    );
+
+    expect(packages.has('empty')).toBe(false);
+    expect(subjects.has('empty')).toBe(false);
+    expect(subjects.get('s1')).toBeNull();
+    expect(getSubject).not.toHaveBeenCalled();
+  });
+
+  it('并发有上限：10 个学员不会同时打满 10 个请求', async () => {
+    const getActive = vi.mocked(packageService.getActiveByStudent);
+    let running = 0;
+    let peak = 0;
+    getActive.mockImplementation(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+      return [] as CoursePackage[];
+    });
+
+    await loadPackageMapsForStudents(
+      Array.from({ length: 10 }, (_, index) => student(`s${index}`)),
+      1,
+    );
+
+    expect(getActive).toHaveBeenCalledTimes(10);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(6);
+  });
+
+  it('空学员列表不发任何请求', async () => {
+    const getActive = vi.mocked(packageService.getActiveByStudent);
+    getActive.mockClear();
+
+    const { packages, subjects } = await loadPackageMapsForStudents([], 1);
+
+    expect(packages.size).toBe(0);
+    expect(subjects.size).toBe(0);
+    expect(getActive).not.toHaveBeenCalled();
   });
 });
