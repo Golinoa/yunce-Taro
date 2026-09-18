@@ -6,7 +6,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import CampusCard from '@/components/campus/CampusCard';
 import Empty from '@/components/Empty';
@@ -17,6 +17,7 @@ import PageContainer from '@/components/PageContainer';
 import { CAMPUS_ICONS, CAMPUS_TYPE_MAP } from '@/constants/campus-ui';
 import { useCampusStore } from '@/stores/campus';
 import type { CampusFormData, CampusType, PartnerMode } from '@/types/campus';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 
 /** 校区表单状态 */
 interface CampusFormState {
@@ -62,6 +63,8 @@ const SubCampus: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [settingMain, setSettingMain] = useState(false);
+  // 慢变配置守卫：跳过重复请求
+  const lastFetchAtRef = useRef<number | null>(null);
 
   // 页面显示时刷新数据
   const reload = useCallback(async () => {
@@ -73,9 +76,16 @@ const SubCampus: React.FC = () => {
       setLoadError(nextError);
     }
     setLoading(false);
+    markFetched(lastFetchAtRef);
   }, [fetchCampuses]);
 
   Taro.useDidShow(() => {
+    // 校区列表属慢变配置：15min TTL 守卫，避免每次进页无条件重拉；
+    // 本页无对应 REFRESH_SIGNAL 键，仅用 TTL（增删改已就地更新 store，不依赖重拉）。
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) {
+      setLoading(false);
+      return;
+    }
     void reload();
   });
 

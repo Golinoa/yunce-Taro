@@ -7,7 +7,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
@@ -16,6 +16,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { SUBJECT_ICONS } from '@/constants/campus-ui';
 import { useCampusStore } from '@/stores/campus';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 
 const Subjects: React.FC = () => {
   const { subjects, fetchSubjects, addSubject, deleteSubject } = useCampusStore();
@@ -25,6 +26,8 @@ const Subjects: React.FC = () => {
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState('');
+  // 慢变配置守卫：跳过重复请求
+  const lastFetchAtRef = useRef<number | null>(null);
 
   // 表单
   const [form, setForm] = useState({
@@ -41,10 +44,17 @@ const Subjects: React.FC = () => {
       setLoadError(nextError);
     }
     setLoading(false);
+    markFetched(lastFetchAtRef);
   }, [fetchSubjects]);
 
   // 页面显示时加载数据
   Taro.useDidShow(() => {
+    // 科目属慢变配置：15min TTL 守卫，避免每次进页无条件重拉；
+    // 本页无对应 REFRESH_SIGNAL 键，仅用 TTL（增删已就地更新 store，不依赖重拉）。
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) {
+      setLoading(false);
+      return;
+    }
     void reload();
   });
 

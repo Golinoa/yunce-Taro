@@ -6,7 +6,7 @@ import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import Empty from '@/components/Empty';
@@ -16,6 +16,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { useCampusStore } from '@/stores/campus';
 import type { Holiday } from '@/types/campus';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 
 type DateField = 'startDate' | 'endDate' | null;
 type HolidayDisplayRow = Holiday & { ids: string[] };
@@ -37,6 +38,8 @@ const Holidays: React.FC = () => {
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 慢变配置守卫：跳过重复请求时给 loading 终态
+  const lastFetchAtRef = useRef<number | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -51,9 +54,16 @@ const Holidays: React.FC = () => {
     const nextError = useCampusStore.getState().error;
     if (nextError) setLoadError(nextError);
     setLoading(false);
+    markFetched(lastFetchAtRef);
   }, [fetchHolidays]);
 
   Taro.useDidShow(() => {
+    // 节假日属慢变配置：15min TTL 守卫，避免每次进页无条件重拉；
+    // 本页无对应 REFRESH_SIGNAL 键，仅用 TTL（增删改已就地更新 store，不依赖重拉）。
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) {
+      setLoading(false);
+      return;
+    }
     void reload();
   });
 

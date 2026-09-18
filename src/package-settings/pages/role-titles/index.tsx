@@ -5,7 +5,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import {
   MANAGER_TITLE_OPTIONS,
@@ -20,6 +20,7 @@ import {
 } from '@/constants/role-glossary';
 import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { isAdmin, useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -69,9 +70,15 @@ const RoleTitlesPage: React.FC = () => {
   const saveTitles = useRoleGlossaryStore((s) => s.saveTitles);
   const [draft, setDraft] = useState<RoleTitles>(storeTitles);
   const [saving, setSaving] = useState(false);
+  // 慢变配置守卫：跳过重复请求（store 已含本地保存结果，跳过不影响展示）
+  const lastFetchAtRef = useRef<number | null>(null);
 
   useDidShow(() => {
+    // 角色称呼属慢变配置：15min TTL 守卫，避免每次进页无条件重拉；
+    // 无对应 REFRESH_SIGNAL 键，仅用 TTL。保存已就地更新 store，不依赖重拉。
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) return;
     void load().then(() => {
+      markFetched(lastFetchAtRef);
       setDraft(useRoleGlossaryStore.getState().titles);
     });
   });

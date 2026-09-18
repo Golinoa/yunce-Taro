@@ -11,7 +11,7 @@
 import { Text, View } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { usePermissionStore } from '@/stores/permission';
@@ -19,6 +19,7 @@ import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { isAdmin, useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const PermissionSettings: React.FC = () => {
@@ -30,10 +31,18 @@ const PermissionSettings: React.FC = () => {
   const config = usePermissionStore((s) => s.config);
   const removeCustomRole = usePermissionStore((s) => s.removeCustomRole);
   const save = usePermissionStore((s) => s.save);
+  // 慢变配置守卫：跳过重复请求（store 已有全局首屏数据，跳过不影响展示）
+  const lastFetchAtRef = useRef<number | null>(null);
 
   useDidShow(() => {
-    void usePermissionStore.getState().load();
-    void loadTitles();
+    // 角色权限 + 称呼配置均属慢变：15min TTL 守卫，避免每次进页无条件重拉；
+    // 无对应 REFRESH_SIGNAL 键，仅用 TTL。写后冲突已在 handleDelete 里 force 重拉，不受影响。
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) return;
+    void (async () => {
+      await usePermissionStore.getState().load();
+      await loadTitles();
+      markFetched(lastFetchAtRef);
+    })();
   });
 
   const ROLE_LABELS: Record<string, string> = {

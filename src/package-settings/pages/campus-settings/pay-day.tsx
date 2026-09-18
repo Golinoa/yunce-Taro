@@ -10,7 +10,7 @@ import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
@@ -19,6 +19,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { useCampusStore } from '@/stores/campus';
 import type { SalaryModel } from '@/types/campus';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 
 const PayDay: React.FC = () => {
   const {
@@ -38,6 +39,8 @@ const PayDay: React.FC = () => {
   const [savingPayDay, setSavingPayDay] = useState(false);
   const [savingModel, setSavingModel] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState('');
+  // 慢变配置守卫：跳过重复请求
+  const lastFetchAtRef = useRef<number | null>(null);
 
   // 薪资模板弹窗
   const [showModelSheet, setShowModelSheet] = useState(false);
@@ -65,9 +68,16 @@ const PayDay: React.FC = () => {
       setLoadError(nextError);
     }
     setLoading(false);
+    markFetched(lastFetchAtRef);
   }, [fetchPayDaySettings, fetchSalaryModels]);
 
   Taro.useDidShow(() => {
+    // 发薪规则 + 薪资模板均属慢变配置：15min TTL 守卫，避免每次进页无条件重拉；
+    // 本页无对应 REFRESH_SIGNAL 键，仅用 TTL（保存已就地更新 store，不依赖重拉）。
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) {
+      setLoading(false);
+      return;
+    }
     void reload();
   });
 
