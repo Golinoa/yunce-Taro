@@ -93,7 +93,9 @@ function ensureLazyCodeLoading() {
 
   appJson.lazyCodeLoading = 'requiredComponents';
   fs.writeFileSync(distAppJsonPath, `${JSON.stringify(appJson)}\n`, 'utf8');
-  console.log('[postbuild-weapp-fixes] injected lazyCodeLoading=requiredComponents into dist/app.json');
+  console.log(
+    '[postbuild-weapp-fixes] injected lazyCodeLoading=requiredComponents into dist/app.json',
+  );
   return true;
 }
 
@@ -130,9 +132,7 @@ function cleanupDistArtifacts() {
   let removed = 0;
   for (const filePath of collectFiles(distRoot)) {
     const name = path.basename(filePath);
-    const shouldRemove =
-      name.endsWith('.LICENSE.txt') ||
-      name.endsWith('.map');
+    const shouldRemove = name.endsWith('.LICENSE.txt') || name.endsWith('.map');
 
     if (shouldRemove) {
       fs.unlinkSync(filePath);
@@ -298,20 +298,12 @@ function ensureStaticAssetsCopied() {
   ];
 
   // B12 主包瘦身：cover-home.webp 下沉分包、support-repair-qr.webp 上云，均不再进主包
-  const imageFiles = [
-    'sgpk.png',
-    'qr-point-hand.png',
-    'icon-book.webp',
-    'icon-calendar-check.webp',
-    'icon-crown.webp',
-    'icon-customer-service.webp',
-    'icon-lightning.webp',
-    'icon-rocket.webp',
-    'icon-users.webp',
-    'icon-wallet-pink.webp',
-    'icon-wallet-purple.webp',
-    'icon-wallet-yen.webp',
-  ];
+  //
+  // 2026-09-18：瓷片 3D 图 `icon-*.webp` 全部移出主包——
+  // 它们是带 alpha 的 VP8X，小程序**真机不渲染**（开发者工具能显示、真机空白）；
+  // 图片统一改走七牛 CDN（基址见 `constants/brand.ts` 的 HOME_TILE_IMAGE_BASE，
+  // 未配置时回退 mdi 渐变图标）。本项为主包省下约 92KB。
+  const imageFiles = ['sgpk.png', 'qr-point-hand.png'];
 
   /** B12：下沉到分包的静态图（分包 assets 目录，不占主包体积） */
   const subpackageImageFiles = [
@@ -412,7 +404,9 @@ function ensureStaticAssetsCopied() {
 }
 
 if (!fs.existsSync(distBaseWxmlPath)) {
-  console.error('[postbuild-weapp-fixes] ERROR: dist/base.wxml not found; build output is incomplete');
+  console.error(
+    '[postbuild-weapp-fixes] ERROR: dist/base.wxml not found; build output is incomplete',
+  );
   process.exit(1);
 }
 
@@ -421,7 +415,10 @@ const wxssCreated =
   fs
     .readdirSync(distRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('package-'))
-    .reduce((count, entry) => count + ensurePageWxssFiles(path.join(distRoot, entry.name, 'pages')), 0);
+    .reduce(
+      (count, entry) => count + ensurePageWxssFiles(path.join(distRoot, entry.name, 'pages')),
+      0,
+    );
 
 const originalContent = fs.readFileSync(distBaseWxmlPath, 'utf8');
 

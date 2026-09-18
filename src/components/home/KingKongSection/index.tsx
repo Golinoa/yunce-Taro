@@ -49,6 +49,8 @@ const TRIPLE_CARD_CONFIG = [
     subLabel: '快速核销学员或班级课时',
     icon: 'mdi-check-circle',
     image: HOME_TILE_3D.rocket,
+    /** CDN 图未就绪/加载失败时的 mdi 渐变回退配色 */
+    gradient: { from: '#60A5FA', to: '#2563EB', deg: 135 },
     url: '/package-course/pages/lesson-form/index',
     badge: 'HOT',
     cardBg: 'linear-gradient(145deg, #EEF2FF 0%, #E0E9FF 55%, #FFE8E0 100%)',
@@ -60,6 +62,7 @@ const TRIPLE_CARD_CONFIG = [
     subLabel: '查看关联预约',
     icon: 'mdi-calendar-check',
     image: HOME_TILE_3D.calendarCheck,
+    gradient: { from: '#34D399', to: '#0F766E', deg: 135 },
     url: '/package-course/pages/booking/index',
     cardBg: 'linear-gradient(145deg, #EAF8F4 0%, #D2EFE8 100%)',
     cardShadow: '0 8rpx 20rpx rgba(15, 118, 110, 0.12)',
@@ -70,6 +73,7 @@ const TRIPLE_CARD_CONFIG = [
     subLabel: '查看全部学员',
     icon: 'mdi-account-group',
     image: HOME_TILE_3D.users,
+    gradient: { from: '#93C5FD', to: '#3B82F6', deg: 135 },
     url: '/package-student/pages/students/index',
     cardBg: 'linear-gradient(145deg, #ECF3FB 0%, #D6E6F7 100%)',
     cardShadow: '0 8rpx 20rpx rgba(59, 130, 246, 0.12)',
@@ -104,32 +108,55 @@ const renderGradientIcon = (
   );
 };
 
-/** 瓷片 3D 图标：尺寸/倾斜；不做破框 */
+/**
+ * 瓷片 3D 图标：尺寸/倾斜；不做破框。
+ * src 为空（CDN 未就绪）或加载失败时，回退为 mdi 渐变图标，避免出现空白。
+ */
 const TileIcon: React.FC<{
-  src: string;
+  src?: string;
+  icon?: string;
+  gradient?: { from: string; to: string; deg: number };
   size?: number;
   rotateDeg?: number;
   className?: string;
   style?: React.CSSProperties;
-}> = ({ src, size = 120, rotateDeg = 0, className, style }) => (
-  <View
-    className={cn('pointer-events-none', className)}
-    style={{
-      width: `${size}rpx`,
-      height: `${size}rpx`,
-      ...style,
-    }}
-  >
-    <Image
-      src={src}
-      mode="aspectFit"
-      className="h-full w-full"
+}> = ({ src, icon, gradient, size = 120, rotateDeg = 0, className, style }) => {
+  const [failed, setFailed] = React.useState(false);
+  const showFallback = !src || failed;
+
+  if (showFallback) {
+    if (!icon || !gradient) return null;
+    return (
+      <View
+        className={cn('pointer-events-none flex items-center justify-center', className)}
+        style={{ width: `${size}rpx`, height: `${size}rpx`, ...style }}
+      >
+        {renderGradientIcon(icon, gradient, Math.round(size * 0.6))}
+      </View>
+    );
+  }
+
+  return (
+    <View
+      className={cn('pointer-events-none', className)}
       style={{
-        transform: rotateDeg ? `rotate(${rotateDeg}deg)` : undefined,
+        width: `${size}rpx`,
+        height: `${size}rpx`,
+        ...style,
       }}
-    />
-  </View>
-);
+    >
+      <Image
+        src={src}
+        mode="aspectFit"
+        className="h-full w-full"
+        onError={() => setFailed(true)}
+        style={{
+          transform: rotateDeg ? `rotate(${rotateDeg}deg)` : undefined,
+        }}
+      />
+    </View>
+  );
+};
 
 /**
  * KingKongSection
@@ -207,6 +234,8 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({
                 </View>
                 <TileIcon
                   src={tripleCards[0].image}
+                  icon={tripleCards[0].icon}
+                  gradient={tripleCards[0].gradient}
                   size={112}
                   rotateDeg={22}
                   className="mb-[2rpx] mr-[4rpx]"
@@ -247,7 +276,13 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({
                         {entry.subLabel}
                       </Text>
                     </View>
-                    <TileIcon src={entry.image} size={64} className="relative z-0 shrink-0" />
+                    <TileIcon
+                      src={entry.image}
+                      icon={entry.icon}
+                      gradient={entry.gradient}
+                      size={64}
+                      className="relative z-0 shrink-0"
+                    />
                   </View>
                 </View>
               );

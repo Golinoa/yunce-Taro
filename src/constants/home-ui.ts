@@ -1,27 +1,34 @@
-import { MEDIA_IMAGE_BASE } from '@/constants/brand';
+import { HOME_TILE_IMAGE_BASE } from '@/constants/brand';
 
 export interface HomeQuickEntry {
   label: string;
   /** mdi 回退图标 */
   icon: string;
-  /** 3D 瓷片图（优先展示） */
+  /** 3D 瓷片图（优先展示）；为空则走 mdi 渐变 */
   image?: string;
   color: string;
   url: string;
 }
 
-/** 首页瓷片区 3D 图标（src/assets/images/icon-*.webp） */
+/**
+ * 瓷片 3D 图 URL（七牛 CDN）。
+ * 基址为空 → 返回空串 → 消费方按「无图」处理并回退 mdi 渐变图标（与「添加学员」同款）。
+ */
+const tileImage = (file: string): string =>
+  HOME_TILE_IMAGE_BASE ? `${HOME_TILE_IMAGE_BASE}/${file}` : '';
+
+/** 首页瓷片区 3D 图标（七牛 PNG；CDN 未就绪时全部回退 mdi） */
 export const HOME_TILE_3D = {
-  book: `${MEDIA_IMAGE_BASE}/icon-book.webp`,
-  calendarCheck: `${MEDIA_IMAGE_BASE}/icon-calendar-check.webp`,
-  crown: `${MEDIA_IMAGE_BASE}/icon-crown.webp`,
-  customerService: `${MEDIA_IMAGE_BASE}/icon-customer-service.webp`,
-  lightning: `${MEDIA_IMAGE_BASE}/icon-lightning.webp`,
-  rocket: `${MEDIA_IMAGE_BASE}/icon-rocket.webp`,
-  users: `${MEDIA_IMAGE_BASE}/icon-users.webp`,
-  walletPink: `${MEDIA_IMAGE_BASE}/icon-wallet-pink.webp`,
-  walletPurple: `${MEDIA_IMAGE_BASE}/icon-wallet-purple.webp`,
-  walletYen: `${MEDIA_IMAGE_BASE}/icon-wallet-yen.webp`,
+  book: tileImage('icon-book.png'),
+  calendarCheck: tileImage('icon-calendar-check.png'),
+  crown: tileImage('icon-crown.png'),
+  customerService: tileImage('icon-customer-service.png'),
+  lightning: tileImage('icon-lightning.png'),
+  rocket: tileImage('icon-rocket.png'),
+  users: tileImage('icon-users.png'),
+  walletPink: tileImage('icon-wallet-pink.png'),
+  walletPurple: tileImage('icon-wallet-purple.png'),
+  walletYen: tileImage('icon-wallet-yen.png'),
 } as const;
 
 /** 家长端首页金刚区（生产 / Mock 共用） */
