@@ -48,9 +48,24 @@ function runNpm(script, extraArgs = []) {
   });
 }
 
+/** 主包体积审计（B4：1.5MB 建议值告警 / 2MB 微信硬限失败，见 scripts/audit-main-size.mjs） */
+function auditMainSize() {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(root, 'scripts', 'audit-main-size.mjs')], {
+      cwd: root,
+      stdio: 'inherit',
+    });
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`audit-main-size exited with code ${code ?? 1}`));
+    });
+  });
+}
+
 async function main() {
   await runNpm('build:weapp:clean');
   verifyProdDist();
+  await auditMainSize();
 }
 
 main().catch((error) => {
