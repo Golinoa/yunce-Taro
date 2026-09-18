@@ -81,13 +81,22 @@ export default defineConfig<'webpack5'>(async (merge) => {
           from: 'src/assets/images/qr-point-hand.png',
           to: 'dist/assets/images/qr-point-hand.png',
         },
-        // 首页瓷片 3D 图（原 icon-*.webp）已于 2026-09-18 全部移除主包与源目录：
-        // - 它们是带 alpha 的 VP8X，**小程序真机不渲染**（开发者工具能显示、真机空白）；
-        // - 转 PNG 后（10 张约 219KB）远超主包余量，也不能放分包（首页在主包，引用不到分包资源）；
-        // - 因此图片统一走七牛 CDN，基址见 `src/constants/brand.ts` 的 HOME_TILE_IMAGE_BASE，
-        //   未配置时瓷片自动回退为 mdi 渐变图标（`KingKongSection` 内 TileIcon 的 onError 兜底）。
-        // 需要恢复时：上传 PNG 至 `platform/static/home-icons/`（与 support-repair-qr.png 同目录），
-        // 填 HOME_TILE_IMAGE_BASE 即可，无需再往主包塞图（本项为主包/整体包体省下约 104KB）。
+        // 首页顶部三张大瓷片的 3D 图标（2026-09-18 换装）：
+        // 原 `icon-*.webp`（带 alpha 的 VP8X）**小程序真机不渲染**（工具能显示、真机空白），
+        // 已全部移除；改为 **PNG + 144px 量化 128 色**，三张合计约 11.8KB，仅在顶部三卡使用。
+        // 金刚区 8 个入口不再用图（统一 mdi 渐变，见 constants/home-ui.ts）。
+        {
+          from: 'src/assets/images/icon-rocket.png',
+          to: 'dist/assets/images/icon-rocket.png',
+        },
+        {
+          from: 'src/assets/images/icon-calendar-check.png',
+          to: 'dist/assets/images/icon-calendar-check.png',
+        },
+        {
+          from: 'src/assets/images/icon-users.png',
+          to: 'dist/assets/images/icon-users.png',
+        },
         {
           from: 'src/package-settings/assets/wx.webp',
           to: 'dist/package-settings/assets/wx.webp',

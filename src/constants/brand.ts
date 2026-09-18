@@ -24,16 +24,17 @@ export const BRAND_NAME_EN_SUB = 'Pinecone Scheduling';
 export const MEDIA_IMAGE_BASE = '/assets/images';
 
 /**
- * 首页瓷片 3D 图的 CDN 基址（七牛）。**留空 = 所有瓷片走 mdi 渐变图标**。
+ * 首页顶部三张大瓷片的 3D 图基址。**当前指向主包本地** `src/assets/images`。
  *
- * 为什么不用本地图：本地那批 `icon-*.webp` 是带 alpha 的 VP8X，**小程序真机不渲染**
- * （开发者工具能显示、真机空白）；转 PNG 后 10 张约 219KB，远超**主包余量（仅 7KB）**，
- * 又不能放分包（首页在主包，主包页面引用不到分包资源）——所以图片只能走 CDN。
+ * 为什么最终放回本地：
+ * - 原 `icon-*.webp`（带 alpha 的 VP8X）**小程序真机不渲染**（开发者工具能显示、真机空白）→ 必须换 PNG；
+ * - 全量 PNG（10 张 219KB）装不下主包，但**只保留大瓷片用到的 3 张、量化压缩到 144px 128 色后仅 11.8KB**
+ *   → 主包余量足够（清掉 10 张 webp 后余量约 83KB），且**零网络请求、真机必显示**。
  *
- * 七牛上传就绪后把这里填成 `'https://res.chancore.cn/platform/static/home-icons'`
- * 即可让所有瓷片图自动恢复（key 形如 `icon-rocket.png`，与 `support-repair-qr.png` 同目录）。
+ * 若日后想改走 CDN：把这里改成 `'https://res.chancore.cn/platform/static/home-icons'`
+ * 即可（key 与文件名同名），无需改业务代码；留空则自动回退 mdi 渐变图标。
  */
-export const HOME_TILE_IMAGE_BASE = '';
+export const HOME_TILE_IMAGE_BASE = MEDIA_IMAGE_BASE;
 
 /** 机构 Logo 资源路径（主包 assets，多处首屏复用） */
 export const BRAND_LOGO = `${MEDIA_IMAGE_BASE}/sgpk.png`;

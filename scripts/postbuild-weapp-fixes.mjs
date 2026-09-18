@@ -303,7 +303,14 @@ function ensureStaticAssetsCopied() {
   // 它们是带 alpha 的 VP8X，小程序**真机不渲染**（开发者工具能显示、真机空白）；
   // 图片统一改走七牛 CDN（基址见 `constants/brand.ts` 的 HOME_TILE_IMAGE_BASE，
   // 未配置时回退 mdi 渐变图标）。本项为主包省下约 92KB。
-  const imageFiles = ['sgpk.png', 'qr-point-hand.png'];
+  const imageFiles = [
+    'sgpk.png',
+    'qr-point-hand.png',
+    // 顶部三张大瓷片 3D 图（PNG + 量化 128 色，三张约 11.8KB）；原 icon-*.webp 真机不渲染已移除
+    'icon-rocket.png',
+    'icon-calendar-check.png',
+    'icon-users.png',
+  ];
 
   /** B12：下沉到分包的静态图（分包 assets 目录，不占主包体积） */
   const subpackageImageFiles = [
@@ -378,8 +385,10 @@ function ensureStaticAssetsCopied() {
     'assets/icons/checkin_unselected.png',
     'assets/icons/profile_selected.png',
     'assets/icons/profile_unselected.png',
-    // 瓷片 3D 图（icon-rocket / icon-users / icon-calendar-check .webp）已移除——
-    // 真机不渲染 webp + 主包放不下 PNG，统一改走七牛 CDN（见 constants/brand.ts: HOME_TILE_IMAGE_BASE）
+    // 顶部三张大瓷片 3D 图（PNG）：原 icon-*.webp 因真机不渲染 webp 已移除
+    'assets/images/icon-rocket.png',
+    'assets/images/icon-calendar-check.png',
+    'assets/images/icon-users.png',
     'assets/images/sgpk.png',
   ];
   for (const rel of required) {
