@@ -170,3 +170,15 @@ P1 已完成的 TTL 守卫（`data-freshness.ts` 的 `shouldRefetch` + 组件 `u
 2. **B3（D2 写后失效）暂缓**，待你回签 §8 Q1–Q5（尤其 Q1 资损清单复核、Q5 配额缓存定夺）后实施。
 3. B2（D3 字典落盘）条件交付（休眠），待 G3 调用方就位 + Q2 确认后灰度首发。
 4. 每批推 `ci-*` 跑门禁，全绿合并；`cacheEnabled` 保持默认关，等你给白名单再开。
+
+---
+
+## 10. 2026-09-19 追加决策：产品未发布，免灰度
+
+> 业务方拍板：产品尚未发布，无真实用户与对账压力，**取消灰度放量环节**。
+
+1. `CACHE_FLAGS.cacheEnabled` 直接置 `true`（`constants/cache-flags.ts`）；开关**保留为紧急回退**（置 false 即全量直连，无需发版）。
+2. **B2 已实施（D3 字典落盘）**：`card-type` / `course-category` / `course-template` 三域经 `utils/cache-helpers.ts` 的 `withCache` 接入（TTL.campus=15min，冷启动命中免网络）；作用域经 `utils/cache-scope.ts` 同步解析（profile storage + campus store）。
+3. **B3 轻量版已实施（写后失效）**：上述三域 CRUD 成功后 `invalidateDomain`；`resetDomainCaches('all')` 连带 `clearAllCache()`（切机构/切身份/登出双保险）。
+4. **重资损域维持不持久化**（权限/角色、会员 SKU、学员/班级/教师列表、充值退费）——内存守卫（TTL + refresh-signal）已覆盖，未发布阶段无对账压力；**发布前须回签 §8 Q1/Q2/Q5 并评估 D2 持久化**。
+5. §8 Q4（灰度白名单机构）作废；Q3（serverTime）仍建议发布前由后端支持（现 G7 以 `Date.now()` 降级）。

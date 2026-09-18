@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { courseTemplateService } from '@/services/course-template';
 import type { CourseTemplate, CourseTemplateFormData } from '@/types/course-template';
+import { invalidateDomain, withCache } from '@/utils/cache-helpers';
 import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
@@ -61,7 +62,10 @@ export const useCourseTemplateStore = create<CourseTemplateState>((set, get) => 
     }
     set({ loading: true, error: '', activeCategoryId: categoryId });
     try {
-      const list = await courseTemplateService.getList(categoryId);
+      // B2 字典落盘：按分类分桶缓存（键含 categoryId，scope 四维隔离见 utils/cache-scope）
+      const list = await withCache('course-template', `list:${categoryId}`, TTL.campus, () =>
+        courseTemplateService.getList(categoryId),
+      );
       set((s) => ({
         templates: list,
         loading: false,
@@ -80,6 +84,7 @@ export const useCourseTemplateStore = create<CourseTemplateState>((set, get) => 
 
   create: async (data) => {
     const created = await courseTemplateService.create(data);
+    invalidateDomain('course-template'); // B3 写后失效（写可能跨分类桶，整域失效）
     set((state) => {
       const categoryId = created.categoryId || data.categoryId;
       const bucket =
@@ -96,6 +101,7 @@ export const useCourseTemplateStore = create<CourseTemplateState>((set, get) => 
 
   update: async (id, data) => {
     const updated = await courseTemplateService.update(id, data);
+    invalidateDomain('course-template');
     set((state) => {
       const categoryId = updated.categoryId || state.activeCategoryId;
       const nextCache = { ...state.cache };
@@ -122,6 +128,7 @@ export const useCourseTemplateStore = create<CourseTemplateState>((set, get) => 
 
   copy: async (id) => {
     const copied = await courseTemplateService.copy(id);
+    invalidateDomain('course-template');
     set((state) => {
       const categoryId = copied.categoryId || state.activeCategoryId;
       const bucket =
@@ -139,6 +146,7 @@ export const useCourseTemplateStore = create<CourseTemplateState>((set, get) => 
   remove: async (id) => {
     const before = get().templates.find((item) => item.id === id);
     await courseTemplateService.remove(id);
+    invalidateDomain('course-template');
     set((state) => {
       const categoryId = before?.categoryId || state.activeCategoryId;
       const nextCache = { ...state.cache };

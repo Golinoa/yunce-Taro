@@ -13,6 +13,7 @@ import { useLeadStore } from '@/stores/lead';
 import { usePackageTemplateStore } from '@/stores/package-template';
 import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
+import { clearAllCache } from '@/utils/cache-store';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 
 export type ResetDomainCachesScope = 'all' | 'campus';
@@ -42,6 +43,8 @@ export function resetDomainCaches(scope: ResetDomainCachesScope = 'all'): void {
     invalidateMembershipBootstrapCache();
     // 权限配置为机构级：切机构时清本地缓存，避免串租户授权
     clearPermissionCache();
+    // B3 轻量：切机构/切身份/登出时连带清持久缓存（命名空间本已四维隔离，此处双保险）
+    clearAllCache();
   } else {
     useCampusStore.getState().invalidateSubjectsCache();
   }

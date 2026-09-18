@@ -15,6 +15,7 @@ import type {
   CourseCategoryFormData,
   CourseCategoryMode,
 } from '@/types/course-category';
+import { invalidateDomain, withCache } from '@/utils/cache-helpers';
 import { TTL } from '@/utils/data-freshness';
 
 interface CourseCategoryState {
@@ -58,7 +59,10 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
     }
     set({ loading: true, error: null });
     try {
-      const list = await courseCategoryService.getList();
+      // B2 字典落盘：缓存存 service 原始列表（映射后仍走 resolveCourseCategoriesFromApi，确定性变换）
+      const list = await withCache('course-category', 'list', TTL.campus, () =>
+        courseCategoryService.getList(),
+      );
       const next = resolveCourseCategoriesFromApi(list);
       const currentId = get().activeCategoryId;
       const activeCategoryId = next.some((c) => c.id === currentId)
@@ -91,6 +95,7 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
 
   create: async (data) => {
     const created = await courseCategoryService.create(data);
+    invalidateDomain('course-category'); // B3 写后失效
     set((state) => {
       const next = [...state.categories, created].sort((a, b) => a.sortOrder - b.sortOrder);
       return { categories: next, activeCategoryId: created.id, lastFetchAt: Date.now() };
@@ -100,6 +105,7 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
 
   update: async (id, data) => {
     const updated = await courseCategoryService.update(id, data);
+    invalidateDomain('course-category');
     set((state) => {
       const next = state.categories
         .map((item) => (item.id === id ? updated : item))
@@ -111,6 +117,7 @@ export const useCourseCategoryStore = create<CourseCategoryState>((set, get) => 
 
   remove: async (id) => {
     await courseCategoryService.remove(id);
+    invalidateDomain('course-category');
     set((state) => {
       const next = state.categories.filter((item) => item.id !== id);
       const nextActiveId =

@@ -8,9 +8,12 @@
  * 回退不靠 revert：出问题把 cacheEnabled 置 false 即恢复直连。
  */
 export const CACHE_FLAGS = {
-  /** 总开关：默认关闭（休眠），灰度时置 true 或按机构白名单放开 */
-  cacheEnabled: false,
-  /** 灰度白名单 orgId；空数组 = cacheEnabled=true 时全量放开 */
+  /**
+   * 总开关。2026-09-19 决策：产品未发布、免灰度 —— 直接开启。
+   * 开关保留为紧急回退：异常时置 false 即全量直连（get 早返回 null），无需发版回滚。
+   */
+  cacheEnabled: true,
+  /** 灰度白名单 orgId；空数组 = 总开关开启时全量放开（未发布阶段即此形态） */
   enabledOrgIds: [] as string[],
 };
 

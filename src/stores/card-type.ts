@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { cardTypeService } from '@/services/card-type';
 import type { CardType, CardTypeFormData, CardTypeStatus } from '@/types/card-type';
+import { invalidateDomain, withCache } from '@/utils/cache-helpers';
 import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
@@ -48,7 +49,10 @@ export const useCardTypeStore = create<CardTypeState>((set, get) => ({
     }
     set({ loading: true, error: '' });
     try {
-      const list = await cardTypeService.getList();
+      // B2 字典落盘：冷启动持久缓存命中则免网络（scope 四维隔离见 utils/cache-scope）
+      const list = await withCache('card-type', 'list', TTL.campus, () =>
+        cardTypeService.getList(),
+      );
       set({ cards: list, loading: false, lastFetchAt: now });
     } catch (err) {
       logError('cardType fetchList', err);
@@ -62,6 +66,7 @@ export const useCardTypeStore = create<CardTypeState>((set, get) => ({
 
   create: async (data) => {
     const created = await cardTypeService.create(data);
+    invalidateDomain('card-type'); // B3 写后失效：防冷启动读到旧卡种
     set((state) => ({
       cards: [created, ...state.cards],
       lastFetchAt: Date.now(),
@@ -71,6 +76,7 @@ export const useCardTypeStore = create<CardTypeState>((set, get) => ({
 
   update: async (id, data) => {
     const updated = await cardTypeService.update(id, data);
+    invalidateDomain('card-type');
     set((state) => ({
       cards: state.cards.map((item) => (item.id === id ? updated : item)),
     }));
@@ -79,6 +85,7 @@ export const useCardTypeStore = create<CardTypeState>((set, get) => ({
 
   toggleStatus: async (id, status) => {
     const updated = await cardTypeService.toggleStatus(id, status);
+    invalidateDomain('card-type');
     set((state) => ({
       cards: state.cards.map((item) => (item.id === id ? updated : item)),
     }));
@@ -87,6 +94,7 @@ export const useCardTypeStore = create<CardTypeState>((set, get) => ({
 
   remove: async (id) => {
     await cardTypeService.remove(id);
+    invalidateDomain('card-type');
     set((state) => ({
       cards: state.cards.filter((item) => item.id !== id),
     }));
