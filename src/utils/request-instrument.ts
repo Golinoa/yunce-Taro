@@ -42,7 +42,8 @@ export function dumpRequests(): RequestRecord[] {
 
 /** 按 url 聚合计数（用于「重复触发」判据；只看起始时间窗内的记录） */
 export function countByUrl(sinceTs?: number): Array<{ url: string; count: number }> {
-  const scoped = typeof sinceTs === 'number' ? records.filter((r) => r.startAt >= sinceTs) : records;
+  const scoped =
+    typeof sinceTs === 'number' ? records.filter((r) => r.startAt >= sinceTs) : records;
   const map = new Map<string, number>();
   for (const r of scoped) {
     map.set(r.url, (map.get(r.url) ?? 0) + 1);
@@ -86,8 +87,7 @@ export function summarizeColdStart(bootAt?: number | null): {
 } {
   const hasBoot = typeof bootAt === 'number' && bootAt > 0;
   const windowStart = hasBoot ? (bootAt as number) : null;
-  const scoped =
-    windowStart === null ? records : records.filter((r) => r.startAt >= windowStart);
+  const scoped = windowStart === null ? records : records.filter((r) => r.startAt >= windowStart);
   const firstScreenMs =
     hasBoot && firstScreenAt !== null ? firstScreenAt - (bootAt as number) : null;
   return {
