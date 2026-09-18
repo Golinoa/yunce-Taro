@@ -3,8 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SubscribeAuthHost } from '@/components/subscribe';
+import { APP_VERSION } from '@/constants/version';
 import { scheduleDeferredAppStartup } from '@/utils/app-startup';
 import { AuthProvider } from '@/utils/auth';
+import { clearIfVersionMismatch } from '@/utils/cache-store';
 import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import { logError } from '@/utils/logger';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
@@ -68,6 +70,8 @@ if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {
 const App: React.FC<{ children?: React.ReactNode }> = (props) => {
   useLaunch((options) => {
     try {
+      // G2 版本护栏：APP_VERSION 不符即整体清空持久缓存（cache-store 默认休眠，无行为影响）
+      clearIfVersionMismatch(APP_VERSION);
       markAppColdStart(options);
       logLaunchOptions(options);
     } catch (err) {

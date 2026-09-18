@@ -13,6 +13,7 @@ import {
   type MembershipSku,
 } from '@/services/payment';
 import { TTL } from '@/utils/data-freshness';
+import { logError } from '@/utils/logger';
 
 const QUOTA_STORAGE_KEY = 'yunce:membership:quota-v1';
 const SKU_STORAGE_KEY = 'yunce:membership:sku-v1';
@@ -48,8 +49,9 @@ function readStorage<T>(key: string): CachedBox<T> | null {
 function writeStorage<T>(key: string, box: CachedBox<T>): void {
   try {
     Taro.setStorageSync(key, box);
-  } catch {
-    /* 存储满/禁用时忽略，内存仍可用 */
+  } catch (err) {
+    // G5（缓存层计划 §2）：存储满/禁用不再静默 —— 内存缓存仍可用，行为不变，仅补可观测
+    logError('membershipCache.writeStorage', err);
   }
 }
 
