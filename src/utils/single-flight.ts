@@ -16,14 +16,14 @@ export function singleFlight<T>(key: string, task: () => Promise<T>): Promise<T>
   if (existing) return existing as Promise<T>;
 
   const promise = task();
-  inFlight.set(key, promise);
-  // 独立消费一次结果：保证无论调用方是否 catch，飞行态都会被清理
-  void promise
-    .catch(() => undefined)
-    .then(() => {
-      if (inFlight.get(key) === promise) inFlight.delete(key);
-    });
-  return promise;
+  // 用 finally 把「清理飞行态」并进返回 Promise 的 settle 链：
+  // 调用方 await 到结果时该 key 必已从表中移除 —— 保证「只合并并发、不缓存结果」。
+  // （改用 .then 清理会排在调用方 await 之后，紧接着的第二次调用会误命中旧结果。）
+  const tracked = promise.finally(() => {
+    if (inFlight.get(key) === tracked) inFlight.delete(key);
+  });
+  inFlight.set(key, tracked);
+  return tracked;
 }
 
 /** 丢弃指定 key 的飞行态（切机构 / 登出等需要强制重拉的场合） */

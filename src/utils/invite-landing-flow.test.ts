@@ -97,7 +97,9 @@ describe('invite-landing-flow (L1 态机)', () => {
     const rules = { bookingDeadlineEnabled: true, bookingDeadlineMinutes: 120 };
 
     it('已下课（now 晚于结束时刻）→ lesson_expired', () => {
-      const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // 用「2 天前」而非「1 小时前」：1 小时前可能仍是今天，而 10:00–11:00 相对当前
+      // 时刻未必已过（CI 跑在 UTC 时尤其明显）——原写法是与运行时刻相关的 flaky 用例。
+      const past = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       expect(
         resolveTrialInviteBookingClosed({
           date: past.slice(0, 10),
