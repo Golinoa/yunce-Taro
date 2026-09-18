@@ -8,6 +8,8 @@ import { mapGatewayErrorMessage, mapNetworkFailMessage } from '@/utils/api-gatew
 import { getApiBaseUrl } from '@/utils/build-env';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logRequestIssue } from '@/utils/logger';
+/** P0 取证仪表：只记录，不干预（详见该文件说明） */
+import { beginRequest } from '@/utils/request-instrument';
 import { singleFlight } from '@/utils/single-flight';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
@@ -431,6 +433,9 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
 async function performRequest<T = unknown>(options: RequestOptions): Promise<T> {
   const { url, method = 'GET', data, header = {}, skipAuth = false, timeout = TIMEOUT } = options;
   const startAt = Date.now();
+
+  // 度量：记录一次「发起」。只读观测，不改变任何请求行为（不写存储、不发网络）。
+  beginRequest(url, method);
 
   // 上一波 429 的退避窗口内，先等再发（/auth/* 除外，保证能重新登录与续期）
   await waitForRateLimitBackoff(url);

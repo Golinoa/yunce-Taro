@@ -38,6 +38,8 @@ import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { storefrontKey } from '@/utils/parent-storefront';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
+/** P0 取证仪表：仅首屏打点，只读观测，不干预业务行为 */
+import { markFirstScreen } from '@/utils/request-instrument';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
@@ -357,6 +359,17 @@ const Home: React.FC = () => {
     enabled: Boolean(teacherId && profileId),
     staleTime: HOME_QUERY_STALE_TIME_MS,
   });
+
+  /**
+   * 首屏完成打点（P0 取证）：身份就绪 + 聚合数据到位即视为「首屏渲染完成」。
+   * **只标记时间戳，不影响任何渲染与请求行为**（惰性，只记第一次）。
+   */
+  const homeFirstScreenReady = homeIdentityReady && agg !== undefined;
+  useEffect(() => {
+    if (homeFirstScreenReady) {
+      markFirstScreen();
+    }
+  }, [homeFirstScreenReady]);
 
   /** 查询结果 → 页面展示态同步（保持既有 useState 驱动渲染，行为与改造前一致） */
   useEffect(() => {
