@@ -31,4 +31,26 @@ describe('mapBackendTeacherToUI', () => {
       attendanceMode: 'per_student_per_lesson',
     });
   });
+
+  it('marks the profile as wechat bound when the backend reports it', () => {
+    const teacher = mapBackendTeacherToUI({
+      id: 'teacher-1',
+      name: '测试老师',
+      wechatBound: true,
+      wechatNickname: '微信昵称',
+      wechatAvatarUrl: 'https://cdn.example.com/a.png',
+    });
+
+    expect(teacher.wechatBound).toBe(true);
+    expect(teacher.wechatNickname).toBe('微信昵称');
+    expect(teacher.wechatAvatarUrl).toBe('https://cdn.example.com/a.png');
+  });
+
+  it('treats a missing wechat binding field as unbound (backward compatible)', () => {
+    const teacher = mapBackendTeacherToUI({ id: 'teacher-2', name: '空白资料' });
+
+    expect(teacher.wechatBound).toBe(false);
+    expect(teacher.wechatNickname).toBeUndefined();
+    expect(teacher.wechatAvatarUrl).toBeUndefined();
+  });
 });

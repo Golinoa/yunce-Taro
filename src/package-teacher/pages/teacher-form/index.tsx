@@ -14,6 +14,7 @@ import Taro, { useRouter } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Avatar from '@/components/Avatar';
 import BindEmailSheet from '@/components/BindEmailSheet';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import FormCell from '@/components/FormCell';
@@ -278,6 +279,16 @@ const TeacherFormPage: React.FC = () => {
     [bindAccountEmail, bindingEmail],
   );
 
+  // 员工资料的微信绑定状态：后端由 Teacher.userId → User/Profile 的 openid 推导，
+  // 字段缺失（旧后端 / undefined）一律按「未绑定」处理，保持原有「邀请绑定微信」入口。
+  const currentTeacher = useMemo(
+    () => (isEdit ? teachers.find((t) => t.id === id) : undefined),
+    [isEdit, teachers, id],
+  );
+  const wechatBound = currentTeacher?.wechatBound === true;
+  const wechatNickname = wechatBound ? currentTeacher?.wechatNickname : undefined;
+  const wechatAvatarUrl = wechatBound ? currentTeacher?.wechatAvatarUrl : undefined;
+
   if (isEdit && loading && !formInitializedRef.current) {
     return (
       <View
@@ -464,7 +475,30 @@ const TeacherFormPage: React.FC = () => {
             </View>
           </View>
 
-          {isEdit ? (
+          {isEdit && wechatBound ? (
+            <View className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx] flex flex-row items-center justify-between">
+              <View className="flex-1 min-w-0">
+                <Text className="text-[30rpx] font-medium text-foreground block">微信绑定</Text>
+                <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] block">
+                  该员工已用微信注册登录，资料已绑定微信
+                </Text>
+              </View>
+              {wechatAvatarUrl || wechatNickname ? (
+                <View className="flex flex-row items-center gap-[16rpx] shrink-0">
+                  {wechatAvatarUrl ? (
+                    <Avatar
+                      name={wechatNickname || form.name || '员工'}
+                      avatarUrl={wechatAvatarUrl}
+                      size="md"
+                    />
+                  ) : null}
+                  {wechatNickname ? (
+                    <Text className="text-[26rpx] text-foreground">{wechatNickname}</Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          ) : isEdit ? (
             <View
               className="bg-card rounded-[32rpx] p-[32rpx] mb-[24rpx] flex flex-row items-center justify-between press-bg"
               onClick={() => {

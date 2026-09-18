@@ -174,6 +174,10 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
         : str(latestPay?.serialNo ?? latestPay?.serial_no)),
     payHistory,
     selectedSalaryRecord,
+    // 微信绑定状态：后端下发为 boolean；字段缺失/类型异常一律按未绑定处理（向后兼容）
+    wechatBound: raw.wechatBound === true,
+    wechatNickname: str(raw.wechatNickname),
+    wechatAvatarUrl: str(raw.wechatAvatarUrl),
   };
 }
 

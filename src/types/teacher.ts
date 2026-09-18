@@ -485,6 +485,15 @@ export interface TeacherUIModel {
   categoryLessonFees?: CategoryLessonFeeItem[];
   /** 本月消课次数（详情接口） */
   lessonCount?: number;
+  /**
+   * 该员工资料是否已绑定微信（后端由 Teacher.userId → User/Profile 的 openid 推导）。
+   * 字段缺失（undefined/null/非 true）一律按「未绑定」处理，保持旧行为。
+   */
+  wechatBound?: boolean;
+  /** 已绑定微信的昵称；未绑定或后端未下发时为 undefined */
+  wechatNickname?: string;
+  /** 已绑定微信的头像 URL；未绑定或后端未下发时为 undefined */
+  wechatAvatarUrl?: string;
 }
 
 /** 筛选条件 */
