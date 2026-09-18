@@ -12,6 +12,7 @@ import InviteQrSection from '@/components/lead/InviteQrSection';
 import PageContainer from '@/components/PageContainer';
 import { parentShareInviteService } from '@/services/parent-share-invite';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { buildWxacodeImageSrc } from '@/utils/wxacode-scene';
 
@@ -23,8 +24,16 @@ const InviteQrcodePage: React.FC = () => {
   const [qrImageSrc, setQrImageSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // 招生码为教师固定码（永久有效、可多人复用）；小程序码生成属较重网络调用，
+  // 用 TTL 守卫避免 useDidShow 反复进页时重复拉取与重复生成。
+  const lastFetchAtRef = React.useRef<number | null>(null);
 
   const loadWxacode = useCallback(async () => {
+    // 5min 内已成功生成过 → 跳过重复请求（首次进入 lastFetchAtRef 为 null 必定拉取）
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -33,6 +42,7 @@ const InviteQrcodePage: React.FC = () => {
       const wxacode = await parentShareInviteService.getWxacode(myInvite.parentInviteCode);
       setInviteLink(myInvite.parentInviteLandingPath || wxacode.landingPath);
       setQrImageSrc(buildWxacodeImageSrc(wxacode.imageBase64));
+      markFetched(lastFetchAtRef);
     } catch (e) {
       setQrImageSrc('');
       setError(e instanceof Error ? e.message : '生成小程序码失败，请稍后重试');
