@@ -273,8 +273,10 @@ export interface Subject {
   studentCount: number;
   /** 授课教师数 */
   teacherCount: number;
-  /** 排课数 */
+  /** 关联课程/课包数 */
   courseCount: number;
+  /** 关联会员卡种数 */
+  cardCount?: number;
 }
 
 /** 科目表单数据（添加） */

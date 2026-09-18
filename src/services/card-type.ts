@@ -39,6 +39,8 @@ function mapCardType(raw: BackendCardType): CardType {
     usageLimit: Number(raw.usageLimit ?? 0),
     commissionCalc: String(raw.commissionCalc ?? ''),
     backgroundImage: raw.backgroundImage ? String(raw.backgroundImage) : undefined,
+    subjectId: raw.subjectId ? String(raw.subjectId) : undefined,
+    subjectName: raw.subjectName ? String(raw.subjectName) : undefined,
     stats: {
       sold: Number(stats.sold ?? 0),
       inUse: Number(stats.inUse ?? 0),
@@ -82,6 +84,8 @@ function toBackendCardType(
     'usageLimit',
     'commissionCalc',
     'backgroundImage',
+    'subjectId',
+    'subjectName',
   ] as const;
   const body: Record<string, unknown> = {};
   for (const field of fields) {

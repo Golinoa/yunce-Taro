@@ -43,6 +43,10 @@ export interface CourseImageUploaderProps {
   scrollTopRef?: React.MutableRefObject<number>;
   /** 选图完成后恢复页面滚动位置 */
   onScrollRestore?: (top: number) => void;
+  /** 打开微信原生选图前通知父页面，避免 useDidShow 覆盖临时图片 */
+  onChooseStart?: () => void;
+  /** 微信原生选图流程结束后通知父页面 */
+  onChooseEnd?: () => void;
 }
 
 const CourseImageUploader: React.FC<CourseImageUploaderProps> = ({
@@ -55,6 +59,8 @@ const CourseImageUploader: React.FC<CourseImageUploaderProps> = ({
   maxSizeMB = 5,
   scrollTopRef,
   onScrollRestore,
+  onChooseStart,
+  onChooseEnd,
 }) => {
   const cropScale: keyof Taro.cropImage.CropScale = layout === 'fullWidth' ? '16:9' : '1:1';
 
@@ -62,6 +68,7 @@ const CourseImageUploader: React.FC<CourseImageUploaderProps> = ({
     // 选图/裁剪是原生浮层（wx.chooseMedia / wx.cropImage），关闭时微信会重置内层
     // ScrollView 滚动位置导致页面跳回顶部。先记录当前位置，选图完成后再恢复。
     const savedTop = scrollTopRef?.current ?? 0;
+    onChooseStart?.();
     try {
       const tempPath = await chooseImageTemp({ maxSizeMB, cropScale });
       // 替换图片：先删掉旧的本地临时文件，避免 uploads 目录累积
@@ -81,8 +88,19 @@ const CourseImageUploader: React.FC<CourseImageUploaderProps> = ({
       } else {
         Taro.showToast({ title: message, icon: 'none' });
       }
+    } finally {
+      onChooseEnd?.();
     }
-  }, [maxSizeMB, cropScale, onChange, scrollTopRef, onScrollRestore, value]);
+  }, [
+    maxSizeMB,
+    cropScale,
+    onChange,
+    onChooseEnd,
+    onChooseStart,
+    scrollTopRef,
+    onScrollRestore,
+    value,
+  ]);
 
   const handleDelete = useCallback(
     async (e: { stopPropagation: () => void }) => {

@@ -3,9 +3,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
 import { COURSE_MANAGEMENT_CLASS_TAB_URL } from '@/constants/course-category-ui';
-import { studentService, packageService, campusService, subscribeMessageService } from '@/services';
-import { subjectService } from '@/services/campus';
-import { useStudentStore, usePackageTemplateStore } from '@/stores';
+import { studentService, subscribeMessageService } from '@/services';
+import { useCampusStore, useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { CampusUIModel, Subject } from '@/types/campus';
 import type { FeeMethod, CoursePackageTemplate } from '@/types/course-package';
 import type { Student } from '@/types/student';
@@ -192,6 +191,9 @@ export function useStudentForm(): UseStudentFormReturn {
 
   const updateStudentInCache = useStudentStore((state) => state.updateInCache);
   const fetchPackageTemplatesByTeacher = usePackageTemplateStore((state) => state.fetchByTeacher);
+  // 校区/科目为低频参照数据：经 campus store 的 TTL 读取，避免每次进页重复请求
+  const fetchCampuses = useCampusStore((state) => state.fetchCampuses);
+  const fetchSubjects = useCampusStore((state) => state.fetchSubjects);
 
   const selectedPackage = useMemo(
     () => packageTemplates.find((t) => t.id === selectedPackageId),
@@ -238,10 +240,16 @@ export function useStudentForm(): UseStudentFormReturn {
     }
 
     try {
-      const [campusList, subjectList] = await Promise.all([
-        campusService.getList(),
-        subjectService.getList(),
-      ]);
+      // 校区/科目为低频参照数据：走 campus store 的 TTL（15min / 5min），
+      // TTL 内进页不再重复请求；切校区/切机构由 resetDomainCaches 复位。
+      await Promise.all([fetchCampuses(), fetchSubjects()]);
+      const campusStore = useCampusStore.getState();
+      // 从未成功拉取过（首次失败）→ 保留原「初始化失败」错误态
+      if (!campusStore.lastCampusesFetchAt || !campusStore.lastSubjectsFetchAt) {
+        throw new Error('校区/科目参照数据加载失败');
+      }
+      const campusList = campusStore.campuses;
+      const subjectList = campusStore.subjects;
       setCampusOptions(campusList);
       setSubjects(subjectList);
       const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
@@ -268,7 +276,8 @@ export function useStudentForm(): UseStudentFormReturn {
         return;
       }
 
-      const list = await fetchPackageTemplatesByTeacher(currentUserId, true);
+      // 课包模板同样为低频参照数据：不再强制重拉，交由 store 的 TTL.list 保鲜
+      const list = await fetchPackageTemplatesByTeacher(currentUserId);
       setPackageTemplates(list);
       setCampusId(mainCampusId);
     } catch (error) {
@@ -288,7 +297,15 @@ export function useStudentForm(): UseStudentFormReturn {
       });
       setLoading(false);
     }
-  }, [currentUserId, isEdit, studentId, fetchPackageTemplatesByTeacher, initStartAtRef]);
+  }, [
+    currentUserId,
+    isEdit,
+    studentId,
+    fetchPackageTemplatesByTeacher,
+    fetchCampuses,
+    fetchSubjects,
+    initStartAtRef,
+  ]);
 
   useEffect(() => {
     void loadFormData();
@@ -501,7 +518,6 @@ export function useStudentForm(): UseStudentFormReturn {
         : { fee_amount: undefined, fee_method: undefined };
 
       let newStudent: Student | undefined;
-      let packageInitializationFailed = false;
 
       const resolveAvatarForStudent = async (
         targetStudentId: string,
@@ -538,22 +554,43 @@ export function useStudentForm(): UseStudentFormReturn {
         const localAvatarPending = isLocalWechatFilePath(avatarUrl) ? avatarUrl.trim() : '';
         const existingRemoteAvatar =
           avatarUrl.trim() && !localAvatarPending ? avatarUrl.trim() : undefined;
+        const initialPackages =
+          studentType === 'old'
+            ? legacyPackages.map((pkg) => {
+                const hours = parseInt(pkg.remainingHours, 10);
+                return {
+                  name: `${pkg.subjectName || '科目'}（历史导入）`,
+                  totalHours: hours,
+                  subjectId: pkg.subjectId,
+                  validEnd: pkg.expireEnabled ? pkg.expireDate || undefined : undefined,
+                  note: `老生迁移：剩余 ${hours} 课时`,
+                };
+              })
+            : (() => {
+                const hours = parseInt(initHours, 10) || 0;
+                return hours > 0
+                  ? [{ name: '初始课时', totalHours: hours, note: '新生初始课时' }]
+                  : [];
+              })();
 
-        newStudent = await studentService.create({
-          teacher_id: teacherId,
-          name: name.trim(),
-          nickname: nickname.trim() || undefined,
-          invite_code: inviteCode,
-          phone: phone.trim() || undefined,
-          gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
-          birthday: birthday || undefined,
-          address: address.trim() || undefined,
-          note: note.trim() || undefined,
-          avatar_url: existingRemoteAvatar,
-          ...feePayload,
-          campus_id: campusId || undefined,
-          campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
-        });
+        newStudent = await studentService.create(
+          {
+            teacher_id: teacherId,
+            name: name.trim(),
+            nickname: nickname.trim() || undefined,
+            invite_code: inviteCode,
+            phone: phone.trim() || undefined,
+            gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
+            birthday: birthday || undefined,
+            address: address.trim() || undefined,
+            note: note.trim() || undefined,
+            avatar_url: existingRemoteAvatar,
+            ...feePayload,
+            campus_id: campusId || undefined,
+            campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
+          },
+          initialPackages,
+        );
 
         if (newStudent && localAvatarPending) {
           try {
@@ -577,53 +614,8 @@ export function useStudentForm(): UseStudentFormReturn {
         if (newStudent) {
           updateStudentInCache(currentUserId, newStudent);
           setRefreshSignal(REFRESH_SIGNAL.students);
-
-          try {
-            if (studentType === 'old') {
-              for (const pkg of legacyPackages) {
-                const hours = parseInt(pkg.remainingHours, 10) || 0;
-                if (hours <= 0 || !pkg.subjectId) continue;
-                await packageService.create({
-                  teacher_id: teacherId,
-                  student_id: newStudent.id,
-                  name: `${pkg.subjectName || '科目'}（历史导入）`,
-                  total_hours: hours,
-                  remaining_hours: hours,
-                  purchased_remaining: hours,
-                  bonus_remaining: 0,
-                  status: 'active',
-                  subject_id: pkg.subjectId,
-                  end_date: pkg.expireEnabled ? pkg.expireDate || undefined : undefined,
-                  expiry_date: pkg.expireEnabled ? pkg.expireDate || undefined : undefined,
-                  note: `老生迁移：剩余 ${hours} 课时`,
-                });
-              }
-            } else {
-              const init = parseInt(initHours, 10) || 0;
-              if (init > 0) {
-                await packageService.create({
-                  teacher_id: teacherId,
-                  student_id: newStudent.id,
-                  name: '初始课时',
-                  total_hours: init,
-                  remaining_hours: init,
-                  purchased_remaining: init,
-                  bonus_remaining: 0,
-                  status: 'active',
-                });
-              }
-            }
-          } catch (error) {
-            packageInitializationFailed = true;
-            logError('init student package', error);
-          }
         }
-
-        if (packageInitializationFailed) {
-          Taro.showToast({ title: '学员已创建，课时初始化失败', icon: 'none', duration: 2500 });
-        } else {
-          Taro.showToast({ title: '添加成功', icon: 'success' });
-        }
+        Taro.showToast({ title: '添加成功', icon: 'success' });
       }
 
       if (!isEdit && newStudent) {

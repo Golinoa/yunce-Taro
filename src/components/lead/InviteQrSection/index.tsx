@@ -13,6 +13,7 @@ export interface InviteQrSectionProps {
   qrCodeBase64?: string;
   qrImageSrc?: string;
   expireAt?: string;
+  permanent?: boolean;
   loading?: boolean;
   error?: string;
   onRefresh?: () => void;
@@ -33,6 +34,7 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
   inviteLink,
   qrImageSrc,
   expireAt,
+  permanent = false,
   loading = false,
   error = '',
   onRefresh,
@@ -46,7 +48,11 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
     Taro.setClipboardData({
       data: inviteLink,
       success: () => {
-        Taro.showToast({ title: '链接已复制（24h有效）', icon: 'none', duration: 2500 });
+        Taro.showToast({
+          title: permanent ? '链接已复制（长期有效）' : '链接已复制（24h有效）',
+          icon: 'none',
+          duration: 2500,
+        });
       },
     });
   }, [inviteLink]);
@@ -87,7 +93,7 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
       </View>
 
       <Text className="text-[22rpx] text-muted-foreground mb-3">
-        扫码直达招生页 · 有效期至 {formatExpireAt(expireAt)}
+        扫码直达招生页 · {permanent ? '长期有效' : `有效期至 ${formatExpireAt(expireAt)}`}
       </Text>
 
       <View className="flex flex-col items-center gap-1 mb-4">

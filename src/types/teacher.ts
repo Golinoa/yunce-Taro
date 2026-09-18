@@ -145,6 +145,7 @@ export type LessonFeeMode =
   | 'unified'
   | 'by_course'
   | 'by_attendance'
+  | 'by_person_per_lesson'
   | 'by_monthly_tier'
   | 'by_perf_tier';
 
@@ -319,6 +320,8 @@ export interface SalaryRuleConfig {
 /** 薪资模板 */
 export interface SalaryTemplate {
   id: string;
+  /** 所属校区；新建模板时必须提供 */
+  campusId?: string;
   name: string;
   /** 简短描述，如"兼职80/次" */
   summary?: string;

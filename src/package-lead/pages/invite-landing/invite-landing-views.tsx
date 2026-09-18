@@ -6,7 +6,7 @@ import cn from 'classnames';
 import React from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
-import { BRAND_LOGO, ORG_COVER_IMAGE } from '@/constants/brand';
+import { BRAND_LOGO } from '@/constants/brand';
 import type { CampusUIModel } from '@/types/campus';
 import type { CampusOpenStatus } from '@/utils/campus';
 import {
@@ -15,8 +15,14 @@ import {
   clampCampusSingleLine,
   estimateCampusAddressMaxChars,
 } from '@/utils/campus';
-import type { TrialInviteDockAction } from '@/utils/invite-landing-flow';
+import type {
+  TrialInviteBookingClosedReason,
+  TrialInviteDockAction,
+} from '@/utils/invite-landing-flow';
 import type { InviteLandingChildGender } from '@/utils/invite-landing-params';
+
+/** 机构封面默认图：随本分包下发（B12 主包瘦身，避免占用主包体积） */
+const ORG_COVER_IMAGE = '/package-lead/assets/cover-home.webp';
 
 export const InviteLandingLoginGate: React.FC<{
   statusBarHeight: number;
@@ -264,7 +270,8 @@ export const InviteLandingMainView: React.FC<{
   timeLabel: string;
   isGroupBook: boolean;
   isLoggedIn: boolean;
-  lessonExpired: boolean;
+  bookingClosed: boolean;
+  bookingClosedReason?: TrialInviteBookingClosedReason | null;
   claimed: boolean;
   showVoucher: boolean;
   showLogin: boolean;
@@ -298,7 +305,8 @@ export const InviteLandingMainView: React.FC<{
   timeLabel,
   isGroupBook,
   isLoggedIn,
-  lessonExpired,
+  bookingClosed,
+  bookingClosedReason,
   claimed,
   showVoucher,
   showLogin,
@@ -364,9 +372,15 @@ export const InviteLandingMainView: React.FC<{
                   {isGroupBook ? '团课预约' : '免费试听'}
                 </Text>
               </View>
-              {lessonExpired ? (
+              {bookingClosed ? (
                 <View className="rounded-full bg-muted px-[20rpx] py-[6rpx]">
-                  <Text className="text-[22rpx] font-semibold text-muted-foreground">已结束</Text>
+                  <Text className="text-[22rpx] font-semibold text-muted-foreground">
+                    {bookingClosedReason === 'lesson_started'
+                      ? '已开始'
+                      : bookingClosedReason === 'booking_deadline'
+                        ? '已截止'
+                        : '已结束'}
+                  </Text>
                 </View>
               ) : claimed ? (
                 <View className="rounded-full bg-success/10 px-[20rpx] py-[6rpx]">
@@ -445,7 +459,7 @@ export const InviteLandingMainView: React.FC<{
       </View>
     ) : null}
 
-    {showVoucher && !lessonExpired ? (
+    {showVoucher && !bookingClosed ? (
       <View className="invite-mask center">
         <View className="invite-voucher-pop">
           <View className="invite-voucher-shine" />
@@ -513,7 +527,7 @@ export const InviteLandingMainView: React.FC<{
       </View>
     ) : null}
 
-    {showForm && !lessonExpired ? (
+    {showForm && !bookingClosed ? (
       <View className="invite-mask bottom">
         <View className="invite-sheet w-full rounded-t-[32rpx] bg-card px-[32rpx] pb-[48rpx] pt-[16rpx]">
           <View className="mx-auto mb-[24rpx] h-[8rpx] w-[72rpx] rounded-full bg-border" />

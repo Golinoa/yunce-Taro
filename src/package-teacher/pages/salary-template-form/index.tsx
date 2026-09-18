@@ -21,6 +21,7 @@ import { createDefaultSalaryRule } from '@/domain/teacher-salary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig } from '@/types/teacher';
+import { useAuth } from '@/utils/auth';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 /** 表单字段错误 */
@@ -31,6 +32,8 @@ interface SalaryTemplateFormErrors {
 const SalaryTemplateFormPage: React.FC = () => {
   useCardNavigationBar();
   const { activeTheme } = useThemeStore();
+  const { profile } = useAuth();
+  const campusId = profile?.currentContext?.campusId || '';
   const router = useRouter();
   const editId = (router.params?.id as string) || '';
   const isEdit = !!editId;
@@ -77,6 +80,10 @@ const SalaryTemplateFormPage: React.FC = () => {
       Taro.showToast({ title: '请检查表单填写', icon: 'none' });
       return;
     }
+    if (!campusId) {
+      Taro.showToast({ title: '请先选择校区', icon: 'none' });
+      return;
+    }
     setSaving(true);
     try {
       if (isEdit) {
@@ -89,6 +96,7 @@ const SalaryTemplateFormPage: React.FC = () => {
         Taro.showToast({ title: '保存成功', icon: 'success' });
       } else {
         await createSalaryTemplate({
+          campusId,
           name: name.trim(),
           summary: summary.trim() || undefined,
           isDefault,
@@ -107,6 +115,7 @@ const SalaryTemplateFormPage: React.FC = () => {
     validate,
     isEdit,
     editId,
+    campusId,
     name,
     summary,
     isDefault,

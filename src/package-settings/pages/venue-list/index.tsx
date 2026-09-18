@@ -17,8 +17,10 @@ import { roomService } from '@/services/campus';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useCampusStore } from '@/stores/campus';
 import type { Room } from '@/types/campus';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { REFRESH_SIGNAL, consumeRefreshSignal } from '@/utils/refresh-signal';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.venue;
 
@@ -29,12 +31,18 @@ const VenueListPage: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  // 上下文键 + TTL 组合守卫：切换校区必须立刻重拉（键不同即视为过期）
+  const lastFetchKeyRef = React.useRef('');
+  const lastFetchAtRef = React.useRef<number | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const campusKey = currentCampusId || '';
       const list = await roomService.getList({ campusId: currentCampusId || undefined });
       setRooms(list);
+      lastFetchKeyRef.current = campusKey;
+      markFetched(lastFetchAtRef);
     } catch (err) {
       logError('load venue list', err);
       Taro.showToast({ title: '加载失败', icon: 'none' });
@@ -44,7 +52,17 @@ const VenueListPage: React.FC = () => {
   }, [currentCampusId]);
 
   useDidShow(() => {
-    void loadData();
+    // 列表页 TTL 守卫：写入口在子页 venue-form（保存/删除后置 REFRESH_SIGNAL.venues）；
+    // 同一校区且 TTL 内直接跳过，避免切回即全量重拉。
+    const campusKey = currentCampusId || '';
+    const force = consumeRefreshSignal(REFRESH_SIGNAL.venues);
+    const canSkip =
+      !force &&
+      campusKey === lastFetchKeyRef.current &&
+      !shouldRefetch(lastFetchAtRef.current, TTL.campus);
+    if (!canSkip) {
+      void loadData();
+    }
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       setShowIntro(hidden !== true);

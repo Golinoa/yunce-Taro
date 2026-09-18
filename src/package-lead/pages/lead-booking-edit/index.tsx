@@ -8,7 +8,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useLoad, useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import Icon from '@/components/Icon';
 import PickerSheet, { type PickerOption } from '@/components/PickerSheet';
@@ -147,6 +147,8 @@ const LeadBookingEditPage: React.FC = () => {
   const [classroomPickerVisible, setClassroomPickerVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
+  /** 首挂载去重：bookingId 就绪后下面 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   useLoad((options) => {
     const opt = options as Record<string, string>;
@@ -196,7 +198,15 @@ const LeadBookingEditPage: React.FC = () => {
     void loadBooking();
   }, [loadBooking]);
 
+  /**
+   * 预约编辑页保留每次进入必刷新（不加 TTL）：表单要靠服务端最新值回填，
+   * 用过期数据回填会覆盖他人的改动。仅挡掉首次显示这一次重复拉取。
+   */
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void loadBooking();
   });
 

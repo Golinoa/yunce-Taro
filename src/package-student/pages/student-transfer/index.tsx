@@ -1,6 +1,6 @@
 import { ScrollView, Text, View } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -39,6 +39,8 @@ const StudentTransferPage: React.FC = () => {
   const [currentClass, setCurrentClass] = useState<Class | null>(null);
   const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
   const [targetClassId, setTargetClassId] = useState('');
+  /** R2：已按该上下文（学员 ID + 账号 + 校区）拉过调班数据，避免依赖逐个确定时重复拉取 */
+  const lastTransferFetchKeyRef = useRef<string | null>(null);
 
   const selectedTargetClass = useMemo(
     () => availableClasses.find((item) => item.id === targetClassId) || null,
@@ -119,9 +121,27 @@ const StudentTransferPage: React.FC = () => {
     }
   }, [currentUserId, currentCampusId, fetchClassesByTeacher, studentId]);
 
+  /**
+   * R2 就绪闸门：调班数据依赖 studentId（路由参数）/ currentUserId（会话异步恢复）/ currentCampusId，
+   * loadData 又随这几个值换身份，直接进依赖数组会在身份确定过程中反复整页重拉
+   * （getById + 按班逐个核对成员，代价高）。这里压成一个 key：
+   * - key 为空 = 学员 ID 或登录信息未就绪 → 走原有空态 / 错误态分支（不产生请求），不套守卫以免卡在「加载中」；
+   * - key 未变 = 同一组上下文 → 只拉一次；
+   * - key 变化 = 切校区 / 换账号 → 重拉。
+   */
+  const transferFetchKey =
+    studentId && currentUserId ? `${studentId}|${currentUserId}|${currentCampusId}` : '';
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!transferFetchKey) {
+      // 依赖未齐全：沿用原有「未找到学员」「未获取到登录信息」语义，仅不产生重复请求
+      void loadData();
+      return;
+    }
+    if (lastTransferFetchKeyRef.current === transferFetchKey) return;
+    lastTransferFetchKeyRef.current = transferFetchKey;
+    void loadData();
+  }, [transferFetchKey, loadData]);
 
   const handleSubmit = useCallback(async () => {
     if (!student || !currentClass || !selectedTargetClass || submitting) {

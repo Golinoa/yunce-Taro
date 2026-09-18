@@ -31,6 +31,7 @@ const LESSON_MODE_TEXT: Record<LessonFeeMode, string> = {
   unified: '统一课时费',
   by_course: '按课程设置',
   by_attendance: '按上课人数',
+  by_person_per_lesson: '按每人每节',
   by_monthly_tier: '按月课量阶梯',
   by_perf_tier: '按业绩阶梯',
 };

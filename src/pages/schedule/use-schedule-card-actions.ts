@@ -84,6 +84,10 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
 
   const handleBookTrialByClassSuccess = useCallback(
     ({ classId, lessonDate }: { classId: string; lessonDate: string }) => {
+      // 子弹层会调用 onClose，但微信端在回调后可能仍保留父级 visible 状态；
+      // 这里同步收口父级状态，避免预约成功后弹框残留。
+      setBookSheetVisible(false);
+      setBookSheetItem(null);
       // 预约成功后本地标记该班级时段为试听，并刷新课表数据
       setTrialBookingKeys((prev) => {
         const next = new Set(prev);
@@ -92,7 +96,7 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
       });
       void loadBaseData();
     },
-    [loadBaseData, setTrialBookingKeys],
+    [loadBaseData, setBookSheetItem, setBookSheetVisible, setTrialBookingKeys],
   );
 
   /** 卡片「补录」：仅历史课且 30 天内 */

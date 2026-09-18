@@ -1,38 +1,13 @@
 /**
- * 员工拉家长临时邀请 Service
+ * 员工招生码（固定家长邀请码）Service
  *
- * - POST /teachers/me/parent-share-invites  创建 24h 临时码
- * - GET  /teachers/me/share-invite          最近待使用码 + 统计
- * - GET  /teachers/me/wxacode?inviteCode=   小程序码（可选先 create）
+ * - GET /teachers/me/share-invite  教师固定招生码 + 统计
+ * - GET /teachers/me/wxacode?inviteCode=  小程序码（传固定码）
+ *
+ * 注：旧临时码字段（latestPendingInvite/landingPath/inviteCode/wxacodeScene）与
+ *     创建接口已按已决 #2/#3 移除；固定码长期有效、可多人复用。
  */
-import { get, post } from '@/utils/request';
-
-export type ShareInviteViewStatus = 'pending' | 'expired' | 'used' | 'invalid';
-
-export interface ParentShareInviteItem {
-  id: string;
-  inviteCode: string;
-  status: string;
-  expireAt: string;
-  usedAt?: string | null;
-  usedByUserId?: string | null;
-  createdAt?: string;
-  landingPath: string;
-}
-
-export interface CreateParentShareInviteResult {
-  id: string;
-  inviteCode: string;
-  expireAt: string;
-  status: string;
-  landingPath: string;
-  organizationId: string;
-  organizationName: string;
-  campusId: string | null;
-  campusName: string | null;
-  teacherId: string;
-  teacherName: string;
-}
+import { get } from '@/utils/request';
 
 export interface MyShareInviteResult {
   teacherId: string;
@@ -41,10 +16,9 @@ export interface MyShareInviteResult {
   organizationName: string;
   campusId: string | null;
   campusName: string | null;
-  latestPendingInvite: ParentShareInviteItem | null;
-  landingPath: string | null;
-  inviteCode: string | null;
-  wxacodeScene: string | null;
+  /** 教师固定招生码（③ 类，永久有效、可多人复用） */
+  parentInviteCode: string;
+  parentInviteLandingPath: string;
   stats: { total: number; lead: number; member: number };
 }
 
@@ -57,10 +31,6 @@ export interface WxacodeResult {
 }
 
 export const parentShareInviteService = {
-  create: async (): Promise<CreateParentShareInviteResult> => {
-    return post<CreateParentShareInviteResult>('/teachers/me/parent-share-invites', {});
-  },
-
   getMyShareInvite: async (): Promise<MyShareInviteResult> => {
     return get<MyShareInviteResult>('/teachers/me/share-invite');
   },

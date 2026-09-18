@@ -4,7 +4,7 @@
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -12,6 +12,7 @@ import PageContainer from '@/components/PageContainer';
 import { lessonRecordService, studentService } from '@/services';
 import type { LessonRecord } from '@/types/lesson-record';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -44,6 +45,7 @@ const ParentLessonNotesPage: React.FC = () => {
 
   const [records, setRecords] = useState<LessonRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastNotesFetchAtRef = useRef<number | null>(null);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) {
@@ -64,6 +66,7 @@ const ParentLessonNotesPage: React.FC = () => {
           : Boolean(item.performance?.trim()),
       );
       setRecords(filtered);
+      markFetched(lastNotesFetchAtRef);
     } catch (err) {
       logError('ParentLessonNotes load', err);
       setRecords([]);
@@ -75,6 +78,12 @@ const ParentLessonNotesPage: React.FC = () => {
 
   useDidShow(() => {
     Taro.setNavigationBarTitle({ title: meta.title });
+    // 列表页 TTL 守卫：本页是家长端只读视图（课后作业 / 课堂点评），页内无写入口，
+    // 唯一子页 lesson-detail 的写操作只改课时，不影响本页展示的作业/点评字段。
+    // profile 未就绪时不打点（loadData 也直接返回），交给下一次显示拉取。
+    if (profile?.id && !shouldRefetch(lastNotesFetchAtRef.current, TTL.list)) {
+      return;
+    }
     void loadData();
   });
 

@@ -7,13 +7,14 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
+import { useCampusStore } from '@/stores/campus';
 import type { Subject } from '@/types/campus';
 
 /** 科目管理列表页 */
@@ -25,6 +26,8 @@ const SubjectManagementPage: React.FC = () => {
   // 删除确认弹窗
   const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** 首挂载去重：挂载时 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -39,7 +42,20 @@ const SubjectManagementPage: React.FC = () => {
     }
   }, []);
 
+  /**
+   * 首挂载不重复（保留每次进入必刷新）：科目表单页走 subjectService 直连、不经 store，
+   * 保存后 navigateBack，本页 useDidShow 是列表唯一的刷新通道，因此**不加 TTL**。
+   *
+   * 同时：科目写入口在本页（subject-form 直连 service，不经 store），
+   * 故每次显示都让 store 的科目 TTL 缓存过期，避免其他表单页
+   * （添加学员 / 新建课包 / 新增排课）在 TTL 窗口内读到过期的科目列表。
+   */
   useDidShow(() => {
+    useCampusStore.getState().invalidateSubjectsCache();
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void reload();
   });
 

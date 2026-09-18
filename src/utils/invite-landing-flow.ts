@@ -5,6 +5,58 @@
 
 export type TrialInviteAccessDecision = 'wait' | 'staff_blocked' | 'allow';
 
+/** 试听预约「无法预约」原因（与后端 bookingDeadline / 已开课拦截对齐） */
+export type TrialInviteBookingClosedReason =
+  | 'lesson_expired'
+  | 'lesson_started'
+  | 'booking_deadline';
+
+/**
+ * 统一计算「无法预约」状态：达禁止时间 / 已下课 / 开课中。
+ * 纯函数，无 Taro / React 副作用。now 默认取调用时刻。
+ */
+export function resolveTrialInviteBookingClosed(params: {
+  date?: string;
+  start?: string;
+  end?: string;
+  bookingDeadlineEnabled: boolean;
+  bookingDeadlineMinutes: number;
+  now?: Date;
+}): { closed: boolean; reason: TrialInviteBookingClosedReason | null } {
+  const now = params.now ?? new Date();
+
+  // 已下课：now 晚于结束时刻
+  if (params.date && params.end) {
+    const endAt = new Date(
+      `${params.date} ${params.end.length === 5 ? `${params.end}:00` : params.end}`,
+    );
+    if (!Number.isNaN(endAt.getTime()) && now > endAt) {
+      return { closed: true, reason: 'lesson_expired' };
+    }
+  }
+
+  if (!params.date || !params.start) return { closed: false, reason: null };
+  const startAt = new Date(
+    `${params.date} ${params.start.length === 5 ? `${params.start}:00` : params.start}`,
+  );
+  if (Number.isNaN(startAt.getTime())) return { closed: false, reason: null };
+
+  // 已开课 / 开课中：now 晚于或等于开课时刻
+  if (now >= startAt) {
+    return { closed: true, reason: 'lesson_started' };
+  }
+
+  // 达预约截止时间：now 晚于（开课时刻 - 截止分钟数）
+  if (
+    params.bookingDeadlineEnabled &&
+    now.getTime() > startAt.getTime() - params.bookingDeadlineMinutes * 60_000
+  ) {
+    return { closed: true, reason: 'booking_deadline' };
+  }
+
+  return { closed: false, reason: null };
+}
+
 /** 机构端不可访问家长邀约落地（guest=1 仅 Mock 强制访客演示） */
 export function resolveTrialInviteAccess(input: {
   authLoading: boolean;
@@ -21,7 +73,7 @@ export type TrialInviteBootstrapKind =
   | 'wait'
   | 'login_required'
   | 'restore_success'
-  | 'lesson_expired'
+  | 'booking_closed'
   | 'ready';
 
 export interface TrialInviteBootstrapInput {
@@ -34,10 +86,11 @@ export interface TrialInviteBootstrapInput {
   /** 已登录且非 guest */
   loggedIn: boolean;
   hasSuccessRecord: boolean;
-  lessonExpired: boolean;
+  /** 达禁止时间 / 已下课 / 开课中 → 无法预约 */
+  bookingClosed: boolean;
 }
 
-/** 首屏 bootstrap：登录门 / 已预约成功 / 过期跳过领券 / 待领券 */
+/** 首屏 bootstrap：登录门 / 已预约成功 / 无法预约跳过领券 / 待领券 */
 export function resolveTrialInviteBootstrap(
   input: TrialInviteBootstrapInput,
 ): TrialInviteBootstrapKind {
@@ -46,11 +99,11 @@ export function resolveTrialInviteBootstrap(
   if (input.bootstrapped) return 'wait';
   if (!input.loggedIn && !input.guest) return 'login_required';
   if (input.hasSuccessRecord) return 'restore_success';
-  if (input.lessonExpired) return 'lesson_expired';
+  if (input.bookingClosed) return 'booking_closed';
   return 'ready';
 }
 
-export type TrialInviteLoginCatchupKind = 'noop' | 'lesson_expired' | 'reveal_voucher';
+export type TrialInviteLoginCatchupKind = 'noop' | 'booking_closed' | 'reveal_voucher';
 
 /** 登录成功后若尚未进入主流程，补一次 bootstrap */
 export function resolveTrialInviteLoginCatchup(input: {
@@ -65,7 +118,7 @@ export function resolveTrialInviteLoginCatchup(input: {
   claimed: boolean;
   showForm: boolean;
   showVoucher: boolean;
-  lessonExpired: boolean;
+  bookingClosed: boolean;
 }): TrialInviteLoginCatchupKind {
   if (input.authLoading || !input.paramsReady || input.staffBlocked || !input.bootstrapped) {
     return 'noop';
@@ -73,29 +126,29 @@ export function resolveTrialInviteLoginCatchup(input: {
   if (input.isStaff && !input.guest) return 'noop';
   if (!input.loggedIn) return 'noop';
   if (input.success || input.claimed || input.showForm) return 'noop';
-  if (input.lessonExpired) return 'lesson_expired';
+  if (input.bookingClosed) return 'booking_closed';
   if (!input.showVoucher && !input.claimed) return 'reveal_voucher';
   return 'noop';
 }
 
-export type TrialInviteBookNext = 'ignore_expired' | 'need_login' | 'open_form';
+export type TrialInviteBookNext = 'ignore_closed' | 'need_login' | 'open_form';
 
 export function resolveTrialInviteBookNext(input: {
-  lessonExpired: boolean;
+  bookingClosed: boolean;
   loggedIn: boolean;
 }): TrialInviteBookNext {
-  if (input.lessonExpired) return 'ignore_expired';
+  if (input.bookingClosed) return 'ignore_closed';
   if (!input.loggedIn) return 'need_login';
   return 'open_form';
 }
 
-export type TrialInvitePostLoginNext = 'lesson_expired' | 'open_form' | 'show_voucher';
+export type TrialInvitePostLoginNext = 'booking_closed' | 'open_form' | 'show_voucher';
 
 export function resolveTrialInvitePostLoginNext(input: {
-  lessonExpired: boolean;
+  bookingClosed: boolean;
   openFormAfterLogin: boolean;
 }): TrialInvitePostLoginNext {
-  if (input.lessonExpired) return 'lesson_expired';
+  if (input.bookingClosed) return 'booking_closed';
   if (input.openFormAfterLogin) return 'open_form';
   return 'show_voucher';
 }
@@ -126,29 +179,35 @@ export type TrialInviteDockAction = 'hidden' | 'call_campus' | 'contact_teacher'
 
 export function resolveTrialInviteDockAction(input: {
   claimed: boolean;
-  lessonExpired: boolean;
+  bookingClosed: boolean;
   hasCampusPhone: boolean;
 }): TrialInviteDockAction {
   if (!input.claimed) return 'hidden';
-  if (input.lessonExpired) {
+  if (input.bookingClosed) {
     return input.hasCampusPhone ? 'call_campus' : 'contact_teacher';
   }
   return 'book_now';
 }
 
 export function resolveTrialInviteMainCopy(input: {
-  lessonExpired: boolean;
+  bookingClosedReason?: TrialInviteBookingClosedReason | null;
   claimed: boolean;
   isGroupBook: boolean;
   teacherName: string;
   campusPhone?: string;
 }): { title: string; subtitle: string } {
-  if (input.lessonExpired) {
+  if (input.bookingClosedReason) {
     const teacherPart = input.teacherName ? `老师「${input.teacherName}」` : '老师';
     const phonePart = input.campusPhone ? '，也可直接电话联系校区' : '';
+    const title =
+      input.bookingClosedReason === 'lesson_expired'
+        ? '本场课程已结束'
+        : input.bookingClosedReason === 'lesson_started'
+          ? '本场试听已开始'
+          : '已超过预约截止时间';
     return {
-      title: '本场课程已结束',
-      subtitle: `这场课已经上过了，无法再预约该时段。请联系${teacherPart}重新安排试听时间${phonePart}。`,
+      title,
+      subtitle: `这场课无法再预约。请联系${teacherPart}重新安排试听时间${phonePart}。`,
     };
   }
   if (input.claimed) {

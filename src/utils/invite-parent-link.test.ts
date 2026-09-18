@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildTeacherInvitePath,
   consumePendingInviteCode,
   consumeShareAttached,
   copyParentInviteLink,
-  copyTeacherInviteLink,
   getPendingInviteCode,
   hasPendingInviteCode,
   markShareAttached,
@@ -13,23 +11,15 @@ import {
   storePendingInviteCode,
 } from './invite-parent-link';
 
-const {
-  setClipboardData,
-  showToast,
-  post,
-  setStorageSync,
-  getStorageSync,
-  removeStorageSync,
-  parentShareCreate,
-} = vi.hoisted(() => ({
-  setClipboardData: vi.fn().mockResolvedValue({}),
-  showToast: vi.fn(),
-  post: vi.fn(),
-  setStorageSync: vi.fn(),
-  getStorageSync: vi.fn(),
-  removeStorageSync: vi.fn(),
-  parentShareCreate: vi.fn(),
-}));
+const { setClipboardData, showToast, post, setStorageSync, getStorageSync, removeStorageSync } =
+  vi.hoisted(() => ({
+    setClipboardData: vi.fn().mockResolvedValue({}),
+    showToast: vi.fn(),
+    post: vi.fn(),
+    setStorageSync: vi.fn(),
+    getStorageSync: vi.fn(),
+    removeStorageSync: vi.fn(),
+  }));
 
 vi.mock('@tarojs/taro', () => ({
   default: {
@@ -48,12 +38,6 @@ vi.mock('@/utils/request', () => ({
   del: vi.fn(),
 }));
 
-vi.mock('@/services/parent-share-invite', () => ({
-  parentShareInviteService: {
-    create: parentShareCreate,
-  },
-}));
-
 describe('invite-parent-link', () => {
   beforeEach(() => {
     setClipboardData.mockClear();
@@ -62,11 +46,6 @@ describe('invite-parent-link', () => {
     setStorageSync.mockClear();
     getStorageSync.mockReset();
     removeStorageSync.mockClear();
-    parentShareCreate.mockReset();
-    parentShareCreate.mockResolvedValue({
-      inviteCode: 'PABC12345',
-      landingPath: '/package-auth/pages/invite-register/index?code=PABC12345',
-    });
   });
 
   it('normalizeInviteCodeParam：trim/大写并剥 TEACHERCODE=/CODE= 前缀', () => {
@@ -74,42 +53,6 @@ describe('invite-parent-link', () => {
     expect(normalizeInviteCodeParam('TEACHERCODE=xyz9')).toBe('XYZ9');
     expect(normalizeInviteCodeParam('code:abc')).toBe('ABC');
     expect(normalizeInviteCodeParam('')).toBe('');
-  });
-
-  it('buildTeacherInvitePath 指向 invite-register 直链（code 参数）', () => {
-    expect(buildTeacherInvitePath('pabc-123')).toBe(
-      '/package-auth/pages/invite-register/index?code=PABC-123',
-    );
-  });
-
-  it('编码往返：特殊字符 encode/decode 一致', () => {
-    const path = buildTeacherInvitePath('p@1/二');
-    const encoded = path.split('code=')[1];
-    expect(decodeURIComponent(encoded)).toBe('P@1/二');
-  });
-
-  it('copyTeacherInviteLink 先创建临时码再复制直链', async () => {
-    await copyTeacherInviteLink();
-    expect(parentShareCreate).toHaveBeenCalled();
-    expect(setClipboardData).toHaveBeenCalledWith({
-      data: '/package-auth/pages/invite-register/index?code=PABC12345',
-    });
-    expect(showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: expect.stringContaining('邀请链接已复制') }),
-    );
-  });
-
-  it('copyTeacherInviteLink：无 landingPath/inviteCode → 失败 toast', async () => {
-    parentShareCreate.mockResolvedValueOnce({});
-    await copyTeacherInviteLink();
-    expect(setClipboardData).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ title: '生成邀请链接失败' }));
-  });
-
-  it('copyTeacherInviteLink：create 抛错 → 失败 toast', async () => {
-    parentShareCreate.mockRejectedValueOnce(new Error('network'));
-    await copyTeacherInviteLink();
-    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ title: '生成邀请链接失败' }));
   });
 
   it('copyParentInviteLink 复制家长绑定链接', async () => {

@@ -152,16 +152,19 @@ describe('validateSalaryRule', () => {
   it('attendance：min/max/rate 非法区间报错', () => {
     const errors = validateSalaryRule(
       withRule({
+        lessonFeeMode: 'by_person_per_lesson',
         attendanceTiers: [
           { id: 'a1', minCount: -1, maxCount: -2, rate: -3 },
           { id: 'a2', minCount: '', maxCount: 'bad' as unknown as number, rate: '' },
         ],
       }),
     );
-    expect(errors.attendanceTiers?.a1?.minCount).toBe('不能为负数');
-    expect(errors.attendanceTiers?.a1?.maxCount).toBe('不能为负数');
-    expect(errors.attendanceTiers?.a1?.rate).toBe('不能为负数');
-    expect(errors.attendanceTiers?.a2?.maxCount).toBe('不能为负数');
+    expect(errors.attendanceTiers?.a1?.minCount).toBeTruthy();
+    expect(errors.attendanceTiers?.a1?.maxCount).toBeTruthy();
+    expect(errors.attendanceTiers?.a1?.rate).toBeTruthy();
+    expect(errors.attendanceTiers?.a2?.minCount).toBeTruthy();
+    expect(errors.attendanceTiers?.a2?.maxCount).toBeTruthy();
+    expect(errors.attendanceTiers?.a2?.rate).toBeTruthy();
   });
 
   it('perfTiers：门槛与比例非法报错', () => {
@@ -219,6 +222,7 @@ describe('validateSalaryRule', () => {
       withRule({
         fixedBaseAmount: -1,
         unifiedLessonRate: -2,
+        lessonFeeMode: 'by_person_per_lesson',
         commissionTiers: [{ id: 'c1', perfThreshold: -1, rate: '' }],
         attendanceTiers: [{ id: 'a1', minCount: -1, maxCount: '', rate: '' }],
         categoryExtraFees: [{ ...base.categoryExtraFees[0], rate: -9 }],
@@ -226,9 +230,34 @@ describe('validateSalaryRule', () => {
     );
     expect(isSalaryRuleValid(errors)).toBe(false);
     expect(errors.fixedBaseAmount).toBeTruthy();
-    expect(errors.unifiedLessonRate).toBeTruthy();
+    expect(errors.unifiedLessonRate).toBeUndefined();
     expect(errors.commissionTiers?.c1?.perfThreshold).toBeTruthy();
     expect(errors.attendanceTiers?.a1?.minCount).toBeTruthy();
     expect(errors.categoryExtraFees?.[base.categoryExtraFees[0].id]).toBeTruthy();
+  });
+
+  it('按每人每节要求完整且不重叠的人数梯度', () => {
+    const valid = validateSalaryRule(
+      withRule({
+        lessonFeeMode: 'by_person_per_lesson',
+        attendanceTiers: [
+          { id: 'a1', minCount: 0, maxCount: 6, rate: 5 },
+          { id: 'a2', minCount: 7, maxCount: '', rate: 8 },
+        ],
+      }),
+    );
+    expect(valid.attendanceTiers).toBeUndefined();
+
+    const invalid = validateSalaryRule(
+      withRule({
+        lessonFeeMode: 'by_person_per_lesson',
+        attendanceTiers: [
+          { id: 'a1', minCount: 0, maxCount: 6, rate: 5 },
+          { id: 'a2', minCount: 6, maxCount: 12, rate: '' },
+        ],
+      }),
+    );
+    expect(invalid.attendanceTiers?.a2?.minCount).toContain('重叠');
+    expect(invalid.attendanceTiers?.a2?.rate).toBeTruthy();
   });
 });

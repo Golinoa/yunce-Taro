@@ -165,9 +165,20 @@ const CourseManagementPage: React.FC = () => {
     }
   }, []);
 
-  const handleEdit = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-course/pages/course-form/index?id=${id}` });
-  }, []);
+  const handleEdit = useCallback(
+    (id: string) => {
+      const categoryId = activeCategoryId || activeCategoryItem?.id || '';
+      const query = [
+        `id=${encodeURIComponent(id)}`,
+        'mode=course',
+        categoryId ? `categoryId=${encodeURIComponent(categoryId)}` : '',
+      ]
+        .filter(Boolean)
+        .join('&');
+      Taro.navigateTo({ url: `/package-course/pages/course-form/index?${query}` });
+    },
+    [activeCategoryId, activeCategoryItem?.id],
+  );
 
   const handleCourseLongPress = useCallback(
     (template: CourseTemplate) => {
@@ -317,7 +328,7 @@ const CourseManagementPage: React.FC = () => {
                       className="bg-card rounded-[24rpx] px-[32rpx] py-[28rpx] flex flex-row items-center justify-between press-bg shadow-card"
                       onClick={() =>
                         Taro.navigateTo({
-                          url: `/package-course/pages/course-form/index?id=${encodeURIComponent(cls.id)}&type=class`,
+                          url: `/package-course/pages/course-form/index?id=${encodeURIComponent(cls.id)}&mode=class${activeCategoryId ? `&categoryId=${encodeURIComponent(activeCategoryId)}` : ''}`,
                         })
                       }
                     >

@@ -147,6 +147,8 @@ export function mapBackendTeacherToUI(raw: RawRecord, modelIdx = 0): TeacherUIMo
     rate: num(salaryModel?.rate),
     attend: num(salaryModel?.attend),
     perf: num(salaryModel?.perf),
+    salaryRule: salaryModel?.rules as TeacherUIModel['salaryRule'],
+    salaryTemplateId: str(raw.salaryTemplateId ?? raw.salary_template_id),
     salaryStatus:
       selectedSalaryRecord?.status ??
       (selectedSalaryRecord === null
@@ -179,6 +181,7 @@ export function mapBackendSalaryTemplate(raw: RawRecord): SalaryTemplate {
   const rules = (raw.rules ?? raw.config ?? {}) as SalaryTemplate['config'];
   return {
     id: String(raw.id ?? ''),
+    campusId: str(raw.campusId ?? raw.campus_id),
     name: String(raw.name ?? ''),
     summary: str(raw.summary),
     isDefault: Boolean(raw.isDefault ?? raw.is_default),

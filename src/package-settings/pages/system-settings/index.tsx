@@ -31,6 +31,7 @@ import {
   getCalendarSyncSettings,
   isCalendarSyncEnabled,
 } from '@/utils/calendar-sync-settings';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { getDisplayAppVersion } from '@/utils/mini-program-env';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import {
@@ -59,19 +60,33 @@ const SystemSettings: React.FC = () => {
   /** 请假自动审批开关（仅校长/管理员可见，null=未加载） */
   const [leaveAutoApprove, setLeaveAutoApprove] = useState<boolean | null>(null);
   const [leaveAutoApproveLoading, setLeaveAutoApproveLoading] = useState(false);
+  // 上下文键 + TTL 组合守卫：切换账号/校区/角色必须立刻重拉（键不同即视为过期）
+  const lastSettingsFetchKeyRef = React.useRef('');
+  const lastSettingsFetchAtRef = React.useRef<number | null>(null);
 
   // 页面显示时读取最新开关状态
   useDidShow(() => {
     setVenueBookingEnabledState(getVenueBookingEnabled());
+    if (currentUserId) {
+      setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
+    }
+    const campusId = profile?.currentContext?.campusId;
+    // 设置页 TTL 守卫：本页展示的 3 项远端值（场地预约开关 / 校区预警阈值 / 请假自动审批）
+    // 都可在页内或同级设置页改动，窗口内切回跳过重复拉取；页内改动走各自的就地更新。
+    const fetchKey = `${currentUserId}|${campusId || ''}|${isManagerRole ? 'm' : 'n'}`;
+    if (
+      fetchKey === lastSettingsFetchKeyRef.current &&
+      !shouldRefetch(lastSettingsFetchAtRef.current, TTL.tab)
+    ) {
+      return;
+    }
+    lastSettingsFetchKeyRef.current = fetchKey;
+    markFetched(lastSettingsFetchAtRef);
     if (isManagerRole) {
       void fetchVenueBookingEnabled()
         .then(setVenueBookingEnabledState)
         .catch(() => undefined);
     }
-    if (currentUserId) {
-      setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
-    }
-    const campusId = profile?.currentContext?.campusId;
     if (campusId) {
       void campusService
         .getById(campusId)

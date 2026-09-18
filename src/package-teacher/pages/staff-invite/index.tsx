@@ -1,24 +1,26 @@
 /**
  * 员工邀请页：生成临时 E 码；支持点对点绑定（?teacherId=）
  */
-import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, useRouter } from '@tarojs/taro';
+import { Button, View, Text, ScrollView } from '@tarojs/components';
+import Taro, { useDidShow, useRouter, useShareAppMessage } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ActionButton from '@/components/ActionButton';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
+import { teacherService } from '@/services';
 import { campusService } from '@/services/campus';
 import {
   campusInviteService,
+  resolvePointToPointRoleCode,
   type CampusInviteItem,
   type CampusInviteRoleCode,
   type CreateCampusInviteResult,
 } from '@/services/campus-invite';
 import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useAuth } from '@/utils/auth';
-import { copyCampusInviteLink } from '@/utils/invite-staff-link';
+import { buildCampusInvitePath, copyCampusInviteLink } from '@/utils/invite-staff-link';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const EXPIRE_MINUTES = 24 * 60;
@@ -62,19 +64,29 @@ const StaffInvitePage: React.FC = () => {
 
   const [campusId, setCampusId] = useState('');
   const [campusName, setCampusName] = useState('');
+  const [targetTeacherName, setTargetTeacherName] = useState('');
   const [roleCode, setRoleCode] = useState<CampusInviteRoleCode>('campus_principal');
+  const autoCreateStartedRef = React.useRef(false);
   const [creating, setCreating] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [invites, setInvites] = useState<CampusInviteItem[]>([]);
   const [latest, setLatest] = useState<CreateCampusInviteResult | null>(null);
 
   const loadContext = useCallback(async () => {
-    const campuses = await campusService.getList();
+    const [campuses, targetTeacher] = await Promise.all([
+      campusService.getList(),
+      isPointToPoint ? teacherService.getById(targetTeacherId) : Promise.resolve(null),
+    ]);
     const currentId = profile?.currentContext?.campusId || campuses[0]?.id || '';
     const current = campuses.find((c) => c.id === currentId) || campuses[0];
     setCampusId(current?.id || '');
     setCampusName(current?.name || '未选择校区');
-  }, [profile?.currentContext?.campusId]);
+    if (isPointToPoint) {
+      if (!targetTeacher) throw new Error('员工资料不存在');
+      setTargetTeacherName(targetTeacher.name);
+      setRoleCode(resolvePointToPointRoleCode(targetTeacher.identity));
+    }
+  }, [profile?.currentContext?.campusId, isPointToPoint, targetTeacherId]);
 
   const loadInvites = useCallback(async () => {
     setLoadingList(true);
@@ -94,7 +106,12 @@ const StaffInvitePage: React.FC = () => {
 
   useDidShow(() => {
     void loadTitles();
-    void loadContext();
+    void loadContext().catch((error) => {
+      Taro.showToast({
+        title: error instanceof Error ? error.message : '员工资料加载失败',
+        icon: 'none',
+      });
+    });
     void loadInvites();
   });
 
@@ -124,6 +141,32 @@ const StaffInvitePage: React.FC = () => {
       setCreating(false);
     }
   }, [campusId, creating, roleCode, loadInvites, isPointToPoint, targetTeacherId]);
+
+  useEffect(() => {
+    if (
+      !isPointToPoint ||
+      !campusId ||
+      !targetTeacherName ||
+      loadingList ||
+      autoCreateStartedRef.current
+    ) {
+      return;
+    }
+    const existing = invites[0];
+    if (existing) {
+      setLatest(existing);
+      return;
+    }
+    autoCreateStartedRef.current = true;
+    void handleCreate();
+  }, [campusId, handleCreate, invites, isPointToPoint, loadingList, targetTeacherName]);
+
+  useShareAppMessage(() => ({
+    title: `请${targetTeacherName || '员工'}绑定微信，加入${campusName || '门店'}`,
+    path: latest?.inviteCode
+      ? buildCampusInvitePath(latest.inviteCode).replace(/^\//, '')
+      : 'pages/index/index',
+  }));
 
   const handleCopyLink = useCallback(async (code: string) => {
     await copyCampusInviteLink(code);
@@ -167,28 +210,44 @@ const StaffInvitePage: React.FC = () => {
           <Text className="text-[26rpx] text-muted-foreground">{campusName || '加载中...'}</Text>
         </View>
 
-        <View className="bg-card rounded-[24rpx] p-[28rpx] border border-border mb-[24rpx]">
-          <Text className="text-[28rpx] font-semibold text-foreground block mb-[20rpx]">
-            邀请角色
-          </Text>
-          <View className="flex flex-col gap-[16rpx]">
-            {ROLE_OPTIONS.map((opt) => (
-              <View
-                key={opt.code}
-                className={cn(
-                  'rounded-[20rpx] px-[24rpx] py-[20rpx] border-2',
-                  roleCode === opt.code ? 'border-primary bg-primary/5' : 'border-border',
-                )}
-                onClick={() => setRoleCode(opt.code)}
-              >
-                <Text className="text-[30rpx] font-medium text-foreground block">{opt.label}</Text>
-                <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
-                  {opt.desc}
-                </Text>
-              </View>
-            ))}
+        {isPointToPoint ? (
+          <View className="bg-card rounded-[24rpx] p-[28rpx] border border-border mb-[24rpx]">
+            <Text className="text-[28rpx] font-semibold text-foreground block mb-[12rpx]">
+              绑定员工
+            </Text>
+            <Text className="text-[30rpx] text-foreground block">
+              {targetTeacherName || '加载中...'}
+            </Text>
+            <Text className="text-[24rpx] text-muted-foreground mt-[8rpx] block">
+              身份取自已创建的员工资料，无需再次选择
+            </Text>
           </View>
-        </View>
+        ) : (
+          <View className="bg-card rounded-[24rpx] p-[28rpx] border border-border mb-[24rpx]">
+            <Text className="text-[28rpx] font-semibold text-foreground block mb-[20rpx]">
+              邀请角色
+            </Text>
+            <View className="flex flex-col gap-[16rpx]">
+              {ROLE_OPTIONS.map((opt) => (
+                <View
+                  key={opt.code}
+                  className={cn(
+                    'rounded-[20rpx] px-[24rpx] py-[20rpx] border-2',
+                    roleCode === opt.code ? 'border-primary bg-primary/5' : 'border-border',
+                  )}
+                  onClick={() => setRoleCode(opt.code)}
+                >
+                  <Text className="text-[30rpx] font-medium text-foreground block">
+                    {opt.label}
+                  </Text>
+                  <Text className="text-[24rpx] text-muted-foreground mt-[6rpx] block">
+                    {opt.desc}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View className="bg-card rounded-[24rpx] p-[28rpx] border border-border mb-[24rpx]">
           <Text className="text-[28rpx] font-semibold text-foreground block mb-[12rpx]">
@@ -199,11 +258,20 @@ const StaffInvitePage: React.FC = () => {
           </Text>
         </View>
 
-        <ActionButton
-          text={creating ? '生成中...' : isPointToPoint ? '生成绑定邀请码' : '生成邀请码'}
-          onClick={handleCreate}
-          disabled={creating || !campusId || (isPointToPoint && !targetTeacherId)}
-        />
+        {isPointToPoint && displayCode ? (
+          <Button
+            openType="share"
+            className="h-[92rpx] rounded-[28rpx] bg-primary center press-scale m-0 p-0 leading-none after:border-none"
+          >
+            <Text className="text-[30rpx] font-semibold text-white">直接分享绑定卡片</Text>
+          </Button>
+        ) : (
+          <ActionButton
+            text={creating ? '生成中...' : isPointToPoint ? '生成绑定卡片' : '生成邀请码'}
+            onClick={handleCreate}
+            disabled={creating || !campusId || (isPointToPoint && !targetTeacherId)}
+          />
+        )}
 
         {displayCode ? (
           <View className="bg-primary/10 rounded-[24rpx] p-[28rpx] mt-[24rpx] border border-primary/20">

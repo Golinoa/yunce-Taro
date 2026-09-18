@@ -10,13 +10,8 @@ import {
 } from 'react';
 import { type ScheduleItem, buildInstallmentSchedule } from '@/components/InstallmentPanel';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import {
-  studentService,
-  packageService,
-  subjectService,
-  subscribeMessageService,
-} from '@/services';
-import { useStudentStore, usePackageTemplateStore } from '@/stores';
+import { studentService, packageService, subscribeMessageService } from '@/services';
+import { useCampusStore, useStudentStore, usePackageTemplateStore } from '@/stores';
 import type { Subject } from '@/types/campus';
 import type { CoursePackageTemplate, FeeMethod } from '@/types/course-package';
 import type { Student } from '@/types/student';
@@ -45,6 +40,7 @@ export function usePackageForm() {
   const fetchStudentsByTeacher = useStudentStore((state) => state.fetchByTeacher);
   const invalidateStudents = useStudentStore((state) => state.invalidate);
   const fetchPackageTemplatesByTeacher = usePackageTemplateStore((state) => state.fetchByTeacher);
+  const fetchSubjects = useCampusStore((state) => state.fetchSubjects);
 
   const params = useMemo(() => {
     const instance = Taro.getCurrentInstance();
@@ -211,8 +207,14 @@ export function usePackageForm() {
         setStudents(stuList);
         setTemplates(tplList);
 
-        // 加载科目列表
-        const subjectList = await subjectService.getList();
+        // 加载科目列表：低频参照数据走 campus store 的 TTL（TTL.list），
+        // 未过期时进页不再重复请求；切校区/切机构由 resetDomainCaches 复位。
+        await fetchSubjects();
+        const subjectList = useCampusStore.getState().subjects;
+        if (!useCampusStore.getState().lastSubjectsFetchAt) {
+          // 从未成功拉取（首次失败）→ 保留原「初始化失败」错误态
+          throw new Error('科目参照数据加载失败');
+        }
         setSubjects(subjectList);
 
         if (isEdit && packageId) {
@@ -277,6 +279,7 @@ export function usePackageForm() {
     currentUserId,
     fetchStudentsByTeacher,
     fetchPackageTemplatesByTeacher,
+    fetchSubjects,
     initStartAtRef,
   ]);
 

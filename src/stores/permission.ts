@@ -18,6 +18,7 @@ import {
   type DataScope,
   type PermissionConfig,
 } from '@/types/permission';
+import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 
 /** 可被管理员编辑的系统角色（admin 自身为全量，parent 为只读绑定） */
@@ -27,8 +28,10 @@ export type EditableSystemRole = (typeof EDITABLE_SYSTEM_ROLES)[number];
 interface PermissionState {
   config: PermissionConfig;
   loaded: boolean;
-  /** 从服务端拉取配置并写入本地缓存 */
-  load: () => Promise<void>;
+  /** 上次成功从服务端拉取的时间戳（TTL 节流用） */
+  lastLoadAt: number;
+  /** 从服务端拉取配置并写入本地缓存（force 跳过 TTL 节流） */
+  load: (force?: boolean) => Promise<void>;
   /** 更新某角色（系统角色或自定义角色）的授权 */
   updateGrant: (key: string, grant: { scope: DataScope; modules: DataModule[] }) => void;
   /** 新建自定义角色 */
@@ -50,13 +53,21 @@ interface PermissionState {
 export const usePermissionStore = create<PermissionState>((set, get) => ({
   config: getPermissionConfig(),
   loaded: false,
+  lastLoadAt: 0,
 
-  load: async () => {
+  load: async (force = false) => {
+    // TTL 守卫：角色权限页每次切回都会调用 load()，窗口内不重复打库；
+    // 409 版本冲突后的强制刷新走 load(true)。
+    const { lastLoadAt } = get();
+    const now = Date.now();
+    if (!force && lastLoadAt > 0 && now - lastLoadAt < TTL.list) {
+      return;
+    }
     try {
-      set({ config: await fetchPermissionConfig(), loaded: true });
+      set({ config: await fetchPermissionConfig(), loaded: true, lastLoadAt: now });
     } catch (err) {
       logError('permissionStore.load', err);
-      // 拉取失败时回退本地缓存，不阻塞页面
+      // 拉取失败时回退本地缓存，不阻塞页面（不更新节流时间戳，下次进页重试）
       set({ config: getPermissionConfig(), loaded: true });
     }
   },
@@ -125,7 +136,8 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
   save: async () => {
     try {
       const saved = await savePermissionConfig(get().config);
-      set({ config: saved });
+      // 写后即为服务端最新值，同步打点避免下次进页无谓重拉
+      set({ config: saved, lastLoadAt: Date.now() });
       return saved;
     } catch (err) {
       logError('permissionStore.save', err);

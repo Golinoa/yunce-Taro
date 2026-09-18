@@ -108,6 +108,7 @@ const CampusSettings: React.FC = () => {
   /** 标记表单是否已初始化，避免 useEffect 反复覆盖用户输入 */
   const formInitializedRef = React.useRef(false);
   const hasChangedRef = React.useRef(false);
+  const mediaPickerActiveRef = React.useRef(false);
 
   const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.campus;
 
@@ -159,13 +160,15 @@ const CampusSettings: React.FC = () => {
   );
 
   Taro.useDidShow(() => {
-    void (async () => {
-      await fetchCampuses(true);
-      // 无未保存改动时用服务端数据回填（含标签）；避免选图触发 didShow 冲掉编辑
-      if (!hasChangedRef.current) {
-        formInitializedRef.current = false;
-      }
-    })();
+    if (!mediaPickerActiveRef.current) {
+      void (async () => {
+        // 正常返回页面时先允许服务端数据回填；微信选图返回时整段跳过。
+        if (!hasChangedRef.current) {
+          formInitializedRef.current = false;
+        }
+        await fetchCampuses(true);
+      })();
+    }
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       setShowIntro(hidden !== true);
@@ -173,6 +176,14 @@ const CampusSettings: React.FC = () => {
       setShowIntro(true);
     }
   });
+
+  const handleMediaChooseStart = useCallback(() => {
+    mediaPickerActiveRef.current = true;
+  }, []);
+
+  const handleMediaChooseEnd = useCallback(() => {
+    mediaPickerActiveRef.current = false;
+  }, []);
 
   /** 更新单个字段 */
   const updateField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -608,6 +619,8 @@ const CampusSettings: React.FC = () => {
               layout="square"
               squareSizeRpx={160}
               maxSizeMB={5}
+              onChooseStart={handleMediaChooseStart}
+              onChooseEnd={handleMediaChooseEnd}
               onChange={(value) => updateField('logo', value)}
             />
           </View>
@@ -621,6 +634,8 @@ const CampusSettings: React.FC = () => {
               subtitle="750×420 横图效果最佳"
               layout="fullWidth"
               maxSizeMB={5}
+              onChooseStart={handleMediaChooseStart}
+              onChooseEnd={handleMediaChooseEnd}
               onChange={(value) => {
                 const next = [...form.venueImages];
                 if (value) {
@@ -647,6 +662,8 @@ const CampusSettings: React.FC = () => {
                   layout="square"
                   squareSizeRpx={200}
                   maxSizeMB={5}
+                  onChooseStart={handleMediaChooseStart}
+                  onChooseEnd={handleMediaChooseEnd}
                   onChange={(value) => {
                     const next = [...form.venueImages];
                     const realIdx = index + 1;
@@ -665,6 +682,8 @@ const CampusSettings: React.FC = () => {
                   layout="square"
                   squareSizeRpx={200}
                   maxSizeMB={5}
+                  onChooseStart={handleMediaChooseStart}
+                  onChooseEnd={handleMediaChooseEnd}
                   onChange={(value) => {
                     if (value) {
                       updateField('venueImages', [...form.venueImages, value]);

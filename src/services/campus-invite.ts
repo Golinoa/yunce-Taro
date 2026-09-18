@@ -89,6 +89,12 @@ const ROLE_LABEL: Record<CampusInviteRoleCode, string> = {
   campus_reception: '前台',
 };
 
+export function resolvePointToPointRoleCode(identity?: string): CampusInviteRoleCode {
+  if (identity === 'principal') return 'campus_principal';
+  if (identity === 'reception') return 'campus_reception';
+  return 'campus_teacher';
+}
+
 export function campusInviteRoleLabel(
   code: CampusInviteRoleCode,
   managerTitle = DEFAULT_ROLE_TITLES.manager,
@@ -135,7 +141,7 @@ export function buildPointToPointInvitePayload(input: {
   return {
     campusId: input.campusId,
     targetTeacherId: input.teacherId,
-    roleCode: input.roleCode ?? 'campus_principal',
+    roleCode: input.roleCode ?? 'campus_teacher',
     expireMinutes: input.expireMinutes ?? 24 * 60,
   };
 }

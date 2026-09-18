@@ -247,8 +247,10 @@ const SalaryRuleEditor: React.FC<SalaryRuleEditorProps> = ({
             />
           )}
 
-          {value.lessonFeeMode === 'by_attendance' && (
+          {(value.lessonFeeMode === 'by_attendance' ||
+            value.lessonFeeMode === 'by_person_per_lesson') && (
             <AttendanceTierEditor
+              perPerson={value.lessonFeeMode === 'by_person_per_lesson'}
               tiers={value.attendanceTiers}
               errors={errors.attendanceTiers}
               onChange={updateAttendanceTier}

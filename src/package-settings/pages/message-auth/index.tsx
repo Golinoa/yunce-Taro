@@ -6,6 +6,7 @@ import PageContainer from '@/components/PageContainer';
 import { SUBSCRIBE_GROUP_LABELS, SUBSCRIBE_TEMPLATE_GROUPS } from '@/constants/subscribe-presets';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { SubscribeQuotaDto, SubscribeTemplateGroup } from '@/types/subscribe-message';
+import { TTL, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -26,11 +27,11 @@ const MessageAuthPage: React.FC = () => {
 
   const load = useCallback(async (force = false) => {
     if (loadingRef.current) return;
-    const now = Date.now();
-    // Debounce re-entry jitter when navigating back within 1.5s
-    if (!force && now - lastLoadAtRef.current < 1500) return;
+    // 配额页 TTL 守卫（TTL.quota：配额类短窗口）：窗口内重复进出不再重拉；
+    // force（授权成功后 / 手动刷新）不受 TTL 限制。
+    if (!force && !shouldRefetch(lastLoadAtRef.current, TTL.quota)) return;
     loadingRef.current = true;
-    lastLoadAtRef.current = now;
+    lastLoadAtRef.current = Date.now();
     setLoading(true);
     try {
       const data = await subscribeMessageService.bootstrap(undefined, undefined, { force: true });

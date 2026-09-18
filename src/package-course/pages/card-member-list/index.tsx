@@ -12,7 +12,7 @@
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
@@ -82,6 +82,8 @@ const CardMemberListPage: React.FC = () => {
   });
   const [list, setList] = useState<MemberCardDetail[]>([]);
   const [loading, setLoading] = useState(false);
+  /** 首挂载去重：参数就绪后下面 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   /** 解析 URL 参数 */
   const resolveQuery = useCallback(() => {
@@ -122,9 +124,17 @@ const CardMemberListPage: React.FC = () => {
     void Taro.setNavigationBarTitle({ title });
   }, [query, fetchList]);
 
-  /** 页面重新显示时刷新 */
+  /**
+   * 页面重新显示时刷新（不加 TTL）：子页学员详情里可以改卡 / 退卡，
+   * 返回本页时必须拿到最新会员状态，否则会看到过期数据。
+   * 仅挡掉首次显示这一次重复拉取——参数就绪时上面的 useEffect 已经拉过了。
+   */
   useDidShow(() => {
     resolveQuery();
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     if (query.cardTypeId && query.stat) {
       void fetchList();
     }

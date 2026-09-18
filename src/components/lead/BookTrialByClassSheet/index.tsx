@@ -25,6 +25,7 @@ import {
   subscribeMessageService,
 } from '@/services';
 import { useCampusStore } from '@/stores/campus';
+import type { Class } from '@/types/class';
 import type { Lead } from '@/types/lead';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -80,6 +81,32 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
   const [childName, setChildName] = useState('');
   const [parentPhone, setParentPhone] = useState('');
   const [note, setNote] = useState('');
+  const [classDetail, setClassDetail] = useState<Class | null>(null);
+
+  // 课表卡片可能只带班级 ID，不能假设卡片上的老师/校区字段永远完整。
+  // 打开弹层时补取班级详情，预约时优先使用数据库中的授课老师和校区。
+  useEffect(() => {
+    if (!visible || !classId) {
+      setClassDetail(null);
+      return;
+    }
+    let cancelled = false;
+    void classService
+      .getById(classId)
+      .then((detail) => {
+        if (!cancelled) setClassDetail(detail);
+      })
+      .catch(() => {
+        if (!cancelled) setClassDetail(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, classId]);
+
+  const bookingCampusId = classDetail?.campus_id || resolvedCampusId;
+  const bookingTeacherId = classDetail?.teacher_id || teacherId || '';
+  const bookingClassName = className || classDetail?.name || '试听课';
 
   const handleOpenLeadPicker = useCallback(() => {
     setKeyword('');
@@ -101,7 +128,9 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     setLoading(true);
     Promise.all([
       studentService.getByTeacher(userId, resolvedCampusId || undefined),
-      classId ? classService.getStudents(classId) : Promise.resolve([] as Student[]),
+      classId
+        ? classService.getStudents(classId, { includePackages: false })
+        : Promise.resolve([] as Student[]),
     ])
       .then(([list, classStu]) => {
         setStudents(list);
@@ -169,8 +198,12 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
 
   const handleSubmit = useCallback(async () => {
     if (!classId || !canSubmit) return;
-    if (!resolvedCampusId) {
+    if (!bookingCampusId) {
       Taro.showToast({ title: '缺少校区信息，请先选择校区', icon: 'none' });
+      return;
+    }
+    if (!bookingTeacherId) {
+      Taro.showToast({ title: '缺少授课老师信息，请刷新课表后重试', icon: 'none' });
       return;
     }
 
@@ -202,7 +235,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           {
             child_name: childName.trim(),
             parent_phone: parentPhone.trim(),
-            campus_id: resolvedCampusId,
+            campus_id: bookingCampusId,
             source_type: 'manual',
           },
           userId,
@@ -213,12 +246,12 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
       await leadService.bookTrialByClass({
         leadId: leadId!,
         classId,
-        className,
-        campusId: resolvedCampusId,
+        className: bookingClassName,
+        campusId: bookingCampusId,
         lessonDate,
         startTime,
         endTime,
-        teacherId,
+        teacherId: bookingTeacherId,
         teacherName,
         operatorId: userId,
         note: note.trim() || undefined,
@@ -226,23 +259,28 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
 
       Taro.showToast({ title: '预约成功', icon: 'success' });
       void subscribeMessageService.runFlow('E24', {
-        bookingLabel: `试听·${className}`,
+        bookingLabel: `试听·${bookingClassName}`,
       });
       onSuccess?.({ classId, lessonDate });
       onClose();
-    } catch {
-      Taro.showToast({ title: mode === 'makeup' ? '补课预约失败' : '预约失败', icon: 'none' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      Taro.showToast({
+        title: message ? message.slice(0, 32) : mode === 'makeup' ? '补课预约失败' : '预约失败',
+        icon: 'none',
+      });
     } finally {
       setSubmitting(false);
     }
   }, [
     canSubmit,
     classId,
-    resolvedCampusId,
-    className,
+    bookingCampusId,
+    bookingClassName,
     lessonDate,
     startTime,
     endTime,
+    bookingTeacherId,
     teacherId,
     teacherName,
     userId,

@@ -1,8 +1,10 @@
 /**
  * 邀约二维码页 package-lead/pages/invite-qrcode
  *
- * 创建 24h 临时邀请码 → 调用微信 getwxacodeunlimit 生成真实小程序码。
- * 家长扫码直达 invite-register，scene 携带临时 P 码。
+ * 取教师固定招生码（Teacher.parentInviteCode，永久有效、可多人复用）
+ * → 调用微信 getwxacodeunlimit 生成真实小程序码。
+ * 家长扫码直达 invite-register，scene 携带固定 P 码。
+ * （旧「每次新建 24h 临时码」流程已按已决 #3 删除）
  */
 import { useDidShow, useShareAppMessage } from '@tarojs/taro';
 import React, { useCallback, useState } from 'react';
@@ -18,7 +20,6 @@ const InviteQrcodePage: React.FC = () => {
   const { profile, currentIdentity } = useAuth();
 
   const [inviteLink, setInviteLink] = useState('');
-  const [expireAt, setExpireAt] = useState('');
   const [qrImageSrc, setQrImageSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,10 +28,10 @@ const InviteQrcodePage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const created = await parentShareInviteService.create();
-      const wxacode = await parentShareInviteService.getWxacode(created.inviteCode);
-      setInviteLink(wxacode.landingPath || created.landingPath);
-      setExpireAt(created.expireAt);
+      // ③ 类固定招生码：GET 取教师固定码（永久有效、可多人复用），不再每次新建临时码
+      const myInvite = await parentShareInviteService.getMyShareInvite();
+      const wxacode = await parentShareInviteService.getWxacode(myInvite.parentInviteCode);
+      setInviteLink(myInvite.parentInviteLandingPath || wxacode.landingPath);
       setQrImageSrc(buildWxacodeImageSrc(wxacode.imageBase64));
     } catch (e) {
       setQrImageSrc('');
@@ -57,7 +58,7 @@ const InviteQrcodePage: React.FC = () => {
         campusName={currentIdentity?.organizationName || ''}
         inviteLink={inviteLink}
         qrImageSrc={qrImageSrc}
-        expireAt={expireAt}
+        permanent
         loading={loading}
         error={error}
         onRefresh={() => {

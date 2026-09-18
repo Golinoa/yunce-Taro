@@ -31,6 +31,8 @@ const SubjectFormPage: React.FC = () => {
 
   // 表单字段
   const [name, setName] = useState('');
+  const [originalName, setOriginalName] = useState('');
+  const [usage, setUsage] = useState({ courseCount: 0, cardCount: 0 });
   const [iconIndex, setIconIndex] = useState(0);
 
   // 状态
@@ -48,6 +50,8 @@ const SubjectFormPage: React.FC = () => {
       .then((data) => {
         if (data) {
           setName(data.name);
+          setOriginalName(data.name);
+          setUsage({ courseCount: data.courseCount || 0, cardCount: data.cardCount || 0 });
           // 从 icon 反查索引
           const idx = SUBJECT_ICONS.findIndex((item) => item.icon === data.icon);
           setIconIndex(idx >= 0 ? idx : 0);
@@ -68,16 +72,73 @@ const SubjectFormPage: React.FC = () => {
     return Object.keys(nextErrors).length === 0;
   }, [name]);
 
+  const handleDelete = useCallback(async () => {
+    if (!isEdit || !subjectId || saving) return;
+
+    const latest = await subjectService.getById(subjectId);
+    const latestUsage = {
+      courseCount: latest?.courseCount || usage.courseCount,
+      cardCount: latest?.cardCount || usage.cardCount,
+    };
+    const totalUsage = latestUsage.courseCount + latestUsage.cardCount;
+    const firstConfirm = await Taro.showModal({
+      title: '确认删除科目？',
+      content:
+        totalUsage > 0
+          ? '删除后，关联课程、课包和会员卡的科目将被清空，需要重新补齐。'
+          : '删除后无法恢复，确认继续吗？',
+      showCancel: true,
+      confirmText: '继续删除',
+      cancelText: '取消',
+    });
+    if (!firstConfirm.confirm) return;
+
+    if (totalUsage > 0) {
+      const secondConfirm = await Taro.showModal({
+        title: '存在关联数据',
+        content: `当前关联 ${latestUsage.courseCount} 个课程/课包和 ${latestUsage.cardCount} 个会员卡种，删除会清空这些关联的科目。仍要删除吗？`,
+        showCancel: true,
+        confirmText: '确认删除',
+        cancelText: '返回',
+      });
+      if (!secondConfirm.confirm) return;
+    }
+
+    setSaving(true);
+    try {
+      await subjectService.delete(subjectId);
+      Taro.showToast({ title: '删除成功', icon: 'success' });
+      setTimeout(() => Taro.navigateBack(), 300);
+    } catch {
+      Taro.showToast({ title: '删除失败', icon: 'none' });
+    } finally {
+      setSaving(false);
+    }
+  }, [isEdit, subjectId, saving, usage]);
+
   const handleSubmit = useCallback(async () => {
     if (!validate()) {
       Taro.showToast({ title: '请检查表单填写', icon: 'none' });
       return;
     }
-    setSaving(true);
 
+    const trimmedName = name.trim();
+    const renamed = isEdit && originalName && trimmedName !== originalName;
+    if (renamed && usage.courseCount + usage.cardCount > 0) {
+      const confirm = await Taro.showModal({
+        title: '同步修改关联数据',
+        content: `该科目已关联 ${usage.courseCount} 个课程/课包和 ${usage.cardCount} 个会员卡种，修改名称后会同步更新关联数据。继续吗？`,
+        showCancel: true,
+        confirmText: '继续保存',
+        cancelText: '取消',
+      });
+      if (!confirm.confirm) return;
+    }
+
+    setSaving(true);
     const iconItem = SUBJECT_ICONS[iconIndex] || SUBJECT_ICONS[0];
     const formData: SubjectFormData = {
-      name: name.trim(),
+      name: trimmedName,
       icon: iconItem.icon,
       color: iconItem.color,
       iconGradient: iconItem.gradient,
@@ -91,13 +152,13 @@ const SubjectFormPage: React.FC = () => {
         await subjectService.add(formData);
         Taro.showToast({ title: '新增成功', icon: 'success' });
       }
-      setTimeout(() => Taro.navigateBack(), 800);
+      setTimeout(() => Taro.navigateBack(), 300);
     } catch {
       Taro.showToast({ title: isEdit ? '保存失败' : '新增失败', icon: 'none' });
     } finally {
       setSaving(false);
     }
-  }, [validate, name, iconIndex, isEdit, subjectId]);
+  }, [validate, name, originalName, usage, iconIndex, isEdit, subjectId]);
 
   if (loading) {
     return (
@@ -140,13 +201,20 @@ const SubjectFormPage: React.FC = () => {
                 <View
                   key={idx}
                   className={cn(
-                    'w-[80rpx] h-[80rpx] rounded-[20rpx] flex items-center justify-center border-[3rpx] press-scale',
-                    iconIndex === idx ? 'border-primary' : 'border-transparent',
+                    'relative w-[80rpx] h-[80rpx] rounded-[20rpx] flex items-center justify-center border-[3rpx] press-scale',
+                    iconIndex === idx
+                      ? 'border-primary shadow-float scale-105'
+                      : 'border-transparent',
                   )}
                   style={{ background: item.gradient }}
                   onClick={() => setIconIndex(idx)}
                 >
                   <Text className="text-[36rpx]">{item.icon}</Text>
+                  {iconIndex === idx && (
+                    <Text className="absolute right-[-6rpx] top-[-10rpx] w-[28rpx] h-[28rpx] rounded-full bg-primary text-white text-[20rpx] leading-[28rpx] text-center">
+                      ✓
+                    </Text>
+                  )}
                 </View>
               ))}
             </View>
@@ -154,8 +222,19 @@ const SubjectFormPage: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* 底部确认按钮 */}
+      {/* 底部操作按钮 */}
       <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))]">
+        {isEdit && (
+          <View
+            className={cn(
+              'w-full mb-[20rpx] py-[22rpx] rounded-full border-[2rpx] border-red-400 flex items-center justify-center press-scale',
+              saving && 'opacity-60 pointer-events-none',
+            )}
+            onClick={() => void handleDelete()}
+          >
+            <Text className="text-[28rpx] font-medium text-red-500">删除科目</Text>
+          </View>
+        )}
         <View
           className={cn(
             'w-full py-[26rpx] rounded-full bg-primary flex items-center justify-center press-scale shadow-float',

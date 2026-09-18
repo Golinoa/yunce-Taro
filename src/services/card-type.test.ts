@@ -40,7 +40,7 @@ describe('cardTypeService', () => {
     expect(request.get).toHaveBeenCalledWith('/card-types', { page: 1, pageSize: 100 });
   });
 
-  it('uses backend write contracts and strips FE-only fields', async () => {
+  it('uses backend write contracts and preserves the selected subject', async () => {
     request.post.mockResolvedValue({ id: 'new-card', name: '新卡', kind: 'count' });
     const { cardTypeService } = await import('@/services/card-type');
     await cardTypeService.create({
@@ -69,7 +69,7 @@ describe('cardTypeService', () => {
     });
     expect(request.post).toHaveBeenCalledWith(
       '/card-types',
-      expect.not.objectContaining({ subjectId: expect.anything() }),
+      expect.objectContaining({ subjectId: 'local-only' }),
     );
   });
 

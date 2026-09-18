@@ -31,7 +31,7 @@ import { resolveLifecycle } from '@/constants/membership-tips';
 import { displayUserRoleLabel } from '@/constants/role-glossary';
 import EmailBindReminder from '@/package-auth/components/EmailBindReminder';
 import WechatBindReminder from '@/package-auth/components/WechatBindReminder';
-import { onboardingService, packageService, studentService, lessonRecordService } from '@/services';
+import { onboardingService, studentService } from '@/services';
 import {
   prefetchMembershipBootstrap,
   writeMembershipQuotaCache,
@@ -156,7 +156,8 @@ const Profile: React.FC = () => {
     setLoadingStudents(true);
     setErrorMsg('');
     try {
-      const list = await studentService.getByParent(profile.id);
+      const summary = await studentService.getParentSummary(profile.id);
+      const list = summary.students;
       setStudents(list);
       const stored = Taro.getStorageSync('activeStudentId') || '';
       const valid = list.find((s) => s.id === stored)?.id || list[0]?.id || '';
@@ -170,28 +171,16 @@ const Profile: React.FC = () => {
           remainingBalance: 0,
         });
       } else {
-        const [pkgGroups, recordGroups] = await Promise.all([
-          Promise.all(list.map((s) => packageService.getByStudent(s.id).catch(() => []))),
-          Promise.all(list.map((s) => lessonRecordService.getByStudent(s.id).catch(() => []))),
-        ]);
-        const packages = pkgGroups.flat();
-        const records = recordGroups.flat();
-        const remainingHours = packages.reduce(
-          (sum, pkg) => sum + Math.max(Number(pkg.remaining_hours ?? 0), 0),
+        const remainingHours = list.reduce(
+          (sum, student) =>
+            sum + Math.max(Number(student.course_packages?.[0]?.remaining_hours ?? 0), 0),
           0,
         );
-        const remainingBalance = packages.reduce((sum, pkg) => {
-          const fee = Number((pkg as { fee_amount?: number }).fee_amount ?? 0);
-          const total = Math.max(Number(pkg.total_hours ?? 0), 0);
-          const remain = Math.max(Number(pkg.remaining_hours ?? 0), 0);
-          if (!fee || !total) return sum;
-          return sum + (fee * remain) / total;
-        }, 0);
         setParentStatValues({
-          attendance: records.filter((r) => r.status !== 'cancelled').length,
+          attendance: summary.attendance,
           remainingTimes: Math.round(remainingHours),
           remainingHours: Math.round(remainingHours * 10) / 10,
-          remainingBalance: Math.round(remainingBalance),
+          remainingBalance: Math.round(summary.remainingBalance),
         });
       }
     } catch {

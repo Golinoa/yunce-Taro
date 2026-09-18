@@ -18,6 +18,7 @@ import { useCampusStore } from '@/stores/campus';
 import type { Holiday } from '@/types/campus';
 
 type DateField = 'startDate' | 'endDate' | null;
+type HolidayDisplayRow = Holiday & { ids: string[] };
 
 const Holidays: React.FC = () => {
   const {
@@ -66,13 +67,37 @@ const Holidays: React.FC = () => {
     [holidays],
   );
 
+  const displayHolidays = useMemo(
+    () =>
+      sortedHolidays.reduce<HolidayDisplayRow[]>((rows, holiday) => {
+        const previous = rows[rows.length - 1];
+        const isContinuous =
+          previous &&
+          previous.name === holiday.name &&
+          dayjs(previous.endDate).add(1, 'day').format('YYYY-MM-DD') === holiday.startDate;
+        if (isContinuous) {
+          previous.endDate = holiday.endDate;
+          previous.ids.push(holiday.id);
+          return rows;
+        }
+        rows.push({ ...holiday, ids: [holiday.id] });
+        return rows;
+      }, []),
+    [sortedHolidays],
+  );
+
   const formatRange = useCallback((h: Holiday) => {
-    if (h.startDate === h.endDate) return `${h.startDate}至${h.endDate}`;
-    return `${h.startDate}至${h.endDate}`;
+    if (h.startDate === h.endDate) return h.startDate;
+    return `${h.startDate} 至 ${h.endDate}`;
   }, []);
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleSelect = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+      return allSelected
+        ? prev.filter((id) => !ids.includes(id))
+        : Array.from(new Set([...prev, ...ids]));
+    });
   }, []);
 
   const handleOpenAdd = useCallback(() => {
@@ -98,27 +123,19 @@ const Holidays: React.FC = () => {
     }
     setSaving(true);
     try {
-      // 按日拆条，与设计稿「元旦/春节逐日一条」一致
-      let cursor = dayjs(form.startDate);
-      const end = dayjs(form.endDate);
-      const name = form.name.trim();
-      while (!cursor.isAfter(end, 'day')) {
-        const date = cursor.format('YYYY-MM-DD');
-        const result = await addHoliday({
-          name,
-          icon: '📅',
-          startDate: date,
-          endDate: date,
-          status: 'rest',
+      const result = await addHoliday({
+        name: form.name.trim(),
+        icon: '📅',
+        startDate: form.startDate,
+        endDate: form.endDate,
+        status: 'rest',
+      });
+      if (!result) {
+        Taro.showToast({
+          title: useCampusStore.getState().error || '添加失败',
+          icon: 'none',
         });
-        if (!result) {
-          Taro.showToast({
-            title: useCampusStore.getState().error || '添加失败',
-            icon: 'none',
-          });
-          return;
-        }
-        cursor = cursor.add(1, 'day');
+        return;
       }
       setShowFormSheet(false);
       Taro.showToast({ title: '添加成功', icon: 'success' });
@@ -128,7 +145,7 @@ const Holidays: React.FC = () => {
   }, [addHoliday, form, saving, submitBlockedReason]);
 
   const handleDeleteOne = useCallback(
-    async (id: string) => {
+    async (ids: string[]) => {
       const { confirm } = await Taro.showModal({
         title: '删除假期',
         content: '确认删除该条停课放假记录？',
@@ -136,12 +153,14 @@ const Holidays: React.FC = () => {
         confirmColor: '#F0705F',
       });
       if (!confirm) return;
-      const ok = await deleteHoliday(id);
-      if (!ok) {
-        Taro.showToast({ title: useCampusStore.getState().error || '删除失败', icon: 'none' });
-        return;
+      for (const id of ids) {
+        const ok = await deleteHoliday(id);
+        if (!ok) {
+          Taro.showToast({ title: useCampusStore.getState().error || '删除失败', icon: 'none' });
+          return;
+        }
       }
-      setSelectedIds((prev) => prev.filter((x) => x !== id));
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
       Taro.showToast({ title: '已删除', icon: 'success' });
     },
     [deleteHoliday],
@@ -188,7 +207,7 @@ const Holidays: React.FC = () => {
     if (busy) return;
     const { confirm } = await Taro.showModal({
       title: '生成法定节假日',
-      content: '将按当前年份生成法定节假日（逐日一条）。已有同名同日记录会跳过。',
+      content: '将按当前年份生成法定节假日，同名连续日期会合并为一条。已有冲突日期会跳过。',
       confirmText: '生成',
     });
     if (!confirm) return;
@@ -200,7 +219,7 @@ const Holidays: React.FC = () => {
         return;
       }
       Taro.showToast({
-        title: count > 0 ? `已生成 ${count} 条` : '没有新增（可能已存在）',
+        title: count > 0 ? `已生成 ${count} 个假期` : '没有新增（可能已存在）',
         icon: 'none',
       });
     } finally {
@@ -252,14 +271,14 @@ const Holidays: React.FC = () => {
       </View>
 
       <View className="mt-[16rpx] bg-white">
-        {sortedHolidays.map((holiday, index) => {
-          const selected = selectedIds.includes(holiday.id);
+        {displayHolidays.map((holiday, index) => {
+          const selected = holiday.ids.every((id) => selectedIds.includes(id));
           return (
             <View
-              key={holiday.id}
+              key={holiday.ids.join('-')}
               className={cn(
                 'flex items-center gap-[20rpx] px-[32rpx] py-[28rpx]',
-                index < sortedHolidays.length - 1 && 'border-b border-border/60',
+                index < displayHolidays.length - 1 && 'border-b border-border/60',
               )}
             >
               <View
@@ -267,12 +286,12 @@ const Holidays: React.FC = () => {
                   'flex h-[40rpx] w-[40rpx] shrink-0 items-center justify-center rounded-full border-[3rpx]',
                   selected ? 'border-primary bg-primary' : 'border-muted-foreground/40 bg-white',
                 )}
-                onClick={() => toggleSelect(holiday.id)}
+                onClick={() => toggleSelect(holiday.ids)}
               >
                 {selected ? <Icon name="mdi-check" size={22} color="#ffffff" /> : null}
               </View>
 
-              <View className="min-w-0 flex-1" onClick={() => toggleSelect(holiday.id)}>
+              <View className="min-w-0 flex-1" onClick={() => toggleSelect(holiday.ids)}>
                 <Text className="block text-[30rpx] font-medium text-foreground">
                   {holiday.name}
                 </Text>
@@ -283,7 +302,7 @@ const Holidays: React.FC = () => {
 
               <Text
                 className="shrink-0 text-[28rpx] text-primary active:opacity-70"
-                onClick={() => void handleDeleteOne(holiday.id)}
+                onClick={() => void handleDeleteOne(holiday.ids)}
               >
                 删除
               </Text>
@@ -291,7 +310,7 @@ const Holidays: React.FC = () => {
           );
         })}
 
-        {sortedHolidays.length === 0 ? (
+        {displayHolidays.length === 0 ? (
           <View className="py-[160rpx]">
             <Empty
               icon="mdi-calendar-blank-outline"

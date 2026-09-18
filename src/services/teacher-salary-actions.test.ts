@@ -27,7 +27,10 @@ describe('工资操作月份与副作用', () => {
     const { teacherService } = await import('@/services/teacher');
     await expect(teacherService.confirmSalary('t1', '2026-08')).resolves.toBe(true);
     expect(request.get).toHaveBeenCalledWith('/teachers/t1', { month: '2026-08' });
-    expect(request.post).toHaveBeenCalledWith('/teachers/salary/sr-aug/confirm');
+    expect(request.post).toHaveBeenNthCalledWith(1, '/teachers/salary/generate-month', {
+      month: '2026-08',
+    });
+    expect(request.post).toHaveBeenNthCalledWith(2, '/teachers/salary/sr-aug/confirm');
   });
 
   it('批量操作遇到缺失月份记录时不静默过滤或调用接口', async () => {
@@ -36,6 +39,13 @@ describe('工资操作月份与副作用', () => {
       .mockResolvedValueOnce({ salaryRecord: null });
     const { teacherService } = await import('@/services/teacher');
     await expect(teacherService.batchConfirm(['t1', 't2'], '2026-08')).resolves.toBe(false);
-    expect(request.post).not.toHaveBeenCalled();
+    expect(request.post).toHaveBeenCalledTimes(1);
+    expect(request.post).toHaveBeenCalledWith('/teachers/salary/generate-month', {
+      month: '2026-08',
+    });
+    expect(request.post).not.toHaveBeenCalledWith(
+      '/teachers/salary/batch-confirm',
+      expect.anything(),
+    );
   });
 });

@@ -13,6 +13,8 @@ export const REFRESH_SIGNAL = {
   membership: 'yunce:membership:refresh',
   profileQuota: 'yunce:profile-quota:refresh',
   students: 'yunce:students:refresh',
+  /** 场地/教室列表（venue-form 写后通知 venue-list） */
+  venues: 'yunce:venues:refresh',
 } as const;
 
 export type RefreshSignalKey = (typeof REFRESH_SIGNAL)[keyof typeof REFRESH_SIGNAL] | string;

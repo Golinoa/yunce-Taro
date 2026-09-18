@@ -3,6 +3,7 @@ import {
   TRIAL_INVITE_FORM_TOAST,
   resolveTrialInviteAccess,
   resolveTrialInviteBookNext,
+  resolveTrialInviteBookingClosed,
   resolveTrialInviteBootstrap,
   resolveTrialInviteDockAction,
   resolveTrialInviteLoginCatchup,
@@ -57,7 +58,7 @@ describe('invite-landing-flow (L1 态机)', () => {
     });
   });
 
-  describe('bootstrap：登录门 / 已预约 / 过期', () => {
+  describe('bootstrap：登录门 / 已预约 / 无法预约', () => {
     const base = {
       authLoading: false,
       paramsReady: true,
@@ -67,7 +68,7 @@ describe('invite-landing-flow (L1 态机)', () => {
       bootstrapped: false,
       loggedIn: true,
       hasSuccessRecord: false,
-      lessonExpired: false,
+      bookingClosed: false,
     };
 
     it('未登录 → login_required', () => {
@@ -80,8 +81,8 @@ describe('invite-landing-flow (L1 态机)', () => {
       );
     });
 
-    it('场次过期 → lesson_expired', () => {
-      expect(resolveTrialInviteBootstrap({ ...base, lessonExpired: true })).toBe('lesson_expired');
+    it('无法预约（达禁止时间 / 已下课 / 开课中）→ booking_closed', () => {
+      expect(resolveTrialInviteBootstrap({ ...base, bookingClosed: true })).toBe('booking_closed');
     });
 
     it('正常 → ready；已 boot / staffBlocked → wait', () => {
@@ -92,8 +93,88 @@ describe('invite-landing-flow (L1 态机)', () => {
     });
   });
 
+  describe('resolveTrialInviteBookingClosed：统一「无法预约」判定', () => {
+    const rules = { bookingDeadlineEnabled: true, bookingDeadlineMinutes: 120 };
+
+    it('已下课（now 晚于结束时刻）→ lesson_expired', () => {
+      const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      expect(
+        resolveTrialInviteBookingClosed({
+          date: past.slice(0, 10),
+          start: '10:00',
+          end: '11:00',
+          ...rules,
+          now: new Date(),
+        }),
+      ).toEqual({ closed: true, reason: 'lesson_expired' });
+    });
+
+    it('开课中（now 在开课后、结束前）→ lesson_started', () => {
+      const inAnHour = new Date(Date.now() + 30 * 60 * 1000);
+      const d = inAnHour.toISOString().slice(0, 10);
+      const start = `${String(inAnHour.getHours()).padStart(2, '0')}:${String(inAnHour.getMinutes()).padStart(2, '0')}`;
+      // now 视为开课时刻 + 5 分钟（开课中）
+      const now = new Date(inAnHour.getTime() + 5 * 60 * 1000);
+      expect(
+        resolveTrialInviteBookingClosed({
+          date: d,
+          start,
+          end: '23:59',
+          ...rules,
+          now,
+        }),
+      ).toEqual({ closed: true, reason: 'lesson_started' });
+    });
+
+    it('达预约截止时间（开课前 <120min）→ booking_deadline', () => {
+      const in30 = new Date(Date.now() + 30 * 60 * 1000);
+      const d = in30.toISOString().slice(0, 10);
+      const start = `${String(in30.getHours()).padStart(2, '0')}:${String(in30.getMinutes()).padStart(2, '0')}`;
+      expect(
+        resolveTrialInviteBookingClosed({
+          date: d,
+          start,
+          end: '23:59',
+          ...rules,
+          now: new Date(),
+        }),
+      ).toEqual({ closed: true, reason: 'booking_deadline' });
+    });
+
+    it('未到截止时间（开课前 >120min）→ 不关闭', () => {
+      const in300 = new Date(Date.now() + 300 * 60 * 1000);
+      const d = in300.toISOString().slice(0, 10);
+      const start = `${String(in300.getHours()).padStart(2, '0')}:${String(in300.getMinutes()).padStart(2, '0')}`;
+      expect(
+        resolveTrialInviteBookingClosed({
+          date: d,
+          start,
+          end: '23:59',
+          ...rules,
+          now: new Date(),
+        }),
+      ).toEqual({ closed: false, reason: null });
+    });
+
+    it('截止时间关闭时仍可预约（bookingDeadlineEnabled=false）', () => {
+      const in30 = new Date(Date.now() + 30 * 60 * 1000);
+      const d = in30.toISOString().slice(0, 10);
+      const start = `${String(in30.getHours()).padStart(2, '0')}:${String(in30.getMinutes()).padStart(2, '0')}`;
+      expect(
+        resolveTrialInviteBookingClosed({
+          date: d,
+          start,
+          end: '23:59',
+          bookingDeadlineEnabled: false,
+          bookingDeadlineMinutes: 120,
+          now: new Date(),
+        }),
+      ).toEqual({ closed: false, reason: null });
+    });
+  });
+
   describe('登录补跑 / 预约下一步 / 登录后下一步', () => {
-    it('login catchup：过期 / 揭示券 / noop', () => {
+    it('login catchup：无法预约 / 揭示券 / noop', () => {
       const ready = {
         authLoading: false,
         paramsReady: true,
@@ -106,37 +187,37 @@ describe('invite-landing-flow (L1 态机)', () => {
         claimed: false,
         showForm: false,
         showVoucher: false,
-        lessonExpired: false,
+        bookingClosed: false,
       };
-      expect(resolveTrialInviteLoginCatchup({ ...ready, lessonExpired: true })).toBe(
-        'lesson_expired',
+      expect(resolveTrialInviteLoginCatchup({ ...ready, bookingClosed: true })).toBe(
+        'booking_closed',
       );
       expect(resolveTrialInviteLoginCatchup(ready)).toBe('reveal_voucher');
       expect(resolveTrialInviteLoginCatchup({ ...ready, claimed: true })).toBe('noop');
       expect(resolveTrialInviteLoginCatchup({ ...ready, showVoucher: true })).toBe('noop');
     });
 
-    it('book next：过期忽略 / 需登录 / 开表单', () => {
-      expect(resolveTrialInviteBookNext({ lessonExpired: true, loggedIn: true })).toBe(
-        'ignore_expired',
+    it('book next：无法预约忽略 / 需登录 / 开表单', () => {
+      expect(resolveTrialInviteBookNext({ bookingClosed: true, loggedIn: true })).toBe(
+        'ignore_closed',
       );
-      expect(resolveTrialInviteBookNext({ lessonExpired: false, loggedIn: false })).toBe(
+      expect(resolveTrialInviteBookNext({ bookingClosed: false, loggedIn: false })).toBe(
         'need_login',
       );
-      expect(resolveTrialInviteBookNext({ lessonExpired: false, loggedIn: true })).toBe(
+      expect(resolveTrialInviteBookNext({ bookingClosed: false, loggedIn: true })).toBe(
         'open_form',
       );
     });
 
-    it('post-login next：过期 / 开表单 / 领券', () => {
+    it('post-login next：无法预约 / 开表单 / 领券', () => {
       expect(
-        resolveTrialInvitePostLoginNext({ lessonExpired: true, openFormAfterLogin: false }),
-      ).toBe('lesson_expired');
+        resolveTrialInvitePostLoginNext({ bookingClosed: true, openFormAfterLogin: false }),
+      ).toBe('booking_closed');
       expect(
-        resolveTrialInvitePostLoginNext({ lessonExpired: false, openFormAfterLogin: true }),
+        resolveTrialInvitePostLoginNext({ bookingClosed: false, openFormAfterLogin: true }),
       ).toBe('open_form');
       expect(
-        resolveTrialInvitePostLoginNext({ lessonExpired: false, openFormAfterLogin: false }),
+        resolveTrialInvitePostLoginNext({ bookingClosed: false, openFormAfterLogin: false }),
       ).toBe('show_voucher');
     });
   });
@@ -186,40 +267,40 @@ describe('invite-landing-flow (L1 态机)', () => {
       expect(TRIAL_INVITE_FORM_TOAST.parent_phone).toBe('请输入正确手机号');
     });
 
-    it('dock：未领券隐藏；过期有/无电话；可预约', () => {
+    it('dock：未领券隐藏；无法预约有/无电话；可预约', () => {
       expect(
         resolveTrialInviteDockAction({
           claimed: false,
-          lessonExpired: false,
+          bookingClosed: false,
           hasCampusPhone: true,
         }),
       ).toBe('hidden');
       expect(
         resolveTrialInviteDockAction({
           claimed: true,
-          lessonExpired: true,
+          bookingClosed: true,
           hasCampusPhone: true,
         }),
       ).toBe('call_campus');
       expect(
         resolveTrialInviteDockAction({
           claimed: true,
-          lessonExpired: true,
+          bookingClosed: true,
           hasCampusPhone: false,
         }),
       ).toBe('contact_teacher');
       expect(
         resolveTrialInviteDockAction({
           claimed: true,
-          lessonExpired: false,
+          bookingClosed: false,
           hasCampusPhone: false,
         }),
       ).toBe('book_now');
     });
 
-    it('main copy：过期 / 已领券 / 待领券', () => {
+    it('main copy：无法预约(三种原因) / 已领券 / 待领券', () => {
       const expired = resolveTrialInviteMainCopy({
-        lessonExpired: true,
+        bookingClosedReason: 'lesson_expired',
         claimed: true,
         isGroupBook: false,
         teacherName: '王老师',
@@ -229,8 +310,24 @@ describe('invite-landing-flow (L1 态机)', () => {
       expect(expired.subtitle).toContain('王老师');
       expect(expired.subtitle).toContain('电话联系校区');
 
+      const started = resolveTrialInviteMainCopy({
+        bookingClosedReason: 'lesson_started',
+        claimed: true,
+        isGroupBook: false,
+        teacherName: '王老师',
+      });
+      expect(started.title).toBe('本场试听已开始');
+
+      const deadline = resolveTrialInviteMainCopy({
+        bookingClosedReason: 'booking_deadline',
+        claimed: true,
+        isGroupBook: false,
+        teacherName: '',
+      });
+      expect(deadline.title).toBe('已超过预约截止时间');
+
       const claimed = resolveTrialInviteMainCopy({
-        lessonExpired: false,
+        bookingClosedReason: null,
         claimed: true,
         isGroupBook: true,
         teacherName: '',
@@ -238,7 +335,7 @@ describe('invite-landing-flow (L1 态机)', () => {
       expect(claimed.title).toBe('预约本场团课');
 
       const pending = resolveTrialInviteMainCopy({
-        lessonExpired: false,
+        bookingClosedReason: null,
         claimed: false,
         isGroupBook: false,
         teacherName: '',

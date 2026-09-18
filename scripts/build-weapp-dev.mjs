@@ -1,7 +1,7 @@
 /**
- * 微信小程序「测环境」构建：Mock 关 + API → https://dev.chancore.cn/api/app/v1
+ * 微信小程序测试环境构建：Mock 关 + API → dev.chancore.cn（回源 WSL）
  *
- * 前置：本机 API + cloudflared tunnel run yunce-dev
+ * 前置：curl -4 https://dev.chancore.cn/health 返回 ok
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const API_BASE = 'https://dev.chancore.cn/api/app/v1';
+const DEFAULT_DEV_API_BASE = 'https://dev.chancore.cn/api/app/v1';
+const API_BASE = process.env.TARO_API_BASE_URL ?? DEFAULT_DEV_API_BASE;
 
 function verifyDevDist() {
   const commonJsPath = path.join(root, 'dist/common.js');
@@ -20,14 +21,14 @@ function verifyDevDist() {
   }
 
   const content = fs.readFileSync(commonJsPath, 'utf8');
-  if (!content.includes('dev.chancore.cn')) {
+  if (!content.includes(API_BASE)) {
     console.error(
-      '[build:weapp:dev] ERROR: 产物未包含 dev.chancore.cn，请关闭微信开发者工具后重试',
+      `[build:weapp:dev] ERROR: 产物未包含 ${API_BASE}，请关闭微信开发者工具后重试`,
     );
     process.exit(1);
   }
 
-  console.log('[build:weapp:dev] verified dev.chancore.cn in dist/common.js');
+  console.log(`[build:weapp:dev] verified ${API_BASE} in dist/common.js`);
 }
 
 function runNpm(script, extraArgs = []) {

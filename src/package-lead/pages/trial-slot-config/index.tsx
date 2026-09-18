@@ -16,7 +16,7 @@ import { View, Text, ScrollView, Image, Switch } from '@tarojs/components';
 import Taro, { useLoad } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
 import { leadService, studentService, teacherService } from '@/services';
@@ -89,12 +89,14 @@ type SlotTagType = 'none' | 'course' | 'rest' | 'full';
 type SelectedSlotType = 'normal' | 'course' | 'rest';
 
 const TrialSlotConfigPage: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const navSafeHeight = useNavSafeHeight();
   const [params, setParams] = useState<PageParams>({});
   const [teacher, setTeacher] = useState<TeacherUIModel | null>(null);
   const [slots, setSlots] = useState<TrialSlotConfig[]>([]);
   const [loading, setLoading] = useState(false);
+  /** R2：已按该上下文（老师 ID + 账号 + 校区）发起过拉取，避免依赖逐个确定时重复拉取 */
+  const lastSlotConfigFetchKeyRef = useRef<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(dayjs());
   /** 多选时间集合（含类型） */
   const [selectedSlots, setSelectedSlots] = useState<Map<string, SelectedSlotType>>(new Map());
@@ -240,10 +242,26 @@ const TrialSlotConfigPage: React.FC = () => {
     }
   }, [params.teacherId, profile?.currentContext?.campusId]);
 
+  /**
+   * R2 就绪闸门：本页取数依赖 params.teacherId（useLoad 异步回填）与
+   * profile.currentContext.campusId（会话异步恢复），两者分批确定；直接放进依赖数组时
+   * loadTeacher / loadSlots 会各被拉多遍（params 到位一次、profile 到位又一次）。这里压成一个 key：
+   * - key 为空 = 参数或账号上下文未就绪 → 不发请求；
+   * - key 未变 = 同一组上下文 → 只拉一次（挡掉 profile 对象换新但未换账号/校区的情况）；
+   * - key 变化 = 换老师 / 切机构换校区 / 换账号 → 重拉。
+   */
+  const slotConfigFetchKey =
+    params.teacherId && !authLoading
+      ? `${params.teacherId}|${profile?.id ?? ''}|${profile?.currentContext?.campusId ?? ''}`
+      : '';
+
   useEffect(() => {
+    if (!slotConfigFetchKey) return;
+    if (lastSlotConfigFetchKeyRef.current === slotConfigFetchKey) return;
+    lastSlotConfigFetchKeyRef.current = slotConfigFetchKey;
     void loadTeacher();
     void loadSlots();
-  }, [loadTeacher, loadSlots]);
+  }, [slotConfigFetchKey, loadTeacher, loadSlots]);
 
   const weekDates = useMemo(() => {
     const start = dayjs().startOf('week').add(1, 'day');

@@ -294,15 +294,27 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
         scheduleService.getByTeacher(currentUserId, currentCampusId),
         classService.getByTeacher(currentUserId, currentCampusId),
         teacherService.getList(currentCampusId),
-        // 试听标签按「当天有效预约」判定，含 pending/confirmed（后端新建默认可为 pending）
-        leadService.getLeadBookingsByTeacher(currentTeacherId),
-        fetchCategories(),
+        // 试听预约和分类是课表增强数据；失败时不得阻断核心课表渲染。
+        leadService.getLeadBookingsByTeacher(currentTeacherId).catch((err) => {
+          logError('SchedulePage load lead bookings', err);
+          return [];
+        }),
+        Promise.resolve()
+          .then(() => fetchCategories())
+          .catch((err) => {
+            logError('SchedulePage load categories', err);
+            return undefined;
+          }),
       ]);
-      await studentService.getByTeacher(currentUserId, currentCampusId);
       const classStudentsList = await Promise.all(
         classList.map(async (classItem) => ({
           classId: classItem.id,
-          students: await classService.getStudents(classItem.id),
+          students: await classService
+            .getStudents(classItem.id, { includePackages: false })
+            .catch((err) => {
+              logError(`SchedulePage load class students: ${classItem.id}`, err);
+              return [];
+            }),
         })),
       );
       const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};

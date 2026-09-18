@@ -8,7 +8,7 @@ import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import ActionButton from '@/components/ActionButton';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
@@ -18,6 +18,7 @@ import PageContainer from '@/components/PageContainer';
 import { leadService } from '@/services';
 import type { TrialSlotConfig } from '@/services/lead';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 
 interface SlotFormData {
   courseId: string;
@@ -39,6 +40,7 @@ const TrialSlotsPage: React.FC = () => {
   const { profile, session } = useAuth();
   const [slots, setSlots] = useState<TrialSlotConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastSlotsFetchAtRef = useRef<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SlotFormData>({
@@ -59,7 +61,14 @@ const TrialSlotsPage: React.FC = () => {
   const campusId = profile?.currentContext?.campusId;
 
   useDidShow(() => {
-    loadSlots();
+    // 时段配置列表 TTL 守卫：本页所有写操作（新增 / 修改 / 删除）都在页内完成，
+    // 且写完直接调 loadSlots() 自刷新，不依赖本页 useDidShow 兜底，所以可以按 TTL 节流。
+    // 账号 / 校区未就绪时不打点也不跳过：loadSlots 依赖这两个身份值，
+    // 上下文不全时若缓存住结果，后续补齐的身份就再也拉不到数据了。
+    if (userId && campusId && !shouldRefetch(lastSlotsFetchAtRef.current, TTL.list)) {
+      return;
+    }
+    void loadSlots();
   });
 
   const loadSlots = useCallback(async () => {
@@ -69,6 +78,7 @@ const TrialSlotsPage: React.FC = () => {
       const cid = campusId;
       const list = await leadService.getTrialSlotConfigs(teacherId, cid);
       setSlots(list);
+      markFetched(lastSlotsFetchAtRef);
     } finally {
       setLoading(false);
     }

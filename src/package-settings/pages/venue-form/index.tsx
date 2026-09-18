@@ -18,6 +18,7 @@ import { getThemeHexColors } from '@/theme';
 import type { Room, RoomStatus } from '@/types/campus';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 
 interface FormState {
   name: string;
@@ -126,6 +127,8 @@ const VenueFormPage: React.FC = () => {
         await roomService.add(payload);
       }
       Taro.showToast({ title: '保存成功', icon: 'success' });
+      // 通知 venue-list 写后强制重拉（列表页按 TTL 节流，不再无条件刷新）
+      setRefreshSignal(REFRESH_SIGNAL.venues);
       setTimeout(() => Taro.navigateBack(), 800);
     } catch (err) {
       logError('save room', err);
@@ -149,6 +152,7 @@ const VenueFormPage: React.FC = () => {
     try {
       await roomService.delete(roomId);
       Taro.showToast({ title: '删除成功', icon: 'success' });
+      setRefreshSignal(REFRESH_SIGNAL.venues);
       setTimeout(() => Taro.navigateBack(), 800);
     } catch (err) {
       logError('delete room', err);

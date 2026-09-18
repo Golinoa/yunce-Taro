@@ -1,19 +1,16 @@
 /**
  * 全局客服 / 维修企微二维码
  *
- * CDN 为主（七牛），本地为构建回退；保存相册优先走 CDN download。
+ * B12 主包瘦身：原主包本地回退图（`/assets/images/support-repair-qr.webp`，25.1KB）
+ * 已上云，二维码统一走七牛 CDN（`res.chancore.cn`，已在生产默认使用且域名已白名单）。
+ * 如需恢复离线回退能力，回退本提交即可（本地图仍可从 git 历史取回）。
  */
-
-import { MEDIA_IMAGE_BASE } from '@/constants/brand';
 
 /** 七牛 CDN 正式地址 */
 export const SUPPORT_REPAIR_QR_CDN =
   'https://res.chancore.cn/platform/static/support-repair-qr.png';
 
-/** 主包本地回退（压缩 WebP ~26KB；完整 PNG 只走七牛） */
-export const SUPPORT_REPAIR_QR_LOCAL = `${MEDIA_IMAGE_BASE}/support-repair-qr.webp`;
-
-/** 默认展示用 URL（优先 CDN） */
+/** 默认展示用 URL（CDN） */
 export const SUPPORT_REPAIR_QR_URL = SUPPORT_REPAIR_QR_CDN;
 
 /** 默认弹窗文案：添加客服维修 */

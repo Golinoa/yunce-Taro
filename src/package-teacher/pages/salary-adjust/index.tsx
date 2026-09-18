@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import LessonFeeDetailSheet from '@/components/teacher/LessonFeeDetailSheet';
+import { buildSalaryAdjustmentDrafts } from '@/domain/teacher-salary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { CategoryLessonFeeItem, DeductionType } from '@/types/teacher';
@@ -198,7 +199,7 @@ const SalaryAdjustPage: React.FC = () => {
   useCardNavigationBar();
   const { activeTheme } = useThemeStore();
   const { id } = useRouter().params;
-  const { teachers, addDeduction } = useTeacherStore();
+  const { teachers, addDeduction, salaryMonth } = useTeacherStore();
 
   const teacher = useMemo(() => teachers.find((t) => t.id === id), [teachers, id]);
 
@@ -327,32 +328,53 @@ const SalaryAdjustPage: React.FC = () => {
     return Math.max(0, result);
   }, [teacher, form, customBonus, customDeduct]);
 
-  /** 保存调整：草稿仅提交新增扣款；已确认/已发薪由后端拦截 */
+  /** 保存调整：所有可编辑字段都转换为后端扣款/补发明细。 */
   const handleSave = useCallback(async () => {
     if (!teacher) return;
 
-    const month = new Date().toISOString().slice(0, 7);
-    const newRows = form.deductions.filter((d) => d.id.startsWith('temp-'));
+    const month = salaryMonth || new Date().toISOString().slice(0, 7);
+    const drafts = buildSalaryAdjustmentDrafts(
+      {
+        base: form.base,
+        lateFine: form.lateFine,
+        otherFine: form.otherFine,
+        bonusAmount: form.bonusAmount,
+        socialInsurance: form.socialInsurance,
+        customRows: form.deductions
+          .filter((item) => item.id.startsWith('temp-'))
+          .map(({ reason, amount, type }) => ({ reason, amount, type })),
+      },
+      teacher.base,
+    );
+    if (drafts.length === 0) {
+      Taro.showToast({ title: '没有需要保存的调整', icon: 'none' });
+      return;
+    }
 
+    let completed = 0;
     try {
-      for (const d of newRows) {
+      for (const draft of drafts) {
         await addDeduction(teacher.id, {
-          id: `temp-${Date.now()}`,
-          reason: d.reason.trim() || '自定义调整',
-          amount: parseAmount(d.amount),
-          type: d.type,
+          id: `temp-${Date.now()}-${completed}`,
+          ...draft,
           month,
         });
+        completed += 1;
       }
-      // 非 temp 行视为已落库，本页不再调改删（产品：落库后不可改）
       Taro.showToast({ title: '保存成功', icon: 'success' });
       setTimeout(() => {
         void Taro.navigateBack();
       }, 500);
     } catch {
-      Taro.showToast({ title: '保存失败（可能该月已确认/已发薪）', icon: 'none' });
+      Taro.showToast({
+        title:
+          completed > 0
+            ? `已保存 ${completed} 项，其余失败，请返回列表核对`
+            : '保存失败（可能该月已确认/已发薪）',
+        icon: 'none',
+      });
     }
-  }, [teacher, form, addDeduction]);
+  }, [teacher, salaryMonth, form, addDeduction]);
 
   if (!teacher) {
     return (

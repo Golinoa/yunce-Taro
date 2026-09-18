@@ -29,6 +29,7 @@ import {
   fetchAllPages,
 } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
+import { singleFlight } from '@/utils/single-flight';
 
 type RawRecord = Record<string, unknown>;
 
@@ -56,6 +57,10 @@ async function fetchSalaryTemplatesPage(
 
 function currentSalaryMonth(month?: string): string {
   return month || dayjs().format('YYYY-MM');
+}
+
+async function generateSalaryRecords(month?: string): Promise<void> {
+  await post('/teachers/salary/generate-month', { month: currentSalaryMonth(month) });
 }
 
 async function resolveSalaryRecordId(teacherId: string, month?: string): Promise<string | null> {
@@ -110,7 +115,7 @@ export const teacherService = {
 
   /** 当前登录教师（GET /teachers/me） */
   getMe: async (): Promise<TeacherUIModel | null> => {
-    const detail = await get<RawRecord>('/teachers/me');
+    const detail = await singleFlight('teachers-me', () => get<RawRecord>('/teachers/me'));
     return detail ? mapBackendTeacherToUI(detail) : null;
   },
 
@@ -130,6 +135,7 @@ export const teacherService = {
   },
 
   confirmSalary: async (id: string, month?: string) => {
+    await generateSalaryRecords(month);
     const recordId = await resolveSalaryRecordId(id, month);
     if (!recordId) return false;
     await post(`/teachers/salary/${recordId}/confirm`);
@@ -137,6 +143,7 @@ export const teacherService = {
   },
 
   batchConfirm: async (ids: string[], month?: string) => {
+    await generateSalaryRecords(month);
     const resolvedIds = await Promise.all(
       ids.map((teacherId) => resolveSalaryRecordId(teacherId, month)),
     );
@@ -273,10 +280,15 @@ export const salaryTemplateService = {
   },
 
   create: async (data: Omit<SalaryTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!data.campusId) {
+      throw new Error('请先选择校区');
+    }
     const created = await post<RawRecord>('/attendance/salary-templates', {
-      campusId: data.config ? undefined : undefined,
+      campusId: data.campusId,
       name: data.name,
-      baseSalary: 0,
+      summary: data.summary,
+      isDefault: data.isDefault ?? false,
+      baseSalary: Number(data.config.fixedBaseAmount) || 0,
       rules: data.config,
     });
     return mapBackendSalaryTemplate(created);
@@ -285,6 +297,12 @@ export const salaryTemplateService = {
   update: async (id: string, updates: Partial<Omit<SalaryTemplate, 'id'>>) => {
     const updated = await put<RawRecord>(`/attendance/salary-templates/${id}`, {
       name: updates.name,
+      summary: updates.summary,
+      isDefault: updates.isDefault,
+      baseSalary:
+        updates.config?.fixedBaseAmount === undefined
+          ? undefined
+          : Number(updates.config.fixedBaseAmount) || 0,
       rules: updates.config,
     });
     return mapBackendSalaryTemplate(updated);

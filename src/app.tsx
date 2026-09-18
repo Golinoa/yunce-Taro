@@ -1,4 +1,5 @@
 import Taro, { useDidShow, useDidHide, useLaunch } from '@tarojs/taro';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SubscribeAuthHost } from '@/components/subscribe';
@@ -16,39 +17,46 @@ import 'uno.css';
 import '@/constants/lead';
 import '@/constants/brand';
 import '@/components/lead/LeadCard';
-import '@/components/lead/LeadStatusBadge';
-import '@/components/lead/ConvertSheet';
-import '@/components/lead/FollowUpSheet';
 import '@/components/Card';
-import '@/components/CardHeader';
 import '@/components/FormRow';
-import '@/components/InlineSelector';
-import '@/components/InlineDropdown';
 import '@/components/ChipPicker';
 import '@/components/SegmentedControl';
 import '@/components/InstallmentPanel';
 import '@/components/QuestionHint';
 import '@/components/reschedule/WorkflowHeaderCard';
-import '@/components/schedule/ScheduleBookingSwitch';
-import '@/components/schedule/ScheduleCardMenu';
 import '@/components/lead/TrialBookingSkeleton';
 import '@/components/lead/TrialBookingView';
 import '@/components/lead/BookTrialByClassSheet';
-import '@/components/campus/CampusSwitcher';
-import '@/components/campus/CampusTrigger';
 import '@/stores/campus';
 import '@/stores/subscribe-auth';
 import '@/services/member-card';
 import '@/services/card-type';
 import '@/services/student';
-import '@/services/follow-record';
 import '@/components/student/StudentAvatar';
 import '@/components/student/StudentListCard';
-import '@/components/teacher/SalaryEditSheet';
 import '@/components/PageContainer';
 import './app.scss';
 
 // 不注册 onNeedPrivacyAuthorization，保留微信系统原生隐私弹窗（图二）
+
+/**
+ * 查询缓存保鲜期（Batch 8 POC 口径）：30s 内切回同一页面不再重复请求。
+ * 小程序无「窗口焦点 / 网络重连」语义，两个 refetch 开关全局关闭，避免无效请求。
+ * retry 关闭：与改造前手写取数一致（原实现失败只记日志不重试），
+ * 否则默认 3 次重试会把失败场景的请求数放大 4 倍。
+ */
+const QUERY_STALE_TIME_MS = 30_000;
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: QUERY_STALE_TIME_MS,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: false,
+    },
+  },
+});
 
 // H-02：全局未捕获错误兜底上报（经 utils/logger 门控，生产可剥离）
 if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {
@@ -87,13 +95,16 @@ const App: React.FC<{ children?: React.ReactNode }> = (props) => {
   });
 
   return (
-    // B-01(工程)：全局错误边界，渲染异常降级为错误页而非白屏
-    <ErrorBoundary>
-      <AuthProvider>
-        {props.children}
-        <SubscribeAuthHost />
-      </AuthProvider>
-    </ErrorBoundary>
+    // 页面取数的统一查询缓存（POC：先在首页试点）
+    <QueryClientProvider client={queryClient}>
+      {/* B-01(工程)：全局错误边界，渲染异常降级为错误页而非白屏 */}
+      <ErrorBoundary>
+        <AuthProvider>
+          {props.children}
+          <SubscribeAuthHost />
+        </AuthProvider>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 };
 

@@ -14,12 +14,11 @@ import {
 import {
   classService,
   roomService,
-  campusService,
   scheduleService,
   teacherService,
   subscribeMessageService,
 } from '@/services';
-import { subjectService } from '@/services/campus';
+import { useCampusStore } from '@/stores/campus';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class, ClassLevel } from '@/types/class';
 import type { UserRole } from '@/types/profile';
@@ -153,6 +152,10 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
     invalidateStudents,
   } = params;
 
+  // 校区/科目为低频参照数据：经 campus store 的 TTL 读取，避免每次进页重复请求
+  const fetchCampuses = useCampusStore((state) => state.fetchCampuses);
+  const fetchSubjects = useCampusStore((state) => state.fetchSubjects);
+
   const selectedClass = useMemo(
     () => classes.find((c) => c.id === classId) || null,
     [classId, classes],
@@ -177,20 +180,23 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
       return;
     }
     try {
-      const [stuList, clsList, schList, tchList, campList] = await Promise.all([
+      const [stuList, clsList, schList, tchList] = await Promise.all([
         fetchStudentsByTeacher(currentUserId),
         fetchClassesByTeacher(currentUserId),
         scheduleService.getByTeacher(currentUserId),
         teacherService.getList(),
-        campusService.getList(),
+        fetchCampuses(),
       ]);
+      // 校区为低频参照数据：store 内 TTL.campus 未过期时不会发请求；
+      // 首次拉取失败（时间戳仍为 0）走原有错误态。切校区/切机构由 resetDomainCaches 复位。
+      const campList = useCampusStore.getState().campuses;
+      if (!useCampusStore.getState().lastCampusesFetchAt) {
+        throw new Error('校区参照数据加载失败');
+      }
       // 全部学员池（供学员选择弹窗搜索）
       setStudents(stuList);
-      // 科目列表（供学员选择弹窗按科目筛选）
-      subjectService
-        .getList()
-        .then(setSubjects)
-        .catch(() => setSubjects([]));
+      // 科目列表（供学员选择弹窗按科目筛选）：同样走 store TTL.list，非阻塞
+      void fetchSubjects().then(() => setSubjects(useCampusStore.getState().subjects));
       setClasses(clsList);
       setAllSchedules(schList);
       setTeachers(tchList);
@@ -299,6 +305,8 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
     sourceMode,
     fetchStudentsByTeacher,
     fetchClassesByTeacher,
+    fetchCampuses,
+    fetchSubjects,
     setLoading,
     setLoadError,
     setNotFound,

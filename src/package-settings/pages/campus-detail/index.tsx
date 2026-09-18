@@ -8,7 +8,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BusinessCategoryPicker from '@/components/business/BusinessCategoryPicker';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -56,6 +56,8 @@ const CampusDetail: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [isEditingCategory, setIsEditingCategory] = useState(false);
   const [draftCategories, setDraftCategories] = useState<SelectedBusinessCategory[]>([]);
+  /** 首挂载去重：挂载时 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   const campusId = useMemo(() => {
     const router = Taro.getCurrentInstance().router;
@@ -83,7 +85,15 @@ const CampusDetail: React.FC = () => {
     void loadCampus();
   }, [loadCampus]);
 
+  /**
+   * 校区详情页保留每次进入必刷新（不加 TTL）：校区信息可能已被他人（运营后台 / 校长）改过，
+   * 本页还带编辑入口，看到过期数据风险高。仅挡掉首次显示这一次重复拉取。
+   */
   Taro.useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void loadCampus();
   });
 

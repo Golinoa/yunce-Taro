@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-15
 status: active
 ---
 
@@ -65,6 +65,11 @@ npx vitest run src/constants src/pages src/package-course src/package-student sr
 ## 交付时必须说明
 
 - [ ] 是否已重编译，dist 是否是最新
+- [ ] 测试包 `dist/common.js` 是否包含 `https://dev.chancore.cn/api/app/v1`；不得默认包含本机 `127.0.0.1`
+- [ ] 微信开发者工具“详情 → 本地设置”是否人工开启 JS/WXML/WXSS 三个“上传代码时自动压缩”开关；项目配置字段不能替代该步骤
+- [ ] `project.config.json` 与 `project.private.config.json` 是否均保留 `minified`、`minifyWXSS`、`minifyWXML` 默认值
+- [ ] 若微信开发者工具直接打开 `dist/`，是否存在 `dist/project.config.json` 与 `dist/project.private.config.json`，且 `dist/project.config.json.miniprogramRoot` 为 `./`
+- [ ] 压缩配置变更后是否关闭并重新打开同一 `dist` 项目、重新编译，并在“代码质量”面板重新扫描；旧扫描结果不能作为当前状态
 - [ ] 跑了哪些检查、结果如何
 - [ ] 未接通 / 待确认项是否登记进 ISSUES 台账
 - [ ] 有无需要用户决策的冲突（前端 UI 已固定，后端优先兼容前端）

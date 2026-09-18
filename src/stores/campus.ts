@@ -60,6 +60,12 @@ interface CampusState {
   lastCampusesFetchAt: number;
   /** 科目列表上次成功拉取时间 */
   lastSubjectsFetchAt: number;
+  /** 薪资模板上次成功拉取时间 */
+  lastSalaryModelsFetchAt: number;
+  /** 发薪日设置上次成功拉取时间 */
+  lastPayDayFetchAt: number;
+  /** 节假日列表上次成功拉取时间 */
+  lastHolidaysFetchAt: number;
 
   // 校区操作
   fetchCampuses: (force?: boolean) => Promise<void>;
@@ -72,7 +78,7 @@ interface CampusState {
   setMainCampus: (id: string) => Promise<boolean>;
 
   // 薪资模板操作
-  fetchSalaryModels: () => Promise<void>;
+  fetchSalaryModels: (force?: boolean) => Promise<void>;
   createSalaryModel: (
     model: Omit<SalaryModel, 'id' | 'teacherCount'>,
   ) => Promise<SalaryModel | null>;
@@ -80,11 +86,11 @@ interface CampusState {
   deleteSalaryModel: (id: string) => Promise<boolean>;
 
   // 发薪日操作
-  fetchPayDaySettings: () => Promise<void>;
+  fetchPayDaySettings: (force?: boolean) => Promise<void>;
   updatePayDaySettings: (updates: Partial<PayDaySettings>) => Promise<void>;
 
   // 节假日操作
-  fetchHolidays: () => Promise<void>;
+  fetchHolidays: (force?: boolean) => Promise<void>;
   addHoliday: (holiday: Omit<Holiday, 'id'>) => Promise<Holiday | null>;
   updateHoliday: (id: string, updates: Partial<Holiday>) => Promise<boolean>;
   deleteHoliday: (id: string) => Promise<boolean>;
@@ -130,6 +136,9 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   error: null,
   lastCampusesFetchAt: 0,
   lastSubjectsFetchAt: 0,
+  lastSalaryModelsFetchAt: 0,
+  lastPayDayFetchAt: 0,
+  lastHolidaysFetchAt: 0,
 
   // ============================================
   // 校区
@@ -156,7 +165,15 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   },
 
   invalidateCache: () => {
-    set({ lastCampusesFetchAt: 0, lastSubjectsFetchAt: 0, campuses: [], subjects: [] });
+    set({
+      lastCampusesFetchAt: 0,
+      lastSubjectsFetchAt: 0,
+      lastSalaryModelsFetchAt: 0,
+      lastPayDayFetchAt: 0,
+      lastHolidaysFetchAt: 0,
+      campuses: [],
+      subjects: [],
+    });
   },
 
   invalidateSubjectsCache: () => {
@@ -227,10 +244,20 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   // ============================================
   // 薪资模板
   // ============================================
-  fetchSalaryModels: async () => {
+  fetchSalaryModels: async (force = false) => {
     try {
-      const salaryModels = await salaryModelCampusService.getList();
-      set({ salaryModels, error: null });
+      const { salaryModels, lastSalaryModelsFetchAt } = get();
+      const now = Date.now();
+      if (
+        !force &&
+        salaryModels.length > 0 &&
+        lastSalaryModelsFetchAt > 0 &&
+        now - lastSalaryModelsFetchAt < TTL.list
+      ) {
+        return;
+      }
+      const list = await salaryModelCampusService.getList();
+      set({ salaryModels: list, error: null, lastSalaryModelsFetchAt: now });
     } catch (err) {
       logError('fetchSalaryModels', err);
       set({ error: '薪资模板加载失败' });
@@ -241,7 +268,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
     try {
       const result = await salaryModelCampusService.create(model);
       const salaryModels = await salaryModelCampusService.getList();
-      set({ salaryModels, error: null });
+      set({ salaryModels, error: null, lastSalaryModelsFetchAt: Date.now() });
       return result;
     } catch (err) {
       logError('createSalaryModel', err);
@@ -255,7 +282,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const result = await salaryModelCampusService.update(id, updates);
       if (result) {
         const salaryModels = await salaryModelCampusService.getList();
-        set({ salaryModels, error: null });
+        set({ salaryModels, error: null, lastSalaryModelsFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -271,7 +298,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const success = await salaryModelCampusService.delete(id);
       if (success) {
         const salaryModels = await salaryModelCampusService.getList();
-        set({ salaryModels, error: null });
+        set({ salaryModels, error: null, lastSalaryModelsFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -285,10 +312,15 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   // ============================================
   // 发薪日
   // ============================================
-  fetchPayDaySettings: async () => {
+  fetchPayDaySettings: async (force = false) => {
     try {
+      const { lastPayDayFetchAt } = get();
+      const now = Date.now();
+      if (!force && lastPayDayFetchAt > 0 && now - lastPayDayFetchAt < TTL.list) {
+        return;
+      }
       const payDaySettings = await payDaySettingsService.get();
-      set({ payDaySettings, error: null });
+      set({ payDaySettings, error: null, lastPayDayFetchAt: now });
     } catch (err) {
       logError('fetchPayDaySettings', err);
       set({ error: '发薪日设置加载失败' });
@@ -298,7 +330,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   updatePayDaySettings: async (updates) => {
     try {
       const payDaySettings = await payDaySettingsService.update(updates);
-      set({ payDaySettings, error: null });
+      set({ payDaySettings, error: null, lastPayDayFetchAt: Date.now() });
     } catch (err) {
       logError('updatePayDaySettings', err);
       set({ error: '更新发薪日设置失败' });
@@ -308,10 +340,20 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   // ============================================
   // 节假日
   // ============================================
-  fetchHolidays: async () => {
+  fetchHolidays: async (force = false) => {
     try {
-      const holidays = await holidayService.getList();
-      set({ holidays, error: null });
+      const { holidays, lastHolidaysFetchAt } = get();
+      const now = Date.now();
+      if (
+        !force &&
+        holidays.length > 0 &&
+        lastHolidaysFetchAt > 0 &&
+        now - lastHolidaysFetchAt < TTL.list
+      ) {
+        return;
+      }
+      const list = await holidayService.getList();
+      set({ holidays: list, error: null, lastHolidaysFetchAt: now });
     } catch (err) {
       logError('fetchHolidays', err);
       set({ error: '节假日数据加载失败' });
@@ -322,7 +364,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
     try {
       const result = await holidayService.add(holiday);
       const holidays = await holidayService.getList();
-      set({ holidays, error: null });
+      set({ holidays, error: null, lastHolidaysFetchAt: Date.now() });
       return result;
     } catch (err) {
       logError('addHoliday', err);
@@ -336,7 +378,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const result = await holidayService.update(id, updates);
       if (result) {
         const holidays = await holidayService.getList();
-        set({ holidays, error: null });
+        set({ holidays, error: null, lastHolidaysFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -352,7 +394,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       const success = await holidayService.delete(id);
       if (success) {
         const holidays = await holidayService.getList();
-        set({ holidays, error: null });
+        set({ holidays, error: null, lastHolidaysFetchAt: Date.now() });
         return true;
       }
       return false;
@@ -382,7 +424,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
     try {
       const count = await holidayService.generateStatutory(year);
       const holidays = await holidayService.getList();
-      set({ holidays, error: null });
+      set({ holidays, error: null, lastHolidaysFetchAt: Date.now() });
       return count;
     } catch (err) {
       logError('generateStatutoryHolidays', err);

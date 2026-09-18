@@ -41,7 +41,10 @@ const CourseFormPage: React.FC = () => {
   const isEdit = !!courseId;
   // 班级模式（用户口径 2026-08-23）：课程管理页「未排课班级」与班级详情页「编辑」
   // 统一走本页编辑班级数据（type=class），编辑入口不再散落于 class-form / 弹窗
-  const editType = decodeURIComponent(instance?.router?.params?.type || '');
+  // mode 是本页统一使用的路由参数；兼容旧入口传入的 type=class。
+  const editType = decodeURIComponent(
+    instance?.router?.params?.mode || instance?.router?.params?.type || '',
+  );
   const routeCategoryId = decodeURIComponent(instance?.router?.params?.categoryId || '');
   const isClassEdit = isEdit && editType === 'class';
 

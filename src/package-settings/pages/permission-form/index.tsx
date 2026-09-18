@@ -128,7 +128,7 @@ const PermissionForm: React.FC = () => {
       } catch (err) {
         // 版本冲突：刷新缓存并如实提示，禁止静默覆盖
         if (Number((err as { code?: number })?.code) === 409) {
-          void usePermissionStore.getState().load();
+          void usePermissionStore.getState().load(true);
           Taro.showToast({ title: '权限已被他人修改，已刷新', icon: 'none' });
         } else {
           Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
@@ -166,7 +166,7 @@ const PermissionForm: React.FC = () => {
     } catch (err) {
       // 版本冲突：刷新缓存并如实提示，禁止静默覆盖
       if (Number((err as { code?: number })?.code) === 409) {
-        void usePermissionStore.getState().load();
+        void usePermissionStore.getState().load(true);
         Taro.showToast({ title: '权限已被他人修改，已刷新', icon: 'none' });
       } else {
         Taro.showToast({ title: '保存失败，请重试', icon: 'none' });

@@ -17,17 +17,24 @@ import { useAgreementStore } from '@/stores/agreement';
 import type { CampusUIModel } from '@/types/campus';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import { clearIdentitySelectionPending, markOnboardingSkipped } from '@/utils/auth-onboarding';
+import {
+  DEFAULT_BOOKING_RULES,
+  fetchBookingRules,
+  type BookingRuleState,
+} from '@/utils/booking-rules';
 import { getCampusOpenStatus, parseBusinessHours } from '@/utils/campus';
 import {
   TRIAL_INVITE_FORM_TOAST,
   resolveTrialInviteAccess,
   resolveTrialInviteBookNext,
+  resolveTrialInviteBookingClosed,
   resolveTrialInviteBootstrap,
   resolveTrialInviteDockAction,
   resolveTrialInviteLoginCatchup,
   resolveTrialInviteMainCopy,
   resolveTrialInvitePostLoginNext,
   validateTrialInviteForm,
+  type TrialInviteBookingClosedReason,
 } from '@/utils/invite-landing-flow';
 import {
   formatInviteLandingDateLabel,
@@ -49,7 +56,6 @@ import {
   resolveTrialInviteLandingScreen,
   resolveTrialInviteNeedLoginGate,
 } from '@/utils/invite-landing-view-state';
-import { isInviteLessonExpired } from '@/utils/invite-lesson-expired';
 import { getOrCreateInviteVisitorKey } from '@/utils/invite-visitor-key';
 import { logError } from '@/utils/logger';
 import { ensurePrivacyBeforeAuth, promptPrivacySyncInHandler } from '@/utils/privacy-authorize';
@@ -85,6 +91,13 @@ const InviteLandingPage: React.FC = () => {
   const [childGender, setChildGender] = useState<InviteLandingChildGender | ''>('');
   const [parentPhone, setParentPhone] = useState('');
 
+  // 预约规则（用于「达禁止时间」客户端预显）；默认开课前 120 分钟截止，登录后按机构真实配置刷新
+  const [bookingRules, setBookingRules] = useState<BookingRuleState>(DEFAULT_BOOKING_RULES);
+  // 服务端软降级（提交被 #4 拦截）→ 强制切「无法预约」态（避免停留在可重试的旧快照）
+  const [closedByServer, setClosedByServer] = useState<{
+    reason: TrialInviteBookingClosedReason;
+  } | null>(null);
+
   const [campus, setCampus] = useState<CampusUIModel | null>(null);
   const [teacherName, setTeacherName] = useState('');
 
@@ -118,10 +131,26 @@ const InviteLandingPage: React.FC = () => {
   );
 
   const isStaff = isStaffRole(currentRole);
-  const lessonExpired = useMemo(
-    () => isInviteLessonExpired(params.date, params.end),
-    [params.date, params.end],
+  const { closed: slotClosed, reason: slotClosedReason } = useMemo(
+    () =>
+      resolveTrialInviteBookingClosed({
+        date: params.date,
+        start: params.start,
+        end: params.end,
+        bookingDeadlineEnabled: bookingRules.bookingDeadlineEnabled,
+        bookingDeadlineMinutes: bookingRules.bookingDeadlineMinutes,
+      }),
+    [
+      params.date,
+      params.start,
+      params.end,
+      bookingRules.bookingDeadlineEnabled,
+      bookingRules.bookingDeadlineMinutes,
+    ],
   );
+  // 客户端预判 ∪ 服务端软降级：任一为真即「无法预约」
+  const bookingClosed = Boolean(closedByServer) || slotClosed;
+  const bookingClosedReason = slotClosed ? slotClosedReason : (closedByServer?.reason ?? null);
 
   /** 机构端不可访问家长邀约落地（guest=1 仅用于 Mock 强制访客演示） */
   useEffect(() => {
@@ -162,7 +191,7 @@ const InviteLandingPage: React.FC = () => {
           parentUserId: session?.user.id,
         }),
       ),
-      lessonExpired,
+      bookingClosed,
     });
 
     if (phase === 'wait') return;
@@ -198,7 +227,7 @@ const InviteLandingPage: React.FC = () => {
       return;
     }
 
-    if (phase === 'lesson_expired') {
+    if (phase === 'booking_closed') {
       setShowVoucher(false);
       setShowLogin(false);
       setClaimed(true);
@@ -212,7 +241,7 @@ const InviteLandingPage: React.FC = () => {
     authLoading,
     bootstrapped,
     isStaff,
-    lessonExpired,
+    bookingClosed,
     lessonKey,
     params.guest,
     paramsReady,
@@ -234,9 +263,9 @@ const InviteLandingPage: React.FC = () => {
       claimed,
       showForm,
       showVoucher,
-      lessonExpired,
+      bookingClosed,
     });
-    if (catchup === 'lesson_expired') {
+    if (catchup === 'booking_closed') {
       setShowVoucher(false);
       setClaimed(true);
       setShowLogin(false);
@@ -252,7 +281,7 @@ const InviteLandingPage: React.FC = () => {
     claimed,
     guestMode,
     isStaff,
-    lessonExpired,
+    bookingClosed,
     params.guest,
     paramsReady,
     session,
@@ -276,6 +305,22 @@ const InviteLandingPage: React.FC = () => {
     });
   }, [params.t]);
 
+  /** 登录后按校区拉取预约规则（含 bookingDeadlineMinutes），用于「达禁止时间」客户端预显 */
+  useEffect(() => {
+    if (!params.c) return;
+    let cancelled = false;
+    void fetchBookingRules(params.c)
+      .then((rules) => {
+        if (!cancelled) setBookingRules(rules);
+      })
+      .catch(() => {
+        /* 拉取失败回退默认规则，后端 422 仍是最终拦截 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [params.c, session?.user.id]);
+
   /** 已登录后上报访问；过期场次附带半小时站内提醒登记 */
   useEffect(() => {
     if (!bootstrapped || staffBlocked || success) return;
@@ -291,8 +336,8 @@ const InviteLandingPage: React.FC = () => {
         sourceType: params.st || 'share_link',
         parentUserId: session?.user.id,
         visitorKey: visitorKeyRef.current,
-        lessonExpired,
-        lessonKey: lessonExpired ? lessonKey : undefined,
+        lessonExpired: bookingClosed,
+        lessonKey: bookingClosed ? lessonKey : undefined,
         className: params.className,
         date: params.date,
         start: params.start,
@@ -302,7 +347,7 @@ const InviteLandingPage: React.FC = () => {
   }, [
     bootstrapped,
     guestMode,
-    lessonExpired,
+    bookingClosed,
     lessonKey,
     params.c,
     params.className,
@@ -350,7 +395,7 @@ const InviteLandingPage: React.FC = () => {
     success,
   });
   const mainCopy = resolveTrialInviteMainCopy({
-    lessonExpired,
+    bookingClosedReason,
     claimed,
     isGroupBook,
     teacherName,
@@ -358,7 +403,7 @@ const InviteLandingPage: React.FC = () => {
   });
   const dockAction = resolveTrialInviteDockAction({
     claimed,
-    lessonExpired,
+    bookingClosed,
     hasCampusPhone: Boolean(campus?.phone),
   });
 
@@ -388,15 +433,15 @@ const InviteLandingPage: React.FC = () => {
   }, [ensureSubscribe, profile?.phone]);
 
   const handleBookClick = useCallback(() => {
-    const next = resolveTrialInviteBookNext({ lessonExpired, loggedIn: isLoggedIn });
-    if (next === 'ignore_expired') return;
+    const next = resolveTrialInviteBookNext({ bookingClosed, loggedIn: isLoggedIn });
+    if (next === 'ignore_closed') return;
     if (next === 'need_login') {
       openFormAfterLoginRef.current = true;
       setShowLogin(true);
       return;
     }
     void openBookingForm();
-  }, [isLoggedIn, lessonExpired, openBookingForm]);
+  }, [isLoggedIn, bookingClosed, openBookingForm]);
 
   const executeWechatLogin = useCallback(async () => {
     if (wechatSubmitting) return;
@@ -419,10 +464,10 @@ const InviteLandingPage: React.FC = () => {
       visitReportedRef.current = false;
 
       const postLogin = resolveTrialInvitePostLoginNext({
-        lessonExpired: isInviteLessonExpired(params.date, params.end),
+        bookingClosed,
         openFormAfterLogin: openFormAfterLoginRef.current,
       });
-      if (postLogin === 'lesson_expired') {
+      if (postLogin === 'booking_closed') {
         setShowVoucher(false);
         setClaimed(true);
         return;
@@ -442,14 +487,7 @@ const InviteLandingPage: React.FC = () => {
     } finally {
       setWechatSubmitting(false);
     }
-  }, [
-    ensureSubscribe,
-    openBookingForm,
-    params.date,
-    params.end,
-    signInWithWechat,
-    wechatSubmitting,
-  ]);
+  }, [ensureSubscribe, openBookingForm, bookingClosed, signInWithWechat, wechatSubmitting]);
 
   const handleWechatLogin = useCallback(() => {
     if (wechatSubmitting) return;
@@ -515,7 +553,7 @@ const InviteLandingPage: React.FC = () => {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (submitting || lessonExpired) return;
+    if (submitting || bookingClosed) return;
     const field = validateTrialInviteForm({
       childName,
       childAge,
@@ -559,6 +597,25 @@ const InviteLandingPage: React.FC = () => {
         return;
       }
 
+      // #4 软降级：有课程上下文但服务端未约课（超过截止 / 已开课）→ 留资成功，切「无法预约」态
+      if (hasLessonContext && !result.booked) {
+        const fresh = resolveTrialInviteBookingClosed({
+          date: params.date,
+          start: params.start,
+          end: params.end,
+          bookingDeadlineEnabled: bookingRules.bookingDeadlineEnabled,
+          bookingDeadlineMinutes: bookingRules.bookingDeadlineMinutes,
+        });
+        setClosedByServer({ reason: fresh.reason ?? 'booking_deadline' });
+        setShowForm(false);
+        Taro.showToast({
+          title: result.message || '已超过预约截止时间，已为您留资，老师会尽快联系你',
+          icon: 'none',
+          duration: 3000,
+        });
+        return;
+      }
+
       persistSuccess({
         childName: childName.trim(),
         childAge: childAge.trim(),
@@ -579,7 +636,9 @@ const InviteLandingPage: React.FC = () => {
     childName,
     hasLessonContext,
     isGroupBook,
-    lessonExpired,
+    bookingClosed,
+    bookingRules.bookingDeadlineEnabled,
+    bookingRules.bookingDeadlineMinutes,
     params,
     parentPhone,
     persistSuccess,
@@ -677,7 +736,8 @@ const InviteLandingPage: React.FC = () => {
         timeLabel={timeLabel}
         isGroupBook={isGroupBook}
         isLoggedIn={isLoggedIn}
-        lessonExpired={lessonExpired}
+        bookingClosed={bookingClosed}
+        bookingClosedReason={bookingClosedReason}
         claimed={claimed}
         showVoucher={showVoucher}
         showLogin={showLogin}

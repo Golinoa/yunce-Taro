@@ -329,6 +329,7 @@ export const subjectService = {
       studentCount: Number(raw.studentCount ?? 0),
       teacherCount: Number(raw.teacherCount ?? 0),
       courseCount: Number(raw.courseCount ?? 0),
+      cardCount: Number(raw.cardCount ?? 0),
       createdAt: String(raw.createdAt ?? ''),
       updatedAt: String(raw.updatedAt ?? ''),
     })) as Subject[];
@@ -345,6 +346,7 @@ export const subjectService = {
         studentCount: Number(raw.studentCount ?? 0),
         teacherCount: Number(raw.teacherCount ?? 0),
         courseCount: Number(raw.courseCount ?? 0),
+        cardCount: Number(raw.cardCount ?? 0),
         createdAt: String(raw.createdAt ?? ''),
         updatedAt: String(raw.updatedAt ?? ''),
       } as Subject;
@@ -363,6 +365,7 @@ export const subjectService = {
       studentCount: Number(raw.studentCount ?? 0),
       teacherCount: Number(raw.teacherCount ?? 0),
       courseCount: Number(raw.courseCount ?? 0),
+      cardCount: Number(raw.cardCount ?? 0),
       createdAt: String(raw.createdAt ?? ''),
       updatedAt: String(raw.updatedAt ?? ''),
     } as Subject;

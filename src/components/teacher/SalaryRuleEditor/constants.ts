@@ -24,6 +24,7 @@ export const LESSON_FEE_MODE_OPTIONS: { label: string; value: LessonFeeMode }[] 
   { label: '统一课时费', value: 'unified' },
   { label: '按课程设置', value: 'by_course' },
   { label: '按上课人数', value: 'by_attendance' },
+  { label: '按每人每节', value: 'by_person_per_lesson' },
   { label: '按月课量阶梯', value: 'by_monthly_tier' },
   { label: '按业绩阶梯', value: 'by_perf_tier' },
 ];

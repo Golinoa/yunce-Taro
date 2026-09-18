@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
-import { ORG_COVER_IMAGE } from '@/constants/brand';
 import { homeService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import type { CampusUIModel } from '@/types/campus';
@@ -11,6 +10,9 @@ import type { Schedule } from '@/types/schedule';
 import { useAuth } from '@/utils/auth';
 import { parseBusinessHours, getCampusOpenStatus } from '@/utils/campus';
 import { withRouteGuard } from '@/utils/route-guard';
+
+/** 机构封面默认图：随本分包下发（B12 主包瘦身，避免占用主包体积） */
+const ORG_COVER_IMAGE = '/package-auth/assets/cover-home.webp';
 
 /**
  * Index - 教师端首页

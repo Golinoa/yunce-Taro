@@ -10,12 +10,7 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import { MEDIA_IMAGE_BASE } from '@/constants/brand';
-import {
-  SUPPORT_QR_DEFAULT_COPY,
-  SUPPORT_REPAIR_QR_CDN,
-  SUPPORT_REPAIR_QR_LOCAL,
-  SUPPORT_REPAIR_QR_URL,
-} from '@/constants/support-qr';
+import { SUPPORT_QR_DEFAULT_COPY, SUPPORT_REPAIR_QR_URL } from '@/constants/support-qr';
 
 const QR_POINT_HAND = `${MEDIA_IMAGE_BASE}/qr-point-hand.png`;
 
@@ -109,13 +104,8 @@ const SupportQrDialog: React.FC<SupportQrDialogProps> = ({
   };
 
   const handleImgError = useCallback(() => {
-    setImgSrc((prev) => {
-      if (prev === SUPPORT_REPAIR_QR_LOCAL) return prev;
-      if (prev === SUPPORT_REPAIR_QR_CDN || prev === qrUrl) {
-        return SUPPORT_REPAIR_QR_LOCAL;
-      }
-      return SUPPORT_REPAIR_QR_LOCAL;
-    });
+    // B12：本地回退图已上云移除，加载失败时仅记录，UI 保持白卡（原文案不变）
+    setImgSrc((prev) => (prev === qrUrl ? prev : qrUrl));
   }, [qrUrl]);
 
   const handleSave = useCallback(async () => {
@@ -127,12 +117,7 @@ const SupportQrDialog: React.FC<SupportQrDialogProps> = ({
         Taro.showToast({ title: '未获得相册权限', icon: 'none' });
         return;
       }
-      let path: string;
-      try {
-        path = await resolveLocalPath(imgSrc);
-      } catch {
-        path = await resolveLocalPath(SUPPORT_REPAIR_QR_LOCAL);
-      }
+      const path = await resolveLocalPath(imgSrc);
       await Taro.saveImageToPhotosAlbum({ filePath: path });
       Taro.showToast({ title: '已保存到相册', icon: 'success' });
     } catch {

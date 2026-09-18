@@ -10,7 +10,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useLoad, useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import { leadService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
@@ -33,6 +33,8 @@ const LeadBookingDetailPage: React.FC = () => {
   const [booking, setBooking] = useState<LeadBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusBarHeight, setStatusBarHeight] = useState(44);
+  /** 首挂载去重：bookingId 就绪后下面 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   useLoad((options) => {
     const opt = options as Record<string, string>;
@@ -68,7 +70,15 @@ const LeadBookingDetailPage: React.FC = () => {
     void loadBooking();
   }, [loadBooking]);
 
+  /**
+   * 预约详情页保留每次进入必刷新（不加 TTL）：详情内容可能已被他人改动，
+   * 加 TTL 会看到过期数据。仅挡掉首次显示这一次重复拉取。
+   */
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void loadBooking();
   });
 

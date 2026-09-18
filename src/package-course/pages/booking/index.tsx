@@ -6,7 +6,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
@@ -135,6 +135,8 @@ const MyBookingsPage: React.FC = () => {
   const [bookings, setBookings] = useState<MyBookingCard[]>([]);
   const [statusTab, setStatusTab] = useState<StatusTab>('confirmed');
   const [actingId, setActingId] = useState<string | null>(null);
+  /** 首挂载去重：挂载时 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   const dateRange = useMemo(
     () => ({
@@ -167,7 +169,16 @@ const MyBookingsPage: React.FC = () => {
     void loadBookings();
   }, [loadBookings]);
 
+  /**
+   * 首挂载不重复（详情页语义保留）：本页是「我的预约」台账落地页，
+   * 子页（线索详情 / 预约记录详情）里的核销、取消会改动台账内容，
+   * 所以从子页返回时必须刷新，这里**不加 TTL**，只挡掉首次显示这一次重复拉取。
+   */
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void loadBookings();
   });
 

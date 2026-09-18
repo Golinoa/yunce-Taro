@@ -7,6 +7,7 @@ import type { AttendanceTier } from '@/types/teacher';
 import GradientRow from './GradientRow';
 
 export interface AttendanceTierEditorProps {
+  perPerson?: boolean;
   tiers: AttendanceTier[];
   errors?: Record<string, { minCount?: string; maxCount?: string; rate?: string }>;
   onChange: (id: string, key: 'minCount' | 'maxCount' | 'rate', raw: string) => void;
@@ -15,6 +16,7 @@ export interface AttendanceTierEditorProps {
 }
 
 const AttendanceTierEditor: React.FC<AttendanceTierEditorProps> = ({
+  perPerson = false,
   tiers,
   errors,
   onChange,
@@ -24,7 +26,9 @@ const AttendanceTierEditor: React.FC<AttendanceTierEditorProps> = ({
   return (
     <View className="flex flex-col">
       <Text className="text-[24rpx] text-muted-foreground leading-relaxed mb-[12rpx] block">
-        按单节课实际到课人数设置课时费，例如 1-5 人 80 元/节、6-10 人 100 元/节。
+        {perPerson
+          ? '按实际到课人数选择梯度，再按人数 × 每人每节单价计算。例如 1-6 人每人每节 5 元，5 人合计 25 元。'
+          : '按实际到课人数选择整节课课时费。例如 1-5 人 80 元/节、6-10 人 100 元/节。'}
       </Text>
       {tiers.map((t, idx) => (
         <View key={t.id} className="flex flex-col mt-[16rpx]">
@@ -49,7 +53,9 @@ const AttendanceTierEditor: React.FC<AttendanceTierEditorProps> = ({
               inputClassName="w-[120rpx] h-[72rpx] bg-muted rounded-[12rpx] px-[16rpx] text-[28rpx] text-right"
               className="mb-0"
             />
-            <Text className="text-[28rpx] text-foreground whitespace-nowrap">人，每节</Text>
+            <Text className="text-[28rpx] text-foreground whitespace-nowrap">
+              {perPerson ? '人，每人每节' : '人，每节'}
+            </Text>
             <FormInput
               variant="ghost"
               type="digit"

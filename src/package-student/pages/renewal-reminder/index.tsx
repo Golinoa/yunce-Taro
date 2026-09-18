@@ -5,7 +5,7 @@
 import { View, Text, ScrollView, Input } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
@@ -41,6 +41,8 @@ const RenewalReminderPage: React.FC = () => {
   const [draft, setDraft] = useState<AlertThresholdConfig>(getAlertThresholdConfig());
   const [saving, setSaving] = useState(false);
   const [tabCounts, setTabCounts] = useState({ active: 0, muted: 0 });
+  /** 首挂载去重：挂载时 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   const syncCampusThresholds = useCallback(async () => {
     if (!campusId) return;
@@ -91,7 +93,15 @@ const RenewalReminderPage: React.FC = () => {
     void load();
   }, [load]);
 
+  /**
+   * 首挂载不重复（不加 TTL）：本页是运营提醒台账，子页学员详情里可以办续费 / 改课包，
+   * 返回必须刷新；只挡掉首次显示这一次（挂载时 useEffect 已经拉过）。
+   */
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void load();
   });
 

@@ -1,6 +1,6 @@
 import { View, Text } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Icon from '@/components/Icon';
 import { studentService } from '@/services';
 import { organizationService } from '@/services/organization';
@@ -33,14 +33,20 @@ const ParentBind: React.FC = () => {
   const [binding, setBinding] = useState(false);
   const [bound, setBound] = useState(false);
   const [error, setError] = useState('');
+  /** R2：已按该学员 ID 拉过详情，避免依赖确定过程中重复拉取 */
+  const lastStudentFetchIdRef = useRef<string | null>(null);
 
   // 加载学生信息
   useEffect(() => {
+    // R2 就绪闸门：本页取学员信息只依赖 studentId。**不把 profile 放进 key**——
+    // 本页允许未登录预览邀请卡，等 profile 就绪才拉会让未登录访客永远拿不到学员信息。
     if (!studentId) {
       setError('缺少学员信息');
       setLoading(false);
       return;
     }
+    if (lastStudentFetchIdRef.current === studentId) return;
+    lastStudentFetchIdRef.current = studentId;
     studentService
       .getById(studentId)
       .then((stu) => {

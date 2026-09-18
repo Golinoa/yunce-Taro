@@ -128,6 +128,8 @@ const MyTodos: React.FC = () => {
   const isFirstMount = useRef(true);
   const loadSeqRef = useRef(0);
   const todosCountRef = useRef(0);
+  /** R2：已按该身份上下文（profileId + 角色 + 校区）发起过列表拉取，避免依赖逐个确定时重复拉取 */
+  const lastTodosFetchKeyRef = useRef<string | null>(null);
 
   todosCountRef.current = todos.length;
 
@@ -222,11 +224,28 @@ const MyTodos: React.FC = () => {
     await loadTodos();
   }, [loadCategories, loadTodos]);
 
+  /**
+   * R2 就绪闸门：待办列表依赖 profile.id / currentRole / currentCampusId / monthFilter，
+   * 其中三个身份值是**分批确定**的，直接放进 useEffect 依赖数组会每确定一个就整页重拉一次
+   * （getTeacher + todos 各被拉多遍）。这里把身份与月份压成一个 key：
+   * - key 为空 = 身份未齐全 → 不发请求（profile 未就绪时 loadTodos 本来也会空返回）；
+   * - key 未变 = 同一组身份上下文 → 只拉一次（挡掉 profile 对象换新但三项未变的情况）；
+   * - key 变化 = 切校区 / 切身份 / 换账号 / 切月份 → 重拉。
+   * monthFilter 必须在 key 内：切换月份此前是靠 loadTodos 依赖变化触发重拉，漏掉会让切月不刷新。
+   */
+  const todosFetchKey =
+    profile?.id && currentRole
+      ? `${profile.id}|${currentRole}|${currentCampusId}|${monthFilter}`
+      : '';
+
   /** 首载与身份/校区变化：不依赖 useDidShow（自定义导航页 onShow 可能晚于首帧） */
   useEffect(() => {
     loadCategories();
+    if (!todosFetchKey) return;
+    if (lastTodosFetchKeyRef.current === todosFetchKey) return;
+    lastTodosFetchKeyRef.current = todosFetchKey;
     void loadTodos();
-  }, [profile?.id, currentRole, currentCampusId, loadCategories, loadTodos]);
+  }, [todosFetchKey, loadCategories, loadTodos]);
 
   useDidShow(() => {
     const collaboratorResult = consumeTodoCollaboratorResult();

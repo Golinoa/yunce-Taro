@@ -14,6 +14,7 @@ import {
   type RoleGrant,
 } from '@/types/permission';
 import { get, put } from '@/utils/request';
+import { singleFlight } from '@/utils/single-flight';
 
 /** 默认配置：系统角色按 ROLE_PERMISSION_MAP 默认值，无自定义角色 */
 export function createDefaultConfig(): PermissionConfig {
@@ -63,13 +64,15 @@ export function clearPermissionCache(): void {
 
 /** 从服务端拉取并写入本地缓存 */
 export async function fetchPermissionConfig(): Promise<PermissionConfig> {
-  const data = await get<PermissionConfig>('/org-permissions');
-  const cfg: PermissionConfig = {
-    version: Number(data?.version ?? 1),
-    grants: (data?.grants as PermissionConfig['grants']) || createDefaultConfig().grants,
-    customRoles: Array.isArray(data?.customRoles) ? data.customRoles : [],
-  };
-  return cacheConfig(cfg);
+  return singleFlight('org-permissions', async () => {
+    const data = await get<PermissionConfig>('/org-permissions');
+    const cfg: PermissionConfig = {
+      version: Number(data?.version ?? 1),
+      grants: (data?.grants as PermissionConfig['grants']) || createDefaultConfig().grants,
+      customRoles: Array.isArray(data?.customRoles) ? data.customRoles : [],
+    };
+    return cacheConfig(cfg);
+  });
 }
 
 /** 保存到服务端并更新本地缓存 */

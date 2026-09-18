@@ -21,6 +21,47 @@ const buildRequestUrl = (url: string): string => {
   return `${BASE_URL}${normalizedPath}`;
 };
 
+/** 限流退避：收到 429 后的静默窗口（ms），窗口内的新请求先等再发，避免继续加压 */
+const RATE_LIMIT_BACKOFF_MS = 1500;
+/** 限流提示防抖（ms）：同一波 429 只提示一次 */
+const RATE_LIMIT_TOAST_DEBOUNCE_MS = 3000;
+const RATE_LIMIT_MESSAGE = '操作太频繁，稍后再试';
+/** /auth/* 不受退避影响：限流时也要保证用户能重新登录、能续期 */
+const AUTH_PATH_PREFIX = '/auth/';
+const isAuthPath = (url: string): boolean => url.startsWith(AUTH_PATH_PREFIX);
+
+let rateLimitBackoffUntil = 0;
+let rateLimitToastAt = 0;
+
+/**
+ * 429 是限流，不是会话失效：禁止清登录态、禁止跳登录页。
+ * 只做统一提示 + 短暂退避，让用户停在原页面。
+ */
+function handleRateLimited(url: string): void {
+  if (!isAuthPath(url)) {
+    rateLimitBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS;
+  }
+
+  const now = Date.now();
+  if (now - rateLimitToastAt < RATE_LIMIT_TOAST_DEBOUNCE_MS) {
+    return;
+  }
+  rateLimitToastAt = now;
+  Taro.showToast({ title: RATE_LIMIT_MESSAGE, icon: 'none', duration: 2000 });
+}
+
+/** 退避窗口内的请求先等待再发出 */
+async function waitForRateLimitBackoff(url: string): Promise<void> {
+  if (isAuthPath(url)) {
+    return;
+  }
+  const remaining = rateLimitBackoffUntil - Date.now();
+  if (remaining <= 0) {
+    return;
+  }
+  await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+}
+
 function clearAuthSession(): void {
   Taro.removeStorageSync(AUTH_TOKEN_KEY);
 }
@@ -246,6 +287,9 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
     warnDuplicateGet(url);
   }
 
+  // 上一波 429 的退避窗口内，先等再发（/auth/* 除外，保证能重新登录与续期）
+  await waitForRateLimitBackoff(url);
+
   // 注入 token（过期时尝试 refresh）
   if (!skipAuth) {
     const token = await resolveAccessToken(skipAuth);
@@ -302,6 +346,12 @@ export async function request<T = unknown>(options: RequestOptions): Promise<T> 
       }
       // 直接返回数据
       return res.data as T;
+    }
+
+    // 429：限流。不清登录态、不跳登录页，统一提示并退避
+    if (res.statusCode === 429) {
+      handleRateLimited(url);
+      throw new ApiError(429, RATE_LIMIT_MESSAGE);
     }
 
     // 401：鉴权失败

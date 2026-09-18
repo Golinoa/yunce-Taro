@@ -249,8 +249,13 @@ export const classService = {
     }, API_PAGE_SIZE_BATCH);
     return list.map(mapBackendClassListItem);
   },
-  getStudents: async (classId: string): Promise<Student[]> => {
+  getStudents: async (
+    classId: string,
+    options: { includePackages?: boolean } = {},
+  ): Promise<Student[]> => {
+    const includePackages = options.includePackages !== false;
     const withPackages = async (base: Student[]): Promise<Student[]> => {
+      if (!includePackages) return base;
       if (base.length === 0) return base;
       return Promise.all(
         base.map(async (student) => {
@@ -357,7 +362,10 @@ export const classService = {
     }
     return Array.from(ids);
   },
-  create: async (data: Omit<Class, 'id' | 'created_at' | 'updated_at'>) => {
+  create: async (
+    data: Omit<Class, 'id' | 'created_at' | 'updated_at'>,
+    studentIds: string[] = [],
+  ) => {
     const created = await post<BackendClassListItem>('/classes', {
       name: data.name,
       schedule: data.schedule,
@@ -374,6 +382,7 @@ export const classService = {
       endTime: data.end_time,
       homeImage: data.homeImage ?? null,
       backgroundImage: data.backgroundImage ?? null,
+      studentIds,
     });
     return mapBackendClassListItem(created);
   },

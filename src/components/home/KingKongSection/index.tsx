@@ -57,7 +57,7 @@ const TRIPLE_CARD_CONFIG = [
   },
   {
     label: '我的预约',
-    subLabel: '查看关联\n预约',
+    subLabel: '查看关联预约',
     icon: 'mdi-calendar-check',
     image: HOME_TILE_3D.calendarCheck,
     url: '/package-course/pages/booking/index',
@@ -67,7 +67,7 @@ const TRIPLE_CARD_CONFIG = [
   },
   {
     label: '学员管理',
-    subLabel: '查看全部\n学员',
+    subLabel: '查看全部学员',
     icon: 'mdi-account-group',
     image: HOME_TILE_3D.users,
     url: '/package-student/pages/students/index',
@@ -240,17 +240,12 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({
                   <View className="relative z-10 flex h-full min-h-[128rpx] items-center justify-between py-[14rpx] pl-[36rpx] pr-[16rpx]">
                     <View className="relative z-10 min-w-0 flex-1 pr-[8rpx]">
                       <Text className="text-[24rpx] font-bold text-foreground">{entry.label}</Text>
-                      <View className="mt-[2rpx]">
-                        {entry.subLabel.split('\n').map((line) => (
-                          <Text
-                            key={line}
-                            className="block text-[20rpx] font-semibold leading-[1.3]"
-                            style={{ color: entry.accent }}
-                          >
-                            {line}
-                          </Text>
-                        ))}
-                      </View>
+                      <Text
+                        className="mt-[2rpx] whitespace-nowrap text-[20rpx] font-semibold leading-[1.3]"
+                        style={{ color: entry.accent }}
+                      >
+                        {entry.subLabel}
+                      </Text>
                     </View>
                     <TileIcon src={entry.image} size={64} className="relative z-0 shrink-0" />
                   </View>

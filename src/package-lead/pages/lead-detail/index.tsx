@@ -9,7 +9,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useLoad, useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Card from '@/components/Card';
 import DatePickerSheet from '@/components/DatePickerSheet';
@@ -56,6 +56,8 @@ const LeadDetailPage: React.FC = () => {
   const [leadId, setLeadId] = useState('');
   const [teacherNameMap, setTeacherNameMap] = useState<Record<string, string>>({});
   const [bookingActingId, setBookingActingId] = useState<string | null>(null);
+  /** 首挂载去重：leadId 就绪后下面 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   useLoad((options) => {
     const id = (options as Record<string, string>)?.id || '';
@@ -126,7 +128,15 @@ const LeadDetailPage: React.FC = () => {
     }
   }, [leadId, loadData]);
 
+  /**
+   * 线索详情页保留每次进入必刷新（不加 TTL）：本页可改状态、写跟进、核销试听，
+   * 详情数据可能已被他人改动。仅挡掉首次显示这一次重复拉取。
+   */
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     if (leadId) {
       void loadData(leadId);
     }

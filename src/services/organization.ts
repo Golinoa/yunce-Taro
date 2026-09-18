@@ -10,6 +10,7 @@
  */
 import Taro from '@tarojs/taro';
 import { get, post, put } from '@/utils/request';
+import { singleFlight } from '@/utils/single-flight';
 
 const AUTH_TOKEN_KEY = 'yunce-edu-auth-token';
 
@@ -88,7 +89,8 @@ export interface ShareContext {
   teacherId: string;
   teacherName: string;
   inviteCode: string;
-  expireAt: string;
+  /** 固定招生码（③ 类）长期有效，后端不再返回 expireAt；仅历史/临时码上下文才有 */
+  expireAt?: string;
   usedByUserId?: string | null;
 }
 
@@ -179,9 +181,11 @@ export const organizationService = {
    * 生产：GET /organization/entitlements
    */
   getEntitlements: async (): Promise<OrganizationQuotaUsage> => {
-    const data = await get<
-      OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }
-    >('/organization/entitlements');
+    const data = await singleFlight('organization-entitlements', () =>
+      get<OrganizationQuotaUsage & { entitlements?: { features?: Record<string, boolean> } }>(
+        '/organization/entitlements',
+      ),
+    );
     const features = {
       ...(data.features || {}),
       ...(data.entitlements?.features || {}),

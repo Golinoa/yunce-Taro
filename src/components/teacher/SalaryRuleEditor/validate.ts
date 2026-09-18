@@ -98,29 +98,37 @@ export function validateSalaryRule(value: SalaryRuleConfig): SalaryRuleEditorErr
     });
   });
 
-  value.attendanceTiers.forEach((t) => {
-    const minCount = Number(t.minCount);
-    const maxCount = Number(t.maxCount);
-    const rate = Number(t.rate);
-    if (t.minCount !== '' && (Number.isNaN(minCount) || minCount < 0)) {
+  if (value.lessonFeeMode === 'by_attendance' || value.lessonFeeMode === 'by_person_per_lesson') {
+    const sortedTiers = [...value.attendanceTiers].sort(
+      (a, b) => Number(a.minCount || 0) - Number(b.minCount || 0),
+    );
+    sortedTiers.forEach((t, index) => {
+      const minCount = Number(t.minCount);
+      const maxCount = Number(t.maxCount);
+      const rate = Number(t.rate);
       next.attendanceTiers = next.attendanceTiers || {};
-      next.attendanceTiers[t.id] = {
-        ...(next.attendanceTiers[t.id] || {}),
-        minCount: '不能为负数',
-      };
+      const itemErrors = next.attendanceTiers[t.id] || {};
+      if (t.minCount === '' || Number.isNaN(minCount) || minCount < 0) {
+        itemErrors.minCount = '请输入非负人数下限';
+      }
+      if (t.maxCount !== '' && (Number.isNaN(maxCount) || maxCount < minCount)) {
+        itemErrors.maxCount = '人数上限不能小于下限';
+      }
+      if (t.rate === '' || Number.isNaN(rate) || rate < 0) {
+        itemErrors.rate = '请输入非负单价';
+      }
+      const previous = sortedTiers[index - 1];
+      if (previous && previous.maxCount !== '' && Number(previous.maxCount) >= minCount) {
+        itemErrors.minCount = '人数区间不能重叠';
+      }
+      if (Object.keys(itemErrors).length > 0) {
+        next.attendanceTiers[t.id] = itemErrors;
+      }
+    });
+    if (next.attendanceTiers && Object.keys(next.attendanceTiers).length === 0) {
+      delete next.attendanceTiers;
     }
-    if (t.maxCount !== '' && (Number.isNaN(maxCount) || maxCount < 0)) {
-      next.attendanceTiers = next.attendanceTiers || {};
-      next.attendanceTiers[t.id] = {
-        ...(next.attendanceTiers[t.id] || {}),
-        maxCount: '不能为负数',
-      };
-    }
-    if (t.rate !== '' && (Number.isNaN(rate) || rate < 0)) {
-      next.attendanceTiers = next.attendanceTiers || {};
-      next.attendanceTiers[t.id] = { ...(next.attendanceTiers[t.id] || {}), rate: '不能为负数' };
-    }
-  });
+  }
 
   value.perfTiers.forEach((t) => {
     const threshold = Number(t.threshold);

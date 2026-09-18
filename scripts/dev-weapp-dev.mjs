@@ -1,11 +1,9 @@
 /**
- * 本机真实联调：Mock 关 + API 指向 Cloudflare Tunnel（dev.chancore.cn → 本机 :3000）
+ * 测试环境实时联调：Mock 关 + API 指向 dev.chancore.cn（回源 WSL）
  *
  * 前置：
- * 1. 后端 start.cmd / npm run dev，curl http://127.0.0.1:3000/health 返回 ok
- * 2. cloudflared tunnel run yunce-dev（窗口保持开着）
- * 3. curl -4 https://dev.chancore.cn/health 返回 ok
- * 4. 微信公众平台 request 合法域名含 dev.chancore.cn
+ * 1. curl -4 https://dev.chancore.cn/health 返回 ok
+ * 2. 微信公众平台 request 合法域名含 dev.chancore.cn
  *
  * 注意：package.json 的 build:weapp 是 `taro && postbuild`，npm 追加的 --watch
  * 会落到 postbuild 上导致 watch 立刻退出，故此处直接调 taro --watch。
@@ -17,11 +15,12 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const API_BASE = 'https://dev.chancore.cn/api/app/v1';
+const DEFAULT_DEV_API_BASE = 'https://dev.chancore.cn/api/app/v1';
+const API_BASE = process.env.TARO_API_BASE_URL ?? DEFAULT_DEV_API_BASE;
 
 console.log(`[dev:weapp:dev] VITE_USE_MOCK=false`);
 console.log(`[dev:weapp:dev] TARO_API_BASE_URL=${API_BASE}`);
-console.log(`[dev:weapp:dev] 请确认已运行: cloudflared tunnel run yunce-dev`);
+console.log(`[dev:weapp:dev] 请确认测试环境可访问: ${API_BASE.replace(/\/api\/app\/v1$/, '')}/health`);
 
 let postbuildRunning = false;
 let postbuildQueued = false;

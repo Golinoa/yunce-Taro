@@ -10,7 +10,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
@@ -161,6 +161,10 @@ const TrialRecordsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<LeadBooking[]>([]);
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
+  /** R2：已按该身份上下文（角色 + 演员ID + 校区）发起过列表拉取，避免依赖逐个确定时重复拉取 */
+  const lastTrialRecordsFetchKeyRef = useRef<string | null>(null);
+  /** 首挂载去重：身份就绪后下面 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
 
   const dateRange = useMemo(
     () => ({
@@ -202,11 +206,34 @@ const TrialRecordsPage: React.FC = () => {
     }
   }, [currentCampusId, dateRange, profile, role, teachingActorId]);
 
-  useEffect(() => {
-    void loadRecords();
-  }, [loadRecords]);
+  /**
+   * R2 就绪闸门：本页范围依赖 profile（身份上下文）/ role / teachingActorId / currentCampusId，
+   * 这些值在会话恢复、切身份、换校区时**分批确定**；loadRecords 又随 profile 对象换新而换身份，
+   * 直接进依赖数组会让整页列表被反复重拉。这里压成一个 key：
+   * - key 为空 = 会话未恢复 → 不发请求（此时页面本就渲染「仅机构人员可查看」空态）；
+   * - key 未变 = 同一组身份上下文 → 只拉一次（挡掉 profile 对象换新但范围未变的情况）；
+   * - key 变化 = 切校区 / 切身份 / 换账号 / 老师身份确定 → 重拉。
+   */
+  const recordsFetchKey = profile
+    ? `${profile.id}|${role ?? ''}|${teachingActorId ?? ''}|${currentCampusId}`
+    : '';
 
+  useEffect(() => {
+    if (!recordsFetchKey) return;
+    if (lastTrialRecordsFetchKeyRef.current === recordsFetchKey) return;
+    lastTrialRecordsFetchKeyRef.current = recordsFetchKey;
+    void loadRecords();
+  }, [recordsFetchKey, loadRecords]);
+
+  /**
+   * 首挂载不重复（不加 TTL）：本页是试听台账，子页线索详情里可以签到 / 取消试听预约，
+   * 返回必须刷新；只挡掉首次显示这一次（身份就绪时上面的 useEffect 已经拉过）。
+   */
   useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     void loadRecords();
   });
 

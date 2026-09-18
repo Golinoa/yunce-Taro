@@ -15,6 +15,7 @@ import {
   type AttendanceAnomalyKind,
 } from '@/services/ops-alerts';
 import { isStaffRole, useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -41,36 +42,54 @@ const AttendanceAnomalyPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [list, setList] = useState<AttendanceAnomalyItem[]>([]);
   const [tab, setTab] = useState<TabKey>('all');
+  // 上下文键 + TTL 组合守卫：切换校区/角色必须立刻重拉（键不同即视为过期）
+  const lastFetchKeyRef = React.useRef('');
+  const lastFetchAtRef = React.useRef<number | null>(null);
 
-  const load = useCallback(async () => {
-    if (!isStaffRole(role)) {
-      setList([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await opsAlertService.listAttendanceAnomalies(campusId);
-      setList(data);
-    } catch (err) {
-      logError('attendance-anomaly load', err);
-      Taro.showToast({ title: '加载失败', icon: 'none' });
-      setList([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [campusId, role]);
+  const load = useCallback(
+    async (force = false) => {
+      if (!isStaffRole(role)) {
+        setList([]);
+        setLoading(false);
+        return;
+      }
+      const fetchKey = `${role || ''}|${campusId || ''}`;
+      if (
+        !force &&
+        fetchKey === lastFetchKeyRef.current &&
+        !shouldRefetch(lastFetchAtRef.current, TTL.list)
+      ) {
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await opsAlertService.listAttendanceAnomalies(campusId);
+        setList(data);
+        lastFetchKeyRef.current = fetchKey;
+        markFetched(lastFetchAtRef);
+      } catch (err) {
+        logError('attendance-anomaly load', err);
+        Taro.showToast({ title: '加载失败', icon: 'none' });
+        setList([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [campusId, role],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useDidShow(() => {
+    // 列表页 TTL 守卫：本页只读（点进学员详情不回写），窗口内切回跳过全量重拉；
+    // 下拉刷新走 load(true) 强制重拉。
     void load();
   });
 
   usePullDownRefresh(() => {
-    void load().finally(() => Taro.stopPullDownRefresh());
+    void load(true).finally(() => Taro.stopPullDownRefresh());
   });
 
   const counts = useMemo(() => {

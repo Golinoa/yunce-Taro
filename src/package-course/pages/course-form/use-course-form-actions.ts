@@ -583,16 +583,16 @@ export function useCourseFormActions(params: UseCourseFormActionsParams) {
           }
         } else {
           const leadTeacherId = teacherId || profile?.id || '';
-          const created = await classService.create({
-            ...(classPayload as Omit<Class, 'id' | 'created_at' | 'updated_at'>),
-            teacher_id: leadTeacherId,
-            teachers: [leadTeacherId, assistantId].filter(Boolean),
-            used_lessons: 0,
-            student_count: studentIds.length,
-          });
-          if (created?.id && studentIds.length > 0) {
-            await classService.addStudents(created.id, studentIds);
-          }
+          await classService.create(
+            {
+              ...(classPayload as Omit<Class, 'id' | 'created_at' | 'updated_at'>),
+              teacher_id: leadTeacherId,
+              teachers: [leadTeacherId, assistantId].filter(Boolean),
+              used_lessons: 0,
+              student_count: studentIds.length,
+            },
+            studentIds,
+          );
           Taro.showToast({ title: '新增成功', icon: 'success' });
           try {
             Taro.hideToast();

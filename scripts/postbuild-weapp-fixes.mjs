@@ -98,6 +98,32 @@ function ensureLazyCodeLoading() {
 }
 
 /**
+ * 兼容团队现有的微信开发者工具工作流：工具直接打开 dist/。
+ * dist 作为项目根目录时，必须有自己的 project.config.json，且根路径应为 ./。
+ */
+function ensureDevToolsProjectConfig() {
+  const configFiles = ['project.config.json', 'project.private.config.json'];
+  let written = 0;
+
+  for (const fileName of configFiles) {
+    const sourcePath = path.join(projectRoot, fileName);
+    const targetPath = path.join(distRoot, fileName);
+    if (!fs.existsSync(sourcePath)) continue;
+
+    const config = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    if (fileName === 'project.config.json') {
+      config.miniprogramRoot = './';
+    }
+    fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+    written += 1;
+  }
+
+  if (written > 0) {
+    console.log(`[postbuild-weapp-fixes] wrote ${written} DevTools config file(s) into dist`);
+  }
+}
+
+/**
  * 删除 dist 内不应参与上传/扫描的冗余文件。
  */
 function cleanupDistArtifacts() {
@@ -106,9 +132,7 @@ function cleanupDistArtifacts() {
     const name = path.basename(filePath);
     const shouldRemove =
       name.endsWith('.LICENSE.txt') ||
-      name.endsWith('.map') ||
-      name === 'project.config.json' ||
-      name === 'project.private.config.json';
+      name.endsWith('.map');
 
     if (shouldRemove) {
       fs.unlinkSync(filePath);
@@ -273,10 +297,9 @@ function ensureStaticAssetsCopied() {
     },
   ];
 
+  // B12 主包瘦身：cover-home.webp 下沉分包、support-repair-qr.webp 上云，均不再进主包
   const imageFiles = [
     'sgpk.png',
-    'cover-home.webp',
-    'support-repair-qr.webp',
     'qr-point-hand.png',
     'icon-book.webp',
     'icon-calendar-check.webp',
@@ -288,6 +311,18 @@ function ensureStaticAssetsCopied() {
     'icon-wallet-pink.webp',
     'icon-wallet-purple.webp',
     'icon-wallet-yen.webp',
+  ];
+
+  /** B12：下沉到分包的静态图（分包 assets 目录，不占主包体积） */
+  const subpackageImageFiles = [
+    {
+      name: 'cover-home.webp',
+      to: 'package-auth/assets/cover-home.webp',
+    },
+    {
+      name: 'cover-home.webp',
+      to: 'package-lead/assets/cover-home.webp',
+    },
   ];
 
   let copied = 0;
@@ -317,6 +352,18 @@ function ensureStaticAssetsCopied() {
       missing.push(`src/assets/images/${name}`);
       continue;
     }
+    fs.copyFileSync(src, dest);
+    copied += 1;
+  }
+
+  for (const item of subpackageImageFiles) {
+    const src = path.join(imagesFrom, item.name);
+    const dest = path.join(distRoot, item.to);
+    if (!fs.existsSync(src)) {
+      missing.push(`src/assets/images/${item.name}`);
+      continue;
+    }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(src, dest);
     copied += 1;
   }
@@ -365,8 +412,8 @@ function ensureStaticAssetsCopied() {
 }
 
 if (!fs.existsSync(distBaseWxmlPath)) {
-  console.warn('[postbuild-weapp-fixes] dist/base.wxml not found, skip patch');
-  process.exit(0);
+  console.error('[postbuild-weapp-fixes] ERROR: dist/base.wxml not found; build output is incomplete');
+  process.exit(1);
 }
 
 const wxssCreated =
@@ -397,6 +444,7 @@ if (wxssCreated > 0) {
 }
 
 ensureLazyCodeLoading();
+ensureDevToolsProjectConfig();
 cleanupDistArtifacts();
 verifySubpackageChunkRequires();
 ensureStaticAssetsCopied();
