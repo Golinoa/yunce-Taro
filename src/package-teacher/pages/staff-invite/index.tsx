@@ -19,6 +19,7 @@ import {
 } from '@/services/campus-invite';
 import { useRoleGlossaryStore } from '@/stores/role-glossary';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { buildCampusInvitePath, copyCampusInviteCode } from '@/utils/invite-staff-link';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
@@ -66,6 +67,8 @@ const StaffInvitePage: React.FC = () => {
   const [targetTeacherName, setTargetTeacherName] = useState('');
   const [roleCode, setRoleCode] = useState<CampusInviteRoleCode>('campus_principal');
   const autoCreateStartedRef = React.useRef(false);
+  /** TTL 守卫：校区 / 角色称谓 / 邀请名单慢变，5min 内重复进页不重拉 */
+  const lastFetchAtRef = React.useRef<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [invites, setInvites] = useState<CampusInviteItem[]>([]);
@@ -104,6 +107,9 @@ const StaffInvitePage: React.FC = () => {
   }, [isPointToPoint, targetTeacherId]);
 
   useDidShow(() => {
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      return;
+    }
     void loadTitles();
     void loadContext().catch((error) => {
       Taro.showToast({
@@ -112,6 +118,7 @@ const StaffInvitePage: React.FC = () => {
       });
     });
     void loadInvites();
+    markFetched(lastFetchAtRef);
   });
 
   const handleCreate = useCallback(async () => {

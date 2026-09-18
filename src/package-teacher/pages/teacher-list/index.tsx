@@ -29,6 +29,7 @@ import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { ResignType, TeacherStatus, TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
@@ -65,10 +66,15 @@ const TeacherListPage: React.FC = () => {
 
   // 页面引导弹窗
   const [introVisible, setIntroVisible] = useState(false);
+  /** TTL 守卫：员工列表 / 角色称谓慢变，5min 内重复进页不重拉 */
+  const lastFetchAtRef = React.useRef<number | null>(null);
 
   useDidShow(() => {
-    void useRoleGlossaryStore.getState().load();
-    void fetchAll(undefined, false);
+    if (shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      void useRoleGlossaryStore.getState().load();
+      void fetchAll(undefined, false);
+      markFetched(lastFetchAtRef);
+    }
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       if (hidden !== true) {

@@ -17,6 +17,7 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import { PAGE_INTRO_STORAGE_KEYS } from '@/services/onboarding';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.salary;
@@ -59,10 +60,15 @@ const SalaryHomePage: React.FC = () => {
   const { activeTheme } = useThemeStore();
   const { fetchSalaryTemplates, fetchTeachers } = useTeacherStore();
   const [introVisible, setIntroVisible] = useState(false);
+  /** TTL 守卫：首页仅拉教师与模板列表，慢变，5min 内重复进页不重拉 */
+  const lastFetchAtRef = React.useRef<number | null>(null);
 
   useDidShow(() => {
-    void fetchTeachers();
-    void fetchSalaryTemplates();
+    if (shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      void fetchTeachers();
+      void fetchSalaryTemplates();
+      markFetched(lastFetchAtRef);
+    }
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       if (hidden !== true) {

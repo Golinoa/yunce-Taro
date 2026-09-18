@@ -26,6 +26,7 @@ import { createDefaultSalaryRule } from '@/domain/teacher-salary';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig, SalaryTemplate } from '@/types/teacher';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const SalaryFormPage: React.FC = () => {
@@ -67,9 +68,16 @@ const SalaryFormPage: React.FC = () => {
   /** 复制给其他员工弹窗 */
   const [copySheetVisible, setCopySheetVisible] = useState(false);
 
+  /** TTL 守卫：教师列表 / 模板均慢变，5min 内重复进页不重拉 */
+  const lastFetchAtRef = React.useRef<number | null>(null);
+
   useDidShow(() => {
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      return;
+    }
     void fetchAll();
     void fetchSalaryTemplates();
+    markFetched(lastFetchAtRef);
   });
 
   // 设置导航栏标题为 "xx工资设置"，并移除页面内重复标题

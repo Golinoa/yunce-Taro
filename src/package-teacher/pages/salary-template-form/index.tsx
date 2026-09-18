@@ -22,6 +22,7 @@ import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { SalaryRuleConfig } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 /** 表单字段错误 */
@@ -49,8 +50,15 @@ const SalaryTemplateFormPage: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
   const [errors, setErrors] = useState<SalaryTemplateFormErrors>({});
 
+  /** TTL 守卫：模板为配置数据，15min 内重复进页不重拉（store 已持久化） */
+  const lastFetchAtRef = React.useRef<number | null>(null);
+
   useDidShow(() => {
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) {
+      return;
+    }
     void fetchSalaryTemplates();
+    markFetched(lastFetchAtRef);
   });
 
   // 编辑态：回填

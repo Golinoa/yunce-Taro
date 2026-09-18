@@ -15,6 +15,7 @@ import PageIntroSheet from '@/components/PageIntroSheet';
 import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import type { BaseSalaryMode, LessonFeeMode, TeacherUIModel } from '@/types/teacher';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 const INTRO_STORAGE_KEY = 'salary_settings_intro_hidden';
@@ -78,9 +79,14 @@ const SalarySettingsPage: React.FC = () => {
   const { teachers, fetchAll } = useTeacherStore();
   const [introVisible, setIntroVisible] = useState(false);
   const [keyword] = useState('');
+  /** TTL 守卫：员工薪资规则列表慢变，5min 内重复进页不重拉 */
+  const lastFetchAtRef = React.useRef<number | null>(null);
 
   useDidShow(() => {
-    void fetchAll();
+    if (shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      void fetchAll();
+      markFetched(lastFetchAtRef);
+    }
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       if (hidden !== true) {

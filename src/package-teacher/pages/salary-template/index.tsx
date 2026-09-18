@@ -20,6 +20,7 @@ import { useTeacherStore } from '@/stores/teacher';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { SalaryTemplate } from '@/types/teacher';
+import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type ApplyState =
@@ -39,11 +40,17 @@ const SalaryTemplateListPage: React.FC = () => {
   } = useTeacherStore();
 
   const [applyState, setApplyState] = useState<ApplyState>({ phase: 'none' });
+  /** TTL 守卫：模板 / 教师列表慢变，5min 内重复进页不重拉 */
+  const lastFetchAtRef = React.useRef<number | null>(null);
   /** 删除确认（简易版用 Taro.showModal） */
 
   useDidShow(() => {
+    if (!shouldRefetch(lastFetchAtRef.current, TTL.list)) {
+      return;
+    }
     void fetchSalaryTemplates();
     void fetchTeachers();
+    markFetched(lastFetchAtRef);
   });
 
   const handleCreate = useCallback(() => {
