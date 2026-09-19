@@ -52,6 +52,8 @@ const VenueFormPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const formInitializedRef = useRef(false);
+  // 防重复提交守卫（ref，不触发 re-render）：避免停在 state 上干扰 navigateBack 关页。
+  const savingRef = useRef(false);
 
   const currentCampus = useMemo(
     () => campuses.find((c) => c.id === currentCampusId) || campuses[0] || null,
@@ -94,28 +96,27 @@ const VenueFormPage: React.FC = () => {
   }, [form.name]);
 
   /**
-   * 写完必须真的回到列表页：列表页只有被重新 onShow 才会消费
-   * REFRESH_SIGNAL.venues 并重拉，若 navigateBack 失败（页面栈异常）就会
-   * 停留在表单页 —— 表现即「保存成功但表单没关、列表也没刷新」。
-   * 确定性保证：先核对 navigateBack 将揭示的页面——
-   * - 是 venue-list：正常 back；
-   * - 还是 venue-form（快速双击 FAB 曾把两层表单入栈）：连退两层；
-   * - 其它来源页：redirectTo 换成列表页，保证信号一定被消费。
+   * 写完回到列表页。表单只可能由 venue-list 经 navigateTo 压入，
+   * 按页面栈精确算出到列表页的距离 delta，一次退掉所有叠加的表单层
+   * （防慢速双击叠层时只退一层、露出底层同款表单）；栈内无列表页（深链直达）才 redirectTo 兜底。
    */
   const goBackToList = useCallback(() => {
     const LIST_URL = '/package-settings/pages/venue-list/index';
+    const LIST_PATH = 'package-settings/pages/venue-list/index';
     const pages = Taro.getCurrentPages();
-    const prev = pages[pages.length - 2];
-    const prevRoute = prev?.route ?? '';
-    if (prevRoute.includes('venue-form')) {
-      Taro.navigateBack({ delta: 2, fail: () => Taro.redirectTo({ url: LIST_URL }) });
-      return;
+    let delta = 0;
+    for (let i = pages.length - 2; i >= 0; i--) {
+      const route = (pages[i] as { route?: string } | undefined)?.route || '';
+      if (route.includes(LIST_PATH)) {
+        delta = pages.length - 1 - i;
+        break;
+      }
     }
-    if (prevRoute.includes('venue-list')) {
-      Taro.navigateBack({ delta: 1, fail: () => Taro.redirectTo({ url: LIST_URL }) });
-      return;
+    if (delta > 0) {
+      Taro.navigateBack({ delta });
+    } else {
+      Taro.redirectTo({ url: LIST_URL });
     }
-    Taro.redirectTo({ url: LIST_URL });
   }, []);
 
   const hasChanged = useMemo(
@@ -124,7 +125,8 @@ const VenueFormPage: React.FC = () => {
   );
 
   const handleSave = useCallback(async () => {
-    if (!validate() || saving || !currentCampus) return;
+    if (!validate() || savingRef.current || !currentCampus) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       let venue = (await venueService.getList(currentCampus.id))[0];
@@ -152,20 +154,23 @@ const VenueFormPage: React.FC = () => {
         await roomService.add(payload);
       }
       Taro.showToast({ title: '保存成功', icon: 'success' });
-      // 通知 venue-list 写后强制重拉：列表页 onShow 里「信号优先于 TTL」，有信号必重拉
+      // 通知 venue-list 写后强制重拉；列表「返回即强刷」兜底，双保险
       setRefreshSignal(REFRESH_SIGNAL.venues);
-      // 成功后保持 saving=true 直到离页：防止 800ms 窗口内二次提交
-      // （二次 add 会命中后端「同名教室」冲突，把成功变成报错）
-      setTimeout(goBackToList, 800);
+      // 成功后延时回退，让「保存成功」toast 可见；回退由列表 onShow 必然触发重拉。
+      setTimeout(goBackToList, 400);
     } catch (err) {
       logError('save room', err);
-      setSaving(false); // 仅失败恢复按钮；成功路径保持锁到离页
       Taro.showToast({
         title: err instanceof Error && err.message ? err.message : '保存失败',
         icon: 'none',
       });
+    } finally {
+      // 流程结束（成功或失败）一律复位守卫与状态，绝不停留在 true：
+      // 既不残留「保存中」干扰 navigateBack 关页，也不让按钮被永久锁死。
+      savingRef.current = false;
+      setSaving(false);
     }
-  }, [form, isEdit, saving, currentCampus, validate, roomId, goBackToList]);
+  }, [form, isEdit, currentCampus, validate, roomId, goBackToList]);
 
   const handleDelete = useCallback(async () => {
     if (!isEdit) return;
@@ -179,7 +184,7 @@ const VenueFormPage: React.FC = () => {
       await roomService.delete(roomId);
       Taro.showToast({ title: '删除成功', icon: 'success' });
       setRefreshSignal(REFRESH_SIGNAL.venues);
-      setTimeout(goBackToList, 800);
+      setTimeout(goBackToList, 400);
     } catch (err) {
       logError('delete room', err);
       Taro.showToast({ title: '删除失败', icon: 'none' });
@@ -217,12 +222,14 @@ const VenueFormPage: React.FC = () => {
         <View className="bg-white rounded-[32rpx] px-[32rpx] py-[8rpx] mb-[24rpx]">
           <FormCell label="容量" divider>
             <View className="flex flex-row items-center justify-end gap-[8rpx] flex-1">
+              {/* 只允许数字：非数字字符（小数点/负号/空格等）即时剔除，最多 5 位 */}
               <Input
                 className="text-right text-[30rpx] text-foreground placeholder:text-muted-foreground bg-transparent"
                 value={form.capacity}
                 placeholder="请输入"
                 type="number"
-                onInput={(e) => updateField('capacity', e.detail.value)}
+                maxlength={5}
+                onInput={(e) => updateField('capacity', e.detail.value.replace(/\D/g, ''))}
               />
               <Text className="text-[30rpx] text-muted-foreground">人</Text>
             </View>

@@ -62,6 +62,16 @@ let pendingNavigateUrl = '';
 export function navigateToOnce(url: string): void {
   const normalizedUrl = normalizeUrl(url);
   if (pendingNavigateUrl === normalizedUrl) return;
+
+  // 幂等护栏（2026-09-19 场地事故根因）：若当前栈顶已是目标页，直接忽略。
+  // 仅靠上面的「同 tick 锁」挡不住**慢速双击**——navigateTo 的 complete 很快释放锁，
+  // 第二下会再压入一层同款页面；写后 navigateBack 只退一层、露出底层同款表单，
+  // 表现为「保存成功但没关页」（删除是单次点击进入，故不受影响，形成对照）。
+  const pages = Taro.getCurrentPages?.() ?? [];
+  const topRoute = (pages[pages.length - 1] as { route?: string } | undefined)?.route ?? '';
+  const targetPath = normalizedUrl.split('?')[0].replace(/^\//, '');
+  if (topRoute && (topRoute === targetPath || topRoute.endsWith(targetPath))) return;
+
   pendingNavigateUrl = normalizedUrl;
   Taro.navigateTo({
     url: normalizedUrl,

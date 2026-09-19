@@ -120,6 +120,19 @@ export interface ApiResponse<T = unknown> {
   message: string;
 }
 
+/**
+ * 业务成功码判定。
+ * 后端统一响应体 code 有两条成功约定（见 yunce-backend/src/utils/response.ts）：
+ * - `success()` → 200
+ * - `created()` → **201**，且默认 message 就是「创建成功」（所有 POST 创建类接口）
+ * 因此成功码 = 0（历史约定）或任意 2xx。
+ * 此前只认 0/200，会把 201 的创建响应当异常抛出（message 恰为「创建成功」），
+ * 导致写成功后直接落到 catch —— 关页 / 刷新等后续全部被跳过（表现为"保存成功但不关页"）。
+ */
+function isSuccessCode(code: unknown): boolean {
+  return code === 0 || (typeof code === 'number' && code >= 200 && code < 300);
+}
+
 /** 获取存储的 token */
 function readAccessToken(): string | null {
   try {
@@ -287,7 +300,7 @@ async function refreshAccessToken(): Promise<string | null> {
           refreshToken: string;
           expiresIn: number;
         }>;
-        if (body.code === 0 || body.code === 200) {
+        if (isSuccessCode(body.code)) {
           persistRefreshedSession(
             body.data.token,
             body.data.refreshToken,
@@ -487,7 +500,7 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
       // 如果后端返回 { code, data, message } 格式
       if (res.data && typeof res.data === 'object' && 'code' in res.data) {
         const body = res.data as ApiResponse<T>;
-        if (body.code === 0 || body.code === 200) {
+        if (isSuccessCode(body.code)) {
           return body.data;
         }
         if (body.code === 401) {

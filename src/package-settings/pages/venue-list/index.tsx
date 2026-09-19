@@ -38,6 +38,9 @@ const VenueListPage: React.FC = () => {
   // 上下文键 + TTL 组合守卫：切换校区必须立刻重拉（键不同即视为过期）
   const lastFetchKeyRef = React.useRef('');
   const lastFetchAtRef = React.useRef<number | null>(null);
+  // 是否已首进：首进走 TTL 省请求；之后任意返回（含写后回跳）一律强刷，
+  // 不依赖 refresh-signal 时序，杜绝「保存成功但列表不刷」。
+  const shownOnceRef = React.useRef(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -60,10 +63,14 @@ const VenueListPage: React.FC = () => {
   useDidShow(() => {
     // 列表页 TTL 守卫：写入口在子页 venue-form（保存/删除后置 REFRESH_SIGNAL.venues）；
     // 刷新信号优先级高于 TTL —— 有信号就必须真的重新拉取，否则写后列表不更新。
+    // 此外「返回即强刷」：只要不是首次进入（即从 venue-form 写后回跳），一律重拉，
+    // 双保险彻底杜绝「保存成功但列表不刷」。
     const campusKey = currentCampusId || '';
     const force = consumeRefreshSignal(REFRESH_SIGNAL.venues);
+    const isReturn = shownOnceRef.current;
     const canSkip =
       !force &&
+      !isReturn &&
       campusKey === lastFetchKeyRef.current &&
       !shouldRefetch(lastFetchAtRef.current, TTL.campus);
     if (canSkip) {
@@ -72,6 +79,7 @@ const VenueListPage: React.FC = () => {
     } else {
       void loadData();
     }
+    shownOnceRef.current = true;
     try {
       const hidden = Taro.getStorageSync(INTRO_STORAGE_KEY);
       setShowIntro(hidden !== true);
