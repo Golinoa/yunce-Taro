@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-19
 status: active
 ---
 
@@ -31,6 +31,26 @@ const confirmSalary = useTeacherStore((s) => s.confirmSalary);
 ❌ Store 里存 JSX
 
 ✅ FIX: Store 只存数据，渲染逻辑留在组件。
+
+## 校区数据（harness 冻结 · 2026-09-19 事故沉淀）
+
+❌ 页面自写校区列表的 fetch / 自愈 / `currentCampus` 派生，或给校区列表套 React Query 层
+（store 与 RQ 双时钟各管新鲜度曾导致首页校区卡片永久空白）
+
+✅ FIX: 统一走 `useCampusList()`（`stores/campus.ts`）：
+
+```tsx
+const { campuses, currentCampus, ensureLoaded } = useCampusList();
+useDidShow(() => {
+  void ensureLoaded(); // 唯一自愈入口，TTL/防并发内置，可安全每次调用
+});
+```
+
+- 需要身份闸门的页面：`useEffect(() => { if (ready) void ensureLoaded(); }, [ready])`
+- 派生用 `selectCurrentCampus(campuses, id, { strict? })`（数据页用 strict，页面兜底用默认）
+- 写路径（CRUD / 切换校区 / 入驻）直调 store action 不受限
+
+📖 See: `docs/diagnostics/2026-09-19-campus-data-harness.md`（改 harness 先修订该文档，不得顺手改）
 
 ## TypeScript
 

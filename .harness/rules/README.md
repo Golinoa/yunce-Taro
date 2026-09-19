@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-19
 status: active
 ---
 
@@ -27,7 +27,7 @@ status: active
 | `20-components.md` | 先查后写、组件结构、Props、JSDoc | 写 / 改组件 |
 | `30-sheets-and-forms.md` | BottomSheet 单 prop、独立 Sheet、FormInput | 写弹窗 / 表单 |
 | `40-data-and-services.md` | Service 唯一出口、禁止 Mock、契约核对 | 接接口 |
-| `50-state-and-types.md` | Zustand 用法、TypeScript 严格度 | 写状态 / 类型 |
+| `50-state-and-types.md` | Zustand 用法、TypeScript 严格度、**校区数据 harness（冻结）** | 写状态 / 类型 / 涉及校区数据 |
 | `60-role-identity.md` | 角色身份四层模型（**改角色相关代码必读**） | 涉及 `UserRole`/`orgRole`/`campusRole`/`identity` |
 | `70-wechat-platform.md` | 分包、主包体积、域名、API 可用性、渲染性能 | 小程序平台相关 |
 | `80-compliance.md` | 隐私、最小必要、内容与资金合规 | 提审 / 涉及用户信息 |
