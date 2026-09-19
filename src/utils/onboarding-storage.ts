@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro';
 import type { IconName } from '@/components/Icon';
 import type { StoreOnboardingStep, StoreOnboardingStepKey } from '@/types/onboarding';
 import { STORE_ONBOARDING_VISITED_KEY } from '@/utils/auth';
+import { logError } from '@/utils/logger';
 
 export const PAGE_INTRO_STORAGE_KEYS: Record<StoreOnboardingStepKey, string> = {
   campus: 'campus_settings_intro_hidden',
@@ -77,9 +78,14 @@ export function getVisitedMap(): VisitedMap {
 }
 
 export function markStepVisited(key: StoreOnboardingStepKey): void {
-  const visited = getVisitedMap();
-  visited[key] = true;
-  Taro.setStorageSync(STORE_ONBOARDING_VISITED_KEY, JSON.stringify(visited));
+  // 存储写入失败不得中断调用方（该函数后面通常紧跟 Taro.navigateTo）
+  try {
+    const visited = getVisitedMap();
+    visited[key] = true;
+    Taro.setStorageSync(STORE_ONBOARDING_VISITED_KEY, JSON.stringify(visited));
+  } catch (err) {
+    logError('markStepVisited', err);
+  }
 }
 
 export function clearVisitedMap(): void {

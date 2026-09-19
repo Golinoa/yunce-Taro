@@ -217,24 +217,28 @@ const Profile: React.FC = () => {
   }, []);
 
   // 加载店铺管理 onboarding 进度（仅管理员/校长）
-  const loadStoreProgress = useCallback(async () => {
-    if (!isManagerRole) return;
-    setLoadingStoreProgress(true);
-    try {
-      const progress = await onboardingService.getStoreProgress();
-      setStoreProgress(progress);
-      // 首次完成全部步骤后，自动标记为已隐藏
-      if (progress.completed === progress.total && storeOnboardingHidden === null) {
-        Taro.setStorageSync(STORE_ONBOARDING_HIDDEN_KEY, true);
-        setStoreOnboardingHidden(true);
+  const loadStoreProgress = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!isManagerRole) return;
+      // silent：回页刷新时不要闪 loading 遮罩（本地读取，无需 loading 态）
+      if (!options?.silent) setLoadingStoreProgress(true);
+      try {
+        const progress = await onboardingService.getStoreProgress();
+        setStoreProgress(progress);
+        // 首次完成全部步骤后，自动标记为已隐藏
+        if (progress.completed === progress.total && storeOnboardingHidden === null) {
+          Taro.setStorageSync(STORE_ONBOARDING_HIDDEN_KEY, true);
+          setStoreOnboardingHidden(true);
+        }
+      } catch {
+        // 异常时降级为正常态（不阻断用户）
+        setStoreProgress(null);
+      } finally {
+        if (!options?.silent) setLoadingStoreProgress(false);
       }
-    } catch {
-      // 异常时降级为正常态（不阻断用户）
-      setStoreProgress(null);
-    } finally {
-      setLoadingStoreProgress(false);
-    }
-  }, [isManagerRole, storeOnboardingHidden]);
+    },
+    [isManagerRole, storeOnboardingHidden],
+  );
 
   const isFirstMount = useRef(true);
   const lastProfileFetchAtRef = useRef<number | null>(null);
@@ -268,6 +272,10 @@ const Profile: React.FC = () => {
       isFirstMount.current = false;
       return;
     }
+    // 引导进度是纯本地存储读取（零网络成本），必须每次回到本页都重读：
+    // 它是「点击步骤 → 返回本页立刻显示完成态」的唯一刷新通道。
+    // 曾与网络请求一起被 TTL.tab(60s) 门控，导致点了步骤返回后看不到 ✓（用户实测复现）。
+    void loadStoreProgress({ silent: true });
     const forceQuota =
       consumeRefreshSignal(REFRESH_SIGNAL.membership) ||
       consumeRefreshSignal(REFRESH_SIGNAL.profileQuota);
@@ -275,7 +283,7 @@ const Profile: React.FC = () => {
       void loadQuotaUsage().then(() => markFetched(lastQuotaFetchAtRef));
     }
     if (shouldRefetch(lastProfileFetchAtRef.current, TTL.tab)) {
-      void Promise.all([loadStudents(), loadTeacherStats(), loadStoreProgress()]).then(() =>
+      void Promise.all([loadStudents(), loadTeacherStats()]).then(() =>
         markFetched(lastProfileFetchAtRef),
       );
     }

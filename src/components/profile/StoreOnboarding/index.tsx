@@ -3,7 +3,7 @@
  *
  * 用于教师角色个人中心「店铺管理」区域：
  * - 7 项基础配置（门店/场地/员工/课程/科目/卡种/薪资）未全部完成时展示引导态
- * - 显示进度条、「配置进度 X/6」、步骤角标
+ * - 显示进度条、「配置进度 X/7」、步骤角标
  * - 未完成步骤逐个雷达扩散光圈闪烁，引导用户按顺序配置
  * - 全部完成后由页面切换回普通 8 宫格（ProfileGrid）
  * - 图标统一使用主题色 + 浅色圆形背景，随主题切换变化
@@ -20,8 +20,19 @@ const EXTRA_ITEMS: Array<{ label: string; icon: 'mdi-calendar-remove' }> = [
   { label: '停课放假', icon: 'mdi-calendar-remove' },
 ];
 
-// 进度条宽度映射（6 等分，避免内联 style）
-const PROGRESS_WIDTH_CLASSES = ['w-0', 'w-1/6', 'w-2/6', 'w-3/6', 'w-4/6', 'w-5/6', 'w-full'];
+// 进度条宽度映射（7 等分，避免内联 style）：下标 = 已完成步骤数（0…7）。
+// 店铺管理引导共 7 步（门店/场地/员工/课程/科目/卡种/薪资）；
+// 7 分母不是 UnoCSS 默认分数，宽度类在 uno.config.ts 显式声明。
+const PROGRESS_WIDTH_CLASSES = [
+  'w-0',
+  'w-1/7',
+  'w-2/7',
+  'w-3/7',
+  'w-4/7',
+  'w-5/7',
+  'w-6/7',
+  'w-full',
+];
 
 const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
   data,
@@ -30,10 +41,11 @@ const StoreOnboarding: React.FC<StoreOnboardingProps> = ({
   onExtraClick,
   className,
 }) => {
-  const progressClass = useMemo(
-    () => PROGRESS_WIDTH_CLASSES[Math.min(data.completed, data.total)] || 'w-0',
-    [data.completed, data.total],
-  );
+  // 夹到合法下标（0…7），避免完成数越界时回退成 w-0（旧实现 7/7 会显示 0%）
+  const progressClass = useMemo(() => {
+    const idx = Math.max(0, Math.min(data.completed, PROGRESS_WIDTH_CLASSES.length - 1));
+    return PROGRESS_WIDTH_CLASSES[idx] || 'w-0';
+  }, [data.completed]);
 
   // ============================================
   // 引导闪烁：始终只高亮「第一个未完成步骤」

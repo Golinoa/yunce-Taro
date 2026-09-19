@@ -290,8 +290,10 @@ const ProfileEdit: React.FC = () => {
       confirmColor: '#FF3B30',
       success: async ({ confirm }) => {
         if (confirm) {
+          // signOut() 已清理全部账号级状态（token/profile/userRole + 领域缓存 + 账号级缓存）。
+          // 不要再调 Taro.clearStorageSync()：那是"核弹式"清理，会把主题、店铺引导进度
+          // 等设备级偏好一并抹掉（用户实测：退出后引导进度归零）。
           await signOut();
-          Taro.clearStorageSync();
           Taro.reLaunch({ url: '/package-auth/pages/login/index' });
         }
       },
