@@ -4,7 +4,7 @@ import HomeCampusCard from '@/components/home/campus-card';
 import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import TodayScheduleCard from '@/components/home/TodayScheduleCard';
 import { homeService } from '@/services';
-import { useCampusStore } from '@/stores/campus';
+import { useCampusList, useCampusStore } from '@/stores/campus';
 import type { CampusUIModel } from '@/types/campus';
 import type { Schedule } from '@/types/schedule';
 import { useAuth } from '@/utils/auth';
@@ -26,20 +26,16 @@ const Index: React.FC = () => {
   const campuses = useCampusStore((s) => s.campuses);
   const currentCampusId = useCampusStore((s) => s.currentCampusId);
   const setCurrentCampusId = useCampusStore((s) => s.setCurrentCampusId);
-  const fetchCampuses = useCampusStore((s) => s.fetchCampuses);
+  // 校区列表 + 当前校区派生：统一走 harness（useCampusList，含唯一自愈 ensureLoaded）
+  const { currentCampus, ensureLoaded: ensureCampusesLoaded } = useCampusList();
 
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [showCampusSheet, setShowCampusSheet] = useState(false);
 
-  const currentCampus = useMemo(() => {
-    const byId = campuses.find((c) => c.id === currentCampusId);
-    return byId || campuses.find((c) => c.isMain) || campuses[0] || null;
-  }, [campuses, currentCampusId]);
-
-  // 加载校区列表
+  // 加载校区列表（harness 自愈：失败强拉重试一次）
   useEffect(() => {
-    void fetchCampuses();
-  }, [fetchCampuses]);
+    void ensureCampusesLoaded();
+  }, [ensureCampusesLoaded]);
 
   // 加载教师与今日课表数据
   useEffect(() => {

@@ -8,7 +8,7 @@ import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import SegmentedControl from '@/components/SegmentedControl';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { dataCenterService } from '@/services/data-center';
-import { selectCurrentCampus, useCampusStore } from '@/stores/campus';
+import { selectCurrentCampus, useCampusList, useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type {
   VenueOverviewType,
@@ -40,7 +40,7 @@ const DataCenter: React.FC = () => {
   const { profile } = useAuth();
   const campuses = useCampusStore((s) => s.campuses);
   const currentCampusId = useCampusStore((s) => s.currentCampusId);
-  const fetchCampuses = useCampusStore((s) => s.fetchCampuses);
+  const { ensureLoaded: ensureCampusesLoaded } = useCampusList();
   const [venueOverview, setVenueOverview] = useState<VenueOverviewType | null>(null);
 
   const campusName = useMemo(() => {
@@ -100,13 +100,8 @@ const DataCenter: React.FC = () => {
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
-    if (campuses.length === 0) {
-      // 失败要重试：store 只在内部记 error，不抛错，这里靠返回值判断（首页同理）
-      void (async () => {
-        const ok = await fetchCampuses();
-        if (!ok) await fetchCampuses(true);
-      })();
-    }
+    // 校区自愈统一走 harness（useCampusList.ensureLoaded，勿在页面自写）
+    void ensureCampusesLoaded();
     if (isFirstStatsShow.current) {
       isFirstStatsShow.current = false;
       return;

@@ -4,6 +4,7 @@
  * 管理校区列表、薪资模板、发薪日、节假日等状态；营业时间随校区资料读写。
  */
 import Taro from '@tarojs/taro';
+import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import {
   campusService,
@@ -681,4 +682,34 @@ export function selectCurrentCampus(
   const byId = campuses.find((c) => c.id === currentCampusId) ?? null;
   if (byId || opts?.strict) return byId;
   return campuses.find((c) => c.isMain) ?? campuses[0] ?? null;
+}
+
+// ============================================
+// 统一读取入口（harness · 设计见 docs/diagnostics/2026-09-19-campus-data-harness.md）
+// 页面禁止自写校区 fetch/自愈/派生，一律走 useCampusList
+// ============================================
+export function useCampusList() {
+  const campuses = useCampusStore((s) => s.campuses);
+  const currentCampusId = useCampusStore((s) => s.currentCampusId);
+  const loading = useCampusStore((s) => s.loading);
+  const error = useCampusStore((s) => s.error);
+
+  /** 唯一自愈实现：拉取失败（store 只记 error 不抛）→ 强拉重试一次；store.loading 防并发 */
+  const ensureLoaded = useCallback(async (): Promise<void> => {
+    if (useCampusStore.getState().loading) return;
+    const ok = await useCampusStore.getState().fetchCampuses();
+    if (!ok) {
+      const ok2 = await useCampusStore.getState().fetchCampuses(true);
+      if (!ok2) {
+        logError('useCampusList.ensureLoaded', new Error('campus list retry failed'));
+      }
+    }
+  }, []);
+
+  const currentCampus = useMemo(
+    () => selectCurrentCampus(campuses, currentCampusId),
+    [campuses, currentCampusId],
+  );
+
+  return { campuses, currentCampusId, currentCampus, loading, error, ensureLoaded };
 }

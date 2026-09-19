@@ -24,7 +24,7 @@ import {
   type PendingRelation,
 } from '@/services/organization';
 import { venueBookingService } from '@/services/venue-booking';
-import { selectCurrentCampus, useCampusStore } from '@/stores/campus';
+import { useCampusList, useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CampusUIModel } from '@/types/campus';
 import type { TodoItem } from '@/types/home-todo';
@@ -74,15 +74,11 @@ const HOME_QUERY_ROOT = ['home'] as const;
 const HOME_QUERY_STALE_TIME_MS = 30_000;
 
 /**
- * 校区列表保鲜期为 0（每次挂载都让 queryFn 跑一遍）。
- * 理由：校区列表的真正新鲜度归 Zustand store（TTL.campus = 15min，见 stores/campus.ts），
- * React Query 只是「触发 store 拉取」的入口。若这里再设 30s staleTime，就会出现两个互相独立的时钟：
- * 登出/切机构时 store 清了内存 + 快照并把 lastCampusesFetchAt 归零，但 RQ 仍认为 30s 内缓存新鲜
- * → 不再调用 queryFn → 校区列表停在已清空的状态（首页校区卡片空、「未设置校区」引导误弹）。
- * 设为 0 后：每次进首页都会走到 store，由 store 自己的 TTL 决定是否真发网络（稳态下不发），
- * 而被 invalidateCache 归零后必然真正重拉。
+ * 校区列表已统一走 useCampusList harness（唯一数据源 useCampusStore：
+ * TTL 15min + 冷启动快照 + 唯一自愈 ensureLoaded）。
+ * 曾用 React Query 包过一层（双时钟）导致卡片永久空白，已移除——
+ * 详见 docs/diagnostics/2026-09-19-campus-data-harness.md，禁止再加中间层。
  */
-const CAMPUSES_QUERY_STALE_TIME_MS = 0;
 
 /**
  * Home - 机构端首页
@@ -132,11 +128,8 @@ const Home: React.FC = () => {
     return () => clearTimeout(timer);
   }, [isManagerRole, campuses.length]);
 
-  // 共用派生（selectCurrentCampus）：byId → 主校区 → 首个，卡片渲染兜底
-  const currentCampus = useMemo<CampusUIModel | null>(
-    () => selectCurrentCampus(campuses, currentCampusId),
-    [campuses, currentCampusId],
-  );
+  // 校区列表 + 当前校区派生：统一走 harness（useCampusList，禁止页面自写）
+  const { currentCampus, ensureLoaded: ensureCampusesLoaded } = useCampusList();
 
   const businessTime = useMemo(() => {
     const parsed = parseBusinessHours(currentCampus?.businessHours);
@@ -313,28 +306,10 @@ const Home: React.FC = () => {
   /** 身份就绪：与原 Batch 2 手工闸门一致 */
   const homeIdentityReady = Boolean(profileId && currentRole);
 
-  /**
-   * 校区列表：真正的新鲜度由 Store 内 TTL(CAMPUS) 控，这里 staleTime 必须为 0，
-   * 否则 store 的 invalidateCache（登出/切机构清内存 + 清快照 + 归零 lastCampusesFetchAt）
-   * 会被 RQ 的 staleTime 挡住而不重拉 —— 见 CAMPUSES_QUERY_STALE_TIME_MS 注释。
-   */
-  const campusesQuery = useQuery({
-    queryKey: ['campuses', currentRole ?? ''],
-    queryFn: async () => {
-      const ok = await fetchCampuses();
-      // 失败必须抛错：store 内部只记 error 不抛，若不抛则 RQ 判定 queryFn 成功 → 不重试
-      // → 空列表常驻 → 首页校区卡片一直空白（2026-09-19 反馈的问题）
-      if (!ok) throw new Error('校区列表加载失败');
-      return true;
-    },
-    // 与聚合接口同一闸门（profileId + role 双就绪）：profile 未恢复完时 token 可能未就绪，
-    // 过早发出的 401 会白白消耗 retry 次数，放大「一次失败 → 永久空白」的概率
-    enabled: homeIdentityReady,
-    // 早于身份恢复发出时会 401，退避重试可自动补偿
-    retry: 2,
-    retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 4000),
-    staleTime: CAMPUSES_QUERY_STALE_TIME_MS,
-  });
+  /** 校区列表（harness）：唯一自愈入口；身份就绪后才首拉，避免 token 未恢复先发 401 */
+  useEffect(() => {
+    if (homeIdentityReady) void ensureCampusesLoaded();
+  }, [homeIdentityReady, ensureCampusesLoaded]);
 
   /** 首页聚合（B10 / PERF-14）：教师/家长/课表/未读/消课 一次请求返回 */
   const aggregateQuery = useQuery({
@@ -577,17 +552,9 @@ const Home: React.FC = () => {
       }
     }
     void checkPendingRelation();
-    // 校区列表自愈：失败或为空且无在飞请求 → 强制失效重拉。
-    // 背景：tab 页不重挂载、refetchOnWindowFocus/Reconnect 全局关闭，而 campuses query
-    // 不在 HOME_QUERY_ROOT 前缀内（下方 refetchQueries 覆盖不到）——首挂载一旦失败
-    //（如身份恢复竞态 401），此后没有任何自愈路径，首页校区卡片永久空白（2026-09-19 反馈的根治）。
-    if (
-      (campusesQuery.isError || campuses.length === 0) &&
-      !campusesQuery.isFetching &&
-      currentRole
-    ) {
-      void queryClient.invalidateQueries({ queryKey: ['campuses', currentRole] });
-    }
+    // 校区列表自愈走 harness（useCampusList.ensureLoaded：TTL 守卫 + loading 防并发 + 失败强拉重试一次）。
+    // 背景：tab 页不重挂载且 RQ focus/reconnect 全局关闭，若无此自愈，首挂载一次失败即永久空白。
+    if (homeIdentityReady) void ensureCampusesLoaded();
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
