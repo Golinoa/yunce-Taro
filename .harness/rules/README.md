@@ -26,7 +26,7 @@ status: active
 | `10-styling.md` | UnoCSS、设计 Token、rpx、禁 SCSS / 内联 style | 写样式 |
 | `20-components.md` | 先查后写、组件结构、Props、JSDoc | 写 / 改组件 |
 | `30-sheets-and-forms.md` | BottomSheet 单 prop、独立 Sheet、FormInput | 写弹窗 / 表单 |
-| `40-data-and-services.md` | Service 唯一出口、禁止 Mock、契约核对 | 接接口 |
+| `40-data-and-services.md` | Service 唯一出口、禁止 Mock、契约核对、**响应成功码判定（0 或 2xx）**、**缓存 TTL 时间源（serverNow）** | 接接口 / 接缓存 / 排「写成功却被当失败」 |
 | `50-state-and-types.md` | Zustand 用法、TypeScript 严格度、**校区数据 harness（冻结）** | 写状态 / 类型 / 涉及校区数据 |
 | `60-role-identity.md` | 角色身份四层模型（**改角色相关代码必读**） | 涉及 `UserRole`/`orgRole`/`campusRole`/`identity` |
 | `70-wechat-platform.md` | 分包、主包体积、域名、API 可用性、渲染性能、**页面导航防双击** | 小程序平台相关 / 推入表单型入口 |

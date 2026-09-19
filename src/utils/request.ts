@@ -10,6 +10,7 @@ import { reportLocalDebug } from '@/utils/local-debug';
 import { logRequestIssue } from '@/utils/logger';
 /** P0 取证仪表：只记录，不干预（详见该文件说明） */
 import { beginRequest } from '@/utils/request-instrument';
+import { syncServerClock } from '@/utils/server-clock';
 import { singleFlight } from '@/utils/single-flight';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
@@ -480,6 +481,11 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
       },
       timeout,
     });
+
+    // G7 时钟校正：网关（nginx / Cloudflare）返回标准 HTTP `Date` 头，
+    // 每个响应顺带校正一次偏移量，供缓存 TTL 使用（与设备时钟解耦）。
+    // 静默失败，不影响请求链路。
+    syncServerClock(res.header as Record<string, unknown> | undefined);
 
     // #region debug-point H1:request-success
     reportLocalDebug({

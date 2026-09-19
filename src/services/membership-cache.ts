@@ -12,11 +12,31 @@ import {
   type MembershipCatalogPlan,
   type MembershipSku,
 } from '@/services/payment';
+import { getCacheScope } from '@/utils/cache-scope';
 import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
+import { serverNow } from '@/utils/server-clock';
 
-const QUOTA_STORAGE_KEY = 'yunce:membership:quota-v1';
-const SKU_STORAGE_KEY = 'yunce:membership:sku-v1';
+const QUOTA_KEY_PREFIX = 'yunce:membership:quota-v1';
+const SKU_KEY_PREFIX = 'yunce:membership:sku-v1';
+
+/**
+ * 租户维度后缀（计划 §2 G1 / §8 Q2）。
+ *
+ * 会员配额与 SKU 是**机构级**数据，但缓存键必须按「机构 + 用户 + 角色」隔离：
+ * 同一微信用户在家长 ↔ 教师之间切换、或同一设备换号登录时，首帧不得读到上一身份的数据。
+ * 键内隔离后，即使某条切换路径漏了 `resetDomainCaches`，最坏也只是 miss 回源、不会串数据
+ * （"宁 miss 不串"，与 `utils/cache-scope.ts` 同口径）。
+ *
+ * 不含 campusId —— 配额与 SKU 与校区无关，带上只会白丢命中率。
+ */
+function scopeSuffix(): string {
+  const s = getCacheScope();
+  return `${s.orgId ?? '-'}:${s.userId ?? '-'}:${s.role ?? '-'}`;
+}
+
+const quotaKey = (): string => `${QUOTA_KEY_PREFIX}:${scopeSuffix()}`;
+const skuKey = (): string => `${SKU_KEY_PREFIX}:${scopeSuffix()}`;
 
 export type MembershipSkuCatalogCache = {
   enabled: boolean;
@@ -30,8 +50,11 @@ type CachedBox<T> = {
   data: T;
 };
 
-let quotaMem: CachedBox<OrganizationQuotaUsage> | null = null;
-let skuMem: CachedBox<MembershipSkuCatalogCache> | null = null;
+/** 内存盒子额外记住写入时的作用域：作用域变了即视为未命中（防漏清时串数据） */
+type ScopedMemBox<T> = CachedBox<T> & { scope: string };
+
+let quotaMem: ScopedMemBox<OrganizationQuotaUsage> | null = null;
+let skuMem: ScopedMemBox<MembershipSkuCatalogCache> | null = null;
 let prefetchInflight: Promise<void> | null = null;
 
 function readStorage<T>(key: string): CachedBox<T> | null {
@@ -55,22 +78,45 @@ function writeStorage<T>(key: string, box: CachedBox<T>): void {
   }
 }
 
-/** 同步读配额（首帧用，可过期） */
+/**
+ * 按前缀清 storage。
+ * 键已含租户维度 → 无法只删"某一个 key"，切换身份时必须清掉**所有历史作用域**的键。
+ */
+function clearByPrefix(prefix: string): void {
+  try {
+    const info = Taro.getStorageInfoSync();
+    (info?.keys ?? []).forEach((key) => {
+      if (typeof key === 'string' && key.startsWith(prefix)) {
+        Taro.removeStorageSync(key);
+      }
+    });
+  } catch (err) {
+    logError('membershipCache.clearByPrefix', err);
+  }
+}
+
+/**
+ * 同步读配额（首帧展示用，**不作任何决策依据**）。
+ * 权威判定以后端为准：超配额时后端返回 422 `QUOTA_EXCEEDED`，前端仅据此引导升级。
+ * 作用域不匹配即视为未命中（换身份后即使漏清也不会串数据）。
+ */
 export function peekMembershipQuotaCache(): OrganizationQuotaUsage | null {
-  if (quotaMem?.data) return quotaMem.data;
-  const box = readStorage<OrganizationQuotaUsage>(QUOTA_STORAGE_KEY);
+  const suffix = scopeSuffix();
+  if (quotaMem?.data && quotaMem.scope === suffix) return quotaMem.data;
+  const box = readStorage<OrganizationQuotaUsage>(quotaKey());
   if (box?.data) {
-    quotaMem = box;
+    quotaMem = { ...box, scope: suffix };
     return box.data;
   }
   return null;
 }
 
 export function peekMembershipSkuCache(): MembershipSkuCatalogCache | null {
-  if (skuMem?.data) return skuMem.data;
-  const box = readStorage<MembershipSkuCatalogCache>(SKU_STORAGE_KEY);
+  const suffix = scopeSuffix();
+  if (skuMem?.data && skuMem.scope === suffix) return skuMem.data;
+  const box = readStorage<MembershipSkuCatalogCache>(skuKey());
   if (box?.data) {
-    skuMem = box;
+    skuMem = { ...box, scope: suffix };
     seedMembershipSkuCache(
       {
         enabled: box.data.enabled,
@@ -85,21 +131,23 @@ export function peekMembershipSkuCache(): MembershipSkuCatalogCache | null {
   return null;
 }
 
-export function isMembershipQuotaCacheFresh(now = Date.now()): boolean {
-  const at = quotaMem?.at ?? readStorage<OrganizationQuotaUsage>(QUOTA_STORAGE_KEY)?.at;
+export function isMembershipQuotaCacheFresh(now = serverNow()): boolean {
+  const suffix = scopeSuffix();
+  const memAt = quotaMem?.scope === suffix ? quotaMem.at : undefined;
+  const at = memAt ?? readStorage<OrganizationQuotaUsage>(quotaKey())?.at;
   return typeof at === 'number' && now - at < TTL.quota;
 }
 
 export function writeMembershipQuotaCache(data: OrganizationQuotaUsage): void {
-  const box = { at: Date.now(), data };
-  quotaMem = box;
-  writeStorage(QUOTA_STORAGE_KEY, box);
+  const box: CachedBox<OrganizationQuotaUsage> = { at: serverNow(), data };
+  quotaMem = { ...box, scope: scopeSuffix() };
+  writeStorage(quotaKey(), box);
 }
 
 export function writeMembershipSkuCache(data: MembershipSkuCatalogCache): void {
-  const box = { at: Date.now(), data };
-  skuMem = box;
-  writeStorage(SKU_STORAGE_KEY, box);
+  const box: CachedBox<MembershipSkuCatalogCache> = { at: serverNow(), data };
+  skuMem = { ...box, scope: scopeSuffix() };
+  writeStorage(skuKey(), box);
   seedMembershipSkuCache(
     {
       enabled: data.enabled,
@@ -116,12 +164,9 @@ export function invalidateMembershipBootstrapCache(): void {
   skuMem = null;
   prefetchInflight = null;
   invalidateMembershipSkuCache();
-  try {
-    Taro.removeStorageSync(QUOTA_STORAGE_KEY);
-    Taro.removeStorageSync(SKU_STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
+  // 键含租户维度 → 不能只删当前 scope 那一个：按前缀清掉所有历史作用域的键
+  clearByPrefix(QUOTA_KEY_PREFIX);
+  clearByPrefix(SKU_KEY_PREFIX);
 }
 
 /**

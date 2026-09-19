@@ -48,13 +48,18 @@ P1 已完成的 TTL 守卫（`data-freshness.ts` 的 `shouldRefetch` + 组件 `u
 
 **1.1 绝对禁缓存（TTL=0，stale 即资损）—— D1**
 - 支付：`payment.getOrder` 订单态
-- 配额：`organization/quota-usage`（超额售卡 / 超员开班）
 - 排课冲突：`schedules/check-conflict`（教师/教室双占）
 - 课时包：`package.deductHours`、`getActiveByStudent`、`remainingHours`（**直接资损**）
 - 审批：`leave` 审批
 - 上传：`upload token`
 - 触达：`notification` 发送与订阅额度（重复推送）
 - 关系：`student-parents` 绑定、`organization bindings`（**跨租户**）
+- **薪资发放链路**（2026-09-19 治理审计增补，来源 `2026-09-19-cache-layer-governance-audit.md` Q1）：
+  `teachers/salary/execute-pay`（**实际发薪**）、`teachers/salary/batch-confirm`、
+  `teachers/salary/generate-month`、`teachers/salary/send-slip`、`teachers/salary/{id}/confirm`、
+  `data-center/salary`
+- **课时结算 / 退费**（同上增补）：`lesson-debts/{studentId}/settle`（欠费结清）、
+  `course-package-refunds`（课时包退费）
 
 **1.2 写后失效（不是 TTL，写成功立即 invalidate）—— D2**
 - 权限配置与角色授予
@@ -69,6 +74,14 @@ P1 已完成的 TTL 守卫（`data-freshness.ts` 的 `shouldRefetch` + 组件 `u
 - 字典类：course-category、card-type、course-template、package-template、subjects、venues、rooms、holidays
 - 校区 15min
 - 历史月 `statistics.getFullYear`
+
+**1.4 展示类短窗口（首帧可读旧值，不作决策依据）—— D4**
+> 2026-09-19 治理审计 Q5 修正：`organization/quota-usage` 原列 §1.1 D1，**改归本档**。
+> 依据：配额由**后端强制**拦截 —— `yunce-back/yunce-backend/src/version/quota.service.ts` 超限即回
+> **422 `QUOTA_EXCEEDED`**，前端只负责按该响应弹升级引导。故前端读到旧配额**造不成资损**，
+> 最坏是「界面显示尚有余量 → 点下去被后端拒」。定位：**仅供首帧展示，权威判定永远以后端 422 为准**。
+- 配额：`organization/quota-usage`（TTL 20s，仅首帧展示；失败模式＝被后端拒，非资损）
+- 会员 SKU 货架：`membership/skus`（改价低频，写后失效兜底）
 
 ---
 

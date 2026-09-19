@@ -1,9 +1,10 @@
 /**
  * 最小可用持久化缓存基座（B1 · docs/diagnostics/2026-09-19-frontend-cache-layer-plan.md）
  *
- * 交付形态：**休眠**。所有读写在 `cacheEnabled=false`（默认）时空转：
- * get() 一律早返回 null、set()/invalidate() 直接跳过 —— prod 行为与直连完全一致，
- * 灰度开启后按下列护栏运行。
+ * 交付形态：**已启用**（2026-09-19 决策：产品未发布、免灰度 → `cacheEnabled=true`，
+ * 见 `constants/cache-flags.ts` 与计划 §10）。开关保留为**紧急回退**：置 `false` 后
+ * 所有读写在 `isCacheEnabledForOrg` 处空转（get() 一律早返回 null、set()/invalidate()
+ * 直接跳过），prod 行为即刻回到直连，无需发版回滚。
  *
  * 护栏对照（计划 §2）：
  * - G1 命名空间：`yunce:cc:v{schema}:{domain}:{orgId}:{userId}:{role}:{campusId}:{key}`
@@ -14,11 +15,14 @@
  * - G4 并发去重：自建 inflight（membership-cache 的 prefetchInflight 为模块私有，不可复用）
  * - G5 容量上限：单 key ≤1MB、总量 ≤2MB；存储异常 logError 埋点，不静默
  * - G6 回退开关：constants/cache-flags.ts，关即直连，不靠 revert
- * - G7 时间源：前端响应暂无 serverTime，暂用 Date.now() 降级（待后端支持后替换）
+ * - G7 时间源：用 HTTP 响应头 `Date` 校正的服务器时钟（`utils/server-clock.ts` 的
+ *   `serverNow()`）——业务响应体暂无 serverTime，但网关 `Date` 头实测可用且准确；
+ *   未同步到偏移时自动等价 `Date.now()`（降级，行为与校正前一致）
  */
 import Taro from '@tarojs/taro';
 import { isCacheEnabledForOrg } from '@/constants/cache-flags';
 import { logError } from '@/utils/logger';
+import { serverNow } from '@/utils/server-clock';
 
 /** 缓存结构版本：改动 Box 结构/键公式时 +1，旧数据自动清空（G2 兜底） */
 export const CACHE_SCHEMA_VERSION = 1;
@@ -108,7 +112,7 @@ export function getCache<T>(
     if (!raw || typeof raw !== 'object') return null;
     const box = raw as CacheBox<T>;
     if (box.data == null || typeof box.at !== 'number') return null;
-    if (Date.now() - box.at >= ttlMs) return null;
+    if (serverNow() - box.at >= ttlMs) return null;
     return box.data;
   } catch (err) {
     logError('cacheStore.get', err);
@@ -122,7 +126,7 @@ export function getCache<T>(
 export function setCache<T>(domain: string, key: string, data: T, scope: CacheScope): void {
   if (!isCacheEnabledForOrg(scope.orgId)) return;
   try {
-    const box: CacheBox<T> = { at: Date.now(), data };
+    const box: CacheBox<T> = { at: serverNow(), data };
     const bytes = estimateBytes(box);
     if (bytes > MAX_VALUE_BYTES) {
       logError('cacheStore.set.oversize', new Error(`key too large: ${domain}/${key}`));
