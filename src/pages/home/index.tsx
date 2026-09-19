@@ -24,7 +24,7 @@ import {
   type PendingRelation,
 } from '@/services/organization';
 import { venueBookingService } from '@/services/venue-booking';
-import { useCampusStore } from '@/stores/campus';
+import { selectCurrentCampus, useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CampusUIModel } from '@/types/campus';
 import type { TodoItem } from '@/types/home-todo';
@@ -132,10 +132,11 @@ const Home: React.FC = () => {
     return () => clearTimeout(timer);
   }, [isManagerRole, campuses.length]);
 
-  const currentCampus = useMemo<CampusUIModel | null>(() => {
-    const byId = campuses.find((c) => c.id === currentCampusId);
-    return byId || campuses.find((c) => c.isMain) || campuses[0] || null;
-  }, [campuses, currentCampusId]);
+  // 共用派生（selectCurrentCampus）：byId → 主校区 → 首个，卡片渲染兜底
+  const currentCampus = useMemo<CampusUIModel | null>(
+    () => selectCurrentCampus(campuses, currentCampusId),
+    [campuses, currentCampusId],
+  );
 
   const businessTime = useMemo(() => {
     const parsed = parseBusinessHours(currentCampus?.businessHours);

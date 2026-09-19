@@ -665,3 +665,20 @@ export const useCampusStore = create<CampusState>((set, get) => ({
     }
   },
 }));
+
+/**
+ * 当前校区派生（首页 / 数据页等共用，消除各页重复实现）
+ *
+ * @param strict  true  = 仅按 currentCampusId 精确匹配（数据页：找不到显示「加载中」，
+ *                        不得回退渲染别的校区，否则头部名称与统计数据错位）
+ *                false = byId → 主校区 → 首个（首页卡片渲染兜底）
+ */
+export function selectCurrentCampus(
+  campuses: CampusUIModel[],
+  currentCampusId: string,
+  opts?: { strict?: boolean },
+): CampusUIModel | null {
+  const byId = campuses.find((c) => c.id === currentCampusId) ?? null;
+  if (byId || opts?.strict) return byId;
+  return campuses.find((c) => c.isMain) ?? campuses[0] ?? null;
+}

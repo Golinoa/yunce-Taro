@@ -8,7 +8,7 @@ import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import SegmentedControl from '@/components/SegmentedControl';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { dataCenterService } from '@/services/data-center';
-import { useCampusStore } from '@/stores/campus';
+import { selectCurrentCampus, useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type {
   VenueOverviewType,
@@ -44,8 +44,12 @@ const DataCenter: React.FC = () => {
   const [venueOverview, setVenueOverview] = useState<VenueOverviewType | null>(null);
 
   const campusName = useMemo(() => {
-    const current = campuses.find((c) => c.id === currentCampusId);
-    return current?.name || venueOverview?.venueName || '加载中';
+    // 共用派生（strict：仅按当前校区精确匹配，找不到显示「加载中」，不回退到别的校区）
+    return (
+      selectCurrentCampus(campuses, currentCampusId, { strict: true })?.name ||
+      venueOverview?.venueName ||
+      '加载中'
+    );
   }, [campuses, currentCampusId, venueOverview?.venueName]);
 
   // 导航栏背景色与弥散渐变顶部一致，实现无缝衔接
