@@ -97,15 +97,25 @@ const VenueFormPage: React.FC = () => {
    * 写完必须真的回到列表页：列表页只有被重新 onShow 才会消费
    * REFRESH_SIGNAL.venues 并重拉，若 navigateBack 失败（页面栈异常）就会
    * 停留在表单页 —— 表现即「保存成功但表单没关、列表也没刷新」。
-   * 兜底用 redirectTo 换成列表页，保证信号一定被消费。
+   * 确定性保证：先核对 navigateBack 将揭示的页面——
+   * - 是 venue-list：正常 back；
+   * - 还是 venue-form（快速双击 FAB 曾把两层表单入栈）：连退两层；
+   * - 其它来源页：redirectTo 换成列表页，保证信号一定被消费。
    */
   const goBackToList = useCallback(() => {
-    Taro.navigateBack({
-      delta: 1,
-      fail: () => {
-        Taro.redirectTo({ url: '/package-settings/pages/venue-list/index' });
-      },
-    });
+    const LIST_URL = '/package-settings/pages/venue-list/index';
+    const pages = Taro.getCurrentPages();
+    const prev = pages[pages.length - 2];
+    const prevRoute = prev?.route ?? '';
+    if (prevRoute.includes('venue-form')) {
+      Taro.navigateBack({ delta: 2, fail: () => Taro.redirectTo({ url: LIST_URL }) });
+      return;
+    }
+    if (prevRoute.includes('venue-list')) {
+      Taro.navigateBack({ delta: 1, fail: () => Taro.redirectTo({ url: LIST_URL }) });
+      return;
+    }
+    Taro.redirectTo({ url: LIST_URL });
   }, []);
 
   const hasChanged = useMemo(
@@ -144,15 +154,16 @@ const VenueFormPage: React.FC = () => {
       Taro.showToast({ title: '保存成功', icon: 'success' });
       // 通知 venue-list 写后强制重拉：列表页 onShow 里「信号优先于 TTL」，有信号必重拉
       setRefreshSignal(REFRESH_SIGNAL.venues);
+      // 成功后保持 saving=true 直到离页：防止 800ms 窗口内二次提交
+      // （二次 add 会命中后端「同名教室」冲突，把成功变成报错）
       setTimeout(goBackToList, 800);
     } catch (err) {
       logError('save room', err);
+      setSaving(false); // 仅失败恢复按钮；成功路径保持锁到离页
       Taro.showToast({
         title: err instanceof Error && err.message ? err.message : '保存失败',
         icon: 'none',
       });
-    } finally {
-      setSaving(false);
     }
   }, [form, isEdit, saving, currentCampus, validate, roomId, goBackToList]);
 

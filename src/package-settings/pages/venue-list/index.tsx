@@ -79,8 +79,18 @@ const VenueListPage: React.FC = () => {
     }
   });
 
+  // FAB 单飞守卫：快速双击曾把两层相同表单压栈，navigateBack 只关顶层，
+  // 露出底下一张同样的表单 —— 表现即「添加成功后没关闭页面」（2026-09-19 反馈）
+  const addNavigatingRef = React.useRef(false);
   const handleAdd = useCallback(() => {
-    Taro.navigateTo({ url: '/package-settings/pages/venue-form/index' });
+    if (addNavigatingRef.current) return;
+    addNavigatingRef.current = true;
+    Taro.navigateTo({
+      url: '/package-settings/pages/venue-form/index',
+      complete: () => {
+        addNavigatingRef.current = false;
+      },
+    });
   }, []);
 
   const handleEdit = useCallback((id: string) => {
