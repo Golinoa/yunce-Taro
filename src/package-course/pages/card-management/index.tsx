@@ -24,6 +24,7 @@ import { useCourseCategoryStore } from '@/stores/course-category';
 import type { CardType, CardTypeStatus } from '@/types/card-type';
 import type { CourseCategoryMode } from '@/types/course-category';
 import type { CardTypeStatKey } from '@/types/member-card';
+import { navigateToOnce } from '@/utils/navigation';
 import { withRouteGuard } from '@/utils/route-guard';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.package;
@@ -97,7 +98,7 @@ const CardManagementPage: React.FC = () => {
   }, []);
 
   const handleEdit = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-course/pages/card-form/index?id=${id}` });
+    navigateToOnce(`/package-course/pages/card-form/index?id=${id}`);
   }, []);
 
   /** 复制卡种：跳转到新增页并传入原卡种 ID */

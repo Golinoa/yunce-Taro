@@ -16,6 +16,7 @@ import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { subjectService } from '@/services/campus';
 import { useCampusStore } from '@/stores/campus';
 import type { Subject } from '@/types/campus';
+import { navigateToOnce } from '@/utils/navigation';
 
 /** 科目管理列表页 */
 const SubjectManagementPage: React.FC = () => {
@@ -68,7 +69,7 @@ const SubjectManagementPage: React.FC = () => {
   }, []);
 
   const handleEdit = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-course/pages/subject-form/index?id=${id}` });
+    navigateToOnce(`/package-course/pages/subject-form/index?id=${id}`);
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {

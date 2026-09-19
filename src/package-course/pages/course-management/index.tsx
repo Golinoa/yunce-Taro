@@ -25,6 +25,7 @@ import type { Class } from '@/types/class';
 import type { CourseTemplate } from '@/types/course-template';
 import { useAuth } from '@/utils/auth';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { navigateToOnce } from '@/utils/navigation';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 
 const INTRO_STORAGE_KEY = PAGE_INTRO_STORAGE_KEYS.course;
@@ -153,7 +154,7 @@ const CourseManagementPage: React.FC = () => {
   }, [activeCategoryId, activeCategoryItem?.id]);
 
   const handleCategoryLongPress = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-course/pages/category-form/index?id=${id}` });
+    navigateToOnce(`/package-course/pages/category-form/index?id=${id}`);
   }, []);
 
   const handleDismissCategoryTip = useCallback(() => {

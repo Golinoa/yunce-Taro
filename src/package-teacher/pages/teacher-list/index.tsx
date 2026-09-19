@@ -98,7 +98,7 @@ const TeacherListPage: React.FC = () => {
   }, []);
 
   const handleEdit = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-teacher/pages/teacher-form/index?id=${id}` });
+    navigateToOnce(`/package-teacher/pages/teacher-form/index?id=${id}`);
   }, []);
 
   // 切换 Tab 时收起所有已展开的滑动按钮

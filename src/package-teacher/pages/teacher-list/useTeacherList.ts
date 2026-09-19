@@ -6,6 +6,7 @@ import { useTeacherStore, calcTotal } from '@/stores/teacher';
 import type { SalaryModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { navigateToOnce } from '@/utils/navigation';
 
 /** 主Tab类型 */
 export type MainTab = 'teacher' | 'salary' | 'schedule';
@@ -223,7 +224,7 @@ export function useTeacherList() {
 
   // ===== 事件处理 =====
   const handleTeacherClick = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-teacher/pages/teacher-form/index?id=${id}` });
+    navigateToOnce(`/package-teacher/pages/teacher-form/index?id=${id}`);
   }, []);
 
   const handleSalaryAction = useCallback(
@@ -304,7 +305,7 @@ export function useTeacherList() {
   }, []);
 
   const handleSalaryDetail = useCallback((teacherId: string) => {
-    Taro.navigateTo({ url: `/package-teacher/pages/salary-detail/index?id=${teacherId}` });
+    navigateToOnce(`/package-teacher/pages/salary-detail/index?id=${teacherId}`);
   }, []);
 
   return {
