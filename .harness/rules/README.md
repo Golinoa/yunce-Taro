@@ -29,7 +29,7 @@ status: active
 | `40-data-and-services.md` | Service 唯一出口、禁止 Mock、契约核对 | 接接口 |
 | `50-state-and-types.md` | Zustand 用法、TypeScript 严格度、**校区数据 harness（冻结）** | 写状态 / 类型 / 涉及校区数据 |
 | `60-role-identity.md` | 角色身份四层模型（**改角色相关代码必读**） | 涉及 `UserRole`/`orgRole`/`campusRole`/`identity` |
-| `70-wechat-platform.md` | 分包、主包体积、域名、API 可用性、渲染性能 | 小程序平台相关 |
+| `70-wechat-platform.md` | 分包、主包体积、域名、API 可用性、渲染性能、**页面导航防双击** | 小程序平台相关 / 推入表单型入口 |
 | `80-compliance.md` | 隐私、最小必要、内容与资金合规 | 提审 / 涉及用户信息 |
 | `90-scroll-interaction.md` | ScrollView、FAB、PickerView | 首页交互、滚轮选择器 |
 

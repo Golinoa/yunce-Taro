@@ -31,6 +31,7 @@ import type { ResignType, TeacherStatus, TeacherUIModel } from '@/types/teacher'
 import { useAuth } from '@/utils/auth';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
+import { navigateToOnce } from '@/utils/navigation';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type StatusTab = Extract<TeacherStatus, 'active' | 'resigned'>;
@@ -93,7 +94,7 @@ const TeacherListPage: React.FC = () => {
   }, [list.length, activeTab]);
 
   const handleAdd = useCallback(() => {
-    Taro.navigateTo({ url: '/package-teacher/pages/teacher-form/index' });
+    navigateToOnce('/package-teacher/pages/teacher-form/index');
   }, []);
 
   const handleEdit = useCallback((id: string) => {

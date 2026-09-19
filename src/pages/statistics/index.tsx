@@ -20,6 +20,7 @@ import type {
 } from '@/types/data-center';
 import { useAuth } from '@/utils/auth';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { navigateToOnce } from '@/utils/navigation';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
@@ -138,7 +139,7 @@ const DataCenter: React.FC = () => {
 
   /** 跳转记一笔 */
   const goRecordTransaction = useCallback(() => {
-    Taro.navigateTo({ url: '/package-statistics/pages/record-transaction/index' });
+    navigateToOnce('/package-statistics/pages/record-transaction/index');
   }, []);
 
   /** 返回首页 */

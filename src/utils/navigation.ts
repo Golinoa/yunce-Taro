@@ -49,3 +49,24 @@ export async function safeReLaunch(url: string) {
     }, RE_LAUNCH_LOCK_MS);
   }
 }
+
+/**
+ * 单飞 navigateTo：浮层按钮/列表项快速双击不再把两层相同页面压栈。
+ * 背景（2026-09-19 场地事故）：双击「添加」FAB 压入两层相同表单，
+ * 保存后 navigateBack 只关顶层，露出底层同款表单 —— 表现为「保存成功但没关闭页面」。
+ * 仅锁同 URL：不同页面的连续导航不受影响。所有**推入表单型**入口必须使用本函数
+ * （规则见 .harness/rules/50-state-and-types.md 校区数据条目同款约定）。
+ */
+let pendingNavigateUrl = '';
+
+export function navigateToOnce(url: string): void {
+  const normalizedUrl = normalizeUrl(url);
+  if (pendingNavigateUrl === normalizedUrl) return;
+  pendingNavigateUrl = normalizedUrl;
+  Taro.navigateTo({
+    url: normalizedUrl,
+    complete: () => {
+      if (pendingNavigateUrl === normalizedUrl) pendingNavigateUrl = '';
+    },
+  });
+}

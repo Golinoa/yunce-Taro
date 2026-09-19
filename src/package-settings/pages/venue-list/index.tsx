@@ -19,6 +19,7 @@ import { useCampusStore } from '@/stores/campus';
 import type { Room } from '@/types/campus';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
+import { navigateToOnce } from '@/utils/navigation';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { REFRESH_SIGNAL, consumeRefreshSignal } from '@/utils/refresh-signal';
 
@@ -79,22 +80,13 @@ const VenueListPage: React.FC = () => {
     }
   });
 
-  // FAB 单飞守卫：快速双击曾把两层相同表单压栈，navigateBack 只关顶层，
-  // 露出底下一张同样的表单 —— 表现即「添加成功后没关闭页面」（2026-09-19 反馈）
-  const addNavigatingRef = React.useRef(false);
+  // 推入表单统一走 navigateToOnce（单飞防双击双层压栈，2026-09-19 场地事故沉淀）
   const handleAdd = useCallback(() => {
-    if (addNavigatingRef.current) return;
-    addNavigatingRef.current = true;
-    Taro.navigateTo({
-      url: '/package-settings/pages/venue-form/index',
-      complete: () => {
-        addNavigatingRef.current = false;
-      },
-    });
+    navigateToOnce('/package-settings/pages/venue-form/index');
   }, []);
 
   const handleEdit = useCallback((id: string) => {
-    Taro.navigateTo({ url: `/package-settings/pages/venue-form/index?id=${id}` });
+    navigateToOnce(`/package-settings/pages/venue-form/index?id=${id}`);
   }, []);
 
   const countText = useMemo(() => `${rooms.length} 个场地`, [rooms.length]);

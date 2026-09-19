@@ -9,6 +9,7 @@ import { dataCenterService } from '@/services/data-center';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { FinanceDetailType, RevenueTrendItem } from '@/types/data-center';
+import { navigateToOnce } from '@/utils/navigation';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -77,7 +78,7 @@ const FinanceData: React.FC = () => {
 
   /** 跳转记一笔 */
   const goRecordTransaction = useCallback(() => {
-    Taro.navigateTo({ url: '/package-statistics/pages/record-transaction/index' });
+    navigateToOnce('/package-statistics/pages/record-transaction/index');
   }, []);
 
   /** 格式化金额 */

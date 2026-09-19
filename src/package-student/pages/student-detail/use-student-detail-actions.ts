@@ -14,6 +14,7 @@ import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
+import { navigateToOnce } from '@/utils/navigation';
 import { getPackageRefundableAmount } from './student-detail-package';
 
 export interface UseStudentDetailActionsParams {
@@ -120,16 +121,16 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
 
   const handleIssueCard = useCallback(() => {
     if (!student) return;
-    Taro.navigateTo({
-      url: `/package-student/pages/member-card-issue/index?studentId=${encodeURIComponent(student.id)}`,
-    });
+    navigateToOnce(
+      `/package-student/pages/member-card-issue/index?studentId=${encodeURIComponent(student.id)}`,
+    );
   }, [student]);
 
   const handleWriteFollow = useCallback(() => {
     if (!student) return;
-    Taro.navigateTo({
-      url: `/package-student/pages/follow-record-form/index?studentId=${encodeURIComponent(student.id)}`,
-    });
+    navigateToOnce(
+      `/package-student/pages/follow-record-form/index?studentId=${encodeURIComponent(student.id)}`,
+    );
   }, [student]);
 
   const handleMemberCardClick = useCallback((card: MemberCardDetail) => {

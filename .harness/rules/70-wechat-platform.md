@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-15
+last_updated: 2026-09-19
 status: active
 source: 主包超限、真机域名校验失败、测试包误指本地地址及微信压缩审计失败；官方性能优化指南（2021-12-20）
 ---
@@ -80,3 +80,19 @@ Taro.redirectTo({ url: '/pages/login/index' });      // 不可返回
 ❌ 底部操作栏被 Home Indicator 遮挡
 
 ✅ FIX: `pb-safe` / `pb-safe-bar`；自定义导航 `pt-nav-safe`。
+
+## 页面导航（推入表型入口防双击 · 2026-09-19 场地事故沉淀）
+
+❌ 浮层按钮 / 列表项等**推入表单型**入口直接裸调 `Taro.navigateTo`
+（快速双击会把两层相同页面压栈；保存后 navigateBack 只关顶层，
+露出底层同款表单 —— 表现为「保存成功但页面没关、列表没刷新」）
+
+✅ FIX: 统一走 `navigateToOnce(url)`（`utils/navigation.ts`，同 URL 单飞锁）：
+
+```tsx
+const handleAdd = useCallback(() => {
+  navigateToOnce('/package-settings/pages/venue-form/index');
+}, []);
+```
+
+📖 See: `docs/diagnostics/2026-09-19-campus-data-harness.md` §3 页面规则

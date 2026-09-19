@@ -21,6 +21,7 @@ import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { SalaryTemplate } from '@/types/teacher';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { navigateToOnce } from '@/utils/navigation';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
 type ApplyState =
@@ -54,9 +55,7 @@ const SalaryTemplateListPage: React.FC = () => {
   });
 
   const handleCreate = useCallback(() => {
-    Taro.navigateTo({
-      url: '/package-teacher/pages/salary-template-form/index',
-    });
+    navigateToOnce('/package-teacher/pages/salary-template-form/index');
   }, []);
 
   const handleEdit = useCallback((tpl: SalaryTemplate) => {
