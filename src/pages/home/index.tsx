@@ -317,7 +317,7 @@ const Home: React.FC = () => {
    * 否则 store 的 invalidateCache（登出/切机构清内存 + 清快照 + 归零 lastCampusesFetchAt）
    * 会被 RQ 的 staleTime 挡住而不重拉 —— 见 CAMPUSES_QUERY_STALE_TIME_MS 注释。
    */
-  useQuery({
+  const campusesQuery = useQuery({
     queryKey: ['campuses', currentRole ?? ''],
     queryFn: async () => {
       const ok = await fetchCampuses();
@@ -326,7 +326,9 @@ const Home: React.FC = () => {
       if (!ok) throw new Error('校区列表加载失败');
       return true;
     },
-    enabled: Boolean(currentRole),
+    // 与聚合接口同一闸门（profileId + role 双就绪）：profile 未恢复完时 token 可能未就绪，
+    // 过早发出的 401 会白白消耗 retry 次数，放大「一次失败 → 永久空白」的概率
+    enabled: homeIdentityReady,
     // 早于身份恢复发出时会 401，退避重试可自动补偿
     retry: 2,
     retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 4000),
@@ -574,6 +576,17 @@ const Home: React.FC = () => {
       }
     }
     void checkPendingRelation();
+    // 校区列表自愈：失败或为空且无在飞请求 → 强制失效重拉。
+    // 背景：tab 页不重挂载、refetchOnWindowFocus/Reconnect 全局关闭，而 campuses query
+    // 不在 HOME_QUERY_ROOT 前缀内（下方 refetchQueries 覆盖不到）——首挂载一旦失败
+    //（如身份恢复竞态 401），此后没有任何自愈路径，首页校区卡片永久空白（2026-09-19 反馈的根治）。
+    if (
+      (campusesQuery.isError || campuses.length === 0) &&
+      !campusesQuery.isFetching &&
+      currentRole
+    ) {
+      void queryClient.invalidateQueries({ queryKey: ['campuses', currentRole] });
+    }
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
