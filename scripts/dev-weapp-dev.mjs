@@ -1,9 +1,9 @@
 /**
- * 测试环境实时联调：Mock 关 + API 指向 dev.chancore.cn（回源 WSL）
+ * 本机实时联调：Mock 关 + API 指向 Windows/WSL 可访问的本机后端
  *
  * 前置：
- * 1. curl -4 https://dev.chancore.cn/health 返回 ok
- * 2. 微信公众平台 request 合法域名含 dev.chancore.cn
+ * 1. curl http://127.0.0.1:3000/health 返回 ok
+ * 2. 微信开发者工具允许本地调试请求
  *
  * 注意：package.json 的 build:weapp 是 `taro && postbuild`，npm 追加的 --watch
  * 会落到 postbuild 上导致 watch 立刻退出，故此处直接调 taro --watch。
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const DEFAULT_DEV_API_BASE = 'https://dev.chancore.cn/api/app/v1';
+const DEFAULT_DEV_API_BASE = 'http://127.0.0.1:3000/api/app/v1';
 const API_BASE = process.env.TARO_API_BASE_URL ?? DEFAULT_DEV_API_BASE;
 
 console.log(`[dev:weapp:dev] VITE_USE_MOCK=false`);

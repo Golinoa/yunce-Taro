@@ -32,9 +32,9 @@ for (const t of targets) {
   } catch (error) {
     const errCode =
       error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-    // Node 22 常见 EBUSY；Node 24 / Windows 被微信开发者工具占用时多为 EPERM
+    // Node 22 常见 EBUSY；Node 24 / Windows 被微信开发者工具占用时可能为 EPERM/EACCES
     const isDistLocked =
-      t.endsWith('dist') && (errCode === 'EBUSY' || errCode === 'EPERM');
+      t.endsWith('dist') && (errCode === 'EBUSY' || errCode === 'EPERM' || errCode === 'EACCES');
     if (isDistLocked) {
       console.warn(
         '[clean] dist is locked (close WeChat DevTools preview?), skip removing dist — static assets will be force-copied in postbuild',
