@@ -67,5 +67,5 @@ npm test              # Vitest
 ## 🔗 相关文档
 
 - 后端工程规则：[`../yunce-back/yunce-backend/.harness/`](../yunce-back/yunce-backend/.harness/README.md)
-- 运营后台工程规则：[`../yunce-back/yunce-admin/apps/web-antd/.harness/`](../yunce-back/yunce-admin/apps/web-antd/.harness/README.md)
+- 运营后台工程入口：[`../yunce-back/yunce-admin/apps/web-antd/AGENTS.md`](../yunce-back/yunce-admin/apps/web-antd/AGENTS.md)；工程化文档见 [`docs/README.md`](../yunce-back/yunce-admin/apps/web-antd/docs/README.md) 与 [`docs/SOP/README.md`](../yunce-back/yunce-admin/apps/web-antd/docs/SOP/README.md)。该工程当前没有 `.harness/`，不凭空创建规则入口。
 - 联调入口 / 修复计划：[`../yunce-back/yunce-backend/docs/development/README.md`](../yunce-back/yunce-backend/docs/development/README.md)
