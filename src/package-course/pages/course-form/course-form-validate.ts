@@ -16,6 +16,12 @@ export type CourseFormValidateInput = {
   price: string;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isCourseCategoryId(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
+
 /** 校验表单，返回错误对象（空对象表示通过） */
 export function validateCourseForm(input: CourseFormValidateInput): FormErrors {
   const nextErrors: FormErrors = {};
@@ -24,6 +30,8 @@ export function validateCourseForm(input: CourseFormValidateInput): FormErrors {
   }
   if (!input.categoryId) {
     nextErrors.categoryId = '请选择所属分类';
+  } else if (!isCourseCategoryId(input.categoryId)) {
+    nextErrors.categoryId = '课程分类加载失败，请返回重试';
   }
   if (input.isClassMode && !input.subjectId) {
     nextErrors.subjectId = '请选择所属科目';

@@ -328,8 +328,9 @@ export function useCourseFormLoaders(params: UseCourseFormLoadersParams): void {
         // 新增时默认选中路由/当前激活分类，没有则选第一个；
         // 直接从 store 取最新列表，避免闭包拿到旧 categories
         const state = useCourseCategoryStore.getState();
+        const routeCategory = state.categories.find((item) => item.id === routeCategoryId);
         const defaultId =
-          routeCategoryId || state.activeCategoryId || state.categories[0]?.id || '';
+          routeCategory?.id || state.activeCategoryId || state.categories[0]?.id || '';
         if (defaultId) {
           setCategoryId(defaultId);
           defaultCategorySetRef.current = true;

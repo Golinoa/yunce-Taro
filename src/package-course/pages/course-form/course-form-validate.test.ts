@@ -3,7 +3,7 @@ import { validateCourseForm } from './course-form-validate';
 
 const base = {
   name: '钢琴启蒙',
-  categoryId: 'cat-1',
+  categoryId: '11111111-1111-4111-8111-111111111111',
   subjectId: 'sub-1',
   duration: '60',
   capacity: '',
@@ -24,6 +24,12 @@ describe('validateCourseForm', () => {
       name: '请输入课程名称',
       categoryId: '请选择所属分类',
     });
+  });
+
+  it('blocks UI-only fallback category IDs from being submitted', () => {
+    expect(validateCourseForm({ ...base, categoryId: 'cat-class' }).categoryId).toBe(
+      '课程分类加载失败，请返回重试',
+    );
   });
 
   it('requires subject only in class mode', () => {
