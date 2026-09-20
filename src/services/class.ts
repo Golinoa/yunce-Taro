@@ -11,6 +11,7 @@ interface BackendClassListItem {
   backgroundImage?: null | string;
   campusId?: null | string;
   capacity?: null | number;
+  categoryId?: null | string;
   color?: null | string;
   createdAt: string;
   endTime?: null | string;
@@ -48,6 +49,7 @@ interface BackendClassDetailResponse {
   backgroundImage?: null | string;
   campusId?: null | string;
   capacity?: null | number;
+  categoryId?: null | string;
   color?: null | string;
   createdAt: string;
   endTime?: null | string;
@@ -142,6 +144,7 @@ function mapBackendClassListItem(item: BackendClassListItem): Class {
     total_lessons: item.totalLessons ?? undefined,
     used_lessons: item.usedLessons ?? 0,
     capacity: item.capacity ?? undefined,
+    category_id: item.categoryId || undefined,
     color: (item.color as Class['color']) || 'primary',
     student_count: item.studentCount ?? 0,
     note: item.note || item.location || undefined,
@@ -172,6 +175,7 @@ function mapBackendClassDetail(item: BackendClassDetailResponse): Class {
     total_lessons: item.totalLessons ?? undefined,
     used_lessons: item.usedLessons ?? item.recentLessons?.length ?? 0,
     capacity: item.capacity ?? undefined,
+    category_id: item.categoryId || undefined,
     color: (item.color as Class['color']) || 'primary',
     student_count: item.students?.length || 0,
     note: item.note || item.location || undefined,
@@ -382,6 +386,7 @@ export const classService = {
       endTime: data.end_time,
       homeImage: data.homeImage ?? null,
       backgroundImage: data.backgroundImage ?? null,
+      categoryId: data.category_id || undefined,
       studentIds,
     });
     return mapBackendClassListItem(created);
@@ -403,6 +408,7 @@ export const classService = {
       endTime: data.end_time,
       homeImage: data.homeImage,
       backgroundImage: data.backgroundImage,
+      categoryId: data.category_id || undefined,
     });
     return mapBackendClassListItem(updated);
   },
