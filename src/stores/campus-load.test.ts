@@ -10,7 +10,7 @@ const services = vi.hoisted(() => ({
   payDaySettingsService: { get: vi.fn() },
   holidayService: { getList: vi.fn() },
   notifyService: { getList: vi.fn() },
-  subjectService: {},
+  subjectService: { getList: vi.fn() },
 }));
 
 vi.mock('@/services', () => services);
@@ -52,6 +52,38 @@ describe('校区设置聚合加载', () => {
     await useCampusStore.getState().fetchCampuses(true);
     expect(useCampusStore.getState().error).toBe('校区数据加载失败');
     expect(JSON.parse(String(Taro.getStorageSync(CAMPUS_SNAPSHOT_KEY)))).toHaveLength(1);
+  });
+
+  it('并发进入不同页面时共享同一个校区请求', async () => {
+    let resolveRequest!: (value: Array<{ id: string; name: string }>) => void;
+    services.campusService.getList.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+
+    const first = useCampusStore.getState().fetchCampuses(true);
+    const second = useCampusStore.getState().fetchCampuses(true);
+    expect(services.campusService.getList).toHaveBeenCalledTimes(1);
+
+    resolveRequest([{ id: 'c1', name: '门店' }]);
+    await Promise.all([first, second]);
+  });
+
+  it('并发进入不同页面时共享同一个科目请求', async () => {
+    let resolveRequest!: (value: Array<{ id: string; name: string }>) => void;
+    services.subjectService.getList.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+
+    const first = useCampusStore.getState().fetchSubjects(true);
+    const second = useCampusStore.getState().fetchSubjects(true);
+    expect(services.subjectService.getList).toHaveBeenCalledTimes(1);
+
+    resolveRequest([{ id: 's1', name: '钢琴' }]);
+    await Promise.all([first, second]);
   });
 
   it('清缓存（登出/切机构）会移除校区快照，避免下一账号先渲染上一家的校区', async () => {

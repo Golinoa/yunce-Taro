@@ -618,6 +618,10 @@ export function useStudentForm(): UseStudentFormReturn {
         Taro.showToast({ title: '添加成功', icon: 'success' });
       }
 
+      // 后端写入及必要的头像补传已经完成；订阅授权和分班确认属于后续副作用，
+      // 不应继续占用保存按钮的 loading 状态。
+      setSaving(false);
+
       if (!isEdit && newStudent) {
         Taro.hideToast();
         try {

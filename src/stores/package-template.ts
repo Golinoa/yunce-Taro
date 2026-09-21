@@ -19,6 +19,7 @@ interface PackageTemplateState {
 }
 
 const CACHE_TTL = TTL.list;
+const requests = new Map<string, Promise<CoursePackageTemplate[]>>();
 
 export const usePackageTemplateStore = create<PackageTemplateState>((set, get) => ({
   cache: {},
@@ -38,20 +39,29 @@ export const usePackageTemplateStore = create<PackageTemplateState>((set, get) =
       return cache[teacherId];
     }
 
+    const inFlight = requests.get(teacherId);
+    if (inFlight) return inFlight;
+
     set((s) => ({ loading: { ...s.loading, [teacherId]: true } }));
 
-    try {
-      const list = await packageTemplateService.getByTeacher(teacherId);
-      set((s) => ({
-        cache: { ...s.cache, [teacherId]: list },
-        loading: { ...s.loading, [teacherId]: false },
-        lastFetch: { ...s.lastFetch, [teacherId]: now },
-      }));
-      return list;
-    } catch {
-      set((s) => ({ loading: { ...s.loading, [teacherId]: false } }));
-      return cache[teacherId] || [];
-    }
+    const request = (async () => {
+      try {
+        const list = await packageTemplateService.getByTeacher(teacherId);
+        set((s) => ({
+          cache: { ...s.cache, [teacherId]: list },
+          loading: { ...s.loading, [teacherId]: false },
+          lastFetch: { ...s.lastFetch, [teacherId]: now },
+        }));
+        return list;
+      } catch {
+        set((s) => ({ loading: { ...s.loading, [teacherId]: false } }));
+        return get().cache[teacherId] || [];
+      } finally {
+        requests.delete(teacherId);
+      }
+    })();
+    requests.set(teacherId, request);
+    return request;
   },
 
   invalidate: (teacherId) => {

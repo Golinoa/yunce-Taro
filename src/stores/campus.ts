@@ -46,6 +46,8 @@ const LAST_VISITED_CAMPUS_ID_KEY = 'yunce_last_visited_campus_id';
  * 否则「登录态已恢复但 /campuses 还没回来」的窗口里，首页会先显示兜底文案「未设置校区」。
  */
 const CAMPUS_SNAPSHOT_KEY = 'yunce_campus_list_snapshot';
+let campusesRequest: Promise<boolean> | null = null;
+let subjectsRequest: Promise<void> | null = null;
 
 /** 读回校区列表快照；解析失败/非数组一律当空，不影响主链路 */
 function readCampusSnapshot(): CampusUIModel[] {
@@ -195,18 +197,24 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       // 缓存新鲜：视为成功（不算失败，避免上层无谓重试）
       return true;
     }
+    if (campusesRequest) return campusesRequest;
     set({ loading: true, error: null });
-    try {
-      const list = await campusService.getList();
-      persistCampusSnapshot(list);
-      set({ campuses: list, error: null, loading: false, lastCampusesFetchAt: now });
-      return true;
-    } catch (err) {
-      logError('fetchCampuses', err);
-      set({ error: '校区数据加载失败', loading: false });
-      // 把失败暴露给调用方：否则 React Query 认为 queryFn 成功 → 不重试 → 空列表常驻
-      return false;
-    }
+    campusesRequest = (async () => {
+      try {
+        const list = await campusService.getList();
+        persistCampusSnapshot(list);
+        set({ campuses: list, error: null, loading: false, lastCampusesFetchAt: now });
+        return true;
+      } catch (err) {
+        logError('fetchCampuses', err);
+        set({ error: '校区数据加载失败', loading: false });
+        // 把失败暴露给调用方：否则 React Query 认为 queryFn 成功 → 不重试 → 空列表常驻
+        return false;
+      } finally {
+        campusesRequest = null;
+      }
+    })();
+    return campusesRequest;
   },
 
   invalidateCache: () => {
@@ -511,6 +519,7 @@ export const useCampusStore = create<CampusState>((set, get) => ({
   // 科目
   // ============================================
   fetchSubjects: async (force = false) => {
+    if (subjectsRequest) return subjectsRequest;
     try {
       const { subjects, lastSubjectsFetchAt } = get();
       const now = Date.now();
@@ -522,8 +531,18 @@ export const useCampusStore = create<CampusState>((set, get) => ({
       ) {
         return;
       }
-      const list = await subjectService.getList();
-      set({ subjects: list, error: null, lastSubjectsFetchAt: now });
+      subjectsRequest = (async () => {
+        try {
+          const list = await subjectService.getList();
+          set({ subjects: list, error: null, lastSubjectsFetchAt: now });
+        } catch (err) {
+          logError('fetchSubjects', err);
+          set({ error: '科目数据加载失败' });
+        } finally {
+          subjectsRequest = null;
+        }
+      })();
+      return subjectsRequest;
     } catch (err) {
       logError('fetchSubjects', err);
       set({ error: '科目数据加载失败' });

@@ -35,6 +35,9 @@ interface StudentState {
 /** 缓存有效期（L2 列表） */
 const CACHE_TTL = TTL.list;
 
+const teacherRequests = new Map<string, Promise<Student[]>>();
+const parentRequests = new Map<string, Promise<Student[]>>();
+
 export const useStudentStore = create<StudentState>((set, get) => ({
   cache: {},
   loading: {},
@@ -50,21 +53,30 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       return cache[cacheKey];
     }
 
+    const inFlight = teacherRequests.get(cacheKey);
+    if (inFlight) return inFlight;
+
     set((s) => ({ loading: { ...s.loading, [cacheKey]: true } }));
 
-    try {
-      const list = await studentService.getByTeacher(teacherId, campusId);
-      set((s) => ({
-        cache: { ...s.cache, [cacheKey]: list },
-        loading: { ...s.loading, [cacheKey]: false },
-        lastFetch: { ...s.lastFetch, [cacheKey]: now },
-      }));
-      return list;
-    } catch (err) {
-      logError('student fetchByTeacher', err);
-      set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
-      return cache[cacheKey] || [];
-    }
+    const request = (async () => {
+      try {
+        const list = await studentService.getByTeacher(teacherId, campusId);
+        set((s) => ({
+          cache: { ...s.cache, [cacheKey]: list },
+          loading: { ...s.loading, [cacheKey]: false },
+          lastFetch: { ...s.lastFetch, [cacheKey]: now },
+        }));
+        return list;
+      } catch (err) {
+        logError('student fetchByTeacher', err);
+        set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
+        return get().cache[cacheKey] || [];
+      } finally {
+        teacherRequests.delete(cacheKey);
+      }
+    })();
+    teacherRequests.set(cacheKey, request);
+    return request;
   },
 
   fetchByParent: async (parentId, force = false) => {
@@ -76,21 +88,30 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       return cache[cacheKey];
     }
 
+    const inFlight = parentRequests.get(cacheKey);
+    if (inFlight) return inFlight;
+
     set((s) => ({ loading: { ...s.loading, [cacheKey]: true } }));
 
-    try {
-      const list = await studentService.getByParent(parentId);
-      set((s) => ({
-        cache: { ...s.cache, [cacheKey]: list },
-        loading: { ...s.loading, [cacheKey]: false },
-        lastFetch: { ...s.lastFetch, [cacheKey]: now },
-      }));
-      return list;
-    } catch (err) {
-      logError('student fetchByParent', err);
-      set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
-      return cache[cacheKey] || [];
-    }
+    const request = (async () => {
+      try {
+        const list = await studentService.getByParent(parentId);
+        set((s) => ({
+          cache: { ...s.cache, [cacheKey]: list },
+          loading: { ...s.loading, [cacheKey]: false },
+          lastFetch: { ...s.lastFetch, [cacheKey]: now },
+        }));
+        return list;
+      } catch (err) {
+        logError('student fetchByParent', err);
+        set((s) => ({ loading: { ...s.loading, [cacheKey]: false } }));
+        return get().cache[cacheKey] || [];
+      } finally {
+        parentRequests.delete(cacheKey);
+      }
+    })();
+    parentRequests.set(cacheKey, request);
+    return request;
   },
 
   fetchById: async (studentId, teacherId) => {
