@@ -574,12 +574,12 @@ const PackageForm: React.FC = () => {
                   <Text className="text-[22rpx] text-muted-foreground/60">选填，仅记录</Text>
                 </View>
 
-                <View className="flex items-center border-[3rpx] border-border rounded-[24rpx] bg-white overflow-hidden mb-4">
-                  <View className="py-5 px-6 flex items-center justify-center bg-muted/30">
+                <View className="flex min-h-[104rpx] items-center border-[3rpx] border-border rounded-[24rpx] bg-white overflow-hidden mb-4">
+                  <View className="py-[24rpx] px-6 flex items-center justify-center bg-muted/30">
                     <Text className="text-lg font-semibold text-muted-foreground">¥</Text>
                   </View>
                   <Input
-                    className="flex-1 py-5 px-7 text-lg font-semibold text-foreground"
+                    className="flex-1 py-[24rpx] px-7 text-lg font-semibold text-foreground"
                     type="digit"
                     placeholder="0.00"
                     value={feeAmount}

@@ -89,7 +89,6 @@ const StudentForm: React.FC = () => {
     errors,
     saving,
     canSubmit,
-    submitBlockedReason,
     clearError,
     handleChooseAvatar,
     handleSave,
@@ -636,12 +635,7 @@ const StudentForm: React.FC = () => {
           </Card>
         </View>
 
-        <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] flex flex-col gap-[16rpx]">
-          {!canSubmit && submitBlockedReason ? (
-            <Text className="text-[22rpx] text-muted-foreground text-center">
-              {submitBlockedReason}
-            </Text>
-          ) : null}
+        <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] z-50 flex flex-col gap-[16rpx] rounded-[24rpx] border-[2rpx] border-border/60 bg-background/95 px-[16rpx] py-[16rpx] shadow-float pointer-events-auto">
           <View className="flex flex-row gap-[20rpx]">
             {!isEdit ? (
               <View
@@ -654,7 +648,7 @@ const StudentForm: React.FC = () => {
             <View
               className={cn(
                 'flex-1 py-[26rpx] rounded-full bg-primary flex items-center justify-center press-scale shadow-float',
-                (!canSubmit || saving) && 'opacity-60 pointer-events-none',
+                (!canSubmit || saving) && 'opacity-60',
               )}
               onClick={canSubmit && !saving ? () => void handleSave() : undefined}
             >
