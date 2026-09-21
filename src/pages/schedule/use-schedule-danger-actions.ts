@@ -401,6 +401,42 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
       return;
     }
 
+    if (
+      dangerActionState.type === 'pause-rule' ||
+      dangerActionState.type === 'resume-rule' ||
+      dangerActionState.type === 'stop-rule'
+    ) {
+      if (!item) return;
+      setDangerActionSubmitting(true);
+      const action = dangerActionState.type.replace('-rule', '') as 'pause' | 'resume' | 'stop';
+      try {
+        const updated = await scheduleService.changeRuleStatus(item.id, action);
+        setSchedules((prev) =>
+          prev.map((schedule) =>
+            schedule.id === item.id
+              ? { ...schedule, rule_status: updated.rule_status, stopped_at: updated.stopped_at }
+              : schedule,
+          ),
+        );
+        closeDangerActionDialog();
+        Taro.showToast({
+          title:
+            action === 'pause'
+              ? '循环排课已暂停'
+              : action === 'stop'
+                ? '循环排课已停止'
+                : '循环排课已恢复',
+          icon: 'success',
+        });
+      } catch (err) {
+        logError('SchedulePage change schedule rule status', err);
+        Taro.showToast({ title: '规则状态更新失败，请重试', icon: 'none' });
+      } finally {
+        setDangerActionSubmitting(false);
+      }
+      return;
+    }
+
     if (dangerActionState.type === 'cancel') {
       if (!item) {
         return;

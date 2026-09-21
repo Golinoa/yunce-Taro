@@ -16,6 +16,7 @@ import {
   isUpcomingClassCard,
 } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
+import type { ScheduleDangerActionType } from '@/utils/schedule-danger-meta';
 import { canOperateHistoricalLesson, canSuspendThisLesson } from '@/utils/schedule-guard';
 import type dayjs from 'dayjs';
 
@@ -50,6 +51,10 @@ export interface ScheduleDaySwiperItemProps {
   onCancelLesson: (item: ScheduleCardItem) => void;
   onRestoreLesson: (item: ScheduleCardItem) => void;
   onSuspendLesson: (item: ScheduleCardItem) => void;
+  onScheduleRuleAction: (
+    item: ScheduleCardItem,
+    action: Extract<ScheduleDangerActionType, 'pause-rule' | 'resume-rule' | 'stop-rule'>,
+  ) => void;
   onResumeClass: (classId: string, className: string) => void;
 }
 
@@ -78,6 +83,7 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
   onCancelLesson,
   onRestoreLesson,
   onSuspendLesson,
+  onScheduleRuleAction,
   onResumeClass,
 }) => {
   return (
@@ -263,6 +269,30 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
                         },
                         disabled: !canSuspendThisLesson(item, date, currentTime),
                       },
+                      ...(item.ruleStatus === 'PAUSED'
+                        ? [
+                            {
+                              label: '恢复规则',
+                              variant: 'warning' as const,
+                              onClick: () => onScheduleRuleAction(item, 'resume-rule'),
+                            },
+                          ]
+                        : [
+                            {
+                              label: '暂停规则',
+                              variant: 'warning' as const,
+                              onClick: () => onScheduleRuleAction(item, 'pause-rule'),
+                            },
+                          ]),
+                      ...(item.ruleStatus !== 'STOPPED'
+                        ? [
+                            {
+                              label: '停止规则',
+                              variant: 'danger' as const,
+                              onClick: () => onScheduleRuleAction(item, 'stop-rule'),
+                            },
+                          ]
+                        : []),
                       {
                         label: '调课',
                         variant: 'warning',

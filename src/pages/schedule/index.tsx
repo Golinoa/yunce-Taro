@@ -485,6 +485,7 @@ const SchedulePage: React.FC = () => {
     handleRollCall,
     handleEditSchedule,
     handleClassReschedule,
+    handleScheduleRuleAction,
     handleCreateSchedule,
     handleManageBookingConfig,
     handleBatchAction,
@@ -615,6 +616,7 @@ const SchedulePage: React.FC = () => {
           onCancelLesson={handleCancelLesson}
           onRestoreLesson={handleRestoreLesson}
           onSuspendLesson={handleSuspendLesson}
+          onScheduleRuleAction={handleScheduleRuleAction}
           onResumeClass={handleResumeClass}
           onOpenClassSlotConfig={handleOpenClassSlotConfig}
           onProxyBooking={handleProxyBooking}

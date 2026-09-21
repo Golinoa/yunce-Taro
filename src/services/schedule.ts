@@ -1,7 +1,7 @@
 /**
  * 排课 Service（Q2-4，从 student.ts 抽出）
  */
-import type { Schedule } from '@/types/schedule';
+import type { Schedule, ScheduleRuleStatus } from '@/types/schedule';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
 
@@ -15,6 +15,8 @@ interface BackendScheduleListItem {
   id: string;
   startDate?: null | string;
   startTime: string;
+  status?: ScheduleRuleStatus;
+  stoppedAt?: null | string;
 }
 
 interface BackendScheduleListResponse {
@@ -65,6 +67,8 @@ interface BackendScheduleDetailResponse {
   teacherId?: null | string;
   teacherName?: null | string;
   updatedAt: string;
+  status?: ScheduleRuleStatus;
+  stoppedAt?: null | string;
 }
 
 interface BackendScheduleConflictResponse {
@@ -200,6 +204,8 @@ function mapBackendSchedule(
         : undefined,
     created_at: item.createdAt,
     updated_at: 'updatedAt' in item ? item.updatedAt : item.createdAt,
+    rule_status: item.status,
+    stopped_at: item.stoppedAt || undefined,
     class_info: classInfo?.name ? { name: classInfo.name } : undefined,
     teacher_name: teacherName,
     operator_teacher_name: operatorTeacherName,
@@ -337,6 +343,16 @@ export const scheduleService = {
   remove: async (scheduleId: string) => {
     await del(`/schedules/${scheduleId}`);
     return;
+  },
+  changeRuleStatus: async (
+    scheduleId: string,
+    action: 'pause' | 'resume' | 'stop',
+  ): Promise<Schedule> => {
+    const updated = await post<BackendScheduleDetailResponse>(
+      `/schedules/${scheduleId}/rule-status`,
+      { action },
+    );
+    return mapBackendSchedule(updated);
   },
   checkConflict: async (params: {
     teacherId: string;

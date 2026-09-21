@@ -42,6 +42,7 @@ export type ScheduleCardItem = {
   hasTrialStudent?: boolean;
   canCancelLesson: boolean;
   isTemporaryAdjusted?: boolean;
+  ruleStatus?: Schedule['rule_status'];
   students?: ScheduleCardStudentAvatar[];
 };
 
@@ -161,6 +162,7 @@ export function buildScheduleCardsForDate(input: {
         ),
         canCancelLesson: statusResult.status !== 'cancelled',
         isTemporaryAdjusted: Boolean(schedule.__temporaryAdjusted),
+        ruleStatus: schedule.rule_status,
         students: schedule.class_id ? input.classStudentAvatars[schedule.class_id] || [] : [],
       };
     })

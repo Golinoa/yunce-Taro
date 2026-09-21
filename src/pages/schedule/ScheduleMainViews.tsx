@@ -12,7 +12,7 @@ import type { TeacherUIModel } from '@/types/teacher';
 import type { BookableVenue } from '@/types/venue-booking';
 import type { LessonSharePayload } from '@/utils/lesson-share';
 import type { ScheduleCardItem, ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
-import type { DangerActionMeta } from '@/utils/schedule-danger-meta';
+import type { DangerActionMeta, ScheduleDangerActionType } from '@/utils/schedule-danger-meta';
 import OpenClassScheduleList from './OpenClassScheduleList';
 import ScheduleBatchSheets, {
   type ScheduleBatchActionType as BatchActionType,
@@ -82,6 +82,10 @@ export interface ScheduleMainViewsProps {
   onCancelLesson: (item: ScheduleCardItem) => void;
   onRestoreLesson: (item: ScheduleCardItem) => void;
   onSuspendLesson: (item: ScheduleCardItem) => void;
+  onScheduleRuleAction: (
+    item: ScheduleCardItem,
+    action: Extract<ScheduleDangerActionType, 'pause-rule' | 'resume-rule' | 'stop-rule'>,
+  ) => void;
   onResumeClass: (classId: string, className: string) => void;
   onOpenClassSlotConfig: (classId: string, dateStr: string) => void;
   onProxyBooking: (slot: ClassBookingSlot) => void;
@@ -162,6 +166,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     onCancelLesson,
     onRestoreLesson,
     onSuspendLesson,
+    onScheduleRuleAction,
     onResumeClass,
     onOpenClassSlotConfig,
     onProxyBooking,
@@ -228,6 +233,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
                   onCancelLesson={onCancelLesson}
                   onRestoreLesson={onRestoreLesson}
                   onSuspendLesson={onSuspendLesson}
+                  onScheduleRuleAction={onScheduleRuleAction}
                   onResumeClass={onResumeClass}
                 />
               </SwiperItem>

@@ -7,6 +7,7 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import type { CourseCategoryMode } from '@/types/course-category';
 import { getCardActionVisibility } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
+import type { ScheduleDangerActionType } from '@/utils/schedule-danger-meta';
 import {
   buildBookingPagePath,
   buildCheckinLessonFormPath,
@@ -202,6 +203,16 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
     setTeacherSwitchSheetVisible(true);
   }, [setTeacherSwitchSheetVisible]);
 
+  const handleScheduleRuleAction = useCallback(
+    (
+      item: ScheduleCardItem,
+      action: Extract<ScheduleDangerActionType, 'pause-rule' | 'resume-rule' | 'stop-rule'>,
+    ) => {
+      setDangerActionState({ visible: true, type: action, item });
+    },
+    [setDangerActionState],
+  );
+
   const handleBatchAction = useCallback(() => {
     const initialSelectedIds =
       selectedClassId && selectedClassId !== filterAllClassId ? [selectedClassId] : [];
@@ -277,6 +288,7 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
     handleClassReschedule,
     handleCreateSchedule,
     handleManageBookingConfig,
+    handleScheduleRuleAction,
     handleBatchAction,
     toggleBatchClassSelection,
     handleSelectAllBatchClasses,

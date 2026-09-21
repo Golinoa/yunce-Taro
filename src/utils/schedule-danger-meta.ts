@@ -1,7 +1,13 @@
 /**
  * 课表危险操作弹窗文案（Q2-1）
  */
-export type ScheduleDangerActionType = 'cancel' | 'delete' | 'batch-delete';
+export type ScheduleDangerActionType =
+  | 'cancel'
+  | 'delete'
+  | 'batch-delete'
+  | 'pause-rule'
+  | 'resume-rule'
+  | 'stop-rule';
 
 export type DangerActionMeta = {
   title: string;
@@ -17,6 +23,31 @@ export function buildDangerActionMeta(input: {
   batchCount: number;
 }): DangerActionMeta | null {
   if (!input.type) return null;
+
+  if (input.type === 'pause-rule') {
+    return {
+      title: '暂停循环排课',
+      confirmText: '确认暂停',
+      tone: 'warning',
+      description: '暂停只停止未来课表展示，规则和历史课节保留；之后可以恢复。',
+    };
+  }
+  if (input.type === 'resume-rule') {
+    return {
+      title: '恢复循环排课',
+      confirmText: '确认恢复',
+      tone: 'warning',
+      description: '恢复后规则将继续生成未来课表，已保留的历史课节不变。',
+    };
+  }
+  if (input.type === 'stop-rule') {
+    return {
+      title: '停止循环排课',
+      confirmText: '确认停止',
+      tone: 'danger',
+      description: '停止只影响未来课表，历史课节和规则记录保留；停止后不能恢复，请新建规则。',
+    };
+  }
 
   if (input.type === 'batch-delete') {
     return {

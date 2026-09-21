@@ -25,6 +25,7 @@ export type CourseStatus = 'urgent' | 'upcoming' | 'active' | 'done' | 'unattend
  * 星期枚举（1=周一, 7=周日）
  */
 export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type ScheduleRuleStatus = 'ACTIVE' | 'PAUSED' | 'STOPPED';
 
 /**
  * 排课信息 (schedules 表)
@@ -44,6 +45,9 @@ export interface Schedule {
   reminder_minutes?: number;
   created_at: string;
   updated_at: string;
+  /** 重复规则状态；停止/暂停不等同于删除已生成课节。 */
+  rule_status?: ScheduleRuleStatus;
+  stopped_at?: string;
   // 关联查询字段
   student?: {
     name: string;
