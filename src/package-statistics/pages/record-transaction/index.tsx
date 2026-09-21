@@ -33,14 +33,19 @@ const RecordTransaction: React.FC = () => {
   /** 加载分类数据 */
   useEffect(() => {
     const loadCategories = async () => {
-      if (type === 'expense') {
-        const result = await dataCenterService.getExpenseCategories();
-        setCategories(result);
-      } else {
-        const result = await dataCenterService.getIncomeCategories();
-        setCategories(result);
+      try {
+        if (type === 'expense') {
+          const result = await dataCenterService.getExpenseCategories();
+          setCategories(result);
+        } else {
+          const result = await dataCenterService.getIncomeCategories();
+          setCategories(result);
+        }
+        setSelectedCategory(null);
+      } catch {
+        setCategories([]);
+        Taro.showToast({ title: '分类加载失败', icon: 'none' });
       }
-      setSelectedCategory(null);
     };
     loadCategories();
   }, [type]);

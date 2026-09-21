@@ -70,34 +70,52 @@ const DataCenter: React.FC = () => {
   const lastStatsFetchAtRef = useRef<number | null>(null);
   const isFirstStatsShow = useRef(true);
 
-  /** 加载所有数据 */
-  const loadData = useCallback(async () => {
+  /** 加载摘要卡片；趋势数据单独加载，避免切换周期重复请求五张卡片。 */
+  const loadSummary = useCallback(async () => {
     setLoading(true);
     try {
-      const [overview, trend, finance, member, card, salary] = await Promise.all([
-        dataCenterService.getVenueOverview(),
-        dataCenterService.getRevenueTrend({ period: trendPeriod }),
-        dataCenterService.getFinanceData(),
-        dataCenterService.getMemberData(),
-        dataCenterService.getCardData(),
-        dataCenterService.getSalaryData(),
+      const [overview, finance, member, card, salary] = await Promise.all([
+        dataCenterService.getVenueOverview({ campusId: currentCampusId }),
+        dataCenterService.getFinanceData({ campusId: currentCampusId }),
+        dataCenterService.getMemberData({ campusId: currentCampusId }),
+        dataCenterService.getCardData({ campusId: currentCampusId }),
+        dataCenterService.getSalaryData({ campusId: currentCampusId }),
       ]);
       setVenueOverview(overview);
-      setRevenueTrend(trend);
       setFinanceData(finance);
       setMemberData(member);
       setCardData(card);
       setSalaryData(salary);
       markFetched(lastStatsFetchAtRef);
+    } catch {
+      Taro.showToast({ title: '数据加载失败', icon: 'none' });
     } finally {
       setLoading(false);
     }
-  }, [trendPeriod, setLoading]);
+  }, [currentCampusId, setLoading]);
 
-  // 首屏 + 趋势周期切换：即时拉（不受 Tab TTL）
+  /** 加载当前趋势周期。 */
+  const loadTrend = useCallback(async () => {
+    try {
+      const trend = await dataCenterService.getRevenueTrend({
+        period: trendPeriod,
+        campusId: currentCampusId,
+      });
+      setRevenueTrend(trend);
+    } catch {
+      Taro.showToast({ title: '趋势数据加载失败', icon: 'none' });
+    }
+  }, [currentCampusId, trendPeriod]);
+
+  // 首屏与校区切换加载摘要卡片。
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadSummary();
+  }, [loadSummary]);
+
+  // 首屏、校区切换和趋势周期切换只加载趋势数据。
+  useEffect(() => {
+    void loadTrend();
+  }, [loadTrend]);
 
   useDidShow(() => {
     syncTabBarByProfile(profile);
@@ -108,7 +126,8 @@ const DataCenter: React.FC = () => {
       return;
     }
     if (shouldRefetch(lastStatsFetchAtRef.current, TTL.tab)) {
-      void loadData();
+      void loadSummary();
+      void loadTrend();
     }
   });
 

@@ -6,6 +6,7 @@ import Card from '@/components/Card';
 import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
 import { dataCenterService } from '@/services/data-center';
+import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { FinanceDetailType, RevenueTrendItem } from '@/types/data-center';
@@ -47,6 +48,7 @@ const FinanceData: React.FC = () => {
   const { activeTheme } = useThemeStore();
   const [data, setData] = useState<FinanceDetailType | null>(null);
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const canvasIdRef = useRef(`fc-${Math.random().toString(36).slice(2, 9)}`);
 
   // 导航栏背景色与渐变顶部一致
@@ -60,12 +62,15 @@ const FinanceData: React.FC = () => {
   /** 加载数据 */
   const loadData = useCallback(async () => {
     try {
-      const result = await dataCenterService.getFinanceDetail({ periodType: period });
+      const result = await dataCenterService.getFinanceDetail({
+        periodType: period,
+        campusId: currentCampusId,
+      });
       setData(result);
     } catch {
-      // ignore
+      Taro.showToast({ title: '数据加载失败', icon: 'none' });
     }
-  }, [period]);
+  }, [currentCampusId, period]);
 
   useEffect(() => {
     loadData();

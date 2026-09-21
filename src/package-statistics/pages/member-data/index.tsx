@@ -1,4 +1,5 @@
 import { View, Text, ScrollView } from '@tarojs/components';
+import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
 import Card from '@/components/Card';
@@ -6,6 +7,7 @@ import Icon from '@/components/Icon';
 import SegmentedControl from '@/components/SegmentedControl';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { dataCenterService } from '@/services/data-center';
+import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { MemberDetailType } from '@/types/data-center';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
@@ -30,18 +32,24 @@ const MemberData: React.FC = () => {
 
   const [data, setData] = useState<MemberDetailType | null>(null);
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const { setLoading } = useDelayedLoading();
 
   /** 加载数据 */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await dataCenterService.getMemberDetail({ periodType: period });
+      const result = await dataCenterService.getMemberDetail({
+        periodType: period,
+        campusId: currentCampusId,
+      });
       setData(result);
+    } catch {
+      Taro.showToast({ title: '数据加载失败', icon: 'none' });
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [currentCampusId, period, setLoading]);
 
   useEffect(() => {
     loadData();
