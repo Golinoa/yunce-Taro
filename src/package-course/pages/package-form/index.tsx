@@ -167,7 +167,7 @@ const PackageForm: React.FC = () => {
           <View className="mb-6">
             {selectedStudent ? (
               <View
-                className="rounded-[40rpx] p-[40rpx] relative overflow-hidden bg-class-primary"
+                className="rounded-[40rpx] p-[40rpx] relative overflow-hidden bg-gradient-primary"
                 onClick={openStudentSheet}
               >
                 <View className="absolute -top-[60rpx] -right-[60rpx] w-[200rpx] h-[200rpx] rounded-full bg-white/8" />
@@ -223,7 +223,7 @@ const PackageForm: React.FC = () => {
               </View>
             ) : (
               <View
-                className="rounded-[40rpx] p-[40rpx] relative overflow-hidden bg-class-primary"
+                className="rounded-[40rpx] p-[40rpx] relative overflow-hidden bg-gradient-primary"
                 onClick={openStudentSheet}
               >
                 <View className="absolute -top-[60rpx] -right-[60rpx] w-[200rpx] h-[200rpx] rounded-full bg-white/8" />
