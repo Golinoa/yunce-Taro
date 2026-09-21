@@ -117,7 +117,7 @@ export interface CustomRole {
   /** 角色名称（如「教学主管」「财务」） */
   name: string;
   /** 基准系统角色（创建时继承其默认模块） */
-  baseRole: Exclude<UserRole, 'parent'>;
+  baseRole: Exclude<UserRole, 'parent'> | 'reception';
   /** 数据范围 */
   scope: DataScope;
   /** 可见模块 */
@@ -147,7 +147,7 @@ export interface PermissionConfig {
 export const PERMISSION_CONFIG_KEY = 'yunce-permission-config';
 
 /** 取角色默认授权（未覆盖时回退） */
-export function defaultRoleGrant(role: UserRole): RoleGrant {
+export function defaultRoleGrant(role: UserRole | 'reception'): RoleGrant {
   const cfg = ROLE_PERMISSION_MAP[role];
   const sharedTodos = role === 'admin' || role === 'principal' || role === 'teacher';
   return {
