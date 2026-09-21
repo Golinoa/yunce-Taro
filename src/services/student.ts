@@ -18,6 +18,7 @@ interface BackendStudentListItem {
   id: string;
   inviteCode?: null | string;
   name: string;
+  nickname?: null | string;
   parentCount?: number;
   phone?: null | string;
   remark?: null | string;
@@ -67,6 +68,7 @@ interface BackendStudentDetailResponse {
   id: string;
   inviteCode?: null | string;
   name: string;
+  nickname?: null | string;
   parents?: Array<{
     bindStatus?: string;
     id: string;
@@ -118,6 +120,7 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
   return {
     id: item.id,
     name: item.name,
+    nickname: item.nickname || undefined,
     teacher_id: '',
     invite_code: resolveInviteCode(item.inviteCode),
     avatar_url: item.avatar || undefined,
@@ -150,6 +153,7 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
   return {
     id: item.id,
     name: item.name,
+    nickname: item.nickname || undefined,
     teacher_id: item.teacher?.id || '',
     invite_code: resolveInviteCode(item.inviteCode),
     avatar_url: item.avatar || undefined,
@@ -178,6 +182,7 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
 function mapStudentPayload(data: Partial<Student>) {
   return {
     avatar: data.avatar_url,
+    nickname: data.nickname,
     birthday: data.birthday,
     gender: data.gender === 'male' ? 'MALE' : data.gender === 'female' ? 'FEMALE' : undefined,
     name: data.name,
