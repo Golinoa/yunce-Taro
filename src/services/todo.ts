@@ -138,10 +138,8 @@ function buildListQuery(params: TodoListParams, monthKey: string): string {
   queryParams.set('view', params.view);
   if (params.campusId) queryParams.set('campusId', params.campusId);
   if (params.view === 'all') {
-    const [yearText, monthText] = monthKey.split('-');
-    if (yearText) queryParams.set('year', yearText);
-    if (monthText) queryParams.set('month', monthText);
-    queryParams.set('monthKey', monthKey);
+    // 后端契约的 month 是 YYYY-MM；不要拆成 year/month 或发送重复别名。
+    queryParams.set('month', monthKey);
   }
   return queryParams.toString();
 }
