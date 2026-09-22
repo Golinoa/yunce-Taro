@@ -52,7 +52,7 @@ export function usePackageForm() {
   const isEdit = !!packageId;
 
   // ===== 页面 Tab / 充值模式 =====
-  const pageTabPair = useStatePair<PageTab>(routeTab === 'card' ? 'card' : 'recharge');
+  const pageTabPair = useStatePair<PageTab>(routeTab === 'recharge' ? 'recharge' : 'issue');
   const pageTab = pageTabPair[0];
   const setPageTab = pageTabPair[1];
   const rechargeModePair = useStatePair<RechargeMode>('package');

@@ -48,6 +48,33 @@ function mapCard(raw: BackendMemberCard): MemberCardDetail {
 }
 
 export const memberCardService = {
+  recharge: async (data: {
+    memberCardId: string;
+    amount: number;
+    giftAmount?: number;
+    purchasePrice?: number;
+    paymentMethod?: string;
+    reason: string;
+    sourceId?: string;
+    idempotencyKey: string;
+  }): Promise<MemberCardDetail> => {
+    const updated = await post<BackendMemberCard>(
+      `/card-types/member-cards/${data.memberCardId}/recharges`,
+      {
+        amount: data.amount,
+        giftAmount: data.giftAmount ?? 0,
+        purchasePrice: data.purchasePrice ?? 0,
+        paymentMethod: data.paymentMethod,
+        reason: data.reason,
+        sourceId: data.sourceId,
+        idempotencyKey: data.idempotencyKey,
+      },
+    );
+    invalidatePackagesCache(updated.studentId);
+    const detail = await memberCardService.getById(String(updated.id));
+    if (!detail) throw new Error('追加次数成功但读取会员卡失败');
+    return detail;
+  },
   migrate: async (data: {
     cardTypeId: string;
     studentId: string;

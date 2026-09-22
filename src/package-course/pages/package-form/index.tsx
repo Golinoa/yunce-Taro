@@ -7,6 +7,7 @@ import Empty from '@/components/Empty';
 import InstallmentPanel from '@/components/InstallmentPanel';
 import Loading from '@/components/Loading';
 import MemberCardIssueForm from '@/components/member-card/MemberCardIssueForm';
+import MemberCardRechargeForm from '@/components/member-card/MemberCardRechargeForm';
 import PackageSelectSheet from '@/components/package/PackageSelectSheet';
 import StudentSelectSheet from '@/components/package/StudentSelectSheet';
 import PageContainer from '@/components/PageContainer';
@@ -17,7 +18,7 @@ import { withRouteGuard } from '@/utils/route-guard';
 import { getQuickHours, getGiftOptions, getFeeMethodOptions, getTypeIconMap } from './constants';
 import { usePackageForm } from './usePackageForm';
 
-/** 课时充值 / 发会员卡 双 Tab 页 */
+/** 发会员卡 / 追加次数入口；历史课包仅保留编辑兼容。 */
 const PackageForm: React.FC = () => {
   useCardNavigationBar();
   const QUICK_HOURS = getQuickHours();
@@ -112,11 +113,11 @@ const PackageForm: React.FC = () => {
   } = usePackageForm();
 
   useEffect(() => {
-    void Taro.setNavigationBarTitle({ title: isEdit ? '编辑套餐' : '课时充值' });
+    void Taro.setNavigationBarTitle({ title: isEdit ? '编辑套餐' : '会员卡操作' });
   }, [isEdit]);
 
   useDidShow(() => {
-    void Taro.setNavigationBarTitle({ title: isEdit ? '编辑套餐' : '课时充值' });
+    void Taro.setNavigationBarTitle({ title: isEdit ? '编辑套餐' : '会员卡操作' });
   });
 
   if (loading) {
@@ -234,10 +235,23 @@ const PackageForm: React.FC = () => {
             )}
           </View>
 
-          {/* 主 Tab：课时充值 | 发会员卡（编辑套餐时不显示） */}
+          {/* 主 Tab：发会员卡 | 追加次数（编辑套餐时不显示） */}
           {!isEdit ? (
             <View className="mb-6 bg-white rounded-[20rpx] shadow-sm overflow-hidden">
               <View className="flex">
+                <View
+                  className="flex-1 flex items-center justify-center py-[28rpx] relative"
+                  onClick={() => setPageTab('issue')}
+                >
+                  <Text
+                    className={`text-[28rpx] font-medium ${pageTab === 'issue' ? 'text-primary' : 'text-muted-foreground'}`}
+                  >
+                    发会员卡
+                  </Text>
+                  {pageTab === 'issue' ? (
+                    <View className="absolute bottom-0 left-0 right-0 h-[4rpx] bg-primary" />
+                  ) : null}
+                </View>
                 <View
                   className="flex-1 flex items-center justify-center py-[28rpx] relative"
                   onClick={() => setPageTab('recharge')}
@@ -245,22 +259,9 @@ const PackageForm: React.FC = () => {
                   <Text
                     className={`text-[28rpx] font-medium ${pageTab === 'recharge' ? 'text-primary' : 'text-muted-foreground'}`}
                   >
-                    课时充值
+                    追加次数
                   </Text>
                   {pageTab === 'recharge' ? (
-                    <View className="absolute bottom-0 left-0 right-0 h-[4rpx] bg-primary" />
-                  ) : null}
-                </View>
-                <View
-                  className="flex-1 flex items-center justify-center py-[28rpx] relative"
-                  onClick={() => setPageTab('card')}
-                >
-                  <Text
-                    className={`text-[28rpx] font-medium ${pageTab === 'card' ? 'text-primary' : 'text-muted-foreground'}`}
-                  >
-                    发会员卡
-                  </Text>
-                  {pageTab === 'card' ? (
                     <View className="absolute bottom-0 left-0 right-0 h-[4rpx] bg-primary" />
                   ) : null}
                 </View>
@@ -269,7 +270,7 @@ const PackageForm: React.FC = () => {
           ) : null}
 
           {/* 发会员卡 Tab */}
-          {!isEdit && pageTab === 'card' ? (
+          {!isEdit && pageTab === 'issue' ? (
             selectedStudent ? (
               <MemberCardIssueForm
                 student={selectedStudent}
@@ -283,8 +284,8 @@ const PackageForm: React.FC = () => {
             )
           ) : null}
 
-          {/* 课时充值内容（用 View 替代 Fragment，避免 Taro 子节点索引错位） */}
-          {isEdit || pageTab === 'recharge' ? (
+          {/* 历史课包编辑兼容内容 */}
+          {isEdit ? (
             <View>
               {/* 充值方式：按课包 / 单独充值 */}
               {!isEdit ? (
@@ -670,11 +671,22 @@ const PackageForm: React.FC = () => {
                 </View>
               ) : null}
             </View>
+          ) : !isEdit && pageTab === 'recharge' ? (
+            selectedStudent ? (
+              <MemberCardRechargeForm
+                student={selectedStudent}
+                onSuccess={() => setTimeout(() => Taro.navigateBack(), 300)}
+              />
+            ) : (
+              <View className="mb-6 bg-white rounded-[32rpx] p-[48rpx] shadow-soft flex flex-col items-center">
+                <Text className="text-[28rpx] text-muted-foreground">请先选择学员</Text>
+              </View>
+            )
           ) : null}
         </View>
 
-        {/* 底部按钮：仅课时充值 Tab / 编辑模式 */}
-        {isEdit || pageTab === 'recharge' ? (
+        {/* 历史课包编辑底部按钮；会员卡表单自带提交按钮 */}
+        {isEdit ? (
           <View className="fixed bottom-0 left-0 right-0 px-8 py-6 bg-white/95 backdrop-blur-sm border-t-[2rpx] border-border pb-safe-bar z-50 pointer-events-auto shadow-card">
             {!canSubmit && submitBlockedReason ? (
               <View className="mb-3 px-4">

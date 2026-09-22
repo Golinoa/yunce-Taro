@@ -1,7 +1,7 @@
 import type { FeeMethod, PackageType } from '@/types/course-package';
 
 /** 页面主 Tab：课时充值 / 发会员卡 */
-export type PageTab = 'recharge' | 'card';
+export type PageTab = 'issue' | 'recharge';
 /** 课时充值子模式：按课包 / 单独输入课时 */
 export type RechargeMode = 'package' | 'direct';
 
