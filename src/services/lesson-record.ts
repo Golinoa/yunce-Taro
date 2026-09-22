@@ -22,6 +22,8 @@ interface BackendLessonRecordListItem {
   note?: null | string;
   remark?: null | string;
   packageId?: null | string;
+  memberCardId?: null | string;
+  memberCardName?: null | string;
   packageName?: null | string;
   performance?: null | string;
   operatorTeacherId?: null | string;
@@ -203,6 +205,7 @@ function mapBackendLessonRecord(
         : 'package' in item && item.package?.id
           ? item.package.id
           : '',
+    member_card_id: 'memberCardId' in item ? item.memberCardId || undefined : undefined,
     lesson_date: normalizeLessonDate(item.lessonDate),
     hours_used: Number(('hoursUsed' in item ? item.hoursUsed : null) ?? item.duration / 60),
     status,
@@ -268,6 +271,7 @@ function buildLessonRecordPayload(
     operatorTeacherId: data.operator_teacher_id || undefined,
     assistantTeacherId: data.assistant_teacher_id || undefined,
     packageId: data.package_id || undefined,
+    memberCardId: data.member_card_id || undefined,
     classId: data.class_id || undefined,
     campusId: data.campus_id || undefined,
     room: data.room,

@@ -12,6 +12,7 @@ export interface LessonRecord {
   assistant_teacher_id?: string;
   student_id: string;
   package_id: string;
+  member_card_id?: string;
   lesson_date: string;
   hours_used: number;
   status?: 'normal' | 'cancelled' | 'makeup' | 'leave' | 'absent';
