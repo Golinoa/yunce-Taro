@@ -21,7 +21,7 @@ import { withRouteGuard } from '@/utils/route-guard';
 import { useStudentForm, FEE_METHOD_OPTIONS } from './useStudentForm';
 import type { StudentType } from './useStudentForm';
 
-type SelectorType = 'campus' | 'package' | 'feeMethod' | 'subject' | null;
+type SelectorType = 'campus' | 'feeMethod' | 'subject' | null;
 type DatePickerTarget = { kind: 'birthday' } | { kind: 'expire'; packageId: string } | null;
 
 const StudentForm: React.FC = () => {
@@ -60,8 +60,6 @@ const StudentForm: React.FC = () => {
     setFeeMethod,
     studentType,
     setStudentType,
-    initHours,
-    setInitHours,
     legacyPackages,
     addLegacyPackage,
     removeLegacyPackage,
@@ -79,10 +77,6 @@ const StudentForm: React.FC = () => {
     setSchedule,
     feeMethodOther,
     setFeeMethodOther,
-    packageTemplates,
-    selectedPackageId,
-    setSelectedPackageId,
-    selectedPackage,
     campusId,
     setCampusId,
     campusOptions,
@@ -309,7 +303,6 @@ const StudentForm: React.FC = () => {
                   value={studentType}
                   onChange={(v) => {
                     setStudentType(v as StudentType);
-                    setSelectedPackageId('');
                     clearError('legacyPackages');
                   }}
                 />
@@ -321,47 +314,14 @@ const StudentForm: React.FC = () => {
               </View>
 
               {studentType === 'new' ? (
-                <>
-                  {packageTemplates.length > 0 ? (
-                    <FormRow
-                      label="选择课包"
-                      helperText="选填，自动填充课时和金额"
-                      onClick={() => openSelector('package')}
-                    >
-                      <View className="min-w-0 flex-1">
-                        <Text
-                          className={cn(
-                            'block text-[30rpx] text-right truncate',
-                            selectedPackage ? 'text-foreground' : 'text-muted-foreground',
-                          )}
-                        >
-                          {selectedPackage ? selectedPackage.name : '请选择'}
-                        </Text>
-                        {selectedPackage ? (
-                          <Text className="block text-[22rpx] text-muted-foreground text-right mt-[4rpx]">
-                            {selectedPackage.lesson_count}课时 / ¥{selectedPackage.price}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </FormRow>
-                  ) : null}
-
-                  <FormRow
-                    label="初始课时"
-                    required
-                    editable
-                    placeholder="例如：20"
-                    value={initHours}
-                    inputType="number"
-                    onInput={(e) => {
-                      setInitHours(e.detail.value || '');
-                      setSelectedPackageId('');
-                      clearError('initHours');
-                    }}
-                    error={errors.initHours}
-                    border={false}
-                  />
-                </>
+                <View className="rounded-[16rpx] bg-muted/60 px-[24rpx] py-[22rpx]">
+                  <Text className="block text-[28rpx] font-medium text-foreground">
+                    新生先建立学员档案
+                  </Text>
+                  <Text className="block text-[24rpx] text-muted-foreground mt-[8rpx]">
+                    保存后可立即发会员卡，也可稍后在学员详情中发卡。
+                  </Text>
+                </View>
               ) : (
                 <View>
                   <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">
@@ -664,56 +624,30 @@ const StudentForm: React.FC = () => {
           title={
             selector.type === 'campus'
               ? '选择校区'
-              : selector.type === 'package'
-                ? '选择课包'
-                : selector.type === 'subject'
-                  ? '选择科目'
-                  : '选择支付方式'
+              : selector.type === 'subject'
+                ? '选择科目'
+                : '选择支付方式'
           }
           options={
             selector.type === 'campus'
               ? campusOptions.map((c): PickerOption => ({ label: c.name, value: c.id }))
-              : selector.type === 'package'
-                ? [
-                    { label: '不选择课包', value: '' },
-                    ...packageTemplates.map(
-                      (tpl): PickerOption => ({
-                        label: `${tpl.name}（${tpl.lesson_count}课时 / ¥${tpl.price}）`,
-                        value: tpl.id,
-                      }),
-                    ),
-                  ]
-                : selector.type === 'subject'
-                  ? subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))
-                  : FEE_METHOD_OPTIONS.map(
-                      (item): PickerOption => ({ label: item.label, value: item.value }),
-                    )
+              : selector.type === 'subject'
+                ? subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))
+                : FEE_METHOD_OPTIONS.map(
+                    (item): PickerOption => ({ label: item.label, value: item.value }),
+                  )
           }
           value={
             selector.type === 'campus'
               ? campusId
-              : selector.type === 'package'
-                ? selectedPackageId
-                : selector.type === 'subject'
-                  ? legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''
-                  : feeMethod
+              : selector.type === 'subject'
+                ? legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''
+                : feeMethod
           }
           onClose={closeSelector}
           onConfirm={(v) => {
             if (selector.type === 'campus') {
               setCampusId(v);
-            } else if (selector.type === 'package') {
-              if (!v) {
-                setSelectedPackageId('');
-              } else {
-                const tpl = packageTemplates.find((item) => item.id === v);
-                setSelectedPackageId(v);
-                if (tpl) {
-                  setInitHours(String(tpl.lesson_count));
-                  if (!paymentEnabled) setPaymentEnabled(true);
-                  setFeeAmount(String(tpl.price));
-                }
-              }
             } else if (selector.type === 'subject' && selector.packageId) {
               const subject = subjects.find((s) => s.id === v);
               updateLegacyPackage(selector.packageId, {

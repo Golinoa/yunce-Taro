@@ -319,11 +319,11 @@ export const studentService = {
   /** 创建学员 */
   create: async (
     data: Omit<Student, 'id' | 'created_at' | 'updated_at'>,
-    initialPackages: InitialStudentPackagePayload[] = [],
+    initialPackages?: InitialStudentPackagePayload[],
   ) => {
     const created = await post<BackendStudentListItem>('/students', {
       ...mapStudentPayload(data),
-      initialPackages,
+      ...(initialPackages ? { initialPackages } : {}),
     });
     return mapBackendStudentListItem(created);
   },

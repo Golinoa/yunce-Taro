@@ -136,7 +136,13 @@ const PackagesPanel: React.FC<PackagesPanelProps> = ({
 
         <View className="flex flex-col gap-[24rpx]">
           {filteredCards.map((card) => {
-            const statusInfo = MEMBER_CARD_STATUS_MAP[card.status];
+            const isExpired =
+              card.status === 'inactive' &&
+              Boolean(card.expiredAt) &&
+              new Date(card.expiredAt as string).getTime() <= Date.now();
+            const statusInfo = isExpired
+              ? { label: '已过期', color: 'text-destructive' }
+              : MEMBER_CARD_STATUS_MAP[card.status];
             const cardBgClass = MEMBER_CARD_BG_MAP[card.status];
             const cardOverlayClass = MEMBER_CARD_OVERLAY_MAP[card.status];
             const kindText =
@@ -204,7 +210,19 @@ const PackagesPanel: React.FC<PackagesPanelProps> = ({
               </View>
             );
           })}
-          {filteredCards.length === 0 && <Empty description="暂无卡包" />}
+          {filteredCards.length === 0 && (
+            <Empty
+              description={
+                memberCards.length === 0
+                  ? '未开卡，暂无可用会员卡'
+                  : cardSubTab === 'active'
+                    ? '暂无可用会员卡（可能已用完、已过期或暂停）'
+                    : cardSubTab === 'inactive'
+                      ? '暂无已用完或已过期的会员卡'
+                      : '暂无卡包'
+              }
+            />
+          )}
         </View>
       </View>
     </ScrollView>
