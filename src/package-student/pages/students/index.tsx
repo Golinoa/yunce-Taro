@@ -37,7 +37,7 @@ import { useBatchRender } from '@/utils/use-batch-render';
 /** 顶部 Tab 类型 */
 type MainTab = 'member' | 'lead';
 
-/** 会员子筛选 Tab */
+/** 学员子筛选 Tab */
 type MemberSubTab =
   | 'all'
   | 'active'
@@ -48,7 +48,7 @@ type MemberSubTab =
   | 'birthday'
   | 'lost';
 
-/** 会员子筛选选项（减轻视觉权重） */
+/** 学员子筛选选项（减轻视觉权重） */
 const MEMBER_SUB_TAB_OPTIONS: { key: MemberSubTab; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'active', label: '在籍' },
@@ -89,13 +89,14 @@ const Students: React.FC = () => {
   // ====== 主 Tab 状态 ======
   const [mainTab, setMainTab] = useState<MainTab>('member');
 
-  // ====== 会员 Tab 状态 ======
+  // ====== 学员 Tab 状态 ======
   const [students, setStudents] = useState<Student[]>([]);
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [sortBy, setSortBy] = useState<StudentSort>('default');
   const [memberSubTab, setMemberSubTab] = useState<MemberSubTab>('all');
   const [sortOpen, setSortOpen] = useState(false);
+  const actorId = profile?.id || session?.user.id;
 
   // 搜索防抖必须参与分页 query key，搜索条件变化时从第一页重新加载。
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
@@ -116,13 +117,13 @@ const Students: React.FC = () => {
     queryKey: [
       'students',
       isTeacher ? 'teacher' : 'parent',
-      profile?.id,
+      actorId,
       profile?.currentContext?.campusId,
       debouncedKeyword.trim(),
     ],
     initialPageParam: 1,
     queryFn: ({ pageParam }) => {
-      if (!profile?.id) {
+      if (!actorId) {
         return Promise.resolve({
           list: [],
           pagination: { page: 1, pageSize: API_PAGE_SIZE_BATCH, total: 0, totalPages: 0 },
@@ -130,24 +131,21 @@ const Students: React.FC = () => {
       }
       return isTeacher
         ? studentService.getPageByTeacher(
-            profile.id,
+            actorId,
             pageParam,
             API_PAGE_SIZE_BATCH,
-            profile.currentContext?.campusId,
+            profile?.currentContext?.campusId,
             debouncedKeyword,
           )
-        : studentService.getPageByParent(
-            profile.id,
-            pageParam,
-            API_PAGE_SIZE_BATCH,
-            debouncedKeyword,
-          );
+        : studentService.getPageByParent(actorId, pageParam, API_PAGE_SIZE_BATCH, debouncedKeyword);
     },
     getNextPageParam: (lastPage) =>
       lastPage.pagination.page < lastPage.pagination.totalPages
         ? lastPage.pagination.page + 1
         : undefined,
-    enabled: !!profile?.id,
+    enabled: !!actorId,
+    // 进入独立页面时强制确认一次首屏数据，避免旧的空缓存掩盖真实学员。
+    refetchOnMount: 'always',
     staleTime: TTL.list,
   });
 
@@ -210,10 +208,13 @@ const Students: React.FC = () => {
       const forceStudents = consumeRefreshSignal(REFRESH_SIGNAL.students);
       // 写后（student-form 已 emitRefreshSignal）：失效列表 query，触发刷新
       // 旧缓存可能是错误的空列表，空缓存也必须重新请求一次；已有数据不因每次进页重复拉取。
-      if (forceStudents || students.length === 0) {
+      if (forceStudents) {
         void queryClient.invalidateQueries({
-          queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
+          queryKey: ['students', isTeacher ? 'teacher' : 'parent', actorId],
         });
+      } else if (actorId && students.length === 0 && !studentsQuery.isFetching) {
+        // 身份恢复晚于页面展示时，补一次主动请求；refetch 不依赖 enabled 状态。
+        void studentsQuery.refetch();
       }
     } else {
       loadLeads();
@@ -224,7 +225,7 @@ const Students: React.FC = () => {
   usePullDownRefresh(async () => {
     if (mainTab === 'member') {
       await queryClient.invalidateQueries({
-        queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
+        queryKey: ['students', isTeacher ? 'teacher' : 'parent', actorId],
       });
     } else {
       if (teacherId) {
@@ -258,7 +259,7 @@ const Students: React.FC = () => {
     [loadLeads, closeAllDropdowns],
   );
 
-  // 会员子 Tab 切换
+  // 学员子 Tab 切换
   const handleMemberSubTabChange = useCallback((tab: MemberSubTab) => {
     setMemberSubTab(tab);
   }, []);
@@ -275,7 +276,7 @@ const Students: React.FC = () => {
       );
     }
 
-    // 会员子 Tab 筛选（基于现有数据做简化映射）
+    // 学员子 Tab 筛选（基于现有数据做简化映射）
     if (memberSubTab !== 'all') {
       const today = dayjs();
       result = result.filter((s) => {
@@ -294,7 +295,7 @@ const Students: React.FC = () => {
           case 'renew':
             return cardStatus === 'low' || cardStatus === 'expiring' || cardStatus === 'owe';
           case 'silent':
-            // 沉默会员：有有效课包且剩余课时较多（数据完善后可改用最近消课时间）
+            // 沉默学员：有有效课包且剩余课时较多（数据完善后可改用最近消课时间）
             return hasActive && calcRemainingHours(packages) >= 10;
           case 'frozen':
             return hasFrozen;
@@ -361,7 +362,7 @@ const Students: React.FC = () => {
     );
   }, [leadList, debouncedKeyword]);
 
-  // ====== 会员 Tab：下拉菜单 ======
+  // ====== 学员 Tab：下拉菜单 ======
   const goToDetail = (id: string) => {
     Taro.navigateTo({
       url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(id)}`,
@@ -425,7 +426,7 @@ const Students: React.FC = () => {
             <Icon name="mdi-magnify" size={20} color="#9ca3af" />
             <Input
               className="flex-1 text-[26rpx] text-foreground"
-              placeholder={mainTab === 'member' ? '搜索会员姓名或手机号' : '搜索线索姓名或手机号'}
+              placeholder={mainTab === 'member' ? '搜索学员姓名或手机号' : '搜索线索姓名或手机号'}
               placeholderStyle="color:#9ca3af"
               value={keyword}
               onInput={(e) => setKeyword(e.detail.value || '')}
@@ -482,7 +483,7 @@ const Students: React.FC = () => {
         </View>
       </View>
 
-      {/* ====== Tab 切换：会员 / 客资（白色背景区域） ====== */}
+      {/* ====== Tab 切换：学员 / 客资（白色背景区域） ====== */}
       <View className="bg-white flex-shrink-0 px-[32rpx] pt-[20rpx] pb-[16rpx]">
         <View className="flex justify-center">
           <View className="flex items-center gap-[8rpx] bg-muted/40 rounded-full p-[6rpx]">
@@ -499,7 +500,7 @@ const Students: React.FC = () => {
                   mainTab === 'member' ? 'text-white' : 'text-muted-foreground',
                 )}
               >
-                会员
+                学员
               </Text>
             </View>
             <View
@@ -522,7 +523,7 @@ const Students: React.FC = () => {
         </View>
       </View>
 
-      {/* ====== 会员 Tab：轻量子筛选标签 + 统计 ====== */}
+      {/* ====== 学员 Tab：轻量子筛选标签 + 统计 ====== */}
       {mainTab === 'member' && (
         <View className="bg-white flex-shrink-0">
           <ScrollView scrollX className="whitespace-nowrap px-[24rpx] pb-[16rpx]">
@@ -556,7 +557,7 @@ const Students: React.FC = () => {
               <Text className="text-[28rpx] font-bold text-foreground">
                 {filteredStudents.length}
               </Text>{' '}
-              位会员
+              位学员
             </Text>
           </View>
         </View>
@@ -765,8 +766,13 @@ const Students: React.FC = () => {
               );
             })}
 
+            {/* 请求失败不能伪装成空列表，便于真机直接识别加载链路问题 */}
+            {studentsQuery.isError && !loading && (
+              <Empty description="学员加载失败，请下拉刷新重试" />
+            )}
+
             {/* 空状态 */}
-            {filteredStudents.length === 0 && !loading && (
+            {filteredStudents.length === 0 && !loading && !studentsQuery.isError && (
               <>
                 <Empty
                   description={
@@ -835,13 +841,13 @@ const Students: React.FC = () => {
           <View className="flex items-center gap-[8rpx] px-[28rpx] py-[18rpx] rounded-full bg-gradient-primary shadow-schedule-fab">
             <Icon name="mdi-plus" size="sm" color="white" />
             <Text className="text-[28rpx] text-white font-medium">
-              {mainTab === 'member' ? '会员操作' : '客资录入'}
+              {mainTab === 'member' ? '学员操作' : '客资录入'}
             </Text>
           </View>
         </View>
       )}
 
-      {/* 会员操作弹窗 */}
+      {/* 学员操作弹窗 */}
       <MemberActionSheet
         visible={memberActionVisible}
         onClose={handleCloseMemberAction}
