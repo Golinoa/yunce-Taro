@@ -1,6 +1,6 @@
 import { View, Text, Input, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
@@ -29,6 +29,7 @@ import {
 } from '@/utils/hours-status';
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { API_PAGE_SIZE_BATCH } from '@/utils/pagination';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useBatchRender } from '@/utils/use-batch-render';
@@ -96,25 +97,67 @@ const Students: React.FC = () => {
   const [memberSubTab, setMemberSubTab] = useState<MemberSubTab>('all');
   const [sortOpen, setSortOpen] = useState(false);
 
+  // 搜索防抖必须参与分页 query key，搜索条件变化时从第一页重新加载。
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedKeyword(keyword), 300);
+    return () => clearTimeout(debounceTimer.current);
+  }, [keyword]);
+
   const queryClient = useQueryClient();
   /**
    * 学员列表接入 TanStack Query（B9-1）：
    * 原走 useStudentStore（TTL.list=5min）手写缓存；现统一到与首页（B8）一致的缓存层，
-   * 由 query 拥有缓存 / 去重 / 写后失效。queryKey 复用角色+profileId，staleTime 沿用 TTL.list。
+   * 由 query 拥有缓存 / 去重 / 写后失效。queryKey 包含角色、profile、校区和搜索条件，staleTime 沿用 TTL.list。
    */
-  const studentsQuery = useQuery({
-    queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
-    queryFn: async () => {
-      if (!profile?.id) return [];
-      if (isTeacher) return studentService.getByTeacher(profile.id);
-      return studentService.getByParent(profile.id);
+  const studentsQuery = useInfiniteQuery({
+    queryKey: [
+      'students',
+      isTeacher ? 'teacher' : 'parent',
+      profile?.id,
+      profile?.currentContext?.campusId,
+      debouncedKeyword.trim(),
+    ],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => {
+      if (!profile?.id) {
+        return Promise.resolve({
+          list: [],
+          pagination: { page: 1, pageSize: API_PAGE_SIZE_BATCH, total: 0, totalPages: 0 },
+        });
+      }
+      return isTeacher
+        ? studentService.getPageByTeacher(
+            profile.id,
+            pageParam,
+            API_PAGE_SIZE_BATCH,
+            profile.currentContext?.campusId,
+            debouncedKeyword,
+          )
+        : studentService.getPageByParent(
+            profile.id,
+            pageParam,
+            API_PAGE_SIZE_BATCH,
+            debouncedKeyword,
+          );
     },
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.totalPages
+        ? lastPage.pagination.page + 1
+        : undefined,
     enabled: !!profile?.id,
     staleTime: TTL.list,
   });
+
+  const pagedStudents = useMemo(
+    () => studentsQuery.data?.pages.flatMap((page) => page.list) ?? [],
+    [studentsQuery.data],
+  );
   useEffect(() => {
-    setStudents(studentsQuery.data ?? []);
-  }, [studentsQuery.data]);
+    setStudents(pagedStudents);
+  }, [pagedStudents]);
   useEffect(() => {
     setLoading(studentsQuery.isFetching);
   }, [studentsQuery.isFetching]);
@@ -166,7 +209,8 @@ const Students: React.FC = () => {
     if (mainTab === 'member') {
       const forceStudents = consumeRefreshSignal(REFRESH_SIGNAL.students);
       // 写后（student-form 已 emitRefreshSignal）：失效列表 query，触发刷新
-      if (forceStudents) {
+      // 旧缓存可能是错误的空列表，空缓存也必须重新请求一次；已有数据不因每次进页重复拉取。
+      if (forceStudents || students.length === 0) {
         void queryClient.invalidateQueries({
           queryKey: ['students', isTeacher ? 'teacher' : 'parent', profile?.id],
         });
@@ -199,15 +243,6 @@ const Students: React.FC = () => {
     setSortOpen(false);
   }, []);
 
-  // ====== 搜索防抖（会员/线索共用 keyword） ======
-  const [debouncedKeyword, setDebouncedKeyword] = useState('');
-  const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => {
-    clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => setDebouncedKeyword(keyword), 300);
-    return () => clearTimeout(debounceTimer.current);
-  }, [keyword]);
-
   // Tab 切换时清空搜索和子筛选
   const handleMainTabChange = useCallback(
     (tab: MainTab) => {
@@ -228,39 +263,16 @@ const Students: React.FC = () => {
     setMemberSubTab(tab);
   }, []);
 
-  // 后端搜索（大数据量时使用）
-  const [remoteResults, setRemoteResults] = useState<Student[]>([]);
-  const [remoteSearching, setRemoteSearching] = useState(false);
-  const useRemoteSearch = students.length >= 200;
-
-  useEffect(() => {
-    if (!useRemoteSearch || !debouncedKeyword || debouncedKeyword.length < 2 || !profile?.id) {
-      setRemoteResults([]);
-      return;
-    }
-    setRemoteSearching(true);
-    studentService
-      .search(profile.id, debouncedKeyword)
-      .then(setRemoteResults)
-      .catch(() => setRemoteResults([]))
-      .finally(() => setRemoteSearching(false));
-  }, [debouncedKeyword, useRemoteSearch, profile?.id]);
-
   // 筛选 + 排序后的列表
   const filteredStudents = useMemo(() => {
     let result = [...students];
 
     // 搜索过滤
     if (debouncedKeyword) {
-      if (useRemoteSearch) {
-        const remoteIds = new Set(remoteResults.map((r) => r.id));
-        result = result.filter((s) => remoteIds.has(s.id));
-      } else {
-        const kw = debouncedKeyword.toLowerCase();
-        result = result.filter(
-          (s) => (s.name || '').toLowerCase().includes(kw) || (s.phone || '').includes(kw),
-        );
-      }
+      const kw = debouncedKeyword.toLowerCase();
+      result = result.filter(
+        (s) => (s.name || '').toLowerCase().includes(kw) || (s.phone || '').includes(kw),
+      );
     }
 
     // 会员子 Tab 筛选（基于现有数据做简化映射）
@@ -315,12 +327,12 @@ const Students: React.FC = () => {
     }
 
     return result;
-  }, [students, debouncedKeyword, memberSubTab, sortBy, remoteResults, useRemoteSearch]);
+  }, [students, debouncedKeyword, memberSubTab, sortBy]);
 
   // ====== 分批渲染（P-02）：长列表首屏仅渲染前 50 条，上拉追加 ======
   const {
     visibleList: visibleStudents,
-    hasMore: hasMoreStudents,
+    hasMore: hasMoreRenderedStudents,
     onScrollToLower: onStudentsScrollToLower,
     reset: resetStudentBatch,
   } = useBatchRender(filteredStudents);
@@ -328,6 +340,15 @@ const Students: React.FC = () => {
   useEffect(() => {
     resetStudentBatch();
   }, [debouncedKeyword, memberSubTab, sortBy, resetStudentBatch]);
+
+  const hasMoreStudents = hasMoreRenderedStudents || studentsQuery.hasNextPage;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = studentsQuery;
+  const onStudentsListScrollToLower = useCallback(() => {
+    onStudentsScrollToLower();
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [onStudentsScrollToLower, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // ====== 线索 Tab：搜索过滤 ======
   const filteredLeads = useMemo(() => {
@@ -572,7 +593,7 @@ const Students: React.FC = () => {
 
       {/* ====== 会员 Tab：学员卡片列表 ====== */}
       {mainTab === 'member' && (
-        <ScrollView scrollY className="flex-1" onScrollToLower={onStudentsScrollToLower}>
+        <ScrollView scrollY className="flex-1" onScrollToLower={onStudentsListScrollToLower}>
           <View className="px-[32rpx] pt-[24rpx] pb-[24rpx]">
             {visibleStudents.map((student) => {
               const cardStatus = getStudentCardStatus(student);
@@ -756,42 +777,13 @@ const Students: React.FC = () => {
                         : '暂无关联学员'
                   }
                 />
-                {/* 本地无结果 + 未启用远程搜索 → 显示"搜索更多" */}
-                {debouncedKeyword &&
-                  !useRemoteSearch &&
-                  debouncedKeyword.length >= 2 &&
-                  profile?.id && (
-                    <View
-                      className="mt-4 py-3 px-6 rounded-full bg-primary/10 self-center"
-                      onClick={() => {
-                        setRemoteSearching(true);
-                        studentService
-                          .search(profile.id, debouncedKeyword)
-                          .then((results) => {
-                            if (results.length > 0) {
-                              setStudents((prev) => {
-                                const existingIds = new Set(prev.map((s) => s.id));
-                                const newStudents = results.filter((r) => !existingIds.has(r.id));
-                                return [...prev, ...newStudents];
-                              });
-                            }
-                          })
-                          .catch(() => {})
-                          .finally(() => setRemoteSearching(false));
-                      }}
-                    >
-                      <Text className="text-[26rpx] text-primary font-medium">
-                        {remoteSearching ? '搜索中...' : '搜索更多学员'}
-                      </Text>
-                    </View>
-                  )}
               </>
             )}
 
             {/* 分批渲染：还有更多时显示加载提示（上拉自动追加） */}
             {hasMoreStudents && (
               <View className="py-[24rpx] text-center text-[24rpx] text-muted-foreground">
-                上拉加载更多…
+                {studentsQuery.isFetchingNextPage ? '正在加载下一页…' : '上拉加载更多…'}
               </View>
             )}
           </View>

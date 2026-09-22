@@ -623,36 +623,39 @@ export function useStudentForm(): UseStudentFormReturn {
       setSaving(false);
 
       if (!isEdit && newStudent) {
-        Taro.hideToast();
-        try {
-          await subscribeMessageService.runFlow('E01', {
-            studentId: newStudent.id,
-            studentName: newStudent.name,
-            campusId: campusId || undefined,
-            role: profile?.currentContext?.role,
-          });
-        } catch (error) {
-          logError('subscribe E01 after student create', error);
-        }
-        const canManageClasses = isAdmin(profile?.currentContext?.role);
-        if (canManageClasses) {
-          const { confirm } = await Taro.showModal({
-            title: '学员已创建',
-            content: '是否立即分班？',
-            confirmText: '立即分班',
-            cancelText: '稍后再说',
-          });
-          if (confirm) {
-            Taro.navigateTo({ url: COURSE_MANAGEMENT_CLASS_TAB_URL });
-          } else {
-            Taro.navigateBack();
+        // 保存成功的边界到此为止；订阅授权和分班询问在后台继续，不能阻塞保存按钮。
+        void (async () => {
+          Taro.hideToast();
+          try {
+            await subscribeMessageService.runFlow('E01', {
+              studentId: newStudent.id,
+              studentName: newStudent.name,
+              campusId: campusId || undefined,
+              role: profile?.currentContext?.role,
+            });
+          } catch (error) {
+            logError('subscribe E01 after student create', error);
           }
-        } else {
-          // 教师无课程管理权限：进学员详情闭环，避免跳转后被守卫拦回
-          Taro.navigateTo({
-            url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(newStudent.id)}`,
-          });
-        }
+          const canManageClasses = isAdmin(profile?.currentContext?.role);
+          if (canManageClasses) {
+            const { confirm } = await Taro.showModal({
+              title: '学员已创建',
+              content: '是否立即分班？',
+              confirmText: '立即分班',
+              cancelText: '稍后再说',
+            });
+            if (confirm) {
+              Taro.navigateTo({ url: COURSE_MANAGEMENT_CLASS_TAB_URL });
+            } else {
+              Taro.navigateBack();
+            }
+          } else {
+            // 教师无课程管理权限：进学员详情闭环，避免跳转后被守卫拦回
+            Taro.navigateTo({
+              url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(newStudent.id)}`,
+            });
+          }
+        })();
       } else {
         setTimeout(() => Taro.navigateBack(), 1500);
       }

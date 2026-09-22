@@ -39,6 +39,11 @@ interface BackendStudentListResponse {
   };
 }
 
+export interface StudentPageResult {
+  list: Student[];
+  pagination: BackendStudentListResponse['pagination'];
+}
+
 export interface ParentStudentSummary {
   students: Student[];
   attendance: number;
@@ -204,6 +209,46 @@ export interface InitialStudentPackagePayload {
 // 学员 Service
 // ============================================
 export const studentService = {
+  /** 获取学员分页，页面列表按触底逐页加载，禁止一次性拉全量。 */
+  getPageByTeacher: async (
+    _teacherId: string,
+    page: number,
+    pageSize = API_PAGE_SIZE_BATCH,
+    campusId?: string,
+    keyword?: string,
+  ): Promise<StudentPageResult> => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(Math.min(pageSize, 100)),
+    });
+    if (campusId) params.set('campusId', campusId);
+    if (keyword?.trim()) params.set('keyword', keyword.trim());
+    const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
+    return {
+      list: (data.list || []).map(mapBackendStudentListItem),
+      pagination: data.pagination,
+    };
+  },
+
+  /** 获取家长分页，页面列表按触底逐页加载。 */
+  getPageByParent: async (
+    _parentId: string,
+    page: number,
+    pageSize = API_PAGE_SIZE_BATCH,
+    keyword?: string,
+  ): Promise<StudentPageResult> => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(Math.min(pageSize, 100)),
+    });
+    if (keyword?.trim()) params.set('keyword', keyword.trim());
+    const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
+    return {
+      list: (data.list || []).map(mapBackendStudentListItem),
+      pagination: data.pagination,
+    };
+  },
+
   /** 获取教师的学员列表（分批拉全） */
   getByTeacher: async (_teacherId: string, campusId?: string): Promise<Student[]> => {
     const list = await fetchAllPages(async (page, pageSize) => {
