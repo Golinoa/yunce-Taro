@@ -255,6 +255,11 @@ const StudentDetail: React.FC = () => {
             onCardSubTabChange={setCardSubTab}
             memberCardStats={derived.memberCardStats}
             onMemberCardClick={actions.handleMemberCardClick}
+            onMigrateHistory={() =>
+              Taro.navigateTo({
+                url: `/package-student/pages/student-migration/index?studentId=${studentId}`,
+              })
+            }
           />
         </SwiperItem>
 

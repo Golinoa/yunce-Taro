@@ -40,6 +40,7 @@ export default defineAppConfig({
         'pages/member-card-issue/index',
         'pages/member-card-detail/index',
         'pages/member-card-edit/index',
+        'pages/student-migration/index',
         'pages/follow-record-form/index',
         'pages/help/index',
         'pages/child-detail/index',

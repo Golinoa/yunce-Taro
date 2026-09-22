@@ -48,6 +48,23 @@ function mapCard(raw: BackendMemberCard): MemberCardDetail {
 }
 
 export const memberCardService = {
+  migrate: async (data: {
+    cardTypeId: string;
+    studentId: string;
+    remainingCount: number;
+    validStart?: string;
+    expiredAt: string;
+    sourceAt?: string;
+    remark: string;
+    idempotencyKey: string;
+  }): Promise<MemberCardDetail> => {
+    const created = await post<BackendMemberCard>('/card-types/member-cards/migrations', data);
+    invalidatePackagesCache(data.studentId);
+    const detail = await memberCardService.getById(String(created.id));
+    if (!detail) throw new Error('迁移会员卡创建成功但读取失败');
+    return detail;
+  },
+
   getListByCardType: async (
     cardTypeId: string,
     stat: CardTypeStatKey,
