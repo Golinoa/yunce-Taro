@@ -160,6 +160,141 @@
 | FE-12 | 刷新后首页显示「未设置校区」，点 tab 若干次后才加载出校区；应自动恢复上次选中校区 | 首页 / 校区切换 | 待检查（待定位） |
 | FE-13 | 滑动日历自动选中日期时不加载当天课表，手动点击才加载；诉求降频或异步加载且不报错 | 课表 / 日历 | 待检查（待定位 + 待方案） |
 | FE-14 | 班级详情页（补录/点名进入）学员列表拉取慢、无加载态；一次进入固定打 18 个请求，用户认为冗余 | 课表 / 班级详情页 | 待检查（待定位 + 待优化） |
+| **FE-15** | **【P0】学员管理页永远显示「共 0 位学员 / 暂无学员」，后端全程收不到 `GET /students`；反复修复 6 轮未解决** | 学员管理 / 列表查询 | **根因确认：小程序运行时缺 `AbortController` → `query-core` 的 `Query.fetch()` 抛 `ReferenceError`**（全局性问题，非学员页专属）。`-06` 已加 polyfill 修复，**待真机复验** → 笔记 [`FE-15-修复笔记.md`](./FE-15-修复笔记.md) |
+| **FE-16** | UnoCSS 默认**不扫描 `.ts`**，`src/utils/*.ts` 里返回的 class 静默不生成 CSS（学员卡片 0.5px 边框改完不生效即由此暴露） | 全局样式 / UnoCSS | **已修复**：`uno.config.ts` 的 `content.pipeline.include` 纳入 `.ts`；`getCardBorderColorClass` 边框 `3rpx → 1rpx`（≈0.5px），`-07` 已出包 |
+| **FE-17** | 学员卡片显示**整圈粗红/黄边框**（~3px），改 `border-l-[3rpx] → [1rpx]` 后"粗细毫无变化" | 学员管理 / 样式 | **已修复**（`-10`）：`border-solid` 只设 border-style，`border-width` 的 CSS 初始值 `medium`(=3px) 让未指定宽度的边回退成 3px；改用一体化 `border-status-*`（**整圈** 1rpx）→ 笔记 [`FE-17-修复笔记.md`](./FE-17-修复笔记.md) |
+| **FE-18** | **项目没有 UnoCSS preflight** → `border-style` 恒为初始值 `none`，全站约 164 处「写了宽度没写样式」的边框**完全不显示**（订阅会员页对着设计稿 v3 一比就暴露：卡片边框全无、"糊成一片"） | 全局样式 / UnoCSS | **已修复**（`-12`）：`uno.config.ts` 加 `preflights`（**显式元素列表**，因为 **WXSS 不支持 `*`** —— `-11` 用 `*` 导致整包编译失败）→ 与 FE-17 是**同一根因的两面** → 笔记 [`FE-18-修复笔记.md`](./FE-18-修复笔记.md) |
+| **FE-19** | 诊断埋点的「默认关闭」开关**只挡住了网络上报**：`reportLocalDebug` 把同步 storage 读写 + `console.warn` 写在门禁**之前**，生产包在热路径（每请求 / 每 render / 每次路由鉴权）照样执行 2 次同步 storage IO | 诊断埋点 / 性能 · 包体 | **已修复**：门禁提到函数首行 + 常量改为构建期可折叠写法 → **生产构建整个函数被 terser 删除**（空函数）；28 个调用点参数字面量约 6.8 KB（主包 ≈0.15%）保留不动 → 审计笔记 [`FE-19-诊断埋点成本审计.md`](./FE-19-诊断埋点成本审计.md) |
+
+---
+
+## FE-15（P0）学员管理页列表永久空白
+
+> **修复笔记（必读，逐轮记录 + 已排除清单 + 速查索引）**：见同目录 [`FE-15-修复笔记.md`](./FE-15-修复笔记.md)。
+> 纪律：该问题**每次修复必须写笔记**（7 段固定模板），被推翻的假设也要留档。
+
+**现象**（2026-09-23）：点击首页金刚区「学员管理」→ 页面正常打开（导航栏正确、tab/筛选器都在），
+但列表区恒为「共 0 位学员 / 暂无学员，点击上方添加」；后端日志**全程没有任何 `GET /students`**。
+
+**关键埋点证据**（`students-debug-20260923-02`，一次点击）：
+
+```
+[H6] kk click -> 学员管理 /package-student/pages/students/index     ← 点击生效
+[students-module-loaded] 学员页面模块已加载                          ← 页面已加载
+[H3] route guard pass {currentPath:".../students/index", hasProfile:true}
+[students-query-gate] {role:"principal", campusId:"9f53c333-…", canLoadStudents:true}
+[students-query-result] {status:"pending", fetchStatus:"fetching", queryFnRuns:0,
+  queryKey:"[\"students\",\"teacher\",\"fe4ffaa7-…\",\"9f53c333-…\",\"\"]"}
+[students-query-result] {status:"pending", fetchStatus:"idle",     queryFnRuns:0, 同一 queryKey}
+```
+
+**根因**：`queryFnRuns` 恒为 0 ⇒ **`queryFn` 从未被调用**。query 已经进入 `fetch()` 并标记
+`fetchStatus='fetching'`，却在调用 queryFn 之前被 `cancel()`，此后永远停在
+`pending/idle`（v5 不会自动重试）。
+
+已排除的候选（都有证据，不再重复走）：
+| 候选 | 排除依据 |
+| --- | --- |
+| 登录态 / profile 为空 | `route guard pass {hasProfile:true}`，`canLoadStudents:true` |
+| 角色 / 权限拦截 | 无任何 `route-guard-deny`；`role:"principal"` |
+| 入口未渲染 / 点击没触发 | `kk click` 已打印，`kk render variant=staff` |
+| queryKey 抖动 | 两次日志 queryKey 三段值完全一致 |
+| 显式取消 | 全项目无 `cancelQueries/removeQueries/resetQueries` |
+| 网络离线暂停（networkMode） | 未设 `networkMode`；小程序无 `window`，onlineManager 默认 online |
+| 后端查不到数据 | 后端**根本没收到请求**，非查询结果为空 |
+
+**结论**：v5 中 query 被 cancel 的来源只有两个 —— ①该 query 最后一个 observer 被移除（组件卸载）；
+②`enabled` 翻转导致 observer 重新订阅 in-flight query。其中 ② 是**确定的脆弱设计**：
+`enabled: canLoadStudents` 的入参 `actorId` 由 `profile?.id || session?.user.id` 推导，首帧必然波动。
+
+**修复**：
+1. `pages/students/index.tsx`：**移除 `enabled: canLoadStudents`**。queryFn 内已有
+   `if (!actorId) return 空列表` 兜底，且 queryKey 含 `actorId`，profile 恢复后会自然产生新 query 拉取，
+   无需 enabled 把关 —— 去掉即消除了 ② 这个取消源。
+2. `utils/route-guard.tsx`：`checkAuth` 中 `if (loading) setAuthorized(false)` 会把**已放行**的页面
+   整块卸载（`!authorized` 返回的是 Loading），新增 `hasAuthorizedRef`，放行后 loading 波动不再撤回授权。
+3. `pages/students/index.tsx`：`useDidShow` 里的 `studentsQuery.refetch()` 会取消 in-flight 首屏 fetch，
+   加 `status === 'success'` 限定，只在"已有数据但为空"时补拉。
+4. 诊断埋点：新增 `students-lifecycle`（mount/unmount）、`enabled-flip`（canLoadStudents 翻转），
+   以及 `queryKey` / `queryFnRuns` 字段 —— 若修复后仍空白，这三条日志可直接锁定是 ① 还是 ②。
+
+**验证标准**：后端出现 `GET /students` 200，且前端出现 `students-query-start`（queryFn 真的执行）。
+**`-05` 复验标准**：贴出 `students-query-stall`（含环境开关与 query 内部状态）与
+`students-manual-fetch`（成败 + 错误对象）两条日志即可一锤定音。
+
+### FE-15 追加（第六轮 · `-04` 实测推翻第五轮结论，改用「探针 + 兜底直取」，不再猜测）
+
+`-04` 日志给出的三个值**直接证伪了第五轮的 `removeObserver` 结论**：
+
+```
+[students-query-result] fetchStatus:"fetching"  queryFnRuns:0  observerCount:1
+[students-query-result] fetchStatus:"idle"      queryFnRuns:0  observerCount:1   ← observers 从未归零
+[students-query-stall]  attempt:1  observerCount:1                                 ← 显式 refetch() 也毫无反应
+```
+
+**`observerCount` 恒为 1** → `query.js:138` 的 `removeObserver` 分支（`!this.observers.length`）根本不成立；
+**显式 `refetch()` 连一次状态变化都不产生** → 排除「observer 生命周期」。
+
+同时由源码确定的两条硬约束把范围收死：
+
+1. 全局 `queryClient` 设了 `retry: false`（`src/app.tsx:58`），因此**任何真实 reject 都会立刻变成
+   `status:'error'`**；但实测是 `pending/idle` 且 `error:null` → 只可能走了
+   `query.js:220 onCancel` 的 `CancelledError.revert` 分支（`setState({...revertState, fetchStatus:'idle'})`）。
+2. `query-core` 中 `revert:true` 只有两处来源：`query.js:138`（已排除）与 `queryClient.js:129`
+   `cancelQueries()`（全项目无调用）。说明**现有埋点覆盖不到真正的取消源**。
+
+已排除的清单（均有实测证据，不再重走）：组件卸载、enabled 翻转、queryKey 抖动、显式 cancel、
+query-core 重复打包（`dist/` 内 `CancelledError` 仅出现在 `vendors.js`，无副本）、
+`onlineManager` 默认 true（首页 `useQuery` 正常取数反证）。
+
+**本轮做法**：不再基于假设改逻辑，改为一次性把判定所需全部值打出来 ——
+`onlineManager.isOnline()` / `focusManager.isFocused()` / query 内部
+`state.fetchFailureReason`、`fetchFailureCount`、`dataUpdateCount`、`networkMode`、
+`options.behavior`、`isDisabled()`、`isActive()`，并**绕过 observer 直接调用 `query.fetch()`**，
+把真实错误对象（`name` / `message` / `revert` / `silent`）原样记录。
+另加**兜底直取**：确诊卡死后直接走 `studentService` 拉首屏并 `setQueryData`，保证列表可用。
+buildId = `students-debug-20260923-05`。
+
+### FE-15 追加（第五轮 · 从库源码反查，`-03` 日志仍复现）
+
+`-03` 日志用 `students-lifecycle` 埋点**证伪了前两个候选**：
+
+```
+[students-lifecycle] 学员页组件已挂载      ← 只有 mount，全程无 unmount
+（全程无 enabled-flip）                    ← canLoadStudents 从未翻转
+[students-query-result] fetching → idle, queryFnRuns:0, queryKey 三段值完全一致
+```
+
+组件没卸载、enabled 没翻转、key 没抖、无显式 cancel —— 于是**直接穷举 `@tanstack/query-core` 中
+所有把 `fetchStatus` 置回 `idle` 的代码路径**（`build/modern/query.js`），只有一处能同时满足
+「fetchStatus fetching→idle」且「queryFn 零执行」：
+
+```js
+// node_modules/@tanstack/query-core/build/modern/query.js:132-149
+removeObserver(observer) {
+  ...
+  if (!this.observers.length) {          // ← observer 数量归零
+    if (this.#retryer) {
+      if (this.#abortSignalConsumed || ...) {
+        this.#retryer.cancel({ revert: true });   // ← 回退状态 + fetchStatus=idle，且【不重发】
+      } else this.#retryer.cancelRetry();
+    }
+    ...
+```
+
+配套事实：
+- `#abortSignalConsumed` 在 `query.js:177` 的 signal getter 里被置位 —— **只要有人读 `signal` 就为 true**；
+- `infiniteQueryBehavior.js:14-22` 的 `addSignalProperty(object, () => context.signal, ...)`
+  **恰恰会读它**，且 `fetchPage` 开头有 `if (cancelled) return Promise.reject(...)` ——
+  所以 signal 一旦已 abort，**`queryFn` 会被整体跳过**（完美解释 `queryFnRuns:0`）；
+- 这也解释了**为什么只有学员页**：它是 `useInfiniteQuery`（会消费 signal），
+  首页那批 `useQuery` 不走 infinite behavior。
+
+**修复（`-04`）**：
+1. `pages/students/index.tsx` 新增**停滞自愈**：检测 `status==='pending' && fetchStatus==='idle'`
+   停滞态，300ms 后主动 `refetch()`（限 3 次，避免真实失败场景无限重试），让列表不再永久空白；
+2. 新增 `students-query-stall` 埋点与 `observerCount` 字段 —— **observerCount===0 即证实上面这条路径**；
+   `>0` 则说明还有第四个入口，需要换方向继续查。
 
 ---
 
@@ -182,6 +317,62 @@
 | 用户提供的证据 | 后端日志 4 条（原文见下方「原始日志」） |
 | 日志中的客观事实（仅登记，未判定） | ① 4 条请求**全部 200**，无 4xx/5xx、无异常堆栈；耗时 6~23ms。② 这 4 条分别是 `GET /api/app/v1/auth/me`、`GET /api/app/v1/org-permissions`、`GET /api/app/v1/organization/entitlements`、`GET /api/app/v1/teachers/me`。③ **已提供的日志中未见「订单详情」相关接口的调用记录**。 |
 | 待用户补充 | 页面路由/从哪里进入；是否每次都这样（必现还是偶发）；期望表现；出现问题的具体时间点（便于对齐更完整的日志） |
+
+---
+
+## FE-16 · UnoCSS 默认不扫描 `.ts`，导致 `.ts` 里返回的 class 静默不生成 CSS
+
+**发现时间**：2026-09-23（做「学员卡片状态色边框改为 0.5px」时顺带暴露，与 FE-15 无关，但同属「静默失效」类）
+
+**现象**：按需求把 `getCardBorderColorClass` 的左边框从 `border-l-[3rpx]` 改成
+`border-l-[1rpx]`（0.5px，项目单位是 rpx：750rpx = 375px，故 **0.5px ≈ 1rpx**）。
+页面 JS 里类名正确，但编译后的 wxss **完全没有这条规则** → 边框消失。
+
+**假设**：UnoCSS 没有提取到这个 class。
+
+**验证方式**：核对产物 + 读插件源码。
+
+**结论**：✅ **成立。**
+`@unocss/webpack` 的默认扫描正则（`defaultPipelineInclude`）为：
+
+```
+/\.(vue|svelte|[jt]sx|vine.ts|mdx?|astro|elm|php|phtml|marko|html)($|\?)/
+```
+
+**只有 `[jt]sx`，没有 `.ts`。** 而本项目大量 class 是由 `src/utils/*.ts` 里的函数返回的
+（`getCardBorderColorClass` / `getHoursColorClass` / `getProgressGradientClass` …）。
+**只要这些 class 没在某个 `.tsx` 里恰好也出现一次，CSS 就不会生成** ——
+表现为「TS 逻辑完全正确，但样式静默丢失」。
+
+补充两条实测约束：
+1. `@unocss/webpack` **只扫描进入构建图的模块**：`src/utils/hours-status.ts` 被页面 import → 在图中；
+   而未被子包/页面引用的 `components/teacher/ConfirmSalarySheet` 不在图中，其 class 也不参与提取。
+2. 此前学员卡片 `border-l-[3rpx]` 能生效**纯属巧合** —— 帮助页（`.tsx`）恰好也用了同一个类。
+
+**修复**：
+1. `uno.config.ts` 增加 `content.pipeline.include`，在默认正则基础上把 `.ts` 一并纳入：
+   `/\.(vue|svelte|[jt]sx?|mdx?|astro|elm|php|phtml|marko|html)($|\?)/`
+   （只加了 `?`，即 `[jt]sx?` → `.jsx/.tsx/.js/.ts`）。因插件只扫构建图模块，不会引入测试噪声。
+2. `src/utils/hours-status.ts`：学员卡片状态色左边框 `3rpx` → **`1rpx`（≈0.5px）**，
+   并在注释里写明「0.5px ≈ 1rpx，不要再写 3rpx」。
+
+**验证结果**：
+- 产物已生成 `.border-l-_a_1rpx_a_{border-left-width:1rpx}` ✅
+- 连带修复：此前缺失的 `bg-gradient-amber` 也补上了（它只由 `hours-status.ts` 返回）✅
+- 主包 **1477.8KB → 1483.1KB**（+5.3KB，纳入 `.ts` 扫描的代价；仍 < 自设闸门 1536KB）
+- `tsc` 0 错、ESLint 0 warning、**59 文件 336 测试全绿**；129 页 0 缺失、117 分包 chunk 校验通过
+
+**教训（重要）**：
+- 本项目「`utils/*.ts` 返回 class 字符串」是常见写法，**改样式必须核对产物 wxss，不能只看源码**：
+  `grep -o "border-left-width:[^;}]*" dist/app-origin.wxss`
+- 新增 UnoCSS 类（尤其 arbitrary value）时，若只写在 `.ts` 里，必须确认已生成。
+
+**复核（2026-09-23，用户要求「先复核问题真实性」）**：不只靠产物 A/B，直接用**已安装插件里的常量**
+跑真实过滤 —— `defaultPipelineInclude = /\.(vue|svelte|[jt]sx|vine.ts|mdx?|astro|elm|php|phtml|marko|html)($|\?)/`
+→ `src/utils/hours-status.ts` **被跳过**、`src/package-student/pages/students/index.tsx` **会被扫描**。
+**结论：问题真实存在**，修复有效（产物已生成 `.border-l-_a_1rpx_a_{border-left-width:1rpx}`）。
+
+---
 
 ### 原始日志（用户粘贴内容，原文照录）
 
