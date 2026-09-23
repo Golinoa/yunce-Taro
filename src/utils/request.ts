@@ -223,6 +223,30 @@ function persistRefreshedSession(token: string, refreshToken: string, expiresIn:
   }
 }
 
+/**
+ * 轮换竞态复查：并发的另一路可能已用同一张旧票换到新凭据，但还没落盘。
+ *
+ * 后端 refresh 是「单次使用 + 轮换」：先到的那路成功后旧票立刻被 revoke，
+ * 后到的那路必然 401。此时若直接判死（清态 + 跳登录），业务页（如学员列表）
+ * 就拿不到 actorId → query 被 enabled=false 挡住 → 列表空白且后端无任何请求，
+ * 表现为「页面能进、列表永远加载不出来」，且日志里看不到失败原因。
+ *
+ * 仅在本轮确实没人换到新票时才让调用方走终态处理，不改变原有的安全语义。
+ */
+async function waitForRotatedSession(sentRefreshToken: string): Promise<string | null> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const latestRefreshToken = readRefreshToken();
+    if (latestRefreshToken && latestRefreshToken !== sentRefreshToken) {
+      const latestAccessToken = readAccessToken();
+      if (latestAccessToken) {
+        return latestAccessToken;
+      }
+    }
+  }
+  return null;
+}
+
 let refreshInFlight: Promise<string | null> | null = null;
 
 /**
@@ -327,6 +351,13 @@ async function refreshAccessToken(): Promise<string | null> {
 
       // 只有 401 才是「凭据无效」的终态：清态 + 跳登录
       if (res.statusCode === 401) {
+        // 先排除「输给并发另一路」的情况：另一路可能刚换到新票但尚未落盘。
+        // 复查到新票就复用，避免把一次轮换竞态误判成会话失效而踢人下线。
+        const racedAccessToken = await waitForRotatedSession(refreshToken);
+        if (racedAccessToken) {
+          return racedAccessToken;
+        }
+
         rejectedRefreshToken = refreshToken;
         logRequestIssue('refresh_fail', {
           path: '/auth/refresh',
@@ -659,12 +690,13 @@ function sanitizeQueryParams(
 export function get<T = unknown>(
   url: string,
   params?: Record<string, unknown>,
-  options?: { skipAuth?: boolean },
+  options?: { skipAuth?: boolean; header?: Record<string, string> },
 ): Promise<T> {
   return request<T>({
     url,
     method: 'GET',
     data: sanitizeQueryParams(params),
+    header: options?.header,
     skipAuth: options?.skipAuth,
   });
 }

@@ -4,10 +4,15 @@ import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SubscribeAuthHost } from '@/components/subscribe';
 import { APP_VERSION } from '@/constants/version';
+// 微信小程序运行时没有 AbortController，而 @tanstack/query-core 的 Query.fetch() 第一行就是
+// `new AbortController()`（全库唯一引用）。缺失会直接抛 ReferenceError，导致所有 query 的
+// queryFn 永不执行、fetchStatus 永久停在 idle。详见 docs/diagnostics/FE-15-修复笔记.md。
+import { ABORT_CONTROLLER_POLYFILL_INSTALLED } from '@/utils/abort-controller-polyfill';
 import { scheduleDeferredAppStartup } from '@/utils/app-startup';
 import { AuthProvider } from '@/utils/auth';
 import { clearIfVersionMismatch } from '@/utils/cache-store';
 import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import 'uno.css';
@@ -48,6 +53,23 @@ import './app.scss';
  * 否则默认 3 次重试会把失败场景的请求数放大 4 倍。
  */
 const QUERY_STALE_TIME_MS = 30_000;
+
+/**
+ * FE-15 启动自检（一次性）：确认 AbortController 可用。
+ * 小程序原生没有它，而 @tanstack/query-core 的 Query.fetch() 第一行就 `new AbortController()`，
+ * 缺失会让所有 query 静默失效（queryFn 永不执行）。这条日志用于一眼确认 polyfill 是否生效。
+ */
+reportLocalDebug({
+  hypothesisId: 'abort-controller-env',
+  location: 'src/app.tsx:env-check',
+  msg: 'AbortController 环境自检',
+  data: {
+    installed: ABORT_CONTROLLER_POLYFILL_INSTALLED,
+    hasAbortController: typeof AbortController !== 'undefined',
+    hasAbortSignal: typeof AbortSignal !== 'undefined',
+    hasGlobalThis: typeof globalThis !== 'undefined',
+  },
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {

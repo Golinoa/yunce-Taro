@@ -348,10 +348,22 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const hasRefreshed = useRef(false);
   const storeEntryFunnelCheckedRef = useRef(false);
   const guardStartAtRef = useRef(Date.now());
+  /**
+   * 是否已经放行过一次。
+   *
+   * `!authorized` 时守卫渲染的是 Loading 占位，children（页面本体）会被整体卸载。
+   * 若放行后仅因 loading 波动就撤回授权，已挂载的页面会被卸载、正在进行的
+   * TanStack Query 请求随之被取消——学员列表就是这样变成空白且后端收不到 /students。
+   */
+  const hasAuthorizedRef = useRef(false);
 
   const checkAuth = useCallback(() => {
     if (loading) {
-      setAuthorized(false);
+      // 从未放行过 ⇒ 保持 Loading 占位；已放行过 ⇒ 不再撤回，避免卸载页面内容
+      // 并取消进行中的请求。真正的鉴权失败由下面的 deny 分支显式 setAuthorized(false)。
+      if (!hasAuthorizedRef.current) {
+        setAuthorized(false);
+      }
       return;
     }
 
@@ -362,6 +374,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
     // 未登录且不在公开页 → 跳转登录（冷启动 + 有效 token 时延后，等 session 恢复）
     if (!profile && !isPublicPage) {
+      reportLocalDebug({
+        hypothesisId: 'route-guard-deny',
+        location: 'src/utils/route-guard.tsx:checkAuth:no-profile',
+        msg: '路由守卫阻止页面：没有 profile',
+        data: { currentPath, loading, hasStoredSession: hasValidStoredSession() },
+      });
       if (hasValidStoredSession() && isColdStartGracePeriod()) {
         setAuthorized(false);
         return;
@@ -375,6 +393,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
     // 未完善头像昵称：优先于 identity-select（避免重进小程序直接进选身份）
     if (profile && needsProfileSetup(profile)) {
+      reportLocalDebug({
+        hypothesisId: 'route-guard-deny',
+        location: 'src/utils/route-guard.tsx:checkAuth:profile-setup',
+        msg: '路由守卫阻止页面：资料未完善',
+        data: { currentPath },
+      });
       if (!currentPath.includes('profile-setup')) {
         redirectToProfileSetup();
       }
@@ -391,6 +415,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
         identityPending = false;
       }
       if (identityPending && !isIdentityOnboardingAllowlistedPath(currentPath)) {
+        reportLocalDebug({
+          hypothesisId: 'route-guard-deny',
+          location: 'src/utils/route-guard.tsx:checkAuth:identity-pending',
+          msg: '路由守卫阻止页面：身份选择未完成',
+          data: { currentPath },
+        });
         if (!currentPath.includes('identity-select')) {
           redirectToIdentitySelect();
         }
@@ -408,6 +438,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
           : required.every((r) => r === 'parent')
             ? 'parent'
             : 'staff';
+        reportLocalDebug({
+          hypothesisId: 'route-guard-deny',
+          location: 'src/utils/route-guard.tsx:checkAuth:role-denied',
+          msg: '路由守卫阻止页面：角色不满足要求',
+          data: { currentPath, required, role: profile.currentContext?.role || null, reason },
+        });
         redirectToForbidden(reason);
         setAuthorized(false);
         return;
@@ -415,6 +451,12 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
       // 授权开关：角色门槛通过后，再按 admin 对当前角色的模块授权动态放行
       const pageModule = PAGE_MODULE_MAP[normPath];
       if (pageModule && !hasModuleAccess(profile, pageModule)) {
+        reportLocalDebug({
+          hypothesisId: 'route-guard-deny',
+          location: 'src/utils/route-guard.tsx:checkAuth:module-denied',
+          msg: '路由守卫阻止页面：模块未授权',
+          data: { currentPath, pageModule, role: profile.currentContext?.role || null },
+        });
         redirectToForbidden('staff');
         setAuthorized(false);
         return;
@@ -437,6 +479,7 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
         },
       });
       // #endregion
+      hasAuthorizedRef.current = true;
       setAuthorized(true);
       return;
     }
