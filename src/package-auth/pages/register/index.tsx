@@ -164,7 +164,7 @@ const Register: React.FC = () => {
       <View className="relative z-10 flex-1 flex flex-col px-[56rpx] pt-[40rpx] pb-[calc(40rpx+env(safe-area-inset-bottom))] shadow-login-sheet bg-white rounded-t-[72rpx]">
         <Text className="mb-[28rpx] text-[32rpx] font-semibold text-foreground">注册账号</Text>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="text"
@@ -176,7 +176,7 @@ const Register: React.FC = () => {
           />
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="number"
@@ -200,7 +200,7 @@ const Register: React.FC = () => {
           </Text>
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             password
@@ -212,7 +212,7 @@ const Register: React.FC = () => {
           />
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[24rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             password

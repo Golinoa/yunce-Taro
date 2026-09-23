@@ -286,7 +286,7 @@ const AuditLog: React.FC = () => {
                 className="bg-card rounded-[20rpx] px-[24rpx] py-[24rpx] mb-[16rpx]"
               >
                 <View className="flex flex-row items-center justify-between">
-                  <View className="px-[14rpx] py-[4rpx] rounded-full bg-primary-bg">
+                  <View className="px-[14rpx] py-[4rpx] rounded-[8rpx] bg-primary-bg">
                     <Text className="text-[22rpx] text-primary">{log.actionLabel}</Text>
                   </View>
                   <Text className="text-[22rpx] text-muted-foreground">

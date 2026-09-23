@@ -263,7 +263,7 @@ const LoginFlowPopover: React.FC<LoginFlowPopoverProps> = ({
 
         <View
           className={cn(
-            'absolute rounded-[24rpx] bg-white border-[2rpx] border-solid px-[28rpx] h-[96rpx] flex items-center will-change-transform',
+            'absolute rounded-button bg-white border-[2rpx] border-solid px-[28rpx] h-[96rpx] flex items-center will-change-transform',
             controlsHighlighted
               ? 'border-primary shadow-[0_16rpx_42rpx_rgba(59,110,245,0.18)]'
               : 'border-white/70 shadow-[0_12rpx_40rpx_rgba(59,110,245,0.10)]',

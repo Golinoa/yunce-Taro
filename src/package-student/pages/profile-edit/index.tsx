@@ -565,7 +565,7 @@ const ProfileEdit: React.FC = () => {
                     <Text className="text-[30rpx] text-foreground truncate">{boundEmail}</Text>
                   ) : (
                     <View className="flex items-center gap-[8rpx]">
-                      <View className="rounded-full bg-primary/10 px-[24rpx] py-[8rpx]">
+                      <View className="rounded-[8rpx] bg-primary/10 px-[24rpx] py-[8rpx]">
                         <Text className="text-[26rpx] font-semibold text-primary">去绑定</Text>
                       </View>
                       <RowArrow />
@@ -604,7 +604,7 @@ const ProfileEdit: React.FC = () => {
             {/* 保存 */}
             <View
               className={cn(
-                'h-[96rpx] rounded-2xl center press-scale',
+                'h-[96rpx] rounded-button center press-scale',
                 saving ? 'bg-muted' : 'bg-gradient-primary shadow-elegant',
               )}
               onClick={saving ? undefined : handleSave}
@@ -616,7 +616,7 @@ const ProfileEdit: React.FC = () => {
 
             {/* 退出登录 */}
             <View
-              className="h-[96rpx] rounded-2xl bg-card center press-scale shadow-soft"
+              className="h-[96rpx] rounded-button bg-card center press-scale shadow-soft"
               onClick={handleLogout}
             >
               <Text className="text-[30rpx] font-medium text-destructive">退出登录</Text>
@@ -717,7 +717,7 @@ const ProfileEdit: React.FC = () => {
 
             {/* 添加子女 */}
             <View
-              className="h-[96rpx] rounded-2xl border-[2rpx] border-dashed border-primary/40 bg-primary-bg center press-scale"
+              className="h-[96rpx] rounded-button border-[2rpx] border-dashed border-primary/40 bg-primary-bg center press-scale"
               onClick={() => {
                 resetChildForm();
                 setShowAddSheet(true);
@@ -814,7 +814,7 @@ const ProfileEdit: React.FC = () => {
           </Text>
           <View
             className={cn(
-              'h-[96rpx] rounded-2xl center press-scale bg-gradient-primary shadow-elegant',
+              'h-[96rpx] rounded-button center press-scale bg-gradient-primary shadow-elegant',
               addingChild && 'opacity-60',
             )}
             onClick={() => void handleAddChild()}

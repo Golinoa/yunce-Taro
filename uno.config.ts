@@ -15,6 +15,51 @@ export default defineConfig({
     }),
   ],
   transformers: [transformerAttributify({ ignoreAttributes: ['block'] })],
+  /**
+   * ===== 边框基础重置（preflight，2026-09-23 新增，FE-18）=====
+   *
+   * 背景：UnoCSS 的 `border` 工具类**只输出 `border-width`**，"这是条实线"（`border-style: solid`）
+   * 由 preflight 的通配规则统一打底。本项目用的是 `presetApplet()`，**它不带 preflight**，
+   * 于是 `border-style` 一直是 CSS 初始值 `none` ——
+   *   ① 有宽度、没写 style  → **边框完全不渲染**（订阅会员页几乎所有卡片、使用帮助页 FAQ 竖线）
+   *   ② 写了 style、没给宽度 → 未指定的边回退 `border-width: medium`(=3px) → **整圈粗框**（FE-17）
+   * 两者是同一个根因的两面。此前只能逐处手写 `border-solid` 兜底（见下方 `chip` / `contact-card`
+   * / `form-input-wrap` 等），漏写的地方边框就静默消失。
+   *
+   * 这里补上 Tailwind preflight 中与边框相关的两条（**只重置 border，不动 margin/padding/字体**，
+   * 避免引入整份 reset 带来的全站排版漂移）。
+   * 重置后基准：`border-width: 0` + `border-style: solid` ⇒
+   * 只写宽度即可显示；`border-solid` 单独出现也不再有 3px 回退的隐患。
+   *
+   * ⚠️ **WXSS 不支持 `*` 通配符选择器** —— 官方文档列出的支持类型只有
+   * `.class` / `#id` / `element` / `element, element` / `::after` / `::before`。
+   * 最初写 `*` 会让微信开发者工具直接报
+   * `./app-origin.wxss(1:…): unexpected token '*'`（整包编译失败），
+   * 故这里改为**显式列出小程序内置组件标签**。元素选择器优先级 (0,0,1) 低于工具类的
+   * 类选择器 (0,1,0)，因此 `.border{border-width:1px}` 之类仍能正常覆盖宽度。
+   *
+   * 注意：既有代码里手写的 `border-solid` 可保留（重复声明 solid 无副作用），不必批量清理。
+   */
+  preflights: [
+    {
+      getCSS: () =>
+        'page,view,text,image,scroll-view,swiper,swiper-item,form,label,navigator,' +
+        'picker,picker-view,picker-view-column,canvas,video,cover-view,cover-image,' +
+        'rich-text,::before,::after{border-width:0;border-style:solid;}',
+    },
+  ],
+  /**
+   * UnoCSS 默认扫描正则（defaultPipelineInclude）只匹配 `[jt]sx`，**不含 `.ts`**。
+   * 本项目大量 class 是 `src/utils/*.ts` 里的函数返回的（`getCardBorderColorClass` /
+   * `getHoursColorClass` / `getProgressGradientClass` …），若这些 class 没在某个 .tsx 里
+   * 恰好也出现一次，就不会生成 CSS —— 表现为「TS 逻辑跑对了但样式静默丢失」。
+   * 这里把 `.ts` 一并纳入扫描（`@unocss/webpack` 只扫描进入构建图的模块，不会引入测试噪声）。
+   */
+  content: {
+    pipeline: {
+      include: [/\.(vue|svelte|[jt]sx?|mdx?|astro|elm|php|phtml|marko|html)($|\?)/],
+    },
+  },
   theme: {
     colors: {
       primary: 'hsl(var(--primary))',
@@ -122,6 +167,22 @@ export default defineConfig({
       'gray-950': 'hsl(var(--gray-950))',
     },
     borderRadius: {
+      /**
+       * ===== 语义 token（**新代码优先用这些，不要再写 arbitrary 圆角**）=====
+       *
+       * 2026-09-23 用户口径：同类组件的圆角必须一致。
+       * 「统一」= **按语义分层统一**，不是全站一个值（按钮和标签尺寸语义不同，强行同值会牺牲比例感）。
+       *
+       * - `button` 48rpx：大按钮 / 主 CTA（胶囊）
+       * - `chip`   16rpx：小按钮 / 筛选 chip / 分段控件
+       * - `tag`     8rpx：标签 / 角标
+       *   ⚠️ `tag` 原本**没定义**，但源码有 9 处 `rounded-tag`（todo-collaborator / SalaryItem /
+       *   TeacherCard）→ 圆角静默丢失、渲染成直角。本次补上修复。
+       * - `card`   24rpx：卡片 / 面板 / 输入框
+       * - `round` 999rpx：正圆（头像 / 圆点 / 圆形按钮 / 圆形序号）
+       *
+       * ===== 数值刻度（历史 arbitrary 值的对应档，逐步收敛到上面的语义 token）=====
+       */
       DEFAULT: '30rpx',
       xs: '4rpx',
       sm: '8rpx',
@@ -132,6 +193,9 @@ export default defineConfig({
       '3xl': '30rpx',
       '4xl': '40rpx',
       button: '48rpx',
+      chip: '16rpx',
+      tag: '8rpx',
+      card: '24rpx',
       round: '999rpx',
     },
     boxShadow: {
@@ -638,6 +702,19 @@ export default defineConfig({
     ['border-t', { 'border-top-width': '2rpx', 'border-top-style': 'solid' }],
     ['border-2', { 'border-width': '4rpx', 'border-style': 'solid' }],
 
+    /**
+     * 状态色「细边框」（学员卡片）—— 0.5px 视觉宽 = 1rpx，**整圈四边**。
+     *
+     * ⚠️ 必须用 `border` 一体化简写（一次性给全 width / style / color），
+     * 不能拆成 `border-[1rpx] + border-solid + border-destructive`：
+     * `border-solid` 只设置 border-style，而 CSS 中 `border-width` 的初始值是
+     * `medium`(=3px)，凡未显式指定宽度的边都会回退成 3px 粗线 → 渲染成粗框
+     * （2026-09-23 FE-17 实测确认：当时只给左边写了宽度，结果四边全被画出来，
+     *  其中上/右/下三边是 3px，且"只改左边宽度"视觉上完全看不出变化）。
+     */
+    ['border-status-danger', { border: '1rpx solid hsl(var(--destructive))' }],
+    ['border-status-warn', { border: '1rpx solid hsl(var(--warning))' }],
+
     // ===== 圆角补充 =====
     ['rounded-md', { 'border-radius': '12rpx' }],
 
@@ -890,19 +967,39 @@ export default defineConfig({
     // 加载态：统一透明度 + 禁止点击
     'state-loading': 'opacity-50 pointer-events-none',
 
-    // ===== 全局按钮规范 =====
-    // 主按钮（确认/提交）：h-[96rpx] + Token 圆角（--radius-button / rounded-button = 48rpx）
+    // ===== 全局按钮规范（2026-09-23 用户口径：按尺寸**分层**统一 = 方案 A）=====
+    //
+    // 分层规则（改前这四个"按钮"圆角各不相同：48 / 32 / 28 / 20，属同类不一致）：
+    //   大按钮（高 ≥ 88rpx：主 CTA / 确认提交）→ `rounded-button` 48rpx（胶囊）
+    //   小按钮（卡片内操作 / 头部浮动按钮）    → `rounded-card`   24rpx
+    //   chip / 分段选项                        → `rounded-chip`   16rpx
+    //   标签 / 角标                            → `rounded-tag`     8rpx
+    // **新代码一律用语义 token，不要再写 `rounded-[Nrpx]`。**
+    // 主按钮（确认/提交）：h-[96rpx]
     'btn-primary': 'h-[96rpx] rounded-button flex items-center justify-center press-scale',
-    // 次按钮（选择/更换）：h-[88rpx] + 同上圆角，与登录主/次 CTA 一致
+    // 次按钮（选择/更换）：h-[88rpx]，与登录主/次 CTA 一致
     'btn-secondary': 'h-[88rpx] rounded-button flex items-center justify-center press-scale',
 
     // ===== 全局标签规范 =====
-    // 状态标签：统一 padding + 圆角 + 不换行防挤压（2026-08-23：rounded 在 applet 不生成，改 rounded-full）
-    tag: 'rounded-full px-2 py-0_d5 text-xs font-medium inline-flex items-center shrink-0 whitespace-nowrap',
+    //
+    // 2026-09-23 用户口径：**圆角不要做成胶囊**（原 `rounded-full` 太圆），统一为 `8rpx`；
+    // 并补齐 `justify-center`，避免短文案在标签里不居中。
+    // 只改这条 shortcut 即可让所有 `tag` / `tag-*` 调用点统一生效，无需逐处改样式。
+    tag: 'inline-flex items-center justify-center rounded-[8rpx] px-2 py-0_d5 text-xs font-medium shrink-0 whitespace-nowrap',
     'tag-primary': 'tag bg-primary/10 text-primary',
     'tag-purple': 'tag bg-purple-10 text-purple',
     'tag-amber': 'tag bg-amber-10 text-amber',
     'tag-white': 'tag bg-white/25 text-white',
+
+    // ===== 实心角标规范（会员页「立省 / 更划算 / 荐」等短标注）=====
+    // badge-base 只定义「形状 + 居中 + 白字」，不含尺寸；尺寸由 badge-solid / badge-solid-sm 给，
+    // 避免同一属性出现两个不同 arbitrary 值、靠 CSS 顺序决胜负（不可靠）。
+    'badge-base':
+      'inline-flex items-center justify-center rounded-[8rpx] font-extrabold leading-none text-white shrink-0 whitespace-nowrap',
+    /** 标准角标（20rpx 字） */
+    'badge-solid': 'badge-base px-[16rpx] py-[6rpx] text-[20rpx]',
+    /** 小号角标（18rpx 字，卡片角上的「荐」等） */
+    'badge-solid-sm': 'badge-base px-[12rpx] py-[4rpx] text-[18rpx]',
 
     // ===== 全局统计卡片规范 =====
     'stat-card': 'rounded-xl p-3 text-center',
@@ -916,7 +1013,7 @@ export default defineConfig({
 
     // ===== 分段控制器规范 =====
     'segment-wrap': 'flex flex-row bg-muted rounded-2xl p-[6rpx] gap-[6rpx]',
-    'segment-item': 'flex-1 py-[16rpx] rounded-xl text-center text-base font-medium',
+    'segment-item': 'flex-1 py-[16rpx] rounded-chip text-center text-base font-medium',
     'segment-active': 'bg-white text-primary font-semibold shadow-card',
     'segment-inactive': 'text-muted-foreground',
 
@@ -938,14 +1035,14 @@ export default defineConfig({
     'inst-summary-item': 'flex-1 py-[20rpx] rounded-[20rpx] text-center',
 
     // ===== 教师管理模块规范 =====
-    // 渐变头部内毛玻璃按钮
+    // 渐变头部内毛玻璃按钮（小按钮 → 24rpx）
     'header-glass-btn':
-      'h-[64rpx] px-[24rpx] rounded-[32rpx] bg-white/22 text-white text-[26rpx] font-medium flex items-center justify-center press-scale',
+      'h-[64rpx] px-[24rpx] rounded-card bg-white/22 text-white text-[26rpx] font-medium flex items-center justify-center press-scale',
     // 统计Chip（渐变头部内）
-    'stat-chip': 'flex-1 text-center py-[16rpx] px-[8rpx] bg-white/20 rounded-[20rpx]',
-    // 胶囊Tab
+    'stat-chip': 'flex-1 text-center py-[16rpx] px-[8rpx] bg-white/20 rounded-chip',
+    // 胶囊Tab（分段选项 → 16rpx）
     'capsule-tab':
-      'flex-1 flex items-center justify-center gap-[12rpx] py-[20rpx] rounded-[20rpx] text-[26rpx] font-medium text-white/75 press-scale',
+      'flex-1 flex items-center justify-center gap-[12rpx] py-[20rpx] rounded-chip text-[26rpx] font-medium text-white/75 press-scale',
     'capsule-tab-active': 'text-white font-bold bg-white/25 shadow-float',
     // 子Tab下划线指示器
     'sub-tab-indicator':
@@ -970,13 +1067,13 @@ export default defineConfig({
       'w-[64rpx] h-[64rpx] rounded-full bg-muted flex items-center justify-center transition',
     'flow-dot-done': 'bg-primary',
     'flow-dot-current': 'bg-primary shadow-[0_0_0_8rpx_rgba(59,110,245,0.2)]',
-    // 底部操作按钮
+    // 底部操作按钮（卡片内操作按钮 → 24rpx）
     'action-btn-primary':
-      'flex-1 py-[28rpx] rounded-[28rpx] text-center text-[30rpx] font-semibold bg-class-amber text-white shadow-float press-scale',
+      'flex-1 py-[28rpx] rounded-card text-center text-[30rpx] font-semibold bg-class-amber text-white shadow-float press-scale',
     'action-btn-secondary':
-      'flex-1 py-[28rpx] rounded-[28rpx] text-center text-[30rpx] font-semibold bg-amber-10 text-amber press-scale',
+      'flex-1 py-[28rpx] rounded-card text-center text-[30rpx] font-semibold bg-amber-10 text-amber press-scale',
     'action-btn-danger':
-      'flex-1 py-[28rpx] rounded-[28rpx] text-center text-[30rpx] font-semibold bg-muted text-destructive press-scale',
+      'flex-1 py-[28rpx] rounded-card text-center text-[30rpx] font-semibold bg-muted text-destructive press-scale',
 
     // ===== 全局文字尺寸规范（Tailwind 类名 → rpx 映射） =====
     'text-md': { 'font-size': '28rpx' },

@@ -282,7 +282,7 @@ const StaffInvitePage: React.FC = () => {
               {latest?.roleLabel} · 有效至 {formatExpireAt(latest?.expireAt || '')}
             </Text>
             <View
-              className="h-[80rpx] rounded-full bg-primary flex items-center justify-center press-scale"
+              className="h-[80rpx] rounded-button bg-primary flex items-center justify-center press-scale"
               onClick={() => void handleCopyCode(displayCode)}
             >
               <Text className="text-[28rpx] text-white font-medium">复制邀请码</Text>

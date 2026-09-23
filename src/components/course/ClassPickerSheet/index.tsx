@@ -234,7 +234,7 @@ const ClassPickerSheet: React.FC<ClassPickerSheetProps> = ({
                             {cls.name}
                           </Text>
                           {!scheduled ? (
-                            <View className="shrink-0 rounded-full bg-primary-bg px-[10rpx] py-[2rpx]">
+                            <View className="shrink-0 rounded-[8rpx] bg-primary-bg px-[10rpx] py-[2rpx]">
                               <Text className="text-[20rpx] text-primary">未排课</Text>
                             </View>
                           ) : null}

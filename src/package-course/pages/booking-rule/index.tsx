@@ -82,7 +82,7 @@ const RuleSwitchCell: React.FC<RuleSwitchCellProps> = ({
         <View className="flex items-center gap-[16rpx]">
           {checked && onEdit ? (
             <View
-              className="rounded-full border border-[#f5c6bf] bg-[#fff6f4] px-[18rpx] py-[8rpx]"
+              className="rounded-[8rpx] border border-[#f5c6bf] bg-[#fff6f4] px-[18rpx] py-[8rpx]"
               onClick={onEdit}
             >
               <Text className="text-[22rpx] font-medium text-[#de7567]">{editLabel}</Text>
@@ -269,7 +269,7 @@ const BookingRulePage: React.FC = () => {
             </View>
 
             <View
-              className="mt-[28rpx] flex h-[88rpx] items-center justify-center rounded-[24rpx] bg-[#f97b6d] shadow-[0_12rpx_28rpx_rgba(249,123,109,0.25)]"
+              className="mt-[28rpx] flex h-[88rpx] items-center justify-center rounded-button bg-[#f97b6d] shadow-[0_12rpx_28rpx_rgba(249,123,109,0.25)]"
               onClick={handleSave}
             >
               <Text className="text-[30rpx] font-semibold text-white">保存规则</Text>

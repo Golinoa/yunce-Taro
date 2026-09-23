@@ -299,7 +299,7 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
       <View className="flex flex-col h-full px-[32rpx]">
         {/* 搜索栏 */}
         <View className="shrink-0 flex flex-row items-center gap-[16rpx] pt-[8rpx] pb-[24rpx]">
-          <View className="flex-1 h-[72rpx] px-[24rpx] rounded-full bg-muted flex flex-row items-center gap-[12rpx]">
+          <View className="flex-1 h-[72rpx] px-[24rpx] rounded-button bg-muted flex flex-row items-center gap-[12rpx]">
             <Icon name="mdi-magnify" size={32} color="mutedForeground" />
             <Input
               className="flex-1 text-[28rpx] text-foreground"

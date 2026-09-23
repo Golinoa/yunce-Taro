@@ -53,7 +53,7 @@ function Chip({
 function PreviewPill({ label, locked }: { label: string; locked?: boolean }) {
   return (
     <View
-      className={cn('rounded-full px-[20rpx] py-[8rpx]', locked ? 'bg-muted' : 'bg-warning-bg')}
+      className={cn('rounded-[8rpx] px-[20rpx] py-[8rpx]', locked ? 'bg-muted' : 'bg-warning-bg')}
     >
       <Text className={cn('text-[24rpx]', locked ? 'text-muted-foreground' : 'text-warning')}>
         {label}

@@ -148,7 +148,7 @@ const LeadFormPage: React.FC = () => {
                 <View
                   key={opt.value}
                   className={cn(
-                    'px-[24rpx] py-[8rpx] rounded-full',
+                    'px-[24rpx] py-[8rpx] rounded-[8rpx]',
                     form.child_gender === opt.value ? 'bg-primary' : 'bg-muted',
                   )}
                   onClick={() => updateField('child_gender', opt.value)}

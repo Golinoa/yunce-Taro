@@ -114,7 +114,7 @@ const TodoList: React.FC<TodoListProps> = ({
             style={{ width: `${EMBED.cardInset}rpx`, height: '40rpx' }}
           >
             <View
-              className="absolute top-1/2 z-10 -translate-y-1/2 rounded-full bg-primary px-[12rpx] py-[4rpx]"
+              className="absolute top-1/2 z-10 -translate-y-1/2 rounded-[8rpx] bg-primary px-[12rpx] py-[4rpx]"
               style={{ left: `${EMBED_AXIS_CENTER - 20}rpx` }}
             >
               <Text className="text-[20rpx] font-medium text-white">{nowLabel}</Text>
@@ -127,7 +127,7 @@ const TodoList: React.FC<TodoListProps> = ({
 
     return (
       <View key={key} className="relative -ml-[52rpx] my-[20rpx] flex items-center">
-        <View className="absolute left-[28rpx] z-10 rounded-full bg-primary px-[12rpx] py-[4rpx]">
+        <View className="absolute left-[28rpx] z-10 rounded-[8rpx] bg-primary px-[12rpx] py-[4rpx]">
           <Text className="text-[20rpx] font-medium text-white">{nowLabel}</Text>
         </View>
         <View className="ml-[12rpx] h-[2rpx] flex-1 todo-timeline-now-dash" />

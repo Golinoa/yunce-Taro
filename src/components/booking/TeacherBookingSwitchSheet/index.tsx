@@ -103,7 +103,7 @@ const TeacherBookingSwitchSheet: React.FC<TeacherBookingSwitchSheetProps> = ({
           <Text className="text-[24rpx] text-muted-foreground">
             打开开关的老师会在预约列表中显示并可被预约
           </Text>
-          <View className="ml-[16rpx] flex-shrink-0 rounded-full bg-primary/10 px-[18rpx] py-[8rpx]">
+          <View className="ml-[16rpx] flex-shrink-0 rounded-[8rpx] bg-primary/10 px-[18rpx] py-[8rpx]">
             <Text className="text-[22rpx] font-medium text-primary">
               已开放 {openCount}/{switchTeachers.length}
             </Text>

@@ -534,7 +534,7 @@ function TodoDetailPopover({
                 {isCustom && onDelete ? (
                   <View
                     className={cn(
-                      'center h-[80rpx] flex-1 rounded-[16rpx] border border-destructive/30 bg-destructive-5 press-scale',
+                      'center h-[80rpx] flex-1 rounded-card border border-destructive/30 bg-destructive-5 press-scale',
                       busy && 'opacity-60',
                     )}
                     onClick={busy ? undefined : handleDelete}
@@ -544,7 +544,7 @@ function TodoDetailPopover({
                 ) : null}
                 <View
                   className={cn(
-                    'center h-[80rpx] flex-1 rounded-[16rpx] press-scale',
+                    'center h-[80rpx] flex-1 rounded-card press-scale',
                     busy && !showProcessAction ? 'bg-muted' : 'bg-primary',
                     !canSave && !showProcessAction && 'opacity-60',
                   )}

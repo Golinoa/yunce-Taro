@@ -64,7 +64,7 @@ const AddLedgerCategorySheet: React.FC<AddLedgerCategorySheetProps> = ({
       <View className="flex flex-col">
         <View className="px-[32rpx] pt-[8rpx] pb-[24rpx]">
           <Text className="mb-[12rpx] block text-[26rpx] text-muted-foreground">????</Text>
-          <View className="min-h-[88rpx] rounded-[16rpx] bg-muted px-[20rpx] py-[16rpx]">
+          <View className="min-h-[88rpx] rounded-card bg-muted px-[20rpx] py-[16rpx]">
             <Input
               className="w-full text-[30rpx] text-foreground"
               placeholder="????????????"
@@ -82,13 +82,13 @@ const AddLedgerCategorySheet: React.FC<AddLedgerCategorySheetProps> = ({
         <View className="border-t border-border px-[32rpx] pt-[24rpx] pb-[calc(24rpx+env(safe-area-inset-bottom))]">
           <View className="flex flex-row gap-[20rpx]">
             <View
-              className="flex h-[88rpx] flex-1 items-center justify-center rounded-[20rpx] bg-muted press-scale"
+              className="flex h-[88rpx] flex-1 items-center justify-center rounded-button bg-muted press-scale"
               onClick={onClose}
             >
               <Text className="text-[30rpx] font-medium text-foreground">??</Text>
             </View>
             <View
-              className={`flex h-[88rpx] flex-1 items-center justify-center rounded-[20rpx] press-scale ${
+              className={`flex h-[88rpx] flex-1 items-center justify-center rounded-button press-scale ${
                 submitting ? 'bg-muted' : 'bg-primary'
               }`}
               onClick={submitting ? undefined : () => void handleSubmit()}

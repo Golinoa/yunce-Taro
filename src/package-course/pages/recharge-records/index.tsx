@@ -325,7 +325,7 @@ const RechargeRecordsPage: React.FC = () => {
                     </Text>
                     <View
                       className={cn(
-                        'rounded-full px-[16rpx] py-[6rpx] flex-shrink-0',
+                        'rounded-[8rpx] px-[16rpx] py-[6rpx] flex-shrink-0',
                         record.type === 'refund' ? 'bg-[#e5e7eb]' : 'bg-primary-bg',
                       )}
                     >

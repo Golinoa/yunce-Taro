@@ -56,13 +56,13 @@ const AddTodoCategorySheet: React.FC<AddTodoCategorySheetProps> = ({
         />
         <View className="mt-[32rpx] flex flex-row gap-[20rpx]">
           <View
-            className="flex h-[88rpx] flex-1 items-center justify-center rounded-[20rpx] bg-muted press-scale"
+            className="flex h-[88rpx] flex-1 items-center justify-center rounded-button bg-muted press-scale"
             onClick={onClose}
           >
             <Text className="text-[30rpx] font-medium text-foreground">取消</Text>
           </View>
           <View
-            className="flex h-[88rpx] flex-1 items-center justify-center rounded-[20rpx] bg-primary press-scale"
+            className="flex h-[88rpx] flex-1 items-center justify-center rounded-button bg-primary press-scale"
             onClick={() => void handleSubmit()}
           >
             <Text className="text-[30rpx] font-semibold text-white">

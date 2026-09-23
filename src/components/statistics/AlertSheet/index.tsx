@@ -162,7 +162,7 @@ const AlertSheet: React.FC<AlertSheetProps> = ({ visible, total, alerts, onClose
 
                 {/* 右侧：数量 + 箭头 */}
                 <View className="flex items-center gap-[12rpx] flex-shrink-0">
-                  <View className={`px-[20rpx] py-[8rpx] rounded-full ${config.badgeBg}`}>
+                  <View className={`px-[20rpx] py-[8rpx] rounded-[8rpx] ${config.badgeBg}`}>
                     <Text className={`text-[24rpx] font-bold ${config.badgeText}`}>
                       {alert.count}
                     </Text>

@@ -573,7 +573,7 @@ const VenueBookingPage: React.FC = () => {
           {/* 预约按钮 */}
           <View
             className={cn(
-              'flex h-[96rpx] w-full items-center justify-center rounded-[48rpx]',
+              'flex h-[96rpx] w-full items-center justify-center rounded-button',
               selectedSlot && !submitting
                 ? 'bg-gradient-primary active:opacity-90'
                 : 'bg-btn-disabled',

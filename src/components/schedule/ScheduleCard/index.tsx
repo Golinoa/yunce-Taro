@@ -137,7 +137,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
               <Text className="text-[34rpx] font-bold text-foreground">{item.className}</Text>
               {/* 班课标题区状态标签仅两种：上课中 / 试听 */}
               {isActive ? (
-                <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                <View className="course-tag-active rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                   <Text className="text-[20rpx] font-medium">上课中</Text>
                 </View>
               ) : null}

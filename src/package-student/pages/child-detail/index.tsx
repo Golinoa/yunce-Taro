@@ -349,7 +349,7 @@ const ChildDetail: React.FC = () => {
 
                     {/* 邀请按钮 */}
                     <View
-                      className="h-[88rpx] rounded-[24rpx] bg-white center press-scale"
+                      className="h-[88rpx] rounded-button bg-white center press-scale"
                       onClick={handleShareInvite}
                     >
                       <View className="flex items-center gap-[12rpx]">

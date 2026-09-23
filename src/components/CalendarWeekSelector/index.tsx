@@ -483,7 +483,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
 
         {showTodayButton ? (
           <View
-            className="flex h-[64rpx] items-center justify-center gap-[8rpx] rounded-full border border-primary/12 bg-primary/8 px-[22rpx] shadow-schedule-today"
+            className="flex h-[64rpx] items-center justify-center gap-[8rpx] rounded-button border border-primary/12 bg-primary/8 px-[22rpx] shadow-schedule-today"
             onClick={handleGoToday}
           >
             <Icon name="mdi-calendar-check-outline" size="xs" color="primary" />

@@ -111,7 +111,7 @@ const PermissionSettings: React.FC = () => {
           <View className="flex flex-row items-center">
             <Text className="text-[30rpx] font-medium text-foreground">{ROLE_LABELS[key]}</Text>
             {isAdminRow && (
-              <View className="ml-[12rpx] px-[12rpx] py-[2rpx] rounded-full bg-primary-bg">
+              <View className="ml-[12rpx] px-[12rpx] py-[2rpx] rounded-[8rpx] bg-primary-bg">
                 <Text className="text-[20rpx] text-primary">全量权限</Text>
               </View>
             )}
@@ -185,7 +185,7 @@ const PermissionSettings: React.FC = () => {
                     </Text>
                   </View>
                   <View
-                    className="mr-[24rpx] px-[20rpx] py-[8rpx] rounded-full bg-destructive text-destructive-foreground"
+                    className="mr-[24rpx] px-[20rpx] py-[8rpx] rounded-[8rpx] bg-destructive text-destructive-foreground"
                     onClick={() => handleDelete(role.id, role.name)}
                   >
                     <Text className="text-[22rpx]">删除</Text>

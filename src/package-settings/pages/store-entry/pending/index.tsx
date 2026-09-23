@@ -188,7 +188,7 @@ const StoreEntryPendingPage: React.FC = () => {
             {STORE_ENTRY_PENDING_COPY.loadFailed}
           </Text>
           <View
-            className="h-[80rpx] px-[40rpx] rounded-full bg-primary flex items-center justify-center"
+            className="h-[80rpx] px-[40rpx] rounded-button bg-primary flex items-center justify-center"
             onClick={() => void loadLatest()}
           >
             <Text className="text-[28rpx] text-white font-semibold">重试</Text>
@@ -208,7 +208,7 @@ const StoreEntryPendingPage: React.FC = () => {
             当前账号没有待审核的门店入驻记录，可直接返回首页继续使用。
           </Text>
           <View
-            className="h-[80rpx] px-[48rpx] rounded-full bg-primary flex items-center justify-center"
+            className="h-[80rpx] px-[48rpx] rounded-button bg-primary flex items-center justify-center"
             onClick={handleGoHome}
           >
             <Text className="text-[28rpx] text-white font-semibold">返回首页</Text>

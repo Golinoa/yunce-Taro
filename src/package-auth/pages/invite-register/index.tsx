@@ -199,7 +199,7 @@ const InviteRegisterPage: React.FC = () => {
             邀请人：{context.teacherName}
           </Text>
           <View
-            className="h-[96rpx] w-full rounded-full bg-primary flex items-center justify-center active:opacity-90"
+            className="h-[96rpx] w-full rounded-button bg-primary flex items-center justify-center active:opacity-90"
             onClick={goHome}
           >
             <Text className="text-[34rpx] font-semibold text-white">进入首页</Text>
@@ -249,7 +249,7 @@ const InviteRegisterPage: React.FC = () => {
         {isLoggedIn ? (
           <View
             className={cn(
-              'h-[96rpx] rounded-full flex items-center justify-center mb-[28rpx]',
+              'h-[96rpx] rounded-button flex items-center justify-center mb-[28rpx]',
               'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
             )}
             onClick={goHome}
@@ -259,7 +259,7 @@ const InviteRegisterPage: React.FC = () => {
         ) : (
           <View
             className={cn(
-              'h-[96rpx] rounded-full flex items-center justify-center mb-[28rpx]',
+              'h-[96rpx] rounded-button flex items-center justify-center mb-[28rpx]',
               'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
               submitting && 'opacity-50',
             )}

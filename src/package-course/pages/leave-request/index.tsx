@@ -467,7 +467,7 @@ const LeaveRequestPage: React.FC = () => {
                     {detailLeave.student?.name || '学生'}
                   </Text>
                 </View>
-                <View className={`py-[6rpx] px-[16rpx] rounded-full ${typeInfo.cls}`}>
+                <View className={`py-[6rpx] px-[16rpx] rounded-[8rpx] ${typeInfo.cls}`}>
                   <Text className="text-[22rpx] font-medium">{typeInfo.label}</Text>
                 </View>
               </View>
@@ -489,7 +489,7 @@ const LeaveRequestPage: React.FC = () => {
                 </Text>
               </FormRow>
               <FormRow label="状态" border={false}>
-                <View className={`py-[6rpx] px-[16rpx] rounded-full ${statusInfo.cls}`}>
+                <View className={`py-[6rpx] px-[16rpx] rounded-[8rpx] ${statusInfo.cls}`}>
                   <Text className="text-[22rpx] font-medium">{statusInfo.label}</Text>
                 </View>
               </FormRow>
@@ -545,7 +545,7 @@ const LeaveRequestPage: React.FC = () => {
                       <Text className="text-[30rpx] font-semibold text-foreground">
                         {leave.student?.name || '学生'}
                       </Text>
-                      <View className={`py-[6rpx] px-[16rpx] rounded-full ${typeInfo.cls}`}>
+                      <View className={`py-[6rpx] px-[16rpx] rounded-[8rpx] ${typeInfo.cls}`}>
                         <Text className="text-[22rpx] font-medium">{typeInfo.label}</Text>
                       </View>
                     </View>
@@ -556,7 +556,7 @@ const LeaveRequestPage: React.FC = () => {
                       {formatDateRange(leave.original_date, leave.end_date)}
                     </Text>
                     <View className="flex items-center justify-between">
-                      <View className={`py-[6rpx] px-[16rpx] rounded-full ${statusInfo.cls}`}>
+                      <View className={`py-[6rpx] px-[16rpx] rounded-[8rpx] ${statusInfo.cls}`}>
                         <Text className="text-[22rpx] font-medium">{statusInfo.label}</Text>
                       </View>
                       {leave.status === 'pending' ? (

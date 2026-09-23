@@ -87,7 +87,7 @@ const ScheduleBatchSheets: React.FC<ScheduleBatchSheetsProps> = ({
                 <View className="min-w-0 flex-1">
                   <View className="flex items-center gap-[10rpx]">
                     <Text className="text-[30rpx] font-semibold text-foreground">批量调课</Text>
-                    <View className="rounded-full bg-card/80 px-[12rpx] py-[6rpx]">
+                    <View className="rounded-[8rpx] bg-card/80 px-[12rpx] py-[6rpx]">
                       <Text className="text-[20rpx] font-medium text-primary">只调当天</Text>
                     </View>
                   </View>
@@ -111,7 +111,7 @@ const ScheduleBatchSheets: React.FC<ScheduleBatchSheetsProps> = ({
                 <View className="min-w-0 flex-1">
                   <View className="flex items-center gap-[10rpx]">
                     <Text className="text-[30rpx] font-semibold text-destructive">批量删除</Text>
-                    <View className="rounded-full bg-card/85 px-[12rpx] py-[6rpx]">
+                    <View className="rounded-[8rpx] bg-card/85 px-[12rpx] py-[6rpx]">
                       <Text className="text-[20rpx] font-medium text-destructive">谨慎操作</Text>
                     </View>
                   </View>

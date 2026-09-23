@@ -103,20 +103,27 @@ export function getStudentCardStatus(
 }
 
 /**
- * 细左边框：
+ * 细**整圈**边框（0.5px 视觉宽度）：
  * - 红：无可用课包
  * - 黄：即将到期 / 课时不足（含有可用包时的透支提醒）
  * - 正常：无边框
+ *
+ * 宽度说明：项目统一用 rpx（750rpx = 屏幕宽 = 375px），故 **0.5px ≈ 1rpx**。
+ *
+ * ⚠️ 必须用 uno.config.ts 里的一体化类 `border-status-*`（内部是 `border: 1rpx solid …`，
+ * 一次性给全四边的 width/style/color）。任何"只写宽度 + 单独挂 border-solid"的拆写法
+ * 都有 CSS 缺陷：`border-solid` 只设置 border-style，而 `border-width` 的 CSS 初始值是
+ * `medium`(=3px)，会让**未显式指定宽度的边回退成 3px 粗线**（2026-09-23 FE-17 实测）。
  */
 export function getCardBorderColorClass(status: StudentCardStatus): string {
   switch (status) {
     case 'expired':
     case 'owe':
       // owe 仅在无可用包时才会走到红（有可用包时 getStudentCardStatus 已映射为 low）
-      return 'border-l-[3rpx] border-solid border-destructive';
+      return 'border-status-danger';
     case 'low':
     case 'expiring':
-      return 'border-l-[3rpx] border-solid border-amber';
+      return 'border-status-warn';
     default:
       return '';
   }

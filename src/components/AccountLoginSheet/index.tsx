@@ -110,7 +110,7 @@ const AccountLoginSheet: React.FC<AccountLoginSheetProps> = ({
         {/* 登录按钮 */}
         <View
           className={cn(
-            'h-[96rpx] rounded-full flex items-center justify-center',
+            'h-[96rpx] rounded-button flex items-center justify-center',
             'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
             (submitting || !canSubmit) && 'opacity-50',
           )}

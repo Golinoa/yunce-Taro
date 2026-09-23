@@ -153,7 +153,7 @@ const AlertDetail: React.FC = () => {
                 <Text className="text-[24rpx] text-muted-foreground flex-shrink-0">已读</Text>
               ) : (
                 <View
-                  className={`px-[20rpx] py-[8rpx] rounded-full ${style.bg} flex-shrink-0`}
+                  className={`px-[20rpx] py-[8rpx] rounded-[8rpx] ${style.bg} flex-shrink-0`}
                   onClick={(e) => {
                     e.stopPropagation?.();
                     handleMarkRead(detail.id);

@@ -18,7 +18,6 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import { SYSTEM_SETTING_ITEMS } from '@/constants/system-settings-items';
-import { calendarSyncService } from '@/services/calendar-sync';
 import { campusService } from '@/services/campus';
 import { clearVisitedMap } from '@/services/onboarding';
 import { organizationService } from '@/services/organization';
@@ -26,11 +25,6 @@ import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import { getAlertThreshold, syncAlertThresholdFromCampus } from '@/utils/alert-config';
 import { isAdmin, isParentRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
-import {
-  canUseCalendarSync,
-  getCalendarSyncSettings,
-  isCalendarSyncEnabled,
-} from '@/utils/calendar-sync-settings';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { getDisplayAppVersion } from '@/utils/mini-program-env';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
@@ -51,11 +45,8 @@ const SystemSettings: React.FC = () => {
   const { signOut, currentRole, profile } = useAuth();
   const { activeTheme } = useThemeStore();
   const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
-  const [calendarSyncEnabled, setCalendarSyncEnabledState] = useState(false);
   const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
   const currentUserId = profile?.id || '';
-  const isParent = isParentRole(currentRole);
-  const showCalendarSyncSwitch = !isParent && canUseCalendarSync(currentRole);
   const isManagerRole = isAdmin(currentRole) || currentRole === 'principal';
   /** 请假自动审批开关（仅校长/管理员可见，null=未加载） */
   const [leaveAutoApprove, setLeaveAutoApprove] = useState<boolean | null>(null);
@@ -67,9 +58,6 @@ const SystemSettings: React.FC = () => {
   // 页面显示时读取最新开关状态
   useDidShow(() => {
     setVenueBookingEnabledState(getVenueBookingEnabled());
-    if (currentUserId) {
-      setCalendarSyncEnabledState(isCalendarSyncEnabled(currentUserId));
-    }
     const campusId = profile?.currentContext?.campusId;
     // 设置页 TTL 守卫：本页展示的 3 项远端值（场地预约开关 / 校区预警阈值 / 请假自动审批）
     // 都可在页内或同级设置页改动，窗口内切回跳过重复拉取；页内改动走各自的就地更新。
@@ -152,33 +140,7 @@ const SystemSettings: React.FC = () => {
     }
   }, []);
 
-  const handleCalendarSyncChange = useCallback(
-    async (enabled: boolean) => {
-      if (!currentUserId) {
-        return;
-      }
-      if (!enabled) {
-        setCalendarSyncEnabledState(false);
-        calendarSyncService.disable(currentUserId);
-        return;
-      }
-
-      setCalendarSyncEnabledState(true);
-      try {
-        await calendarSyncService.enableAndSync({
-          userId: currentUserId,
-          teacherId: currentUserId,
-          role: currentRole ?? undefined,
-          campusId: profile?.currentContext?.campusId,
-          directAuth: true,
-        });
-      } catch (err) {
-        setCalendarSyncEnabledState(getCalendarSyncSettings(currentUserId).enabled);
-        Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
-      }
-    },
-    [currentRole, currentUserId, profile?.currentContext?.campusId],
-  );
+  // 同步日历经办开关已移除（2026-09-23：功能暂时下线，入口只保留「我的 → 消息通知」一处）
 
   /** 预警阈值：合并到续费提醒页的提醒设置 */
   const handleAlertThresholdChange = useCallback(() => {
@@ -282,17 +244,7 @@ const SystemSettings: React.FC = () => {
             </View>
           )}
 
-          {showCalendarSyncSwitch && (
-            <View className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] border-t border-border">
-              <View className="flex flex-col gap-[8rpx] flex-1 pr-[24rpx]">
-                <Text className="text-[30rpx] text-foreground">同步手机日历</Text>
-                <Text className="text-[24rpx] text-muted-foreground leading-snug">
-                  开启后自动同步未来一周课表到系统日历
-                </Text>
-              </View>
-              <Switch checked={calendarSyncEnabled} onChange={handleCalendarSyncChange} />
-            </View>
-          )}
+          {/* 「同步手机日历」开关已移除（2026-09-23 功能暂时下线，入口只保留「我的 → 消息通知」一处） */}
 
           {/* 运营预警阈值配置（管理员/校长） */}
           {(isAdmin(currentRole) || currentRole === 'principal') && (

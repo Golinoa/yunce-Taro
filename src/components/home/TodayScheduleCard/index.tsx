@@ -343,27 +343,27 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
                         {displayName}
                       </Text>
                       {isUnattended && (
-                        <View className="course-tag-unattended rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-unattended rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">未点名</Text>
                         </View>
                       )}
                       {isActive && (
-                        <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-active rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">上课中</Text>
                         </View>
                       )}
                       {isDone && (
-                        <View className="course-tag-done rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-done rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已完成</Text>
                         </View>
                       )}
                       {isEnded && (
-                        <View className="course-tag-ended rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-ended rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">已下课</Text>
                         </View>
                       )}
                       {!isDone && !isEnded && !isUnattended && !isActive && categoryLabel && (
-                        <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                        <View className="course-tag-booking rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                           <Text className="text-[20rpx] font-medium">{categoryLabel}</Text>
                         </View>
                       )}
@@ -373,12 +373,12 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
                         !isActive &&
                         !categoryLabel &&
                         item.tag && (
-                          <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                          <View className="course-tag-booking rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                             <Text className="text-[20rpx] font-medium">{item.tag}</Text>
                           </View>
                         )}
                       {isEnded && categoryLabel && (
-                        <View className="course-tag-booking rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
+                        <View className="course-tag-booking rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx] opacity-70">
                           <Text className="text-[20rpx] font-medium">{categoryLabel}</Text>
                         </View>
                       )}

@@ -48,7 +48,7 @@ const SubscribeRenewSheet: React.FC<SubscribeRenewSheetProps> = ({
         <Text className="block text-[28rpx] leading-[44rpx] text-foreground-secondary">{body}</Text>
         <View className="mt-[32rpx] flex gap-[16rpx]">
           <View
-            className={`flex-1 h-[88rpx] rounded-[16rpx] bg-muted flex items-center justify-center ${busy ? 'opacity-60' : 'active:opacity-80'}`}
+            className={`flex-1 h-[88rpx] rounded-button bg-muted flex items-center justify-center ${busy ? 'opacity-60' : 'active:opacity-80'}`}
             onClick={busy ? undefined : onSecondary}
           >
             <Text className="text-[28rpx] font-medium text-foreground-secondary">
@@ -56,7 +56,7 @@ const SubscribeRenewSheet: React.FC<SubscribeRenewSheetProps> = ({
             </Text>
           </View>
           <View
-            className={`flex-1 h-[88rpx] rounded-[16rpx] bg-primary flex items-center justify-center ${busy ? 'opacity-60' : 'active:opacity-90'}`}
+            className={`flex-1 h-[88rpx] rounded-button bg-primary flex items-center justify-center ${busy ? 'opacity-60' : 'active:opacity-90'}`}
             onClick={busy ? undefined : handlePrimary}
           >
             <Text className="text-[28rpx] font-semibold text-white">

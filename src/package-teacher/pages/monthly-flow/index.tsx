@@ -227,7 +227,7 @@ const MonthlyFlowPage: React.FC = () => {
                     <View className="flex flex-row items-center gap-[12rpx]">
                       <View
                         className={cn(
-                          'px-[14rpx] py-[4rpx] rounded-full',
+                          'px-[14rpx] py-[4rpx] rounded-[8rpx]',
                           bundle.summary.salaryStatus === 'paid' ? 'bg-success-15' : 'bg-muted',
                         )}
                       >
@@ -285,7 +285,7 @@ const MonthlyFlowPage: React.FC = () => {
                             <Text className="text-[28rpx] font-semibold text-foreground">
                               {item.title}
                             </Text>
-                            <View className="px-[10rpx] py-[2rpx] rounded-full bg-primary/10">
+                            <View className="px-[10rpx] py-[2rpx] rounded-[8rpx] bg-primary/10">
                               <Text className="text-[20rpx] text-primary">
                                 {SALARY_TYPE_LABEL[item.type]}
                               </Text>

@@ -44,7 +44,7 @@ const AgreementSheet: React.FC<AgreementSheetProps> = ({
 
         <View
           className={cn(
-            'h-[96rpx] rounded-full flex items-center justify-center mb-[24rpx]',
+            'h-[96rpx] rounded-button flex items-center justify-center mb-[24rpx]',
             'bg-primary active:opacity-90 transition-opacity shadow-login-btn',
           )}
           onClick={onConfirm}
@@ -53,7 +53,7 @@ const AgreementSheet: React.FC<AgreementSheetProps> = ({
         </View>
 
         <View
-          className="h-[96rpx] rounded-full flex items-center justify-center border-[2rpx] border-solid border-border bg-background active:opacity-80 transition-opacity"
+          className="h-[96rpx] rounded-button flex items-center justify-center border-[2rpx] border-solid border-border bg-background active:opacity-80 transition-opacity"
           onClick={onClose}
         >
           <Text className="text-[34rpx] font-semibold text-foreground">不同意</Text>

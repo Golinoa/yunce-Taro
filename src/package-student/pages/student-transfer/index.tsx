@@ -278,7 +278,7 @@ const StudentTransferPage: React.FC = () => {
                 </Text>
               </View>
               {currentClass ? (
-                <View className="rounded-full bg-[#edfdf3] px-[16rpx] py-[8rpx]">
+                <View className="rounded-[8rpx] bg-[#edfdf3] px-[16rpx] py-[8rpx]">
                   <Text className="text-[22rpx] font-medium text-[#16a34a]">
                     {currentClass.student_count}人
                   </Text>
@@ -360,7 +360,7 @@ const StudentTransferPage: React.FC = () => {
                           </Text>
                         </View>
                         <View className="flex items-center gap-[12rpx]">
-                          <View className="rounded-full bg-white px-[14rpx] py-[8rpx]">
+                          <View className="rounded-[8rpx] bg-white px-[14rpx] py-[8rpx]">
                             <Text className="text-[22rpx] text-muted-foreground">
                               {item.student_count}人
                             </Text>
@@ -385,7 +385,7 @@ const StudentTransferPage: React.FC = () => {
 
       <View className="fixed bottom-0 left-0 right-0 bg-white px-[24rpx] pt-[20rpx] pb-safe-bar shadow-soft">
         <View
-          className={`flex h-[96rpx] items-center justify-center rounded-[48rpx] ${
+          className={`flex h-[96rpx] items-center justify-center rounded-button ${
             canSubmit
               ? 'bg-[linear-gradient(135deg,#17b26a_0%,#36c28d_100%)] press-scale'
               : 'bg-[#d1fadf]'

@@ -138,7 +138,7 @@ const CopyToTeachersSheet: React.FC<CopyToTeachersSheetProps> = ({
         ) : null}
 
         <View className="shrink-0 flex flex-row items-center gap-[16rpx] pb-[16rpx]">
-          <View className="flex h-[72rpx] flex-1 flex-row items-center gap-[12rpx] rounded-full bg-muted px-[24rpx]">
+          <View className="flex h-[72rpx] flex-1 flex-row items-center gap-[12rpx] rounded-button bg-muted px-[24rpx]">
             <Icon name="mdi-magnify" size={32} color="mutedForeground" />
             <Input
               className="flex-1 text-[28rpx] text-foreground bg-transparent"

@@ -154,7 +154,7 @@ const WechatBindDialog: React.FC<WechatBindDialogProps> = ({
         <View className="px-[40rpx] pb-[40rpx] pt-[8rpx]">
           <View
             className={cn(
-              'h-[88rpx] rounded-full flex items-center justify-center',
+              'h-[88rpx] rounded-button flex items-center justify-center',
               'bg-primary active:opacity-90',
               submitting && 'opacity-50',
             )}
@@ -166,7 +166,7 @@ const WechatBindDialog: React.FC<WechatBindDialogProps> = ({
           </View>
           <View
             className={cn(
-              'h-[72rpx] mt-[12rpx] rounded-full flex items-center justify-center active:opacity-70',
+              'h-[72rpx] mt-[12rpx] rounded-button flex items-center justify-center active:opacity-70',
               submitting && 'opacity-40 pointer-events-none',
             )}
             onClick={() => {

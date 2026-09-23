@@ -145,7 +145,6 @@ const MembershipPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'manage' | 'purchase'>('purchase');
   const [pendingOrder, setPendingOrder] = useState<PaymentOrderStatusResult | null>(null);
   const [pendingCd, setPendingCd] = useState<string | null>(null);
-  const autoOpenedRedeem = useRef(false);
   const viewSeeded = useRef(false);
   const hasQuotaRef = useRef(Boolean(cachedQuota));
 
@@ -599,15 +598,6 @@ const MembershipPage: React.FC = () => {
     term,
   ]);
 
-  useEffect(() => {
-    if (autoOpenedRedeem.current || loading) return;
-    const action = String(router.params?.action || '');
-    if (action === 'redeem') {
-      autoOpenedRedeem.current = true;
-      setShowRedeem(true);
-    }
-  }, [loading, router.params?.action]);
-
   const handleSubmitRedeem = useCallback(async () => {
     const code = redeemCode.trim().toUpperCase();
     if (!code) {
@@ -665,8 +655,8 @@ const MembershipPage: React.FC = () => {
   return (
     <PageContainer>
       <View className="min-h-screen bg-background pb-[calc(140rpx+env(safe-area-inset-bottom))]">
-        {/* 原生导航栏下方：卡外右上角「订单详情」 */}
-        <View className="mx-[32rpx] mt-[8rpx] mb-[4rpx] flex flex-row items-center justify-end">
+        {/* 原生导航栏下方：卡外左上角「订单详情」 */}
+        <View className="mx-[32rpx] mt-[8rpx] mb-[4rpx] flex flex-row items-center justify-start">
           <Text className="text-[24rpx] font-semibold text-primary" onClick={goOrders}>
             订单详情
           </Text>
@@ -820,10 +810,10 @@ const MembershipPage: React.FC = () => {
                     >
                       {p.recommended ? (
                         <View
-                          className="absolute -top-[14rpx] right-[8rpx] px-[12rpx] py-[4rpx] rounded-full z-10"
+                          className="absolute -top-[14rpx] right-[8rpx] z-10 badge-solid-sm"
                           style={{ backgroundColor: MEMBERSHIP_MARKETING_RED }}
                         >
-                          <Text className="text-[18rpx] text-white font-bold">荐</Text>
+                          <Text className="text-[18rpx] text-white font-bold leading-none">荐</Text>
                         </View>
                       ) : null}
                       <Text className="text-[24rpx] font-extrabold text-foreground block">
@@ -873,12 +863,12 @@ const MembershipPage: React.FC = () => {
                           </View>
                           {t.badge ? (
                             <View
-                              className="shrink-0 px-[16rpx] py-[6rpx] rounded-full"
+                              className="badge-solid"
                               style={{
                                 backgroundColor: t.bestSave ? '#16a34a' : MEMBERSHIP_MARKETING_RED,
                               }}
                             >
-                              <Text className="text-[20rpx] text-white font-extrabold">
+                              <Text className="text-[20rpx] text-white font-extrabold leading-none">
                                 {t.badge}
                               </Text>
                             </View>
@@ -942,44 +932,6 @@ const MembershipPage: React.FC = () => {
               </View>
             ) : null}
 
-            {shelfPlan.free ? (
-              <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-primary/12 bg-primary/8 px-[28rpx] py-[28rpx]">
-                <Text className="text-[44rpx] font-black text-foreground">¥0</Text>
-                <Text className="text-[24rpx] text-muted-foreground mt-[12rpx] block">
-                  申请开通
-                </Text>
-              </View>
-            ) : (
-              <View className="mx-[24rpx] mb-[24rpx] rounded-[28rpx] border border-primary/14 bg-primary/7 px-[28rpx] py-[28rpx]">
-                <View className="flex flex-row items-end justify-between">
-                  <View className="flex flex-row items-baseline">
-                    <Text className="text-[30rpx] font-bold text-foreground mr-[4rpx]">¥</Text>
-                    <Text className="text-[60rpx] font-black leading-none text-foreground">
-                      {moneyYuan(shelfCalc.pay)}
-                    </Text>
-                  </View>
-                  <View className="items-end">
-                    <Text className="text-[24rpx] text-muted-foreground block">
-                      原价 ¥{moneyYuan(shelfCalc.list)}
-                    </Text>
-                    {shelfCalc.save > 0 ? (
-                      <Text
-                        className="text-[24rpx] font-extrabold mt-[4rpx] block"
-                        style={{ color: MEMBERSHIP_MARKETING_RED }}
-                      >
-                        本次立省 ¥{moneyYuan(shelfCalc.save)}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-                <Text className="text-[24rpx] text-muted-foreground mt-[16rpx] block">
-                  {term === '1d'
-                    ? `${shelfPlan.name} · 1 天`
-                    : `${shelfPlan.name} · ${term} 年 · 一天约 ¥${shelfCalc.daily}`}
-                </Text>
-              </View>
-            )}
-
             <View className="mx-[24rpx] mb-[28rpx] rounded-[28rpx] bg-bg-card px-[28rpx] py-[8rpx]">
               {featureRows.map(([k, v]) => (
                 <View
@@ -1017,13 +969,13 @@ const MembershipPage: React.FC = () => {
           {viewMode === 'manage' ? (
             <>
               <View
-                className="flex-1 h-[96rpx] rounded-[28rpx] bg-primary flex items-center justify-center shadow-soft active:opacity-90"
+                className="flex-1 h-[96rpx] rounded-button bg-primary flex items-center justify-center shadow-soft active:opacity-90"
                 onClick={() => setViewMode('purchase')}
               >
                 <Text className="text-[28rpx] font-extrabold text-white">{primaryActionLabel}</Text>
               </View>
               <View
-                className="flex-1 h-[96rpx] rounded-[28rpx] bg-card border-[3rpx] border-primary/30 flex items-center justify-center active:opacity-90"
+                className="flex-1 h-[96rpx] rounded-button bg-card border-[3rpx] border-primary/30 flex items-center justify-center active:opacity-90"
                 onClick={handleOpenRedeem}
               >
                 <Text className="text-[28rpx] font-extrabold text-primary">激活码</Text>
@@ -1033,7 +985,7 @@ const MembershipPage: React.FC = () => {
             <>
               <View
                 className={cn(
-                  'flex-[1.4] h-[96rpx] rounded-[28rpx] bg-primary flex flex-col items-center justify-center shadow-soft active:opacity-90',
+                  'flex-[1.4] h-[96rpx] rounded-button bg-primary flex flex-col items-center justify-center shadow-soft active:opacity-90',
                   purchasing && 'opacity-60',
                 )}
                 onClick={() => {
@@ -1062,7 +1014,7 @@ const MembershipPage: React.FC = () => {
                 </Text>
               </View>
               <View
-                className="flex-1 h-[96rpx] rounded-[28rpx] bg-card border-[3rpx] border-primary/30 flex items-center justify-center active:opacity-90"
+                className="flex-1 h-[96rpx] rounded-button bg-card border-[3rpx] border-primary/30 flex items-center justify-center active:opacity-90"
                 onClick={handleOpenRedeem}
               >
                 <Text className="text-[28rpx] font-extrabold text-primary">激活码</Text>
@@ -1098,7 +1050,7 @@ const MembershipPage: React.FC = () => {
         />
         <View className="flex flex-row gap-[16rpx]">
           <View
-            className="flex-1 h-[88rpx] rounded-[28rpx] flex items-center justify-center bg-muted/40 active:opacity-90"
+            className="flex-1 h-[88rpx] rounded-button flex items-center justify-center bg-muted/40 active:opacity-90"
             onClick={() => {
               if (!redeeming) setShowRedeem(false);
             }}
@@ -1107,7 +1059,7 @@ const MembershipPage: React.FC = () => {
           </View>
           <View
             className={cn(
-              'flex-1 h-[88rpx] rounded-[28rpx] flex items-center justify-center bg-primary active:opacity-90',
+              'flex-1 h-[88rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90',
               redeeming && 'opacity-60',
             )}
             onClick={() => {

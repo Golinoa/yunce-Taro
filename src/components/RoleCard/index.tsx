@@ -136,7 +136,7 @@ const RoleCard: React.FC<RoleCardProps> = ({
       {mode === 'default' && active && (
         <View
           className={cn(
-            'px-[16rpx] py-[6rpx] rounded-full text-[22rpx] font-medium ml-[16rpx]',
+            'px-[16rpx] py-[6rpx] rounded-[8rpx] text-[22rpx] font-medium ml-[16rpx]',
             meta.bgClass,
             meta.colorClass,
           )}

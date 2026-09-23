@@ -5,6 +5,7 @@ import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { hasShownCampusGuide } from '@/components/home/HomeCampusGuideDialog';
 import KingKongSection from '@/components/home/KingKongSection';
+import { reportLocalDebug } from '@/utils/local-debug';
 import ParentHoursSection from '@/components/home/ParentHoursSection';
 import ParentScheduleSection from '@/components/home/ParentScheduleSection';
 import type { TodoViewMode } from '@/components/home/TodoToolbar';
@@ -534,6 +535,21 @@ const Home: React.FC = () => {
   useEffect(() => {
     setQuickEntries(homeService.getQuickEntries(currentRole));
   }, [currentRole]);
+
+  // 金刚区是否渲染取决于 isStaffRole/isParentRole；角色为空时两个分支都不渲染，
+  // 「学员管理」入口不会出现在页面上（表现为点了没反应）。
+  useEffect(() => {
+    reportLocalDebug({
+      hypothesisId: 'H6',
+      location: 'src/pages/home/index.tsx:entry-gate',
+      msg: `[DEBUG] home role=${currentRole ?? 'null'} quickEntries=${quickEntries.length} isStaff=${isStaffRole(currentRole)} isParent=${isParentRole(currentRole)}`,
+      data: {
+        currentRole: currentRole ?? null,
+        quickEntries: quickEntries.length,
+        hasProfile: Boolean(profile),
+      },
+    });
+  }, [currentRole, quickEntries.length, profile]);
 
   useEffect(() => {
     loadCategories();

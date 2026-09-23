@@ -76,7 +76,7 @@ const ParentScheduleSection: React.FC<ParentScheduleSectionProps> = ({
                       {title}
                     </Text>
                     {tag ? (
-                      <View className="shrink-0 rounded-full bg-primary/10 px-[10rpx] py-[2rpx]">
+                      <View className="shrink-0 rounded-[8rpx] bg-primary/10 px-[10rpx] py-[2rpx]">
                         <Text className="text-[18rpx] text-primary">{tag}</Text>
                       </View>
                     ) : null}

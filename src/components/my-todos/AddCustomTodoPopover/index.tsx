@@ -311,14 +311,14 @@ const AddCustomTodoPopover: React.FC<AddCustomTodoPopoverProps> = ({
 
               <View className="mt-[28rpx] flex flex-row gap-[20rpx]">
                 <View
-                  className="flex-1 h-[80rpx] rounded-[16rpx] bg-muted center press-scale"
+                  className="flex-1 h-[80rpx] rounded-card bg-muted center press-scale"
                   onClick={onClose}
                 >
                   <Text className="text-[28rpx] font-medium text-foreground">取消</Text>
                 </View>
                 <View
                   className={cn(
-                    'flex-1 h-[80rpx] rounded-[16rpx] center press-scale',
+                    'flex-1 h-[80rpx] rounded-card center press-scale',
                     submitting ? 'bg-muted' : 'bg-primary',
                   )}
                   onClick={submitting ? undefined : handleSubmit}

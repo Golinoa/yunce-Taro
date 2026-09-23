@@ -94,7 +94,7 @@ const StoreReferralLanding: React.FC = () => {
           {error || '链接无效'}
         </Text>
         <View
-          className="mt-[48rpx] px-[48rpx] h-[88rpx] rounded-full bg-primary center press-scale"
+          className="mt-[48rpx] px-[48rpx] h-[88rpx] rounded-button bg-primary center press-scale"
           onClick={() => Taro.navigateTo({ url: '/package-settings/pages/about/index' })}
         >
           <Text className="text-[28rpx] font-bold text-white">了解 {BRAND_NAME_ZH}</Text>
@@ -124,7 +124,7 @@ const StoreReferralLanding: React.FC = () => {
 
       <View className="fixed bottom-0 left-0 right-0 px-[32rpx] pb-[calc(24rpx+env(safe-area-inset-bottom))] pt-[16rpx] bg-background/95 border-t border-border">
         <View
-          className="h-[96rpx] rounded-[28rpx] bg-primary center press-scale shadow-lg"
+          className="h-[96rpx] rounded-button bg-primary center press-scale shadow-lg"
           onClick={handleApply}
         >
           <Text className="text-[30rpx] font-bold text-white">申请门店入驻</Text>

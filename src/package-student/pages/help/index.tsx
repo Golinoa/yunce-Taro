@@ -111,14 +111,14 @@ const Help: React.FC = () => {
       <View className="px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[20rpx]">
         <View className="flex gap-[24rpx]">
           <View
-            className="flex-1 h-[88rpx] rounded-[24rpx] border border-primary/30 bg-white center flex items-center justify-center gap-[10rpx] press-scale"
+            className="flex-1 h-[88rpx] rounded-button border border-primary/30 bg-white center flex items-center justify-center gap-[10rpx] press-scale"
             onClick={() => setQrVisible(true)}
           >
             <Icon name="mdi-headset" size={28} color="primary" />
             <Text className="text-[28rpx] font-medium text-primary">联系客服</Text>
           </View>
           <View
-            className="flex-1 h-[88rpx] rounded-[24rpx] bg-primary center flex items-center justify-center gap-[10rpx] press-scale"
+            className="flex-1 h-[88rpx] rounded-button bg-primary center flex items-center justify-center gap-[10rpx] press-scale"
             onClick={handleFeedback}
           >
             <Icon name="mdi-message-plus-outline" size={28} color="#ffffff" />

@@ -269,7 +269,7 @@ const TodoCollaboratorPage: React.FC = () => {
       {mode === 'add' ? (
         <>
           <View className="shrink-0 px-[32rpx] pb-[16rpx] pt-[16rpx]">
-            <View className="flex h-[72rpx] flex-row items-center gap-[12rpx] rounded-[16rpx] bg-muted px-[24rpx]">
+            <View className="flex h-[72rpx] flex-row items-center gap-[12rpx] rounded-card bg-muted px-[24rpx]">
               <Icon name="mdi-magnify" size={32} color="mutedForeground" />
               <Input
                 className="flex-1 bg-transparent text-[28rpx] text-foreground"
@@ -284,7 +284,7 @@ const TodoCollaboratorPage: React.FC = () => {
 
           <View
             className={cn(
-              'mx-[32rpx] mb-[16rpx] flex h-[88rpx] shrink-0 flex-row items-center rounded-[16rpx] border border-border bg-card px-[16rpx] press-bg',
+              'mx-[32rpx] mb-[16rpx] flex h-[88rpx] shrink-0 flex-row items-center rounded-button border border-border bg-card px-[16rpx] press-bg',
               selectedIds.length === 0 && 'opacity-70',
             )}
             onClick={handleOpenViewMode}

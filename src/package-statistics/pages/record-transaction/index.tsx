@@ -238,7 +238,7 @@ const RecordTransaction: React.FC = () => {
               </View>
               {showAmortization && (
                 <View className="mt-[20rpx] flex items-center gap-[16rpx]">
-                  <View className="flex-1 h-[80rpx] rounded-[16rpx] bg-muted px-[20rpx] flex items-center">
+                  <View className="flex-1 h-[80rpx] rounded-card bg-muted px-[20rpx] flex items-center">
                     <Text className="text-[28rpx] text-foreground">
                       {amortizationPeriod || '请输入摊销月数'}
                     </Text>
@@ -255,7 +255,7 @@ const RecordTransaction: React.FC = () => {
               <Icon name="mdi-file-document-outline" size={28} color="primary" />
               <Text className="text-[28rpx] text-foreground font-medium">备注</Text>
             </View>
-            <View className="min-h-[80rpx] bg-muted rounded-[16rpx] px-[20rpx] py-[16rpx]">
+            <View className="min-h-[80rpx] bg-muted rounded-card px-[20rpx] py-[16rpx]">
               <Text
                 className={`text-[28rpx] ${note ? 'text-foreground' : 'text-muted-foreground'}`}
               >

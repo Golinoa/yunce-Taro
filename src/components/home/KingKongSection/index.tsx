@@ -168,6 +168,15 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({
   variant = 'staff',
   onAnchor,
 }) => {
+  // 入口是否渲染 = 能否被点到。entries 为空或 variant 非 staff 时，
+  // 「学员管理」瓷片不会出现在页面上，点击自然永远不会触发。
+  reportLocalDebug({
+    hypothesisId: 'H6',
+    location: 'src/components/home/KingKongSection/index.tsx:render',
+    msg: `[DEBUG] kk render entries=${entries?.length ?? 0} variant=${variant} showTripleCards=${variant === 'staff'}`,
+    data: { entries: entries?.length ?? 0, variant },
+  });
+
   if (!entries || entries.length === 0) return null;
 
   const tripleCards = TRIPLE_CARD_CONFIG;
@@ -176,9 +185,9 @@ const KingKongSection: React.FC<KingKongSectionProps> = ({
 
   const handleNavigate = (url: string, label: string) => {
     reportLocalDebug({
-      hypothesisId: 'H1',
+      hypothesisId: 'H6',
       location: 'src/components/home/KingKongSection/index.tsx:onClick',
-      msg: '[DEBUG] home navigate click',
+      msg: `[DEBUG] kk click -> ${label} ${url}`,
       data: { url, label },
     });
     if (url.startsWith('#')) {

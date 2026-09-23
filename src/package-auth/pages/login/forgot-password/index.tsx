@@ -131,7 +131,7 @@ const ForgotPasswordPage: React.FC = () => {
           输入绑定邮箱接收验证码，验证通过后即可重置密码
         </Text>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="text"
@@ -143,7 +143,7 @@ const ForgotPasswordPage: React.FC = () => {
           />
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             type="number"
@@ -167,7 +167,7 @@ const ForgotPasswordPage: React.FC = () => {
           </Text>
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[28rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             password
@@ -179,7 +179,7 @@ const ForgotPasswordPage: React.FC = () => {
           />
         </View>
 
-        <View className="h-[96rpx] rounded-full bg-login-field flex flex-row items-center px-[44rpx] mb-[40rpx]">
+        <View className="h-[96rpx] rounded-button bg-login-field flex flex-row items-center px-[44rpx] mb-[40rpx]">
           <Input
             className="flex-1 text-[32rpx] font-semibold text-foreground"
             password

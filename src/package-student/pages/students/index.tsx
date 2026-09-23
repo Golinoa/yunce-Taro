@@ -27,12 +27,21 @@ import {
   calcStudentProgress,
   generatePackageTags,
 } from '@/utils/hours-status';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { API_PAGE_SIZE_BATCH } from '@/utils/pagination';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useBatchRender } from '@/utils/use-batch-render';
+import { resolveStudentQueryGate } from './students-query-gate';
+
+reportLocalDebug({
+  hypothesisId: 'students-module-loaded',
+  location: 'students/index.tsx:module',
+  msg: '学员页面模块已加载',
+  data: { path: '/package-student/pages/students/index' },
+});
 
 /** 顶部 Tab 类型 */
 type MainTab = 'member' | 'lead';
@@ -77,8 +86,9 @@ const TAG_COLOR_MAP: Record<PackageTag['color'], { bg: string; text: string }> =
 };
 
 const Students: React.FC = () => {
-  const { profile, session } = useAuth();
-  const isTeacher = isStaffRole(profile?.currentContext?.role);
+  const { profile, session, loading: authLoading } = useAuth();
+  const currentRole = profile?.currentContext?.role;
+  const isTeacher = isStaffRole(currentRole);
 
   // 导航栏与「我的」/数据页同款弥散渐变顶部色无缝衔接
   useThemedNavigationBar((themeHex) => ({
@@ -96,7 +106,73 @@ const Students: React.FC = () => {
   const [sortBy, setSortBy] = useState<StudentSort>('default');
   const [memberSubTab, setMemberSubTab] = useState<MemberSubTab>('all');
   const [sortOpen, setSortOpen] = useState(false);
-  const actorId = profile?.id || session?.user.id;
+  // 会话 token 恢复可能早于 /auth/me 的 Profile 恢复。
+  // 此时不能把 session.user 当成已经确定的家长/教职工身份，否则
+  // query 会先按 parent 分支请求并缓存空列表，随后遮住真实的教职工列表。
+  const { actorId, enabled: canLoadStudents } = resolveStudentQueryGate({
+    profileId: profile?.id,
+    sessionUserId: session?.user.id,
+    role: currentRole,
+  });
+
+  useEffect(() => {
+    reportLocalDebug({
+      hypothesisId: 'students-query-gate',
+      location: 'students/index.tsx:students-state',
+      msg: '学员页已挂载并计算列表请求条件',
+      data: {
+        authLoading,
+        hasProfile: Boolean(profile),
+        profileId: actorId || null,
+        role: currentRole || null,
+        campusId: profile?.currentContext?.campusId || null,
+        canLoadStudents,
+      },
+    });
+  }, [authLoading, actorId, currentRole, profile, canLoadStudents]);
+
+  /**
+   * P0 诊断：`queryFnRuns=0` 证明 queryFn 从未执行 —— query 在 `fetch()` 标记 fetching 之后、
+   * 调用 queryFn 之前被 cancel。TanStack Query v5 中 cancel 只有两个来源：
+   *   ① 该 query 的最后一个 observer 被移除（即本组件卸载）
+   *   ② enabled 翻转导致 observer 重新订阅 in-flight query
+   * 下面把这两个来源都记进日志，一次运行即可判定是哪一个。
+   */
+  const canLoadStudentsRef = useRef(canLoadStudents);
+  useEffect(() => {
+    reportLocalDebug({
+      hypothesisId: 'students-lifecycle',
+      location: 'students/index.tsx:mount',
+      msg: '学员页组件已挂载',
+      data: { canLoadStudents },
+    });
+    return () => {
+      reportLocalDebug({
+        hypothesisId: 'students-lifecycle',
+        location: 'students/index.tsx:unmount',
+        msg: '学员页组件已卸载（会使 in-flight query 被 cancel）',
+        data: { canLoadStudents },
+      });
+    };
+    // 只关心挂载/卸载本身
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (canLoadStudentsRef.current !== canLoadStudents) {
+      reportLocalDebug({
+        hypothesisId: 'students-lifecycle',
+        location: 'students/index.tsx:enabled-flip',
+        msg: `canLoadStudents 翻转 ${canLoadStudentsRef.current} -> ${canLoadStudents}（enabled 翻转会 cancel in-flight fetch）`,
+        data: {
+          from: canLoadStudentsRef.current,
+          to: canLoadStudents,
+          actorId: actorId || null,
+        },
+      });
+      canLoadStudentsRef.current = canLoadStudents;
+    }
+  }, [canLoadStudents, actorId]);
 
   // 搜索防抖必须参与分页 query key，搜索条件变化时从第一页重新加载。
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
@@ -113,16 +189,34 @@ const Students: React.FC = () => {
    * 原走 useStudentStore（TTL.list=5min）手写缓存；现统一到与首页（B8）一致的缓存层，
    * 由 query 拥有缓存 / 去重 / 写后失效。queryKey 包含角色、profile、校区和搜索条件，staleTime 沿用 TTL.list。
    */
+  // queryKey 一旦在首帧内抖动，TanStack Query 会取消旧 query 并重建，
+  // queryFn 就永远没机会执行（表现为列表空白且后端完全没有 /students）。
+  // 故把 key 提取为变量并打进日志，用于判定取消是否由 key 抖动引起。
+  const studentsQueryKey = [
+    'students',
+    isTeacher ? 'teacher' : 'parent',
+    actorId,
+    profile?.currentContext?.campusId,
+    debouncedKeyword.trim(),
+  ];
+  const queryFnRunsRef = useRef(0);
   const studentsQuery = useInfiniteQuery({
-    queryKey: [
-      'students',
-      isTeacher ? 'teacher' : 'parent',
-      actorId,
-      profile?.currentContext?.campusId,
-      debouncedKeyword.trim(),
-    ],
+    queryKey: studentsQueryKey,
     initialPageParam: 1,
     queryFn: ({ pageParam }) => {
+      queryFnRunsRef.current += 1;
+      reportLocalDebug({
+        hypothesisId: 'students-query-start',
+        location: 'students/index.tsx:queryFn',
+        msg: '学员列表 queryFn 已开始执行',
+        data: {
+          role: currentRole || null,
+          actorId: actorId || null,
+          campusId: profile?.currentContext?.campusId || null,
+          keyword: debouncedKeyword,
+          pageParam,
+        },
+      });
       if (!actorId) {
         return Promise.resolve({
           list: [],
@@ -143,11 +237,153 @@ const Students: React.FC = () => {
       lastPage.pagination.page < lastPage.pagination.totalPages
         ? lastPage.pagination.page + 1
         : undefined,
-    enabled: !!actorId,
+    // 这里刻意不设 `enabled`。
+    // `enabled` 依赖推导值（actorId 由 profile/session 推导）会在首帧波动，
+    // 而 v5 中 enabled 翻转会让 observer 重新订阅 in-flight query 并使其被 cancel；
+    // 表现就是 fetchStatus 从 fetching 掉回 idle、queryFn 一次都没执行（queryFnRuns=0）、
+    // 列表永久空白且后端收不到任何 /students。
+    // queryFn 内部已有 `if (!actorId) return 空列表` 兜底，且 queryKey 含 actorId，
+    // profile 恢复后 actorId 变化会自然产生新 query 重新拉取，无需 enabled 把关。
     // 进入独立页面时强制确认一次首屏数据，避免旧的空缓存掩盖真实学员。
     refetchOnMount: 'always',
     staleTime: TTL.list,
   });
+
+  // 用 ref 持有最新的 query 对象与 queryKey：两者每次渲染都是新引用，若写进 effect 依赖
+  // 会让 effect 每渲染重跑（自伤）；v5 的 useInfiniteQuery result 也不暴露 queryKey，故单独存。
+  const studentsQueryRef = useRef(studentsQuery);
+  studentsQueryRef.current = studentsQuery;
+  const studentsQueryKeyRef = useRef(studentsQueryKey);
+  studentsQueryKeyRef.current = studentsQueryKey;
+
+  useEffect(() => {
+    reportLocalDebug({
+      hypothesisId: 'students-query-result',
+      location: 'students/index.tsx:query-result',
+      msg: '学员列表 query 状态发生变化',
+      data: {
+        status: studentsQuery.status,
+        fetchStatus: studentsQuery.fetchStatus,
+        isError: studentsQuery.isError,
+        error: studentsQuery.error instanceof Error ? studentsQuery.error.message : null,
+        pageCount: studentsQuery.data?.pages.length || 0,
+        queryKey: JSON.stringify(studentsQueryKeyRef.current),
+        queryFnRuns: queryFnRunsRef.current,
+        // v5 在「signal 已被消费(#abortSignalConsumed) 且 observers 归零」时，会对 in-flight
+        // fetch 执行 cancel({ revert: true }) 并【不重发】，query 永久停在 pending/idle、
+        // queryFn 一次都不执行。observers 数量是判定是否命中该路径的关键证据。
+        observerCount:
+          queryClient
+            .getQueryCache()
+            .find({ queryKey: studentsQueryKeyRef.current })
+            ?.getObserversCount?.() ?? -1,
+        studentCount:
+          studentsQuery.data?.pages.reduce((sum, page) => sum + page.list.length, 0) || 0,
+      },
+    });
+  }, [
+    studentsQuery.status,
+    studentsQuery.fetchStatus,
+    studentsQuery.isError,
+    studentsQuery.error,
+    studentsQuery.data,
+    queryClient,
+  ]);
+
+  /**
+   * P0 兜底（安全网）：query 卡死在 `status='pending' + fetchStatus='idle'` 时主动补拉。
+   *
+   * 根因已定位并修复：微信小程序运行时缺 `AbortController`，而 `@tanstack/query-core` 的
+   * `Query.fetch()` 第一行就是 `new AbortController()`，缺失会直接抛 `ReferenceError`，
+   * 使 `queryFn` 永不执行、fetchStatus 永久停在 idle（见 `src/utils/abort-controller-polyfill.ts`，
+   * 已在 `src/app.tsx` 首行 import 修复）。
+   *
+   * 这里保留兜底而非删掉，是因为该状态「既不报错也不重试」——一旦再次出现就是永久空白。
+   * 最多补拉 1 次；仍停滞则脱离 query 状态机直接走 service 拉首屏写入缓存，保证列表可用。
+   */
+  const stallRecoveryRef = useRef(0);
+  const directFetchRef = useRef<() => Promise<unknown>>(async () => null);
+  directFetchRef.current = async () => {
+    if (!actorId) return null;
+    return isTeacher
+      ? studentService.getPageByTeacher(
+          actorId,
+          1,
+          API_PAGE_SIZE_BATCH,
+          profile?.currentContext?.campusId,
+          debouncedKeyword,
+        )
+      : studentService.getPageByParent(actorId, 1, API_PAGE_SIZE_BATCH, debouncedKeyword);
+  };
+
+  useEffect(() => {
+    const stalled = studentsQuery.status === 'pending' && studentsQuery.fetchStatus === 'idle';
+    if (!stalled) {
+      stallRecoveryRef.current = 0;
+      return;
+    }
+    const tick = () => {
+      if (stallRecoveryRef.current >= 2) {
+        return;
+      }
+      stallRecoveryRef.current += 1;
+      const attempt = stallRecoveryRef.current;
+      const key = studentsQueryKeyRef.current;
+      reportLocalDebug({
+        hypothesisId: 'students-query-stall',
+        location: 'students/index.tsx:stall-recovery',
+        msg: `检测到 query 停滞(pending/idle)，补拉第 ${attempt} 次`,
+        data: {
+          attempt,
+          queryFnRuns: queryFnRunsRef.current,
+          observerCount:
+            queryClient.getQueryCache().find({ queryKey: key })?.getObserversCount?.() ?? -1,
+          // 复发时用它一眼分辨两种机制：
+          // false → AbortController 缺失（polyfill 未生效）
+          // true  → AbortController 正常，说明是「cancel 早于 queryFn → signal 已 abort →
+          //          infinite fetchFn 直接跳过 queryFn」这条路径（靠下面的兜底直取救场）
+          hasAbortController: typeof AbortController !== 'undefined',
+          queryKey: JSON.stringify(key),
+        },
+      });
+      if (attempt === 1) {
+        void studentsQueryRef.current.refetch();
+        return;
+      }
+      // 第 2 次仍停滞：状态机确实不可用，直接拉数写缓存，避免永久空白。
+      void directFetchRef
+        .current()
+        .then((page) => {
+          if (!page) return;
+          queryClient.setQueryData(key, () => ({ pages: [page], pageParams: [1] }) as never);
+          reportLocalDebug({
+            hypothesisId: 'students-direct-fallback',
+            location: 'students/index.tsx:direct-fallback',
+            msg: 'query 状态机不可用，改为直接拉数写入缓存',
+            data: {
+              attempt,
+              count: (page as { list?: unknown[] }).list?.length ?? -1,
+              queryFnRuns: queryFnRunsRef.current,
+            },
+          });
+        })
+        .catch((err: unknown) => {
+          reportLocalDebug({
+            hypothesisId: 'students-direct-fallback',
+            location: 'students/index.tsx:direct-fallback',
+            msg: '兜底直取也失败',
+            data: { attempt, errMessage: String(err) },
+          });
+        });
+    };
+
+    const timer = setTimeout(tick, 600);
+    const interval = setInterval(tick, 2000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [studentsQuery.status, studentsQuery.fetchStatus, queryClient]);
 
   const pagedStudents = useMemo(
     () => studentsQuery.data?.pages.flatMap((page) => page.list) ?? [],
@@ -212,8 +448,15 @@ const Students: React.FC = () => {
         void queryClient.invalidateQueries({
           queryKey: ['students', isTeacher ? 'teacher' : 'parent', actorId],
         });
-      } else if (actorId && students.length === 0 && !studentsQuery.isFetching) {
-        // 身份恢复晚于页面展示时，补一次主动请求；refetch 不依赖 enabled 状态。
+      } else if (
+        actorId &&
+        studentsQuery.status === 'success' &&
+        students.length === 0 &&
+        !studentsQuery.isFetching
+      ) {
+        // 只在「已有数据但为空」时补拉。首屏 pending 期间不要 refetch：
+        // refetch 会取消 in-flight 的首屏 fetch，导致 queryFn 永远没机会执行
+        // （列表空白 + 后端无任何 /students）。首屏强制刷新已由 refetchOnMount:'always' 保证。
         void studentsQuery.refetch();
       }
     } else {
@@ -743,7 +986,7 @@ const Students: React.FC = () => {
                       </Text>
                       <View
                         className={cn(
-                          'px-[20rpx] py-[8rpx] rounded-full',
+                          'px-[20rpx] py-[8rpx] rounded-[8rpx]',
                           cardStatus === 'expired' || cardStatus === 'owe'
                             ? 'bg-destructive/20'
                             : 'bg-warning/20',
@@ -776,11 +1019,15 @@ const Students: React.FC = () => {
               <>
                 <Empty
                   description={
-                    debouncedKeyword
-                      ? '未找到匹配的学员'
-                      : isTeacher
-                        ? '暂无学员，点击上方添加'
-                        : '暂无关联学员'
+                    // actorId 为空 ⇒ 会话/profile 尚未恢复，此时 query 被 enabled=false 挡住、
+                    // 不会发任何请求。若仍显示「暂无学员」，会把登录态故障伪装成"没有数据"。
+                    !actorId
+                      ? '登录态恢复中…'
+                      : debouncedKeyword
+                        ? '未找到匹配的学员'
+                        : isTeacher
+                          ? '暂无学员，点击上方添加'
+                          : '暂无关联学员'
                   }
                 />
               </>

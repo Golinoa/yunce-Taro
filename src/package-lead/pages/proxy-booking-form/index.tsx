@@ -451,7 +451,7 @@ const AddProxyBookingPage: React.FC = () => {
       <View className="flex-shrink-0 px-[32rpx] pb-safe-bar pt-[20rpx]">
         <View
           className={cn(
-            'h-[88rpx] rounded-full center text-[32rpx] font-medium transition-colors',
+            'h-[88rpx] rounded-button center text-[32rpx] font-medium transition-colors',
             selectedUsers.length > 0 && !submitting
               ? 'bg-[#ff8a4c] text-white'
               : 'bg-[#e0e0e0] text-white',

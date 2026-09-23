@@ -316,7 +316,7 @@ const BookingRecordDetailPage: React.FC = () => {
                   </Text>
                 </View>
                 <View
-                  className={['rounded-full px-[18rpx] py-[8rpx]', meta.badgeClassName].join(' ')}
+                  className={['rounded-[8rpx] px-[18rpx] py-[8rpx]', meta.badgeClassName].join(' ')}
                 >
                   <Text className="text-[22rpx] font-medium">{meta.label}</Text>
                 </View>
@@ -357,7 +357,7 @@ const BookingRecordDetailPage: React.FC = () => {
               {ruleSummaryList.length ? (
                 <View className="mb-[14rpx] flex flex-wrap gap-[12rpx]">
                   {ruleSummaryList.map((summary) => (
-                    <View key={summary} className="rounded-full bg-primary-10 px-[16rpx] py-[8rpx]">
+                    <View key={summary} className="rounded-[8rpx] bg-primary-10 px-[16rpx] py-[8rpx]">
                       <Text className="text-[22rpx] text-primary">{summary}</Text>
                     </View>
                   ))}

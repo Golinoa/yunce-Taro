@@ -335,10 +335,10 @@ const Help: React.FC = () => {
                     />
                   </View>
 
-                  {/* 答案展开区 */}
+                  {/* 答案展开区（用户 2026-09-23 明确不需要左侧竖线，故不加 border） */}
                   {open && (
                     <View className="px-[32rpx] pb-[32rpx] ml-[60rpx]">
-                      <View className="border-l-[3rpx] border-primary/30 pl-[24rpx]">
+                      <View className="pl-[24rpx]">
                         <Text className="text-[27rpx] text-foreground/85 leading-[1.75]">
                           {item.answer}
                         </Text>
@@ -373,14 +373,14 @@ const Help: React.FC = () => {
       <View className="px-[32rpx] pb-[calc(32rpx+env(safe-area-inset-bottom))] pt-[20rpx] border-t border-border/40 bg-background">
         <View className="flex gap-[24rpx]">
           <View
-            className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
+            className="flex-1 h-[88rpx] rounded-button border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
             onClick={() => setQrVisible(true)}
           >
             <Icon name="mdi-headset" size={28} color="foreground" />
             <Text className="text-[28rpx] font-medium text-foreground">联系客服</Text>
           </View>
           <View
-            className="flex-1 h-[88rpx] rounded-[24rpx] border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
+            className="flex-1 h-[88rpx] rounded-button border border-border/60 bg-card center flex items-center justify-center gap-[10rpx] press-scale"
             onClick={handleFeedback}
           >
             <Icon name="mdi-chat-processing-outline" size={28} color="foreground" />

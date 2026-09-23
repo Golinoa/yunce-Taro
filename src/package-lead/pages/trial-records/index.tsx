@@ -98,7 +98,7 @@ function TrialRecordCard({
                 {item.child_name || '试听学员'}
               </Text>
               <View
-                className={cn('shrink-0 rounded-full px-[14rpx] py-[4rpx]', statusMeta.className)}
+                className={cn('shrink-0 rounded-[8rpx] px-[14rpx] py-[4rpx]', statusMeta.className)}
               >
                 <Text className="text-[22rpx] font-bold">{statusMeta.label}</Text>
               </View>

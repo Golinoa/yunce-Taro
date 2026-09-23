@@ -513,7 +513,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
                   </View>
                   <View className="flex items-center gap-[12rpx]">
                     <View
-                      className="center h-[64rpx] rounded-full bg-primary px-[32rpx] active:opacity-80"
+                      className="center h-[64rpx] rounded-button bg-primary px-[32rpx] active:opacity-80"
                       onClick={() =>
                         isParent
                           ? handleParentBookTeacher(teacher.id)

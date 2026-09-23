@@ -348,7 +348,7 @@ const CourseManagementPage: React.FC = () => {
                             </Text>
                             {/* 仅未排课班级加"未排课"标签（主题色提醒，用户口径 2026-08-23） */}
                             {!hasSchedule && (
-                              <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                              <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-[8rpx] bg-primary-bg">
                                 <Text className="text-[20rpx] text-primary">未排课</Text>
                               </View>
                             )}
@@ -383,7 +383,7 @@ const CourseManagementPage: React.FC = () => {
                             {template.name}
                           </Text>
                           {/* 模板无排课关联 → 视为未排课（主题色提醒） */}
-                          <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                          <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-[8rpx] bg-primary-bg">
                             <Text className="text-[20rpx] text-primary">未排课</Text>
                           </View>
                         </View>

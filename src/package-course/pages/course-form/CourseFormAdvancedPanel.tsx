@@ -348,10 +348,10 @@ const CourseFormAdvancedPanel: React.FC<CourseFormAdvancedPanelProps> = ({
         <View className="flex flex-col gap-[16rpx]">
           <View className="flex flex-row items-center gap-[12rpx]">
             <Text className="text-[30rpx] font-medium text-foreground">课程背景图</Text>
-            <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
+            <View className="px-[16rpx] py-[6rpx] rounded-[8rpx] bg-primary/10">
               <Text className="text-[22rpx] text-primary font-medium">约课首页</Text>
             </View>
-            <View className="px-[16rpx] py-[6rpx] rounded-full bg-muted">
+            <View className="px-[16rpx] py-[6rpx] rounded-[8rpx] bg-muted">
               <Text className="text-[22rpx] font-medium text-muted-foreground">敬请期待</Text>
             </View>
           </View>
@@ -380,7 +380,7 @@ const CourseFormAdvancedPanel: React.FC<CourseFormAdvancedPanelProps> = ({
         <View className="flex flex-col gap-[16rpx]">
           <View className="flex flex-row items-center gap-[12rpx]">
             <Text className="text-[30rpx] font-medium text-foreground">课程封面</Text>
-            <View className="px-[16rpx] py-[6rpx] rounded-full bg-primary/10">
+            <View className="px-[16rpx] py-[6rpx] rounded-[8rpx] bg-primary/10">
               <Text className="text-[22rpx] text-primary font-medium">分享使用</Text>
             </View>
           </View>

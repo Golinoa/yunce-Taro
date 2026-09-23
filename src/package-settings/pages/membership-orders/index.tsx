@@ -82,7 +82,7 @@ const Badge: React.FC<{ tone: 'ok' | 'pay' | 'off' | 'ref'; label: string }> = (
 }) => (
   <View
     className={cn(
-      'px-[16rpx] py-[6rpx] rounded-full',
+      'px-[16rpx] py-[6rpx] rounded-[8rpx]',
       tone === 'ok' && 'bg-success/12',
       tone === 'pay' && 'bg-warning/14',
       tone === 'off' && 'bg-border',

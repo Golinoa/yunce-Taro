@@ -272,7 +272,7 @@ const ProfileSetup: React.FC = () => {
         {privacyReady ? (
           <View
             className={cn(
-              'h-[96rpx] rounded-full flex items-center justify-center bg-primary shadow-login-btn active:opacity-90',
+              'h-[96rpx] rounded-button flex items-center justify-center bg-primary shadow-login-btn active:opacity-90',
               submitting && 'opacity-60',
             )}
             onClick={handleSubmit}
@@ -283,7 +283,7 @@ const ProfileSetup: React.FC = () => {
           </View>
         ) : (
           <View
-            className="h-[96rpx] rounded-full flex items-center justify-center bg-muted active:opacity-90"
+            className="h-[96rpx] rounded-button flex items-center justify-center bg-muted active:opacity-90"
             onClick={() => {
               void ensurePrivacy();
             }}

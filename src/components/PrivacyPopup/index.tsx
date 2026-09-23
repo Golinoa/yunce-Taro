@@ -114,7 +114,7 @@ const PrivacyPopup: React.FC = () => {
             </>
           ) : (
             <View
-              className={`h-[96rpx] rounded-full flex items-center justify-center bg-primary active:opacity-90 ${
+              className={`h-[96rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90 ${
                 busy ? 'opacity-60' : ''
               }`}
               onClick={() => {

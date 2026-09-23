@@ -178,7 +178,7 @@ const DataCenter: React.FC = () => {
   const renderChangeBadge = (change: number) => {
     const isPositive = change >= 0;
     return (
-      <View className="inline-flex items-center gap-[4rpx] px-[12rpx] py-[4rpx] rounded-full bg-card/80 backdrop-blur-sm shadow-card">
+      <View className="inline-flex items-center gap-[4rpx] px-[12rpx] py-[4rpx] rounded-[8rpx] bg-card/80 backdrop-blur-sm shadow-card">
         <Icon
           name={isPositive ? 'mdi-trending-up' : 'mdi-trending-down'}
           size={20}
@@ -346,7 +346,7 @@ const DataCenter: React.FC = () => {
               </Text>
               {financeData && (
                 <View
-                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-full ${
+                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-[8rpx] ${
                     financeData.netIncomeChange >= 0 ? 'bg-success/10' : 'bg-destructive/10'
                   }`}
                 >
@@ -412,7 +412,7 @@ const DataCenter: React.FC = () => {
               </Text>
               {memberData && (
                 <View
-                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-full ${
+                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-[8rpx] ${
                     memberData.activeChange >= 0 ? 'bg-success/10' : 'bg-destructive/10'
                   }`}
                 >
@@ -476,7 +476,7 @@ const DataCenter: React.FC = () => {
               </Text>
               {cardData && (
                 <View
-                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-full ${
+                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-[8rpx] ${
                     cardData.salesChange >= 0 ? 'bg-success/10' : 'bg-destructive/10'
                   }`}
                 >
@@ -540,7 +540,7 @@ const DataCenter: React.FC = () => {
               </Text>
               {salaryData && (
                 <View
-                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-full ${
+                  className={`inline-flex items-center gap-[4rpx] px-[10rpx] py-[4rpx] rounded-[8rpx] ${
                     salaryData.salaryChange >= 0 ? 'bg-success/10' : 'bg-destructive/10'
                   }`}
                 >

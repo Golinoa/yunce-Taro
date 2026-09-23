@@ -194,7 +194,7 @@ const LeadBookingDetailPage: React.FC = () => {
                 <Text className="text-[40rpx] font-bold text-white">
                   {booking.course_name || '体验课'}
                 </Text>
-                <View className="rounded-full bg-white/20 px-[16rpx] py-[6rpx]">
+                <View className="rounded-[8rpx] bg-white/20 px-[16rpx] py-[6rpx]">
                   <Text className="text-[22rpx] font-medium text-white">
                     {booking.teacher_name || '未分配老师'}
                   </Text>
@@ -230,7 +230,7 @@ const LeadBookingDetailPage: React.FC = () => {
             </Text>
           </View>
           <View
-            className="center h-[64rpx] rounded-full bg-primary px-[28rpx] active:opacity-80"
+            className="center h-[64rpx] rounded-button bg-primary px-[28rpx] active:opacity-80"
             onClick={() => handleProxyBooking()}
           >
             <Icon name="mdi-plus" size={24} color="white" />
@@ -268,7 +268,7 @@ const LeadBookingDetailPage: React.FC = () => {
               <View
                 key={act.label}
                 className={cn(
-                  'center h-[80rpx] flex-1 rounded-full text-[30rpx] font-medium transition-all active:scale-95',
+                  'center h-[80rpx] flex-1 rounded-button text-[30rpx] font-medium transition-all active:scale-95',
                   act.variant === 'primary'
                     ? 'bg-primary text-white active:bg-primary/90'
                     : 'border border-border bg-white text-foreground active:bg-muted',
@@ -281,7 +281,7 @@ const LeadBookingDetailPage: React.FC = () => {
           ) : bottomAction ? (
             <View
               className={cn(
-                'center h-[80rpx] w-full rounded-full text-[30rpx] font-medium transition-all active:scale-95',
+                'center h-[80rpx] w-full rounded-button text-[30rpx] font-medium transition-all active:scale-95',
                 bottomAction.variant === 'primary'
                   ? 'bg-primary text-white active:bg-primary/90'
                   : 'border border-border bg-white text-foreground active:bg-muted',

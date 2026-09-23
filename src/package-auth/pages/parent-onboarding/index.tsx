@@ -83,7 +83,7 @@ const ParentOnboarding: React.FC = () => {
         ) : null}
 
         <View
-          className="h-[96rpx] rounded-full bg-primary flex items-center justify-center active:opacity-90 mb-[20rpx]"
+          className="h-[96rpx] rounded-button bg-primary flex items-center justify-center active:opacity-90 mb-[20rpx]"
           onClick={handleBind}
         >
           <Text className="text-[32rpx] font-semibold text-white">

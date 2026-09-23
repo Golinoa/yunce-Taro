@@ -92,7 +92,7 @@ const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({
         <View className="flex flex-row items-center gap-[12rpx]">
           <View className="w-[6rpx] h-[28rpx] rounded-[4rpx] bg-warning" />
           <Text className="text-[28rpx] font-semibold text-foreground">上课学员</Text>
-          <View className="px-[14rpx] py-[4rpx] rounded-full bg-primary/10">
+          <View className="px-[14rpx] py-[4rpx] rounded-[8rpx] bg-primary/10">
             <Text className="text-[22rpx] font-medium text-primary">{studentIds.length} 人</Text>
           </View>
         </View>

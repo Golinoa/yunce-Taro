@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro';
 import React from 'react';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import type { Student } from '@/types/student';
+import { reportLocalDebug } from '@/utils/local-debug';
 
 interface StudentQuickListProps {
   students: Student[];
@@ -17,7 +18,15 @@ const StudentQuickList: React.FC<StudentQuickListProps> = ({ students }) => {
         <Text className="text-xl font-semibold text-foreground">我的学生</Text>
         <Text
           className="text-base text-primary"
-          onClick={() => Taro.navigateTo({ url: '/package-student/pages/students/index' })}
+          onClick={() => {
+            reportLocalDebug({
+              hypothesisId: 'student-entry-click',
+              location: 'StudentQuickList:onClick',
+              msg: '首页查看全部学员被点击',
+              data: { url: '/package-student/pages/students/index' },
+            });
+            Taro.navigateTo({ url: '/package-student/pages/students/index' });
+          }}
         >
           查看全部
         </Text>

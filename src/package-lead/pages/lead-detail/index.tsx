@@ -574,7 +574,7 @@ const LeadDetailPage: React.FC = () => {
           <View className="mb-3 flex items-center justify-between">
             <Text className="text-[30rpx] font-bold text-foreground">试听预约</Text>
             <View
-              className="rounded-full bg-primary/10 px-[20rpx] py-[8rpx]"
+              className="rounded-[8rpx] bg-primary/10 px-[20rpx] py-[8rpx]"
               onClick={openProxyBook}
             >
               <Text className="text-[24rpx] text-primary">代预约</Text>
@@ -614,7 +614,7 @@ const LeadDetailPage: React.FC = () => {
                     </View>
                     <View
                       className={cn(
-                        'shrink-0 rounded-full px-[14rpx] py-[4rpx]',
+                        'shrink-0 rounded-[8rpx] px-[14rpx] py-[4rpx]',
                         statusMeta.className,
                       )}
                     >
@@ -624,19 +624,19 @@ const LeadDetailPage: React.FC = () => {
                   {canOperate ? (
                     <View className="mt-2 flex items-center justify-end gap-[16rpx]">
                       <View
-                        className="rounded-full bg-success/10 px-[20rpx] py-[8rpx]"
+                        className="rounded-[8rpx] bg-success/10 px-[20rpx] py-[8rpx]"
                         onClick={() => void handleBookingCheckIn(booking)}
                       >
                         <Text className="text-[22rpx] text-success">签到</Text>
                       </View>
                       <View
-                        className="rounded-full bg-warning/10 px-[20rpx] py-[8rpx]"
+                        className="rounded-[8rpx] bg-warning/10 px-[20rpx] py-[8rpx]"
                         onClick={() => void handleBookingNoShow(booking)}
                       >
                         <Text className="text-[22rpx] text-warning">未到</Text>
                       </View>
                       <View
-                        className="rounded-full bg-muted px-[20rpx] py-[8rpx]"
+                        className="rounded-[8rpx] bg-muted px-[20rpx] py-[8rpx]"
                         onClick={() => void handleBookingCancel(booking)}
                       >
                         <Text className="text-[22rpx] text-muted-foreground">取消</Text>

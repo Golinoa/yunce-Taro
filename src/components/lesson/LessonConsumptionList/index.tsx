@@ -501,7 +501,7 @@ const LessonConsumptionList: React.FC<LessonConsumptionListProps> = ({
                         <Text className="text-[28rpx] font-medium text-foreground truncate">
                           {card.title}
                         </Text>
-                        <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-full bg-primary-bg">
+                        <View className="shrink-0 px-[10rpx] py-[2rpx] rounded-[8rpx] bg-primary-bg">
                           <Text className="text-[20rpx] text-primary">{card.studentCountText}</Text>
                         </View>
                       </View>

@@ -117,7 +117,7 @@ export const TodoCollaboratorBottomAction: React.FC<TodoCollaboratorBottomAction
   <View className="shrink-0 border-t border-border-light bg-card px-[32rpx] pt-[20rpx] pb-safe-bar">
     <View
       className={cn(
-        'center h-[88rpx] rounded-[16rpx] press-scale',
+        'center h-[88rpx] rounded-button press-scale',
         disabled ? 'bg-muted' : 'bg-primary',
       )}
       onClick={disabled ? undefined : onClick}

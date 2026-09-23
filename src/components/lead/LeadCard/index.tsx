@@ -90,7 +90,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ data, className }) => {
               </Text>
             ) : null}
             {statusMeta && (
-              <View className={cn('px-[14rpx] py-[4rpx] rounded-full', statusMeta.className)}>
+              <View className={cn('px-[14rpx] py-[4rpx] rounded-[8rpx]', statusMeta.className)}>
                 <Text className="text-[22rpx] font-bold">{statusMeta.label}</Text>
               </View>
             )}

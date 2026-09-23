@@ -96,13 +96,13 @@ const AgreementDialog: React.FC<AgreementDialogProps> = ({
 
             <View className="flex flex-row gap-[16rpx]">
               <View
-                className="flex-1 h-[64rpx] rounded-[16rpx] bg-fill-secondary flex items-center justify-center active:opacity-80 transition-opacity"
+                className="flex-1 h-[64rpx] rounded-card bg-fill-secondary flex items-center justify-center active:opacity-80 transition-opacity"
                 onClick={onClose}
               >
                 <Text className="text-[26rpx] text-foreground">{cancelText}</Text>
               </View>
               <View
-                className="flex-1 h-[64rpx] rounded-[16rpx] bg-primary flex items-center justify-center active:opacity-90 transition-opacity"
+                className="flex-1 h-[64rpx] rounded-card bg-primary flex items-center justify-center active:opacity-90 transition-opacity"
                 onClick={onConfirm}
               >
                 <Text className="text-[26rpx] font-medium text-white">{confirmText}</Text>
@@ -120,14 +120,14 @@ const AgreementDialog: React.FC<AgreementDialogProps> = ({
             </Text>
 
             <View
-              className="h-[96rpx] rounded-full flex items-center justify-center bg-primary active:opacity-90 transition-opacity shadow-login-btn mb-[24rpx]"
+              className="h-[96rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90 transition-opacity shadow-login-btn mb-[24rpx]"
               onClick={onConfirm}
             >
               <Text className="text-[34rpx] font-semibold text-white">{confirmText}</Text>
             </View>
 
             <View
-              className="h-[96rpx] rounded-full flex items-center justify-center border-[2rpx] border-solid border-border bg-background active:opacity-80 transition-opacity"
+              className="h-[96rpx] rounded-button flex items-center justify-center border-[2rpx] border-solid border-border bg-background active:opacity-80 transition-opacity"
               onClick={onClose}
             >
               <Text className="text-[34rpx] font-semibold text-foreground">{cancelText}</Text>

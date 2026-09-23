@@ -4,11 +4,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
-import { calendarSyncService } from '@/services/calendar-sync';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import type { UserRole } from '@/types/profile';
 import { isParentRole, isPrincipalOrAbove, useAuth } from '@/utils/auth';
-import { canUseCalendarSync, getCalendarSyncSettings } from '@/utils/calendar-sync-settings';
+import { canUseCalendarSync } from '@/utils/calendar-sync-settings';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -148,22 +147,19 @@ function getNotifyGroupsForRole(role: UserRole | null | undefined): NotifyGroup[
 /**
  * 消息通知页面
  * - 顶部总开关（默认开）
- * - 同步日历（默认关，仅教职）
+ * - 同步日历（2026-09-23 起**暂时下线**：入口保留展示，开关不可用，点击仅提示「仅支持移动端」）
  * - 补充发送次数
  * - 分组业务提醒（按角色过滤：老师/家长只看本人相关项）
  */
 const NotificationsPage: React.FC = () => {
   useCardNavigationBar();
   const { profile } = useAuth();
-  const currentUserId = profile?.id || '';
   const currentRole = profile?.currentContext?.role;
   const navigatingRef = useRef(false);
   const [masterEnabled, setMasterEnabled] = useState(() =>
     subscribeMessageService.getMasterNotifyEnabled(),
   );
   const [masterBusy, setMasterBusy] = useState(false);
-  const [calendarEnabled, setCalendarEnabled] = useState(false);
-  const [calendarBusy, setCalendarBusy] = useState(false);
   const showCalendarSwitch = canUseCalendarSync(currentRole);
 
   const initialGroups = useMemo(() => getNotifyGroupsForRole(currentRole), [currentRole]);
@@ -172,14 +168,6 @@ const NotificationsPage: React.FC = () => {
   useEffect(() => {
     setGroups(getNotifyGroupsForRole(currentRole));
   }, [currentRole]);
-
-  useEffect(() => {
-    if (!currentUserId || !showCalendarSwitch) {
-      setCalendarEnabled(false);
-      return;
-    }
-    setCalendarEnabled(getCalendarSyncSettings(currentUserId).enabled);
-  }, [currentUserId, showCalendarSwitch]);
 
   const handleToggle = useCallback(
     (groupIndex: number, itemIndex: number) => {
@@ -224,35 +212,13 @@ const NotificationsPage: React.FC = () => {
     [masterBusy],
   );
 
-  const handleCalendarChange = useCallback(
-    async (enabled: boolean) => {
-      if (!currentUserId || calendarBusy) return;
-      setCalendarBusy(true);
-      setCalendarEnabled(enabled);
-      try {
-        if (!enabled) {
-          calendarSyncService.disable(currentUserId);
-          Taro.showToast({ title: '已关闭日历同步', icon: 'none' });
-          return;
-        }
-        await calendarSyncService.enableAndSync({
-          userId: currentUserId,
-          teacherId: currentUserId,
-          role: currentRole ?? undefined,
-          campusId: profile?.currentContext?.campusId,
-          directAuth: true,
-        });
-        Taro.showToast({ title: '已开启日历同步', icon: 'none' });
-      } catch (err) {
-        logError('notifications.calendarToggle', err);
-        setCalendarEnabled(getCalendarSyncSettings(currentUserId).enabled);
-        Taro.showToast({ title: '同步失败，请重试', icon: 'none' });
-      } finally {
-        setCalendarBusy(false);
-      }
-    },
-    [calendarBusy, currentRole, currentUserId, profile?.currentContext?.campusId],
-  );
+  /**
+   * 同步日历功能 2026-09-23 起**暂时下线**（小程序端不支持写入手机系统日历）。
+   * 入口保留展示，开关不做任何实际动作 —— 点击只提示。
+   */
+  const handleCalendarTap = useCallback(() => {
+    Taro.showToast({ title: '仅支持移动端', icon: 'none' });
+  }, []);
 
   const handleOpenMessageAuth = useCallback(() => {
     if (navigatingRef.current) return;
@@ -288,14 +254,10 @@ const NotificationsPage: React.FC = () => {
               <View className="mr-[24rpx] min-w-0 flex-1">
                 <Text className="block text-[30rpx] font-medium text-foreground">同步日历</Text>
                 <Text className="mt-[8rpx] block text-[24rpx] leading-relaxed text-muted-foreground">
-                  默认关闭。开启后将未来一周课表写入手机日历，上课前可在系统日历收到提醒（比微信消息更稳）
+                  将未来一周课表写入手机系统日历，上课前由系统日历提醒。目前仅移动端 App 支持
                 </Text>
               </View>
-              <Switch
-                checked={calendarEnabled}
-                disabled={calendarBusy}
-                onChange={handleCalendarChange}
-              />
+              <Switch checked={false} onChange={handleCalendarTap} />
             </View>
           ) : null}
 

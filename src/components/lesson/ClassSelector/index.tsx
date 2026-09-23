@@ -34,7 +34,7 @@ const ClassCard: React.FC<{
         <View className="flex flex-row items-center gap-[12rpx]">
           <Text className="truncate text-[26rpx] font-medium text-foreground">{cls.name}</Text>
           {!hasSchedule ? (
-            <View className="shrink-0 rounded-full bg-primary-bg px-[10rpx] py-[2rpx]">
+            <View className="shrink-0 rounded-[8rpx] bg-primary-bg px-[10rpx] py-[2rpx]">
               <Text className="text-[20rpx] text-primary">未排课</Text>
             </View>
           ) : null}
@@ -120,7 +120,7 @@ const ClassSelector: React.FC<ClassSelectorProps> = ({
                 }}
                 right={
                   isCurrent ? (
-                    <View className="rounded-full bg-primary-bg px-[12rpx] py-[4rpx]">
+                    <View className="rounded-[8rpx] bg-primary-bg px-[12rpx] py-[4rpx]">
                       <Text className="text-[22rpx] text-primary">当前</Text>
                     </View>
                   ) : (

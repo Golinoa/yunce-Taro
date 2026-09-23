@@ -196,7 +196,7 @@ const PackagesPanel: React.FC<PackagesPanelProps> = ({
                         有效{card.cardTypeKind === 'time' ? '天数' : '次数'} {remainingText}
                       </Text>
                     </View>
-                    <View className="py-[6rpx] px-[16rpx] rounded-full bg-primary-foreground/20">
+                    <View className="py-[6rpx] px-[16rpx] rounded-[8rpx] bg-primary-foreground/20">
                       <Text className="text-[20rpx] text-primary-foreground font-medium">
                         {statusInfo.label}
                       </Text>

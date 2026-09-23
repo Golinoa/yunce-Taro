@@ -142,7 +142,7 @@ const ConsumptionPanel: React.FC<ConsumptionPanelProps> = ({
                       </View>
                       <View
                         className={cn(
-                          'py-[6rpx] px-[16rpx] rounded-full flex-shrink-0',
+                          'py-[6rpx] px-[16rpx] rounded-[8rpx] flex-shrink-0',
                           statusInfo.className,
                         )}
                       >

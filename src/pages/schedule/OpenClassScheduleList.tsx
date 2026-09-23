@@ -143,7 +143,7 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
               <View className="py-[120rpx] flex flex-col items-center justify-center gap-[16rpx]">
                 <Text className="text-[28rpx] text-muted-foreground">开放班级加载失败</Text>
                 <Button
-                  className="m-0 h-[64rpx] px-[32rpx] text-[28rpx] leading-[64rpx] rounded-[32rpx] bg-primary text-primary-foreground"
+                  className="m-0 h-[64rpx] px-[32rpx] text-[28rpx] leading-[64rpx] rounded-button bg-primary text-primary-foreground"
                   onClick={() => onLoadOpenClassSlots(date, true)}
                 >
                   点击重试
@@ -223,7 +223,7 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
                             </Text>
                             {/* 团课无试听：状态标签仅「上课中」（预约满/可约用人数区表达） */}
                             {isSlotInProgress ? (
-                              <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                              <View className="course-tag-active rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                                 <Text className="text-[20rpx] font-medium">上课中</Text>
                               </View>
                             ) : null}
@@ -457,7 +457,7 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
                                 {cls?.name || slot.class_name || '未命名班级'}
                               </Text>
                               {isSlotInProgress ? (
-                                <View className="course-tag-active rounded-full flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
+                                <View className="course-tag-active rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
                                   <Text className="text-[20rpx] font-medium">上课中</Text>
                                 </View>
                               ) : null}

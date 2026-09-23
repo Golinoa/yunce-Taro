@@ -350,7 +350,7 @@ const RegisterRoleInfo: React.FC = () => {
         {/* 稍后绑定按钮（教师/家长可选跳过） */}
         {role !== 'principal' && (
           <View
-            className="flex items-center justify-center gap-[8rpx] w-full h-[80rpx] border-[2rpx] border-dashed border-border rounded-[24rpx] mt-[24rpx]"
+            className="flex items-center justify-center gap-[8rpx] w-full h-[80rpx] border-[2rpx] border-dashed border-border rounded-card mt-[24rpx]"
             onClick={handleSkip}
           >
             <Icon name="mdi-clock-outline" size={28} className="text-muted-foreground" />

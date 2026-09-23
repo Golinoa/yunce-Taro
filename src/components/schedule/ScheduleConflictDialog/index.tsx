@@ -146,13 +146,13 @@ const ScheduleConflictDialog: React.FC<ScheduleConflictDialogProps> = ({
 
         <View className="mt-[28rpx] flex gap-[20rpx]">
           <View
-            className="flex h-[80rpx] flex-1 items-center justify-center rounded-full border-[2rpx] border-primary"
+            className="flex h-[80rpx] flex-1 items-center justify-center rounded-button border-[2rpx] border-primary"
             onClick={onIgnore}
           >
             <Text className="text-[28rpx] font-medium text-primary">忽略冲突</Text>
           </View>
           <View
-            className="flex h-[80rpx] flex-1 items-center justify-center rounded-full bg-primary"
+            className="flex h-[80rpx] flex-1 items-center justify-center rounded-button bg-primary"
             onClick={onModify}
           >
             <Text className="text-[28rpx] font-medium text-primary-foreground">返回修改</Text>

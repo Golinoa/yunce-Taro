@@ -62,7 +62,7 @@ const BindOrgSheet: React.FC<BindOrgSheetProps> = ({
         />
         <View
           className={cn(
-            'mt-[8rpx] center h-[96rpx] rounded-[28rpx] bg-gradient-primary active:opacity-90',
+            'mt-[8rpx] center h-[96rpx] rounded-button bg-gradient-primary active:opacity-90',
             submitting && 'opacity-60',
           )}
           onClick={submitting ? undefined : handleSubmit}

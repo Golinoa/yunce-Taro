@@ -22,6 +22,19 @@ export interface CalendarSyncSettings {
 
 export const CALENDAR_SYNC_MAX_DAYS = 7;
 
+/**
+ * 同步日历功能总开关（2026-09-23 用户要求**暂时下线**）。
+ *
+ * 原因：小程序端不支持把课表写入手机**系统日历**，该能力只在移动端 App 上可用。
+ * 当前策略：
+ *  - 功能整体停用 —— 不再弹引导弹窗、不再往系统日历写事件（服务层各入口直接短路）；
+ *  - 入口只保留「我的 → 消息通知 → 同步日历」一处（系统设置里的重复开关已移除）；
+ *  - 该开关做成**不可点击**，点击 toast 提示「仅支持移动端」。
+ *
+ * 代码全部保留，日后恢复只需把此常量改回 `true`。
+ */
+export const CALENDAR_SYNC_FEATURE_ENABLED = false;
+
 /** 可使用课表同步的角色：任课老师、助教、校长（兼课场景） */
 export function canUseCalendarSync(role: UserRole | null | undefined): boolean {
   return isTeachingRole(role) || role === 'principal';

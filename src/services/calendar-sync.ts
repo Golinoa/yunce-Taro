@@ -11,6 +11,7 @@ import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
 import {
+  CALENDAR_SYNC_FEATURE_ENABLED,
   CALENDAR_SYNC_MAX_DAYS,
   canUseCalendarSync,
   getCalendarSyncSettings,
@@ -222,6 +223,10 @@ export const calendarSyncService = {
       windowEnd: windowEnd.format('YYYY-MM-DD'),
     };
 
+    if (!CALENDAR_SYNC_FEATURE_ENABLED) {
+      return emptyResult;
+    }
+
     if (!params.userId || !isCalendarSyncEnabled(params.userId)) {
       return emptyResult;
     }
@@ -358,6 +363,16 @@ export const calendarSyncService = {
     /** 跳过 E19 文案弹框，直接调起微信订阅面板（课表页已确认时使用） */
     directAuth?: boolean;
   }): Promise<CalendarSyncWeekResult> {
+    if (!CALENDAR_SYNC_FEATURE_ENABLED) {
+      return {
+        added: 0,
+        skipped: 0,
+        failed: 0,
+        windowStart: getSyncWindowStart().format('YYYY-MM-DD'),
+        windowEnd: getSyncWindowEnd().format('YYYY-MM-DD'),
+      };
+    }
+
     const settings = getCalendarSyncSettings(params.userId);
     if (!settings.authCompleted) {
       try {
@@ -394,7 +409,7 @@ export const calendarSyncService = {
     campusId?: string;
     role?: UserRole;
   }): Promise<void> {
-    if (!isCalendarSyncEnabled(params.userId)) {
+    if (!CALENDAR_SYNC_FEATURE_ENABLED || !isCalendarSyncEnabled(params.userId)) {
       return;
     }
     try {
@@ -431,6 +446,9 @@ export const calendarSyncService = {
     campusId?: string;
     scheduleCount: number;
   }): Promise<void> {
+    if (!CALENDAR_SYNC_FEATURE_ENABLED) {
+      return;
+    }
     if (!params.userId || !canUseCalendarSync(params.role) || promptInFlight) {
       return;
     }
@@ -497,6 +515,9 @@ export const calendarSyncService = {
     role?: UserRole;
     campusId?: string;
   }): Promise<void> {
+    if (!CALENDAR_SYNC_FEATURE_ENABLED) {
+      return;
+    }
     if (!params.userId || !canUseCalendarSync(params.role) || promptInFlight) {
       return;
     }

@@ -235,7 +235,7 @@ const BookingTeacherConfigPage: React.FC = () => {
                     {config.subject} · {config.campusName}
                   </Text>
                 </View>
-                <View className="rounded-full bg-[#fff4f2] px-[16rpx] py-[8rpx]">
+                <View className="rounded-[8rpx] bg-[#fff4f2] px-[16rpx] py-[8rpx]">
                   <Text className="text-[22rpx] font-medium text-[#de7567]">
                     {getTeacherBookingNextSlotSummary(config)}
                   </Text>
@@ -319,7 +319,7 @@ const BookingTeacherConfigPage: React.FC = () => {
               <View className="mb-[18rpx] flex items-center justify-between">
                 <Text className="text-[28rpx] font-semibold text-[#202939]">时段列表</Text>
                 <View
-                  className="rounded-full border border-[#f5c6bf] bg-[#fff4f2] px-[18rpx] py-[8rpx]"
+                  className="rounded-[8rpx] border border-[#f5c6bf] bg-[#fff4f2] px-[18rpx] py-[8rpx]"
                   onClick={() => void handleAddTimeSlot()}
                 >
                   <Text className="text-[22rpx] font-medium text-[#de7567]">新增时段</Text>
@@ -359,7 +359,10 @@ const BookingTeacherConfigPage: React.FC = () => {
               {ruleSummaryList.length ? (
                 <View className="mb-[18rpx] flex flex-wrap gap-[12rpx]">
                   {ruleSummaryList.map((summary) => (
-                    <View key={summary} className="rounded-full bg-[#fff4f2] px-[16rpx] py-[8rpx]">
+                    <View
+                      key={summary}
+                      className="rounded-[8rpx] bg-[#fff4f2] px-[16rpx] py-[8rpx]"
+                    >
                       <Text className="text-[22rpx] text-[#de7567]">{summary}</Text>
                     </View>
                   ))}
@@ -408,7 +411,7 @@ const BookingTeacherConfigPage: React.FC = () => {
             </View>
 
             <View
-              className="mt-[28rpx] flex h-[88rpx] items-center justify-center rounded-[24rpx] bg-[#f97b6d] shadow-[0_12rpx_28rpx_rgba(249,123,109,0.25)]"
+              className="mt-[28rpx] flex h-[88rpx] items-center justify-center rounded-button bg-[#f97b6d] shadow-[0_12rpx_28rpx_rgba(249,123,109,0.25)]"
               onClick={handleSave}
             >
               <Text className="text-[30rpx] font-semibold text-white">保存预约设置</Text>

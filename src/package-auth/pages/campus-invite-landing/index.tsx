@@ -194,7 +194,7 @@ const CampusInviteLanding: React.FC = () => {
             {preview.campusName} · {preview.roleLabel || preview.roleCode}
           </Text>
           <View
-            className="h-[96rpx] w-full rounded-full bg-primary flex items-center justify-center active:opacity-90"
+            className="h-[96rpx] w-full rounded-button bg-primary flex items-center justify-center active:opacity-90"
             onClick={goHome}
           >
             <Text className="text-[32rpx] font-semibold text-white">进入首页</Text>
@@ -263,7 +263,7 @@ const CampusInviteLanding: React.FC = () => {
         {canAccept ? (
           session ? (
             <View
-              className="h-[96rpx] rounded-full bg-primary flex items-center justify-center active:opacity-90"
+              className="h-[96rpx] rounded-button bg-primary flex items-center justify-center active:opacity-90"
               onClick={handleAccept}
             >
               <Text className="text-[32rpx] font-semibold text-white">
@@ -272,7 +272,7 @@ const CampusInviteLanding: React.FC = () => {
             </View>
           ) : (
             <View
-              className="h-[96rpx] rounded-full bg-primary flex items-center justify-center active:opacity-90"
+              className="h-[96rpx] rounded-button bg-primary flex items-center justify-center active:opacity-90"
               onClick={handleLogin}
             >
               <Text className="text-[32rpx] font-semibold text-white">登录并接受邀请</Text>

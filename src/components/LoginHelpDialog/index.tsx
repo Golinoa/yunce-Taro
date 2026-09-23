@@ -116,7 +116,7 @@ const LoginHelpDialog: React.FC<LoginHelpDialogProps> = ({ visible, onClose }) =
         </View>
 
         <View
-          className="h-[96rpx] rounded-full flex items-center justify-center bg-primary active:opacity-90 transition-opacity shadow-login-btn"
+          className="h-[96rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90 transition-opacity shadow-login-btn"
           onClick={onClose}
         >
           <Text className="text-[32rpx] font-semibold text-white">我知道了</Text>

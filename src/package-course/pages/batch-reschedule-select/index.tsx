@@ -314,7 +314,7 @@ const BatchRescheduleSelectPage: React.FC = () => {
                               {item.name}
                             </Text>
                             <View
-                              className={`rounded-full px-[14rpx] py-[8rpx] ${checked ? 'bg-white' : 'bg-[#f4f7fb]'}`}
+                              className={`rounded-[8rpx] px-[14rpx] py-[8rpx] ${checked ? 'bg-white' : 'bg-[#f4f7fb]'}`}
                             >
                               <Text className="text-[22rpx] text-muted-foreground">
                                 {item.studentCount}人

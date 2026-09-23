@@ -82,7 +82,11 @@ export async function getSession(): Promise<{
       return { session: null, profile: null };
     }
 
-    const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me);
+    // /auth/me 不能接受条件缓存：当前请求层不把无 body 的 304 当作成功响应，
+    // 否则冷启动会误清登录态，后续业务页没有 profile 也就不会请求数据。
+    const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me, undefined, {
+      header: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    });
     const baseProfile = mapBackendProfile(user, storedSession.access_token);
     const currentRole = mapBackendRole(user.role);
 
@@ -323,7 +327,9 @@ export async function refreshSessionForTenant(): Promise<{
     // 用 me + 新 JWT 重映射 Profile，确保 organizationId 与 token 同为真实 UUID
     let profile: Profile | null = null;
     try {
-      const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me);
+      const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me, undefined, {
+        header: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       profile = mapBackendProfile(user, nextAccessToken);
       persistLocalProfile(profile);
     } catch {

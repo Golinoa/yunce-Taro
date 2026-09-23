@@ -420,7 +420,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
                       <Text className="truncate text-[32rpx] font-semibold text-foreground">
                         {item.name}
                       </Text>
-                      <View className="rounded-full bg-[#f4f7fb] px-[14rpx] py-[8rpx]">
+                      <View className="rounded-[8rpx] bg-[#f4f7fb] px-[14rpx] py-[8rpx]">
                         <Text className="flex-shrink-0 text-[22rpx] text-muted-foreground">
                           {item.studentCount}人
                         </Text>

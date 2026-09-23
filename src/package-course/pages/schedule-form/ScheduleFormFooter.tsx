@@ -32,7 +32,7 @@ const ScheduleFormFooter: React.FC<ScheduleFormFooterProps> = ({
     )}
     <View
       className={cn(
-        'flex h-[80rpx] w-full items-center justify-center rounded-full',
+        'flex h-[80rpx] w-full items-center justify-center rounded-button',
         !canSubmit || saving || deleting ? 'bg-muted' : 'bg-primary',
       )}
       onClick={!canSubmit || saving || deleting ? undefined : onSave}

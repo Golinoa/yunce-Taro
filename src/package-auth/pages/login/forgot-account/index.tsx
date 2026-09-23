@@ -96,7 +96,7 @@ const ForgotAccountPage: React.FC = () => {
         />
 
         <View
-          className="h-[88rpx] rounded-full flex items-center justify-center bg-primary/8 active:opacity-80 mb-[24rpx]"
+          className="h-[88rpx] rounded-button flex items-center justify-center bg-primary/8 active:opacity-80 mb-[24rpx]"
           onClick={handleSendCode}
         >
           <Text className="text-[30rpx] font-semibold text-primary">
@@ -116,7 +116,7 @@ const ForgotAccountPage: React.FC = () => {
         />
 
         <View
-          className="h-[96rpx] rounded-full flex items-center justify-center bg-primary active:opacity-90 shadow-login-btn"
+          className="h-[96rpx] rounded-button flex items-center justify-center bg-primary active:opacity-90 shadow-login-btn"
           onClick={handleRecoverAccount}
         >
           <Text className="text-[32rpx] font-semibold text-white">
@@ -138,7 +138,7 @@ const ForgotAccountPage: React.FC = () => {
             <Text className="text-[36rpx] font-semibold text-primary">{recoveredAccount}</Text>
           </View>
           <View
-            className="h-[88rpx] rounded-full flex items-center justify-center bg-primary/8 active:opacity-80"
+            className="h-[88rpx] rounded-button flex items-center justify-center bg-primary/8 active:opacity-80"
             onClick={handleBackToLogin}
           >
             <Text className="text-[30rpx] font-semibold text-primary">返回登录</Text>

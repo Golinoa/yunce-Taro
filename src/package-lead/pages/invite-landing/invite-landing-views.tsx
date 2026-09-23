@@ -44,7 +44,7 @@ export const InviteLandingLoginGate: React.FC<{
       </View>
       <View
         className={cn(
-          'center h-[96rpx] rounded-[28rpx] bg-gradient-wechat shadow-wechat-btn active:opacity-90',
+          'center h-[96rpx] rounded-button bg-gradient-wechat shadow-wechat-btn active:opacity-90',
           wechatSubmitting && 'opacity-60',
         )}
         onClick={onWechatLogin}
@@ -251,7 +251,7 @@ export const InviteLandingSuccessView: React.FC<{
 
     <View className="invite-dock">
       <View
-        className="center h-[96rpx] rounded-[28rpx] bg-gradient-primary shadow-card active:opacity-90"
+        className="center h-[96rpx] rounded-button bg-gradient-primary shadow-card active:opacity-90"
         onClick={onDone}
       >
         <Text className="text-[32rpx] font-bold text-white">完成</Text>
@@ -367,13 +367,13 @@ export const InviteLandingMainView: React.FC<{
         <View className="invite-ticket mx-[28rpx] mt-[28rpx] overflow-hidden rounded-[28rpx] border border-border bg-card shadow-card">
           <View className="invite-ticket-head px-[28rpx] pb-[24rpx] pt-[28rpx]">
             <View className="mb-[16rpx] flex flex-wrap gap-[12rpx]">
-              <View className="rounded-full bg-primary/10 px-[20rpx] py-[6rpx]">
+              <View className="rounded-[8rpx] bg-primary/10 px-[20rpx] py-[6rpx]">
                 <Text className="text-[22rpx] font-semibold text-primary">
                   {isGroupBook ? '团课预约' : '免费试听'}
                 </Text>
               </View>
               {bookingClosed ? (
-                <View className="rounded-full bg-muted px-[20rpx] py-[6rpx]">
+                <View className="rounded-[8rpx] bg-muted px-[20rpx] py-[6rpx]">
                   <Text className="text-[22rpx] font-semibold text-muted-foreground">
                     {bookingClosedReason === 'lesson_started'
                       ? '已开始'
@@ -383,7 +383,7 @@ export const InviteLandingMainView: React.FC<{
                   </Text>
                 </View>
               ) : claimed ? (
-                <View className="rounded-full bg-success/10 px-[20rpx] py-[6rpx]">
+                <View className="rounded-[8rpx] bg-success/10 px-[20rpx] py-[6rpx]">
                   <Text className="text-[22rpx] font-semibold text-success">已领券</Text>
                 </View>
               ) : null}
@@ -437,20 +437,20 @@ export const InviteLandingMainView: React.FC<{
       <View className="invite-dock">
         {dockAction === 'call_campus' ? (
           <View
-            className="center h-[96rpx] rounded-[28rpx] bg-gradient-primary shadow-card active:opacity-90"
+            className="center h-[96rpx] rounded-button bg-gradient-primary shadow-card active:opacity-90"
             onClick={onCallPhone}
           >
             <Text className="text-[32rpx] font-bold text-white">联系校区重新约课</Text>
           </View>
         ) : dockAction === 'contact_teacher' ? (
-          <View className="center h-[96rpx] rounded-[28rpx] border border-border bg-card">
+          <View className="center h-[96rpx] rounded-button border border-border bg-card">
             <Text className="text-[28rpx] text-muted-foreground">
               请联系老师{teacherName ? `「${teacherName}」` : ''}另约时间
             </Text>
           </View>
         ) : (
           <View
-            className="center h-[96rpx] rounded-[28rpx] bg-gradient-primary shadow-card active:opacity-90"
+            className="center h-[96rpx] rounded-button bg-gradient-primary shadow-card active:opacity-90"
             onClick={onBookClick}
           >
             <Text className="text-[32rpx] font-bold text-white">立即预约</Text>
@@ -464,7 +464,7 @@ export const InviteLandingMainView: React.FC<{
         <View className="invite-voucher-pop">
           <View className="invite-voucher-shine" />
           <View className="invite-voucher-top">
-            <View className="mb-[20rpx] inline-flex rounded-full bg-white/20 px-[20rpx] py-[8rpx]">
+            <View className="mb-[20rpx] inline-flex rounded-[8rpx] bg-white/20 px-[20rpx] py-[8rpx]">
               <Text className="text-[22rpx] font-bold tracking-wide text-white">
                 FREE TRIAL · 免费试听券
               </Text>
@@ -493,7 +493,7 @@ export const InviteLandingMainView: React.FC<{
           </View>
           <View className="px-[28rpx] pb-[28rpx] pt-[8rpx]">
             <View
-              className="invite-cta-pulse center h-[96rpx] rounded-[28rpx] bg-gradient-primary active:opacity-90"
+              className="invite-cta-pulse center h-[96rpx] rounded-button bg-gradient-primary active:opacity-90"
               onClick={onClaim}
             >
               <Text className="text-[32rpx] font-bold text-white">立即领取</Text>
@@ -514,7 +514,7 @@ export const InviteLandingMainView: React.FC<{
           </Text>
           <View
             className={cn(
-              'center h-[96rpx] rounded-[28rpx] bg-gradient-wechat shadow-wechat-btn active:opacity-90',
+              'center h-[96rpx] rounded-button bg-gradient-wechat shadow-wechat-btn active:opacity-90',
               wechatSubmitting && 'opacity-60',
             )}
             onClick={onWechatLogin}
@@ -568,7 +568,7 @@ export const InviteLandingMainView: React.FC<{
                 <View
                   key={opt.value}
                   className={cn(
-                    'center h-[88rpx] flex-1 rounded-[20rpx] border',
+                    'center h-[88rpx] flex-1 rounded-button border',
                     childGender === opt.value
                       ? 'border-primary bg-primary/10'
                       : 'border-border bg-muted/40',
@@ -600,7 +600,7 @@ export const InviteLandingMainView: React.FC<{
 
           <View
             className={cn(
-              'center mt-[16rpx] h-[96rpx] rounded-[28rpx]',
+              'center mt-[16rpx] h-[96rpx] rounded-button',
               submitting ? 'bg-muted' : 'bg-gradient-primary',
             )}
             onClick={submitting ? undefined : onSubmit}
