@@ -5,7 +5,7 @@
  * - 家长：用户协议、主题颜色、版本、退出（无机构配置）
  * - 教师：个人项（主题颜色、同步手机日历、本人操作日志）+ 用户协议 / 版本 / 退出
  * - 机构效果与配置（待办提醒）：仅管理员/校长
- * - 管理员专属（角色权限、定时备份、重置新手引导、预警阈值）：仅管理员
+ * - 管理员专属（角色权限、定时备份、重置新手引导）：仅管理员
  * - 机构开关（场地预约、请假自动审批）：仅管理员/校长
  *
  * 视觉风格：简洁文字列表，无图标无描述，右侧箭头/开关。
@@ -18,12 +18,10 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import { SYSTEM_SETTING_ITEMS } from '@/constants/system-settings-items';
-import { campusService } from '@/services/campus';
 import { clearVisitedMap } from '@/services/onboarding';
 import { organizationService } from '@/services/organization';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
-import { getAlertThreshold, syncAlertThresholdFromCampus } from '@/utils/alert-config';
 import { isAdmin, isParentRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { getDisplayAppVersion } from '@/utils/mini-program-env';
@@ -45,7 +43,6 @@ const SystemSettings: React.FC = () => {
   const { signOut, currentRole, profile } = useAuth();
   const { activeTheme } = useThemeStore();
   const [venueBookingEnabled, setVenueBookingEnabledState] = useState(true);
-  const [alertThreshold, setAlertThresholdState] = useState(getAlertThreshold());
   const currentUserId = profile?.id || '';
   const isManagerRole = isAdmin(currentRole) || currentRole === 'principal';
   /** 请假自动审批开关（仅校长/管理员可见，null=未加载） */
@@ -59,7 +56,7 @@ const SystemSettings: React.FC = () => {
   useDidShow(() => {
     setVenueBookingEnabledState(getVenueBookingEnabled());
     const campusId = profile?.currentContext?.campusId;
-    // 设置页 TTL 守卫：本页展示的 3 项远端值（场地预约开关 / 校区预警阈值 / 请假自动审批）
+    // 设置页 TTL 守卫：本页展示的 2 项远端值（场地预约开关 / 请假自动审批）
     // 都可在页内或同级设置页改动，窗口内切回跳过重复拉取；页内改动走各自的就地更新。
     const fetchKey = `${currentUserId}|${campusId || ''}|${isManagerRole ? 'm' : 'n'}`;
     if (
@@ -74,25 +71,6 @@ const SystemSettings: React.FC = () => {
       void fetchVenueBookingEnabled()
         .then(setVenueBookingEnabledState)
         .catch(() => undefined);
-    }
-    if (campusId) {
-      void campusService
-        .getById(campusId)
-        .then((campus) => {
-          if (campus) {
-            const cfg = syncAlertThresholdFromCampus({
-              hoursAlertThreshold: campus.hoursAlertThreshold,
-              daysAlertThreshold: campus.daysAlertThreshold,
-              amountAlertThreshold: campus.amountAlertThreshold,
-            });
-            setAlertThresholdState(cfg.hours);
-          } else {
-            setAlertThresholdState(getAlertThreshold());
-          }
-        })
-        .catch(() => setAlertThresholdState(getAlertThreshold()));
-    } else {
-      setAlertThresholdState(getAlertThreshold());
     }
     // 校长/管理员：读取请假自动审批开关
     if (isManagerRole) {
@@ -141,13 +119,6 @@ const SystemSettings: React.FC = () => {
   }, []);
 
   // 同步日历经办开关已移除（2026-09-23：功能暂时下线，入口只保留「我的 → 消息通知」一处）
-
-  /** 预警阈值：合并到续费提醒页的提醒设置 */
-  const handleAlertThresholdChange = useCallback(() => {
-    Taro.navigateTo({
-      url: '/package-student/pages/renewal-reminder/index',
-    });
-  }, []);
 
   // 按角色过滤设置项
   const visibleItems = useMemo(() => {
@@ -246,18 +217,7 @@ const SystemSettings: React.FC = () => {
 
           {/* 「同步手机日历」开关已移除（2026-09-23 功能暂时下线，入口只保留「我的 → 消息通知」一处） */}
 
-          {/* 运营预警阈值配置（管理员/校长） */}
-          {(isAdmin(currentRole) || currentRole === 'principal') && (
-            <View
-              className="flex flex-row items-center justify-between px-[28rpx] py-[28rpx] active:opacity-70 press-bg border-t border-border"
-              onClick={handleAlertThresholdChange}
-            >
-              <Text className="text-[30rpx] text-foreground">续费提醒阈值</Text>
-              <Text className="text-[28rpx] text-muted-foreground">
-                ≤ {alertThreshold} 课时等 · 去设置
-              </Text>
-            </View>
-          )}
+          {/* 「续费提醒阈值」入口已移除（2026-09-24 用户口径） */}
 
           {/* 当前版本：正式版读微信线上号；开发/体验回退 package.json */}
           <View className="border-t border-border flex flex-row items-center justify-between px-[28rpx] py-[28rpx]">

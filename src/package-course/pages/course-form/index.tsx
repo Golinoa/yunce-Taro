@@ -11,6 +11,7 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { COURSE_COLOR_OPTIONS } from '@/constants/course-template-ui';
+import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useCourseTemplateStore } from '@/stores/course-template';
@@ -29,7 +30,6 @@ import CourseFormFooter from './CourseFormFooter';
 import CourseFormSheets from './CourseFormSheets';
 import { useCourseFormActions } from './use-course-form-actions';
 import { useCourseFormLoaders } from './use-course-form-loaders';
-import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 
 const CourseFormPage: React.FC = () => {
   const { create, update, remove } = useCourseTemplateStore();

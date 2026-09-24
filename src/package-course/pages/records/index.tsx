@@ -1,5 +1,6 @@
-import { View, Text } from '@tarojs/components';
+import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
+import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import Empty from '@/components/Empty';
@@ -20,6 +21,19 @@ import { withRouteGuard } from '@/utils/route-guard';
 
 /** 快捷日期范围 */
 type QuickRange = 'week' | 'month' | 'all' | 'custom';
+
+/** 快捷日期筛选标签（导航栏下方标签条，参考「我的预约」） */
+const QUICK_RANGE_OPTIONS: { key: QuickRange; label: string }[] = [
+  { key: 'week', label: '本周' },
+  { key: 'month', label: '本月' },
+  { key: 'all', label: '全部' },
+];
+
+/** 筛选胶囊样式（与「我的预约」状态标签一致：激活 bg-primary，未激活 bg-card） */
+const filterPillClass = (active: boolean) =>
+  cn('rounded-full px-[28rpx] py-[12rpx]', active ? 'bg-primary' : 'bg-card');
+const filterPillTextClass = (active: boolean) =>
+  cn('text-[24rpx]', active ? 'font-semibold text-primary-foreground' : 'text-muted-foreground');
 
 interface DateRange {
   start: string;
@@ -201,119 +215,95 @@ const RecordsPage: React.FC = () => {
   }
 
   return (
-    <PageContainer>
-      <View className="min-h-screen bg-gradient-subtle pb-6">
-        {/* 渐变头部 */}
-        <View className="bg-gradient-primary px-5 pt-10 pb-5">
-          <View className="flex items-center justify-between">
-            <Text className="text-2xl font-bold text-white">上课记录</Text>
-          </View>
-          {/* 快捷日期标签 */}
-          <View className="flex items-center gap-[12rpx] mt-3 flex-wrap">
-            {(
-              [
-                { key: 'week', label: '本周' },
-                { key: 'month', label: '本月' },
-                { key: 'all', label: '全部' },
-              ] as { key: QuickRange; label: string }[]
-            ).map((item) => (
+    <PageContainer className="bg-muted">
+      {/* 筛选标签条：吸附在导航栏正下方（参考「我的预约」状态标签条） */}
+      <View className="sticky top-0 z-10 bg-muted px-[24rpx] pt-[16rpx] pb-[8rpx]">
+        <ScrollView scrollX showScrollbar={false} className="whitespace-nowrap">
+          <View className="inline-flex flex-row items-center gap-[12rpx] pr-[24rpx]">
+            {QUICK_RANGE_OPTIONS.map((item) => (
               <View
                 key={item.key}
-                className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === item.key ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+                className={filterPillClass(quickRange === item.key)}
                 onClick={() => handleQuickChange(item.key)}
               >
-                <Text
-                  className={`text-sm font-medium ${quickRange === item.key ? 'text-white' : 'text-white/80'}`}
-                >
-                  {item.label}
-                </Text>
+                <Text className={filterPillTextClass(quickRange === item.key)}>{item.label}</Text>
               </View>
             ))}
             <View
-              className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === 'custom' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+              className={filterPillClass(quickRange === 'custom')}
               onClick={() => setDatePickerField('start')}
             >
-              <Text
-                className={`text-sm font-medium ${quickRange === 'custom' ? 'text-white' : 'text-white/80'}`}
-              >
+              <Text className={filterPillTextClass(quickRange === 'custom')}>
                 {customStart || '开始'}
               </Text>
             </View>
-            <Text className="text-sm text-white/60 px-[4rpx]">~</Text>
+            <Text className="px-[4rpx] text-[24rpx] text-muted-foreground">~</Text>
             <View
-              className={`py-[12rpx] px-3 rounded-round border transition-all ${quickRange === 'custom' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
+              className={filterPillClass(quickRange === 'custom')}
               onClick={() => setDatePickerField('end')}
             >
-              <Text
-                className={`text-sm font-medium ${quickRange === 'custom' ? 'text-white' : 'text-white/80'}`}
-              >
+              <Text className={filterPillTextClass(quickRange === 'custom')}>
                 {customEnd || '结束'}
               </Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
 
         {/* 多孩筛选（教师 / 家长） */}
         {students.length > 1 && (
-          <View className="flex gap-[12rpx] px-4 pb-[20rpx] overflow-x-auto flex-nowrap">
-            <View
-              className={`py-[10rpx] px-3 rounded-round border flex-shrink-0 transition-all ${filterStudentId === 'all' ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
-              onClick={() => setFilterStudentId('all')}
-            >
-              <Text
-                className={`text-sm font-medium ${filterStudentId === 'all' ? 'text-white' : 'text-white/80'}`}
-              >
-                全部
-              </Text>
-            </View>
-            {students.map((s) => (
+          <ScrollView scrollX showScrollbar={false} className="mt-[12rpx] whitespace-nowrap">
+            <View className="inline-flex flex-row gap-[12rpx] pr-[24rpx]">
               <View
-                key={s.id}
-                className={`py-[10rpx] px-3 rounded-round border flex-shrink-0 transition-all ${filterStudentId === s.id ? 'bg-white/30 border-transparent' : 'bg-white/15 border-white/20'}`}
-                onClick={() => setFilterStudentId(s.id)}
+                className={filterPillClass(filterStudentId === 'all')}
+                onClick={() => setFilterStudentId('all')}
               >
-                <Text
-                  className={`text-sm font-medium ${filterStudentId === s.id ? 'text-white' : 'text-white/80'}`}
-                >
-                  {s.name}
-                </Text>
+                <Text className={filterPillTextClass(filterStudentId === 'all')}>全部</Text>
               </View>
-            ))}
-          </View>
-        )}
-
-        {/* 统计摘要 */}
-        {filteredRecords.length > 0 && (
-          <View className="mx-4 mb-3 bg-white rounded-[24rpx] py-3 px-4 shadow-soft flex items-center justify-around">
-            <View className="flex flex-col items-center gap-[4rpx]">
-              <Text className="text-[40rpx] font-bold text-primary">{stats.totalCount}</Text>
-              <Text className="text-sm text-muted-foreground">消课次数</Text>
+              {students.map((s) => (
+                <View
+                  key={s.id}
+                  className={cn(filterPillClass(filterStudentId === s.id), 'shrink-0')}
+                  onClick={() => setFilterStudentId(s.id)}
+                >
+                  <Text className={filterPillTextClass(filterStudentId === s.id)}>{s.name}</Text>
+                </View>
+              ))}
             </View>
-            <View className="w-[2rpx] h-[48rpx] bg-input" />
-            <View className="flex flex-col items-center gap-[4rpx]">
-              <Text className="text-[40rpx] font-bold text-primary">{stats.totalHours}</Text>
-              <Text className="text-sm text-muted-foreground">消耗课时</Text>
-            </View>
-            <View className="w-[2rpx] h-[48rpx] bg-input" />
-            <View className="flex flex-col items-center gap-[4rpx]">
-              <Text className="text-[40rpx] font-bold text-primary">{stats.uniqueStudents}</Text>
-              <Text className="text-sm text-muted-foreground">涉及学生</Text>
-            </View>
-          </View>
-        )}
-
-        {/* 记录列表 */}
-        {filteredRecords.length === 0 ? (
-          <Empty icon="mdi-history" description="暂无上课记录" />
-        ) : (
-          <View className="px-4">
-            <LessonConsumptionList
-              sections={consumptionSections}
-              onRecordClick={navigateToLessonDetail}
-            />
-          </View>
+          </ScrollView>
         )}
       </View>
+
+      {/* 统计摘要 */}
+      {filteredRecords.length > 0 && (
+        <View className="mx-[24rpx] mb-[12rpx] flex items-center justify-around rounded-card bg-card px-[28rpx] py-[24rpx] shadow-soft">
+          <View className="flex flex-col items-center gap-[4rpx]">
+            <Text className="text-[40rpx] font-bold text-primary">{stats.totalCount}</Text>
+            <Text className="text-sm text-muted-foreground">消课次数</Text>
+          </View>
+          <View className="w-[2rpx] h-[48rpx] bg-input" />
+          <View className="flex flex-col items-center gap-[4rpx]">
+            <Text className="text-[40rpx] font-bold text-primary">{stats.totalHours}</Text>
+            <Text className="text-sm text-muted-foreground">消耗课时</Text>
+          </View>
+          <View className="w-[2rpx] h-[48rpx] bg-input" />
+          <View className="flex flex-col items-center gap-[4rpx]">
+            <Text className="text-[40rpx] font-bold text-primary">{stats.uniqueStudents}</Text>
+            <Text className="text-sm text-muted-foreground">涉及学生</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 记录列表 */}
+      {filteredRecords.length === 0 ? (
+        <Empty icon="mdi-history" description="暂无上课记录" />
+      ) : (
+        <View className="px-[24rpx] pb-[24rpx]">
+          <LessonConsumptionList
+            sections={consumptionSections}
+            onRecordClick={navigateToLessonDetail}
+          />
+        </View>
+      )}
 
       <DatePickerSheet
         visible={Boolean(datePickerField)}

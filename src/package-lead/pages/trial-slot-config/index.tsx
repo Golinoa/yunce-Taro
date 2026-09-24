@@ -19,12 +19,12 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import { BRAND_LOGO } from '@/constants/brand';
+import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import { leadService, studentService, teacherService } from '@/services';
 import { privateBookingService } from '@/services/private-booking';
 import type { TrialSlotConfig } from '@/types/lead';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
-import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import {
   createTeacherBookingConfig,
   readTeacherBookingConfig,

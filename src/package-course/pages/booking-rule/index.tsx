@@ -1,7 +1,8 @@
-import { View, Text, ScrollView, Switch } from '@tarojs/components';
+import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
+import Switch from '@/components/Switch';
 import {
   BOOKING_DEADLINE_OPTIONS,
   CANCEL_DEADLINE_OPTIONS,
@@ -70,11 +71,11 @@ const RuleSwitchCell: React.FC<RuleSwitchCellProps> = ({
   editLabel = '编辑',
 }) => {
   return (
-    <View className="rounded-[24rpx] bg-white px-[24rpx] py-[24rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
+    <View className="rounded-card bg-card px-[24rpx] py-[24rpx] shadow-soft">
       <View className="flex items-start justify-between gap-[24rpx]">
         <View className="min-w-0 flex-1">
-          <Text className="block text-[30rpx] font-semibold text-[#1f2937]">{title}</Text>
-          <Text className="mt-[10rpx] block text-[24rpx] leading-[36rpx] text-[#8b95a7]">
+          <Text className="block text-[30rpx] font-semibold text-foreground">{title}</Text>
+          <Text className="mt-[10rpx] block text-[24rpx] leading-[36rpx] text-muted-foreground">
             {description}
           </Text>
         </View>
@@ -82,17 +83,13 @@ const RuleSwitchCell: React.FC<RuleSwitchCellProps> = ({
         <View className="flex items-center gap-[16rpx]">
           {checked && onEdit ? (
             <View
-              className="rounded-[8rpx] border border-[#f5c6bf] bg-[#fff6f4] px-[18rpx] py-[8rpx]"
+              className="rounded-tag border border-primary/30 bg-primary-10 px-[18rpx] py-[8rpx]"
               onClick={onEdit}
             >
-              <Text className="text-[22rpx] font-medium text-[#de7567]">{editLabel}</Text>
+              <Text className="text-[22rpx] font-medium text-primary">{editLabel}</Text>
             </View>
           ) : null}
-          <Switch
-            checked={checked}
-            color="#f97b6d"
-            onChange={(event) => onToggle(event.detail.value)}
-          />
+          <Switch checked={checked} onChange={onToggle} />
         </View>
       </View>
     </View>
@@ -155,18 +152,18 @@ const BookingRulePage: React.FC = () => {
   }, [rules]);
 
   return (
-    <PageContainer safeBottom className="bg-[#f6f7fb]">
-      <View className="h-screen bg-[#f6f7fb]">
+    <PageContainer safeBottom className="bg-background">
+      <View className="min-h-screen bg-background">
         <ScrollView scrollY className="h-full" showScrollbar={false}>
           <View className="px-[24rpx] pb-[56rpx] pt-[24rpx]">
-            <View className="mb-[20rpx] rounded-[28rpx] bg-[linear-gradient(135deg,#fff6f4_0%,#ffffff_100%)] px-[28rpx] py-[24rpx] shadow-[0_8rpx_24rpx_rgba(249,123,109,0.08)]">
-              <Text className="block text-[32rpx] font-semibold text-[#202939]">预约规则</Text>
-              <Text className="mt-[10rpx] block text-[24rpx] leading-[36rpx] text-[#8b95a7]">
+            <View className="bg-card-gradient mb-[20rpx] rounded-card px-[28rpx] py-[24rpx] shadow-soft">
+              <Text className="block text-[32rpx] font-semibold text-foreground">预约规则</Text>
+              <Text className="mt-[10rpx] block text-[24rpx] leading-[36rpx] text-muted-foreground">
                 统一管理家长端可见性、预约限制、候补与取消规则，适用于预约制课程场景。
               </Text>
             </View>
 
-            <Text className="mb-[12rpx] ml-[8rpx] block text-[24rpx] font-medium text-[#8b95a7]">
+            <Text className="mb-[12rpx] ml-[8rpx] block text-[24rpx] font-medium text-muted-foreground">
               基础设置
             </Text>
             <View className="flex flex-col gap-[16rpx]">
@@ -212,7 +209,7 @@ const BookingRulePage: React.FC = () => {
               />
             </View>
 
-            <Text className="mb-[12rpx] ml-[8rpx] mt-[28rpx] block text-[24rpx] font-medium text-[#8b95a7]">
+            <Text className="mb-[12rpx] ml-[8rpx] mt-[28rpx] block text-[24rpx] font-medium text-muted-foreground">
               预约限制
             </Text>
             <View className="flex flex-col gap-[16rpx]">
@@ -255,9 +252,9 @@ const BookingRulePage: React.FC = () => {
               />
             </View>
 
-            <View className="mt-[32rpx] rounded-[24rpx] bg-white px-[24rpx] py-[22rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
-              <Text className="block text-[28rpx] font-semibold text-[#202939]">当前生效摘要</Text>
-              <Text className="mt-[12rpx] block text-[24rpx] leading-[38rpx] text-[#8b95a7]">
+            <View className="mt-[32rpx] rounded-card bg-card px-[24rpx] py-[22rpx] shadow-soft">
+              <Text className="block text-[28rpx] font-semibold text-foreground">当前生效摘要</Text>
+              <Text className="mt-[12rpx] block text-[24rpx] leading-[38rpx] text-muted-foreground">
                 {rules.parentVisible ? '家长端可见；' : '家长端隐藏；'}
                 {rules.waitlistEnabled ? `${waitlistSummary}；` : '不启用候补；'}
                 {rules.cancelEnabled ? `${cancelSummary}；` : '不允许取消预约；'}
@@ -268,11 +265,8 @@ const BookingRulePage: React.FC = () => {
               </Text>
             </View>
 
-            <View
-              className="mt-[28rpx] flex h-[88rpx] items-center justify-center rounded-button bg-[#f97b6d] shadow-[0_12rpx_28rpx_rgba(249,123,109,0.25)]"
-              onClick={handleSave}
-            >
-              <Text className="text-[30rpx] font-semibold text-white">保存规则</Text>
+            <View className="btn-primary mt-[28rpx] bg-primary shadow-float" onClick={handleSave}>
+              <Text className="text-[30rpx] font-semibold text-primary-foreground">保存规则</Text>
             </View>
           </View>
         </ScrollView>

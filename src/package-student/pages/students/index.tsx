@@ -10,10 +10,10 @@ import LeadCard from '@/components/lead/LeadCard';
 import MemberActionSheet from '@/components/student/MemberActionSheet';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
+import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
 import { useLeadStore } from '@/stores/lead';
-import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import type { LeadFilterTab } from '@/types/lead';
 import type { Student, StudentSort, PackageTag } from '@/types/student';
 import { SORT_OPTIONS } from '@/types/student';
@@ -132,7 +132,7 @@ const Students: React.FC = () => {
         canLoadStudents,
       },
     });
-  }, [authLoading, actorId, currentRole, profile, canLoadStudents]);
+  }, [authLoading, actorId, currentRole, profile, canLoadStudents, effectiveCampusId]);
 
   /**
    * P0 诊断：`queryFnRuns=0` 证明 queryFn 从未执行 —— query 在 `fetch()` 标记 fetching 之后、

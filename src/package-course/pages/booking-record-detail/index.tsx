@@ -357,7 +357,10 @@ const BookingRecordDetailPage: React.FC = () => {
               {ruleSummaryList.length ? (
                 <View className="mb-[14rpx] flex flex-wrap gap-[12rpx]">
                   {ruleSummaryList.map((summary) => (
-                    <View key={summary} className="rounded-[8rpx] bg-primary-10 px-[16rpx] py-[8rpx]">
+                    <View
+                      key={summary}
+                      className="rounded-[8rpx] bg-primary-10 px-[16rpx] py-[8rpx]"
+                    >
                       <Text className="text-[22rpx] text-primary">{summary}</Text>
                     </View>
                   ))}

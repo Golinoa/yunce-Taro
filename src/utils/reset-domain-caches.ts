@@ -13,8 +13,8 @@ import { useLeadStore } from '@/stores/lead';
 import { usePackageTemplateStore } from '@/stores/package-template';
 import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
-import { queryClient } from '@/utils/query-client';
 import { clearAllCache } from '@/utils/cache-store';
+import { queryClient } from '@/utils/query-client';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 
 export type ResetDomainCachesScope = 'all' | 'campus';
