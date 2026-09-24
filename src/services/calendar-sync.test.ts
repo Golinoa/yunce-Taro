@@ -29,6 +29,19 @@ vi.mock('@/services/subscribe-message', () => ({
   },
 }));
 
+vi.mock('@/utils/calendar-sync-settings', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/calendar-sync-settings')>(
+    '@/utils/calendar-sync-settings',
+  );
+  // 功能总开关当前为 false（2026-09-23 暂时下线），源码保持该状态不变。
+  // 本文件验证的是「开启后」的同步逻辑，故在测试运行期模拟开关开启，
+  // 以保证「恢复开关」后的回归路径仍被 CI 覆盖。
+  return {
+    ...actual,
+    CALENDAR_SYNC_FEATURE_ENABLED: true,
+  };
+});
+
 const USER = 'calendar-sync-user';
 
 const baseSchedule: Schedule = {
