@@ -210,6 +210,8 @@ const StudentDetail: React.FC = () => {
         student={student}
         statusBarHeight={statusBarHeight}
         onBack={actions.goBack}
+        onEdit={isTeacher ? actions.goToEditStudent : undefined}
+        onDeleteStudent={isTeacher ? actions.handleDeleteStudent : undefined}
         onCopyPhone={actions.handleCopyPhone}
         onCallPhone={actions.handleCallPhone}
         onSendMessage={actions.handleSendMessage}

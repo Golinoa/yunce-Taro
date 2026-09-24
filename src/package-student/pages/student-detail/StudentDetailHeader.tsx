@@ -14,6 +14,10 @@ export interface StudentDetailHeaderProps {
   student: Student;
   statusBarHeight: number;
   onBack: () => void;
+  /** 编辑学员入口（仅教职工传入，家长端不显示） */
+  onEdit?: () => void;
+  /** 删除学员入口（软删除，仅教职工传入，家长端不显示） */
+  onDeleteStudent?: () => void;
   onCopyPhone: () => void;
   onCallPhone: () => void;
   onSendMessage: () => void;
@@ -23,6 +27,8 @@ const StudentDetailHeader: React.FC<StudentDetailHeaderProps> = ({
   student,
   statusBarHeight,
   onBack,
+  onEdit,
+  onDeleteStudent,
   onCopyPhone,
   onCallPhone,
   onSendMessage,
@@ -91,6 +97,28 @@ const StudentDetailHeader: React.FC<StudentDetailHeaderProps> = ({
             )}
           </View>
         </View>
+
+        {/* 姓名 行右侧操作：编辑 / 删除（软删除，仅教职工可见） */}
+        {(onEdit || onDeleteStudent) && (
+          <View className="flex flex-row items-center gap-[12rpx] flex-shrink-0">
+            {onEdit && (
+              <View
+                className="rounded-full bg-card/80 px-[20rpx] py-[10rpx] center press-scale shadow-soft"
+                onClick={onEdit}
+              >
+                <Text className="text-[24rpx] font-medium text-primary">编辑</Text>
+              </View>
+            )}
+            {onDeleteStudent && (
+              <View
+                className="rounded-full bg-card/80 px-[20rpx] py-[10rpx] center press-scale shadow-soft"
+                onClick={onDeleteStudent}
+              >
+                <Text className="text-[24rpx] font-medium text-error">删除</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );

@@ -7,8 +7,9 @@
 import Taro from '@tarojs/taro';
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { navigateToLessonDetail } from '@/components/lesson/LessonConsumptionList';
-import { leaveService, packageService } from '@/services';
+import { leaveService, packageService, studentService } from '@/services';
 import { getThemeHexColors, type ThemeKey } from '@/theme';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest } from '@/types/leave-request';
@@ -60,6 +61,38 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
     setShowRefundSheet,
     setRefundSubmitting,
   } = params;
+
+  /** 编辑学员：进入 student-form 编辑模式（路由带 id 即为编辑，仅教职工入口）。 */
+  const goToEditStudent = useCallback(() => {
+    if (!student) return;
+    navigateToOnce(
+      `/package-student/pages/student-form/index?id=${encodeURIComponent(student.id)}`,
+    );
+  }, [student]);
+
+  /**
+   * 删除学员（软删除）：确认后调用后端删除接口（status → INACTIVE），
+   * 置列表刷新信号后返回；历史记录与课时数据保留在库中。
+   */
+  const handleDeleteStudent = useCallback(() => {
+    if (!student) return;
+    Taro.showModal({
+      title: '删除学员',
+      content: `确定删除学员「${student.name}」吗？删除后学员不再显示在在籍列表，历史记录将保留。`,
+      confirmColor: getThemeHexColors(activeTheme).error,
+      success: (res) => {
+        if (!res.confirm) return;
+        studentService
+          .remove(student.id)
+          .then(() => {
+            setRefreshSignal(REFRESH_SIGNAL.students);
+            Taro.showToast({ title: '已删除', icon: 'success' });
+            setTimeout(() => Taro.navigateBack(), 600);
+          })
+          .catch(() => Taro.showToast({ title: '删除失败，请重试', icon: 'none' }));
+      },
+    });
+  }, [student, activeTheme]);
 
   const handleCopyPhone = useCallback(() => {
     const phone = student?.phone;
@@ -304,6 +337,8 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
   }, []);
 
   return {
+    goToEditStudent,
+    handleDeleteStudent,
     handleCopyPhone,
     handleCallPhone,
     handleSendMessage,
