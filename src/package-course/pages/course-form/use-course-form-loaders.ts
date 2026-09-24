@@ -36,7 +36,7 @@ export interface UseCourseFormLoadersParams {
   setLoading: (v: boolean) => void;
   fetchList: () => Promise<unknown>;
   fetchTeachers: () => void;
-  fetchByTeacher: (teacherId: string) => Promise<Student[]>;
+  fetchByTeacher: (teacherId: string, campusId?: string) => Promise<Student[]>;
   defaultCategorySetRef: MutableRefObject<boolean>;
   captureBaselineRef: MutableRefObject<boolean>;
   unloadedRef: MutableRefObject<boolean>;
@@ -429,14 +429,15 @@ export function useCourseFormLoaders(params: UseCourseFormLoadersParams): void {
   // 班课模式：加载学员列表（依赖当前教师身份）
   useEffect(() => {
     if (!isClassMode || !profileId) return;
-    fetchByTeacher(profileId)
+    // L3：显式传当前校区，否则学员列表按身份校区返回（切校区后不选新校区的学员）
+    fetchByTeacher(profileId, profileCampusId)
       .then(setStudentList)
       .catch((err) => {
         // 次要数据：加载失败静默置空，不打断表单填写
         logError('course-form load students', err);
         setStudentList([]);
       });
-  }, [isClassMode, profileId, fetchByTeacher, setStudentList]);
+  }, [isClassMode, profileId, profileCampusId, fetchByTeacher, setStudentList]);
 
   // 页面销毁（返回 / 切走销毁）时清理离开确认；临时图片清理策略见原注释。
   useUnload(() => {

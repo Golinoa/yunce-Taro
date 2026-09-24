@@ -13,6 +13,7 @@ import { useLeadStore } from '@/stores/lead';
 import { usePackageTemplateStore } from '@/stores/package-template';
 import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
+import { queryClient } from '@/utils/query-client';
 import { clearAllCache } from '@/utils/cache-store';
 import { invalidateStoreEntryLatestCache } from '@/utils/store-entry-onboarding';
 
@@ -36,6 +37,10 @@ export function resetDomainCaches(scope: ResetDomainCachesScope = 'all'): void {
   useCourseTemplateStore.getState().invalidateCache();
   useCardTypeStore.getState().invalidateCache();
   invalidateStoreEntryLatestCache();
+
+  // TanStack Query 缓存：此前只清 zustand，切校区后 queryKey 不变 → 列表仍是旧校区数据。
+  // 统一失效全部 query，让下一次渲染按新校区重新拉取。
+  void queryClient.invalidateQueries();
 
   if (scope === 'all') {
     useCampusStore.getState().invalidateCache();

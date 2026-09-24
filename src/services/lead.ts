@@ -101,9 +101,21 @@ export async function getLeadById(leadId: string): Promise<Lead | null> {
 export async function getLeadCards(
   teacherId: string,
   filterTab?: LeadFilterTab,
+  /**
+   * 校区维度（2026-09-24 统一数据源）：显式传当前校区，后端 /leads 支持 campusId 过滤。
+   * 不传时后端回落身份校区，切校区后线索列表就不会变。
+   */
+  campusId?: string,
 ): Promise<LeadCardModel[]> {
   const leads = await fetchAllPages(
-    (page, pageSize) => fetchLeadListPage({ teacherId, page, pageSize, filterTab }),
+    (page, pageSize) =>
+      fetchLeadListPage({
+        teacherId,
+        page,
+        pageSize,
+        filterTab,
+        ...(campusId ? { campusId } : {}),
+      }),
     API_PAGE_SIZE_BATCH,
   );
   const cards = leads.map((lead) => ({

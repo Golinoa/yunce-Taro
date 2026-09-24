@@ -1,7 +1,8 @@
 /**
- * 微信小程序本地开发构建：Mock 关 + API → Windows/WSL 可访问的本机后端
+ * 微信小程序本地开发构建：Mock 关 + API → 联调环境
  *
- * 前置：curl http://127.0.0.1:3000/health 返回 ok
+ * API 基址：https://dev.chancore.cn/api/app/v1（联调环境，health 探针：https://dev.chancore.cn/health 返回 200）
+ * ⚠️ 用户口径（2026-09-24）：禁止用 http://127.0.0.1:3000 本机地址打包；联调域名是 dev（非 devops）。
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const DEFAULT_DEV_API_BASE = 'http://127.0.0.1:3000/api/app/v1';
+const DEFAULT_DEV_API_BASE = 'https://dev.chancore.cn/api/app/v1';
 const API_BASE = process.env.TARO_API_BASE_URL ?? DEFAULT_DEV_API_BASE;
 
 function verifyDevDist() {

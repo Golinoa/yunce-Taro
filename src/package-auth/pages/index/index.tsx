@@ -38,17 +38,22 @@ const Index: React.FC = () => {
   }, [ensureCampusesLoaded]);
 
   // 加载教师与今日课表数据
+  // 依赖含 currentCampusId：切校区后必须按新校区重拉课表（此前只依赖 profile，切了校区课表不动）
   useEffect(() => {
     const loadData = async () => {
       if (!profile?.id) return;
       const teacherInfo = await homeService.getTeacher(profile.id);
       if (!teacherInfo) return;
 
-      const scheduleList = await homeService.getTodaySchedules(teacherInfo.id);
+      const scheduleList = await homeService.getTodaySchedules(
+        teacherInfo.id,
+        profile.currentContext?.role || null,
+        currentCampusId || undefined,
+      );
       setSchedules(scheduleList);
     };
     loadData();
-  }, [profile]);
+  }, [profile, currentCampusId]);
 
   const handleOpenCampusSheet = useCallback(() => {
     setShowCampusSheet(true);

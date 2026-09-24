@@ -29,6 +29,7 @@ import CourseFormFooter from './CourseFormFooter';
 import CourseFormSheets from './CourseFormSheets';
 import { useCourseFormActions } from './use-course-form-actions';
 import { useCourseFormLoaders } from './use-course-form-loaders';
+import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 
 const CourseFormPage: React.FC = () => {
   const { create, update, remove } = useCourseTemplateStore();
@@ -36,6 +37,7 @@ const CourseFormPage: React.FC = () => {
   const { profile } = useAuth();
   const { teachers, fetchTeachers } = useTeacherStore();
   const { fetchByTeacher } = useStudentStore();
+  const currentCampusId = useCurrentCampusId();
   const instance = Taro.getCurrentInstance();
   const courseId = decodeURIComponent(instance?.router?.params?.id || '');
   const isEdit = !!courseId;
@@ -164,7 +166,8 @@ const CourseFormPage: React.FC = () => {
     routeCategoryId,
     profileId: profile?.id,
     profileRole: profile?.currentContext?.role,
-    profileCampusId: profile?.currentContext?.campusId,
+    // L1：统一走当前校区（选中校区优先、身份校区兜底）
+    profileCampusId: currentCampusId,
     setLoading,
     fetchList,
     fetchTeachers,

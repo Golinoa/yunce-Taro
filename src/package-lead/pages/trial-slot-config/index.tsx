@@ -24,6 +24,7 @@ import { privateBookingService } from '@/services/private-booking';
 import type { TrialSlotConfig } from '@/types/lead';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
+import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import {
   createTeacherBookingConfig,
   readTeacherBookingConfig,
@@ -90,6 +91,8 @@ type SelectedSlotType = 'normal' | 'course' | 'rest';
 
 const TrialSlotConfigPage: React.FC = () => {
   const { profile, loading: authLoading } = useAuth();
+  /** L1 统一校区口径：选中校区优先、身份校区兜底 */
+  const effectiveCampusId = useCurrentCampusId();
   const navSafeHeight = useNavSafeHeight();
   const [params, setParams] = useState<PageParams>({});
   const [teacher, setTeacher] = useState<TeacherUIModel | null>(null);
@@ -230,17 +233,14 @@ const TrialSlotConfigPage: React.FC = () => {
     if (!params.teacherId) return;
     setLoading(true);
     try {
-      const list = await leadService.getTrialSlotConfigs(
-        params.teacherId,
-        profile?.currentContext?.campusId,
-      );
+      const list = await leadService.getTrialSlotConfigs(params.teacherId, effectiveCampusId);
       setSlots(list);
     } catch {
       Taro.showToast({ title: '时段加载失败', icon: 'none' });
     } finally {
       setLoading(false);
     }
-  }, [params.teacherId, profile?.currentContext?.campusId]);
+  }, [params.teacherId, effectiveCampusId]);
 
   /**
    * R2 就绪闸门：本页取数依赖 params.teacherId（useLoad 异步回填）与
@@ -252,7 +252,7 @@ const TrialSlotConfigPage: React.FC = () => {
    */
   const slotConfigFetchKey =
     params.teacherId && !authLoading
-      ? `${params.teacherId}|${profile?.id ?? ''}|${profile?.currentContext?.campusId ?? ''}`
+      ? `${params.teacherId}|${profile?.id ?? ''}|${effectiveCampusId ?? ''}`
       : '';
 
   useEffect(() => {
@@ -321,7 +321,7 @@ const TrialSlotConfigPage: React.FC = () => {
           endTime,
           courseName: teacher?.subject ? `${teacher.subject}私教` : '私教课',
           teacherName: teacher?.name || '老师',
-          campusId: profile.currentContext?.campusId,
+          campusId: effectiveCampusId,
         });
         // 本地镜像仅作离线展示草稿；真相源为后端 PrivateLessonBooking
         upsertParentBooking({
@@ -334,7 +334,7 @@ const TrialSlotConfigPage: React.FC = () => {
           courseName:
             created.courseName || (teacher?.subject ? `${teacher.subject}私教` : '私教课'),
           courseType: 'oneOnOne',
-          campusId: profile.currentContext?.campusId,
+          campusId: effectiveCampusId,
           lessonDate: dateStr,
           timeRange: `${time}-${endTime}`,
           teacherName: teacher?.name || '老师',

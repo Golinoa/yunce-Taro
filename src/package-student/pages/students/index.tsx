@@ -13,6 +13,7 @@ import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
 import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
 import { useLeadStore } from '@/stores/lead';
+import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
 import type { LeadFilterTab } from '@/types/lead';
 import type { Student, StudentSort, PackageTag } from '@/types/student';
 import { SORT_OPTIONS } from '@/types/student';
@@ -89,6 +90,8 @@ const Students: React.FC = () => {
   const { profile, session, loading: authLoading } = useAuth();
   const currentRole = profile?.currentContext?.role;
   const isTeacher = isStaffRole(currentRole);
+  /** 校区数据源统一（2026-09-24）：全站统一入口，选中校区优先、身份校区兜底 */
+  const effectiveCampusId = useCurrentCampusId();
 
   // 导航栏与「我的」/数据页同款弥散渐变顶部色无缝衔接
   useThemedNavigationBar((themeHex) => ({
@@ -125,7 +128,7 @@ const Students: React.FC = () => {
         hasProfile: Boolean(profile),
         profileId: actorId || null,
         role: currentRole || null,
-        campusId: profile?.currentContext?.campusId || null,
+        campusId: effectiveCampusId || null,
         canLoadStudents,
       },
     });
@@ -196,7 +199,7 @@ const Students: React.FC = () => {
     'students',
     isTeacher ? 'teacher' : 'parent',
     actorId,
-    profile?.currentContext?.campusId,
+    effectiveCampusId,
     debouncedKeyword.trim(),
   ];
   const queryFnRunsRef = useRef(0);
@@ -212,7 +215,7 @@ const Students: React.FC = () => {
         data: {
           role: currentRole || null,
           actorId: actorId || null,
-          campusId: profile?.currentContext?.campusId || null,
+          campusId: effectiveCampusId || null,
           keyword: debouncedKeyword,
           pageParam,
         },
@@ -228,7 +231,7 @@ const Students: React.FC = () => {
             actorId,
             pageParam,
             API_PAGE_SIZE_BATCH,
-            profile?.currentContext?.campusId,
+            effectiveCampusId,
             debouncedKeyword,
           )
         : studentService.getPageByParent(actorId, pageParam, API_PAGE_SIZE_BATCH, debouncedKeyword);
@@ -310,7 +313,7 @@ const Students: React.FC = () => {
           actorId,
           1,
           API_PAGE_SIZE_BATCH,
-          profile?.currentContext?.campusId,
+          effectiveCampusId,
           debouncedKeyword,
         )
       : studentService.getPageByParent(actorId, 1, API_PAGE_SIZE_BATCH, debouncedKeyword);
@@ -398,7 +401,7 @@ const Students: React.FC = () => {
 
   // 同步当前校区课时预警阈值（卡片黄标依赖）
   useEffect(() => {
-    const campusId = profile?.currentContext?.campusId;
+    const campusId = effectiveCampusId;
     if (!campusId) return;
     void campusService
       .getById(campusId)
@@ -412,7 +415,7 @@ const Students: React.FC = () => {
         }
       })
       .catch((err) => logError('sync alert threshold', err));
-  }, [profile?.currentContext?.campusId]);
+  }, [effectiveCampusId]);
 
   // ====== 线索 Tab 状态 ======
   const teacherId = session?.user.id || '';
@@ -426,17 +429,23 @@ const Students: React.FC = () => {
     invalidate,
   } = useLeadStore();
 
-  // 当前 tab 的缓存 key
-  const leadCacheKey = `${teacherId}::${activeFilterTab}`;
+  // 当前 tab 的缓存 key（L2：含校区，与 store 内 key 规则一致）
+  const leadCacheKey = `${teacherId}::${effectiveCampusId || 'all'}::${activeFilterTab}`;
   const leadList = useMemo(() => leadCache[leadCacheKey] || [], [leadCache, leadCacheKey]);
   const isLeadLoading = leadLoading[leadCacheKey];
 
-  // 加载线索数据
+  // 加载线索数据（L3：显式传当前校区）
   const loadLeads = useCallback(async () => {
     if (!teacherId) return;
-    fetchCards(teacherId, activeFilterTab);
+    fetchCards(teacherId, activeFilterTab, false, effectiveCampusId);
     fetchSummary(teacherId);
-  }, [teacherId, activeFilterTab, fetchCards, fetchSummary]);
+  }, [teacherId, activeFilterTab, fetchCards, fetchSummary, effectiveCampusId]);
+
+  // 切校区后按新校区重拉线索（学员列表靠 queryKey 自动重拉，线索走 store 缓存需显式触发）
+  useEffect(() => {
+    if (mainTab !== 'lead') return;
+    loadLeads();
+  }, [mainTab, loadLeads]);
 
   // ====== 公共生命周期 ======
   useDidShow(() => {

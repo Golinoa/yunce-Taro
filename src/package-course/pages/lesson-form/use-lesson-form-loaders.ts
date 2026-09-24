@@ -56,7 +56,7 @@ export interface UseLessonFormLoadersParams {
   teacherOptions: TeacherUIModel[];
   matchedPackage: CoursePackage | null;
   packageManualRef: MutableRefObject<boolean>;
-  fetchClassesByTeacher: (teacherId: string) => Promise<Class[]>;
+  fetchClassesByTeacher: (teacherId: string, campusId?: string) => Promise<Class[]>;
   setMode: Dispatch<SetStateAction<'single' | 'class'>>;
   setLessonDate: Dispatch<SetStateAction<string>>;
   setLessonTime: Dispatch<SetStateAction<string>>;
@@ -308,7 +308,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
 
     const loadData = async () => {
       const [classList, teacherList, campusList, scheduledIds] = await Promise.all([
-        fetchClassesByTeacher(currentTeacherId),
+        // L3：显式传当前校区，班级列表按所选校区返回
+        fetchClassesByTeacher(currentTeacherId, campusId),
         teacherService.getList(),
         campusService.getList(),
         classService.getScheduledClassIds(),

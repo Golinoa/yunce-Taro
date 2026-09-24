@@ -287,10 +287,11 @@ const LessonForm: React.FC = () => {
   // ===== 单人模式：选择学生 =====
   const loadAllStudentsIfNeeded = useCallback(async () => {
     if (allStudents.length === 0) {
-      const list = await fetchStudentsByTeacher(currentUserId);
+      // L3：显式传当前校区，学员列表按所选校区返回
+      const list = await fetchStudentsByTeacher(currentUserId, currentCampusId);
       setAllStudents(list);
     }
-  }, [allStudents.length, currentUserId, fetchStudentsByTeacher]);
+  }, [allStudents.length, currentUserId, currentCampusId, fetchStudentsByTeacher]);
 
   const handleOpenStudentPicker = useCallback(async () => {
     await loadAllStudentsIfNeeded();

@@ -20,11 +20,15 @@ interface LeadState {
   /** 当前筛选 Tab */
   activeFilterTab: LeadFilterTab;
 
-  /** 获取线索卡片列表（优先缓存） */
+  /**
+   * 获取线索卡片列表（优先缓存）
+   * L2 规范：缓存键含校区；L3 规范：显式把当前校区传给后端（否则后端回落身份校区，切校区不生效）。
+   */
   fetchCards: (
     teacherId: string,
     filterTab?: LeadFilterTab,
     force?: boolean,
+    campusId?: string,
   ) => Promise<LeadCardModel[]>;
   /** 获取线索统计摘要 */
   fetchSummary: (teacherId: string, force?: boolean) => Promise<LeadSummary>;
@@ -44,11 +48,12 @@ export const useLeadStore = create<LeadState>((set, get) => ({
   lastFetch: {},
   activeFilterTab: 'following',
 
-  fetchCards: async (teacherId, filterTab, force = false) => {
+  fetchCards: async (teacherId, filterTab, force = false, campusId) => {
     const { cache, lastFetch } = get();
     const now = Date.now();
     const tab = filterTab || get().activeFilterTab;
-    const cacheKey = `${teacherId}::${tab}`;
+    // L2：缓存键含校区，切校区即为新 key（旧缓存不再命中）
+    const cacheKey = `${teacherId}::${campusId || 'all'}::${tab}`;
 
     // 缓存有效且非强制刷新
     if (!force && cache[cacheKey] && lastFetch[cacheKey] && now - lastFetch[cacheKey] < CACHE_TTL) {
@@ -58,7 +63,8 @@ export const useLeadStore = create<LeadState>((set, get) => ({
     set((s) => ({ loading: { ...s.loading, [cacheKey]: true } }));
 
     try {
-      const list = await leadService.getLeadCards(teacherId, tab);
+      // L3：显式传当前校区，避免后端回落身份校区
+      const list = await leadService.getLeadCards(teacherId, tab, campusId);
       set((s) => ({
         cache: { ...s.cache, [cacheKey]: list },
         loading: { ...s.loading, [cacheKey]: false },

@@ -1,5 +1,5 @@
 import Taro, { useDidShow, useDidHide, useLaunch } from '@tarojs/taro';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SubscribeAuthHost } from '@/components/subscribe';
@@ -14,6 +14,7 @@ import { clearIfVersionMismatch } from '@/utils/cache-store';
 import { logLaunchOptions, markAppColdStart } from '@/utils/launch-scene';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
+import { queryClient as sharedQueryClient } from '@/utils/query-client';
 import { consumeSubscribeOnShow } from '@/utils/subscribe-on-show';
 import 'uno.css';
 /**
@@ -52,7 +53,7 @@ import './app.scss';
  * retry 关闭：与改造前手写取数一致（原实现失败只记日志不重试），
  * 否则默认 3 次重试会把失败场景的请求数放大 4 倍。
  */
-const QUERY_STALE_TIME_MS = 30_000;
+/** 查询缓存保鲜期移至 utils/query-client（全局单例自带默认值） */
 
 /**
  * FE-15 启动自检（一次性）：确认 AbortController 可用。
@@ -71,16 +72,12 @@ reportLocalDebug({
   },
 });
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: QUERY_STALE_TIME_MS,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      retry: false,
-    },
-  },
-});
+/**
+ * 全局 QueryClient 单例（由 utils/query-client 提供）。
+ * 切校区 / 切机构 / 登出时 resetDomainCaches 需要拿到同一个实例来失效缓存，
+ * 故不能在组件内 new —— 否则清不到 TanStack 缓存（切校区列表不刷新）。
+ */
+const queryClient = sharedQueryClient;
 
 // H-02：全局未捕获错误兜底上报（经 utils/logger 门控，生产可剥离）
 if (typeof Taro !== 'undefined' && typeof Taro.onError === 'function') {
