@@ -332,11 +332,13 @@ export function navigateAfterLogin(profile?: Profile | null) {
     Taro.redirectTo({ url: '/package-auth/pages/register/index' });
     return;
   }
-  if (identities.length === 1) {
-    Taro.switchTab({ url: '/pages/home/index' });
-    return;
-  }
-  Taro.redirectTo({ url: '/package-auth/pages/role-switch/index' });
+  // 单身份与多身份一律进首页（2026-09-25）：身份切换统一走首页校区卡片，
+  // 不再重定向到 package-auth/pages/role-switch —— 该页的 switchIdentity 仍是空桩
+  // （只弹「暂未开放多身份切换」），把兼身份用户推进去等于推进死路。
+  //
+  // 多身份这条分支当前不可达（mapBackendProfile 硬编码只生成 1 个 identity），
+  // 此处属防御性收敛：后端一旦真正下发多身份，也不能把用户送进未实现的页面。
+  Taro.switchTab({ url: '/pages/home/index' });
 }
 
 // ============================================

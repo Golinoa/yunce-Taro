@@ -107,7 +107,7 @@ describe('navigateAfterLogin', () => {
     expect(switchTab).toHaveBeenCalledWith({ url: '/pages/home/index' });
   });
 
-  it('无 redirect：无身份 → 注册；单身份 → 首页；多身份 → 角色切换', () => {
+  it('无 redirect：无身份 → 注册；单身份 → 首页；多身份 → 首页（不再进未实现的角色切换页）', () => {
     navigateAfterLogin({
       ...profileWithRoles(['teacher']),
       identities: [],
@@ -120,7 +120,13 @@ describe('navigateAfterLogin', () => {
     expect(switchTab).toHaveBeenCalledWith({ url: '/pages/home/index' });
 
     switchTab.mockClear();
+    redirectTo.mockClear();
     navigateAfterLogin(profileWithRoles(['teacher', 'parent']));
-    expect(redirectTo).toHaveBeenCalledWith({ url: '/package-auth/pages/role-switch/index' });
+    // 多身份不再重定向到 package-auth/pages/role-switch：该页的 switchIdentity
+    // 是空桩，会只弹「暂未开放多身份切换」。切换入口统一为首页校区卡片。
+    expect(switchTab).toHaveBeenCalledWith({ url: '/pages/home/index' });
+    expect(redirectTo).not.toHaveBeenCalledWith({
+      url: '/package-auth/pages/role-switch/index',
+    });
   });
 });
