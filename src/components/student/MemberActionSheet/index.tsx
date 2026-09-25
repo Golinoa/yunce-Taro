@@ -51,11 +51,11 @@ const MemberActionSheet: React.FC<MemberActionSheetProps> = ({
   );
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} scrollable={false}>
-      <View
-        className="bg-background rounded-t-[40rpx] overflow-hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+    // 短操作列表（3 个选项 + 取消）：显式传 height="auto" 让面板贴合内容，不留空白。
+    // 与 PickerSheet / RelationConfirmSheet / BindOrgSheet 等短弹框保持同一写法。
+    // 注：BottomSheet 自 2026-09-25 起「不传 height」也是贴合内容（70vh 为上限），此处的显式写法仅为同类统一。
+    <BottomSheet visible={visible} onClose={onClose} height="auto" scrollable={false}>
+      <View className="bg-background rounded-t-[40rpx] overflow-hidden pb-[env(safe-area-inset-bottom)]">
         {/* 操作选项 */}
         <View className="bg-white px-[32rpx] rounded-t-[40rpx]">
           {OPTIONS.map((option, index) => (

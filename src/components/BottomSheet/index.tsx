@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { resolveSheetHeight } from './height';
 
 /**
  * BottomSheet - 统一底部弹窗组件
@@ -34,16 +35,16 @@ export interface BottomSheetProps {
   children: React.ReactNode;
   /**
    * 内容面板高度
-   * - 默认 70vh
-   * - 固定高度如 '80vh' / '600rpx'
-   * - 传 'auto' 时面板自适应内容高度（配合 maxHeightLimit 限制上限）
+   * - **不传（推荐短弹框直接不传）**：面板贴合内容，并以 `70vh` 为上限；长内容仍可滚动。
+   * - 固定高度如 `'80vh'` / `'600rpx'`：面板高度锁死。
+   * - `'auto'`：面板贴合内容；配合 `maxHeightLimit` 限制上限。
    */
   height?: string;
-  /** @deprecated 请使用 height。旧字段保留兼容 */
+  /** @deprecated 请使用 `maxHeightLimit`。旧字段按「上限」语义兼容（不是固定高度） */
   maxHeight?: string;
   /**
-   * 面板上限高度（用于 height='auto' 时限制最大高度，避免遮罩盖全屏；如 '80vh'）
-   * 固定高度模式下不生效
+   * 面板上限高度（如 '80vh'）：面板贴合内容，超过该值才收住，避免遮罩盖全屏。
+   * 未指定高度时也生效；显式固定高度模式下不生效。
    */
   maxHeightLimit?: string;
   /**
@@ -130,27 +131,26 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     return `${Math.round(windowHeight * Math.min(heightRatio, 1))}px`;
   }, [heightRatio, shouldRender]);
 
-  const isAutoHeight = height === 'auto';
-  const fixedHeight = useMemo(() => {
-    if (isAutoHeight) {
-      return undefined;
-    }
-    if (ratioHeightPx) {
-      return ratioHeightPx;
-    }
-    return height || maxHeight || '70vh';
-  }, [height, isAutoHeight, maxHeight, ratioHeightPx]);
-  const scrollAreaHeight = isAutoHeight ? undefined : `calc(${fixedHeight} - 120rpx)`;
+  /**
+   * 高度语义统一由 `resolveSheetHeight` 决策（含单测），三模式见该模块注释：
+   * 固定高度 / 显式 auto / 未指定（贴合内容 + 上限兜底）。
+   *
+   * 关键修正（2026-09-25）：未指定高度时过去落到固定 `'70vh'`，内容不满就在下方留出
+   * 一大片空白（学员操作弹框即如此）。现在贴合内容，长内容靠内容区 `max-height` 滚动。
+   */
+  const { panelStyle, scrollAreaStyle } = useMemo(
+    () =>
+      resolveSheetHeight({
+        height,
+        maxHeight,
+        maxHeightLimit,
+        ratioHeightPx,
+        hasHeightRatio: Boolean(heightRatio),
+      }),
+    [height, maxHeight, maxHeightLimit, ratioHeightPx, heightRatio],
+  );
 
   if (!mounted) return null;
-
-  // auto 模式下：内容自然撑开，用 maxHeightLimit 限制上限
-  // 固定高度模式下：高度固定为 fixedHeight
-  const panelStyle = isAutoHeight
-    ? maxHeightLimit
-      ? { maxHeight: maxHeightLimit }
-      : undefined
-    : { height: fixedHeight, maxHeight: fixedHeight };
 
   const panelPositionStyle =
     keyboardAware && keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined;
@@ -199,12 +199,8 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           </View>
         )}
         {/* 内容区 */}
-        {scrollable && !isAutoHeight ? (
-          <ScrollView
-            scrollY
-            className="bg-white"
-            style={{ height: scrollAreaHeight, maxHeight: scrollAreaHeight }}
-          >
+        {scrollable && scrollAreaStyle ? (
+          <ScrollView scrollY className="bg-white" style={scrollAreaStyle}>
             <View className={cn('bg-white', fillHeight && 'h-full flex flex-col')}>{children}</View>
           </ScrollView>
         ) : (
