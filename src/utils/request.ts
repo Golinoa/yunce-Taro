@@ -368,6 +368,19 @@ async function refreshAccessToken(): Promise<string | null> {
         return null;
       }
 
+      // 403 EMPLOYEE_RESIGNED：离职员工续期被拒。
+      // 这是终态而非后端抖动，必须与 401 同等处理（清会话 + 跳登录 + 弹离职说明）。
+      // 若落到下面的「非 401 = 抖动」分支，用户会看到「服务暂时不可用，请稍后重试」
+      // 且带着已失效的 access token 无限重试，既踢不下线也看不懂原因。
+      if (res.statusCode === 403) {
+        const resignedMessage = extractErrorMessage(res);
+        if (isEmployeeResignedMessage(resignedMessage)) {
+          handleEmployeeResigned(resignedMessage);
+          terminateSession();
+          return null;
+        }
+      }
+
       // 5xx / 429 / 其它非 401：后端抖动，凭据未必失效 —— 不清会话、不跳登录，按可重试处理
       refreshTransientFailure =
         res.statusCode === 429 ? RATE_LIMIT_MESSAGE : '服务暂时不可用，请稍后重试';

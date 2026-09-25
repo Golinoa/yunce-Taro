@@ -92,6 +92,50 @@ describe('FE-11 refresh 失败收口（清 token + 清 profile + 跳登录页）
     expect(redirectTo).toHaveBeenCalledWith(expect.objectContaining({ url: LOGIN_URL }) as never);
   });
 
+  it('refresh 返回 403 EMPLOYEE_RESIGNED：按终态收口（弹离职说明 + 清会话 + 跳登录），不当成「服务暂不可用」', async () => {
+    const taro = await freshTaro();
+    taro.setStorageSync(
+      AUTH_TOKEN_KEY,
+      JSON.stringify({ access_token: 'expired-access', refresh_token: 'R1', expires_at: 1 }),
+    );
+    taro.setStorageSync(USER_PROFILE_KEY, JSON.stringify({ id: 'p1', identities: [] }));
+
+    const redirectTo = vi.fn();
+    (taro as unknown as { redirectTo: unknown }).redirectTo = redirectTo;
+    const showModal = vi.spyOn(taro, 'showModal').mockResolvedValue({} as never);
+
+    const spy = vi.spyOn(taro, 'request').mockResolvedValue({
+      statusCode: 403,
+      data: {
+        code: 403,
+        message:
+          'EMPLOYEE_RESIGNED:您已从「星火艺术中心」离职，无法再登录该机构。如需恢复在职状态，请联系原机构管理员。',
+        data: null,
+      },
+      header: {},
+      cookies: [],
+      errMsg: 'ok',
+    } as never);
+
+    const { get } = await import('@/utils/request');
+    await expect(get('/a')).rejects.toBeTruthy();
+
+    // 只 refresh 一次；不当成抖动
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    // 弹离职说明（标题「您已离职」、已剥内部前缀）
+    expect(showModal).toHaveBeenCalledTimes(1);
+    const options = showModal.mock.calls[0]?.[0] as { title?: string; content?: string };
+    expect(options.title).toBe('您已离职');
+    expect(options.content).not.toContain('EMPLOYEE_RESIGNED');
+    expect(options.content).toContain('星火艺术中心');
+
+    // 终态收口：清会话 + 跳登录
+    expect(taro.getStorageSync(AUTH_TOKEN_KEY)).toBe('');
+    expect(taro.getStorageSync(USER_PROFILE_KEY)).toBe('');
+    expect(redirectTo).toHaveBeenCalledTimes(1);
+  });
+
   it('refresh 成功：并发请求只换一次 token，新 access/refresh 落盘并用于业务请求', async () => {
     const taro = await freshTaro();
     taro.setStorageSync(
