@@ -21,6 +21,7 @@ import StudentAvatar from '@/components/student/StudentAvatar';
 import { studentService } from '@/services';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { filterActiveStudents } from '@/utils/student-visibility';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const GENDER_MAP: Record<NonNullable<Student['gender']>, string> = {
@@ -46,8 +47,8 @@ const Children: React.FC = () => {
     setErrorMsg('');
     try {
       const list = await studentService.getByParent(profile.id);
-      // 只展示存活的
-      setStudents(list.filter((s) => s.status !== 'deleted'));
+      // 只展示在籍的（软删除的学员后端仍会返回）
+      setStudents(filterActiveStudents(list));
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : '加载子女档案失败');
     } finally {

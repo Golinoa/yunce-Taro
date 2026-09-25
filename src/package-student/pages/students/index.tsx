@@ -34,6 +34,7 @@ import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { API_PAGE_SIZE_BATCH } from '@/utils/pagination';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
+import { filterActiveStudents } from '@/utils/student-visibility';
 import { useBatchRender } from '@/utils/use-batch-render';
 import { resolveStudentQueryGate } from './students-query-gate';
 
@@ -388,8 +389,10 @@ const Students: React.FC = () => {
     };
   }, [studentsQuery.status, studentsQuery.fetchStatus, queryClient]);
 
+  // 软删除（后端 status → INACTIVE）的学员后端仍会返回，必须在这里剔除，
+  // 否则删除后列表依旧显示该学员。判定口径统一走 filterActiveStudents。
   const pagedStudents = useMemo(
-    () => studentsQuery.data?.pages.flatMap((page) => page.list) ?? [],
+    () => filterActiveStudents(studentsQuery.data?.pages.flatMap((page) => page.list) ?? []),
     [studentsQuery.data],
   );
   useEffect(() => {

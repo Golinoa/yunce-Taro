@@ -36,6 +36,7 @@ import {
   uploadImage,
 } from '@/utils/image-upload';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { filterActiveStudents } from '@/utils/student-visibility';
 import { usePrivacyForProfileFields } from '@/utils/use-privacy-for-profile-fields';
 
 type Gender = 'male' | 'female' | 'other';
@@ -314,7 +315,8 @@ const ProfileEdit: React.FC = () => {
     setLoadingChildren(true);
     try {
       const list = await studentService.getByParent(profile.id);
-      const alive = list.filter((s) => s.status !== 'deleted');
+      // 只展示在籍的子女（软删除的学员后端仍会返回）
+      const alive = filterActiveStudents(list);
       setChildren(alive);
       // 并行加载每个子女的上课次数与持卡数量
       const stats: Record<string, { lessonCount: number; packageCount: number }> = {};
