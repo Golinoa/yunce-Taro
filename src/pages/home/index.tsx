@@ -45,7 +45,12 @@ import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { markFirstScreen } from '@/utils/request-instrument';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
-import { writeStoredIdentity, type SessionIdentityType } from '@/utils/session-identity';
+import {
+  clearStoredIdentity,
+  readStoredIdentity,
+  writeStoredIdentity,
+  type SessionIdentityType,
+} from '@/utils/session-identity';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { listTodoCategoryTabs, type TodoCategoryTab } from '@/utils/todo-categories';
@@ -421,6 +426,8 @@ const Home: React.FC = () => {
    * 端不同则 JWT 里的角色不同，必须重签会话，因此统一走 POST /auth/switch-context。
    * 流程：重签 → 落会话与目标校区 → 记住本次选择的端 → 清理旧端缓存 → 重载首页。
    * 清理缓存与重载是必要的：教师端与家长端是两个端，业务数据与页面内容都不同。
+   *
+   * @returns 是否成功。冷启动恢复依赖该返回值决定是否清除本地缓存。
    */
   const switchToIdentity = useCallback(
     async (params: {
@@ -428,8 +435,8 @@ const Home: React.FC = () => {
       campusId: string;
       identity: SessionIdentityType;
       organizationName?: string;
-    }) => {
-      if (campusConfirming) return;
+    }): Promise<boolean> => {
+      if (campusConfirming) return false;
       setCampusConfirming(true);
       try {
         const switched = await switchAuthContext({
@@ -442,7 +449,7 @@ const Home: React.FC = () => {
             title: switched.error?.message || '切换失败',
             icon: 'none',
           });
-          return;
+          return false;
         }
 
         // 先落会话与目标校区，再 await，避免 effect 用新 JWT + 旧 campusId
@@ -460,12 +467,14 @@ const Home: React.FC = () => {
 
         setShowCampusSheet(false);
         await safeReLaunch('/pages/home/index');
+        return true;
       } catch (err) {
         logError('Home switchToIdentity', err);
         Taro.showToast({
           title: err instanceof Error ? err.message : '切换失败',
           icon: 'none',
         });
+        return false;
       } finally {
         setCampusConfirming(false);
       }
@@ -512,6 +521,62 @@ const Home: React.FC = () => {
     },
     [currentRole, profile?.currentContext?.organizationId, setCurrentCampusId, switchToIdentity],
   );
+
+  // 冷启动恢复上次使用的端（2026-09-25）
+  //
+  // 后端按默认规则签发（教师端优先），若本地记住的是家长端，需在此切回去。
+  // 只尝试一次：先置 ref 再执行 —— 成功时 reLaunch 会重建页面且届时角色已一致，
+  // 失败则清掉本地缓存，避免每次启动都拿同一份失效缓存重复重试。
+  const identityRestoredRef = useRef(false);
+  useEffect(() => {
+    if (identityRestoredRef.current || !homeIdentityReady) return;
+
+    const stored = readStoredIdentity();
+    const currentIdentityType: SessionIdentityType = isParentRole(currentRole) ? 'parent' : 'staff';
+    if (!stored || stored === currentIdentityType) {
+      identityRestoredRef.current = true;
+      return;
+    }
+
+    identityRestoredRef.current = true;
+
+    void (async () => {
+      if (stored === 'parent') {
+        // 家长端必须落在具体门店上，先取本人的门店列表再切
+        const result = await listParentStorefronts();
+        if (result.error || result.list.length === 0) {
+          clearStoredIdentity();
+          return;
+        }
+        const currentOrgId = profile?.currentContext?.organizationId || '';
+        const target =
+          result.list.find((item) => item.organizationId === currentOrgId) ?? result.list[0];
+        const ok = await switchToIdentity({
+          organizationId: target.organizationId,
+          campusId: target.campusId,
+          identity: 'parent',
+          organizationName: target.organizationName,
+        });
+        if (!ok) clearStoredIdentity();
+        return;
+      }
+
+      // 记住的是教师端，当前却在家长端：切回本机构当前校区
+      const ok = await switchToIdentity({
+        organizationId: profile?.currentContext?.organizationId || '',
+        campusId: currentCampusId || profile?.currentContext?.campusId || '',
+        identity: 'staff',
+      });
+      if (!ok) clearStoredIdentity();
+    })();
+  }, [
+    currentCampusId,
+    currentRole,
+    homeIdentityReady,
+    profile?.currentContext?.campusId,
+    profile?.currentContext?.organizationId,
+    switchToIdentity,
+  ]);
 
   const handlePrivateCheckIn = useCallback(
     async (bookingId: string) => {

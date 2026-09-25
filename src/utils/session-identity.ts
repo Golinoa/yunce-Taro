@@ -37,3 +37,15 @@ export function writeStoredIdentity(identity: SessionIdentityType): void {
     // 持久化失败不影响本次切换，仅下次进入回退到默认教师端
   }
 }
+
+/**
+ * 清除记住的端，回到默认教师端。
+ * 用于冷启动恢复失败时：若不清除，下次启动还会用同一份失效缓存重试一次。
+ */
+export function clearStoredIdentity(): void {
+  try {
+    Taro.removeStorageSync(IDENTITY_STORAGE_KEY);
+  } catch {
+    // 清除失败不影响本次会话
+  }
+}
