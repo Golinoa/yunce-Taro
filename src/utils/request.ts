@@ -549,6 +549,12 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
         if (isQuotaExceededMessage(body.message)) {
           handleQuotaExceeded(body.message);
         }
+        if (isEmployeeResignedMessage(body.message)) {
+          handleEmployeeResigned(body.message);
+          if (!skipAuth) {
+            terminateSession();
+          }
+        }
         throw new ApiError(body.code, body.message);
       }
       // 直接返回数据
@@ -584,6 +590,12 @@ async function performRequest<T = unknown>(options: RequestOptions): Promise<T> 
     }
     if (isQuotaExceededMessage(errorMessage)) {
       handleQuotaExceeded(errorMessage);
+    }
+    if (isEmployeeResignedMessage(errorMessage)) {
+      handleEmployeeResigned(errorMessage);
+      if (!skipAuth) {
+        terminateSession();
+      }
     }
     throw new ApiError(res.statusCode, errorMessage);
   } catch (err) {
@@ -645,6 +657,35 @@ function handleQuotaExceeded(rawMessage: string): void {
 /** 是否 QUOTA_EXCEEDED 类错误消息 */
 function isQuotaExceededMessage(message: unknown): boolean {
   return typeof message === 'string' && message.startsWith('QUOTA_EXCEEDED:');
+}
+
+/** ===== EMPLOYEE_RESIGNED 离职提示（2026-09-25）=====
+ * 后端在「无可用租户 + 存在已离职员工档案」时返回 403，message 以 EMPLOYEE_RESIGNED: 开头。
+ * 识别后弹一次离职说明弹窗（防抖 3s）。
+ *
+ * 文案刻意不使用「未注册 / 账号不存在」：该用户的档案都还在，离职是状态变更而非注销。
+ * 用「未注册」会把人导向注册流程，换手机号注册即产生重复档案。
+ * 也不提供自助入口 —— 复职只能由机构管理员在机构侧发起（restoreTeacher）。
+ */
+let employeeResignedModalShownAt = 0;
+
+function handleEmployeeResigned(rawMessage: string): void {
+  const now = Date.now();
+  if (now - employeeResignedModalShownAt < 3000) {
+    return;
+  }
+  employeeResignedModalShownAt = now;
+  Taro.showModal({
+    title: '您已离职',
+    content: rawMessage.replace(/^EMPLOYEE_RESIGNED:\s*/, ''),
+    showCancel: false,
+    confirmText: '我知道了',
+  });
+}
+
+/** 是否 EMPLOYEE_RESIGNED 类错误消息（导出供登录页抑制重复 toast：全局已弹说明弹窗） */
+export function isEmployeeResignedMessage(message: unknown): boolean {
+  return typeof message === 'string' && message.startsWith('EMPLOYEE_RESIGNED:');
 }
 
 /** 从响应体中提取可读 message（兼容 {code,data,message} 与纯文本） */

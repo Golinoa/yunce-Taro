@@ -59,6 +59,7 @@ import {
 import { getOrCreateInviteVisitorKey } from '@/utils/invite-visitor-key';
 import { logError } from '@/utils/logger';
 import { ensurePrivacyBeforeAuth, promptPrivacySyncInHandler } from '@/utils/privacy-authorize';
+import { isEmployeeResignedMessage } from '@/utils/request';
 import { useMiniProgramNavBarLayout } from '@/utils/use-nav-safe-height';
 import {
   InviteLandingLoginGate,
@@ -452,7 +453,10 @@ const InviteLandingPage: React.FC = () => {
 
       const { error } = await signInWithWechat();
       if (error) {
-        Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
+        // 离职员工：全局已弹出「您已离职」说明弹窗，此处不再叠加 toast
+        if (!isEmployeeResignedMessage(error.message)) {
+          Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
+        }
         return;
       }
       // 邀约落地：只做微信登录，不引导绑定邮箱 / 身份选择，避免流失

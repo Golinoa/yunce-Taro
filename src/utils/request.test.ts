@@ -40,8 +40,68 @@ describe('request 401 分流', () => {
   });
 });
 
-/** 构造一个成功响应；delayMs 用于让多个并发请求真正重叠 */
-function okResponse<T>(data: T, delayMs: number) {
+/** EMPLOYEE_RESIGNED：离职员工被拒登录（2026-09-25 修复） */
+describe('request 403 EMPLOYEE_RESIGNED 分流', () => {
+  const RESIGNED_MESSAGE =
+    'EMPLOYEE_RESIGNED:您已从「测试机构」离职，无法再登录该机构。如需恢复在职状态，请联系原机构管理员。';
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    try {
+      Taro.removeStorageSync('yunce-edu-auth-token');
+    } catch {
+      /* ignore */
+    }
+  });
+
+  it('识别前缀：弹「您已离职」且展示时去掉前缀，错误向上抛出 403', async () => {
+    vi.spyOn(Taro, 'request').mockResolvedValue({
+      statusCode: 403,
+      data: { code: 403, message: RESIGNED_MESSAGE, data: null },
+      header: {},
+      cookies: [],
+      errMsg: 'ok',
+    } as unknown as Taro.request.SuccessCallbackResult);
+    const showModal = vi.spyOn(Taro, 'showModal').mockResolvedValue({} as never);
+
+    const { get } = await import('@/utils/request');
+    await expect(get('/students', { page: 1 })).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 403,
+    });
+
+    expect(showModal).toHaveBeenCalledTimes(1);
+    const options = showModal.mock.calls[0]?.[0] as { title?: string; content?: string };
+    expect(options.title).toBe('您已离职');
+    // 前缀必须剥掉，且文案不得退化成「未注册 / 账号不存在」
+    expect(options.content).not.toContain('EMPLOYEE_RESIGNED');
+    expect(options.content).toContain('测试机构');
+    expect(options.content).toContain('联系原机构管理员');
+    expect(options.content).not.toContain('未注册');
+    expect(options.content).not.toContain('账号不存在');
+  });
+
+  it('普通 403 不触发离职弹窗', async () => {
+    vi.spyOn(Taro, 'request').mockResolvedValue({
+      statusCode: 403,
+      data: { code: 403, message: '权限不足：未分配角色', data: null },
+      header: {},
+      cookies: [],
+      errMsg: 'ok',
+    } as unknown as Taro.request.SuccessCallbackResult);
+    const showModal = vi.spyOn(Taro, 'showModal').mockResolvedValue({} as never);
+
+    const { get } = await import('@/utils/request');
+    await expect(get('/students', { page: 1 })).rejects.toMatchObject({ code: 403 });
+    expect(showModal).not.toHaveBeenCalled();
+  });
+});
+
+/** 构造一个成功响应；delayMs 用于让多个并发请求真正重叠 */ function okResponse<T>(
+  data: T,
+  delayMs: number,
+) {
   return new Promise((resolve) => {
     setTimeout(
       () =>

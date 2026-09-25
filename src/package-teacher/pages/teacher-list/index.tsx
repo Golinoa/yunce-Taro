@@ -138,8 +138,13 @@ const TeacherListPage: React.FC = () => {
         setResignTarget(null);
         // 切换到已离职 Tab，避免在职列表闪烁空态
         setActiveTab('resigned');
-      } catch {
-        Taro.showToast({ title: '操作失败', icon: 'none' });
+      } catch (err) {
+        // 透出后端真实原因（如「机构负责人不可直接标记离职，请先移交机构管理员」），
+        // 否则用户只看到「操作失败」无法知道该怎么处理
+        Taro.showToast({
+          title: err instanceof Error && err.message ? err.message : '操作失败',
+          icon: 'none',
+        });
       } finally {
         setResignSubmitting(false);
       }
@@ -156,8 +161,11 @@ const TeacherListPage: React.FC = () => {
       Taro.showToast({ title: '已删除', icon: 'success' });
       setDeleteTarget(null);
       setActiveTab('resigned');
-    } catch {
-      Taro.showToast({ title: '删除失败', icon: 'none' });
+    } catch (err) {
+      Taro.showToast({
+        title: err instanceof Error && err.message ? err.message : '删除失败',
+        icon: 'none',
+      });
     } finally {
       setDeleteSubmitting(false);
     }

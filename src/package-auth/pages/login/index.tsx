@@ -17,6 +17,7 @@ import {
   promptOfficialPrivacyOnUserAction,
   promptWechatOfficialPrivacyOnPageEnter,
 } from '@/utils/privacy';
+import { isEmployeeResignedMessage } from '@/utils/request';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 type PendingAction = 'wechat' | 'password' | null;
@@ -92,7 +93,10 @@ const Login: React.FC = () => {
       const { error, isNewUser, profile: nextProfile } = await signInWithWechat();
       if (error) {
         Taro.hideLoading();
-        Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
+        // 离职员工：全局已弹出「您已离职」说明弹窗，此处不再叠加 toast（也避免露出内部前缀）
+        if (!isEmployeeResignedMessage(error.message)) {
+          Taro.showToast({ title: error.message || '微信登录失败', icon: 'none' });
+        }
         return;
       }
       Taro.setStorageSync('justLoggedIn', 'true');
@@ -137,7 +141,10 @@ const Login: React.FC = () => {
       } = await signInWithUsername(trimmedAccount, trimmedPassword);
       if (error) {
         Taro.hideLoading();
-        Taro.showToast({ title: error.message || '账号登录失败', icon: 'none' });
+        // 离职员工：全局离职弹窗已给出文案，不再叠加 toast
+        if (!isEmployeeResignedMessage(error.message)) {
+          Taro.showToast({ title: error.message || '账号登录失败', icon: 'none' });
+        }
         return;
       }
       Taro.setStorageSync('justLoggedIn', 'true');
