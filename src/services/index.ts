@@ -32,7 +32,6 @@ export {
   signUp,
   validateInviteCode,
   getSession,
-  switchIdentity,
   addIdentity,
   restoreRegisterDrafts,
   logout,

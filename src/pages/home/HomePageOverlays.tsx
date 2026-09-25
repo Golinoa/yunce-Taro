@@ -12,7 +12,6 @@ import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
 import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import RelationConfirmSheet from '@/components/RelationConfirmSheet';
-import RoleSwitchSheet from '@/components/RoleSwitchSheet';
 import type { CampusUIModel } from '@/types/campus';
 import type { TodoItem, TodoCollaborationMode } from '@/types/home-todo';
 import type { UserRole } from '@/types/profile';
@@ -49,8 +48,6 @@ export interface HomePageOverlaysProps {
   onConfirmStorefront: (item: ParentStorefrontItem, identity: SessionIdentityType) => void;
   /** 机构名：员工行标题与家长行「机构 · 校区」对齐 */
   organizationName?: string;
-  roleSheetVisible: boolean;
-  onCloseRoleSheet: () => void;
   addPopoverVisible: boolean;
   categoryTabs: TodoCategoryTab[];
   addTodoDefaultQuadrant?: TodoQuadrant;
@@ -123,8 +120,6 @@ const HomePageOverlays: React.FC<HomePageOverlaysProps> = (props) => {
     onCloseCampusSheet,
     onConfirmCampus,
     onConfirmStorefront,
-    roleSheetVisible,
-    onCloseRoleSheet,
     addPopoverVisible,
     categoryTabs,
     addTodoDefaultQuadrant,
@@ -177,8 +172,6 @@ const HomePageOverlays: React.FC<HomePageOverlaysProps> = (props) => {
           onConfirmStorefront={onConfirmStorefront}
         />
       )}
-
-      <RoleSwitchSheet visible={roleSheetVisible} onClose={onCloseRoleSheet} />
 
       <AddCustomTodoPopover
         visible={addPopoverVisible}

@@ -20,7 +20,6 @@ import {
   registerStep3,
   registerWithEmailPassword,
   restoreRegisterDrafts,
-  switchIdentity as switchIdentityService,
   updateProfile as updateProfileService,
   validateInviteCode as validateInviteCodeService,
   type WechatLoginOptions,
@@ -139,8 +138,6 @@ export interface AuthState {
   /** 清空注册草稿 */
   clearRegisterDraft: () => void;
 
-  /** 切换当前身份 */
-  switchIdentity: (identityId: string) => Promise<{ error: { message: string } | null }>;
   /** 添加新身份 */
   addIdentity: (
     role: UserRole,
@@ -559,22 +556,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRegisterDraft(null);
   }, []);
 
-  // 切换身份
-  const switchIdentity = useCallback(
-    async (identityId: string) => {
-      const result = await switchIdentityService(identityId);
-      if (result.error) return { error: result.error };
-      if (result.profile) {
-        setProfile(result.profile);
-        persistAuth(result.profile, session);
-        syncUserRole(result.profile.currentContext.role);
-        resetDomainCaches('all');
-      }
-      return { error: null };
-    },
-    [session, persistAuth, syncUserRole],
-  );
-
   // 添加身份
   const addIdentity = useCallback(
     async (role: UserRole, roleInfo: PrincipalRoleInfo | TeacherRoleInfo | ParentRoleInfo) => {
@@ -686,7 +667,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signUpStep3,
       updateRegisterDraft,
       clearRegisterDraft,
-      switchIdentity,
       addIdentity,
       validateInviteCode,
       refreshProfile,
@@ -716,7 +696,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signUpStep3,
       updateRegisterDraft,
       clearRegisterDraft,
-      switchIdentity,
       addIdentity,
       validateInviteCode,
       refreshProfile,

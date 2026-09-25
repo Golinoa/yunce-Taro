@@ -25,8 +25,6 @@ export default defineAppConfig({
         'pages/parent-onboarding/index',
         'pages/campus-invite-landing/index',
         'pages/invite-register/index',
-        'pages/role-switch/index',
-        'pages/role-switch/add-role',
       ],
     },
     {

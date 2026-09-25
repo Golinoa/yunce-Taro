@@ -111,7 +111,6 @@ const Home: React.FC = () => {
     setAllowedCampusIds,
   } = useCampusStore();
   const { activeTheme } = useThemeStore();
-  const [roleSheetVisible, setRoleSheetVisible] = useState(false);
   const [showCampusSheet, setShowCampusSheet] = useState(false);
   const [parentStorefronts, setParentStorefronts] = useState<ParentStorefrontItem[]>([]);
   const [campusConfirming, setCampusConfirming] = useState(false);
@@ -910,8 +909,6 @@ const Home: React.FC = () => {
         onCloseCampusSheet={handleCloseCampusSheet}
         onConfirmCampus={handleConfirmCampus}
         onConfirmStorefront={handleConfirmStorefront}
-        roleSheetVisible={roleSheetVisible}
-        onCloseRoleSheet={() => setRoleSheetVisible(false)}
         addPopoverVisible={addPopoverVisible}
         categoryTabs={categoryTabs}
         addTodoDefaultQuadrant={addTodoDefaultQuadrant}

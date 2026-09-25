@@ -27,7 +27,6 @@ export const AUTH_ENDPOINTS = {
   register: '/auth/register',
   refresh: '/auth/refresh',
   profile: '/profile',
-  switchRole: '/auth/switch-role',
   switchContext: '/auth/switch-context',
   parentStorefronts: '/auth/parent-storefronts',
   wechatLogin: '/auth/wechat-login',

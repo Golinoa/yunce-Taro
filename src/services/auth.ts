@@ -73,7 +73,6 @@ export {
 
 export {
   getSession,
-  switchIdentity,
   updateProfile,
   getProfileExtra,
   addIdentity,

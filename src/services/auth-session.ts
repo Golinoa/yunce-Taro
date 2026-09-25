@@ -115,13 +115,6 @@ export async function getSession(): Promise<{
   }
 }
 
-export async function switchIdentity(_identityId: string): Promise<{
-  profile: Profile | null;
-  error: { message: string } | null;
-}> {
-  return { profile: null, error: { message: '真实后端联调阶段暂未开放多身份切换' } };
-}
-
 /**
  * 更新当前用户的基础资料
  * - Mock：本地持久化到 profile storage
