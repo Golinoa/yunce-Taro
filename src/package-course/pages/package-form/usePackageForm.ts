@@ -18,6 +18,7 @@ import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import type { PageTab, RechargeMode } from './constants';
 
 /**
@@ -525,6 +526,8 @@ export function usePackageForm() {
         });
         invalidateStudents(currentUserId);
         Taro.showToast({ title: '更新成功', icon: 'success' });
+        // 让「更新成功」完整播完再退页
+        setTimeout(() => Taro.navigateBack(), SUCCESS_TOAST_MS);
       } else {
         await packageService.createRecharge({
           student_id: selectedStudent.id,
@@ -558,19 +561,30 @@ export function usePackageForm() {
             ? dayjs().add(effectiveValidDays, 'day').format('YYYY-MM-DD')
             : null;
         const expiryTip = expiryDate ? `，到期日 ${expiryDate}` : '';
-        Taro.showToast({ title: `充值成功${expiryTip}`, icon: 'success', duration: 2000 });
-        try {
-          Taro.hideToast();
-          await subscribeMessageService.runFlow('E08', {
-            studentId: selectedStudent.id,
-            studentName: selectedStudent.name,
-            role: profile?.currentContext?.role,
-          });
-        } catch (error) {
-          logError('subscribe E08 after recharge', error);
-        }
+        // 充值成功统一收尾。两个坑（2026-09-25 修复「点确定后无成功提醒、且表单页不关闭」）：
+        // 1. **不要紧跟 `Taro.hideToast()`**：那会把刚弹出的成功提示立刻抹掉，用户完全看不到提醒；
+        // 2. **订阅授权必须 fire-and-forget**：`runFlow → openPrompt` 的 Promise 只在用户点击
+        //    订阅弹框时才 resolve，若 `await` 在退页之前，一旦弹框未被点击，`navigateBack`
+        //    就永远不会执行 —— 这正是「表单页不关闭」的成因。
+        const recharged = selectedStudent;
+        Taro.showToast({
+          title: `充值成功${expiryTip}`,
+          icon: 'success',
+          duration: SUCCESS_TOAST_MS,
+        });
+        setTimeout(() => Taro.navigateBack(), SUCCESS_TOAST_MS);
+        void (async () => {
+          try {
+            await subscribeMessageService.runFlow('E08', {
+              studentId: recharged.id,
+              studentName: recharged.name,
+              role: profile?.currentContext?.role,
+            });
+          } catch (error) {
+            logError('subscribe E08 after recharge', error);
+          }
+        })();
       }
-      setTimeout(() => Taro.navigateBack(), isEdit ? 1200 : 300);
     } catch (err) {
       logError('save package', err);
       Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
