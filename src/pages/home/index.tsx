@@ -243,6 +243,11 @@ const Home: React.FC = () => {
   }, [profile?.currentContext?.organizationId, profile?.currentContext?.campusId, currentCampusId]);
 
   const handleOpenCampusSheet = useCallback(async () => {
+    // 本次实际可用的家长门店数。setParentStorefronts 是异步的，同一函数内读 state
+    // 拿到的仍是旧值，因此必须用接口刚返回的结果判断，否则纯家长首次打开会被
+    // 「暂无校区」误拦截（state 此时还是空数组）。
+    let storefrontCount = parentStorefronts.length;
+
     // 兼身份要在同一张列表里同时展示「老师」「家长」两行，因此员工身份也必须拉家长门店。
     // 后端已放开员工身份查询（仅返回本人绑定），无绑定时返回空列表属正常。
     if (isParentRole(currentRole) || isStaffRole(currentRole)) {
@@ -250,25 +255,34 @@ const Home: React.FC = () => {
       try {
         const result = await listParentStorefronts();
         if (result.error) {
-          Taro.showToast({ title: result.error.message, icon: 'none' });
-          return;
+          // 员工身份：家长门店只用于展示兼身份的第二行，失败不应阻塞校区切换
+          if (isParentRole(currentRole)) {
+            Taro.showToast({ title: result.error.message, icon: 'none' });
+            return;
+          }
+        } else {
+          // 仅纯家长身份且无门店时才拦截；员工身份没有家长绑定是常态，照常打开
+          if (result.list.length === 0 && isParentRole(currentRole)) {
+            Taro.showToast({ title: '暂无门店', icon: 'none' });
+            return;
+          }
+          setParentStorefronts(result.list);
+          storefrontCount = result.list.length;
         }
-        // 仅纯家长身份且无门店时才拦截；员工身份没有家长绑定是常态，照常打开。
-        if (result.list.length === 0 && isParentRole(currentRole)) {
-          Taro.showToast({ title: '暂无门店', icon: 'none' });
-          return;
-        }
-        setParentStorefronts(result.list);
       } catch (err) {
         logError('Home openParentStorefronts', err);
-        Taro.showToast({ title: '门店列表加载失败', icon: 'none' });
+        // 员工身份下拉取异常同样不阻塞
+        if (isParentRole(currentRole)) {
+          Taro.showToast({ title: '门店列表加载失败', icon: 'none' });
+          return;
+        }
       } finally {
         Taro.hideLoading();
       }
     }
 
     // 两端都没有可进入的入口时才拦截
-    if (campuses.length === 0 && parentStorefronts.length === 0) {
+    if (campuses.length === 0 && storefrontCount === 0) {
       Taro.showToast({ title: '暂无校区', icon: 'none' });
       return;
     }
