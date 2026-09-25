@@ -252,6 +252,11 @@ export async function listParentStorefronts(): Promise<{
 export async function switchAuthContext(input: {
   organizationId: string;
   campusId: string;
+  /**
+   * 指定切换后进哪个端（2026-09-25）：staff=教师端 / parent=家长端。
+   * 省略时由后端按机构推导（默认教师端）。身份归属由后端校验，前端不自行判定。
+   */
+  identity?: 'staff' | 'parent';
 }): Promise<{
   session: AuthSession | null;
   profile: Profile | null;
@@ -270,6 +275,7 @@ export async function switchAuthContext(input: {
     const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.switchContext, {
       organizationId,
       campusId,
+      ...(input.identity ? { identity: input.identity } : {}),
     });
     if (!data?.token || !data.refreshToken || !data.user) {
       return {

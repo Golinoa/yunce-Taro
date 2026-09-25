@@ -5,7 +5,6 @@ import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { hasShownCampusGuide } from '@/components/home/HomeCampusGuideDialog';
 import KingKongSection from '@/components/home/KingKongSection';
-import { reportLocalDebug } from '@/utils/local-debug';
 import ParentHoursSection from '@/components/home/ParentHoursSection';
 import ParentScheduleSection from '@/components/home/ParentScheduleSection';
 import type { TodoViewMode } from '@/components/home/TodoToolbar';
@@ -34,15 +33,19 @@ import type { Schedule } from '@/types/schedule';
 import type { ParentStorefrontItem } from '@/types/storefront';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
 import { isParentRole, isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
+import { clearAllCache } from '@/utils/cache-store';
 import { parseBusinessHours, getCampusOpenStatus } from '@/utils/campus';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
+import { safeReLaunch } from '@/utils/navigation';
 import { storefrontKey } from '@/utils/parent-storefront';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 /** P0 取证仪表：仅首屏打点，只读观测，不干预业务行为 */
 import { markFirstScreen } from '@/utils/request-instrument';
 import { withRouteGuard } from '@/utils/route-guard';
 import { scrollIntoViewProps } from '@/utils/scroll-view-props';
+import { writeStoredIdentity, type SessionIdentityType } from '@/utils/session-identity';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { listTodoCategoryTabs, type TodoCategoryTab } from '@/utils/todo-categories';
@@ -101,7 +104,6 @@ const Home: React.FC = () => {
     setCurrentOrganizationId,
     setOrgName,
     setAllowedCampusIds,
-    fetchCampuses,
   } = useCampusStore();
   const { activeTheme } = useThemeStore();
   const [roleSheetVisible, setRoleSheetVisible] = useState(false);
@@ -241,7 +243,9 @@ const Home: React.FC = () => {
   }, [profile?.currentContext?.organizationId, profile?.currentContext?.campusId, currentCampusId]);
 
   const handleOpenCampusSheet = useCallback(async () => {
-    if (isParentRole(currentRole)) {
+    // 兼身份要在同一张列表里同时展示「老师」「家长」两行，因此员工身份也必须拉家长门店。
+    // 后端已放开员工身份查询（仅返回本人绑定），无绑定时返回空列表属正常。
+    if (isParentRole(currentRole) || isStaffRole(currentRole)) {
       Taro.showLoading({ title: '加载中', mask: true });
       try {
         const result = await listParentStorefronts();
@@ -249,40 +253,34 @@ const Home: React.FC = () => {
           Taro.showToast({ title: result.error.message, icon: 'none' });
           return;
         }
-        if (result.list.length === 0) {
+        // 仅纯家长身份且无门店时才拦截；员工身份没有家长绑定是常态，照常打开。
+        if (result.list.length === 0 && isParentRole(currentRole)) {
           Taro.showToast({ title: '暂无门店', icon: 'none' });
           return;
         }
         setParentStorefronts(result.list);
-        setShowCampusSheet(true);
       } catch (err) {
         logError('Home openParentStorefronts', err);
         Taro.showToast({ title: '门店列表加载失败', icon: 'none' });
       } finally {
         Taro.hideLoading();
       }
-      return;
     }
 
-    if (campuses.length === 0) {
+    // 两端都没有可进入的入口时才拦截
+    if (campuses.length === 0 && parentStorefronts.length === 0) {
       Taro.showToast({ title: '暂无校区', icon: 'none' });
       return;
     }
     setShowCampusSheet(true);
-  }, [campuses.length, currentRole]);
+  }, [campuses.length, currentRole, parentStorefronts.length]);
 
   const handleCloseCampusSheet = useCallback(() => {
     if (campusConfirming) return;
     setShowCampusSheet(false);
   }, [campusConfirming]);
 
-  const handleConfirmCampus = useCallback(
-    (campus: CampusUIModel) => {
-      setCurrentCampusId(campus.id);
-      setShowCampusSheet(false);
-    },
-    [setCurrentCampusId],
-  );
+  // handleConfirmCampus 见下方 switchToIdentity 之后（端切换依赖它，需先定义）
 
   const loadCategories = useCallback(() => {
     if (!profile?.id) {
@@ -403,14 +401,27 @@ const Home: React.FC = () => {
     await queryClient.invalidateQueries({ queryKey: HOME_QUERY_ROOT });
   }, [queryClient]);
 
-  const handleConfirmStorefront = useCallback(
-    async (item: ParentStorefrontItem) => {
+  /**
+   * 切换端（教师端 ⇄ 家长端），或跨机构切换门店。
+   *
+   * 端不同则 JWT 里的角色不同，必须重签会话，因此统一走 POST /auth/switch-context。
+   * 流程：重签 → 落会话与目标校区 → 记住本次选择的端 → 清理旧端缓存 → 重载首页。
+   * 清理缓存与重载是必要的：教师端与家长端是两个端，业务数据与页面内容都不同。
+   */
+  const switchToIdentity = useCallback(
+    async (params: {
+      organizationId: string;
+      campusId: string;
+      identity: SessionIdentityType;
+      organizationName?: string;
+    }) => {
       if (campusConfirming) return;
       setCampusConfirming(true);
       try {
         const switched = await switchAuthContext({
-          organizationId: item.organizationId,
-          campusId: item.campusId,
+          organizationId: params.organizationId,
+          campusId: params.campusId,
+          identity: params.identity,
         });
         if (switched.error || !switched.session || !switched.profile) {
           Taro.showToast({
@@ -422,24 +433,21 @@ const Home: React.FC = () => {
 
         // 先落会话与目标校区，再 await，避免 effect 用新 JWT + 旧 campusId
         applyAuthPayload({ session: switched.session, profile: switched.profile });
-        if (item.organizationName) {
-          setOrgName(item.organizationName);
+        if (params.organizationName) {
+          setOrgName(params.organizationName);
         }
-        setCurrentOrganizationId(item.organizationId);
-        setCurrentCampusId(item.campusId);
-        setAllowedCampusIds([item.campusId]);
-
-        await fetchCampuses();
-        const nextCampuses = useCampusStore.getState().campuses;
-        if (nextCampuses.length > 0) {
-          setAllowedCampusIds(nextCampuses.map((c) => c.id));
-          setCurrentCampusId(item.campusId);
-        }
+        setCurrentOrganizationId(params.organizationId);
+        setCurrentCampusId(params.campusId);
+        setAllowedCampusIds([params.campusId]);
+        // 记住本次选择的端：下次进入小程序默认进入该端
+        writeStoredIdentity(params.identity);
+        // 端已切换，旧端的业务缓存全部失效
+        clearAllCache();
 
         setShowCampusSheet(false);
-        await refreshHome();
+        await safeReLaunch('/pages/home/index');
       } catch (err) {
-        logError('Home confirmStorefront', err);
+        logError('Home switchToIdentity', err);
         Taro.showToast({
           title: err instanceof Error ? err.message : '切换失败',
           icon: 'none',
@@ -451,13 +459,44 @@ const Home: React.FC = () => {
     [
       applyAuthPayload,
       campusConfirming,
-      fetchCampuses,
-      refreshHome,
       setAllowedCampusIds,
       setCurrentCampusId,
       setCurrentOrganizationId,
       setOrgName,
     ],
+  );
+
+  const handleConfirmStorefront = useCallback(
+    (item: ParentStorefrontItem, identity: SessionIdentityType) => {
+      void switchToIdentity({
+        organizationId: item.organizationId,
+        campusId: item.campusId,
+        identity,
+        organizationName: item.organizationName,
+      });
+    },
+    [switchToIdentity],
+  );
+
+  const handleConfirmCampus = useCallback(
+    (campus: CampusUIModel, identity: SessionIdentityType) => {
+      const currentIdentityType: SessionIdentityType = isParentRole(currentRole)
+        ? 'parent'
+        : 'staff';
+      // 端不一致（当前在家长端却点了「老师」行）→ 角色不同必须重签会话
+      if (identity !== currentIdentityType) {
+        void switchToIdentity({
+          organizationId: profile?.currentContext?.organizationId || '',
+          campusId: campus.id,
+          identity,
+        });
+        return;
+      }
+      // 同端切校区：无需重签，仅切本地校区
+      setCurrentCampusId(campus.id);
+      setShowCampusSheet(false);
+    },
+    [currentRole, profile?.currentContext?.organizationId, setCurrentCampusId, switchToIdentity],
   );
 
   const handlePrivateCheckIn = useCallback(
@@ -787,6 +826,7 @@ const Home: React.FC = () => {
         lastVisitedCampusId={lastVisitedCampusId}
         parentStorefronts={parentStorefronts}
         currentStorefrontKey={currentStorefrontKey}
+        organizationName={profile?.identities?.[0]?.organizationName || ''}
         campusConfirming={campusConfirming}
         onCloseCampusSheet={handleCloseCampusSheet}
         onConfirmCampus={handleConfirmCampus}

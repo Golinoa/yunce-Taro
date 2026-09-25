@@ -18,6 +18,7 @@ import type { TodoItem, TodoCollaborationMode } from '@/types/home-todo';
 import type { UserRole } from '@/types/profile';
 import type { ParentStorefrontItem } from '@/types/storefront';
 import type { TodoQuadrant } from '@/types/todo-quadrant';
+import type { SessionIdentityType } from '@/utils/session-identity';
 import type { TodoCategoryTab } from '@/utils/todo-categories';
 import { TODO_CATEGORY_INBOX_ID } from '@/utils/todo-categories';
 import type { CollaboratorSummary } from '@/utils/todo-collaborator-select';
@@ -44,8 +45,10 @@ export interface HomePageOverlaysProps {
   currentStorefrontKey: string;
   campusConfirming: boolean;
   onCloseCampusSheet: () => void;
-  onConfirmCampus: (campus: CampusUIModel) => void;
-  onConfirmStorefront: (item: ParentStorefrontItem) => void;
+  onConfirmCampus: (campus: CampusUIModel, identity: SessionIdentityType) => void;
+  onConfirmStorefront: (item: ParentStorefrontItem, identity: SessionIdentityType) => void;
+  /** 机构名：员工行标题与家长行「机构 · 校区」对齐 */
+  organizationName?: string;
   roleSheetVisible: boolean;
   onCloseRoleSheet: () => void;
   addPopoverVisible: boolean;
@@ -152,6 +155,7 @@ const HomePageOverlays: React.FC<HomePageOverlaysProps> = (props) => {
     onRelationConfirmed,
     campusGuideVisible,
     onCloseCampusGuide,
+    organizationName,
   } = props;
 
   return (
@@ -164,8 +168,9 @@ const HomePageOverlays: React.FC<HomePageOverlaysProps> = (props) => {
           campuses={campuses}
           managedCampusIds={managedCampusIds}
           lastVisitedId={lastVisitedCampusId}
-          storefronts={isParent ? parentStorefronts : undefined}
+          storefronts={parentStorefronts}
           currentStorefrontKey={currentStorefrontKey}
+          organizationName={organizationName}
           confirming={campusConfirming}
           onClose={onCloseCampusSheet}
           onConfirm={onConfirmCampus}
