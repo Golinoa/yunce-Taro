@@ -170,23 +170,39 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     ) => {
       emitScheduleRefreshSignal();
       Taro.showToast({ title, icon, duration });
-      // E05：点名成功后底部弹窗补充可发送次数（不阻断返回）
-      if (options?.renewSubscribe) {
-        try {
-          Taro.hideToast();
-          await subscribeMessageService.runFlow('E05', {
-            campusId: campusId || undefined,
-            role: profile?.currentContext?.role,
-          });
-        } catch (error) {
-          logError('subscribe E05 after checkin', error);
-        }
-      }
-      Taro.navigateBack({
-        fail: () => {
-          void Taro.switchTab({ url: '/pages/schedule/index' });
+
+      const goBack = () => {
+        Taro.navigateBack({
+          fail: () => {
+            void Taro.switchTab({ url: '/pages/schedule/index' });
+          },
+        });
+      };
+
+      /**
+       * 让成功提示播完再返回；E05 订阅补次数弹窗移到返回之后（fire-and-forget）。
+       *
+       * ⚠️ `runFlow('E05')` 的 Promise 只在用户点击订阅弹框时 resolve，
+       * 之前 `await` 写在 `navigateBack` 之前 → 不点弹框就永远不返回（2026-09-25 FE-23 同类修复）。
+       */
+      setTimeout(
+        () => {
+          goBack();
+          if (options?.renewSubscribe) {
+            void (async () => {
+              try {
+                await subscribeMessageService.runFlow('E05', {
+                  campusId: campusId || undefined,
+                  role: profile?.currentContext?.role,
+                });
+              } catch (error) {
+                logError('subscribe E05 after checkin', error);
+              }
+            })();
+          }
         },
-      });
+        Math.max(0, duration),
+      );
     },
     [campusId, emitScheduleRefreshSignal, profile?.currentContext?.role],
   );

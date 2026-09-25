@@ -33,6 +33,7 @@ import { useLeadStore } from '@/stores/lead';
 import type { Lead, LeadFollowUp, LeadBooking, TrialMode } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
 const LeadDetailPage: React.FC = () => {
@@ -204,16 +205,26 @@ const LeadDetailPage: React.FC = () => {
         setShowFollowUp(false);
         invalidate(userId || '');
         loadData(lead.id);
-        Taro.showToast({ title: '跟进已添加', icon: 'success' });
-        try {
+        Taro.showToast({ title: '跟进已添加', icon: 'success', duration: SUCCESS_TOAST_MS });
+        // 本页无退页动作；但不能紧跟 showToast 调 hideToast（会抹掉「跟进已添加」提示），
+        // 故等提示播完再 hide 并触发订阅弹框；runFlow 为 fire-and-forget。
+        setTimeout(() => {
           Taro.hideToast();
-          await subscribeMessageService.runRenewFlow('lead_follow_renew', 'lead_follow_submit', {
-            role: profile?.currentContext?.role,
-            campusId: profile?.currentContext?.campusId,
-          });
-        } catch (error) {
-          logError('subscribe E10 follow renew', error);
-        }
+          void (async () => {
+            try {
+              await subscribeMessageService.runRenewFlow(
+                'lead_follow_renew',
+                'lead_follow_submit',
+                {
+                  role: profile?.currentContext?.role,
+                  campusId: profile?.currentContext?.campusId,
+                },
+              );
+            } catch (error) {
+              logError('subscribe E10 follow renew', error);
+            }
+          })();
+        }, SUCCESS_TOAST_MS);
       } catch {
         Taro.showToast({ title: '添加失败', icon: 'none' });
       }

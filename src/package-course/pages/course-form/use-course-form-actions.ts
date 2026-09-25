@@ -24,6 +24,7 @@ import type { CheckinRole, CourseCategory } from '@/types/course-template';
 import type { TeacherUIModel } from '@/types/teacher';
 import { uploadImage } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { COURSE_MODE_LABELS, type FormErrors, type PickerType } from './course-form-constants';
 import { setLeaveGuard } from './course-form-leave-guard';
 import {
@@ -567,19 +568,23 @@ export function useCourseFormActions(params: UseCourseFormActionsParams) {
           await classService.update(courseId, classPayload);
           for (const sid of toAdd) await classService.addStudents(courseId, [sid]);
           for (const sid of toRemove) await classService.removeStudent(courseId, sid);
-          Taro.showToast({ title: '保存成功', icon: 'success' });
+          Taro.showToast({ title: '保存成功', icon: 'success', duration: SUCCESS_TOAST_MS });
           if (toAdd.length > 0) {
-            try {
-              Taro.hideToast();
-              await subscribeMessageService.runFlow('E02A', {
-                classId: courseId,
-                className: name.trim(),
-                role: profile?.currentContext?.role,
-                navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&type=class`,
-              });
-            } catch (error) {
-              logError('subscribe E02A after class assign', error);
-            }
+            // E02A：订阅授权 fire-and-forget —— runFlow 的 Promise 只在用户点击订阅弹框时
+            // resolve，若 await 在退页之前，一旦弹框未被点击页面就永不退（FE-23 同类修复）。
+            // 不要紧跟 showToast 调 hideToast：那会把「保存成功」提示抹掉。
+            void (async () => {
+              try {
+                await subscribeMessageService.runFlow('E02A', {
+                  classId: courseId,
+                  className: name.trim(),
+                  role: profile?.currentContext?.role,
+                  navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&type=class`,
+                });
+              } catch (error) {
+                logError('subscribe E02A after class assign', error);
+              }
+            })();
           }
         } else {
           const leadTeacherId = teacherId || profile?.id || '';
@@ -593,16 +598,17 @@ export function useCourseFormActions(params: UseCourseFormActionsParams) {
             },
             studentIds,
           );
-          Taro.showToast({ title: '新增成功', icon: 'success' });
-          try {
-            Taro.hideToast();
-            await subscribeMessageService.runFlow('E06', {
-              className: name.trim(),
-              role: profile?.currentContext?.role,
-            });
-          } catch (error) {
-            logError('subscribe E06 after class create', error);
-          }
+          Taro.showToast({ title: '新增成功', icon: 'success', duration: SUCCESS_TOAST_MS });
+          void (async () => {
+            try {
+              await subscribeMessageService.runFlow('E06', {
+                className: name.trim(),
+                role: profile?.currentContext?.role,
+              });
+            } catch (error) {
+              logError('subscribe E06 after class create', error);
+            }
+          })();
         }
       } else if (isEdit) {
         await update(courseId, formData);
@@ -622,11 +628,11 @@ export function useCourseFormActions(params: UseCourseFormActionsParams) {
       } catch {
         /* 静默 */
       }
-      // 延时返回让「保存成功」toast 可见；若期间用户已手动返回（页面已销毁）则跳过，
-      // 避免在上一页再触发一次 navigateBack 造成「连退两层」。
+      // 延时返回让「保存成功」toast 可见（与 SUCCESS_TOAST_MS 对齐）；若期间用户已手动返回
+      // （页面已销毁）则跳过，避免在上一页再触发一次 navigateBack 造成「连退两层」。
       setTimeout(() => {
         if (!unloadedRef.current) Taro.navigateBack();
-      }, 800);
+      }, SUCCESS_TOAST_MS);
     } catch {
       Taro.showToast({ title: isEdit ? '保存失败' : '新增失败', icon: 'none' });
     } finally {

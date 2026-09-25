@@ -16,7 +16,11 @@ import {
 } from '@/utils/image-upload';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
+import { askContinueCreate, backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { setRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
+
+/** 学员列表页（不带前导斜杠），新增成功后统一回退到这里 */
+const STUDENT_LIST_PATH = 'package-student/pages/students/index';
 
 /** 支付方式选项 */
 export const FEE_METHOD_OPTIONS = [
@@ -171,6 +175,12 @@ export function useStudentForm(): UseStudentFormReturn {
 
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
   const [campusId, setCampusId] = useState('');
+
+  /** 主校区 id：首次进页与「继续新增」重置后都用它作为默认选中项 */
+  const defaultCampusId = useMemo(
+    () => campusOptions.find((campus) => campus.isMain)?.id || '',
+    [campusOptions],
+  );
 
   const updateStudentInCache = useStudentStore((state) => state.updateInCache);
   // 校区/科目为低频参照数据：经 campus store 的 TTL 读取，避免每次进页重复请求
@@ -424,6 +434,28 @@ export function useStudentForm(): UseStudentFormReturn {
     }
   }, []);
 
+  /** 清空表单（新增成功后「继续新增」以及页面「重置」按钮共用） */
+  const handleReset = useCallback(() => {
+    setName('');
+    setNickname('');
+    setGender('');
+    setPhone('');
+    setBirthday('');
+    setAddress('');
+    setNote('');
+    setAvatarUrl('');
+    setFeeAmount('');
+    setFeeMethod('');
+    setLegacyPackages([]);
+    setStudentType('new');
+    setPaymentEnabled(false);
+    setInstallmentEnabled(false);
+    setSchedule([]);
+    setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
+    setCampusId('');
+    setErrors({});
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (saving) return;
 
@@ -558,42 +590,39 @@ export function useStudentForm(): UseStudentFormReturn {
         Taro.showToast({ title: '学员已创建', icon: 'success' });
       }
 
-      // 后端写入及必要的头像补传已经完成；订阅授权和分班确认属于后续副作用，
+      // 后端写入及必要的头像补传已经完成；订阅授权属于后续副作用，
       // 不应继续占用保存按钮的 loading 状态。
       setSaving(false);
 
       if (!isEdit && newStudent) {
-        // 保存成功的边界到此为止；订阅授权和分班询问在后台继续，不能阻塞保存按钮。
+        // 保存成功的边界到此为止。统一收尾：成功提示播完 → 询问是否继续新增 → 继续（留在本页）/ 返回列表。
+        //
+        // ⚠️ 订阅授权必须 fire-and-forget：runFlow → openPrompt 的 Promise
+        // 只在用户点击订阅弹框时才 resolve，若 await 在跳转之前，一旦弹框未被点击
+        // 跳转就永远不执行（这正是「新增成功却既不跳转也无提示」的成因）。
+        const created = newStudent;
         void (async () => {
-          Taro.hideToast();
+          if (await askContinueCreate('学员')) {
+            handleReset();
+            // 与首次进页一致：默认选中主校区
+            setCampusId(defaultCampusId);
+          } else {
+            backToListPage(STUDENT_LIST_PATH);
+          }
           try {
             await subscribeMessageService.runFlow('E01', {
-              studentId: newStudent.id,
-              studentName: newStudent.name,
+              studentId: created.id,
+              studentName: created.name,
               campusId: campusId || undefined,
               role: profile?.currentContext?.role,
             });
           } catch (error) {
             logError('subscribe E01 after student create', error);
           }
-          const { confirm } = await Taro.showModal({
-            title: '学员已创建',
-            content: '是否立即发会员卡？',
-            confirmText: '立即发卡',
-            cancelText: '稍后发卡',
-          });
-          if (confirm) {
-            Taro.navigateTo({
-              url: `/package-student/pages/member-card-issue/index?studentId=${encodeURIComponent(newStudent.id)}`,
-            });
-          } else {
-            Taro.navigateTo({
-              url: `/package-student/pages/student-detail/index?id=${encodeURIComponent(newStudent.id)}`,
-            });
-          }
         })();
       } else {
-        setTimeout(() => Taro.navigateBack(), 1500);
+        // 编辑态：让「更新成功」播完再返回
+        setTimeout(() => Taro.navigateBack(), SUCCESS_TOAST_MS);
       }
     } catch (err) {
       logError('save student', err);
@@ -625,28 +654,9 @@ export function useStudentForm(): UseStudentFormReturn {
     campusOptions,
     profile?.currentContext?.role,
     paymentEnabled,
+    handleReset,
+    defaultCampusId,
   ]);
-
-  const handleReset = useCallback(() => {
-    setName('');
-    setNickname('');
-    setGender('');
-    setPhone('');
-    setBirthday('');
-    setAddress('');
-    setNote('');
-    setAvatarUrl('');
-    setFeeAmount('');
-    setFeeMethod('');
-    setLegacyPackages([]);
-    setStudentType('new');
-    setPaymentEnabled(false);
-    setInstallmentEnabled(false);
-    setSchedule([]);
-    setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
-    setCampusId('');
-    setErrors({});
-  }, []);
 
   return {
     isEdit,

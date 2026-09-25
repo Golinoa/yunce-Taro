@@ -50,6 +50,7 @@ import { isStaffRole, STORE_ONBOARDING_HIDDEN_KEY, useAuth } from '@/utils/auth'
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
 import { markStepVisited } from '@/utils/onboarding-storage';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
@@ -305,7 +306,7 @@ const Profile: React.FC = () => {
     setBinding(true);
     try {
       const result = await organizationService.bind(code.toUpperCase());
-      Taro.showToast({ title: '绑定成功', icon: 'success' });
+      Taro.showToast({ title: '绑定成功', icon: 'success', duration: SUCCESS_TOAST_MS });
       setShowBindSheet(false);
       setInviteCode('');
       await loadStudents();
@@ -313,17 +314,23 @@ const Profile: React.FC = () => {
         setActiveStudentId(result.studentId);
         Taro.setStorageSync('activeStudentId', result.studentId);
       }
-      try {
+      // 本页无退页动作；但不能紧跟 showToast 调 hideToast（会抹掉「绑定成功」提示），
+      // 故等提示播完再 hide 并触发订阅弹框；runFlow 为 fire-and-forget。
+      setTimeout(() => {
         Taro.hideToast();
-        await subscribeMessageService.runFlow('E03', {
-          childName: result.studentName,
-          studentName: result.studentName,
-          role: profile.currentContext?.role,
-          campusId: profile.currentContext?.campusId,
-        });
-      } catch (error) {
-        logError('subscribe E03 after bind child', error);
-      }
+        void (async () => {
+          try {
+            await subscribeMessageService.runFlow('E03', {
+              childName: result.studentName,
+              studentName: result.studentName,
+              role: profile.currentContext?.role,
+              campusId: profile.currentContext?.campusId,
+            });
+          } catch (error) {
+            logError('subscribe E03 after bind child', error);
+          }
+        })();
+      }, SUCCESS_TOAST_MS);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('已绑定') || msg.includes('重复')) {

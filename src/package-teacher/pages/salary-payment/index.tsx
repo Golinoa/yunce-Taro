@@ -33,6 +33,7 @@ import {
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 
 const PAGE_INTRO_KEY = 'salary_payment_intro_hidden';
 
@@ -256,16 +257,22 @@ const SalaryPaymentPage: React.FC = () => {
       } catch (e) {
         logError('audit salary.confirm', e);
       }
-      Taro.showToast({ title: '已核对', icon: 'success' });
-      try {
+      Taro.showToast({ title: '已核对', icon: 'success', duration: SUCCESS_TOAST_MS });
+      // 本页无退页动作；但不能紧跟 showToast 调 hideToast（会抹掉「已核对」提示），
+      // 故等提示播完再 hide 并触发订阅弹框；runRenewFlow 为 fire-and-forget。
+      setTimeout(() => {
         Taro.hideToast();
-        await subscribeMessageService.runRenewFlow('salary_confirm_renew', 'salary_confirm', {
-          role: profile?.currentContext?.role,
-          campusId: profile?.currentContext?.campusId,
-        });
-      } catch (error) {
-        logError('subscribe E11 salary confirm renew', error);
-      }
+        void (async () => {
+          try {
+            await subscribeMessageService.runRenewFlow('salary_confirm_renew', 'salary_confirm', {
+              role: profile?.currentContext?.role,
+              campusId: profile?.currentContext?.campusId,
+            });
+          } catch (error) {
+            logError('subscribe E11 salary confirm renew', error);
+          }
+        })();
+      }, SUCCESS_TOAST_MS);
     } catch {
       Taro.showToast({ title: '核对失败，请重试', icon: 'none' });
     } finally {

@@ -17,6 +17,7 @@ import { useLeadStore } from '@/stores/lead';
 import type { LeadFormData } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 
 /** 性别选项 */
 const GENDER_OPTIONS = [
@@ -99,20 +100,24 @@ const LeadFormPage: React.FC = () => {
       // 列表缓存失效
       invalidate(teacherId);
 
-      Taro.showToast({ title: '创建成功', icon: 'success' });
-      try {
-        Taro.hideToast();
-        await subscribeMessageService.runFlow('E10', {
-          studentName: form.child_name.trim(),
-          role: profile?.currentContext?.role,
-          campusId: profile?.currentContext?.campusId || form.campus_id,
-        });
-      } catch (error) {
-        logError('subscribe E10 after lead create', error);
-      }
+      // 创建成功统一收尾：成功提示播完再返回；订阅授权 fire-and-forget。
+      // ⚠️ 不要紧跟 showToast 调 hideToast（会把提示抹掉）；runFlow 的 Promise 只在用户
+      //    点击订阅弹框时才 resolve，若 await 在返回之前，一旦弹框未被点击页面就永不退（FE-23 同类）。
+      Taro.showToast({ title: '创建成功', icon: 'success', duration: SUCCESS_TOAST_MS });
       setTimeout(() => {
         Taro.navigateBack();
-      }, 1000);
+      }, SUCCESS_TOAST_MS);
+      void (async () => {
+        try {
+          await subscribeMessageService.runFlow('E10', {
+            studentName: form.child_name.trim(),
+            role: profile?.currentContext?.role,
+            campusId: profile?.currentContext?.campusId || form.campus_id,
+          });
+        } catch (error) {
+          logError('subscribe E10 after lead create', error);
+        }
+      })();
     } catch {
       Taro.showToast({ title: '创建失败', icon: 'none' });
     } finally {

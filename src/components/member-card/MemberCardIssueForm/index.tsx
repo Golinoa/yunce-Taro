@@ -25,6 +25,7 @@ import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { formatDateCN } from '@/utils/format';
 import { logError } from '@/utils/logger';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 
 const KIND_LABEL_MAP: Record<CardTypeKind, string> = {
   count: '次卡',
@@ -243,27 +244,53 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
       }
       if (debtResult.outcome === 'failed' || debtResult.outcome === 'skipped') {
         // 开卡成功但欠课未处理/跳过：如实提示（DEC-011）
-        Taro.showToast({ title: '开卡成功，欠课未处理', icon: 'none' });
+        Taro.showToast({ title: '开卡成功，欠课未处理', icon: 'none', duration: SUCCESS_TOAST_MS });
       } else {
-        Taro.showToast({ title: '开卡成功', icon: 'success' });
-        if (debtResult.message) {
-          setTimeout(() => {
-            Taro.showToast({ title: debtResult.message as string, icon: 'none' });
-          }, 900);
-        }
+        Taro.showToast({ title: '开卡成功', icon: 'success', duration: SUCCESS_TOAST_MS });
       }
-      try {
-        Taro.hideToast();
-        await subscribeMessageService.runFlow('E09', {
-          studentId: student.id,
-          studentName: student.name,
-          role: profile?.currentContext?.role,
-        });
-      } catch (error) {
-        logError('subscribe E09 after card issue', error);
+
+      /**
+       * 开卡成功统一收尾：提示按序播完再退页；订阅授权 fire-and-forget。
+       *
+       * ⚠️ 两个坑（2026-09-25 FE-23 同类修复）：
+       * 1. 不要紧跟 `showToast` 调 `Taro.hideToast()`，那会把「开卡成功」提示立刻抹掉；
+       * 2. `runFlow('E09')` 的 Promise 只在用户点击订阅弹框时 resolve，`await` 在退页之前
+       *    会导致 `onSuccess`/`navigateBack` 永不执行。
+       */
+      const finish = () => {
+        if (onSuccess) onSuccess();
+        else Taro.navigateBack();
+        void (async () => {
+          try {
+            await subscribeMessageService.runFlow('E09', {
+              studentId: student.id,
+              studentName: student.name,
+              role: profile?.currentContext?.role,
+            });
+          } catch (error) {
+            logError('subscribe E09 after card issue', error);
+          }
+        })();
+      };
+
+      if (
+        debtResult.outcome !== 'failed' &&
+        debtResult.outcome !== 'skipped' &&
+        debtResult.message
+      ) {
+        // 先让「开卡成功」播完，再播欠课说明，说明也播完才退页
+        setTimeout(() => {
+          Taro.hideToast();
+          Taro.showToast({
+            title: debtResult.message as string,
+            icon: 'none',
+            duration: SUCCESS_TOAST_MS,
+          });
+          setTimeout(finish, SUCCESS_TOAST_MS);
+        }, SUCCESS_TOAST_MS);
+      } else {
+        setTimeout(finish, SUCCESS_TOAST_MS);
       }
-      if (onSuccess) onSuccess();
-      else setTimeout(() => Taro.navigateBack(), 300);
     } catch (error) {
       logError('MemberCardIssueForm submit', error);
       Taro.showToast({ title: '开卡失败，请重试', icon: 'none' });

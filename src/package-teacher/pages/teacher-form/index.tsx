@@ -36,8 +36,12 @@ import type { Gender, TeacherIdentity, TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
+import { askContinueCreate, backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 
 const INTRO_STORAGE_KEY = 'teacher_form_intro_v1';
+
+/** 员工列表页（不带前导斜杠），新增成功后统一回退到这里 */
+const TEACHER_LIST_PATH = 'package-teacher/pages/teacher-list/index';
 
 interface FormState {
   identity: TeacherIdentity;
@@ -182,6 +186,12 @@ const TeacherFormPage: React.FC = () => {
     );
   }, [form, isEdit, id, teachers]);
 
+  /** 清空表单，供新增成功后「继续新增」使用 */
+  const resetForm = useCallback(() => {
+    setForm(EMPTY_FORM);
+    setErrors({});
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!validate() || saving) return;
     setSaving(true);
@@ -204,6 +214,8 @@ const TeacherFormPage: React.FC = () => {
       if (isEdit && id) {
         await updateTeacher(id, base);
         Taro.showToast({ title: '保存成功', icon: 'success' });
+        // 编辑态没有「继续新增」语义：让「保存成功」播完再返回
+        setTimeout(() => Taro.navigateBack(), SUCCESS_TOAST_MS);
       } else {
         await addTeacher({
           ...base,
@@ -240,24 +252,31 @@ const TeacherFormPage: React.FC = () => {
           logError('audit staff.add', e);
         }
         Taro.showToast({ title: '添加成功', icon: 'success' });
-        try {
-          Taro.hideToast();
-          await subscribeMessageService.runFlow('E11', {
-            teacherName: base.name?.trim() || form.name.trim(),
-            role: profile?.currentContext?.role,
-            campusId: profile?.currentContext?.campusId,
-          });
-        } catch (error) {
-          logError('subscribe E11 after teacher create', error);
-        }
+        // 订阅授权与跳转解耦：runFlow 的 Promise 只在用户点击订阅弹框时 resolve，
+        // 绝不能 await 在跳转之前，否则一旦弹框没被点击，跳转就永远不执行。
+        void (async () => {
+          if (await askContinueCreate('员工')) {
+            resetForm();
+          } else {
+            backToListPage(TEACHER_LIST_PATH);
+          }
+          try {
+            await subscribeMessageService.runFlow('E11', {
+              teacherName: base.name?.trim() || form.name.trim(),
+              role: profile?.currentContext?.role,
+              campusId: profile?.currentContext?.campusId,
+            });
+          } catch (error) {
+            logError('subscribe E11 after teacher create', error);
+          }
+        })();
       }
-      setTimeout(() => Taro.navigateBack(), 800);
     } catch {
       Taro.showToast({ title: '保存失败', icon: 'none' });
     } finally {
       setSaving(false);
     }
-  }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher, profile]);
+  }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher, profile, resetForm]);
 
   const boundEmail = profile?.email?.trim() || '';
   const handleBindEmail = useCallback(

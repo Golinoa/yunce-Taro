@@ -26,6 +26,7 @@ import type { DayOfWeek, Schedule, ScheduleColor } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { logError } from '@/utils/logger';
+import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { getDefaultRescheduleTargetDate } from '@/utils/reschedule-date';
 import { getTeacherSelectionInfo } from './teacher-selection';
 import { getNextDateByDayOfWeek } from './time';
@@ -481,22 +482,28 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
         setClassStudents(fresh);
         // 刷新 store，让其他页面（课程管理/班级详情）看到最新结果
         invalidateStudents(currentUserId);
-        Taro.showToast({ title: '已同步到课程管理', icon: 'success', duration: 1200 });
-        // E02A：入班成功后操作人弹框
+        Taro.showToast({ title: '已同步到课程管理', icon: 'success', duration: SUCCESS_TOAST_MS });
+        // E02A：入班成功后操作人弹框。
+        // 本页无退页动作，但同样不能紧跟 showToast 调 hideToast（会抹掉「已同步」提示），
+        // 故等提示播完再 hide 并触发订阅弹框；runFlow 仍为 fire-and-forget。
         if (toAdd.length > 0) {
-          try {
+          setTimeout(() => {
             Taro.hideToast();
-            await subscribeMessageService.runFlow('E02A', {
-              classId,
-              className: selectedClass?.name || '',
-              role: profileRole ?? undefined,
-              navigateUrl: classId
-                ? `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&type=class`
-                : undefined,
-            });
-          } catch (error) {
-            logError('subscribe E02A after schedule student assign', error);
-          }
+            void (async () => {
+              try {
+                await subscribeMessageService.runFlow('E02A', {
+                  classId,
+                  className: selectedClass?.name || '',
+                  role: profileRole ?? undefined,
+                  navigateUrl: classId
+                    ? `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&type=class`
+                    : undefined,
+                });
+              } catch (error) {
+                logError('subscribe E02A after schedule student assign', error);
+              }
+            })();
+          }, SUCCESS_TOAST_MS);
         }
       } catch (err) {
         logError('同步班级学员失败', err);

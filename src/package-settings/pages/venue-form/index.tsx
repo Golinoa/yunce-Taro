@@ -18,7 +18,11 @@ import { getThemeHexColors } from '@/theme';
 import type { Room, RoomStatus } from '@/types/campus';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
+import { askContinueCreate, backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
+
+/** 场地列表页（不带前导斜杠），保存成功后统一回退到这里 */
+const VENUE_LIST_PATH = 'package-settings/pages/venue-list/index';
 
 interface FormState {
   name: string;
@@ -95,28 +99,9 @@ const VenueFormPage: React.FC = () => {
     return true;
   }, [form.name]);
 
-  /**
-   * 写完回到列表页。表单只可能由 venue-list 经 navigateTo 压入，
-   * 按页面栈精确算出到列表页的距离 delta，一次退掉所有叠加的表单层
-   * （防慢速双击叠层时只退一层、露出底层同款表单）；栈内无列表页（深链直达）才 redirectTo 兜底。
-   */
+  /** 写完回到列表页（精确退栈逻辑见 utils/post-save-navigation.backToListPage） */
   const goBackToList = useCallback(() => {
-    const LIST_URL = '/package-settings/pages/venue-list/index';
-    const LIST_PATH = 'package-settings/pages/venue-list/index';
-    const pages = Taro.getCurrentPages();
-    let delta = 0;
-    for (let i = pages.length - 2; i >= 0; i--) {
-      const route = (pages[i] as { route?: string } | undefined)?.route || '';
-      if (route.includes(LIST_PATH)) {
-        delta = pages.length - 1 - i;
-        break;
-      }
-    }
-    if (delta > 0) {
-      Taro.navigateBack({ delta });
-    } else {
-      Taro.redirectTo({ url: LIST_URL });
-    }
+    backToListPage(VENUE_LIST_PATH);
   }, []);
 
   const hasChanged = useMemo(
@@ -153,11 +138,23 @@ const VenueFormPage: React.FC = () => {
       } else {
         await roomService.add(payload);
       }
-      Taro.showToast({ title: '保存成功', icon: 'success' });
       // 通知 venue-list 写后强制重拉；列表「返回即强刷」兜底，双保险
       setRefreshSignal(REFRESH_SIGNAL.venues);
-      // 成功后延时回退，让「保存成功」toast 可见；回退由列表 onShow 必然触发重拉。
-      setTimeout(goBackToList, 400);
+      Taro.showToast({ title: '保存成功', icon: 'success' });
+
+      if (isEdit) {
+        // 编辑态没有「继续新增」语义：让「保存成功」播完再回列表
+        setTimeout(goBackToList, SUCCESS_TOAST_MS);
+      } else {
+        // 新增态：等提示播完 → 询问是否继续新增；继续则清空表单留在本页
+        void (async () => {
+          if (await askContinueCreate('场地')) {
+            setForm(EMPTY_FORM);
+          } else {
+            goBackToList();
+          }
+        })();
+      }
     } catch (err) {
       logError('save room', err);
       Taro.showToast({
@@ -184,7 +181,8 @@ const VenueFormPage: React.FC = () => {
       await roomService.delete(roomId);
       Taro.showToast({ title: '删除成功', icon: 'success' });
       setRefreshSignal(REFRESH_SIGNAL.venues);
-      setTimeout(goBackToList, 400);
+      // 与保存链路一致：让「删除成功」播完再回列表
+      setTimeout(goBackToList, SUCCESS_TOAST_MS);
     } catch (err) {
       logError('delete room', err);
       Taro.showToast({ title: '删除失败', icon: 'none' });
