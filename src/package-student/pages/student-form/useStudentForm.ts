@@ -260,6 +260,10 @@ export function useStudentForm(): UseStudentFormReturn {
         setFeeMethod(stu.fee_method || '');
         setPaymentEnabled(Boolean(stu.fee_amount || stu.fee_method));
         setCampusId(stu.campus_id || mainCampusId);
+        // 联系方式：有则回填已有值，无则保留一行空白默认项
+        setContacts(
+          stu.contacts?.length ? stu.contacts : [{ id: '1', relation: '妈妈', phone: '' }],
+        );
         return;
       }
 
@@ -518,6 +522,7 @@ export function useStudentForm(): UseStudentFormReturn {
           birthday: birthday || undefined,
           address: address.trim() || undefined,
           note: note.trim() || undefined,
+          contacts,
           avatar_url: remoteAvatar,
           ...feePayload,
           campus_id: campusId || undefined,
@@ -556,6 +561,7 @@ export function useStudentForm(): UseStudentFormReturn {
             birthday: birthday || undefined,
             address: address.trim() || undefined,
             note: note.trim() || undefined,
+            contacts,
             avatar_url: existingRemoteAvatar,
             ...feePayload,
             campus_id: campusId || undefined,
@@ -642,6 +648,7 @@ export function useStudentForm(): UseStudentFormReturn {
     avatarUrl,
     feeAmount,
     feeMethod,
+    contacts,
     studentId,
     isEdit,
     validate,

@@ -51,8 +51,10 @@ export interface ParentStudentSummary {
 }
 
 interface BackendStudentDetailResponse {
+  address?: null | string;
   avatar?: null | string;
   birthday?: null | string;
+  campusId?: null | string;
   classes?: Array<{
     id: string;
     name: string;
@@ -68,7 +70,10 @@ interface BackendStudentDetailResponse {
     usedHours: number;
     validEnd?: null | string;
   }>;
+  contacts?: Array<{ id?: string; phone: string; relation: string }> | null;
   createdAt: string;
+  feeAmount?: null | number;
+  feeMethod?: null | string;
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
   inviteCode?: null | string;
@@ -166,6 +171,16 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
     birthday: item.birthday || undefined,
     phone: item.phone || undefined,
     note: item.remark || undefined,
+    // R5 断链字段：此前不回传 ⇒ 编辑页永远回显为空
+    address: item.address || undefined,
+    campus_id: item.campusId || undefined,
+    fee_amount: item.feeAmount ?? undefined,
+    fee_method: (item.feeMethod as FeeMethod | undefined) || undefined,
+    contacts: (item.contacts || []).map((contact, index) => ({
+      id: contact.id || `remote-contact-${index}`,
+      relation: contact.relation,
+      phone: contact.phone,
+    })),
     status: mapBackendStudentStatus(item.status),
     created_at: item.createdAt,
     updated_at: item.createdAt,
@@ -185,6 +200,15 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
 }
 
 function mapStudentPayload(data: Partial<Student>) {
+  // 联系方式：剔除「空号码」行（表单默认会带一行空的「妈妈」），避免把空值发给后端
+  const contacts = (data.contacts || [])
+    .map((contact) => ({
+      id: contact.id,
+      phone: contact.phone.trim(),
+      relation: contact.relation,
+    }))
+    .filter((contact) => contact.phone.length > 0);
+
   return {
     avatar: data.avatar_url,
     nickname: data.nickname,
@@ -194,6 +218,11 @@ function mapStudentPayload(data: Partial<Student>) {
     phone: data.phone,
     remark: data.note,
     campusId: data.campus_id,
+    // R5 断链字段：此前本函数是「白名单」，以下 4 个键不在其中 ⇒ 压根没上过网络
+    address: data.address,
+    feeAmount: data.fee_amount,
+    feeMethod: data.fee_method,
+    contacts: contacts.length ? contacts : undefined,
   };
 }
 

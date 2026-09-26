@@ -3,6 +3,18 @@
  */
 import type { FeeMethod, PackageStatus, PackageType } from './course-package';
 
+/**
+ * 学员联系方式（最多 5 条）。
+ *
+ * 结构与 `@/components/ContactList` 的 `ContactItem` **保持一致**，
+ * 否则表单状态无法直接作为请求载荷提交。
+ */
+export interface StudentContact {
+  id: string;
+  relation: string;
+  phone: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -24,6 +36,8 @@ export interface Student {
   campus_id?: string;
   /** 所属校区名称（冗余展示） */
   campus_name?: string;
+  /** 联系方式（最多 5 条） */
+  contacts?: StudentContact[];
   /** 已加入的班级 ID 列表（空表示尚未排班） */
   class_ids?: string[];
   status?: 'active' | 'deleted';
