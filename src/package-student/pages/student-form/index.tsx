@@ -514,7 +514,9 @@ const StudentForm: React.FC = () => {
                     const raw = e.detail.value || '';
                     const filtered = raw
                       .replace(/[^\d.]/g, '')
-                      .replace(/^(\d*\.)(.*)$/, (_m, a, b) => a + b.replace(/\./g, ''));
+                      .replace(/^(\d*\.)(.*)$/, (_m, a, b) => a + b.replace(/\./g, ''))
+                      // 最多两位小数（与后端 Student.feeAmount Decimal(10,2) 一致）
+                      .replace(/^(\d*\.\d{2}).*$/, '$1');
                     setFeeAmount(filtered);
                   }}
                 />
