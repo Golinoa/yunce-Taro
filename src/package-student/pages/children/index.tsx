@@ -215,7 +215,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, onInviteRelatives, o
         <InfoRow label="生日" value={birthdayLabel} />
         <InfoRow
           label="学员邀请码"
-          value={student.invite_code}
+          value={student.invite_code ?? ''}
           copyable={Boolean(student.invite_code && student.invite_code !== '请联系老师')}
         />
         <InfoRow label="所属校区" value={student.campus_name || '由教师分配'} />

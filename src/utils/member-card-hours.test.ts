@@ -75,7 +75,8 @@ describe('getMemberCardPaidTotalCount / getMemberCardPaidRemainingCount（付费
     totalCount: 15,
     cardTypeCount: 10,
     totalGiftCount: 5,
-    consumedValue: 0,
+    remainingCount: 15,
+    remainingGiftCount: 5,
   };
 
   it('付费总次数不含赠送（与"共 X 次"含赠课是两个口径）', () => {
@@ -83,25 +84,47 @@ describe('getMemberCardPaidTotalCount / getMemberCardPaidRemainingCount（付费
     expect(getMemberCardPaidTotalCount(card)).toBe(10);
   });
 
-  it('付费剩余 = 付费总 − 已消耗，恒 ≤ 付费总（退费比例不会 > 1）', () => {
+  it('一次没用 ⇒ 付费剩余 = 付费总次数 ⇒ 退费最多退全额', () => {
     expect(getMemberCardPaidRemainingCount(card)).toBe(10);
-
-    const used = { ...card, consumedValue: 4 };
-    expect(getMemberCardPaidRemainingCount(used)).toBe(6);
   });
 
-  it('回归护栏：不能拿 remainingCount（含赠课）当分子', () => {
-    // 旧退费公式会算成 remainingCount(15) / (10-5) = 300% ⇒ 退费超实付 3 倍
+  it('用掉 1 次赠送 + 2 次付费 ⇒ 付费剩余 8', () => {
+    const used = { ...card, remainingCount: 12, remainingGiftCount: 4 };
+    expect(getMemberCardPaidRemainingCount(used)).toBe(8);
+  });
+
+  it('回归护栏 1：不能拿 remainingCount（含赠课）当分子，比例必须 ≤ 1', () => {
+    // 旧退费公式 = remainingCount(15) / 付费总(10) = 150% ⇒ 退费超实付
     const paidTotal = getMemberCardPaidTotalCount(card) ?? 0;
     const paidRemaining = getMemberCardPaidRemainingCount(card) ?? 0;
     expect(paidRemaining / paidTotal).toBeLessThanOrEqual(1);
+    expect(15 / paidTotal).toBeGreaterThan(1); // 说明误用确实会超
+  });
 
-    const remainingCountIncludingGift = 15; // 若误用这个值当分子
-    expect(remainingCountIncludingGift / paidTotal).toBeGreaterThan(1);
+  it('回归护栏 2：不能用 consumedValue（金额，单位分）参与次数运算', () => {
+    // 曾误写 `付费总 - consumedValue` ⇒ 10 - 50000 = 负数 ⇒ clamp 成 0 ⇒ 退费变 0
+    const withValue = { ...card, consumedValue: 50000 };
+    expect(getMemberCardPaidRemainingCount(withValue)).toBe(10);
+  });
+
+  it('历史卡 remainingGiftCount 缺失 ⇒ 按 0 处理并 clamp 到付费总次数（不超 100%）', () => {
+    const legacy = { ...card, remainingGiftCount: undefined };
+    // 总剩余 15 − 0 = 15 > 付费总 10 ⇒ clamp 到 10
+    expect(getMemberCardPaidRemainingCount(legacy)).toBe(10);
+  });
+
+  it('缺 remainingCount 时安全返回 undefined（不猜）', () => {
+    expect(getMemberCardPaidRemainingCount({ ...card, remainingCount: undefined })).toBeUndefined();
   });
 
   it('赠课为 0 时两个口径相等', () => {
-    const noGift = { ...card, totalCount: 10, totalGiftCount: 0 };
+    const noGift = {
+      ...card,
+      totalCount: 10,
+      totalGiftCount: 0,
+      remainingCount: 10,
+      remainingGiftCount: 0,
+    };
     expect(getMemberCardPaidTotalCount(noGift)).toBe(getMemberCardTotalCount(noGift));
   });
 

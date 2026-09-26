@@ -50,16 +50,30 @@ export const getMemberCardPaidTotalCount = (
 /**
  * 次数卡的「付费部分**剩余**次数」—— 与详情页「购卡剩余」展示同一口径。
  *
- * 用「付费总次数 − 已消耗」而非 `remainingCount`（后者含赠送剩余），
- * 保证比例恒 ≤ 1，退费不会超过实付。
+ * 算法：`总剩余 − 赠送剩余`（两者都是**次数**）。
+ *
+ * ⚠️ **不要用 `consumedValue` 参与本计算**：它的定义是「已耗卡**价值**（分）」，
+ * 是**金额**不是次数（见 `types/member-card.ts` 注释）。「次数 − 金额」会算出负数、
+ * 被 clamp 成 0 ⇒ 退费变 0。此处曾踩过这个坑。
+ *
+ * 兜底：历史卡 `remainingGiftCount` 可能缺失（按 0 处理），此时
+ * `总剩余 − 0` 可能大于付费总次数 ⇒ **clamp 到付费总次数**，保证比例恒 ≤ 1、
+ * 退费不会超过实付。
  */
 export const getMemberCardPaidRemainingCount = (
   card: Pick<
     MemberCardDetail,
-    'totalCount' | 'cardTypeCount' | 'totalGiftCount' | 'consumedValue' | 'cardTypeKind'
+    | 'totalCount'
+    | 'cardTypeCount'
+    | 'totalGiftCount'
+    | 'remainingCount'
+    | 'remainingGiftCount'
+    | 'cardTypeKind'
   >,
 ): number | undefined => {
   const paidTotal = getMemberCardPaidTotalCount(card);
-  if (paidTotal == null) return undefined;
-  return Math.max(paidTotal - (card.consumedValue ?? 0), 0);
+  if (paidTotal == null || typeof card.remainingCount !== 'number') return undefined;
+  const remainingTotal = card.remainingCount;
+  const paidRemaining = remainingTotal - (card.remainingGiftCount ?? 0);
+  return Math.max(Math.min(paidRemaining, paidTotal), 0);
 };

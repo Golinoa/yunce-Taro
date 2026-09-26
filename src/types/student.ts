@@ -31,7 +31,15 @@ export interface Student {
   id: string;
   name: string;
   teacher_id: string;
-  invite_code: string;
+  /**
+   * 学员邀请码（家长绑定用）。
+   *
+   * **由后端生成**（`pickUniqueStudentInviteCode`），前端不自造、也不提交 ——
+   * 此前表单会生成一个随机码放进载荷，但 `mapStudentPayload` 的白名单里没有这个键，
+   * 从未上过网络（2026-09-27 review 已清理）。因此这里允许缺省。
+   * 读取侧一律走 `resolveInviteCode()` 或 `?.trim()`，已有空值兜底。
+   */
+  invite_code?: string;
   avatar_url?: string;
   nickname?: string;
   /** 与当前家长的亲属关系（儿子/女儿等），家长端子女卡片展示用 */

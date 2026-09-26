@@ -560,7 +560,8 @@ export function useStudentForm(): UseStudentFormReturn {
         }
         Taro.showToast({ title: '更新成功', icon: 'success' });
       } else {
-        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        // 邀请码由后端生成（pickUniqueStudentInviteCode）：前端自造的随机码既不上网络、
+        // 也无意义，2026-09-27 review 已移除（详见 types/student.ts 的 invite_code 注释）
         const localAvatarPending = isLocalWechatFilePath(avatarUrl) ? avatarUrl.trim() : '';
         const existingRemoteAvatar =
           avatarUrl.trim() && !localAvatarPending ? avatarUrl.trim() : undefined;
@@ -580,7 +581,6 @@ export function useStudentForm(): UseStudentFormReturn {
             teacher_id: teacherId,
             name: name.trim(),
             nickname: nickname.trim() || undefined,
-            invite_code: inviteCode,
             phone: phone.trim() || undefined,
             gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
             birthday: birthday || undefined,
