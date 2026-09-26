@@ -12,6 +12,7 @@ import Dialog from '@/components/Dialog';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import LegacyPackagesEditor from '@/package-student/components/LegacyPackagesEditor';
+import { studentService } from '@/services';
 import { useThemeStore } from '@/stores/theme';
 import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
@@ -20,6 +21,7 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student, StudentParent } from '@/types/student';
 import { isStaffRole, useAuth } from '@/utils/auth';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import AttendancePanel from './AttendancePanel';
 import ConsumptionPanel from './ConsumptionPanel';
@@ -159,6 +161,29 @@ const StudentDetail: React.FC = () => {
     setRefundSubmitting,
   });
 
+  /**
+   * 改推荐人（B9 / R8，只记关系、无奖励）。
+   * 走专用 `PATCH /students/:id/referrer`，不用 `update()` —— 后者会连带清空档案字段。
+   * 成功后重新拉详情（接口只回列表项，不含推荐关系，必须重拉才能回显）。
+   */
+  const handleUpdateReferrer = useCallback(
+    async (referrerStudentId: null | string) => {
+      if (!student) return;
+      try {
+        await studentService.updateReferrer(student.id, referrerStudentId);
+        setRefreshSignal(REFRESH_SIGNAL.students);
+        Taro.showToast({
+          title: referrerStudentId ? '已关联推荐人' : '已取消关联',
+          icon: 'success',
+        });
+        await loadData();
+      } catch {
+        Taro.showToast({ title: '关联失败，请重试', icon: 'none' });
+      }
+    },
+    [loadData, student],
+  );
+
   if (loading) {
     return (
       <View
@@ -240,6 +265,7 @@ const StudentDetail: React.FC = () => {
             student={student}
             parents={parents}
             onInviteParent={actions.handleInviteParent}
+            onUpdateReferrer={handleUpdateReferrer}
           />
         </SwiperItem>
 

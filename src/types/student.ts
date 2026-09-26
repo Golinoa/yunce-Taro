@@ -15,6 +15,18 @@ export interface StudentContact {
   phone: string;
 }
 
+/**
+ * 推荐关系里的「对方学员」最小引用（B9 / R8）。
+ *
+ * 只带 `id / name / status` —— 够展示与跳转，**不携带他人档案明细**。
+ */
+export interface StudentRelationRef {
+  id: string;
+  name: string;
+  /** ACTIVE / GRADUATED / INACTIVE；INACTIVE 表示已删除（前端应剔除或标注） */
+  status: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -36,6 +48,18 @@ export interface Student {
   campus_id?: string;
   /** 所属校区名称（冗余展示） */
   campus_name?: string;
+  /**
+   * 推荐人学员 ID（B9 / R8，**只记关系、无奖励**）。
+   * 提交语义：`undefined` = 不修改；`null` = 明确清除；字符串 = 设置。
+   */
+  referrer_student_id?: null | string;
+  /**
+   * 推荐人（详情接口回传，仅员工侧返回，家长端没有该字段）。
+   * `status` 用于判断是否已软删除。
+   */
+  referrer_student?: null | StudentRelationRef;
+  /** 被推荐人（谁是他推荐来的）；仅员工侧返回 */
+  referred_students?: StudentRelationRef[];
   /** 联系方式（最多 5 条） */
   contacts?: StudentContact[];
   /** 已加入的班级 ID 列表（空表示尚未排班） */

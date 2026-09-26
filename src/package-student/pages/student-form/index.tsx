@@ -15,6 +15,7 @@ import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import SegmentedControl from '@/components/SegmentedControl';
+import StudentPickerSheet from '@/components/student/StudentPickerSheet';
 import Switch from '@/components/Switch';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -36,9 +37,12 @@ const StudentForm: React.FC = () => {
     type: null,
   });
   const [datePickerTarget, setDatePickerTarget] = useState<DatePickerTarget>(null);
+  /** 推荐人选择器（B9 / R8） */
+  const [referrerPickerVisible, setReferrerPickerVisible] = useState(false);
 
   const {
     isEdit,
+    studentId,
     name,
     setName,
     nickname,
@@ -80,6 +84,10 @@ const StudentForm: React.FC = () => {
     campusId,
     setCampusId,
     campusOptions,
+    referrerStudentId,
+    setReferrerStudentId,
+    referrerName,
+    setReferrerName,
     errors,
     saving,
     canSubmit,
@@ -194,6 +202,22 @@ const StudentForm: React.FC = () => {
               }}
               error={errors.name}
             />
+
+            {/*
+              B9 / R8 推荐人：**只能从学员列表选，不允许手输**。
+              理由：推荐关系存 studentId 而非姓名快照（学员改名要跟随），手输无法保证指向唯一学员。
+              位置按 §9.1 第 16 条：紧贴「学员姓名」下方，避免沉到表单底部不好点选。
+            */}
+            <FormRow label="推荐人" onClick={() => setReferrerPickerVisible(true)}>
+              <Text
+                className={cn(
+                  'text-[30rpx]',
+                  referrerStudentId ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {referrerName || '选填'}
+              </Text>
+            </FormRow>
 
             <FormRow
               label="昵称"
@@ -681,6 +705,20 @@ const StudentForm: React.FC = () => {
             }
             setDatePickerTarget(null);
           }}
+        />
+
+        {/* B9 / R8 推荐人选择器：与学员详情「手动关联」共用同一组件 */}
+        <StudentPickerSheet
+          visible={referrerPickerVisible}
+          title="选择推荐人"
+          selectedId={referrerStudentId}
+          excludeStudentId={isEdit ? studentId : undefined}
+          onSelect={(stu) => {
+            setReferrerStudentId(stu?.id || '');
+            setReferrerName(stu?.name || '');
+            setReferrerPickerVisible(false);
+          }}
+          onClose={() => setReferrerPickerVisible(false)}
         />
       </View>
     </PageContainer>

@@ -120,6 +120,13 @@ export interface UseStudentFormReturn {
   setCampusId: React.Dispatch<React.SetStateAction<string>>;
   campusOptions: CampusUIModel[];
 
+  /** 推荐人学员 ID（B9 / R8，只记关系）；空串 = 没有 / 清除 */
+  referrerStudentId: string;
+  setReferrerStudentId: React.Dispatch<React.SetStateAction<string>>;
+  /** 推荐人姓名（仅展示用） */
+  referrerName: string;
+  setReferrerName: React.Dispatch<React.SetStateAction<string>>;
+
   loading: boolean;
   loadError: string;
   notFound: boolean;
@@ -175,6 +182,16 @@ export function useStudentForm(): UseStudentFormReturn {
 
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
   const [campusId, setCampusId] = useState('');
+
+  /**
+   * 推荐人（B9 / R8，**只记关系、无奖励**）。
+   *
+   * ⚠️ 提交语义与文本字段不同：`''` 不是「不填」而是「**明确没有 / 清除**」。
+   * 因此编辑态**必须先回填**当前值（见 `loadFormData`），否则保存会把已有推荐人清掉。
+   */
+  const [referrerStudentId, setReferrerStudentId] = useState('');
+  /** 推荐人姓名（仅用于表单展示，提交只发 id） */
+  const [referrerName, setReferrerName] = useState('');
 
   /** 主校区 id：首次进页与「继续新增」重置后都用它作为默认选中项 */
   const defaultCampusId = useMemo(
@@ -264,6 +281,9 @@ export function useStudentForm(): UseStudentFormReturn {
         setContacts(
           stu.contacts?.length ? stu.contacts : [{ id: '1', relation: '妈妈', phone: '' }],
         );
+        // B9 / R8：推荐人必须回填，否则保存会把已有推荐人清掉（空串 = 明确清除）
+        setReferrerStudentId(stu.referrer_student_id || '');
+        setReferrerName(stu.referrer_student?.name || '');
         return;
       }
 
@@ -457,6 +477,9 @@ export function useStudentForm(): UseStudentFormReturn {
     setSchedule([]);
     setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
     setCampusId('');
+    // B9 / R8：继续新增时必须一并清空推荐人，否则会串到下一个学员
+    setReferrerStudentId('');
+    setReferrerName('');
     setErrors({});
   }, []);
 
@@ -528,6 +551,8 @@ export function useStudentForm(): UseStudentFormReturn {
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
           teacher_id: teacherId,
+          // B9 / R8：空串 = 明确清除推荐人（后端 `null` = disconnect）
+          referrer_student_id: referrerStudentId || null,
         });
         if (updated) {
           updateStudentInCache(currentUserId, updated);
@@ -566,6 +591,8 @@ export function useStudentForm(): UseStudentFormReturn {
             ...feePayload,
             campus_id: campusId || undefined,
             campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
+            // B9 / R8：空串 = 明确没有推荐人（后端写入 null）
+            referrer_student_id: referrerStudentId || null,
           },
           studentType === 'old' ? initialPackages : undefined,
         );
@@ -659,6 +686,7 @@ export function useStudentForm(): UseStudentFormReturn {
     updateStudentInCache,
     campusId,
     campusOptions,
+    referrerStudentId,
     profile?.currentContext?.role,
     paymentEnabled,
     handleReset,
@@ -713,6 +741,10 @@ export function useStudentForm(): UseStudentFormReturn {
     campusId,
     setCampusId,
     campusOptions,
+    referrerStudentId,
+    setReferrerStudentId,
+    referrerName,
+    setReferrerName,
     errors,
     saving,
     canSubmit,

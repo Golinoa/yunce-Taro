@@ -7,7 +7,7 @@ import { studentParentService } from '@/services/student-parents';
 import type { FeeMethod } from '@/types/course-package';
 import type { Student } from '@/types/student';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
-import { del, get, post, put } from '@/utils/request';
+import { del, get, patch, post, put } from '@/utils/request';
 
 interface BackendStudentListItem {
   avatar?: null | string;
@@ -98,6 +98,20 @@ interface BackendStudentDetailResponse {
     status?: string;
   }>;
   remark?: null | string;
+  /**
+   * 推荐关系（B9 / R8）。⚠️ **家长端不返回**（后端按角色裁剪），
+   * 因此这里是可选的 —— 前端不得假定一定有值。
+   */
+  referrerStudent?: null | {
+    id: string;
+    name: string;
+    status: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+  };
+  referredStudents?: Array<{
+    id: string;
+    name: string;
+    status: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+  }>;
   status?: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
   teacher?: {
     id: string;
@@ -181,6 +195,22 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
       relation: contact.relation,
       phone: contact.phone,
     })),
+    /**
+     * B9 / R8 推荐关系：必须区分「接口明确返回 null」与「接口压根没返回」。
+     *
+     * - 员工端：一定带 `referrerStudent`（`null` = 确实没有）⇒ 映射为 `null`，可触发"清除"；
+     * - 家长端：后端按角色裁剪，**整个键都不存在** ⇒ 映射为 `undefined`（= 不修改）。
+     *
+     * 若写成 `item.referrerStudent?.id ?? null`，家长端会被误判成"没有推荐人"，
+     * 一旦家长端存在任何提交路径，就会把推荐人静默清掉。
+     */
+    referrer_student_id: 'referrerStudent' in item ? (item.referrerStudent?.id ?? null) : undefined,
+    referrer_student: item.referrerStudent ?? null,
+    referred_students: (item.referredStudents || []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      status: s.status,
+    })),
     status: mapBackendStudentStatus(item.status),
     created_at: item.createdAt,
     updated_at: item.createdAt,
@@ -223,8 +253,29 @@ function mapStudentPayload(data: Partial<Student>) {
     feeAmount: data.fee_amount,
     feeMethod: data.fee_method,
     contacts: contacts.length ? contacts : undefined,
+    /**
+     * B9 / R8 推荐关系：**三态语义，与文本字段不同，别写成 `?? null`**。
+     *
+     * - `undefined`（调用方没传）⇒ 不发该键 ⇒ 后端视为 **不修改**；
+     * - `null` ⇒ 后端 **明确清除推荐人**（`disconnect`）；
+     * - 字符串 id ⇒ 设置（后端校验同机构 / 非本人 / 未删除）。
+     *
+     * ⚠️ 为什么不能用 `data.referrer_student_id ?? null`：那样**任何局部更新**
+     * （例如新建后补传头像的那次 `update`）都会因为没带该键而被当成「清除」，
+     * 刚选的推荐人会被静默抹掉。
+     *
+     * ⚠️ 代价与前提：学员表单**必须先回填**当前值再提交（见 `useStudentForm.loadFormData`），
+     * 否则编辑保存会把已有推荐人清掉。
+     */
+    referrerStudentId: data.referrer_student_id,
   };
 }
+
+/**
+ * 仅供单测：推荐关系的「三态语义」（不传 / null / id）极易被后人改坏，
+ * 这里把载荷映射函数暴露出来，由 `student-referrer.test.ts` 钉住行为。
+ */
+export const __studentPayloadMappersForTest = { mapStudentPayload };
 
 export interface InitialStudentPackagePayload {
   name: string;
@@ -328,6 +379,19 @@ export const studentService = {
     } catch {
       return null;
     }
+  },
+
+  /**
+   * 只改「推荐人」（B9 / R8）。
+   *
+   * 为什么走独立 `PATCH /students/:id/referrer` 而不是 `update()`：
+   * `PUT /students/:id` 的 schema 里 `name` 必填，且 `nickname / phone / birthday / remark`
+   * 缺省会被写成 `null` ⇒ 用它只改推荐人会把学员档案连带清空。
+   *
+   * @param referrerStudentId 推荐人学员 ID；`null` = 清除
+   */
+  updateReferrer: async (studentId: string, referrerStudentId: null | string): Promise<void> => {
+    await patch(`/students/${studentId}/referrer`, { referrerStudentId });
   },
 
   /** 后端搜索学员（最少 2 字符；分批拉全匹配结果） */
