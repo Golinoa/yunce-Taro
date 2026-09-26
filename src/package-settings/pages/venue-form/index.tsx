@@ -18,7 +18,7 @@ import { getThemeHexColors } from '@/theme';
 import type { Room, RoomStatus } from '@/types/campus';
 import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
-import { askContinueCreate, backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
+import { backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 
 /** 场地列表页（不带前导斜杠），保存成功后统一回退到这里 */
@@ -146,14 +146,8 @@ const VenueFormPage: React.FC = () => {
         // 编辑态没有「继续新增」语义：让「保存成功」播完再回列表
         setTimeout(goBackToList, SUCCESS_TOAST_MS);
       } else {
-        // 新增态：等提示播完 → 询问是否继续新增；继续则清空表单留在本页
-        void (async () => {
-          if (await askContinueCreate('场地')) {
-            setForm(EMPTY_FORM);
-          } else {
-            goBackToList();
-          }
-        })();
+        // 移除「继续新增」弹框：新增成功后让「保存成功」播完，再返回列表
+        setTimeout(goBackToList, SUCCESS_TOAST_MS);
       }
     } catch (err) {
       logError('save room', err);

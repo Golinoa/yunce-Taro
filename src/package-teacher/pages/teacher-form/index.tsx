@@ -36,7 +36,7 @@ import type { Gender, TeacherIdentity, TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { askContinueCreate, backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
+import { backToListPage, SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
 
 const INTRO_STORAGE_KEY = 'teacher_form_intro_v1';
 
@@ -186,12 +186,6 @@ const TeacherFormPage: React.FC = () => {
     );
   }, [form, isEdit, id, teachers]);
 
-  /** 清空表单，供新增成功后「继续新增」使用 */
-  const resetForm = useCallback(() => {
-    setForm(EMPTY_FORM);
-    setErrors({});
-  }, []);
-
   const handleSave = useCallback(async () => {
     if (!validate() || saving) return;
     setSaving(true);
@@ -252,14 +246,9 @@ const TeacherFormPage: React.FC = () => {
           logError('audit staff.add', e);
         }
         Taro.showToast({ title: '添加成功', icon: 'success' });
-        // 订阅授权与跳转解耦：runFlow 的 Promise 只在用户点击订阅弹框时 resolve，
-        // 绝不能 await 在跳转之前，否则一旦弹框没被点击，跳转就永远不执行。
+        // 订阅授权 fire-and-forget：runFlow 的 Promise 只在用户点击订阅弹框时 resolve，
+        // 绝不 await 在跳转之前，否则会卡住跳转。
         void (async () => {
-          if (await askContinueCreate('员工')) {
-            resetForm();
-          } else {
-            backToListPage(TEACHER_LIST_PATH);
-          }
           try {
             await subscribeMessageService.runFlow('E11', {
               teacherName: base.name?.trim() || form.name.trim(),
@@ -270,13 +259,15 @@ const TeacherFormPage: React.FC = () => {
             logError('subscribe E11 after teacher create', error);
           }
         })();
+        // 移除「继续新增」弹框：成功提示播完即返回员工列表
+        setTimeout(() => backToListPage(TEACHER_LIST_PATH), SUCCESS_TOAST_MS);
       }
     } catch {
       Taro.showToast({ title: '保存失败', icon: 'none' });
     } finally {
       setSaving(false);
     }
-  }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher, profile, resetForm]);
+  }, [form, isEdit, id, saving, validate, addTeacher, updateTeacher, profile]);
 
   const boundEmail = profile?.email?.trim() || '';
   const handleBindEmail = useCallback(
