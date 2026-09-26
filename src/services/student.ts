@@ -382,6 +382,16 @@ export const studentService = {
   },
 
   /**
+   * 只改头像（新建学员后补传微信本地临时头像）。
+   *
+   * 为什么走独立 `PATCH /students/:id/avatar`：`PUT /students/:id` 的 `name` 必填，
+   * 只传头像会被 400 拦下 —— 此前表现为「学员建好了，头像永远补不上去」。
+   */
+  updateAvatar: async (studentId: string, avatarUrl: string): Promise<void> => {
+    await patch(`/students/${studentId}/avatar`, { avatar: avatarUrl });
+  },
+
+  /**
    * 只改「推荐人」（B9 / R8）。
    *
    * 为什么走独立 `PATCH /students/:id/referrer` 而不是 `update()`：

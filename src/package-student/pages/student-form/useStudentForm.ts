@@ -602,14 +602,14 @@ export function useStudentForm(): UseStudentFormReturn {
             const remoteAvatar = await uploadImage(localAvatarPending, 'student_avatar', {
               refId: newStudent.id,
             });
-            const withAvatar = await studentService.update(newStudent.id, {
-              avatar_url: remoteAvatar,
-            });
-            if (withAvatar) {
-              newStudent = withAvatar;
-            } else {
-              newStudent = { ...newStudent, avatar_url: remoteAvatar };
-            }
+            /**
+             * ⚠️ 走专用 `PATCH /students/:id/avatar`，不能用 `studentService.update`：
+             * 后者要求 `name` 必填（只传头像会被 400 拦下），且未传的
+             * `nickname / phone / birthday / remark` 会被写成 null 清空。
+             * 此前正是因此表现为「学员建好了，头像永远补不上去」。
+             */
+            await studentService.updateAvatar(newStudent.id, remoteAvatar);
+            newStudent = { ...newStudent, avatar_url: remoteAvatar };
           } catch (error) {
             logError('upload student avatar after create', error);
             Taro.showToast({ title: '学员已创建，头像上传失败可稍后编辑补传', icon: 'none' });
