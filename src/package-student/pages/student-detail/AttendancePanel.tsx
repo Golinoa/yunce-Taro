@@ -6,13 +6,14 @@
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import cn from 'classnames';
-import React from 'react';
+import React, { useMemo } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
 import { formatDateCN } from '@/utils/format';
 import { LEAVE_STATUS_MAP } from './student-detail-constants';
+import { isConsumingRecord, RECORD_STATUS_LABEL } from './student-detail-record-status';
 import type { TimelineItem } from './use-student-detail-derived';
 
 export interface AttendancePanelProps {
@@ -40,6 +41,9 @@ const AttendancePanel: React.FC<AttendancePanelProps> = ({
   onApproveLeave,
   onRejectLeave,
 }) => {
+  /** 有效签到次数：只算真实消耗课时的记录（已取消 / 缺勤 / 请假不计） */
+  const checkInCount = useMemo(() => records.filter(isConsumingRecord).length, [records]);
+
   return (
     <ScrollView scrollY className="h-full">
       <View className="px-[32rpx] pt-[32rpx] pb-[200rpx]">
@@ -55,7 +59,7 @@ const AttendancePanel: React.FC<AttendancePanelProps> = ({
               <View className="flex flex-row gap-[12rpx]">
                 <View className="flex-1 center-col py-[14rpx] rounded-[16rpx] bg-primary/8">
                   <Text className="text-[36rpx] font-bold text-primary leading-none">
-                    {records.length}
+                    {checkInCount}
                   </Text>
                   <Text className="text-[22rpx] text-muted-foreground mt-[6rpx]">签到次数</Text>
                 </View>
@@ -96,6 +100,7 @@ const AttendancePanel: React.FC<AttendancePanelProps> = ({
                         const isLast = index === items.length - 1;
                         if (item.type === 'record') {
                           const record = item.data;
+                          const isConsuming = isConsumingRecord(record);
                           return (
                             <View
                               key={record.id}
@@ -118,8 +123,15 @@ const AttendancePanel: React.FC<AttendancePanelProps> = ({
                                       {formatDateCN(record.lesson_date)}
                                     </Text>
                                   </View>
-                                  <Text className="text-[30rpx] font-semibold text-primary flex-shrink-0">
-                                    -{record.hours_used}课时
+                                  <Text
+                                    className={cn(
+                                      'text-[30rpx] font-semibold flex-shrink-0',
+                                      isConsuming ? 'text-primary' : 'text-muted-foreground',
+                                    )}
+                                  >
+                                    {isConsuming
+                                      ? `-${record.hours_used}课时`
+                                      : (RECORD_STATUS_LABEL[record.status ?? ''] ?? '未消耗课时')}
                                   </Text>
                                 </View>
                                 {record.content && (

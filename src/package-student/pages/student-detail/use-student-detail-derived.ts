@@ -12,6 +12,7 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import { getPackagePurchasedHours, getPackageRefundableAmount } from './student-detail-package';
+import { isConsumingRecord } from './student-detail-record-status';
 
 export type TimelineItem =
   | { type: 'record'; id: string; date: string; data: LessonRecord }
@@ -202,8 +203,13 @@ export function useStudentDetailDerived(
       let checkIn = 0;
       let leave = 0;
       items.forEach((item) => {
-        if (item.type === 'record') checkIn += 1;
-        else leave += 1;
+        if (item.type === 'record') {
+          // 只有**真实消耗课时**的记录才算签到；
+          // 口径见 student-detail-record-status.ts（单一事实源，勿在此内联重写判据）
+          if (isConsumingRecord(item.data)) checkIn += 1;
+        } else {
+          leave += 1;
+        }
       });
       stats[month] = { checkIn, leave };
     });
