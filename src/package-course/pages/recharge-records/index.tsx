@@ -335,7 +335,7 @@ const RechargeRecordsPage: React.FC = () => {
                           record.type === 'refund' ? 'text-[#6b7280]' : 'text-primary',
                         )}
                       >
-                        {record.type === 'refund' ? '退费' : '充值'}
+                        {record.kind_label ?? (record.type === 'refund' ? '退费' : '充值')}
                       </Text>
                     </View>
                   </View>
@@ -355,11 +355,11 @@ const RechargeRecordsPage: React.FC = () => {
 
                 <View className="flex items-start justify-between gap-[24rpx]">
                   <View className="flex flex-1 flex-wrap items-center gap-[16rpx]">
-                    {record.type === 'recharge' && (
+                    {record.type === 'recharge' && (record.purchased_hours || 0) > 0 && (
                       <>
                         <View className="py-[6rpx] px-[20rpx] rounded-md bg-primary-15">
                           <Text className="text-[22rpx] font-semibold text-primary">
-                            充值 {record.purchased_hours || 0}课时
+                            {record.kind_label || '充值'} {record.purchased_hours}课时
                           </Text>
                         </View>
                         {(record.gift_hours || 0) > 0 && (
@@ -381,14 +381,16 @@ const RechargeRecordsPage: React.FC = () => {
                     <Text className="text-[20rpx] text-muted-foreground">
                       {FEE_METHOD_LABEL[methodKey] || methodKey}
                     </Text>
-                    <Text
-                      className={cn(
-                        'text-[30rpx] font-bold',
-                        record.type === 'refund' ? 'text-[#6b7280]' : 'text-foreground',
-                      )}
-                    >
-                      {record.type === 'refund' ? '-' : ''}¥{amount}
-                    </Text>
+                    {amount > 0 && (
+                      <Text
+                        className={cn(
+                          'text-[30rpx] font-bold',
+                          record.type === 'refund' ? 'text-[#6b7280]' : 'text-foreground',
+                        )}
+                      >
+                        {record.type === 'refund' ? '-' : ''}¥{amount}
+                      </Text>
+                    )}
                   </View>
                 </View>
                 {record.operator_name && (

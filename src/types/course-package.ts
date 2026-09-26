@@ -137,6 +137,14 @@ export type PackageTransactionType = 'recharge' | 'refund';
 export interface PackageTransaction {
   id: string;
   type: PackageTransactionType;
+  /**
+   * 业务类型（对齐后端账本 `kind`）：
+   * `recharge` 充值 / `opening` 老生转入 / `extend` 批量延期 / `migration` 历史迁移 /
+   * `reversal` 冲正 / `debt_deduct` 欠费扣减 / `refund` 退费
+   */
+  kind?: string;
+  /** 类型中文标签（后端下发，**展示优先用它**，不要在页面里硬编码类型名） */
+  kind_label?: string;
   student_id: string;
   student_name: string;
   /** 学员头像（引用学员 avatar，禁止用姓名首字冒充） */

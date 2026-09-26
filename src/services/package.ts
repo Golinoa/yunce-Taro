@@ -99,6 +99,10 @@ interface BackendPackageTransactionRecord {
   feeMethod?: null | string;
   giftHours?: number;
   id: string;
+  /** 账本业务类型（recharge / opening / extend / migration / reversal / debt_deduct / refund） */
+  kind?: string;
+  /** 类型中文标签（后端下发） */
+  kindLabel?: null | string;
   operatorName?: null | string;
   packageId?: string;
   packageName?: null | string;
@@ -192,6 +196,9 @@ function mapBackendPackageTransaction(item: BackendPackageTransactionRecord): Pa
   return {
     id: item.id,
     type: item.type === 'REFUND' ? 'refund' : 'recharge',
+    // 业务类型与中文标签由后端下发；页面展示优先用 kind_label，避免在 UI 里硬编码类型
+    kind: item.kind,
+    kind_label: item.kindLabel || undefined,
     student_id: item.studentId || '',
     student_name: item.studentName || '学员',
     student_avatar: item.studentAvatar || undefined,
