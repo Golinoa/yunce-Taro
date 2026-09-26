@@ -1,9 +1,10 @@
-import { View, Text, Input, ScrollView } from '@tarojs/components';
+import { View, Text, Input, Button, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import Dialog from '@/components/Dialog';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import LeadCard from '@/components/lead/LeadCard';
@@ -11,6 +12,7 @@ import MemberActionSheet from '@/components/student/MemberActionSheet';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
 import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
+import LegacyPackagesEditor from '@/package-student/components/LegacyPackagesEditor';
 import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
 import { useLeadStore } from '@/stores/lead';
@@ -626,6 +628,45 @@ const Students: React.FC = () => {
 
   const [memberActionVisible, setMemberActionVisible] = useState(false);
 
+  // R1：老生历史课时录入（先选学员，再按科目录入）
+  const [legacyVisible, setLegacyVisible] = useState(false);
+  const [legacyStudentId, setLegacyStudentId] = useState('');
+  const [legacyStudentName, setLegacyStudentName] = useState('');
+  const [legacyQuery, setLegacyQuery] = useState('');
+  const [legacyResults, setLegacyResults] = useState<Student[]>([]);
+  const [legacySearching, setLegacySearching] = useState(false);
+
+  const handleImportHistory = useCallback(() => {
+    setLegacyStudentId('');
+    setLegacyStudentName('');
+    setLegacyQuery('');
+    setLegacyResults([]);
+    setLegacyVisible(true);
+  }, []);
+
+  const handleLegacySearch = useCallback(async () => {
+    const legacyKeyword = legacyQuery.trim();
+    if (!legacyKeyword) {
+      Taro.showToast({ title: '请输入姓名或手机号', icon: 'none' });
+      return;
+    }
+    setLegacySearching(true);
+    try {
+      const list = await studentService.search('', legacyKeyword);
+      setLegacyResults(list.filter((item) => item.status !== 'deleted').slice(0, 8));
+      if (list.length === 0) Taro.showToast({ title: '未找到学员', icon: 'none' });
+    } catch {
+      Taro.showToast({ title: '搜索失败，请重试', icon: 'none' });
+    } finally {
+      setLegacySearching(false);
+    }
+  }, [legacyQuery]);
+
+  const handleLegacyPickStudent = useCallback((student: Student) => {
+    setLegacyStudentId(student.id);
+    setLegacyStudentName(student.name);
+  }, []);
+
   const handleOpenMemberAction = useCallback(() => {
     setMemberActionVisible(true);
   }, []);
@@ -1111,9 +1152,71 @@ const Students: React.FC = () => {
         visible={memberActionVisible}
         onClose={handleCloseMemberAction}
         onNewCard={handleNewCard}
+        onImportHistory={handleImportHistory}
         onBatchExtend={handleBatchExtend}
         onBlacklist={handleBlacklist}
       />
+
+      {/* R1：老生历史课时录入（先选学员，再按科目录入） */}
+      <Dialog
+        visible={legacyVisible}
+        onClose={() => setLegacyVisible(false)}
+        className="w-[86vw] max-h-[80vh] overflow-y-auto bg-card rounded-[24rpx] p-[32rpx]"
+      >
+        {legacyStudentId ? (
+          <View>
+            <Text className="text-[34rpx] font-bold text-foreground block">
+              录入历史课时：{legacyStudentName}
+            </Text>
+            <LegacyPackagesEditor
+              studentId={legacyStudentId}
+              onSubmitted={() => setLegacyVisible(false)}
+              onCancel={() => setLegacyVisible(false)}
+            />
+          </View>
+        ) : (
+          <View>
+            <Text className="text-[34rpx] font-bold text-foreground block mb-[16rpx]">
+              选择学员
+            </Text>
+            <View className="flex gap-[16rpx] mb-[16rpx]">
+              <Input
+                className="flex-1 border border-border rounded-[12rpx] p-[18rpx]"
+                type="text"
+                placeholder="姓名或手机号"
+                value={legacyQuery}
+                onInput={(event) => setLegacyQuery(event.detail.value)}
+              />
+              <Button
+                type="primary"
+                size="default"
+                loading={legacySearching}
+                disabled={legacySearching}
+                onClick={handleLegacySearch}
+              >
+                搜索
+              </Button>
+            </View>
+            {legacyResults.map((item) => (
+              <View
+                key={item.id}
+                className="bg-muted rounded-[20rpx] p-[24rpx] mb-[16rpx] flex items-center justify-between"
+                onClick={() => handleLegacyPickStudent(item)}
+              >
+                <Text className="text-foreground">{item.name}</Text>
+                <Text className="text-muted-foreground text-[24rpx]">
+                  {item.phone || '无手机号'}
+                </Text>
+              </View>
+            ))}
+            {legacyResults.length === 0 && !legacySearching && (
+              <Text className="text-muted-foreground text-[24rpx] block">
+                输入关键词后点击搜索，点选学员开始录入
+              </Text>
+            )}
+          </View>
+        )}
+      </Dialog>
     </View>
   );
 };

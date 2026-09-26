@@ -4,12 +4,14 @@
  * 使用场景：学员列表 / 续费提醒 / 异常考勤 / 充值记录 / 会员列表 / 统计告警等入口进入。
  * 功能说明：编排加载、派生数据与各 Tab 面板；path 仍为 `...?id=`，行为零改。
  */
-import { View, Swiper, SwiperItem } from '@tarojs/components';
+import { Text, View, Swiper, SwiperItem } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Dialog from '@/components/Dialog';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
+import LegacyPackagesEditor from '@/package-student/components/LegacyPackagesEditor';
 import { useThemeStore } from '@/stores/theme';
 import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
@@ -56,6 +58,8 @@ const StudentDetail: React.FC = () => {
   const [packageTransactions, setPackageTransactions] = useState<PackageTransaction[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [memberCards, setMemberCards] = useState<MemberCardDetail[]>([]);
+  /** 老生历史课时录入（R6：卡包入口改居中弹框，原 student-migration 页面已下线） */
+  const [legacyPackagesVisible, setLegacyPackagesVisible] = useState(false);
   const [followRecords, setFollowRecords] = useState<FollowRecord[]>([]);
   const [parents, setParents] = useState<StudentParent[]>([]);
   const [cardSubTab, setCardSubTab] = useState<CardSubTabKey>('active');
@@ -255,11 +259,7 @@ const StudentDetail: React.FC = () => {
             onCardSubTabChange={setCardSubTab}
             memberCardStats={derived.memberCardStats}
             onMemberCardClick={actions.handleMemberCardClick}
-            onMigrateHistory={() =>
-              Taro.navigateTo({
-                url: `/package-student/pages/student-migration/index?studentId=${studentId}`,
-              })
-            }
+            onOpenLegacyPackages={() => setLegacyPackagesVisible(true)}
           />
         </SwiperItem>
 
@@ -307,6 +307,26 @@ const StudentDetail: React.FC = () => {
         onRefundReasonChange={setRefundReason}
         onConfirm={actions.handleConfirmRefund}
       />
+
+      {/* 老生历史课时录入（R6：卡包入口改居中弹框，原 student-migration 页面已下线） */}
+      <Dialog
+        visible={legacyPackagesVisible}
+        onClose={() => setLegacyPackagesVisible(false)}
+        className="w-[86vw] max-h-[80vh] overflow-y-auto bg-card rounded-[24rpx] p-[32rpx]"
+      >
+        <Text className="text-[34rpx] font-bold text-foreground mb-[16rpx] block">
+          录入历史课时
+        </Text>
+        <LegacyPackagesEditor
+          studentId={studentId}
+          onSubmitted={() => {
+            setLegacyPackagesVisible(false);
+            // 期初建卡后刷新卡包数据
+            void loadData();
+          }}
+          onCancel={() => setLegacyPackagesVisible(false)}
+        />
+      </Dialog>
     </View>
   );
 };

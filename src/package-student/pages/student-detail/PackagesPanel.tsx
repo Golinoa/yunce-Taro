@@ -31,7 +31,7 @@ export interface PackagesPanelProps {
     remainingAmount: number;
   };
   onMemberCardClick: (card: MemberCardDetail) => void;
-  onMigrateHistory: () => void;
+  onOpenLegacyPackages: () => void;
 }
 
 function filterCardsBySubTab(cards: MemberCardDetail[], subTab: CardSubTabKey): MemberCardDetail[] {
@@ -57,7 +57,7 @@ const PackagesPanel: React.FC<PackagesPanelProps> = ({
   onCardSubTabChange,
   memberCardStats,
   onMemberCardClick,
-  onMigrateHistory,
+  onOpenLegacyPackages,
 }) => {
   const filteredCards = filterCardsBySubTab(memberCards, cardSubTab);
 
@@ -137,8 +137,8 @@ const PackagesPanel: React.FC<PackagesPanelProps> = ({
           })}
         </View>
         <View className="mb-[24rpx]">
-          <Text className="text-primary text-[26rpx]" onClick={onMigrateHistory}>
-            历史数据迁移 ›
+          <Text className="text-primary text-[26rpx]" onClick={onOpenLegacyPackages}>
+            录入历史课时 ›
           </Text>
         </View>
 

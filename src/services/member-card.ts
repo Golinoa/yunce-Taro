@@ -77,7 +77,11 @@ export const memberCardService = {
     if (!detail) throw new Error('追加次数成功但读取会员卡失败');
     return detail;
   },
-  migrate: async (data: {
+  /**
+   * 期初入账（B4，原「历史数据迁移」接口下线）：为老生按科目录入剩余课时并建卡。
+   * 走 `opening` 账本类型，金额为 0、不计售卡业绩。
+   */
+  openLedger: async (data: {
     cardTypeId: string;
     studentId: string;
     remainingCount: number;
@@ -87,7 +91,7 @@ export const memberCardService = {
     remark: string;
     idempotencyKey: string;
   }): Promise<MemberCardDetail> => {
-    const created = await post<BackendMemberCard>('/card-types/member-cards/migrations', data);
+    const created = await post<BackendMemberCard>('/card-types/member-cards/opening', data);
     invalidatePackagesCache(data.studentId);
     const detail = await memberCardService.getById(String(created.id));
     if (!detail) throw new Error('迁移会员卡创建成功但读取失败');
