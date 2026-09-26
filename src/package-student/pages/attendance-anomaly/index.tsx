@@ -159,6 +159,14 @@ const AttendanceAnomalyPage: React.FC = () => {
         </ScrollView>
       </View>
 
+      {/* 判定口径（R7 决议：页面必须写明所用口径，避免老师误解名单含义） */}
+      <View className="px-[24rpx] pb-[12rpx]">
+        <Text className="text-[22rpx] leading-[34rpx] text-muted-foreground">
+          判定口径：长期停课 = 超过 180 天未到课；长期未上课 = 最近连续 2 次缺课/请假（请假计入）；
+          超上学员 = 会员卡课时已耗尽或超出。建档 30 天内且未到课的学员不列入。
+        </Text>
+      </View>
+
       {loading ? (
         <View className="flex items-center justify-center py-[200rpx]">
           <Loading text="加载中..." />
