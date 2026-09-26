@@ -644,6 +644,11 @@ const Students: React.FC = () => {
     setLegacyVisible(true);
   }, []);
 
+  /** R2：批量导入课时（Excel） */
+  const handleBatchImport = useCallback(() => {
+    Taro.navigateTo({ url: '/package-student/pages/legacy-hours-import/index' });
+  }, []);
+
   const handleLegacySearch = useCallback(async () => {
     const legacyKeyword = legacyQuery.trim();
     if (!legacyKeyword) {
@@ -1153,6 +1158,7 @@ const Students: React.FC = () => {
         onClose={handleCloseMemberAction}
         onNewCard={handleNewCard}
         onImportHistory={handleImportHistory}
+        onBatchImport={handleBatchImport}
         onBatchExtend={handleBatchExtend}
         onBlacklist={handleBlacklist}
       />

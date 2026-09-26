@@ -701,6 +701,21 @@ export function isEmployeeResignedMessage(message: unknown): boolean {
   return typeof message === 'string' && message.startsWith('EMPLOYEE_RESIGNED:');
 }
 
+/**
+ * 供 `Taro.uploadFile` / `Taro.downloadFile` 等非 `Taro.request` 通道复用的
+ * URL 拼接 + 鉴权头注入（与 request 主通道同源，行为一致）。
+ * 只读复用，不改变任何请求/会话行为。
+ */
+export async function buildAuthedUrlAndHeader(
+  url: string,
+): Promise<{ url: string; header: Record<string, string> }> {
+  const token = await resolveAccessToken(false);
+  return {
+    url: buildRequestUrl(url),
+    header: token ? { Authorization: `Bearer ${token}` } : {},
+  };
+}
+
 /** 从响应体中提取可读 message（兼容 {code,data,message} 与纯文本） */
 function extractErrorMessage(res: { statusCode: number; data: unknown }): string {
   if (res.data && typeof res.data === 'object' && 'message' in res.data) {

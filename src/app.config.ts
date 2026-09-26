@@ -45,6 +45,7 @@ export default defineAppConfig({
         'pages/profile-edit/index',
         'pages/attendance-anomaly/index',
         'pages/renewal-reminder/index',
+        'pages/legacy-hours-import/index',
       ],
     },
     {

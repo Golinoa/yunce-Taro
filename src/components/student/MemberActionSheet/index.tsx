@@ -14,14 +14,16 @@ export interface MemberActionSheetProps {
   visible: boolean;
   onClose: () => void;
   onNewCard: () => void;
-  /** R1：老生历史课时录入（期初入账） */
+  /** R1：老生历史课时录入（期初入账，单个学员） */
   onImportHistory: () => void;
+  /** R2：老生课时批量导入（Excel）——置于批量延期上方 */
+  onBatchImport: () => void;
   onBatchExtend: () => void;
   onBlacklist: () => void;
 }
 
 interface ActionOption {
-  key: 'new_card' | 'import_history' | 'batch_extend' | 'blacklist';
+  key: 'new_card' | 'import_history' | 'batch_import' | 'batch_extend' | 'blacklist';
   label: string;
   desc: string;
 }
@@ -29,6 +31,7 @@ interface ActionOption {
 const OPTIONS: ActionOption[] = [
   { key: 'new_card', label: '新增会员', desc: '录入新会员信息并办理会员卡' },
   { key: 'import_history', label: '录入历史课时', desc: '为老生按科目录入剩余课时并建卡' },
+  { key: 'batch_import', label: '批量导入课时', desc: '用 Excel 模板批量导入老生剩余课时' },
   { key: 'batch_extend', label: '批量延期', desc: '批量管理会员卡有效期' },
   { key: 'blacklist', label: '门店黑名单', desc: '禁止指定手机号进入本门店' },
 ];
@@ -38,6 +41,7 @@ const MemberActionSheet: React.FC<MemberActionSheetProps> = ({
   onClose,
   onNewCard,
   onImportHistory,
+  onBatchImport,
   onBatchExtend,
   onBlacklist,
 }) => {
@@ -48,11 +52,12 @@ const MemberActionSheet: React.FC<MemberActionSheetProps> = ({
       setTimeout(() => {
         if (key === 'new_card') onNewCard();
         if (key === 'import_history') onImportHistory();
+        if (key === 'batch_import') onBatchImport();
         if (key === 'batch_extend') onBatchExtend();
         if (key === 'blacklist') onBlacklist();
       }, 200);
     },
-    [onClose, onNewCard, onImportHistory, onBatchExtend, onBlacklist],
+    [onClose, onNewCard, onImportHistory, onBatchImport, onBatchExtend, onBlacklist],
   );
 
   return (
