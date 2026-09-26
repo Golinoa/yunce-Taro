@@ -6,10 +6,6 @@
  */
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  buildLessonConsumptionSections,
-  type LessonConsumptionSection,
-} from '@/components/lesson/LessonConsumptionList';
 import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -39,8 +35,6 @@ export interface StudentDetailDerived {
     remaining: number;
     percent: number;
   };
-  recentConsumptions: LessonRecord[];
-  recentConsumptionSections: LessonConsumptionSection[];
   memberCardStats: {
     totalCount: number;
     usedCount: number;
@@ -85,18 +79,6 @@ export function useStudentDetailDerived(
     const percent = total > 0 ? Math.round((used / total) * 100) : 0;
     return { total, used, remaining, percent };
   }, [packages]);
-
-  const recentConsumptions = useMemo(() => {
-    return records
-      .filter((r) => (r.hours_used || 0) > 0 && r.status !== 'cancelled')
-      .sort((a, b) => (dayjs(a.lesson_date).isAfter(dayjs(b.lesson_date)) ? -1 : 1))
-      .slice(0, 8);
-  }, [records]);
-
-  const recentConsumptionSections = useMemo(
-    () => buildLessonConsumptionSections(recentConsumptions),
-    [recentConsumptions],
-  );
 
   const memberCardStats = useMemo(() => {
     let totalCount = 0;
@@ -231,8 +213,6 @@ export function useStudentDetailDerived(
   return {
     remainingHours,
     consumptionStats,
-    recentConsumptions,
-    recentConsumptionSections,
     memberCardStats,
     refundedAmountByPackage,
     refundablePackages,

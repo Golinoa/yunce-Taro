@@ -1,20 +1,18 @@
 /**
  * 学员详情 · 课程消耗 Tab
  *
- * 使用场景：课时汇总、课包进度、最近消课列表。
- * 功能说明：课时汇总、课包进度、最近消课；提供「申请退费」入口打开 RefundSheet。
+ * 使用场景：课时汇总、课包进度。
+ * 功能说明：课时汇总、课包进度；提供「申请退费」入口打开 RefundSheet。
+ *
+ * ⚠️ 「最近消课」区块已于 2026-09-26 按 R9 下线（方案 A）：它与「出勤」Tab 读取的是
+ * **同一份 LessonRecord**（同一批上课记录被展示两遍），消课明细统一归「出勤」展示。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
-import LessonConsumptionList, {
-  navigateToLessonDetail,
-  type LessonConsumptionSection,
-} from '@/components/lesson/LessonConsumptionList';
 import type { CoursePackage } from '@/types/course-package';
-import type { LessonRecord } from '@/types/lesson-record';
 import { PACKAGE_STATUS_MAP } from './student-detail-constants';
 import { getPackageGiftHours, getPackageUsedHours } from './student-detail-package';
 
@@ -26,8 +24,6 @@ export interface ConsumptionPanelProps {
     remaining: number;
     percent: number;
   };
-  recentConsumptions: LessonRecord[];
-  recentConsumptionSections: LessonConsumptionSection[];
   /** 是否存在可退费课包（控制按钮样式） */
   canRefund: boolean;
   /** 打开退费 Sheet；无可退时由上层 toast */
@@ -37,8 +33,6 @@ export interface ConsumptionPanelProps {
 const ConsumptionPanel: React.FC<ConsumptionPanelProps> = ({
   packages,
   consumptionStats,
-  recentConsumptions,
-  recentConsumptionSections,
   canRefund,
   onOpenRefund,
 }) => {
@@ -169,23 +163,6 @@ const ConsumptionPanel: React.FC<ConsumptionPanelProps> = ({
                 );
               })}
             </View>
-          )}
-        </View>
-
-        <View className="bg-card rounded-[28rpx] p-[32rpx] shadow-soft">
-          <View className="flex items-center gap-[12rpx] mb-[24rpx]">
-            <Icon name="mdi-clock-outline" size={28} color="primary" />
-            <Text className="text-[30rpx] font-bold text-foreground">最近消课</Text>
-          </View>
-          {recentConsumptions.length === 0 ? (
-            <Empty icon="mdi-history" description="暂无消课记录" />
-          ) : (
-            <LessonConsumptionList
-              sections={recentConsumptionSections}
-              embedded
-              showDateHeaders={false}
-              onRecordClick={navigateToLessonDetail}
-            />
           )}
         </View>
       </View>

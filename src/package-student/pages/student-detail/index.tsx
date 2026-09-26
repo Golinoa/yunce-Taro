@@ -243,8 +243,6 @@ const StudentDetail: React.FC = () => {
           <ConsumptionPanel
             packages={packages}
             consumptionStats={derived.consumptionStats}
-            recentConsumptions={derived.recentConsumptions}
-            recentConsumptionSections={derived.recentConsumptionSections}
             canRefund={derived.refundablePackages.length > 0}
             onOpenRefund={actions.handleOpenRefund}
           />
