@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getMemberCardTotalCount } from './member-card-hours';
+import {
+  getMemberCardPaidRemainingCount,
+  getMemberCardPaidTotalCount,
+  getMemberCardTotalCount,
+} from './member-card-hours';
 
 /**
  * 次数卡「总课时」统一口径（B3）。
@@ -61,5 +65,48 @@ describe('getMemberCardTotalCount（总课时统一口径）', () => {
         totalGiftCount: undefined,
       }),
     ).toBeUndefined();
+  });
+});
+
+describe('getMemberCardPaidTotalCount / getMemberCardPaidRemainingCount（付费口径）', () => {
+  /** 卡种 10 次 + 赠 5 次，一次没用 */
+  const card = {
+    cardTypeKind: 'count' as const,
+    totalCount: 15,
+    cardTypeCount: 10,
+    totalGiftCount: 5,
+    consumedValue: 0,
+  };
+
+  it('付费总次数不含赠送（与"共 X 次"含赠课是两个口径）', () => {
+    expect(getMemberCardTotalCount(card)).toBe(15);
+    expect(getMemberCardPaidTotalCount(card)).toBe(10);
+  });
+
+  it('付费剩余 = 付费总 − 已消耗，恒 ≤ 付费总（退费比例不会 > 1）', () => {
+    expect(getMemberCardPaidRemainingCount(card)).toBe(10);
+
+    const used = { ...card, consumedValue: 4 };
+    expect(getMemberCardPaidRemainingCount(used)).toBe(6);
+  });
+
+  it('回归护栏：不能拿 remainingCount（含赠课）当分子', () => {
+    // 旧退费公式会算成 remainingCount(15) / (10-5) = 300% ⇒ 退费超实付 3 倍
+    const paidTotal = getMemberCardPaidTotalCount(card) ?? 0;
+    const paidRemaining = getMemberCardPaidRemainingCount(card) ?? 0;
+    expect(paidRemaining / paidTotal).toBeLessThanOrEqual(1);
+
+    const remainingCountIncludingGift = 15; // 若误用这个值当分子
+    expect(remainingCountIncludingGift / paidTotal).toBeGreaterThan(1);
+  });
+
+  it('赠课为 0 时两个口径相等', () => {
+    const noGift = { ...card, totalCount: 10, totalGiftCount: 0 };
+    expect(getMemberCardPaidTotalCount(noGift)).toBe(getMemberCardTotalCount(noGift));
+  });
+
+  it('非次数卡返回 undefined', () => {
+    expect(getMemberCardPaidTotalCount({ ...card, cardTypeKind: 'time' })).toBeUndefined();
+    expect(getMemberCardPaidRemainingCount({ ...card, cardTypeKind: 'stored' })).toBeUndefined();
   });
 });

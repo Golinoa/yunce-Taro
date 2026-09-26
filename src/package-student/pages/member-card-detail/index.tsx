@@ -12,6 +12,10 @@ import PageContainer from '@/components/PageContainer';
 import { memberCardService } from '@/services/member-card';
 import type { MemberCardDetail, MemberCardStatus } from '@/types/member-card';
 import { logError } from '@/utils/logger';
+import {
+  getMemberCardPaidRemainingCount,
+  getMemberCardPaidTotalCount,
+} from '@/utils/member-card-hours';
 import { withRouteGuard } from '@/utils/route-guard';
 
 type TabKey = 'records' | 'detail' | 'actions';
@@ -75,9 +79,15 @@ function computeRefundAmount(card: MemberCardDetail): number {
   }
 
   if (card.cardTypeKind === 'count') {
-    const totalCount = Math.max((card.cardTypeCount || 0) - (card.totalGiftCount || 0), 0);
-    if (totalCount > 0 && typeof card.remainingCount === 'number') {
-      return Math.round(card.purchasePrice * (card.remainingCount / totalCount));
+    /**
+     * ⚠️ 分子分母必须是**同一口径**：都用「付费部分」。
+     * 旧代码分子取 `remainingCount`（含赠课剩余）、分母取付费总次数 ⇒ 比例可能 > 1
+     * ⇒ 退费金额超过实付（例：卡种 10 + 赠 5 全未用 ⇒ 15/5 = 300%）。
+     */
+    const paidTotal = getMemberCardPaidTotalCount(card);
+    const paidRemaining = getMemberCardPaidRemainingCount(card);
+    if (paidTotal && paidTotal > 0 && paidRemaining != null) {
+      return Math.round(card.purchasePrice * (paidRemaining / paidTotal));
     }
   }
 
@@ -282,10 +292,8 @@ const MemberCardDetailPage: React.FC = () => {
     ];
 
     if (card.cardTypeKind === 'count') {
-      const purchaseRemaining = Math.max(
-        (card.cardTypeCount || 0) - (card.totalGiftCount || 0) - (card.consumedValue || 0),
-        0,
-      );
+      // 与退费公式同源（付费部分），避免展示与计算两套口径
+      const purchaseRemaining = getMemberCardPaidRemainingCount(card) ?? 0;
       rows.push(
         { label: '开卡总次数', value: `${card.cardTypeCount || 0}次` },
         { label: '其中赠送', value: `${card.totalGiftCount || 0}次` },

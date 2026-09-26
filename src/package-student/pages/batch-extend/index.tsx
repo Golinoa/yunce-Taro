@@ -16,6 +16,7 @@ import { memberCardService } from '@/services/member-card';
 import type { BatchExtendCardOutcome } from '@/services/member-card';
 import { studentService } from '@/services/student';
 import type { Student } from '@/types/student';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 
 type ExtendMode = 'add_days' | 'set_date';
@@ -134,6 +135,8 @@ const BatchExtendPage: React.FC = () => {
       });
       setResult({ extendedCount: committed.extendedCount, skippedCount: committed.skippedCount });
       setPreview(null);
+      // 卡到期日已变：通知学员列表重拉（详情页 onShow 本就会重拉，这里覆盖列表侧）
+      setRefreshSignal(REFRESH_SIGNAL.students);
       Taro.showToast({ title: `已延期 ${committed.extendedCount} 张卡`, icon: 'success' });
     } catch (error) {
       Taro.showToast({

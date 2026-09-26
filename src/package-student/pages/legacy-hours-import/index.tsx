@@ -17,6 +17,7 @@ import type {
   LegacyImportPreviewRow,
   LegacyImportRecord,
 } from '@/services/legacy-hours-import';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 
 const STATUS_LABEL: Record<LegacyImportPreviewRow['status'], string> = {
@@ -124,6 +125,12 @@ const LegacyHoursImportPage: React.FC = () => {
       setPreview(null);
       setSelections({});
       loadRecords();
+      /**
+       * ⚠️ 必须通知学员列表重拉：导入会**新建学员**。
+       * 列表页只在消费到 `students` 信号时才 invalidate，否则用户返回列表
+       * 看不到刚导入的学员（会误以为导入失败）。
+       */
+      setRefreshSignal(REFRESH_SIGNAL.students);
       Taro.showToast({ title: `导入成功 ${committed.successRows} 条`, icon: 'success' });
     } catch (error) {
       Taro.showToast({

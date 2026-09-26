@@ -26,3 +26,40 @@ export const getMemberCardTotalCount = (
   if (card.cardTypeCount == null) return undefined;
   return card.cardTypeCount + (card.totalGiftCount ?? 0);
 };
+
+/**
+ * 次数卡的「**付费部分**总次数」（不含赠送）—— 单一事实源。
+ *
+ * 与「总课时含赠课」是**两个不同口径**，别混用：
+ *   · 展示「共 X 次」、统计学员总课时 ⇒ 用 `getMemberCardTotalCount()`（含赠课）；
+ *   · 算退费、算"购卡剩余" ⇒ 用本函数（赠送的课时不折现）。
+ *
+ * ⚠️ 2026-09-26 review 修复：此前退费公式**混用了两个口径** ——
+ * 分子取 `remainingCount`（**含**赠课剩余）、分母取 `cardTypeCount - totalGiftCount`（**不含**赠课），
+ * 导致比例可能 > 1（例：卡种 10 次 + 赠 5 次全未用 ⇒ 15/5 = 300% ⇒ **退费金额是实付的 3 倍**）。
+ */
+export const getMemberCardPaidTotalCount = (
+  card: Pick<MemberCardDetail, 'totalCount' | 'cardTypeCount' | 'totalGiftCount' | 'cardTypeKind'>,
+): number | undefined => {
+  if (card.cardTypeKind !== 'count') return undefined;
+  const total = getMemberCardTotalCount(card);
+  if (total == null) return undefined;
+  return Math.max(total - (card.totalGiftCount ?? 0), 0);
+};
+
+/**
+ * 次数卡的「付费部分**剩余**次数」—— 与详情页「购卡剩余」展示同一口径。
+ *
+ * 用「付费总次数 − 已消耗」而非 `remainingCount`（后者含赠送剩余），
+ * 保证比例恒 ≤ 1，退费不会超过实付。
+ */
+export const getMemberCardPaidRemainingCount = (
+  card: Pick<
+    MemberCardDetail,
+    'totalCount' | 'cardTypeCount' | 'totalGiftCount' | 'consumedValue' | 'cardTypeKind'
+  >,
+): number | undefined => {
+  const paidTotal = getMemberCardPaidTotalCount(card);
+  if (paidTotal == null) return undefined;
+  return Math.max(paidTotal - (card.consumedValue ?? 0), 0);
+};
