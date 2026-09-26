@@ -62,6 +62,12 @@ export interface MemberCardDetail extends MemberCard {
   cardTypeKind: CardTypeKind;
   /** 卡种总次数（次卡） */
   cardTypeCount?: number;
+  /**
+   * 总课时快照（B3，次卡）：发卡时 = 卡种次数 + 开卡赠送，追加课时/赠课时累加。
+   * 可空（历史卡未回填）；展示口径统一走 `getMemberCardTotalCount()`，
+   * 为空时回落 `cardTypeCount + totalGiftCount`。
+   */
+  totalCount?: number;
   /** 卡种有效天数 */
   cardTypeValidDays: number;
   /** 卡种可冻卡总次数 */

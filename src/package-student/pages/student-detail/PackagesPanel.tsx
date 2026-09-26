@@ -9,6 +9,7 @@ import cn from 'classnames';
 import React from 'react';
 import Empty from '@/components/Empty';
 import type { MemberCardDetail } from '@/types/member-card';
+import { getMemberCardTotalCount } from '@/utils/member-card-hours';
 import {
   CARD_SUB_TABS,
   MEMBER_CARD_BG_MAP,
@@ -166,7 +167,8 @@ const PackagesPanel: React.FC<PackagesPanelProps> = ({
                   : `¥${((card.remainingAmount ?? 0) / 100).toFixed(2)}`;
             const totalText =
               card.cardTypeKind === 'count'
-                ? `共 ${card.cardTypeCount ?? 0} 次`
+                ? // 总课时统一口径（含赠课，见 utils/member-card-hours.ts）
+                  `共 ${getMemberCardTotalCount(card) ?? 0} 次`
                 : card.cardTypeKind === 'time'
                   ? `共 ${card.cardTypeValidDays} 天`
                   : `充值 ¥${(card.purchasePrice / 100).toFixed(2)}`;

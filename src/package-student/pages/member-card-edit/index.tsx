@@ -14,6 +14,7 @@ import { memberCardService } from '@/services/member-card';
 import type { MemberCardDetail } from '@/types/member-card';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { getMemberCardTotalCount } from '@/utils/member-card-hours';
 import { withRouteGuard } from '@/utils/route-guard';
 
 function formatCurrencyYuan(fen?: number): string {
@@ -281,7 +282,8 @@ const MemberCardEditPage: React.FC = () => {
   const isTime = card.cardTypeKind === 'time';
   const isStored = card.cardTypeKind === 'stored';
 
-  const totalCount = card.cardTypeCount || 0;
+  // 总课时统一口径（含赠课，见 utils/member-card-hours.ts）；已用 = 总课时 − 剩余
+  const totalCount = getMemberCardTotalCount(card) ?? 0;
   const usedCount = Math.max(totalCount - (card.remainingCount || 0), 0);
   const totalDays = card.cardTypeValidDays || 0;
   const usedDays = Math.max(totalDays - (card.remainingDays || 0), 0);

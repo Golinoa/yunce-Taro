@@ -23,6 +23,7 @@ import {
   type CardTypeStatKey,
   type MemberCardDetail,
 } from '@/types/member-card';
+import { getMemberCardTotalCount } from '@/utils/member-card-hours';
 
 /** 页面 URL 参数 */
 interface PageQuery {
@@ -160,12 +161,15 @@ const CardMemberListPage: React.FC = () => {
   /** 根据卡种类型构建剩余数据展示 */
   const getRemainingInfo = useCallback((member: MemberCardDetail) => {
     switch (member.cardTypeKind) {
-      case 'count':
+      case 'count': {
+        // 总课时统一口径（含赠课，见 utils/member-card-hours.ts）
+        const total = getMemberCardTotalCount(member);
         return {
           value: `${member.remainingCount ?? 0}次`,
           label: '剩余次数',
-          subText: member.cardTypeCount ? `共 ${member.cardTypeCount} 次` : undefined,
+          subText: total != null ? `共 ${total} 次` : undefined,
         };
+      }
       case 'time':
         return {
           value: `${member.remainingDays ?? 0}天`,

@@ -11,6 +11,7 @@ import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
+import { getMemberCardTotalCount } from '@/utils/member-card-hours';
 import { getPackagePurchasedHours, getPackageRefundableAmount } from './student-detail-package';
 import { isConsumingRecord } from './student-detail-record-status';
 
@@ -88,7 +89,8 @@ export function useStudentDetailDerived(
     let remainingAmount = 0;
     memberCards.forEach((card) => {
       if (card.cardTypeKind === 'count') {
-        totalCount += card.cardTypeCount || 0;
+        // 总课时统一口径（含赠课，见 utils/member-card-hours.ts）
+        totalCount += getMemberCardTotalCount(card) ?? 0;
         remainingCount += card.remainingCount || 0;
       }
       if (card.cardTypeKind === 'stored') {

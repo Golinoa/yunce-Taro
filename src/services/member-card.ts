@@ -36,6 +36,8 @@ function mapCard(raw: BackendMemberCard): MemberCardDetail {
     remark: raw.remark ? String(raw.remark) : undefined,
     cardTypeKind: (raw.cardTypeKind as MemberCardDetail['cardTypeKind']) || 'count',
     cardTypeCount: raw.cardTypeCount != null ? Number(raw.cardTypeCount) : undefined,
+    // 总课时快照（B3）：历史卡可能为 null，展示口径见 utils/member-card-hours.ts
+    totalCount: raw.totalCount != null ? Number(raw.totalCount) : undefined,
     cardTypeValidDays: Number(raw.cardTypeValidDays ?? 0),
     cardTypeFreezeCount: Number(raw.cardTypeFreezeCount ?? 0),
     cardTypeFreezeDays: Number(raw.cardTypeFreezeDays ?? 0),
