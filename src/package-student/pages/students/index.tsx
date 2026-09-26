@@ -684,8 +684,9 @@ const Students: React.FC = () => {
     Taro.navigateTo({ url: '/package-student/pages/student-form/index' });
   }, []);
 
+  /** R3：批量延期（多选学员 → 方式 → 确认） */
   const handleBatchExtend = useCallback(() => {
-    Taro.showToast({ title: '批量延期功能开发中', icon: 'none' });
+    Taro.navigateTo({ url: '/package-student/pages/batch-extend/index' });
   }, []);
 
   const handleBlacklist = useCallback(() => {

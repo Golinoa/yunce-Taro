@@ -204,4 +204,51 @@ export const memberCardService = {
     await del(`/card-types/member-cards/${id}`);
     return true;
   },
+
+  /** R3 批量延期 · 预览：以学员为入参，服务端展开名下所有卡并逐卡判定结果 */
+  previewBatchExtend: (payload: {
+    studentIds: string[];
+    mode: 'add_days' | 'set_date';
+    days?: number;
+    newDate?: string;
+  }): Promise<BatchExtendOutcome> =>
+    post('/card-types/member-cards/batch-extends/preview', payload),
+
+  /** R3 批量延期 · 提交：逐卡写 `extend` 账本流水（amount=0）并更新到期日 */
+  commitBatchExtend: (payload: {
+    studentIds: string[];
+    mode: 'add_days' | 'set_date';
+    days?: number;
+    newDate?: string;
+    reason?: string;
+    batchNo: string;
+  }): Promise<{ batchNo: string; extendedCount: number; skippedCount: number }> =>
+    post('/card-types/member-cards/batch-extends', payload),
 };
+
+export interface BatchExtendCandidate {
+  studentId: string;
+  name: string;
+  phone?: string | null;
+  campusId?: string | null;
+}
+
+export interface BatchExtendCardOutcome {
+  memberCardId: string;
+  studentId: string;
+  studentName: string;
+  cardTypeName: string;
+  currentExpiry: string | null;
+  outcome: 'extend' | 'skip_permanent' | 'invalid';
+  newExpiry: string | null;
+  detail: string;
+}
+
+export interface BatchExtendOutcome {
+  studentCount: number;
+  cardCount: number;
+  extendCount: number;
+  skipCount: number;
+  invalidCount: number;
+  cards: BatchExtendCardOutcome[];
+}
