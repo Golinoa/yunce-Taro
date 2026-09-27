@@ -2,7 +2,7 @@
  * 课时状态判断工具
  * 根据剩余课时、课包可用性和校区预警阈值返回卡片状态
  */
-import type { StudentCardStatus, StudentProgress, PackageTag } from '@/types/student';
+import type { StudentCardStatus, StudentProgress } from '@/types/student';
 import { getAlertThreshold } from '@/utils/alert-config';
 
 /** 即将过期天数阈值 */
@@ -157,24 +157,6 @@ export function calcStudentProgress(student: {
 }
 
 /** 生成课包标签列表 */
-export function generatePackageTags(student: {
-  course_packages?: { name: string; remaining_hours: number; total_hours: number }[];
-}): PackageTag[] {
-  const packages = student.course_packages || [];
-  const colorPool: PackageTag['color'][] = [
-    'primary',
-    'amber',
-    'danger',
-    'purple',
-    'accent',
-    'info',
-  ];
-  return packages.map((p, i) => ({
-    name: p.name,
-    remainingHours: p.remaining_hours,
-    color: colorPool[i % colorPool.length],
-  }));
-}
 
 /** 计算统计摘要 */
 export function calcStudentSummary(

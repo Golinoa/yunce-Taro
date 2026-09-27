@@ -15,7 +15,7 @@ import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFilterTab } from '@/types/lead';
-import type { Student, StudentSort, PackageTag } from '@/types/student';
+import type { Student, StudentSort } from '@/types/student';
 import { SORT_OPTIONS } from '@/types/student';
 import { syncAlertThresholdFromCampus } from '@/utils/alert-config';
 import { isStaffRole, useAuth } from '@/utils/auth';
@@ -26,7 +26,6 @@ import {
   getProgressGradientClass,
   getHoursColorClass,
   calcStudentProgress,
-  generatePackageTags,
 } from '@/utils/hours-status';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
@@ -76,16 +75,6 @@ function calcRemainingHours(packages?: Student['course_packages']): number {
   if (!packages) return 0;
   return packages.reduce((sum, p) => sum + (p.remaining_hours || 0), 0);
 }
-
-/** 课包标签颜色映射（使用 UnoCSS Token 类名） */
-const TAG_COLOR_MAP: Record<PackageTag['color'], { bg: string; text: string }> = {
-  primary: { bg: 'bg-success-bg', text: 'text-success' },
-  amber: { bg: 'bg-warning-bg', text: 'text-amber' },
-  danger: { bg: 'bg-destructive-5', text: 'text-destructive' },
-  purple: { bg: 'bg-accent-bg', text: 'text-accent' },
-  accent: { bg: 'bg-primary-bg', text: 'text-primary' },
-  info: { bg: 'bg-info-bg', text: 'text-info' },
-};
 
 const Students: React.FC = () => {
   const { profile, session, loading: authLoading } = useAuth();
@@ -861,7 +850,6 @@ const Students: React.FC = () => {
               const cardStatus = getStudentCardStatus(student);
               const borderColorClass = getCardBorderColorClass(cardStatus);
               const progress = calcStudentProgress(student);
-              const tags = generatePackageTags(student);
               const remainingHours = calcRemainingHours(student.course_packages);
               const hoursColorClass = getHoursColorClass(remainingHours);
               return (
@@ -917,30 +905,6 @@ const Students: React.FC = () => {
                       <Icon name="mdi-chevron-right" size="sm" color="mutedForeground" />
                     </View>
                   </View>
-
-                  {/* 课包标签行 */}
-                  {tags.length > 0 && (
-                    <View className="flex gap-[12rpx] mt-[20rpx] flex-wrap">
-                      {tags.map((tag, i) => (
-                        <View
-                          key={i}
-                          className={cn(
-                            'py-[6rpx] px-[16rpx] rounded-[12rpx]',
-                            TAG_COLOR_MAP[tag.color].bg,
-                          )}
-                        >
-                          <Text
-                            className={cn(
-                              'text-[22rpx] font-medium',
-                              TAG_COLOR_MAP[tag.color].text,
-                            )}
-                          >
-                            {tag.name} {tag.remainingHours}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
 
                   {/* 进度条 */}
                   {progress.total > 0 && (
