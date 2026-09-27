@@ -22,6 +22,7 @@ import type { Student, StudentParent } from '@/types/student';
 import { isStaffRole, useAuth } from '@/utils/auth';
 import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
+import { readStudentDetailCore } from '@/utils/student-detail-core-cache';
 import AttendancePanel from './AttendancePanel';
 import FollowPanel from './FollowPanel';
 import PackagesPanel from './PackagesPanel';
@@ -35,6 +36,7 @@ import {
 } from './student-detail-constants';
 import StudentDetailFab from './StudentDetailFab';
 import StudentDetailHeader from './StudentDetailHeader';
+import StudentDetailSkeleton from './StudentDetailSkeleton';
 import StudentDetailTabBar from './StudentDetailTabBar';
 import { useStudentDetailActions } from './use-student-detail-actions';
 import { useStudentDetailDerived } from './use-student-detail-derived';
@@ -50,16 +52,22 @@ const StudentDetail: React.FC = () => {
     return decodeURIComponent(instance?.router?.params?.id || '');
   }, []);
 
-  const [student, setStudent] = useState<Student | null>(null);
+  /**
+   * 首屏缓存：命中则**同步**渲染出内容（第二次及以后点开即时可见、不出现 loading），
+   * 随后由加载 hook 走后台静默刷新。未命中（首次进入）才显示骨架屏。
+   */
+  const [cachedCore] = useState(() => readStudentDetailCore(studentId));
+
+  const [student, setStudent] = useState<Student | null>(cachedCore?.student ?? null);
   const [records, setRecords] = useState<LessonRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [memberCards, setMemberCards] = useState<MemberCardDetail[]>([]);
   /** 老生历史课时录入（R6：卡包入口改居中弹框，原 student-migration 页面已下线） */
   const [legacyPackagesVisible, setLegacyPackagesVisible] = useState(false);
   const [followRecords, setFollowRecords] = useState<FollowRecord[]>([]);
-  const [parents, setParents] = useState<StudentParent[]>([]);
+  const [parents, setParents] = useState<StudentParent[]>(cachedCore?.parents ?? []);
   const [cardSubTab, setCardSubTab] = useState<CardSubTabKey>('active');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedCore);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
@@ -80,6 +88,7 @@ const StudentDetail: React.FC = () => {
   // ⚠️ 数据加载 hook 必须先于使用 loadTab 的回调声明
   const { loadData, loadTab, sliceLoading } = useStudentDetailLoaders({
     studentId,
+    hasCachedCore: Boolean(cachedCore),
     setStudent,
     setRecords,
     setLeaves,
@@ -154,16 +163,7 @@ const StudentDetail: React.FC = () => {
   );
 
   if (loading) {
-    return (
-      <View
-        className={cn(
-          `theme-${activeTheme}`,
-          'min-h-screen bg-background flex items-center justify-center',
-        )}
-      >
-        <Loading text="加载学员详情中..." />
-      </View>
-    );
+    return <StudentDetailSkeleton statusBarHeight={statusBarHeight} activeTheme={activeTheme} />;
   }
 
   if (loadError) {

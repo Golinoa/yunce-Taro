@@ -32,11 +32,17 @@ import type { MemberCardDetail } from '@/types/member-card';
 import type { Student, StudentParent } from '@/types/student';
 import { logError } from '@/utils/logger';
 import { REFRESH_SIGNAL, consumeRefreshSignal } from '@/utils/refresh-signal';
+import { writeStudentDetailCore } from '@/utils/student-detail-core-cache';
 
 export type StudentDetailSlice = 'profile' | 'packages' | 'records' | 'follow';
 
 export interface UseStudentDetailLoadersParams {
   studentId: string;
+  /**
+   * 首屏核心数据是否已命中本地缓存（页面用 `readStudentDetailCore` 同步初始化）。
+   * 命中时：已有内容可渲染 ⇒ **不置全屏 loading**，改为后台静默刷新（stale-while-revalidate）。
+   */
+  hasCachedCore: boolean;
   setStudent: Dispatch<SetStateAction<Student | null>>;
   setRecords: Dispatch<SetStateAction<LessonRecord[]>>;
   setLeaves: Dispatch<SetStateAction<LeaveRequest[]>>;
@@ -51,6 +57,7 @@ export interface UseStudentDetailLoadersParams {
 export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
   const {
     studentId,
+    hasCachedCore,
     setStudent,
     setRecords,
     setLeaves,
@@ -71,9 +78,12 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
   });
 
   const bootedRef = useRef(false);
-  const coreLoadedRef = useRef(false);
+  /** 命中缓存时视为核心已就绪（失败也不该清空页面/报错页，交给后台刷新兜底） */
+  const coreLoadedRef = useRef(hasCachedCore);
   /** 已加载过数据的切片：刷新时只刷这些，未打开过的 tab 不浪费请求 */
-  const loadedSlicesRef = useRef<Set<StudentDetailSlice>>(new Set());
+  const loadedSlicesRef = useRef<Set<StudentDetailSlice>>(
+    hasCachedCore ? new Set<StudentDetailSlice>(['profile']) : new Set<StudentDetailSlice>(),
+  );
   const sliceLoadingRef = useRef(sliceLoading);
   useEffect(() => {
     sliceLoadingRef.current = sliceLoading;
@@ -107,12 +117,18 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
           studentService.getParents(studentId),
         ]);
         if (!stu) {
-          resetAll();
-          setNotFound(true);
-          return false;
+          // 已有数据（含缓存命中/后台刷新）时不清空：`getById` 吞掉网络错误后返回 null，
+          // 若在此无条件 reset 会把已渲染的页面清成「未找到该学员」。仅从未加载成功过才判未找到。
+          if (!coreLoadedRef.current) {
+            resetAll();
+            setNotFound(true);
+          }
+          return coreLoadedRef.current;
         }
         setStudent(stu);
         setParents(parentList);
+        // 回填首屏缓存：下次点开可同步渲染（第二次及以后不再出现 loading）
+        writeStudentDetailCore(studentId, { student: stu, parents: parentList });
         coreLoadedRef.current = true;
         loadedSlicesRef.current.add('profile');
         setNotFound(false);
@@ -177,10 +193,22 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
     [setFollowRecords, setLeaves, setMemberCards, setParents, setRecords, setSliceBusy, studentId],
   );
 
-  /** 首次进入：核心数据阻塞加载（黑盒 loading 只等 student+parents 两个请求） */
+  /** 首次进入：无缓存时核心数据阻塞加载（骨架屏只等 student+parents）；有缓存则后台静默刷新 */
   const boot = useCallback(async () => {
-    if (bootedRef.current || !studentId) return;
+    if (bootedRef.current) return;
+    if (!studentId) {
+      // 缺 id：明确落"未找到"，否则骨架屏会一直转（原实现会停在全屏 loading）
+      bootedRef.current = true;
+      setLoading(false);
+      setNotFound(true);
+      return;
+    }
     bootedRef.current = true;
+    // 命中缓存：页面已同步渲染出内容 ⇒ 不置全屏 loading，只做后台刷新（失败保留旧数据）
+    if (coreLoadedRef.current) {
+      await fetchCore(true);
+      return;
+    }
     setLoading(true);
     setLoadError('');
     setNotFound(false);
