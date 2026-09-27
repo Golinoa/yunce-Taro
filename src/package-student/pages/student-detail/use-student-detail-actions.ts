@@ -5,62 +5,26 @@
  * 功能说明：集中 navigate / toast / service 写操作，保持原 URL 与文案。
  */
 import Taro from '@tarojs/taro';
-import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { navigateToLessonDetail } from '@/components/lesson/LessonConsumptionList';
-import { leaveService, packageService, studentService } from '@/services';
+import { leaveService, studentService } from '@/services';
 import { getThemeHexColors, type ThemeKey } from '@/theme';
-import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import { navigateToOnce } from '@/utils/navigation';
 import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
-import { getPackageRefundableAmount } from './student-detail-package';
 
 export interface UseStudentDetailActionsParams {
   student: Student | null;
   activeTheme: ThemeKey;
-  profileId?: string;
-  profileName?: string;
-  refundablePackages: CoursePackage[];
-  refundedAmountByPackage: Record<string, number>;
-  selectedRefundPackage: CoursePackage | null;
-  selectedRefundMaxAmount: number;
-  refundAmount: string;
-  refundReason: string;
-  showRefundSheet: boolean;
   setLeaves: Dispatch<SetStateAction<LeaveRequest[]>>;
-  setPackageTransactions: Dispatch<SetStateAction<PackageTransaction[]>>;
-  setSelectedRefundPackageId: Dispatch<SetStateAction<string>>;
-  setRefundAmount: Dispatch<SetStateAction<string>>;
-  setRefundReason: Dispatch<SetStateAction<string>>;
-  setShowRefundSheet: Dispatch<SetStateAction<boolean>>;
-  setRefundSubmitting: Dispatch<SetStateAction<boolean>>;
 }
 
 /** 学员详情页各类用户操作回调。 */
 export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
-  const {
-    student,
-    activeTheme,
-    profileId,
-    profileName,
-    refundablePackages,
-    refundedAmountByPackage,
-    selectedRefundPackage,
-    selectedRefundMaxAmount,
-    refundAmount,
-    refundReason,
-    showRefundSheet,
-    setLeaves,
-    setPackageTransactions,
-    setSelectedRefundPackageId,
-    setRefundAmount,
-    setRefundReason,
-    setShowRefundSheet,
-    setRefundSubmitting,
-  } = params;
+  const { student, activeTheme, setLeaves } = params;
 
   /** 编辑学员：进入 student-form 编辑模式（路由带 id 即为编辑，仅教职工入口）。 */
   const goToEditStudent = useCallback(() => {
@@ -223,115 +187,6 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
     [activeTheme, setLeaves],
   );
 
-  const handleSelectRefundPackage = useCallback(
-    (pkg: CoursePackage) => {
-      setSelectedRefundPackageId(pkg.id);
-      setRefundAmount(
-        String(getPackageRefundableAmount(pkg, refundedAmountByPackage[pkg.id] || 0)),
-      );
-    },
-    [refundedAmountByPackage, setRefundAmount, setSelectedRefundPackageId],
-  );
-
-  /** 打开退费 Sheet；无可退课包时 toast，有则可预选第一项。 */
-  const handleOpenRefund = useCallback(() => {
-    if (refundablePackages.length === 0) {
-      Taro.showToast({ title: '暂无可退课包', icon: 'none' });
-      return;
-    }
-    const first = refundablePackages[0];
-    setSelectedRefundPackageId(first.id);
-    setRefundAmount(
-      String(getPackageRefundableAmount(first, refundedAmountByPackage[first.id] || 0)),
-    );
-    setShowRefundSheet(true);
-  }, [
-    refundablePackages,
-    refundedAmountByPackage,
-    setRefundAmount,
-    setSelectedRefundPackageId,
-    setShowRefundSheet,
-  ]);
-
-  useEffect(() => {
-    if (!showRefundSheet) {
-      return;
-    }
-
-    if (!selectedRefundPackage) {
-      setRefundAmount('');
-      return;
-    }
-
-    setRefundAmount(selectedRefundMaxAmount > 0 ? selectedRefundMaxAmount.toFixed(2) : '');
-  }, [selectedRefundMaxAmount, selectedRefundPackage, setRefundAmount, showRefundSheet]);
-
-  const handleConfirmRefund = useCallback(async () => {
-    if (!selectedRefundPackage) {
-      Taro.showToast({ title: '请选择退费课包', icon: 'none' });
-      return;
-    }
-    if (!student) {
-      Taro.showToast({ title: '未获取到学员信息', icon: 'none' });
-      return;
-    }
-
-    if (selectedRefundMaxAmount <= 0) {
-      Taro.showToast({ title: '该课包暂无可退金额', icon: 'none' });
-      return;
-    }
-
-    const amount = Number(refundAmount);
-    if (!refundAmount || isNaN(amount) || amount <= 0) {
-      Taro.showToast({ title: '请输入有效的退费金额', icon: 'none' });
-      return;
-    }
-    if (amount > selectedRefundMaxAmount) {
-      Taro.showToast({ title: `最多可退 ¥${selectedRefundMaxAmount.toFixed(2)}`, icon: 'none' });
-      return;
-    }
-    if (!refundReason.trim()) {
-      Taro.showToast({ title: '请输入退费原因', icon: 'none' });
-      return;
-    }
-
-    try {
-      setRefundSubmitting(true);
-      const created = await packageService.createRefund({
-        student_id: student.id,
-        package_id: selectedRefundPackage.id,
-        refund_amount: amount,
-        reason: refundReason.trim(),
-        operator_id: profileId,
-        operator_name: profileName || undefined,
-      });
-      setPackageTransactions((prev) => [created, ...prev]);
-      Taro.showToast({ title: '退费记录已提交', icon: 'success' });
-      setShowRefundSheet(false);
-      setSelectedRefundPackageId('');
-      setRefundAmount('');
-      setRefundReason('');
-    } catch {
-      Taro.showToast({ title: '退费提交失败，请重试', icon: 'none' });
-    } finally {
-      setRefundSubmitting(false);
-    }
-  }, [
-    profileId,
-    profileName,
-    refundAmount,
-    refundReason,
-    selectedRefundMaxAmount,
-    selectedRefundPackage,
-    setPackageTransactions,
-    setRefundAmount,
-    setRefundReason,
-    setRefundSubmitting,
-    setSelectedRefundPackageId,
-    setShowRefundSheet,
-    student,
-  ]);
-
   const goBack = useCallback(() => {
     Taro.navigateBack();
   }, []);
@@ -350,9 +205,6 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
     handleFollowClick,
     handleApproveLeave,
     handleRejectLeave,
-    handleOpenRefund,
-    handleSelectRefundPackage,
-    handleConfirmRefund,
     goBack,
   };
 }

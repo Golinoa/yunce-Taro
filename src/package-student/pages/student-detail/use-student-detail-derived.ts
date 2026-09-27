@@ -6,13 +6,10 @@
  */
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
-import type { Student } from '@/types/student';
 import { getMemberCardTotalCount } from '@/utils/member-card-hours';
-import { getPackagePurchasedHours, getPackageRefundableAmount } from './student-detail-package';
 import { isConsumingRecord } from './student-detail-record-status';
 
 export type TimelineItem =
@@ -20,23 +17,12 @@ export type TimelineItem =
   | { type: 'leave'; id: string; date: string; data: LeaveRequest };
 
 export interface UseStudentDetailDerivedParams {
-  student: Student | null;
   records: LessonRecord[];
-  packages: CoursePackage[];
-  packageTransactions: PackageTransaction[];
   leaves: LeaveRequest[];
   memberCards: MemberCardDetail[];
-  selectedRefundPackageId: string;
 }
 
 export interface StudentDetailDerived {
-  remainingHours: number;
-  consumptionStats: {
-    total: number;
-    used: number;
-    remaining: number;
-    percent: number;
-  };
   memberCardStats: {
     totalCount: number;
     usedCount: number;
@@ -45,10 +31,6 @@ export interface StudentDetailDerived {
     usedAmount: number;
     remainingAmount: number;
   };
-  refundedAmountByPackage: Record<string, number>;
-  refundablePackages: CoursePackage[];
-  selectedRefundPackage: CoursePackage | null;
-  selectedRefundMaxAmount: number;
   timelineGroups: Record<string, TimelineItem[]>;
   monthStats: Record<string, { checkIn: number; leave: number }>;
   expandedMonths: Set<string>;
@@ -59,28 +41,7 @@ export interface StudentDetailDerived {
 export function useStudentDetailDerived(
   params: UseStudentDetailDerivedParams,
 ): StudentDetailDerived {
-  const {
-    student,
-    records,
-    packages,
-    packageTransactions,
-    leaves,
-    memberCards,
-    selectedRefundPackageId,
-  } = params;
-
-  const remainingHours = useMemo(
-    () => (student?.course_packages || []).reduce((s, p) => s + (p.remaining_hours || 0), 0),
-    [student],
-  );
-
-  const consumptionStats = useMemo(() => {
-    const total = packages.reduce((s, p) => s + (p.total_hours || 0), 0);
-    const remaining = packages.reduce((s, p) => s + (p.remaining_hours || 0), 0);
-    const used = Math.max(total - remaining, 0);
-    const percent = total > 0 ? Math.round((used / total) * 100) : 0;
-    return { total, used, remaining, percent };
-  }, [packages]);
+  const { records, leaves, memberCards } = params;
 
   const memberCardStats = useMemo(() => {
     let totalCount = 0;
@@ -107,47 +68,6 @@ export function useStudentDetailDerived(
       remainingAmount,
     };
   }, [memberCards]);
-
-  const refundedAmountByPackage = useMemo(() => {
-    return packageTransactions.reduce<Record<string, number>>((acc, item) => {
-      if (item.type !== 'refund' || !item.package_id) {
-        return acc;
-      }
-      acc[item.package_id] =
-        (acc[item.package_id] || 0) + Number(item.refund_amount || item.fee_amount || 0);
-      return acc;
-    }, {});
-  }, [packageTransactions]);
-
-  const refundablePackages = useMemo(
-    () =>
-      packages.filter((pkg) => {
-        const purchasedHours = getPackagePurchasedHours(pkg);
-        return (
-          pkg.status === 'active' &&
-          purchasedHours > 0 &&
-          Number(pkg.fee_amount || 0) > 0 &&
-          getPackageRefundableAmount(pkg, refundedAmountByPackage[pkg.id] || 0) > 0
-        );
-      }),
-    [packages, refundedAmountByPackage],
-  );
-
-  const selectedRefundPackage = useMemo(
-    () => refundablePackages.find((pkg) => pkg.id === selectedRefundPackageId) || null,
-    [refundablePackages, selectedRefundPackageId],
-  );
-
-  const selectedRefundMaxAmount = useMemo(
-    () =>
-      selectedRefundPackage
-        ? getPackageRefundableAmount(
-            selectedRefundPackage,
-            refundedAmountByPackage[selectedRefundPackage.id] || 0,
-          )
-        : 0,
-    [refundedAmountByPackage, selectedRefundPackage],
-  );
 
   const timelineGroups = useMemo(() => {
     const items: TimelineItem[] = [
@@ -219,13 +139,7 @@ export function useStudentDetailDerived(
   }, [timelineGroups]);
 
   return {
-    remainingHours,
-    consumptionStats,
     memberCardStats,
-    refundedAmountByPackage,
-    refundablePackages,
-    selectedRefundPackage,
-    selectedRefundMaxAmount,
     timelineGroups,
     monthStats,
     expandedMonths,

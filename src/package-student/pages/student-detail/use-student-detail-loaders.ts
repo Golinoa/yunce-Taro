@@ -22,10 +22,9 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import { studentService, packageService, lessonRecordService, leaveService } from '@/services';
+import { studentService, lessonRecordService, leaveService } from '@/services';
 import { followRecordService } from '@/services/follow-record';
 import { memberCardService } from '@/services/member-card';
-import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -34,15 +33,12 @@ import type { Student, StudentParent } from '@/types/student';
 import { logError } from '@/utils/logger';
 import { REFRESH_SIGNAL, consumeRefreshSignal } from '@/utils/refresh-signal';
 
-export type StudentDetailSlice = 'profile' | 'consumption' | 'packages' | 'records' | 'follow';
+export type StudentDetailSlice = 'profile' | 'packages' | 'records' | 'follow';
 
 export interface UseStudentDetailLoadersParams {
   studentId: string;
-  currentUserId: string;
   setStudent: Dispatch<SetStateAction<Student | null>>;
   setRecords: Dispatch<SetStateAction<LessonRecord[]>>;
-  setPackages: Dispatch<SetStateAction<CoursePackage[]>>;
-  setPackageTransactions: Dispatch<SetStateAction<PackageTransaction[]>>;
   setLeaves: Dispatch<SetStateAction<LeaveRequest[]>>;
   setMemberCards: Dispatch<SetStateAction<MemberCardDetail[]>>;
   setFollowRecords: Dispatch<SetStateAction<FollowRecord[]>>;
@@ -55,11 +51,8 @@ export interface UseStudentDetailLoadersParams {
 export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
   const {
     studentId,
-    currentUserId,
     setStudent,
     setRecords,
-    setPackages,
-    setPackageTransactions,
     setLeaves,
     setMemberCards,
     setFollowRecords,
@@ -72,7 +65,6 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
   /** 各 tab 的独立加载态（首屏阻塞 loading 之外，切片用轻量加载提示） */
   const [sliceLoading, setSliceLoading] = useState<Record<StudentDetailSlice, boolean>>({
     profile: false,
-    consumption: false,
     packages: false,
     records: false,
     follow: false,
@@ -95,22 +87,11 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
   const resetAll = useCallback(() => {
     setStudent(null);
     setRecords([]);
-    setPackages([]);
-    setPackageTransactions([]);
     setLeaves([]);
     setMemberCards([]);
     setFollowRecords([]);
     setParents([]);
-  }, [
-    setFollowRecords,
-    setLeaves,
-    setMemberCards,
-    setPackageTransactions,
-    setPackages,
-    setParents,
-    setRecords,
-    setStudent,
-  ]);
+  }, [setFollowRecords, setLeaves, setMemberCards, setParents, setRecords, setStudent]);
 
   /** 首屏核心：student + parents（资料 tab 所需），阻塞首屏渲染 */
   const fetchCore = useCallback(
@@ -164,20 +145,6 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
             setParents(await studentService.getParents(studentId));
             break;
           }
-          case 'consumption': {
-            const [pkgs, txns] = await Promise.all([
-              packageService.getByStudent(studentId),
-              currentUserId
-                ? packageService
-                    .getTransactions(currentUserId, { studentId, page: 1, pageSize: 50 })
-                    .then((res) => res.list)
-                : Promise.resolve([] as PackageTransaction[]),
-            ]);
-            setPackages(pkgs);
-            setPackageTransactions(txns);
-            loadedSlicesRef.current.add('packages'); // 消耗页附带 packages，卡包切片数据同源
-            break;
-          }
           case 'packages': {
             setMemberCards(await memberCardService.getByStudent(studentId));
             break;
@@ -207,18 +174,7 @@ export function useStudentDetailLoaders(params: UseStudentDetailLoadersParams) {
         setSliceBusy(slice, false);
       }
     },
-    [
-      currentUserId,
-      setFollowRecords,
-      setLeaves,
-      setMemberCards,
-      setPackageTransactions,
-      setPackages,
-      setParents,
-      setRecords,
-      setSliceBusy,
-      studentId,
-    ],
+    [setFollowRecords, setLeaves, setMemberCards, setParents, setRecords, setSliceBusy, studentId],
   );
 
   /** 首次进入：核心数据阻塞加载（黑盒 loading 只等 student+parents 两个请求） */

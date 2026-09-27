@@ -14,7 +14,6 @@ import Loading from '@/components/Loading';
 import LegacyPackagesEditor from '@/package-student/components/LegacyPackagesEditor';
 import { studentService } from '@/services';
 import { useThemeStore } from '@/stores/theme';
-import type { CoursePackage, PackageTransaction } from '@/types/course-package';
 import type { FollowRecord } from '@/types/follow-record';
 import type { LeaveRequest } from '@/types/leave-request';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -24,11 +23,9 @@ import { isStaffRole, useAuth } from '@/utils/auth';
 import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import AttendancePanel from './AttendancePanel';
-import ConsumptionPanel from './ConsumptionPanel';
 import FollowPanel from './FollowPanel';
 import PackagesPanel from './PackagesPanel';
 import ProfilePanel from './ProfilePanel';
-import RefundSheet from './RefundSheet';
 import {
   STUDENT_DETAIL_SWIPER_DURATION,
   STUDENT_DETAIL_TABS,
@@ -47,7 +44,6 @@ const StudentDetail: React.FC = () => {
   const { profile } = useAuth();
   const { activeTheme } = useThemeStore();
   const isTeacher = isStaffRole(profile?.currentContext?.role);
-  const currentUserId = profile?.id || '';
 
   const studentId = useMemo(() => {
     const instance = Taro.getCurrentInstance();
@@ -56,8 +52,6 @@ const StudentDetail: React.FC = () => {
 
   const [student, setStudent] = useState<Student | null>(null);
   const [records, setRecords] = useState<LessonRecord[]>([]);
-  const [packages, setPackages] = useState<CoursePackage[]>([]);
-  const [packageTransactions, setPackageTransactions] = useState<PackageTransaction[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [memberCards, setMemberCards] = useState<MemberCardDetail[]>([]);
   /** 老生历史课时录入（R6：卡包入口改居中弹框，原 student-migration 页面已下线） */
@@ -73,12 +67,6 @@ const StudentDetail: React.FC = () => {
     STUDENT_DETAIL_TAB_INDEX_MAP.profile,
   );
 
-  const [showRefundSheet, setShowRefundSheet] = useState(false);
-  const [selectedRefundPackageId, setSelectedRefundPackageId] = useState('');
-  const [refundAmount, setRefundAmount] = useState('');
-  const [refundReason, setRefundReason] = useState('');
-  const [refundSubmitting, setRefundSubmitting] = useState(false);
-
   const [statusBarHeight, setStatusBarHeight] = useState(44);
   useEffect(() => {
     const windowInfo = Taro.getWindowInfo();
@@ -92,11 +80,8 @@ const StudentDetail: React.FC = () => {
   // ⚠️ 数据加载 hook 必须先于使用 loadTab 的回调声明
   const { loadData, loadTab, sliceLoading } = useStudentDetailLoaders({
     studentId,
-    currentUserId,
     setStudent,
     setRecords,
-    setPackages,
-    setPackageTransactions,
     setLeaves,
     setMemberCards,
     setFollowRecords,
@@ -134,34 +119,15 @@ const StudentDetail: React.FC = () => {
   );
 
   const derived = useStudentDetailDerived({
-    student,
     records,
-    packages,
-    packageTransactions,
     leaves,
     memberCards,
-    selectedRefundPackageId,
   });
 
   const actions = useStudentDetailActions({
     student,
     activeTheme,
-    profileId: profile?.id,
-    profileName: profile?.name,
-    refundablePackages: derived.refundablePackages,
-    refundedAmountByPackage: derived.refundedAmountByPackage,
-    selectedRefundPackage: derived.selectedRefundPackage,
-    selectedRefundMaxAmount: derived.selectedRefundMaxAmount,
-    refundAmount,
-    refundReason,
-    showRefundSheet,
     setLeaves,
-    setPackageTransactions,
-    setSelectedRefundPackageId,
-    setRefundAmount,
-    setRefundReason,
-    setShowRefundSheet,
-    setRefundSubmitting,
   });
 
   /**
@@ -272,19 +238,6 @@ const StudentDetail: React.FC = () => {
           />
         </SwiperItem>
 
-        <SwiperItem itemId="consumption">
-          {sliceLoading.consumption && packages.length === 0 ? (
-            <Loading text="加载课程消耗中..." />
-          ) : (
-            <ConsumptionPanel
-              packages={packages}
-              consumptionStats={derived.consumptionStats}
-              canRefund={derived.refundablePackages.length > 0}
-              onOpenRefund={actions.handleOpenRefund}
-            />
-          )}
-        </SwiperItem>
-
         <SwiperItem itemId="packages">
           {sliceLoading.packages && memberCards.length === 0 ? (
             <Loading text="加载卡包中..." />
@@ -333,24 +286,6 @@ const StudentDetail: React.FC = () => {
         isTeacher={isTeacher}
         onIssueCard={actions.handleIssueCard}
         onWriteFollow={actions.handleWriteFollow}
-      />
-
-      <RefundSheet
-        visible={showRefundSheet}
-        student={student}
-        remainingHours={derived.remainingHours}
-        refundablePackages={derived.refundablePackages}
-        selectedRefundPackageId={selectedRefundPackageId}
-        selectedRefundPackage={derived.selectedRefundPackage}
-        refundedAmountByPackage={derived.refundedAmountByPackage}
-        refundAmount={refundAmount}
-        refundReason={refundReason}
-        refundSubmitting={refundSubmitting}
-        onClose={() => setShowRefundSheet(false)}
-        onSelectPackage={actions.handleSelectRefundPackage}
-        onRefundAmountChange={setRefundAmount}
-        onRefundReasonChange={setRefundReason}
-        onConfirm={actions.handleConfirmRefund}
       />
 
       {/* 老生历史课时录入（R6：卡包入口改居中弹框，原 student-migration 页面已下线） */}

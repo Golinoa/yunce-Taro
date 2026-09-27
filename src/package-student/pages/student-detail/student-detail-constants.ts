@@ -7,11 +7,10 @@
 import type { LeaveStatus } from '@/types/leave-request';
 import type { MemberCardStatus } from '@/types/member-card';
 
-export type TabKey = 'profile' | 'consumption' | 'packages' | 'records' | 'follow';
+export type TabKey = 'profile' | 'packages' | 'records' | 'follow';
 
 export const STUDENT_DETAIL_TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: '资料' },
-  { key: 'consumption', label: '课程消耗' },
   { key: 'packages', label: '卡包' },
   { key: 'records', label: '出勤' },
   { key: 'follow', label: '跟进' },
@@ -19,10 +18,9 @@ export const STUDENT_DETAIL_TABS: { key: TabKey; label: string }[] = [
 
 export const STUDENT_DETAIL_TAB_INDEX_MAP: Record<TabKey, number> = {
   profile: 0,
-  consumption: 1,
-  packages: 2,
-  records: 3,
-  follow: 4,
+  packages: 1,
+  records: 2,
+  follow: 3,
 };
 
 export const STUDENT_DETAIL_SWIPER_DURATION = 280;
@@ -70,10 +68,3 @@ export const CARD_SUB_TABS: { key: CardSubTabKey; label: string }[] = [
   { key: 'notActivated', label: '未开卡' },
   { key: 'inactive', label: '无效卡' },
 ];
-
-/** 课包状态映射（课程消耗展示用） */
-export const PACKAGE_STATUS_MAP: Record<string, { label: string; className: string }> = {
-  active: { label: '使用中', className: 'bg-primary-15 text-primary' },
-  completed: { label: '已用完', className: 'bg-muted text-muted-foreground' },
-  expired: { label: '已过期', className: 'bg-destructive-10 text-destructive' },
-};
