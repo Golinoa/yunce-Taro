@@ -91,6 +91,7 @@ const StudentForm: React.FC = () => {
     errors,
     saving,
     canSubmit,
+    submitBlockedReason,
     clearError,
     handleChooseAvatar,
     handleSave,
@@ -624,6 +625,12 @@ const StudentForm: React.FC = () => {
         </View>
 
         <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] z-50 flex flex-col gap-[16rpx] rounded-[24rpx] border-[2rpx] border-border/60 bg-background/95 px-[16rpx] py-[16rpx] shadow-float pointer-events-auto">
+          {/* 按钮为什么点不动：禁用原因直接可见（此前只置灰不提示，用户无从知晓） */}
+          {!canSubmit && submitBlockedReason ? (
+            <Text className="text-center text-[22rpx] text-muted-foreground">
+              {submitBlockedReason}
+            </Text>
+          ) : null}
           <View className="flex flex-row gap-[20rpx]">
             {!isEdit ? (
               <View
