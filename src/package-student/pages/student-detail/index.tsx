@@ -89,32 +89,8 @@ const StudentDetail: React.FC = () => {
     setStudentSwiperCurrent(STUDENT_DETAIL_TAB_INDEX_MAP[activeTab]);
   }, [activeTab]);
 
-  const handleTabChange = useCallback(
-    (tab: TabKey) => {
-      if (tab === activeTab) {
-        return;
-      }
-      setStudentSwiperCurrent(STUDENT_DETAIL_TAB_INDEX_MAP[tab]);
-    },
-    [activeTab],
-  );
-
-  const handleStudentSwiperChange = useCallback((event: { detail?: { current?: number } }) => {
-    setStudentSwiperCurrent(event.detail?.current ?? 0);
-  }, []);
-
-  const handleStudentSwiperFinish = useCallback(
-    (event: { detail?: { current?: number } }) => {
-      const current = event.detail?.current ?? studentSwiperCurrent;
-      const nextTab = STUDENT_DETAIL_TABS[current]?.key ?? 'records';
-      if (nextTab !== activeTab) {
-        setActiveTab(nextTab);
-      }
-    },
-    [activeTab, studentSwiperCurrent],
-  );
-
-  const { loadData } = useStudentDetailLoaders({
+  // ⚠️ 数据加载 hook 必须先于使用 loadTab 的回调声明
+  const { loadData, loadTab, sliceLoading } = useStudentDetailLoaders({
     studentId,
     currentUserId,
     setStudent,
@@ -129,6 +105,33 @@ const StudentDetail: React.FC = () => {
     setLoadError,
     setNotFound,
   });
+
+  const handleTabChange = useCallback(
+    (tab: TabKey) => {
+      if (tab === activeTab) {
+        return;
+      }
+      setStudentSwiperCurrent(STUDENT_DETAIL_TAB_INDEX_MAP[tab]);
+      loadTab(tab);
+    },
+    [activeTab, loadTab],
+  );
+
+  const handleStudentSwiperChange = useCallback((event: { detail?: { current?: number } }) => {
+    setStudentSwiperCurrent(event.detail?.current ?? 0);
+  }, []);
+
+  const handleStudentSwiperFinish = useCallback(
+    (event: { detail?: { current?: number } }) => {
+      const current = event.detail?.current ?? studentSwiperCurrent;
+      const nextTab = STUDENT_DETAIL_TABS[current]?.key ?? 'records';
+      if (nextTab !== activeTab) {
+        setActiveTab(nextTab);
+        loadTab(nextTab);
+      }
+    },
+    [activeTab, loadTab, studentSwiperCurrent],
+  );
 
   const derived = useStudentDetailDerived({
     student,
@@ -270,42 +273,58 @@ const StudentDetail: React.FC = () => {
         </SwiperItem>
 
         <SwiperItem itemId="consumption">
-          <ConsumptionPanel
-            packages={packages}
-            consumptionStats={derived.consumptionStats}
-            canRefund={derived.refundablePackages.length > 0}
-            onOpenRefund={actions.handleOpenRefund}
-          />
+          {sliceLoading.consumption && packages.length === 0 ? (
+            <Loading text="加载课程消耗中..." />
+          ) : (
+            <ConsumptionPanel
+              packages={packages}
+              consumptionStats={derived.consumptionStats}
+              canRefund={derived.refundablePackages.length > 0}
+              onOpenRefund={actions.handleOpenRefund}
+            />
+          )}
         </SwiperItem>
 
         <SwiperItem itemId="packages">
-          <PackagesPanel
-            memberCards={memberCards}
-            cardSubTab={cardSubTab}
-            onCardSubTabChange={setCardSubTab}
-            memberCardStats={derived.memberCardStats}
-            onMemberCardClick={actions.handleMemberCardClick}
-            onOpenLegacyPackages={() => setLegacyPackagesVisible(true)}
-          />
+          {sliceLoading.packages && memberCards.length === 0 ? (
+            <Loading text="加载卡包中..." />
+          ) : (
+            <PackagesPanel
+              memberCards={memberCards}
+              cardSubTab={cardSubTab}
+              onCardSubTabChange={setCardSubTab}
+              memberCardStats={derived.memberCardStats}
+              onMemberCardClick={actions.handleMemberCardClick}
+              onOpenLegacyPackages={() => setLegacyPackagesVisible(true)}
+            />
+          )}
         </SwiperItem>
 
         <SwiperItem itemId="records">
-          <AttendancePanel
-            records={records}
-            leaves={leaves}
-            timelineGroups={derived.timelineGroups}
-            monthStats={derived.monthStats}
-            expandedMonths={derived.expandedMonths}
-            isTeacher={isTeacher}
-            onToggleMonth={derived.handleToggleMonth}
-            onRecordClick={actions.goToRecordDetail}
-            onApproveLeave={actions.handleApproveLeave}
-            onRejectLeave={actions.handleRejectLeave}
-          />
+          {sliceLoading.records && records.length === 0 ? (
+            <Loading text="加载出勤记录中..." />
+          ) : (
+            <AttendancePanel
+              records={records}
+              leaves={leaves}
+              timelineGroups={derived.timelineGroups}
+              monthStats={derived.monthStats}
+              expandedMonths={derived.expandedMonths}
+              isTeacher={isTeacher}
+              onToggleMonth={derived.handleToggleMonth}
+              onRecordClick={actions.goToRecordDetail}
+              onApproveLeave={actions.handleApproveLeave}
+              onRejectLeave={actions.handleRejectLeave}
+            />
+          )}
         </SwiperItem>
 
         <SwiperItem itemId="follow">
-          <FollowPanel followRecords={followRecords} onFollowClick={actions.handleFollowClick} />
+          {sliceLoading.follow && followRecords.length === 0 ? (
+            <Loading text="加载跟进记录中..." />
+          ) : (
+            <FollowPanel followRecords={followRecords} onFollowClick={actions.handleFollowClick} />
+          )}
         </SwiperItem>
       </Swiper>
 
