@@ -86,7 +86,8 @@ export const memberCardService = {
     studentId: string;
     remainingCount: number;
     validStart?: string;
-    expiredAt: string;
+    /** 有效期。**留空 = 永久有效**（后端落 `expiredAt=null`，卡包按"永久卡"展示） */
+    expiredAt?: string;
     sourceAt?: string;
     remark: string;
     idempotencyKey: string;

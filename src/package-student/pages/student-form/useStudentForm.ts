@@ -2,6 +2,11 @@ import Taro from '@tarojs/taro';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
+import {
+  submitLegacyRows,
+  validateLegacyRows,
+  type LegacyRow,
+} from '@/package-student/components/LegacyPackagesEditor';
 import { studentService, subscribeMessageService } from '@/services';
 import { useCampusStore, useStudentStore } from '@/stores';
 import type { CampusUIModel, Subject } from '@/types/campus';
@@ -34,15 +39,15 @@ export const FEE_METHOD_OPTIONS = [
 /** 学生类型 */
 export type StudentType = 'new' | 'old';
 
-/** 老生迁移课包草稿：科目 + 剩余课时 + 可选有效期 */
-export interface LegacyPackageDraft {
-  id: string;
-  subjectId: string;
-  subjectName: string;
-  remainingHours: string;
-  expireEnabled: boolean;
-  expireDate: string;
-}
+/**
+ * 老生历史课包草稿。
+ *
+ * 自 R1/R6 起**统一为共用组件 `LegacyPackagesEditor` 的行结构**（`LegacyRow`）：
+ * 卡种 + 剩余次数 + 有效期（可留空=永久）+ 录入依据。
+ * 表单与卡包弹框共用同一套字段、校验与提交（`validateLegacyRows` / `submitLegacyRows`），
+ * 禁止再造第二套（此前表单自研的"科目+有效期开关"草稿已废弃）。
+ */
+export type LegacyPackageDraft = LegacyRow;
 
 /** 表单错误 */
 export interface FormErrors {
@@ -51,17 +56,6 @@ export interface FormErrors {
   birthday?: string;
   legacyPackages?: string;
   feeAmount?: string;
-}
-
-function createEmptyLegacyPackage(): LegacyPackageDraft {
-  return {
-    id: `lp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    subjectId: '',
-    subjectName: '',
-    remainingHours: '',
-    expireEnabled: false,
-    expireDate: '',
-  };
 }
 
 /** useStudentForm 返回值类型 */
@@ -93,10 +87,9 @@ export interface UseStudentFormReturn {
   studentType: StudentType;
   setStudentType: React.Dispatch<React.SetStateAction<StudentType>>;
   /** 老生：多课包迁移 */
-  legacyPackages: LegacyPackageDraft[];
-  addLegacyPackage: () => void;
-  removeLegacyPackage: (id: string) => void;
-  updateLegacyPackage: (id: string, patch: Partial<LegacyPackageDraft>) => void;
+  /** 老生历史课包（行结构与卡包弹框共用组件一致；增删改由组件内部处理） */
+  legacyPackages: LegacyRow[];
+  setLegacyPackages: React.Dispatch<React.SetStateAction<LegacyRow[]>>;
   subjects: Subject[];
 
   /** 可选：缴费信息 */
@@ -166,7 +159,7 @@ export function useStudentForm(): UseStudentFormReturn {
   const [feeMethod, setFeeMethod] = useState<string>('');
 
   const [studentType, setStudentType] = useState<StudentType>('new');
-  const [legacyPackages, setLegacyPackages] = useState<LegacyPackageDraft[]>([]);
+  const [legacyPackages, setLegacyPackages] = useState<LegacyRow[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
   const [paymentEnabled, setPaymentEnabled] = useState(false);
@@ -210,20 +203,6 @@ export function useStudentForm(): UseStudentFormReturn {
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
   const initStartAtRef = useState({ current: 0 })[0];
-
-  const addLegacyPackage = useCallback(() => {
-    setLegacyPackages((prev) => [...prev, createEmptyLegacyPackage()]);
-  }, []);
-
-  const removeLegacyPackage = useCallback((id: string) => {
-    setLegacyPackages((prev) => prev.filter((item) => item.id !== id));
-  }, []);
-
-  const updateLegacyPackage = useCallback((id: string, patch: Partial<LegacyPackageDraft>) => {
-    setLegacyPackages((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
-  }, []);
 
   const loadFormData = useCallback(async () => {
     initStartAtRef.current = Date.now();
@@ -334,20 +313,9 @@ export function useStudentForm(): UseStudentFormReturn {
 
     if (!isEdit) {
       if (studentType === 'old') {
-        if (legacyPackages.length === 0) {
-          errs.legacyPackages = '请至少添加一个课包';
-        } else {
-          const invalid = legacyPackages.some((pkg) => {
-            const hours = parseInt(pkg.remainingHours, 10);
-            if (!pkg.subjectId) return true;
-            if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) return true;
-            if (pkg.expireEnabled && !pkg.expireDate) return true;
-            return false;
-          });
-          if (invalid) {
-            errs.legacyPackages = '请完善每个课包的科目、剩余课时与有效期';
-          }
-        }
+        // 与卡包弹框共用同一套校验（validateLegacyRows），避免两处规则漂移
+        const legacyError = validateLegacyRows(legacyPackages);
+        if (legacyError) errs.legacyPackages = legacyError;
       }
     }
 
@@ -377,19 +345,9 @@ export function useStudentForm(): UseStudentFormReturn {
 
     if (!isEdit) {
       if (studentType === 'old') {
-        if (legacyPackages.length === 0) return '请至少添加一个历史课包';
-        for (let i = 0; i < legacyPackages.length; i += 1) {
-          const pkg = legacyPackages[i];
-          const label = legacyPackages.length > 1 ? `课包${i + 1}` : '课包';
-          if (!pkg.subjectId) return `请选择${label}的科目`;
-          const hours = parseInt(pkg.remainingHours, 10);
-          if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) {
-            return `请填写${label}的剩余课时`;
-          }
-          if (pkg.expireEnabled && !pkg.expireDate) {
-            return `请选择${label}的到期日期`;
-          }
-        }
+        // 同一套校验（共用组件导出），保证"按钮禁用原因"与提交前校验完全一致
+        const legacyError = validateLegacyRows(legacyPackages);
+        if (legacyError) return legacyError;
       }
     }
 
@@ -565,37 +523,44 @@ export function useStudentForm(): UseStudentFormReturn {
         const localAvatarPending = isLocalWechatFilePath(avatarUrl) ? avatarUrl.trim() : '';
         const existingRemoteAvatar =
           avatarUrl.trim() && !localAvatarPending ? avatarUrl.trim() : undefined;
-        const initialPackages = legacyPackages.map((pkg) => {
-          const hours = parseInt(pkg.remainingHours, 10);
-          return {
-            name: `${pkg.subjectName || '科目'}（历史导入）`,
-            totalHours: hours,
-            subjectId: pkg.subjectId,
-            validEnd: pkg.expireEnabled ? pkg.expireDate || undefined : undefined,
-            note: `老生迁移：剩余 ${hours} 课时`,
-          };
+        /**
+         * R1：老生「分两步写入」——
+         *   ① 先建学员档案（**不再传 `initialPackages`**：该字段后端已在 Batch W9 移除解析，
+         *      传了只会被 zod 静默剥离，表现为"保存成功但课时凭空消失"）；
+         *   ② 建档成功后，按科目做**期初入账（opening）**，与卡包弹框共用同一实现
+         *      （`submitLegacyRows`），课时落到会员卡 ⇒ 卡包立即可见。
+         */
+        newStudent = await studentService.create({
+          teacher_id: teacherId,
+          name: name.trim(),
+          nickname: nickname.trim() || undefined,
+          phone: phone.trim() || undefined,
+          gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
+          birthday: birthday || undefined,
+          address: address.trim() || undefined,
+          note: note.trim() || undefined,
+          contacts,
+          avatar_url: existingRemoteAvatar,
+          ...feePayload,
+          campus_id: campusId || undefined,
+          campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
+          // B9 / R8：空串 = 明确没有推荐人（后端写入 null）
+          referrer_student_id: referrerStudentId || null,
         });
 
-        newStudent = await studentService.create(
-          {
-            teacher_id: teacherId,
-            name: name.trim(),
-            nickname: nickname.trim() || undefined,
-            phone: phone.trim() || undefined,
-            gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
-            birthday: birthday || undefined,
-            address: address.trim() || undefined,
-            note: note.trim() || undefined,
-            contacts,
-            avatar_url: existingRemoteAvatar,
-            ...feePayload,
-            campus_id: campusId || undefined,
-            campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
-            // B9 / R8：空串 = 明确没有推荐人（后端写入 null）
-            referrer_student_id: referrerStudentId || null,
-          },
-          studentType === 'old' ? initialPackages : undefined,
-        );
+        // ② 期初入账：失败不合并为整体成功（沿用 W9 既定原则）——学员已建档，提示去卡包页重录
+        if (newStudent && studentType === 'old' && legacyPackages.length > 0) {
+          try {
+            await submitLegacyRows(newStudent.id, legacyPackages);
+            setLegacyPackages([]);
+          } catch (error) {
+            logError('submit legacy packages after create', error);
+            Taro.showToast({
+              title: '学员已建档，历史课时录入失败，可在卡包页重新录入',
+              icon: 'none',
+            });
+          }
+        }
 
         if (newStudent && localAvatarPending) {
           try {
@@ -722,9 +687,7 @@ export function useStudentForm(): UseStudentFormReturn {
     studentType,
     setStudentType,
     legacyPackages,
-    addLegacyPackage,
-    removeLegacyPackage,
-    updateLegacyPackage,
+    setLegacyPackages,
     subjects,
     paymentEnabled,
     setPaymentEnabled,
