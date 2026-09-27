@@ -390,6 +390,8 @@ export const packageService = {
     _teacherId: string,
     options?: {
       studentId?: string;
+      /** 科目过滤：账本走 cardType.subjectId，旧课包走自身 subjectId（后端 v1.4.2+） */
+      subjectId?: string;
       page?: number;
       pageSize?: number;
     },
@@ -397,12 +399,16 @@ export const packageService = {
     const page = Math.max(1, options?.page || 1);
     const pageSize = Math.max(1, options?.pageSize || 30);
     const studentId = options?.studentId;
+    const subjectId = options?.subjectId;
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
     });
     if (studentId) {
       params.set('studentId', studentId);
+    }
+    if (subjectId) {
+      params.set('subjectId', subjectId);
     }
 
     const data = await get<{

@@ -8,6 +8,7 @@ import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { usePagedQuery } from '@/hooks/usePagedQuery';
 import { packageService } from '@/services';
+import { useCampusStore } from '@/stores/campus';
 import type { PackageTransaction } from '@/types/course-package';
 import { useAuth } from '@/utils/auth';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -139,13 +140,16 @@ const RechargeRecordsPage: React.FC = () => {
   const { profile } = useAuth();
   const currentUserId = profile?.id || '';
 
-  const [filterStudentId, setFilterStudentId] = useState('');
+  const [filterSubjectId, setFilterSubjectId] = useState('');
   const [typeFilter, setTypeFilter] = useState<TransactionFilterType>('all');
   const [routeStudentId, setRouteStudentId] = useState('');
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null);
-  const [studentOptions, setStudentOptions] = useState<Array<{ id: string; name: string }>>([]);
 
-  const queryStudentId = routeStudentId || filterStudentId || undefined;
+  /** 科目下拉数据源：复用全站统一的校区 store（选中校区优先、身份校区兜底） */
+  const fetchSubjects = useCampusStore((state) => state.fetchSubjects);
+  const campusSubjects = useCampusStore((state) => state.subjects);
+
+  const queryStudentId = routeStudentId || undefined;
 
   const fetcher = useCallback(
     async (page: number, pageSize: number) => {
@@ -157,11 +161,12 @@ const RechargeRecordsPage: React.FC = () => {
       }
       return packageService.getTransactions(currentUserId, {
         studentId: queryStudentId,
+        subjectId: filterSubjectId || undefined,
         page,
         pageSize,
       });
     },
-    [currentUserId, queryStudentId],
+    [currentUserId, filterSubjectId, queryStudentId],
   );
 
   const { list, total, loading, loadingMore, hasMore, reload, loadMore } =
@@ -171,18 +176,12 @@ const RechargeRecordsPage: React.FC = () => {
       enabled: Boolean(currentUserId),
     });
 
-  // 累积学员筛选项（随分页追加）
+  // 科目列表：进页拉一次（campus store 内部有 30s 缓存，与其它页面共享）
   useEffect(() => {
-    setStudentOptions((prev) => {
-      const map = new Map(prev.map((s) => [s.id, s.name]));
-      list.forEach((r) => {
-        if (!map.has(r.student_id)) {
-          map.set(r.student_id, r.student_name);
-        }
-      });
-      return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    void fetchSubjects().catch(() => {
+      /* 拉取失败时下拉仅剩「全部科目」，不阻塞页面 */
     });
-  }, [list]);
+  }, [fetchSubjects]);
 
   const filteredRecords = useMemo(() => {
     if (typeFilter === 'all') return list;
@@ -197,17 +196,19 @@ const RechargeRecordsPage: React.FC = () => {
       options: Array<{ label: string; value: string }>;
     }> = [];
 
-    if (!routeStudentId) {
-      filters.push({
-        id: 'student',
-        label: studentOptions.find((item) => item.id === filterStudentId)?.name || '全部学员',
-        value: filterStudentId || 'all',
-        options: [
-          { label: '全部学员', value: 'all' },
-          ...studentOptions.map((item) => ({ label: item.name, value: item.id })),
-        ],
-      });
-    }
+    /**
+     * 科目过滤（2026-09-27 用户拍板：学员维度移除）。
+     * 流水行显示的是卡包名（如「书法课时卡」），按科目筛选比翻学员名单更贴合。
+     */
+    filters.push({
+      id: 'subject',
+      label: campusSubjects.find((item) => item.id === filterSubjectId)?.name || '全部科目',
+      value: filterSubjectId || 'all',
+      options: [
+        { label: '全部科目', value: 'all' },
+        ...campusSubjects.map((item) => ({ label: item.name, value: item.id })),
+      ],
+    });
 
     filters.push({
       id: 'type',
@@ -222,13 +223,12 @@ const RechargeRecordsPage: React.FC = () => {
     });
 
     return filters;
-  }, [filterStudentId, routeStudentId, studentOptions, typeFilter]);
+  }, [campusSubjects, filterSubjectId, typeFilter]);
 
   useLoad(() => {
     const params = Taro.getCurrentInstance().router?.params || {};
     const studentId = decodeURIComponent(params.studentId || '');
     setRouteStudentId(studentId);
-    setFilterStudentId(studentId);
   });
 
   useEffect(() => {
@@ -236,15 +236,15 @@ const RechargeRecordsPage: React.FC = () => {
     void reload().catch(() => {
       Taro.showToast({ title: '加载失败', icon: 'none' });
     });
-  }, [currentUserId, queryStudentId, reload]);
+  }, [currentUserId, filterSubjectId, queryStudentId, reload]);
 
   const handleFilterToggle = useCallback((id: string) => {
     setActiveFilterId((prev) => (prev === id ? null : id));
   }, []);
 
   const handleFilterSelect = useCallback((id: string, value: string) => {
-    if (id === 'student') {
-      setFilterStudentId(value === 'all' ? '' : value);
+    if (id === 'subject') {
+      setFilterSubjectId(value === 'all' ? '' : value);
     }
     if (id === 'type') {
       setTypeFilter(value as TransactionFilterType);
