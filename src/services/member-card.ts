@@ -80,9 +80,12 @@ export const memberCardService = {
   /**
    * 期初入账（B4，原「历史数据迁移」接口下线）：为老生按科目录入剩余课时并建卡。
    * 走 `opening` 账本类型，金额为 0、不计售卡业绩。
+   * **卡种与科目二选一**：传 `subjectId` 时后端解析该科目的课时卡种，
+   * 找不到自动创建「{科目}课时卡」——前端无需预载卡种列表做匹配。
    */
   openLedger: async (data: {
-    cardTypeId: string;
+    cardTypeId?: string;
+    subjectId?: string;
     studentId: string;
     remainingCount: number;
     validStart?: string;

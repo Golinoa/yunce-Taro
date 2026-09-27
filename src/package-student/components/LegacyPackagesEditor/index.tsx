@@ -18,7 +18,9 @@ import { memberCardService } from '@/services/member-card';
 import type { CardType } from '@/types/card-type';
 
 export type LegacyRow = {
-  cardTypeId: string;
+  /** 与 subjectId **二选一**：弹框场景传卡种；表单（科目库口径）传科目 */
+  cardTypeId?: string;
+  subjectId?: string;
   remainingCount: string;
   /** `YYYY-MM-DD`；**留空 = 永久有效** */
   expiredAt: string;
@@ -38,11 +40,13 @@ export const newLegacyRow = (): LegacyRow => ({
  */
 export const validateLegacyRows = (rows: LegacyRow[]): string | null => {
   if (rows.length === 0) return '请至少录入一个科目';
-  if (rows.some((row) => !row.cardTypeId || !row.remainingCount || !row.remark)) {
+  if (
+    rows.some((row) => !(row.cardTypeId || row.subjectId) || !row.remainingCount || !row.remark)
+  ) {
     return '请完整填写录入信息';
   }
   if (rows.some((row) => Number(row.remainingCount) <= 0)) return '剩余次数必须大于 0';
-  const keys = rows.map((row) => row.cardTypeId);
+  const keys = rows.map((row) => row.cardTypeId || row.subjectId);
   if (new Set(keys).size !== keys.length) return '同一科目只能录入一次';
   return null;
 };
@@ -54,16 +58,19 @@ export const toExpiryIso = (dateText: string): string | undefined =>
 /**
  * 期初入账提交（逐科目建卡）——**唯一提交实现**，弹框与学员表单都走这里。
  * 幂等键包含到期日；永久卡用 `forever` 占位，避免与有到期日的历史录入撞键。
+ * 科目行（subjectId）：后端解析/自动创建「{科目}课时卡」，前端不做卡种匹配。
  */
 export const submitLegacyRows = async (studentId: string, rows: LegacyRow[]): Promise<void> => {
   for (const row of rows) {
+    const scopeKey = row.cardTypeId || `subject:${row.subjectId}`;
     await memberCardService.openLedger({
-      cardTypeId: row.cardTypeId,
+      cardTypeId: row.cardTypeId || undefined,
+      subjectId: row.subjectId || undefined,
       studentId,
       remainingCount: Number(row.remainingCount),
       expiredAt: toExpiryIso(row.expiredAt),
       remark: row.remark.trim(),
-      idempotencyKey: `opening:${studentId}:${row.cardTypeId}:${row.expiredAt || 'forever'}`,
+      idempotencyKey: `opening:${studentId}:${scopeKey}:${row.expiredAt || 'forever'}`,
     });
   }
 };
