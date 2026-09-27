@@ -1,4 +1,4 @@
-import { View, Text } from '@tarojs/components';
+import { View, Text, Input } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -17,20 +17,22 @@ import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import SegmentedControl from '@/components/SegmentedControl';
 import StudentPickerSheet from '@/components/student/StudentPickerSheet';
 import Switch from '@/components/Switch';
-import LegacyPackagesEditor from '@/package-student/components/LegacyPackagesEditor';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 import { useStudentForm, FEE_METHOD_OPTIONS } from './useStudentForm';
 import type { StudentType } from './useStudentForm';
 
-type SelectorType = 'campus' | 'feeMethod' | null;
-/** 日期选择器仅剩出生日期（老生历史课包的有效期改为文本框，且可留空 = 永久） */
-type DatePickerTarget = { kind: 'birthday' } | null;
+type SelectorType = 'campus' | 'feeMethod' | 'subject' | null;
+type DatePickerTarget = { kind: 'birthday' } | { kind: 'expire'; packageId: string } | null;
 
 const StudentForm: React.FC = () => {
   useCardNavigationBar();
   const form = useStudentForm();
-  const [selector, setSelector] = useState<{ visible: boolean; type: SelectorType }>({
+  const [selector, setSelector] = useState<{
+    visible: boolean;
+    type: SelectorType;
+    packageId?: string;
+  }>({
     visible: false,
     type: null,
   });
@@ -63,7 +65,10 @@ const StudentForm: React.FC = () => {
     studentType,
     setStudentType,
     legacyPackages,
-    setLegacyPackages,
+    addLegacyPackage,
+    removeLegacyPackage,
+    updateLegacyPackage,
+    subjects,
     paymentEnabled,
     setPaymentEnabled,
     contacts,
@@ -114,15 +119,20 @@ const StudentForm: React.FC = () => {
     [campusId, campusOptions],
   );
 
-  const openSelector = (type: SelectorType) => setSelector({ visible: true, type });
+  const openSelector = (type: SelectorType, packageId?: string) =>
+    setSelector({ visible: true, type, packageId });
   const closeSelector = () => setSelector((prev) => ({ ...prev, visible: false }));
 
-  const datePickerValue = useMemo(
-    () => (datePickerTarget ? birthday || '2015-01-01' : ''),
-    [birthday, datePickerTarget],
-  );
+  const datePickerValue = useMemo(() => {
+    if (!datePickerTarget) return '';
+    if (datePickerTarget.kind === 'birthday') return birthday || '2015-01-01';
+    return (
+      legacyPackages.find((p) => p.id === datePickerTarget.packageId)?.expireDate ||
+      new Date().toISOString().slice(0, 10)
+    );
+  }, [birthday, datePickerTarget, legacyPackages]);
 
-  const datePickerTitle = '选择出生日期';
+  const datePickerTitle = datePickerTarget?.kind === 'expire' ? '选择到期日期' : '选择出生日期';
 
   if (loading) {
     return (
@@ -341,19 +351,155 @@ const StudentForm: React.FC = () => {
                   <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">
                     历史课包
                   </Text>
-                  {/* R1/R6：与卡包弹框共用同一组件 —— 一套表单、一条链路 */}
-                  <LegacyPackagesEditor
-                    value={legacyPackages}
-                    onChange={setLegacyPackages}
-                    showActions={false}
-                    addLabel="添加课包"
-                    autoRemark="新建学员时录入历史课时"
-                  />
-                  {errors.legacyPackages ? (
-                    <Text className="mt-[8rpx] block text-[22rpx] text-destructive">
-                      {errors.legacyPackages}
-                    </Text>
-                  ) : null}
+
+                  {/* 2026-09-27 回滚：恢复原设计 UI（科目库口径）。
+                      链路仍为两步提交（建档 → 按科目映射卡种期初入账），只是 UI 不再共用卡包弹框组件。 */}
+                  {legacyPackages.length > 0 ? (
+                    <>
+                      {legacyPackages.map((pkg, index) => (
+                        <View
+                          key={pkg.id}
+                          className={cn(
+                            'overflow-hidden rounded-[16rpx] bg-muted/70',
+                            index < legacyPackages.length - 1 && 'mb-[16rpx]',
+                          )}
+                        >
+                          <View
+                            className="flex items-center justify-between border-b border-border/50 px-[24rpx] py-[22rpx]"
+                            onClick={() => openSelector('subject', pkg.id)}
+                          >
+                            <View className="flex items-center gap-[12rpx]">
+                              <Icon
+                                name="mdi-book-open-variant"
+                                size={28}
+                                color="mutedForeground"
+                              />
+                              <Text className="text-[28rpx] text-foreground">科目</Text>
+                            </View>
+                            <View className="flex items-center gap-[12rpx]">
+                              <View className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]">
+                                <Text
+                                  className={cn(
+                                    'text-[26rpx]',
+                                    pkg.subjectName ? 'text-foreground' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {pkg.subjectName || '请选择'}
+                                </Text>
+                              </View>
+                              {legacyPackages.length > 1 ? (
+                                <View
+                                  className="flex h-[44rpx] w-[44rpx] items-center justify-center rounded-full bg-error/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation?.();
+                                    removeLegacyPackage(pkg.id);
+                                  }}
+                                >
+                                  <Icon name="mdi-close" size={20} color="error" />
+                                </View>
+                              ) : null}
+                            </View>
+                          </View>
+
+                          <View className="flex items-center justify-between border-b border-border/50 px-[24rpx] py-[22rpx]">
+                            <View className="flex items-center gap-[12rpx]">
+                              <Icon name="mdi-clock-outline" size={28} color="mutedForeground" />
+                              <Text className="text-[28rpx] text-foreground">剩余课时</Text>
+                            </View>
+                            <View className="rounded-[12rpx] bg-card px-[20rpx] py-[8rpx] min-w-[160rpx]">
+                              <Input
+                                className="text-[26rpx] text-foreground text-right"
+                                type="number"
+                                placeholder="填写课时"
+                                placeholderClass="input-placeholder"
+                                value={pkg.remainingHours}
+                                onInput={(e) => {
+                                  updateLegacyPackage(pkg.id, {
+                                    remainingHours: e.detail.value || '',
+                                  });
+                                  clearError('legacyPackages');
+                                }}
+                              />
+                            </View>
+                          </View>
+
+                          <View className="flex items-center justify-between px-[24rpx] py-[22rpx]">
+                            <View className="flex items-center gap-[12rpx]">
+                              <Icon name="mdi-calendar-clock" size={28} color="mutedForeground" />
+                              <Text className="text-[28rpx] text-foreground">设置有效期</Text>
+                            </View>
+                            <Switch
+                              checked={pkg.expireEnabled}
+                              onChange={(on) =>
+                                updateLegacyPackage(pkg.id, {
+                                  expireEnabled: on,
+                                  expireDate: on ? pkg.expireDate : '',
+                                })
+                              }
+                            />
+                          </View>
+
+                          {pkg.expireEnabled ? (
+                            <View
+                              className="flex items-center justify-between border-t border-border/50 px-[24rpx] py-[22rpx]"
+                              onClick={() =>
+                                setDatePickerTarget({ kind: 'expire', packageId: pkg.id })
+                              }
+                            >
+                              <View className="flex items-center gap-[12rpx]">
+                                <Icon name="mdi-calendar" size={28} color="mutedForeground" />
+                                <Text className="text-[28rpx] text-foreground">到期日期</Text>
+                              </View>
+                              <View className="rounded-[12rpx] bg-card px-[20rpx] py-[12rpx]">
+                                <Text
+                                  className={cn(
+                                    'text-[26rpx]',
+                                    pkg.expireDate ? 'text-foreground' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {pkg.expireDate || '请选择'}
+                                </Text>
+                              </View>
+                            </View>
+                          ) : null}
+                        </View>
+                      ))}
+
+                      <Text className="mt-[16rpx] block text-[22rpx] text-muted-foreground">
+                        点击科目或填写剩余课时；开启有效期后可设置到期日。
+                      </Text>
+                      {errors.legacyPackages ? (
+                        <Text className="mt-[8rpx] block text-[22rpx] text-destructive">
+                          {errors.legacyPackages}
+                        </Text>
+                      ) : null}
+
+                      <View
+                        className="mt-[16rpx] flex items-center justify-center gap-[8rpx] py-[8rpx]"
+                        onClick={addLegacyPackage}
+                      >
+                        <Icon name="mdi-plus" size={28} color="primary" />
+                        <Text className="text-[26rpx] text-primary">添加课包</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View
+                      className="flex min-h-[260rpx] flex-col items-center justify-center rounded-[16rpx] border-[2rpx] border-dashed border-border bg-muted/60"
+                      onClick={addLegacyPackage}
+                    >
+                      <View className="flex h-[88rpx] w-[88rpx] items-center justify-center rounded-full bg-primary shadow-md">
+                        <Icon name="mdi-plus" size={40} color="#ffffff" />
+                      </View>
+                      <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">
+                        添加课包
+                      </Text>
+                      {errors.legacyPackages ? (
+                        <Text className="mt-[12rpx] text-[22rpx] text-destructive">
+                          {errors.legacyPackages}
+                        </Text>
+                      ) : null}
+                    </View>
+                  )}
                 </View>
               )}
             </Card>
@@ -503,19 +649,40 @@ const StudentForm: React.FC = () => {
 
         <PickerSheet
           visible={selector.visible}
-          title={selector.type === 'campus' ? '选择校区' : '选择支付方式'}
+          title={
+            selector.type === 'campus'
+              ? '选择校区'
+              : selector.type === 'subject'
+                ? '选择科目'
+                : '选择支付方式'
+          }
           options={
             selector.type === 'campus'
               ? campusOptions.map((c): PickerOption => ({ label: c.name, value: c.id }))
-              : FEE_METHOD_OPTIONS.map(
-                  (item): PickerOption => ({ label: item.label, value: item.value }),
-                )
+              : selector.type === 'subject'
+                ? subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))
+                : FEE_METHOD_OPTIONS.map(
+                    (item): PickerOption => ({ label: item.label, value: item.value }),
+                  )
           }
-          value={selector.type === 'campus' ? campusId : feeMethod}
+          value={
+            selector.type === 'campus'
+              ? campusId
+              : selector.type === 'subject'
+                ? legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''
+                : feeMethod
+          }
           onClose={closeSelector}
           onConfirm={(v) => {
             if (selector.type === 'campus') {
               setCampusId(v);
+            } else if (selector.type === 'subject' && selector.packageId) {
+              const subject = subjects.find((s) => s.id === v);
+              updateLegacyPackage(selector.packageId, {
+                subjectId: v,
+                subjectName: subject?.name || '',
+              });
+              clearError('legacyPackages');
             } else if (selector.type === 'feeMethod') {
               setFeeMethod(v);
               if (v !== 'other') setFeeMethodOther('');
@@ -531,8 +698,13 @@ const StudentForm: React.FC = () => {
           onClose={() => setDatePickerTarget(null)}
           onConfirm={(date) => {
             if (!datePickerTarget) return;
-            setBirthday(date);
-            clearError('birthday');
+            if (datePickerTarget.kind === 'birthday') {
+              setBirthday(date);
+              clearError('birthday');
+            } else {
+              updateLegacyPackage(datePickerTarget.packageId, { expireDate: date });
+              clearError('legacyPackages');
+            }
             setDatePickerTarget(null);
           }}
         />

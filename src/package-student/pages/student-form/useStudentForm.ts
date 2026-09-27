@@ -4,10 +4,10 @@ import type { ContactItem } from '@/components/ContactList';
 import type { ScheduleItem } from '@/components/InstallmentPanel';
 import {
   submitLegacyRows,
-  validateLegacyRows,
   type LegacyRow,
 } from '@/package-student/components/LegacyPackagesEditor';
 import { studentService, subscribeMessageService } from '@/services';
+import { cardTypeService } from '@/services/card-type';
 import { useCampusStore, useStudentStore } from '@/stores';
 import type { CampusUIModel, Subject } from '@/types/campus';
 import type { FeeMethod } from '@/types/course-package';
@@ -40,14 +40,22 @@ export const FEE_METHOD_OPTIONS = [
 export type StudentType = 'new' | 'old';
 
 /**
- * 老生历史课包草稿。
+ * 老生历史课包草稿（**沿用原设计：科目库口径**，2026-09-27 应用户要求回滚 UI）。
  *
- * 自 R1/R6 起**统一为共用组件 `LegacyPackagesEditor` 的行结构**（`LegacyRow`）：
- * 卡种 + 剩余次数 + 有效期（可留空=永久）+ 录入依据。
- * 表单与卡包弹框共用同一套字段、校验与提交（`validateLegacyRows` / `submitLegacyRows`），
- * 禁止再造第二套（此前表单自研的"科目+有效期开关"草稿已废弃）。
+ * - 科目来自**科目库**（与卡包弹框不同：弹框选的是卡种）；
+ * - 有效期**可留空 = 永久**（`expireEnabled` 关闭即永久）；
+ * - 提交前由 hook 把「科目」映射为该科目下的课时卡种（`kind=count` 且启用），
+ *   再走与弹框共用的 `submitLegacyRows` 期初入账——**链路仍是一条**，只是 UI 按原设计。
+ * 找不到对应卡种时阻断提交并提示，**不会**静默丢课时。
  */
-export type LegacyPackageDraft = LegacyRow;
+export interface LegacyPackageDraft {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  remainingHours: string;
+  expireEnabled: boolean;
+  expireDate: string;
+}
 
 /** 表单错误 */
 export interface FormErrors {
@@ -86,10 +94,11 @@ export interface UseStudentFormReturn {
 
   studentType: StudentType;
   setStudentType: React.Dispatch<React.SetStateAction<StudentType>>;
-  /** 老生：多课包迁移 */
-  /** 老生历史课包（行结构与卡包弹框共用组件一致；增删改由组件内部处理） */
-  legacyPackages: LegacyRow[];
-  setLegacyPackages: React.Dispatch<React.SetStateAction<LegacyRow[]>>;
+  /** 老生：多课包迁移（科目库口径草稿；增删改由表单处理，提交时映射为卡种） */
+  legacyPackages: LegacyPackageDraft[];
+  addLegacyPackage: () => void;
+  removeLegacyPackage: (id: string) => void;
+  updateLegacyPackage: (id: string, patch: Partial<LegacyPackageDraft>) => void;
   subjects: Subject[];
 
   /** 可选：缴费信息 */
@@ -159,8 +168,12 @@ export function useStudentForm(): UseStudentFormReturn {
   const [feeMethod, setFeeMethod] = useState<string>('');
 
   const [studentType, setStudentType] = useState<StudentType>('new');
-  const [legacyPackages, setLegacyPackages] = useState<LegacyRow[]>([]);
+  const [legacyPackages, setLegacyPackages] = useState<LegacyPackageDraft[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  /** 机构可用课时卡种（kind=count 且启用）：提交时把「科目」映射为卡种 */
+  const [cardTypes, setCardTypes] = useState<Awaited<ReturnType<typeof cardTypeService.getList>>>(
+    [],
+  );
 
   const [paymentEnabled, setPaymentEnabled] = useState(false);
 
@@ -290,6 +303,53 @@ export function useStudentForm(): UseStudentFormReturn {
     void loadFormData();
   }, [loadFormData]);
 
+  // 科目→卡种映射所需的卡种列表（失败不阻塞表单，仅影响老生课包提交时的校验）
+  useEffect(() => {
+    let cancelled = false;
+    cardTypeService
+      .getList()
+      .then((items) => {
+        if (!cancelled) {
+          setCardTypes(items.filter((item) => item.kind === 'count' && item.status === 'active'));
+        }
+      })
+      .catch(() => {
+        /* 加载失败：提交时校验会提示「暂无可用课时卡种」 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const findCardTypeForSubject = useCallback(
+    (subjectId: string) => cardTypes.find((ct) => ct.subjectId === subjectId),
+    [cardTypes],
+  );
+
+  const addLegacyPackage = useCallback(() => {
+    setLegacyPackages((prev) => [
+      ...prev,
+      {
+        id: `lp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        subjectId: '',
+        subjectName: '',
+        remainingHours: '',
+        expireEnabled: false,
+        expireDate: '',
+      },
+    ]);
+  }, []);
+
+  const removeLegacyPackage = useCallback((id: string) => {
+    setLegacyPackages((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const updateLegacyPackage = useCallback((id: string, patch: Partial<LegacyPackageDraft>) => {
+    setLegacyPackages((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }, []);
+
   const validate = useCallback((): boolean => {
     const errs: FormErrors = {};
     const trimmedName = name.trim();
@@ -312,10 +372,29 @@ export function useStudentForm(): UseStudentFormReturn {
     }
 
     if (!isEdit) {
-      if (studentType === 'old') {
-        // 与卡包弹框共用同一套校验（validateLegacyRows），避免两处规则漂移
-        const legacyError = validateLegacyRows(legacyPackages);
-        if (legacyError) errs.legacyPackages = legacyError;
+      // ⚠️ 必填只有学员姓名：历史课包为**选填**——没填就直接建档，填了才逐行校验
+      if (studentType === 'old' && legacyPackages.length > 0) {
+        for (let i = 0; i < legacyPackages.length; i += 1) {
+          const pkg = legacyPackages[i];
+          const label = legacyPackages.length > 1 ? `课包${i + 1}` : '课包';
+          if (!pkg.subjectId) {
+            errs.legacyPackages = `请选择${label}的科目`;
+            break;
+          }
+          const hours = parseInt(pkg.remainingHours, 10);
+          if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) {
+            errs.legacyPackages = `请填写${label}的剩余课时`;
+            break;
+          }
+          if (pkg.expireEnabled && !pkg.expireDate) {
+            errs.legacyPackages = `请选择${label}的到期日期`;
+            break;
+          }
+          if (!findCardTypeForSubject(pkg.subjectId)) {
+            errs.legacyPackages = `科目「${pkg.subjectName}」暂无可用课时卡种，请先在卡种管理创建`;
+            break;
+          }
+        }
       }
     }
 
@@ -326,7 +405,17 @@ export function useStudentForm(): UseStudentFormReturn {
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [name, phone, birthday, isEdit, studentType, legacyPackages, feeAmount, paymentEnabled]);
+  }, [
+    name,
+    phone,
+    birthday,
+    isEdit,
+    studentType,
+    legacyPackages,
+    feeAmount,
+    paymentEnabled,
+    findCardTypeForSubject,
+  ]);
 
   const submitBlockedReason = useMemo(() => {
     if (!name.trim()) return '请输入学员姓名';
@@ -343,11 +432,20 @@ export function useStudentForm(): UseStudentFormReturn {
       if (date > today) return '出生日期不能晚于今天';
     }
 
-    if (!isEdit) {
-      if (studentType === 'old') {
-        // 同一套校验（共用组件导出），保证"按钮禁用原因"与提交前校验完全一致
-        const legacyError = validateLegacyRows(legacyPackages);
-        if (legacyError) return legacyError;
+    if (!isEdit && studentType === 'old' && legacyPackages.length > 0) {
+      // 历史课包选填：没填直接建档；填了才逐行校验（与 validate() 同一套规则）
+      for (let i = 0; i < legacyPackages.length; i += 1) {
+        const pkg = legacyPackages[i];
+        const label = legacyPackages.length > 1 ? `课包${i + 1}` : '课包';
+        if (!pkg.subjectId) return `请选择${label}的科目`;
+        const hours = parseInt(pkg.remainingHours, 10);
+        if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) {
+          return `请填写${label}的剩余课时`;
+        }
+        if (pkg.expireEnabled && !pkg.expireDate) return `请选择${label}的到期日期`;
+        if (!findCardTypeForSubject(pkg.subjectId)) {
+          return `科目「${pkg.subjectName}」暂无可用课时卡种，请先在卡种管理创建`;
+        }
       }
     }
 
@@ -391,6 +489,7 @@ export function useStudentForm(): UseStudentFormReturn {
     feeMethodOther,
     installmentEnabled,
     schedule,
+    findCardTypeForSubject,
   ]);
 
   const canSubmit = useMemo(() => !submitBlockedReason, [submitBlockedReason]);
@@ -525,11 +624,33 @@ export function useStudentForm(): UseStudentFormReturn {
           avatarUrl.trim() && !localAvatarPending ? avatarUrl.trim() : undefined;
         /**
          * R1：老生「分两步写入」——
-         *   ① 先建学员档案（**不再传 `initialPackages`**：该字段后端已在 Batch W9 移除解析，
+         *   ① 先建学员档案（**不传 `initialPackages`**：该字段后端已在 Batch W9 移除解析，
          *      传了只会被 zod 静默剥离，表现为"保存成功但课时凭空消失"）；
-         *   ② 建档成功后，按科目做**期初入账（opening）**，与卡包弹框共用同一实现
-         *      （`submitLegacyRows`），课时落到会员卡 ⇒ 卡包立即可见。
+         *   ② 建档成功后，按科目映射出的卡种做**期初入账（opening）**，与卡包弹框共用
+         *      同一实现（`submitLegacyRows`），课时落到会员卡 ⇒ 卡包立即可见。
+         * 科目→卡种映射在**建档前**完成：找不到卡种直接中止，不会"建了学员却录不进课时"。
          */
+        const legacyRows: LegacyRow[] = [];
+        if (studentType === 'old' && legacyPackages.length > 0) {
+          for (const pkg of legacyPackages) {
+            const cardType = findCardTypeForSubject(pkg.subjectId);
+            if (!cardType) {
+              Taro.showToast({
+                title: `科目「${pkg.subjectName}」暂无可用课时卡种，请先在卡种管理创建`,
+                icon: 'none',
+              });
+              setSaving(false);
+              return;
+            }
+            legacyRows.push({
+              cardTypeId: cardType.id,
+              remainingCount: String(parseInt(pkg.remainingHours, 10)),
+              expiredAt: pkg.expireEnabled ? pkg.expireDate : '',
+              remark: `新建学员时录入：科目「${pkg.subjectName}」剩余 ${pkg.remainingHours} 课时`,
+            });
+          }
+        }
+
         newStudent = await studentService.create({
           teacher_id: teacherId,
           name: name.trim(),
@@ -549,9 +670,9 @@ export function useStudentForm(): UseStudentFormReturn {
         });
 
         // ② 期初入账：失败不合并为整体成功（沿用 W9 既定原则）——学员已建档，提示去卡包页重录
-        if (newStudent && studentType === 'old' && legacyPackages.length > 0) {
+        if (newStudent && legacyRows.length > 0) {
           try {
-            await submitLegacyRows(newStudent.id, legacyPackages);
+            await submitLegacyRows(newStudent.id, legacyRows);
             setLegacyPackages([]);
           } catch (error) {
             logError('submit legacy packages after create', error);
@@ -656,6 +777,7 @@ export function useStudentForm(): UseStudentFormReturn {
     paymentEnabled,
     handleReset,
     defaultCampusId,
+    findCardTypeForSubject,
   ]);
 
   return {
@@ -687,7 +809,9 @@ export function useStudentForm(): UseStudentFormReturn {
     studentType,
     setStudentType,
     legacyPackages,
-    setLegacyPackages,
+    addLegacyPackage,
+    removeLegacyPackage,
+    updateLegacyPackage,
     subjects,
     paymentEnabled,
     setPaymentEnabled,
