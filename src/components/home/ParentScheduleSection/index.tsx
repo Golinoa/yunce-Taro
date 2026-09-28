@@ -4,7 +4,10 @@ import React, { useMemo } from 'react';
 import ParentGlassShell from '@/components/home/ParentGlassShell';
 import Icon from '@/components/Icon';
 import type { Schedule } from '@/types/schedule';
-import { resolveScheduleDisplayTitle } from '@/utils/schedule-note-display';
+import {
+  resolveScheduleDisplayTitle,
+  sanitizeScheduleTagLabel,
+} from '@/utils/schedule-note-display';
 
 const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
 /** 首页竖排最多展示 2 张，刚好一屏内看完 */
@@ -69,7 +72,7 @@ const ParentScheduleSection: React.FC<ParentScheduleSectionProps> = ({
             });
             const teacher = item.teacher_name || '授课老师';
             const timeLabel = `${formatWeekday(item.day_of_week)} ${item.start_time}-${item.end_time}`;
-            const tag = item.category_label;
+            const tag = sanitizeScheduleTagLabel(item.category_label);
 
             return (
               <View

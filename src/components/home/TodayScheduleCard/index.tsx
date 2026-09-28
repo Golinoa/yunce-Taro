@@ -6,7 +6,10 @@ import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
 import { classColorHex } from '@/theme';
 import type { Schedule, CourseStatus } from '@/types/schedule';
-import { resolveScheduleDisplayTitle } from '@/utils/schedule-note-display';
+import {
+  resolveScheduleDisplayTitle,
+  sanitizeScheduleTagLabel,
+} from '@/utils/schedule-note-display';
 
 export interface TodayScheduleCardProps {
   schedules: Schedule[];
@@ -242,7 +245,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
           const isActive = status === 'active';
           const isUrgent = status === 'urgent';
           const countdownText = isUrgent ? getCountdownText(item.start_time) : null;
-          const categoryLabel = item.category_label;
+          const categoryLabel = sanitizeScheduleTagLabel(item.category_label);
           const isInlineCheckIn =
             (item.trial_mode === 'private' && !!item.booking_id) ||
             (item.schedule_kind === 'venue' && !!item.venue_booking_id);

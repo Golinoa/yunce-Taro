@@ -43,6 +43,23 @@ export function stripScheduleNoteMeta(note?: string | null): string {
     .trim();
 }
 
+/** `Subject` 表主键（UUID）形态的取值 */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 课程分类标签的展示净化。
+ *
+ * 背景（2026-09-29）：`Class.subject` 存在两代数据——早期直接存科目**名称**（"钢琴"），
+ * 现代表单改存 `Subject` 表**主键**（UUID）。后端已统一解析为名称，但对尚未部署该修复的
+ * 环境（含历史包），回传值仍可能是一串 UUID，直接渲染就是「看不懂的元信息」。
+ * 这类值一律判空不展示：**宁可不显示标签，也不显示一串 ID**。
+ */
+export function sanitizeScheduleTagLabel(label?: string | null): string | undefined {
+  const value = (label || '').trim();
+  if (!value) return undefined;
+  return UUID_RE.test(value) ? undefined : value;
+}
+
 export interface ScheduleDisplayTitleInput {
   /** 排课的原始备注（可能含系统元信息） */
   note?: string | null;

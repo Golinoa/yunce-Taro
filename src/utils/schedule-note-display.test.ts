@@ -6,7 +6,11 @@
  * 1. 元信息段被剥掉；2. 用户原文（含 `|`）原样保留；3. 正式排课标题以班级名称为准。
  */
 import { describe, expect, it } from 'vitest';
-import { resolveScheduleDisplayTitle, stripScheduleNoteMeta } from '@/utils/schedule-note-display';
+import {
+  resolveScheduleDisplayTitle,
+  sanitizeScheduleTagLabel,
+  stripScheduleNoteMeta,
+} from '@/utils/schedule-note-display';
 
 const REAL_NOTE =
   '类型:班课 | 规则:weekly | 开始:2026-09-21 | 结束:不结束 | 节假日排课:否 | 消耗课时:1';
@@ -86,5 +90,30 @@ describe('resolveScheduleDisplayTitle', () => {
         trialMode: 'group',
       }),
     ).toBe('钢琴入门A班');
+  });
+});
+
+describe('sanitizeScheduleTagLabel', () => {
+  // 回归点（2026-09-29）：Class.subject 现代表单存 Subject 表主键（UUID），
+  // 未部署后端解析修复的环境会把这串 ID 原样当科目名显示在卡片标签上。
+  it('Subject 主键（UUID）→ 判空，绝不显示成一串 ID', () => {
+    expect(sanitizeScheduleTagLabel('66adf6a0-bf98-46a8-b9b0-f770ddc50f19')).toBeUndefined();
+    expect(sanitizeScheduleTagLabel('66ADF6A0-BF98-46A8-B9B0-F770DDC50F19')).toBeUndefined();
+  });
+
+  it('历史数据直接存的科目名称 → 原样保留', () => {
+    expect(sanitizeScheduleTagLabel('钢琴')).toBe('钢琴');
+    expect(sanitizeScheduleTagLabel('书法')).toBe('书法');
+  });
+
+  it('空值一律判空', () => {
+    expect(sanitizeScheduleTagLabel(undefined)).toBeUndefined();
+    expect(sanitizeScheduleTagLabel(null)).toBeUndefined();
+    expect(sanitizeScheduleTagLabel('')).toBeUndefined();
+    expect(sanitizeScheduleTagLabel('   ')).toBeUndefined();
+  });
+
+  it('两端空白被裁剪', () => {
+    expect(sanitizeScheduleTagLabel('  乐理  ')).toBe('乐理');
   });
 });
