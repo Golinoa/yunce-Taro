@@ -185,6 +185,50 @@ export const subscribeMessageService = {
     }
   },
 
+  /**
+   * 「开启上课提醒」：点击回调里**第一行同步调起**微信订阅面板。
+   *
+   * 为什么不用 `requestAuthAndReport`：那个方法会先 `await bootstrap()` 发一次网络请求
+   * 再调面板，而微信要求 `requestSubscribeMessage` 处在**用户点击的同步调用栈**内
+   * （否则报 `fail can only be invoked by user TAP`，面板根本不出现）。
+   * 因此这里要求调用方**提前**把 tmplId 从 bootstrap 缓存取好，进来就调起，
+   * 拿到结果后再异步上报攒额度。
+   */
+  async requestReminderAuthNow(params: {
+    group: SubscribeTemplateGroup;
+    tmplId: string;
+    scene: string;
+    meta?: { role?: string; campusId?: string };
+  }): Promise<{ accepted: boolean }> {
+    const { group, tmplId, scene } = params;
+    if (!tmplId) return { accepted: false };
+
+    let accepted = false;
+    try {
+      const res = await Taro.requestSubscribeMessage({
+        tmplIds: [tmplId],
+      } as Taro.requestSubscribeMessage.Option);
+      accepted = res?.[tmplId] === 'accept';
+    } catch (error) {
+      logError('subscribe.requestReminderAuthNow', error);
+      return { accepted: false };
+    }
+
+    if (!accepted) return { accepted: false };
+
+    try {
+      await this.authReport({
+        scene,
+        campusId: params.meta?.campusId,
+        items: [{ tmplId, group, status: 'accept' }],
+        clientRequestId: createClientRequestId(),
+      });
+    } catch (error) {
+      logError('subscribe.requestReminderAuthNow.report', error);
+    }
+    return { accepted: true };
+  },
+
   async consumePending(promptId: string): Promise<void> {
     const userId = await resolveUserId();
     if (!userId) return;

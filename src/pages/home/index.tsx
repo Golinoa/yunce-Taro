@@ -12,6 +12,7 @@ import {
   buildLessonConsumptionSections,
   pickHomeRecentLessonRecords,
 } from '@/components/lesson/LessonConsumptionList';
+import { SubscribePromptDialog, SubscribeReminderBar } from '@/components/subscribe';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import { todoService } from '@/services';
 import { listParentStorefronts, switchAuthContext } from '@/services/auth';
@@ -23,6 +24,7 @@ import {
   organizationService,
   type PendingRelation,
 } from '@/services/organization';
+import { subscribeMessageService } from '@/services/subscribe-message';
 import { venueBookingService } from '@/services/venue-booking';
 import { useCampusList, useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
@@ -52,6 +54,15 @@ import {
   type SessionIdentityType,
 } from '@/utils/session-identity';
 import { hasPushedUnattended, pushUnattendedReminder } from '@/utils/subscribe-message';
+import {
+  decideReminderGuide,
+  hasDialogShownToday,
+  isBannerCooling,
+  markBannerDismissed,
+  markDialogShown,
+  readSubscribePermission,
+  clearGuideThrottle,
+} from '@/utils/subscribe-reminder-guide';
 import { syncTabBarByProfile } from '@/utils/tab-bar';
 import { listTodoCategoryTabs, type TodoCategoryTab } from '@/utils/todo-categories';
 import {
@@ -88,6 +99,26 @@ const HOME_QUERY_STALE_TIME_MS = 30_000;
  * 首页聚合（教师/家长/课表/未读/消课一次返回）被高频重拉。
  */
 const HOME_AUTO_REFRESH_MS = 60_000;
+
+/**
+ * 首页「开启上课提醒」引导条：仅在降级为页面内引导条（`bar`）时渲染。
+ * 教师端与家长端各有一处课表，两处都要紧邻课表上方，故抽成小组件避免重复 JSX。
+ */
+const ReminderGuideBar: React.FC<{
+  mode: 'none' | 'dialog' | 'bar';
+  onEnable: () => void;
+  onDismiss: () => void;
+  loading?: boolean;
+}> = ({ mode, onEnable, onDismiss, loading }) =>
+  mode === 'bar' ? (
+    <SubscribeReminderBar
+      visible
+      message="开启上课提醒，上课前会收到微信通知"
+      onEnable={onEnable}
+      onDismiss={onDismiss}
+      loading={loading}
+    />
+  ) : null;
 
 /**
  * 校区列表已统一走 useCampusList harness（唯一数据源 useCampusStore：
@@ -165,6 +196,14 @@ const Home: React.FC = () => {
   const [homeRefreshing, setHomeRefreshing] = useState(false);
   /** 页面是否处于前台：切后台时停掉自动刷新轮询，避免后台空转请求 */
   const [homePageActive, setHomePageActive] = useState(true);
+
+  // ---- 「开启上课提醒」引导 ----
+  /** dialog=弹框（当天首次） / bar=嵌入内容流的引导条（弹框关闭后） / none=不展示 */
+  const [reminderGuideMode, setReminderGuideMode] = useState<'none' | 'dialog' | 'bar'>('none');
+  const [reminderTmplId, setReminderTmplId] = useState('');
+  const [reminderAuthing, setReminderAuthing] = useState(false);
+  /** 每天只评估一次：引导本身一天最多一次，避免 60s 自动刷新反复触发 bootstrap */
+  const reminderEvaluatedRef = useRef(false);
 
   // ---- 待办事项 ----
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
@@ -701,6 +740,10 @@ const Home: React.FC = () => {
   useDidShow(() => {
     // 回到前台：恢复自动刷新轮询，并由下方逻辑立即补一次刷新（信号/保鲜期）
     setHomePageActive(true);
+    // 当天已弹过框（切 tab 回来 / 二次进入）：降级为页面内引导条，避免同一天反复弹框
+    if (reminderGuideMode === 'dialog' && hasDialogShownToday()) {
+      setReminderGuideMode('bar');
+    }
     syncTabBarByProfile(profile);
     const collaboratorResult = consumeTodoCollaboratorResult();
     if (collaboratorResult !== null) {
@@ -759,6 +802,113 @@ const Home: React.FC = () => {
     }, HOME_AUTO_REFRESH_MS);
     return () => clearInterval(timer);
   }, [homePageActive, homeIdentityReady, queryClient]);
+
+  /**
+   * 评估是否引导用户「开启上课提醒」。
+   *
+   * 微信两条硬约束决定了这里的形态（改动前务必重读 utils/subscribe-reminder-guide.ts 顶部注释）：
+   * 1. 打开小程序**不能自动**调起授权面板（只允许在点击行为中调用）⇒ 只能站内引导；
+   * 2. getSetting 的 itemSettings 只记录勾了「总是保持」的用户 ⇒ 授权状态只能当辅助信号。
+   * 因此判断以后端额度为准（额度用完才引导），微信状态只用来识别「再也弹不出来」的用户。
+   */
+  const evaluateReminderGuide = useCallback(async () => {
+    if (hasDialogShownToday() || isBannerCooling()) {
+      setReminderGuideMode('none');
+      return;
+    }
+    try {
+      const data = await subscribeMessageService.bootstrap(
+        currentRole ?? undefined,
+        currentCampusId,
+      );
+      const quota = data.quotas.find((q) => q.group === 'class_remind');
+      const tmplId = (quota?.tmplId || '').trim();
+      if (!tmplId) {
+        setReminderGuideMode('none');
+        return;
+      }
+      const permission = await readSubscribePermission([tmplId]);
+      const decision = decideReminderGuide({
+        hasCourseToday: true,
+        quotaRemain: quota?.remain ?? 0,
+        needsReactivate: quota?.needsReactivate,
+        masterEnabled: subscribeMessageService.getMasterNotifyEnabled(),
+        permission,
+        tmplId,
+      });
+      if (decision === 'guide') {
+        setReminderTmplId(tmplId);
+        setReminderGuideMode('dialog');
+        // 弹框当天只展示一次（用户关掉后降级为页面内引导条，不再弹框）
+        markDialogShown();
+        return;
+      }
+      setReminderGuideMode('none');
+    } catch (error) {
+      logError('home.reminderGuide', error);
+      setReminderGuideMode('none');
+    }
+  }, [currentRole, currentCampusId]);
+
+  useEffect(() => {
+    if (!homeIdentityReady || reminderEvaluatedRef.current) return;
+    // 没课就不评估（有课才谈"上课提醒"），有课后当天只评估一次
+    const courseCount = isParent ? parentSchedules.length : schedules.length;
+    if (courseCount === 0) return;
+    reminderEvaluatedRef.current = true;
+    void evaluateReminderGuide();
+  }, [
+    homeIdentityReady,
+    isParent,
+    parentSchedules.length,
+    schedules.length,
+    evaluateReminderGuide,
+  ]);
+
+  /** 弹框「暂不」：降级为页面内引导条（当天不再弹框） */
+  const handleReminderDialogSecondary = useCallback(() => {
+    setReminderGuideMode('bar');
+  }, []);
+
+  /** 引导条「关闭」：进入冷却期，几天内不再出现 */
+  const handleReminderBarDismiss = useCallback(() => {
+    markBannerDismissed();
+    setReminderGuideMode('none');
+  }, []);
+
+  /**
+   * 点击「开启提醒」：调起微信订阅面板。
+   * service 内部第一行就是 requestSubscribeMessage，确保处在用户点击的同步调用栈内
+   * （先 await 网络请求再调会被微信拦截，面板不会出现）。
+   */
+  const handleEnableReminder = useCallback(() => {
+    if (!reminderTmplId || reminderAuthing) return;
+    setReminderAuthing(true);
+    void subscribeMessageService
+      .requestReminderAuthNow({
+        group: 'class_remind',
+        tmplId: reminderTmplId,
+        scene: 'home_reminder_guide',
+        meta: { role: currentRole ?? undefined, campusId: currentCampusId },
+      })
+      .then(({ accepted }) => {
+        if (accepted) {
+          clearGuideThrottle();
+          setReminderGuideMode('none');
+          Taro.showToast({ title: '已开启上课提醒', icon: 'none' });
+          return;
+        }
+        // 拒绝或失败：不再反复打扰，进入冷却
+        markBannerDismissed();
+        setReminderGuideMode('none');
+      })
+      .catch(() => {
+        setReminderGuideMode('none');
+      })
+      .finally(() => {
+        setReminderAuthing(false);
+      });
+  }, [reminderTmplId, reminderAuthing, currentRole, currentCampusId]);
 
   const todayTodoItems = useMemo(() => filterTodayTodoItems(todoItems), [todoItems]);
   const otherTodoCount = useMemo(
@@ -917,6 +1067,12 @@ const Home: React.FC = () => {
                     onAnchor={handleParentAnchor}
                   />
                   <View className="px-[8rpx]">
+                    <ReminderGuideBar
+                      mode={reminderGuideMode}
+                      onEnable={handleEnableReminder}
+                      onDismiss={handleReminderBarDismiss}
+                      loading={reminderAuthing}
+                    />
                     <ParentScheduleSection schedules={parentSchedules} />
                     <ParentHoursSection
                       packages={parentPackages}
@@ -927,25 +1083,33 @@ const Home: React.FC = () => {
               )}
 
               {isStaffRole(currentRole) && (
-                <HomeStaffTabPanels
-                  activeTab={activeTab}
-                  tabOptions={tabOptions}
-                  onTabChange={handleHomeTabChange}
-                  schedules={schedules}
-                  onPrivateCheckIn={handlePrivateCheckIn}
-                  onVenueCheckIn={handleVenueCheckIn}
-                  todoViewMode={todoViewMode}
-                  todayTodoItems={todayTodoItems}
-                  otherTodoCount={otherTodoCount}
-                  onTodoViewModeChange={handleTodoViewModeChange}
-                  onOpenMyTodos={handleOpenMyTodos}
-                  onOpenAddTodo={handleOpenAddTodoSheet}
-                  onCompleteTodo={handleCompleteTodo}
-                  onOpenTodoDetail={handleOpenTodoDetail}
-                  onQuadrantChange={handleQuadrantChange}
-                  onQuadrantDragActiveChange={handleQuadrantDragActiveChange}
-                  recentSections={recentSections}
-                />
+                <>
+                  <ReminderGuideBar
+                    mode={reminderGuideMode}
+                    onEnable={handleEnableReminder}
+                    onDismiss={handleReminderBarDismiss}
+                    loading={reminderAuthing}
+                  />
+                  <HomeStaffTabPanels
+                    activeTab={activeTab}
+                    tabOptions={tabOptions}
+                    onTabChange={handleHomeTabChange}
+                    schedules={schedules}
+                    onPrivateCheckIn={handlePrivateCheckIn}
+                    onVenueCheckIn={handleVenueCheckIn}
+                    todoViewMode={todoViewMode}
+                    todayTodoItems={todayTodoItems}
+                    otherTodoCount={otherTodoCount}
+                    onTodoViewModeChange={handleTodoViewModeChange}
+                    onOpenMyTodos={handleOpenMyTodos}
+                    onOpenAddTodo={handleOpenAddTodoSheet}
+                    onCompleteTodo={handleCompleteTodo}
+                    onOpenTodoDetail={handleOpenTodoDetail}
+                    onQuadrantChange={handleQuadrantChange}
+                    onQuadrantDragActiveChange={handleQuadrantDragActiveChange}
+                    recentSections={recentSections}
+                  />
+                </>
               )}
             </View>
           </View>
@@ -1001,6 +1165,17 @@ const Home: React.FC = () => {
         onRelationConfirmed={handleRelationConfirmed}
         campusGuideVisible={campusGuideVisible}
         onCloseCampusGuide={() => setCampusGuideVisible(false)}
+      />
+
+      <SubscribePromptDialog
+        visible={reminderGuideMode === 'dialog'}
+        title="开启上课提醒"
+        body="今天有你的课。开启后，上课前会收到微信通知（一次授权可发一次提醒）。"
+        primaryText="开启提醒"
+        secondaryText="暂不"
+        loading={reminderAuthing}
+        onPrimary={handleEnableReminder}
+        onSecondary={handleReminderDialogSecondary}
       />
     </>
   );
