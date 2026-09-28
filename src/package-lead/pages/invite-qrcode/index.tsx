@@ -13,6 +13,7 @@ import PageContainer from '@/components/PageContainer';
 import { parentShareInviteService } from '@/services/parent-share-invite';
 import { useAuth } from '@/utils/auth';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { buildInviteLandingUrl } from '@/utils/invite-landing-url';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { buildWxacodeImageSrc } from '@/utils/wxacode-scene';
 
@@ -20,7 +21,10 @@ const InviteQrcodePage: React.FC = () => {
   useCardNavigationBar();
   const { profile, currentIdentity } = useAuth();
 
+  /** 复制/展示用的**网址**（H5 落地页，浏览器/微信外均可打开） */
   const [inviteLink, setInviteLink] = useState('');
+  /** 微信分享用的小程序路径（分享 path 必须是小程序页面路径，不能传网址） */
+  const [sharePath, setSharePath] = useState('');
   const [qrImageSrc, setQrImageSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,7 +44,10 @@ const InviteQrcodePage: React.FC = () => {
       // ③ 类固定招生码：GET 取教师固定码（永久有效、可多人复用），不再每次新建临时码
       const myInvite = await parentShareInviteService.getMyShareInvite();
       const wxacode = await parentShareInviteService.getWxacode(myInvite.parentInviteCode);
-      setInviteLink(myInvite.parentInviteLandingPath || wxacode.landingPath);
+      // 分享：小程序页面路径（微信要求 path 为小程序内路径）
+      setSharePath(myInvite.parentInviteLandingPath || wxacode.landingPath);
+      // 复制/展示：普通网址（H5 落地页），替代原先不可分享的小程序内部路径
+      setInviteLink(buildInviteLandingUrl(myInvite.parentInviteCode));
       setQrImageSrc(buildWxacodeImageSrc(wxacode.imageBase64));
       markFetched(lastFetchAtRef);
     } catch (e) {
@@ -57,8 +64,8 @@ const InviteQrcodePage: React.FC = () => {
 
   useShareAppMessage(() => ({
     title: `${profile?.name || '老师'}邀请您加入${currentIdentity?.organizationName || '机构'}`,
-    // 微信分享 path 根路径前不加 /
-    path: (inviteLink || 'package-auth/pages/invite-register/index').replace(/^\//, ''),
+    // 微信分享 path 必须是小程序页面路径（不能用网址），根路径前不加 /
+    path: (sharePath || 'package-auth/pages/invite-register/index').replace(/^\//, ''),
   }));
 
   return (

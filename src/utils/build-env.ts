@@ -22,6 +22,29 @@ export function getApiBaseUrl(): string {
   return process.env.TARO_API_BASE_URL || PROD_API_BASE_URL;
 }
 
+/**
+ * 邀约 H5 落地页的网址前缀。
+ *
+ * 由构建期变量 `TARO_H5_LANDING_BASE_URL` 注入（**换域名只改这一个变量**，不必动代码）；
+ * 未配置时回落到站点根（从 API 基址推导），行为与加变量前一致。
+ */
+export function getLandingBaseUrl(): string {
+  const configured = process.env.TARO_H5_LANDING_BASE_URL;
+  if (configured) return configured.replace(/\/+$/, '');
+  return getSiteOrigin();
+}
+
+/**
+ * 站点根地址（由 API 基址去掉 `/api/...` 后缀得到，作为落地页前缀的兜底）。
+ * `https://dev.chancore.cn/api/app/v1` → `https://dev.chancore.cn`。
+ */
+export function getSiteOrigin(): string {
+  const base = getApiBaseUrl();
+  const apiIndex = base.indexOf('/api/');
+  const origin = apiIndex > 0 ? base.slice(0, apiIndex) : base;
+  return origin.replace(/\/+$/, '');
+}
+
 /** 测环境包：基址指向 dev.chancore.cn（或显式 TARO_ENABLE_LOCAL_DEBUG） */
 export function isDevApiEnv(): boolean {
   if (process.env.TARO_ENABLE_LOCAL_DEBUG === 'true') return true;

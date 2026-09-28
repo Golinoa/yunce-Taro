@@ -13,6 +13,8 @@ interface SaveBatchParams {
   sourceDate: string;
   targetDate: string;
   schedules: Schedule[];
+  /** 调课理由（选填，来自确认页输入框）；留空时用兜底文案 */
+  reason?: string;
 }
 
 interface CheckDateConflictParams {
@@ -135,11 +137,13 @@ export const temporaryRescheduleService = {
     sourceDate,
     targetDate,
     schedules,
+    reason,
   }: SaveBatchParams): Promise<TemporaryReschedule[]> => {
     const response = await post<
       BackendTemporaryRescheduleBatchResponse | BackendTemporaryRescheduleItem[]
     >('/attendance/reschedules/batch', {
-      reason: '课表临时调课',
+      // 老师填的理由优先；留空时用兜底文案（后端 reason 必填，不可为空）
+      reason: reason?.trim() || '课表临时调课',
       schedules: schedules.map((schedule) => ({
         scheduleId: schedule.id,
         originalDate: sourceDate,

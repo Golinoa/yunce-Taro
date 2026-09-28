@@ -23,10 +23,23 @@ export default defineConfig<'webpack5'>(async (merge) => {
     useMock = 'false';
   }
   const apiBaseUrl = process.env.TARO_API_BASE_URL ?? PROD_API_BASE_URL;
+  /**
+   * 邀约 H5 落地页的网址前缀（`<前缀>/invite/<码>`）。
+   *
+   * 独立成环境变量便于**换域名**（改 TARO_H5_LANDING_BASE_URL 即可，不必改代码）；
+   * 未配置时从 API 基址去掉 `/api/...` 后缀推导，行为与之前一致。
+   */
+  const landingBaseUrl = (
+    process.env.TARO_H5_LANDING_BASE_URL ??
+    (() => {
+      const apiIdx = apiBaseUrl.indexOf('/api/');
+      return apiIdx > 0 ? apiBaseUrl.slice(0, apiIdx) : apiBaseUrl;
+    })()
+  ).replace(/\/+$/, '');
   /** mock / API / Node 版本切换时必须隔离 webpack 缓存，否则会复用错误 chunk（如缺失的 sub-common） */
   const weappCacheKey = crypto
     .createHash('md5')
-    .update(`${useMock}|${apiBaseUrl}|${process.version}`)
+    .update(`${useMock}|${apiBaseUrl}|${landingBaseUrl}|${process.version}`)
     .digest('hex')
     .slice(0, 10);
   // 构建目标平台（taro build --type xxx）。weapp 为纯小程序，组件编译为原生组件，
@@ -50,6 +63,7 @@ export default defineConfig<'webpack5'>(async (merge) => {
     plugins: isWeappBuild ? [] : ['@tarojs/plugin-html'],
     defineConstants: {
       'process.env.TARO_API_BASE_URL': JSON.stringify(apiBaseUrl),
+      'process.env.TARO_H5_LANDING_BASE_URL': JSON.stringify(landingBaseUrl),
       'process.env.VITE_USE_MOCK': JSON.stringify(useMock),
       'process.env.TARO_ENABLE_LOCAL_DEBUG': JSON.stringify(
         process.env.TARO_ENABLE_LOCAL_DEBUG ?? 'false',

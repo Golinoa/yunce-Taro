@@ -13,6 +13,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const DEFAULT_DEV_API_BASE = 'https://dev.chancore.cn/api/app/v1';
 const API_BASE = process.env.TARO_API_BASE_URL ?? DEFAULT_DEV_API_BASE;
+/** 邀约 H5 落地页网址前缀（`<前缀>/invite/<码>`）；可换域名，默认与 API 同站点根 */
+const DEFAULT_DEV_LANDING_BASE = API_BASE.replace(/\/api\/.*$/, '');
+const LANDING_BASE = process.env.TARO_H5_LANDING_BASE_URL ?? DEFAULT_DEV_LANDING_BASE;
 
 function verifyDevDist() {
   const commonJsPath = path.join(root, 'dist/common.js');
@@ -23,9 +26,7 @@ function verifyDevDist() {
 
   const content = fs.readFileSync(commonJsPath, 'utf8');
   if (!content.includes(API_BASE)) {
-    console.error(
-      `[build:weapp:dev] ERROR: 产物未包含 ${API_BASE}，请关闭微信开发者工具后重试`,
-    );
+    console.error(`[build:weapp:dev] ERROR: 产物未包含 ${API_BASE}，请关闭微信开发者工具后重试`);
     process.exit(1);
   }
 
@@ -41,6 +42,7 @@ function runNpm(script, extraArgs = []) {
         NODE_ENV: 'production',
         VITE_USE_MOCK: 'false',
         TARO_API_BASE_URL: API_BASE,
+        TARO_H5_LANDING_BASE_URL: LANDING_BASE,
         TARO_ENABLE_LOCAL_DEBUG: 'true',
       },
       stdio: 'inherit',
@@ -55,6 +57,7 @@ function runNpm(script, extraArgs = []) {
 
 async function main() {
   console.log(`[build:weapp:dev] TARO_API_BASE_URL=${API_BASE}`);
+  console.log(`[build:weapp:dev] TARO_H5_LANDING_BASE_URL=${LANDING_BASE}`);
   await runNpm('build:weapp:clean');
   verifyDevDist();
 }

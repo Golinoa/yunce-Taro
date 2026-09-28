@@ -55,7 +55,7 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
         });
       },
     });
-  }, [inviteLink]);
+  }, [inviteLink, permanent]);
 
   const handleShare = useCallback(() => {
     Taro.showShareMenu({ withShareTicket: true, showShareItems: ['shareAppMessage'] });
@@ -64,7 +64,8 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
 
   return (
     <View className={cn('flex flex-col items-center', className)}>
-      <View className="w-[400rpx] h-[400rpx] bg-white rounded-[24rpx] center shadow-card mb-4 overflow-hidden">
+      {/* 尺寸按用户反馈放大：原 400/360rpx 只占屏宽 ~48%，扫码时显得小且"缩在上半部分" */}
+      <View className="w-[520rpx] h-[520rpx] bg-white rounded-[24rpx] center shadow-card mb-4 overflow-hidden">
         {loading ? (
           <Loading text="生成小程序码…" />
         ) : error ? (
@@ -81,7 +82,7 @@ const InviteQrSection: React.FC<InviteQrSectionProps> = ({
           <Image
             src={qrImageSrc}
             mode="aspectFit"
-            className="w-[360rpx] h-[360rpx]"
+            className="w-[470rpx] h-[470rpx]"
             showMenuByLongpress
           />
         ) : (

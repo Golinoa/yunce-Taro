@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, Textarea, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,6 +15,7 @@ import {
   notificationService,
   scheduleService,
   studentService,
+  subscribeMessageService,
   teacherService,
   temporaryRescheduleService,
   calendarSyncService,
@@ -83,6 +84,8 @@ const BatchRescheduleConfirmPage: React.FC = () => {
     return getDefaultRescheduleTargetDate(sourceDate);
   });
   const [calendarVisible, setCalendarVisible] = useState(false);
+  /** 调课理由（选填）：填了随通知发给家长；不填也会发通知，用通用文案兜底 */
+  const [reason, setReason] = useState('');
 
   const sourceWeekday = useMemo(
     () => (dayjs(sourceDate).day() || 7) as Schedule['day_of_week'],
@@ -212,7 +215,12 @@ const BatchRescheduleConfirmPage: React.FC = () => {
   );
 
   const notifyStudentAndParents = useCallback(
-    async (studentId: string, title: string, content: string) => {
+    async (
+      studentId: string,
+      title: string,
+      content: string,
+      wechat: { className: string; changeTime: string; changeReason: string },
+    ) => {
       try {
         await notificationService.send({
           sender_id: currentUserId,
@@ -229,6 +237,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
         const parents = await studentService.getParents(studentId);
         for (const binding of parents) {
           if (!binding.parent_id) continue;
+          // 站内信：必发（不受微信订阅额度影响）
           await notificationService.send({
             sender_id: currentUserId,
             receiver_id: binding.parent_id,
@@ -236,12 +245,25 @@ const BatchRescheduleConfirmPage: React.FC = () => {
             content,
             related_id: studentId,
           });
+          // 微信服务通知：尽力而为。与"停课"共用同一出口；
+          // 额度不足时后端会落站内信兜底，绝不会因为微信发不出去而漏掉上面的站内信。
+          try {
+            await subscribeMessageService.sendScheduleChangeToReceiver({
+              receiverUserId: binding.parent_id,
+              bizKey: `reschedule:${sourceDate}:${targetDate.format('YYYY-MM-DD')}:${studentId}:${binding.parent_id}`,
+              className: wechat.className,
+              changeTime: wechat.changeTime,
+              changeReason: wechat.changeReason,
+            });
+          } catch (err) {
+            logError('BatchRescheduleConfirmPage notify wechat', err);
+          }
         }
       } catch (err) {
         logError('BatchRescheduleConfirmPage notify parents', err);
       }
     },
-    [currentUserId],
+    [currentUserId, sourceDate, targetDate],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -286,19 +308,29 @@ const BatchRescheduleConfirmPage: React.FC = () => {
 
     setSaving(true);
     try {
+      const trimmedReason = reason.trim();
       await temporaryRescheduleService.saveBatch({
         teacherId: currentUserId,
         sourceDate,
         targetDate: targetDateStr,
         schedules: affectedSchedules,
+        reason: trimmedReason,
       });
 
+      const fromText = dayjs(sourceDate).format('MM月DD日');
+      const toText = targetDate.format('MM月DD日');
       for (const classItem of selectedClasses) {
         const students = await classService.getStudents(classItem.id);
         const title = '调课通知';
-        const content = `您所在的「${classItem.name}」已从 ${dayjs(sourceDate).format('MM月DD日')} 调整到 ${targetDate.format('MM月DD日')}，上课时间 ${classItem.scheduleText} 不变，仅本次课程生效。`;
+        // 填了理由就带上；没填也用通用文案照发——调课通知是**必发**的，不因未填理由而静默
+        const baseContent = `您所在的「${classItem.name}」已从 ${fromText} 调整到 ${toText}，上课时间 ${classItem.scheduleText} 不变，仅本次课程生效。`;
+        const content = trimmedReason ? `${baseContent}调课原因：${trimmedReason}` : baseContent;
         for (const student of students) {
-          await notifyStudentAndParents(student.id, title, content);
+          await notifyStudentAndParents(student.id, title, content, {
+            className: classItem.name,
+            changeTime: `${fromText} → ${toText}`,
+            changeReason: trimmedReason || '机构调课',
+          });
         }
       }
 
@@ -325,6 +357,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
     profile?.currentContext?.campusId,
     profile?.currentContext?.role,
     notifyStudentAndParents,
+    reason,
     saving,
     schedules,
     selectedClassIds.length,
@@ -395,6 +428,22 @@ const BatchRescheduleConfirmPage: React.FC = () => {
                   </Text>
                 </View>
               </View>
+            </View>
+
+            {/* 调课理由（选填）：填了随通知发给家长；不填也会发通知（通用文案），不会静默 */}
+            <View className="mt-[16rpx] rounded-[28rpx] bg-white px-[24rpx] py-[22rpx] shadow-card">
+              <Text className="text-[30rpx] font-semibold text-foreground">调课理由</Text>
+              <Text className="mt-[6rpx] block text-[24rpx] text-muted-foreground">
+                选填，填写后会随通知一并发送给家长
+              </Text>
+              <Textarea
+                className="mt-[16rpx] box-border w-full rounded-[16rpx] bg-muted px-[20rpx] py-[16rpx] text-[26rpx] leading-[38rpx]"
+                value={reason}
+                maxlength={200}
+                placeholder="例如：老师临时有安排，本次课程顺延"
+                placeholderClass="text-muted-foreground"
+                onInput={(event) => setReason(event.detail.value)}
+              />
             </View>
 
             <View className="mt-[16rpx] flex flex-col gap-[16rpx]">
