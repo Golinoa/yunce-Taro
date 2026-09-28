@@ -69,6 +69,8 @@ interface CustomTabBarState {
   selectedColor: string;
   backgroundColor: string;
   list: TabBarItem[];
+  /** 全屏弹层（BottomSheet）打开期间为 true；为 true 时整个 tabBar 不渲染 */
+  hidden: boolean;
 }
 
 export default class CustomTabBar extends Component<object, CustomTabBarState> {
@@ -84,6 +86,7 @@ export default class CustomTabBar extends Component<object, CustomTabBarState> {
     selectedColor: '#3B6EF5',
     backgroundColor: '#ffffff',
     list: buildTabList(readStoredRole()),
+    hidden: false,
   };
 
   setSelectedByPath = (pagePath: string) => {
@@ -111,6 +114,23 @@ export default class CustomTabBar extends Component<object, CustomTabBarState> {
     });
   };
 
+  /**
+   * 让 tabBar 让位给全屏弹层（BottomSheet）。
+   *
+   * 为什么必须由组件自己退出、而不能靠弹层盖住：
+   * 本项目 tabBar 是自定义模式（`app.config.ts` 的 `tabBar.custom = true`），
+   * 页面内容无法可靠地覆盖它（2026-09-28 截图实测：批量处理弹层底部被 tabBar 压住），
+   * `Taro.hideTabBar()` 对它同样无效。让组件自身不渲染是最可靠的方式。
+   *
+   * 调用方：`src/utils/tab-bar.ts` 的 `acquireTabBarHidden()`（带引用计数），
+   * 实例通过 `Taro.getTabBar(page)` 取得。
+   */
+  setHidden = (hidden: boolean) => {
+    if (this.state.hidden !== hidden) {
+      this.setState({ hidden });
+    }
+  };
+
   handleSwitch = (item: TabBarItem) => {
     this.setState({ selectedPath: item.pagePath });
     void Taro.switchTab({ url: item.pagePath });
@@ -121,7 +141,13 @@ export default class CustomTabBar extends Component<object, CustomTabBarState> {
   }
 
   render() {
-    const { list, selectedPath, color, selectedColor, backgroundColor } = this.state;
+    const { list, selectedPath, color, selectedColor, backgroundColor, hidden } = this.state;
+
+    // 全屏弹层打开期间整个 tabBar 让位（不渲染）——
+    // 它的层级无法被弹层可靠覆盖，只能由自己退出。
+    if (hidden) {
+      return null;
+    }
 
     return (
       <View className="custom-tab-bar" style={{ backgroundColor }}>

@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { acquireTabBarHidden } from '@/utils/tab-bar';
 import { resolveSheetHeight } from './height';
 
 /**
@@ -116,6 +117,23 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     };
   }, [shouldRender, shouldAnimate]);
 
+  /**
+   * 全屏模态必须盖住底部 tabBar。
+   *
+   * 本项目 tabBar 是自定义模式（`app.config.ts` 的 `tabBar.custom = true`）：它的层级
+   * 无法被弹层可靠覆盖（2026-09-28 截图实测，弹层底部面板被压住一截），
+   * 且 `Taro.hideTabBar()` 对自定义 tabBar 不生效。
+   *
+   * 因此改为让 tabBar 组件自身让位（微信官方给出的自定义 tabBar 控制方式：
+   * `Taro.getTabBar(page)` 取实例后改其自身状态）。弹层挂载期间不渲染 tabBar，
+   * 卸载后恢复；多层弹层叠加由 `acquireTabBarHidden` 的引用计数兜住。
+   * 非 tabBar 页面取不到实例，静默跳过。
+   */
+  useEffect(() => {
+    if (!mounted) return;
+    return acquireTabBarHidden();
+  }, [mounted]);
+
   // 动画结束后卸载
   const handleTransitionEnd = () => {
     if (!animating) {
@@ -165,6 +183,9 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   );
 
   return (
+    // 层级保持 z-200：与 ConfirmDialog / Modal 等同级，上下关系由 DOM 顺序决定
+    // （同类弹层里后渲染的在上）。**不要**为了提高本组件层级而调大此值，
+    // 否则会盖住弹层自身弹出的确认框。页面内浮动元素（如排课 FAB）应下调自己的层级。
     <View className="fixed inset-0 z-200">
       {/* 遮罩层 — 始终保持可点击背景，bg-black/0 确保小程序中接收 tap 事件；
           仅遮罩层 catchMove，阻止背景页面滚动，同时不阻塞内容面板内的 PickerView/ScrollView */}

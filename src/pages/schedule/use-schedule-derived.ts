@@ -274,16 +274,16 @@ export function useScheduleDerived(params: UseScheduleDerivedParams) {
     [buildCardsForDate],
   );
 
+  // 只暴露页面真正消费的派生结果。
+  // filteredSchedules / classById / buildCardsForDate 是本 hook 的内部中间量
+  // （buildCardsForDate 已被 renderDateCards 包装），页面从不直接使用，故不返回。
   return {
     tabs,
     activeTab,
     filteredClasses,
-    filteredSchedules,
     pausedClasses,
-    classById,
     teacherById,
     scheduleById,
-    buildCardsForDate,
     getDateDotType,
     getOpenDateDotType,
     batchClassOptions,

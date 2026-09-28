@@ -1,7 +1,7 @@
 /**
  * 课表批量处理弹层（类型选择 + 班级多选 + 危险确认，从 schedule/index 抽出，Q2-1）
  */
-import { View, Text } from '@tarojs/components';
+import { View, Text, ScrollView } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
 import BottomSheet from '@/components/BottomSheet';
@@ -29,7 +29,15 @@ export interface ScheduleBatchSheetsProps {
   batchActionType: ScheduleBatchActionType;
   batchClassOptions: ScheduleBatchClassOption[];
   batchSelectedClassIds: string[];
-  batchSubmitting: boolean;
+  /**
+   * 批量提交进行中（= 页面 dangerActionSubmitting）。
+   *
+   * 原为独立的 batchSubmitting state，但只有声明、从无 setter，恒为 false，
+   * 导致批量删除执行期间「确定删除」按钮不变灰、可重复触发提交。
+   * 批量删除的真实提交走 use-schedule-danger-actions 的 batch-delete 分支，
+   * 其进度已由 dangerActionSubmitting 表达，这里直接复用，避免两个 state 表达同一件事。
+   */
+  submitting: boolean;
   onSelectAllBatchClasses: () => void;
   onToggleBatchClassSelection: (classId: string) => void;
   onConfirmBatchClassSelection: () => void;
@@ -50,7 +58,7 @@ const ScheduleBatchSheets: React.FC<ScheduleBatchSheetsProps> = ({
   batchActionType,
   batchClassOptions,
   batchSelectedClassIds,
-  batchSubmitting,
+  submitting,
   onSelectAllBatchClasses,
   onToggleBatchClassSelection,
   onConfirmBatchClassSelection,
@@ -126,72 +134,91 @@ const ScheduleBatchSheets: React.FC<ScheduleBatchSheetsProps> = ({
         </View>
       </BottomSheet>
 
+      {/*
+        选班弹层：列表可能很长，必须让底部「取消 / 确定删除」常驻可见。
+        采用项目既有模式（同 StudentMultiSelectSheet）：
+        - heightRatio 固定高度，使内部 flex-1 有确定高度可分配；
+        - fillHeight 让内容区成为 flex-col；
+        - scrollable={false} 禁用外层 ScrollView，由内部 ScrollView 只滚列表，
+          避免嵌套滚动导致内层点击失效、滚动卡顿；
+        - 安全区由底部按钮区自行承担（原先挂在面板上的 pb-safe-bar 会让
+          padding 计入固定高度、压缩列表可见区）。
+      */}
       <BottomSheet
         visible={batchClassSheetVisible}
         title={batchActionType === 'reschedule' ? '选择调课班级' : '选择删除班级'}
         onClose={onCloseBatchClassSheet}
-        className="pb-safe-bar"
+        heightRatio={2 / 3}
+        fillHeight
+        scrollable={false}
       >
-        <View className="px-[24rpx] py-[16rpx]">
-          <View className="flex items-center justify-between">
-            <Text className="text-[24rpx] text-muted-foreground">
-              已选 {batchSelectedClassIds.length} 个班级
-            </Text>
-            <Text className="text-[24rpx] text-primary" onClick={onSelectAllBatchClasses}>
-              {batchSelectedClassIds.length === batchClassOptions.length ? '取消全选' : '全选'}
-            </Text>
+        <View className="flex flex-col h-full">
+          <View className="shrink-0 px-[24rpx] py-[16rpx]">
+            <View className="flex items-center justify-between">
+              <Text className="text-[24rpx] text-muted-foreground">
+                已选 {batchSelectedClassIds.length} 个班级
+              </Text>
+              <Text className="text-[24rpx] text-primary" onClick={onSelectAllBatchClasses}>
+                {batchSelectedClassIds.length === batchClassOptions.length ? '取消全选' : '全选'}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <View className="px-[24rpx] pb-[24rpx] flex flex-col gap-[16rpx]">
-          {batchClassOptions.map((item) => {
-            const checked = batchSelectedClassIds.includes(item.id);
-            return (
-              <View
-                key={item.id}
-                className={cn(
-                  'rounded-[16rpx] border px-[24rpx] py-[22rpx] flex items-start gap-[18rpx]',
-                  checked ? 'border-primary bg-primary-10' : 'border-schedule-soft bg-card',
-                )}
-                onClick={() => onToggleBatchClassSelection(item.id)}
-              >
-                <CircleCheckbox checked={checked} size={42} />
-                <View className="min-w-0 flex-1">
-                  <View className="flex items-center gap-[12rpx]">
-                    <Text className="truncate text-[30rpx] font-semibold text-foreground">
-                      {item.name}
-                    </Text>
-                    <Text className="text-[22rpx] text-muted-foreground">
-                      {item.studentCount}人
-                    </Text>
+          <ScrollView scrollY className="flex-1 min-h-0">
+            <View className="px-[24rpx] pb-[24rpx] flex flex-col gap-[16rpx]">
+              {batchClassOptions.map((item) => {
+                const checked = batchSelectedClassIds.includes(item.id);
+                return (
+                  <View
+                    key={item.id}
+                    className={cn(
+                      'rounded-[16rpx] border px-[24rpx] py-[22rpx] flex items-start gap-[18rpx]',
+                      checked ? 'border-primary bg-primary-10' : 'border-schedule-soft bg-card',
+                    )}
+                    onClick={() => onToggleBatchClassSelection(item.id)}
+                  >
+                    <CircleCheckbox checked={checked} size={42} />
+                    <View className="min-w-0 flex-1">
+                      <View className="flex items-center gap-[12rpx]">
+                        <Text className="truncate text-[30rpx] font-semibold text-foreground">
+                          {item.name}
+                        </Text>
+                        <Text className="text-[22rpx] text-muted-foreground">
+                          {item.studentCount}人
+                        </Text>
+                      </View>
+                      <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
+                        {item.scheduleSummary}
+                      </Text>
+                    </View>
                   </View>
-                  <Text className="mt-[8rpx] block text-[24rpx] text-muted-foreground">
-                    {item.scheduleSummary}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+                );
+              })}
+            </View>
+          </ScrollView>
 
-        <View className="border-t border-schedule-soft px-[24rpx] pt-[20rpx] pb-[24rpx] flex gap-[16rpx] bg-card">
-          <View
-            className="flex-1 h-[84rpx] rounded-[14rpx] bg-muted flex items-center justify-center"
-            onClick={onCloseBatchClassSheet}
-          >
-            <Text className="text-[28rpx] font-medium text-foreground-secondary">取消</Text>
-          </View>
-          <View
-            className={cn(
-              'flex-1 h-[84rpx] rounded-[14rpx] flex items-center justify-center',
-              batchActionType === 'delete' ? 'bg-schedule-delete' : 'bg-schedule-adjust',
-              batchSubmitting ? 'opacity-60' : '',
-            )}
-            onClick={() => void onConfirmBatchClassSelection()}
-          >
-            <Text className="text-[28rpx] font-semibold text-primary-foreground">
-              {batchActionType === 'delete' ? '确定删除' : '下一步'}
-            </Text>
+          <View className="shrink-0 border-t border-schedule-soft px-[24rpx] pt-[20rpx] pb-[calc(48rpx+env(safe-area-inset-bottom))] flex gap-[16rpx] bg-card">
+            <View
+              className="flex-1 h-[84rpx] rounded-[14rpx] bg-muted flex items-center justify-center"
+              onClick={onCloseBatchClassSheet}
+            >
+              <Text className="text-[28rpx] font-medium text-foreground-secondary">取消</Text>
+            </View>
+            <View
+              className={cn(
+                'flex-1 h-[84rpx] rounded-[14rpx] flex items-center justify-center',
+                batchActionType === 'delete' ? 'bg-schedule-delete' : 'bg-schedule-adjust',
+                submitting ? 'opacity-60' : '',
+              )}
+              onClick={() => {
+                if (submitting) return;
+                void onConfirmBatchClassSelection();
+              }}
+            >
+              <Text className="text-[28rpx] font-semibold text-primary-foreground">
+                {batchActionType === 'delete' ? '确定删除' : '下一步'}
+              </Text>
+            </View>
           </View>
         </View>
       </BottomSheet>

@@ -24,6 +24,46 @@ import type { ScheduleTabItem } from './use-schedule-derived';
 
 const SCHEDULE_CARD_SWIPER_DURATION = 260;
 
+interface ScheduleDateSwiperProps {
+  dates: dayjs.Dayjs[];
+  current: number;
+  onChange: (e: { detail?: { current?: number; source?: string } }) => void;
+  onAnimationFinish: (e: { detail?: { current?: number; source?: string } }) => void;
+  children: (date: dayjs.Dayjs) => React.ReactNode;
+}
+
+/**
+ * 日期 Swiper 容器：班课 / 团课 / 场地三个视图共用同一套滑动配置。
+ *
+ * 原来三处各写一遍 Swiper（配置项逐字相同），改动画参数或加属性容易只改一处。
+ * 注意这里**不内置 ScrollView**：三个视图的内容组件自带滚动容器，
+ * 再套一层会产生双滚动条并吃掉垂直手势（与 CalendarSwiper 的差异点，故未直接复用它）。
+ */
+const ScheduleDateSwiper: React.FC<ScheduleDateSwiperProps> = ({
+  dates,
+  current,
+  onChange,
+  onAnimationFinish,
+  children,
+}) => (
+  <Swiper
+    className="bg-schedule-page"
+    style={{ flex: 1, minHeight: 0 }}
+    current={current}
+    duration={SCHEDULE_CARD_SWIPER_DURATION}
+    easingFunction="easeOutCubic"
+    skipHiddenItemLayout
+    onChange={onChange}
+    onAnimationFinish={onAnimationFinish}
+  >
+    {dates.map((date) => (
+      <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
+        {children(date)}
+      </SwiperItem>
+    ))}
+  </Swiper>
+);
+
 export interface ScheduleMainViewsProps {
   activeTab?: ScheduleTabItem;
   activeTabKey: string;
@@ -57,7 +97,8 @@ export interface ScheduleMainViewsProps {
   batchActionType: BatchActionType;
   batchClassOptions: ScheduleBatchClassOption[];
   batchSelectedClassIds: string[];
-  batchSubmitting: boolean;
+  /** 批量提交进行中，见 ScheduleBatchSheets 同名 prop 说明 */
+  submitting: boolean;
   dangerActionMeta: DangerActionMeta | null;
   dangerDialogVisible: boolean;
   dangerActionSubmitting: boolean;
@@ -144,7 +185,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     batchActionType,
     batchClassOptions,
     batchSelectedClassIds,
-    batchSubmitting,
+    submitting,
     dangerActionMeta,
     dangerDialogVisible,
     dangerActionSubmitting,
@@ -194,101 +235,89 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
   return (
     <>
       {activeTab?.mode === 'class' && activeTab?.type === 'category' && (
-        <Swiper
-          className="bg-schedule-page"
-          style={{ flex: 1, minHeight: 0 }}
+        <ScheduleDateSwiper
+          dates={scheduleDateWindow}
           current={swiperCurrent}
-          duration={SCHEDULE_CARD_SWIPER_DURATION}
-          easingFunction="easeOutCubic"
-          skipHiddenItemLayout
           onChange={onSwiperChange}
           onAnimationFinish={onSwiperFinish}
         >
-          {scheduleDateWindow.map((date) => {
+          {(date) => {
             const { cards, summary } = renderDateCards(date);
             return (
-              <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-                <ScheduleDaySwiperItem
-                  date={date}
-                  cards={cards}
-                  summary={summary}
-                  loading={loading}
-                  currentTime={currentTime}
-                  openCardId={openCardId}
-                  onOpenCardIdChange={onOpenCardIdChange}
-                  isParent={isParent}
-                  currentCampusId={currentCampusId}
-                  currentTeacherId={currentTeacherId}
-                  currentUserId={currentUserId}
-                  profileCampusId={profileCampusId}
-                  pausedClasses={pausedClasses}
-                  onPrepareShare={onPrepareShare}
-                  onRunCardButtonAction={onRunCardButtonAction}
-                  onOpenBookSheet={onOpenBookSheet}
-                  onPrimaryAction={onPrimaryAction}
-                  onRollCall={onRollCall}
-                  onSupplement={onSupplement}
-                  onEditSchedule={onEditSchedule}
-                  onClassReschedule={onClassReschedule}
-                  onCancelLesson={onCancelLesson}
-                  onRestoreLesson={onRestoreLesson}
-                  onSuspendLesson={onSuspendLesson}
-                  onScheduleRuleAction={onScheduleRuleAction}
-                  onResumeClass={onResumeClass}
-                />
-              </SwiperItem>
-            );
-          })}
-        </Swiper>
-      )}
-
-      {activeTab?.mode === 'group' && activeTab?.type === 'category' && (
-        <Swiper
-          className="bg-schedule-page"
-          style={{ flex: 1, minHeight: 0 }}
-          current={swiperCurrent}
-          duration={SCHEDULE_CARD_SWIPER_DURATION}
-          easingFunction="easeOutCubic"
-          skipHiddenItemLayout
-          onChange={onSwiperChange}
-          onAnimationFinish={onSwiperFinish}
-        >
-          {scheduleDateWindow.map((date) => (
-            <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-              <OpenClassScheduleList
+              <ScheduleDaySwiperItem
                 date={date}
-                filteredClasses={filteredClasses}
-                openClassSlots={openClassSlots}
-                loadingOpenSlotDates={loadingOpenSlotDates}
-                errorOpenSlotDates={errorOpenSlotDates}
+                cards={cards}
+                summary={summary}
+                loading={loading}
+                currentTime={currentTime}
                 openCardId={openCardId}
                 onOpenCardIdChange={onOpenCardIdChange}
-                teacherById={teacherById}
-                currentTime={currentTime}
                 isParent={isParent}
                 currentCampusId={currentCampusId}
                 currentTeacherId={currentTeacherId}
                 currentUserId={currentUserId}
-                profileId={profileId}
                 profileCampusId={profileCampusId}
-                classStudentAvatars={classStudentAvatars}
-                onLoadOpenClassSlots={onLoadOpenClassSlots}
-                onOpenClassSlotConfig={onOpenClassSlotConfig}
-                onProxyBooking={onProxyBooking}
-                onOpenSlotRollCall={onOpenSlotRollCall}
-                onEditOpenSlot={onEditOpenSlot}
-                onCancelOpenSlot={onCancelOpenSlot}
-                onRestoreOpenSlot={onRestoreOpenSlot}
-                onSuspendOpenSlot={onSuspendOpenSlot}
-                onResumeClass={onResumeClass}
-                onRunCardButtonAction={onRunCardButtonAction}
-                onParentBookOpenSlot={onParentBookOpenSlot}
-                onParentCancelOpenSlot={onParentCancelOpenSlot}
+                pausedClasses={pausedClasses}
                 onPrepareShare={onPrepareShare}
+                onRunCardButtonAction={onRunCardButtonAction}
+                onOpenBookSheet={onOpenBookSheet}
+                onPrimaryAction={onPrimaryAction}
+                onRollCall={onRollCall}
+                onSupplement={onSupplement}
+                onEditSchedule={onEditSchedule}
+                onClassReschedule={onClassReschedule}
+                onCancelLesson={onCancelLesson}
+                onRestoreLesson={onRestoreLesson}
+                onSuspendLesson={onSuspendLesson}
+                onScheduleRuleAction={onScheduleRuleAction}
+                onResumeClass={onResumeClass}
               />
-            </SwiperItem>
-          ))}
-        </Swiper>
+            );
+          }}
+        </ScheduleDateSwiper>
+      )}
+
+      {activeTab?.mode === 'group' && activeTab?.type === 'category' && (
+        <ScheduleDateSwiper
+          dates={scheduleDateWindow}
+          current={swiperCurrent}
+          onChange={onSwiperChange}
+          onAnimationFinish={onSwiperFinish}
+        >
+          {(date) => (
+            <OpenClassScheduleList
+              date={date}
+              filteredClasses={filteredClasses}
+              openClassSlots={openClassSlots}
+              loadingOpenSlotDates={loadingOpenSlotDates}
+              errorOpenSlotDates={errorOpenSlotDates}
+              openCardId={openCardId}
+              onOpenCardIdChange={onOpenCardIdChange}
+              teacherById={teacherById}
+              currentTime={currentTime}
+              isParent={isParent}
+              currentCampusId={currentCampusId}
+              currentTeacherId={currentTeacherId}
+              currentUserId={currentUserId}
+              profileId={profileId}
+              profileCampusId={profileCampusId}
+              classStudentAvatars={classStudentAvatars}
+              onLoadOpenClassSlots={onLoadOpenClassSlots}
+              onOpenClassSlotConfig={onOpenClassSlotConfig}
+              onProxyBooking={onProxyBooking}
+              onOpenSlotRollCall={onOpenSlotRollCall}
+              onEditOpenSlot={onEditOpenSlot}
+              onCancelOpenSlot={onCancelOpenSlot}
+              onRestoreOpenSlot={onRestoreOpenSlot}
+              onSuspendOpenSlot={onSuspendOpenSlot}
+              onResumeClass={onResumeClass}
+              onRunCardButtonAction={onRunCardButtonAction}
+              onParentBookOpenSlot={onParentBookOpenSlot}
+              onParentCancelOpenSlot={onParentCancelOpenSlot}
+              onPrepareShare={onPrepareShare}
+            />
+          )}
+        </ScheduleDateSwiper>
       )}
 
       {(activeTab?.mode === 'class' || activeTab?.mode === 'group') &&
@@ -302,7 +331,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
             batchActionType={batchActionType}
             batchClassOptions={batchClassOptions}
             batchSelectedClassIds={batchSelectedClassIds}
-            batchSubmitting={batchSubmitting}
+            submitting={submitting}
             onSelectAllBatchClasses={onSelectAllBatchClasses}
             onToggleBatchClassSelection={onToggleBatchClassSelection}
             onConfirmBatchClassSelection={onConfirmBatchClassSelection}
@@ -330,29 +359,18 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
       )}
 
       {activeTab?.type === 'venue' && (
-        <Swiper
-          className="bg-schedule-page"
-          style={{ flex: 1, minHeight: 0 }}
+        <ScheduleDateSwiper
+          dates={scheduleDateWindow}
           current={swiperCurrent}
-          duration={SCHEDULE_CARD_SWIPER_DURATION}
-          easingFunction="easeOutCubic"
-          skipHiddenItemLayout
           onChange={onSwiperChange}
           onAnimationFinish={onSwiperFinish}
         >
-          {scheduleDateWindow.map((date) => (
-            <SwiperItem key={date.format('YYYY-MM-DD')} itemId={date.format('YYYY-MM-DD')}>
-              <ScrollView
-                className="h-full bg-schedule-page"
-                scrollY
-                enhanced
-                showScrollbar={false}
-              >
-                <ScheduleVenueTab loadingVenues={loadingVenues} venues={venues} />
-              </ScrollView>
-            </SwiperItem>
-          ))}
-        </Swiper>
+          {() => (
+            <ScrollView className="h-full bg-schedule-page" scrollY enhanced showScrollbar={false}>
+              <ScheduleVenueTab loadingVenues={loadingVenues} venues={venues} />
+            </ScrollView>
+          )}
+        </ScheduleDateSwiper>
       )}
 
       {!isParent &&

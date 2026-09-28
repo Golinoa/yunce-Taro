@@ -387,7 +387,7 @@ const DraggableFab: React.FC<DraggableFabProps> = ({
   if (isWeapp) {
     return (
       <MovableArea
-        className={cn('pointer-events-none absolute left-0 top-0 z-200 overflow-hidden', className)}
+        className={cn('pointer-events-none absolute left-0 top-0 z-100 overflow-hidden', className)}
         style={{
           width: `${bounds.width}px`,
           height: `${bounds.height}px`,
@@ -418,7 +418,7 @@ const DraggableFab: React.FC<DraggableFabProps> = ({
 
   return (
     <View
-      className={cn('absolute z-200 will-change-transform', className)}
+      className={cn('absolute z-100 will-change-transform', className)}
       style={{
         left: 0,
         top: 0,

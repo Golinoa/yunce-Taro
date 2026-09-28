@@ -139,7 +139,6 @@ const SchedulePage: React.FC = () => {
   const [batchActionSheetVisible, setBatchActionSheetVisible] = useState(false);
   const [batchClassSheetVisible, setBatchClassSheetVisible] = useState(false);
   const [batchSelectedClassIds, setBatchSelectedClassIds] = useState<string[]>([]);
-  const [batchSubmitting] = useState(false);
   const [dangerActionSubmitting, setDangerActionSubmitting] = useState(false);
   const [dangerActionState, setDangerActionState] = useState<ScheduleDangerActionState>({
     visible: false,
@@ -592,7 +591,7 @@ const SchedulePage: React.FC = () => {
           batchActionType={batchActionType}
           batchClassOptions={batchClassOptions}
           batchSelectedClassIds={batchSelectedClassIds}
-          batchSubmitting={batchSubmitting}
+          submitting={dangerActionSubmitting}
           dangerActionMeta={dangerActionMeta}
           dangerDialogVisible={dangerActionState.visible}
           dangerActionSubmitting={dangerActionSubmitting}

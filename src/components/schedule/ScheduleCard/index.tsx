@@ -61,8 +61,6 @@ export interface ScheduleCardProps {
   menu?: React.ReactNode;
   /** 额外类名 */
   className?: string;
-  /** @deprecated 使用 metaAction / footerAction */
-  children?: React.ReactNode;
 }
 
 const MAX_VISIBLE_AVATARS = 5;
@@ -77,7 +75,6 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   showShare,
   menu,
   className,
-  children,
 }) => {
   const isActive = item.status === 'active';
   const students = item.students || [];
@@ -212,8 +209,6 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </View>
           {footerAction ? <View className="shrink-0">{footerAction}</View> : null}
         </View>
-      ) : children ? (
-        <View className="mt-[16rpx] border-t border-border/70 pt-[16rpx]">{children}</View>
       ) : null}
     </View>
   );

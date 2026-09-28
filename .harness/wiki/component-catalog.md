@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-28
 status: active
 ---
 
@@ -49,7 +49,7 @@ status: active
 
 `booking / business / campus / class / course / data-center / home / lead / lesson / member-card / my-todos / package / profile / proxy-booking / reschedule / schedule / statistics / student / subscribe / teacher`
 
-常见业务组件：`RoleCard`、`RoleSwitchSheet`、`RegisterStepper`、`MockIdentitySwitcher`（仅开发）、`ContactList`、`StudentMultiSelectSheet`。
+常见业务组件：`RoleCard`、`RegisterStepper`、`MockIdentitySwitcher`（仅开发）、`ContactList`、`StudentMultiSelectSheet`。
 
 ## 业务组件清单（模块明细）
 
@@ -65,9 +65,9 @@ status: active
 | teacher | `SalaryModelSheet` | 工资模型新建 / 编辑弹窗 |
 | teacher | `PaymentSettingsSheet` | 发放设置弹窗 |
 | teacher | `SalaryItem` / `FilterBar` / `MonthPicker` | 薪资条目 / 筛选栏 / 月份选择器 |
-| home | `ChildSelector` / `HourProgress` / `RecentRecordItem` / `ScheduleTimeline` / `StatCard` / `StudentQuickList` | 首页业务组件 |
+| home | `ChildSelector` / `HourProgress` / `StatCard` / `StudentQuickList` | 首页业务组件 |
 | lesson | `ClassSelector` / `StudentCard` / `StudentCheckinList` | 班级 / 学员签到相关 |
-| statistics | `BarChart` / `ChartContainer` / `FilterBar` / `KpiCard` / `RankList` / `TimeSelector` | 图表与统计 |
+| statistics | `AlertSheet` | 预警弹窗（预警分类列表 + 跳详情） |
 
 > 注意：teacher 模块 8 个 Sheet 均遵循 `rules/30-sheets-and-forms.md` 模板。统计图表相关走 ECharts 小程序兼容方案（动态值可用内联 style，见 `rules/10-styling.md`）。
 

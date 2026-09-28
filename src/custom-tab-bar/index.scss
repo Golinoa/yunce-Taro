@@ -3,7 +3,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9999;
+  /* 层级：必须**低于**全屏弹层（BottomSheet / ConfirmDialog 等为 z-200），
+     否则 tabBar 会压在弹层之上，挡住弹层底部的内容与操作按钮；
+     同时要**高于**页面内容与页面浮动按钮（FAB 为 z-100）。
+     历史值为 9999（高于一切），导致批量处理弹层被遮挡。 */
+  z-index: 150;
   display: flex;
   flex-direction: row;
   align-items: center;
