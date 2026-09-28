@@ -1,5 +1,5 @@
 import { View, ScrollView, PageMeta } from '@tarojs/components';
-import Taro, { useDidShow } from '@tarojs/taro';
+import Taro, { useDidHide, useDidShow } from '@tarojs/taro';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -83,6 +83,13 @@ const HOME_QUERY_ROOT = ['home'] as const;
 const HOME_QUERY_STALE_TIME_MS = 30_000;
 
 /**
+ * 停留首页期间的自动刷新间隔：60s。
+ * 与既有「跨设备写入只能靠 TTL（履约类 60s）」口径一致；不设更短是为了避免
+ * 首页聚合（教师/家长/课表/未读/消课一次返回）被高频重拉。
+ */
+const HOME_AUTO_REFRESH_MS = 60_000;
+
+/**
  * 校区列表已统一走 useCampusList harness（唯一数据源 useCampusStore：
  * TTL 15min + 冷启动快照 + 唯一自愈 ensureLoaded）。
  * 曾用 React Query 包过一层（双时钟）导致卡片永久空白，已移除——
@@ -154,6 +161,10 @@ const Home: React.FC = () => {
   const [parentFallbackStudentId, setParentFallbackStudentId] = useState('');
   const [quickEntries, setQuickEntries] = useState<QuickEntry[]>([]);
   const [activeTab, setActiveTab] = useState<HomeTab>('schedule');
+  /** 下拉刷新进行中（驱动 ScrollView refresher 的收起） */
+  const [homeRefreshing, setHomeRefreshing] = useState(false);
+  /** 页面是否处于前台：切后台时停掉自动刷新轮询，避免后台空转请求 */
+  const [homePageActive, setHomePageActive] = useState(true);
 
   // ---- 待办事项 ----
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
@@ -418,6 +429,23 @@ const Home: React.FC = () => {
   }, [queryClient]);
 
   /**
+   * 下拉刷新：强制回源重拉首页全部查询（不等 30s 保鲜期）。
+   *
+   * 背景（2026-09-29 用户反馈）：排课后首页今日课表不实时更新。写后信号只在
+   * `useDidShow` 里消费，停留在首页时排的课、或其它设备写入的课都不会触发，
+   * 需要一个手动入口让用户「拉一下就最新」。
+   */
+  const handlePullDownRefresh = useCallback(async () => {
+    setHomeRefreshing(true);
+    try {
+      await queryClient.refetchQueries({ queryKey: HOME_QUERY_ROOT, type: 'active' });
+    } finally {
+      // 小程序 refresher 靠该标记收起；无论成败都必须复位，否则下拉圈一直转
+      setHomeRefreshing(false);
+    }
+  }, [queryClient]);
+
+  /**
    * 切换端（教师端 ⇄ 家长端），或跨机构切换门店。
    *
    * 端不同则 JWT 里的角色不同，必须重签会话，因此统一走 POST /auth/switch-context。
@@ -671,6 +699,8 @@ const Home: React.FC = () => {
   }, [loadCategories]);
 
   useDidShow(() => {
+    // 回到前台：恢复自动刷新轮询，并由下方逻辑立即补一次刷新（信号/保鲜期）
+    setHomePageActive(true);
     syncTabBarByProfile(profile);
     const collaboratorResult = consumeTodoCollaboratorResult();
     if (collaboratorResult !== null) {
@@ -704,6 +734,31 @@ const Home: React.FC = () => {
       fetchStatus: 'idle',
     });
   });
+
+  useDidHide(() => {
+    // 切后台停掉自动轮询：后台页面无需持续请求；回到前台由 useDidShow 立即补一次
+    setHomePageActive(false);
+  });
+
+  /**
+   * 自动更新：停留首页期间每 60s 回源一次。
+   *
+   * 背景（2026-09-29 用户反馈「排课了之后今日课表没有实时刷新」）：写后信号只在
+   * `useDidShow` 消费，覆盖不到两类场景——① 就停在首页时其它设备/其它端写入；
+   * ② 排课后没有回到首页（信号一直没被消费）。故补一个前台轮询兜底。
+   * 约束：仅前台执行、身份就绪才启动、`fetchStatus: 'idle'` 不打断在飞请求。
+   */
+  useEffect(() => {
+    if (!homePageActive || !homeIdentityReady) return;
+    const timer = setInterval(() => {
+      void queryClient.refetchQueries({
+        queryKey: HOME_QUERY_ROOT,
+        type: 'active',
+        fetchStatus: 'idle',
+      });
+    }, HOME_AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [homePageActive, homeIdentityReady, queryClient]);
 
   const todayTodoItems = useMemo(() => filterTodayTodoItems(todoItems), [todoItems]);
   const otherTodoCount = useMemo(
@@ -827,6 +882,13 @@ const Home: React.FC = () => {
           showScrollbar={false}
           scrollWithAnimation={false}
           className="h-full overflow-x-hidden no-scrollbar"
+          // 下拉刷新：页面级 enablePullDownRefresh 不可用（本页 disableScroll + 自定义导航，
+          // 只走内部 ScrollView），因此用 ScrollView 自带 refresher。
+          // 弹层/FAB 展开期间禁用，避免与拖拽手势打架。
+          refresherEnabled={!fabMenuExpanded && !quadrantDragging}
+          refresherTriggered={homeRefreshing}
+          onRefresherRefresh={handlePullDownRefresh}
+          refresherBackground="transparent"
           // idle 时禁止绑定 scroll-into-view（空串也会导致每次 setState 回顶）
           {...scrollIntoViewProps(homeScrollIntoView)}
           // 弹层/FAB 期间钉住；idle 完全不传 scrollTop
