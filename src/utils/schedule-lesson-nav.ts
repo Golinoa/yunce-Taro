@@ -13,6 +13,15 @@ export type LessonFormNavFields = {
   hasTrialStudent?: boolean;
   status: ScheduleCardStatus;
   bookingTag?: string;
+  /**
+   * 这节课的排课时间（`Schedule.startTime/endTime`）。
+   *
+   * ⚠️ 必须与班级时间（`Class.startTime/endTime`）区分开：一个班级可以有多节课，
+   * 各节时间不同（实测：初级书法班 Class=09:00-10:30，但排课有 09:00 和 14:00 两节）。
+   * 详情页此前优先取班级时间，导致改了排课规则后详情页时间不变——修正为带本节时间过去。
+   */
+  startTime?: string;
+  endTime?: string;
 };
 
 export type LessonFormNavParams = {
@@ -93,6 +102,17 @@ export function resolveSchedulePrimaryActionKind(
   return 'checkin';
 }
 
+/**
+ * 这节课的时间区间（`HH:mm-HH:mm`）。
+ * 缺任一端就不传——详情页会回落到班级时间，比传半截时间更安全。
+ */
+function buildLessonTimeRange(item: LessonFormNavFields): string | undefined {
+  const start = (item.startTime || '').trim();
+  const end = (item.endTime || '').trim();
+  if (!start || !end) return undefined;
+  return `${start}-${end}`;
+}
+
 export function buildSupplementLessonFormPath(
   item: LessonFormNavFields,
   actionDate: dayjs.Dayjs,
@@ -101,6 +121,7 @@ export function buildSupplementLessonFormPath(
     scheduleId: item.id,
     classId: item.classId || '',
     lessonDate: actionDate.format('YYYY-MM-DD'),
+    lessonTime: buildLessonTimeRange(item),
     hasTrialStudent: item.hasTrialStudent,
     action: item.status === 'done' ? 'supplement' : undefined,
   });
@@ -114,6 +135,7 @@ export function buildViewOnlyLessonFormPath(
     scheduleId: item.id,
     classId: item.classId || '',
     lessonDate: actionDate.format('YYYY-MM-DD'),
+    lessonTime: buildLessonTimeRange(item),
     hasTrialStudent: item.hasTrialStudent,
     viewOnly: true,
   });
@@ -127,6 +149,7 @@ export function buildCheckinLessonFormPath(
     scheduleId: item.id,
     classId: item.classId || '',
     lessonDate: actionDate.format('YYYY-MM-DD'),
+    lessonTime: buildLessonTimeRange(item),
     hasTrialStudent: item.hasTrialStudent,
   });
 }

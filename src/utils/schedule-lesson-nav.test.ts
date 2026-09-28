@@ -109,6 +109,29 @@ describe('schedule-lesson-nav (Q2-1)', () => {
     expect(buildBookingPagePath('2026-09-02')).toContain('/booking/index?date=');
   });
 
+  it('带上「本节课」的排课时间（改排课规则后详情页时间跟着变）', () => {
+    const item = {
+      id: 's1',
+      classId: 'c1',
+      status: 'upcoming' as const,
+      startTime: '14:00',
+      endTime: '15:00',
+    };
+    // 关键回归点：详情页此前优先用班级时间（班级时间是默认值，一个班有多节课且时间不同），
+    // 导致改排课规则后详情页时间不变。必须把本节排课时间带过去。
+    expect(buildCheckinLessonFormPath(item, NOW)).toContain('lessonTime=14%3A00-15%3A00');
+    expect(buildSupplementLessonFormPath(item, NOW)).toContain('lessonTime=14%3A00-15%3A00');
+    expect(buildViewOnlyLessonFormPath(item, NOW)).toContain('lessonTime=14%3A00-15%3A00');
+  });
+
+  it('排课时间缺一端时不拼 lessonTime（交详情页按班级时间兜底）', () => {
+    const item = { id: 's1', classId: 'c1', status: 'upcoming' as const, startTime: '14:00' };
+    expect(buildCheckinLessonFormPath(item, NOW)).not.toContain('lessonTime=');
+    expect(buildCheckinLessonFormPath({ ...item, startTime: '' }, NOW)).not.toContain(
+      'lessonTime=',
+    );
+  });
+
   it('批量调课入口：带源日期与预选班级（点名页与卡片共用）', () => {
     const url = buildBatchRescheduleSelectPath('2026-09-28', 'cls-1');
     expect(url).toContain('/package-course/pages/batch-reschedule-select/index');

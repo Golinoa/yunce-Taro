@@ -124,7 +124,7 @@ function navigateToSchedule(item: Schedule): void {
       url:
         `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(item.class_id || '')}` +
         `&lessonDate=${encodeURIComponent(lessonDate)}` +
-        `&lessonTime=${encodeURIComponent(item.start_time)}` +
+        `&lessonTime=${encodeURIComponent(`${item.start_time}-${item.end_time}`)}` +
         `&hasTrialStudent=1`,
     });
     return;

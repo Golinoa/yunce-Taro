@@ -74,15 +74,25 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
   const isClassDirectEntry = Boolean(classIdParam);
   const shouldShowModeTabs = !isClassDirectEntry;
 
-  /** 头部大字号展示的"本节课时间"：优先用班级固定上课时间（最权威，来自排课规则），
-   *  没有班级（课时/手动消课）时才回落到进入页携带的时间参数 lessonTime。
-   *  注意：绝不再回落到实时时钟（formatTime(new Date())）——详情页打开的可能是
-   *  历史课或未来课，显示"现在几点"会让老师误以为在显示当前正在上的课，是错的。 */
+  /**
+   * 头部大字号展示的"本节课时间"。
+   *
+   * 优先级：**本节课的排课时间（URL 的 lessonTime） > 班级时间 > 空**。
+   *
+   * ⚠️ 2026-09-29 修正：此前写成"班级时间优先"，注释还写着"最权威，来自排课规则"——
+   * 这是错的。班级时间（`Class.start_time/end_time`）是**班级默认值**，一个班级可以有多
+   * 节课且时间不同（实测：初级书法班 Class=09:00-10:30，但排课有 09:00 与 14:00 两节），
+   * 所以改排课规则后班级时间不变，详情页就一直显示旧时间。真正权威的是**这一节课**
+   * 的排课时间（`Schedule.start_time/end_time`，由课表页跳转时带上）。
+   *
+   * 另：绝不再回落到实时时钟（formatTime(new Date())）——详情页打开的可能是历史课或
+   * 未来课，显示"现在几点"会让老师误以为在显示当前正在上的课。
+   */
   const classScheduledTime =
     selectedClass?.start_time && selectedClass?.end_time
       ? `${selectedClass.start_time}-${selectedClass.end_time}`
       : null;
-  const displayLessonTime = classScheduledTime || lessonTime || '';
+  const displayLessonTime = lessonTime || classScheduledTime || '';
 
   /** 30 天操作窗口：可补录 / 修改；超时或 viewOnly 仅查看 */
   const canModifyLesson = useMemo(() => {
