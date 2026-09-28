@@ -69,6 +69,10 @@ export interface ScheduleMainViewsProps {
   activeTabKey: string;
   tabs: ScheduleTabItem[];
   isParent: boolean;
+  /** 上课提醒是否已开启（卡片铃铛状态；额度按用户共享，不是按每节课） */
+  reminderEnabled?: boolean;
+  /** 点击铃铛：页面在点击回调内同步调起微信授权面板 */
+  onReminderClick?: () => void;
   selectedDate: dayjs.Dayjs;
   /** 私教视图刷新令牌：下拉刷新时递增，透传给 TrialBookingView 触发它自己重拉 */
   privateReloadToken: number;
@@ -150,6 +154,8 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     activeTabKey,
     tabs,
     isParent,
+    reminderEnabled,
+    onReminderClick,
     selectedDate,
     privateReloadToken,
     currentTime,
@@ -239,6 +245,8 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
                 loading={loading}
                 currentTime={currentTime}
                 isParent={isParent}
+                reminderEnabled={reminderEnabled}
+                onReminderClick={onReminderClick}
                 currentCampusId={currentCampusId}
                 currentTeacherId={currentTeacherId}
                 currentUserId={currentUserId}

@@ -70,6 +70,20 @@ function writeStorage(next: GuideStorage): void {
   }
 }
 
+/**
+ * 上课提醒是否已开启（课表卡片铃铛图标用）。
+ *
+ * 以后端额度为准：还有可发次数即视为"已开启"。这类提醒是一次性订阅，
+ * 同意一次攒一次额度，额度用完就收不到，所以额度就是最真实的开关状态。
+ */
+export function isReminderEnabled(
+  quota?: { remain: number; needsReactivate?: boolean } | null,
+): boolean {
+  if (!quota) return false;
+  if (quota.needsReactivate === true) return false;
+  return quota.remain > 0;
+}
+
 /** 读取微信侧的订阅消息状态（静默，不打扰用户） */
 export async function readSubscribePermission(
   tmplIds: string[],

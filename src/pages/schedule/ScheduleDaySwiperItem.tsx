@@ -27,6 +27,10 @@ export interface ScheduleDaySwiperItemProps {
   loading: boolean;
   currentTime: dayjs.Dayjs;
   isParent: boolean;
+  /** 上课提醒是否已开启（卡片铃铛状态） */
+  reminderEnabled?: boolean;
+  /** 点击铃铛：同步调起微信授权面板 */
+  onReminderClick?: () => void;
   currentCampusId: string;
   currentTeacherId: string;
   currentUserId: string;
@@ -48,6 +52,8 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
   loading,
   currentTime,
   isParent,
+  reminderEnabled,
+  onReminderClick,
   currentCampusId,
   currentTeacherId,
   currentUserId,
@@ -100,6 +106,8 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
                 const cardBody = (
                   <ScheduleCard
                     item={item}
+                    reminderEnabled={reminderEnabled}
+                    onReminderClick={onReminderClick}
                     showShare={!isParent && item.status !== 'cancelled'}
                     onSharePrepare={
                       isParent

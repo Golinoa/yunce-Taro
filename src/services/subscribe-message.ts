@@ -26,6 +26,7 @@ import type {
   SubscribeTemplateGroup,
 } from '@/types/subscribe-message';
 import { isSubscribeContextReady } from '@/utils/auth-onboarding';
+import { isDevApiEnv } from '@/utils/build-env';
 import { copyParentInviteLink } from '@/utils/invite-parent-link';
 import { logError } from '@/utils/logger';
 import {
@@ -204,14 +205,20 @@ export const subscribeMessageService = {
     if (!tmplId) return { accepted: false };
 
     let accepted = false;
-    try {
-      const res = await Taro.requestSubscribeMessage({
-        tmplIds: [tmplId],
-      } as Taro.requestSubscribeMessage.Option);
-      accepted = res?.[tmplId] === 'accept';
-    } catch (error) {
-      logError('subscribe.requestReminderAuthNow', error);
-      return { accepted: false };
+    // Dev-only：mock 模板 id 跳过微信 API（与 requestSubscribeMessageAuth 同一口径），
+    // 否则开发者工具里点击铃铛会真的去调 requestSubscribeMessage 而报错。
+    if (isDevApiEnv() && tmplId.startsWith('mock-')) {
+      accepted = true;
+    } else {
+      try {
+        const res = await Taro.requestSubscribeMessage({
+          tmplIds: [tmplId],
+        } as Taro.requestSubscribeMessage.Option);
+        accepted = res?.[tmplId] === 'accept';
+      } catch (error) {
+        logError('subscribe.requestReminderAuthNow', error);
+        return { accepted: false };
+      }
     }
 
     if (!accepted) return { accepted: false };

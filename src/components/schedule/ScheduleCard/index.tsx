@@ -59,6 +59,18 @@ export interface ScheduleCardProps {
   showShare?: boolean;
   /** 右上角更多菜单（优先于分享按钮） */
   menu?: React.ReactNode;
+  /**
+   * 上课提醒是否已开启（铃铛图标状态）。
+   * ⚠️ 微信的一次性订阅额度是**按用户**算的，不是按每节课算的，
+   * 所以同一屏所有卡片的铃铛状态相同——它表示"你开没开上课提醒"。
+   */
+  reminderEnabled?: boolean;
+  /**
+   * 点击铃铛：由页面在**点击回调内同步**调起微信授权面板
+   * （微信限制 requestSubscribeMessage 只能在点击行为中调用）。
+   * 不传则不显示铃铛。
+   */
+  onReminderClick?: () => void;
   /** 额外类名 */
   className?: string;
 }
@@ -74,6 +86,8 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   onSharePrepare,
   showShare,
   menu,
+  reminderEnabled = false,
+  onReminderClick,
   className,
 }) => {
   const isActive = item.status === 'active';
@@ -173,6 +187,24 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
             </View>
           ) : null}
         </View>
+        {/* 上课提醒铃铛：已开启=实心铃铛（主色），未开启=划掉的铃铛（灰）。
+            只有图标没有文字，靠图标形态区分，点击直接调起微信授权。 */}
+        {onReminderClick ? (
+          <View
+            className="mr-[8rpx] flex shrink-0 items-center px-[6rpx] py-[6rpx]"
+            onClick={(event) => {
+              // 必须阻止冒泡：否则会同时触发卡片跳转详情页
+              event.stopPropagation();
+              onReminderClick();
+            }}
+          >
+            <Icon
+              name={reminderEnabled ? 'mdi-bell' : 'mdi-bell-off'}
+              size="sm"
+              color={reminderEnabled ? 'primary' : 'mutedForeground'}
+            />
+          </View>
+        ) : null}
         {metaAction ? <View className="shrink-0">{metaAction}</View> : null}
       </View>
 

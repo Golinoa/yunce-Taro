@@ -13,6 +13,7 @@ import {
   decideReminderGuide,
   hasDialogShownToday,
   isBannerCooling,
+  isReminderEnabled,
   markBannerDismissed,
   markDialogShown,
   readSubscribePermission,
@@ -144,6 +145,25 @@ describe('readSubscribePermission', () => {
     expect(snap.ok).toBe(false);
     expect(snap.mainSwitch).toBe(true);
     expect(snap.statusByTmplId[TMPL]).toBe('unknown');
+  });
+});
+
+describe('isReminderEnabled（卡片铃铛状态）', () => {
+  it('还有额度 → 已开启', () => {
+    expect(isReminderEnabled({ remain: 2 })).toBe(true);
+  });
+
+  it('额度为 0 → 未开启（收不到提醒）', () => {
+    expect(isReminderEnabled({ remain: 0 })).toBe(false);
+  });
+
+  it('后端标记 needsReactivate → 即使 remain>0 也算未开启', () => {
+    expect(isReminderEnabled({ remain: 1, needsReactivate: true })).toBe(false);
+  });
+
+  it('拿不到额度 → 未开启', () => {
+    expect(isReminderEnabled(undefined)).toBe(false);
+    expect(isReminderEnabled(null)).toBe(false);
   });
 });
 

@@ -40,6 +40,7 @@ import {
 import { type ScheduleBatchActionType as BatchActionType } from './ScheduleBatchSheets';
 import ScheduleMainViews from './ScheduleMainViews';
 import SchedulePageChrome from './SchedulePageChrome';
+import { useClassReminder } from './use-class-reminder';
 import { useScheduleCardActions } from './use-schedule-card-actions';
 import {
   useScheduleDangerActions,
@@ -317,6 +318,16 @@ const SchedulePage: React.FC = () => {
     setTemporaryReschedules,
   });
 
+  /**
+   * 卡片铃铛：上课提醒开关状态 + 点击授权。
+   * 家长端不显示（那不是"自己的课"，家长不需要上课提醒）。
+   */
+  const classReminder = useClassReminder({
+    role: currentRole,
+    campusId: currentCampusId || undefined,
+    disabled: isParent,
+  });
+
   const handleMainTabChange = useCallback(
     (tabKey: string, tabIndex: number) => {
       if (tabKey === activeTabKey) return;
@@ -574,6 +585,8 @@ const SchedulePage: React.FC = () => {
           activeTabKey={activeTabKey}
           tabs={tabs}
           isParent={isParent}
+          reminderEnabled={classReminder.enabled}
+          onReminderClick={classReminder.onReminderClick}
           selectedDate={selectedDate}
           privateReloadToken={privateReloadToken}
           currentTime={currentTime}
