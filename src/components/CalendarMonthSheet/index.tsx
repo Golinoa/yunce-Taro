@@ -18,6 +18,8 @@ interface CalendarMonthSheetProps {
   onClose: () => void;
   onSelect: (date: dayjs.Dayjs) => void;
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
+  /** 该日是否放假（透传给日历，日期右上角标「休」） */
+  isHoliday?: (date: dayjs.Dayjs) => boolean;
   disablePastDates?: boolean;
   /** 多选模式（自由排课选日期） */
   multiSelect?: boolean;
@@ -32,6 +34,7 @@ const CalendarMonthSheet: React.FC<CalendarMonthSheetProps> = ({
   onClose,
   onSelect,
   getDateDotType,
+  isHoliday,
   disablePastDates = false,
   multiSelect = false,
   selectedDates = [],
@@ -103,6 +106,7 @@ const CalendarMonthSheet: React.FC<CalendarMonthSheetProps> = ({
           selectedDate={draftDate}
           onChange={setDraftDate}
           getDateDotType={getDateDotType}
+          isHoliday={isHoliday}
           isDateDisabled={isDateDisabled}
           monthOnly
           navigateMonthWithoutSelect

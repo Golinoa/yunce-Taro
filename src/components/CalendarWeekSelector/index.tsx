@@ -13,6 +13,11 @@ export interface CalendarWeekSelectorProps {
   onChange: (date: dayjs.Dayjs) => void;
   /** 日期下方红点/灰点状态 */
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
+  /**
+   * 该日是否放假：是则在**日期数字右上角**标一个主题色「休」字（比数字小 2 档字号）。
+   * 数据来自 `/holidays/calendar`（所有角色可读，家长端也能看到）。
+   */
+  isHoliday?: (date: dayjs.Dayjs) => boolean;
   /** 无数据日期禁用（灰色不可点） */
   isDateDisabled?: (date: dayjs.Dayjs) => boolean;
   /** 是否展示“返回今日” */
@@ -92,6 +97,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
   selectedDate,
   onChange,
   getDateDotType,
+  isHoliday,
   isDateDisabled,
   showTodayButton = true,
   showExpandToggle = true,
@@ -336,6 +342,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
     const today = date.isSame(dayjs(), 'day');
     const dotType = getDateDotType?.(date) || 'none';
     const disabled = isDateDisabled?.(date) ?? false;
+    const holiday = isHoliday?.(date) ?? false;
 
     return (
       <View
@@ -356,7 +363,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         </Text>
         <View
           className={cn(
-            'mt-[8rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full',
+            'relative mt-[8rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full',
             selected
               ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
               : today
@@ -376,6 +383,12 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           >
             {date.date()}
           </Text>
+          {/* 放假「休」：数字右上角，主题色，比数字小 2 档字号（28→24） */}
+          {holiday ? (
+            <Text className="absolute right-[-2rpx] top-[-8rpx] text-[24rpx] font-medium leading-[24rpx] text-primary">
+              休
+            </Text>
+          ) : null}
         </View>
         <View className="mt-[10rpx] h-[8rpx] w-[8rpx] rounded-full">
           {dotType === 'active' ? (
@@ -398,6 +411,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
     const isToday = date.isSame(dayjs(), 'day');
     const dotType = getDateDotType?.(date) || 'none';
     const disabled = isDateDisabled?.(date) ?? false;
+    const holiday = isHoliday?.(date) ?? false;
 
     return (
       <View
@@ -411,7 +425,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         <View className="flex items-center">
           <View
             className={cn(
-              'flex h-[68rpx] w-[68rpx] flex-col items-center justify-center rounded-full',
+              'relative flex h-[68rpx] w-[68rpx] flex-col items-center justify-center rounded-full',
               isSelected
                 ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
                 : isToday
@@ -433,6 +447,12 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             >
               {date.date()}
             </Text>
+            {/* 放假「休」：数字右上角，主题色，比数字小 2 档字号（30→26） */}
+            {holiday ? (
+              <Text className="absolute right-[-2rpx] top-[-6rpx] text-[26rpx] font-medium leading-[26rpx] text-primary">
+                休
+              </Text>
+            ) : null}
             {dotType !== 'none' ? (
               <View className="mt-[4rpx] h-[8rpx] w-[8rpx] rounded-full">
                 {dotType === 'active' ? (

@@ -30,6 +30,8 @@ export interface SchedulePageChromeProps {
   scheduleSubMode: 'fixed' | 'open';
   getDateDotType: (date: dayjs.Dayjs) => CalendarDotType;
   getOpenDateDotType: (date: dayjs.Dayjs) => CalendarDotType;
+  /** 该日是否放假（日期右上角标「休」） */
+  isHoliday?: (date: dayjs.Dayjs) => boolean;
   onMainTabChange: (tabKey: string, tabIndex: number) => void;
   onBatchAction: () => void;
   onScheduleDateChange: (date: dayjs.Dayjs) => void;
@@ -46,6 +48,7 @@ const SchedulePageChrome: React.FC<SchedulePageChromeProps> = ({
   scheduleSubMode,
   getDateDotType,
   getOpenDateDotType,
+  isHoliday,
   onMainTabChange,
   onBatchAction,
   onScheduleDateChange,
@@ -133,6 +136,7 @@ const SchedulePageChrome: React.FC<SchedulePageChromeProps> = ({
                 ? getDateDotType
                 : getOpenDateDotType
           }
+          isHoliday={isHoliday}
         />
       )}
     </View>

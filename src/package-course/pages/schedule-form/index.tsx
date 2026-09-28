@@ -202,6 +202,7 @@ const ScheduleForm: React.FC = () => {
       setSelectedDays,
       setTimeSlots,
       setScheduleType,
+      setScheduleOnHoliday,
       setAutoOpenType,
       setSlotMaxCount,
       setMinOpenCount,

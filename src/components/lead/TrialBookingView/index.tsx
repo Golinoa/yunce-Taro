@@ -45,6 +45,8 @@ export interface TrialBookingViewProps {
   onSuccess?: () => void;
   /** 外部触发的刷新版本号（例如老师预约开关变化后递增） */
   refreshKey?: number;
+  /** 该日是否放假（日历日期右上角标「休」，与课表页口径一致） */
+  isHoliday?: (date: dayjs.Dayjs) => boolean;
   /**
    * 外部触发的「重新拉取数据」令牌：数值变化即重跑 loadData。
    * 目前由课表页的下拉刷新递增（本视图自带数据加载，页面侧只能靠令牌触发）。
@@ -284,6 +286,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
   initialTeacherId,
   className,
   refreshKey,
+  isHoliday,
   reloadToken,
   switchSheetVisible = false,
   onSwitchSheetClose,
@@ -607,6 +610,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
         selectedDate={selectedDate}
         onDateChange={handleDateChange}
         getDateDotType={getDateDotType}
+        isHoliday={isHoliday}
         contentClassName="px-page-padding pt-[24rpx]"
         onScroll={() => setOpenCardId(null)}
         toolbar={

@@ -47,6 +47,7 @@ import {
   type ScheduleDangerActionState,
 } from './use-schedule-danger-actions';
 import { useScheduleDerived } from './use-schedule-derived';
+import { useScheduleHolidayCheck } from './use-schedule-holiday-check';
 import { useScheduleLoaders } from './use-schedule-loaders';
 import { useScheduleOpenSlotActions } from './use-schedule-open-slot-actions';
 
@@ -328,6 +329,9 @@ const SchedulePage: React.FC = () => {
     disabled: isParent,
   });
 
+  /** 日历「休」标识：放假日期的右上角标记（教师端/家长端共用） */
+  const isHolidayDate = useScheduleHolidayCheck();
+
   const handleMainTabChange = useCallback(
     (tabKey: string, tabIndex: number) => {
       if (tabKey === activeTabKey) return;
@@ -575,6 +579,7 @@ const SchedulePage: React.FC = () => {
           scheduleSubMode={scheduleSubMode}
           getDateDotType={getDateDotType}
           getOpenDateDotType={getOpenDateDotType}
+          isHoliday={isHolidayDate}
           onMainTabChange={handleMainTabChange}
           onBatchAction={handleBatchAction}
           onScheduleDateChange={handleScheduleDateChange}
@@ -587,6 +592,7 @@ const SchedulePage: React.FC = () => {
           isParent={isParent}
           reminderEnabled={classReminder.enabled}
           onReminderClick={classReminder.onReminderClick}
+          isHoliday={isHolidayDate}
           selectedDate={selectedDate}
           privateReloadToken={privateReloadToken}
           currentTime={currentTime}

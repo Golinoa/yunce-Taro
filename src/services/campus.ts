@@ -224,6 +224,27 @@ function mapHoliday(raw: Record<string, unknown>): Holiday {
 }
 
 export const holidayService = {
+  /**
+   * 日历用假期区间：所有角色可读（含家长）。
+   * 只返回「休」，用于在课表日期右上角标「休」。
+   */
+  getCalendar: async (params: {
+    startDate: string;
+    endDate: string;
+  }): Promise<Array<{ id: string; name: string; startDate: string; endDate: string }>> => {
+    const data = await get<{ list?: Array<Record<string, unknown>> } | null>('/holidays/calendar', {
+      startDate: params.startDate,
+      endDate: params.endDate,
+    });
+    const list = Array.isArray(data?.list) ? data.list : [];
+    return list.map((item) => ({
+      id: String(item.id ?? ''),
+      name: String(item.name ?? ''),
+      startDate: String(item.startDate ?? ''),
+      endDate: String(item.endDate ?? ''),
+    }));
+  },
+
   getList: async (): Promise<Holiday[]> => {
     const data = await get<unknown>('/holidays', { page: 1, pageSize: 100 });
     const page = asPaginatedResponse<Record<string, unknown>>(

@@ -20,6 +20,8 @@ export interface CalendarSwiperProps {
   onDateChange: (date: dayjs.Dayjs) => void;
   /** 日期下方红点/灰点状态 */
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
+  /** 该日是否放假（日期右上角标「休」） */
+  isHoliday?: (date: dayjs.Dayjs) => boolean;
   /** 按日期渲染内容的 render prop */
   children: (date: dayjs.Dayjs) => React.ReactNode;
   /** 日历下方、Swiper 上方的工具栏/Tab 区域 */
@@ -38,6 +40,7 @@ const CalendarSwiper: React.FC<CalendarSwiperProps> = ({
   selectedDate,
   onDateChange,
   getDateDotType,
+  isHoliday,
   children,
   toolbar,
   className,
@@ -63,6 +66,7 @@ const CalendarSwiper: React.FC<CalendarSwiperProps> = ({
           selectedDate={selectedDate}
           onChange={handleCalendarChange}
           getDateDotType={getDateDotType}
+          isHoliday={isHoliday}
           showTodayButton
         />
       </View>

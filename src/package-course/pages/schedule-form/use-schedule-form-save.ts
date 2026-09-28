@@ -368,6 +368,12 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
 
         const baseNote = buildRuleNote();
         const ignoreConflict = ignoreConflictRef.current;
+        /**
+         * 是否跳过节假日：表单「节假日排课」开关的反值（选「否」⇒ 跳过）。
+         * 只有「规则」排课才涉及——自由排课的日期是老师手选的，不该被假期规则抹掉。
+         * ⚠️ 早前漏传此参数，后端始终 default(true)，「节假日排课=是」等于失效。
+         */
+        const skipHoliday = schedulingMode === 'rule' ? !scheduleOnHoliday : undefined;
         const ruleStartDate = schedulingMode === 'rule' ? startDate : undefined;
         const ruleEndDate =
           schedulingMode === 'rule' && endMode === 'by_date' ? endDate : undefined;
@@ -377,6 +383,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
             start_date?: string;
             end_date?: string;
             maxOccurrences?: number;
+            skipHoliday?: boolean;
           } = {
             teacher_id: selectedTeachingTeacherId || currentUserId,
             assistant_teacher_id: selectedAssistantTeacherId || undefined,
@@ -390,6 +397,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
             note: baseNote,
             reminder_minutes: reminderMinutes,
             ignoreConflict,
+            skipHoliday,
             start_date: ruleStartDate || primary.dateHint,
             end_date: ruleEndDate,
             maxOccurrences:
@@ -404,6 +412,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               start_date?: string;
               end_date?: string;
               maxOccurrences?: number;
+              skipHoliday?: boolean;
             } = {
               teacher_id: selectedTeachingTeacherId || currentUserId,
               assistant_teacher_id: selectedAssistantTeacherId || undefined,
@@ -417,6 +426,7 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               note: [baseNote, dateLine].filter(Boolean).join('\n') || undefined,
               reminder_minutes: reminderMinutes,
               ignoreConflict,
+              skipHoliday,
               start_date: t.dateHint || ruleStartDate,
               end_date:
                 ruleEndDate ||

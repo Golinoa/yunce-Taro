@@ -48,6 +48,11 @@ export interface Schedule {
   /** 重复规则状态；停止/暂停不等同于删除已生成课节。 */
   rule_status?: ScheduleRuleStatus;
   stopped_at?: string;
+  /**
+   * 节假日是否跳过（＝排课表单「节假日排课」开关的反值）。
+   * true/undefined＝遇放假自动停课；false＝节假日照常上课。
+   */
+  skip_holiday?: boolean;
   // 关联查询字段
   student?: {
     name: string;

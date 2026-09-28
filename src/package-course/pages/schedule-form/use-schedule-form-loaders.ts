@@ -62,6 +62,8 @@ export interface UseScheduleFormLoadersParams {
   setSelectedDays: Dispatch<SetStateAction<DayOfWeek[]>>;
   setTimeSlots: Dispatch<SetStateAction<TimeSlotPair[]>>;
   setScheduleType: Dispatch<SetStateAction<'class' | 'group'>>;
+  /** 「节假日排课」开关回填（编辑时读到真实设置；此前从不回填 → 每次编辑都被重置） */
+  setScheduleOnHoliday: Dispatch<SetStateAction<boolean>>;
   setAutoOpenType: Dispatch<SetStateAction<AutoOpenType>>;
   setSlotMaxCount: Dispatch<SetStateAction<number>>;
   setMinOpenCount: Dispatch<SetStateAction<number>>;
@@ -123,6 +125,7 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
     setSelectedDays,
     setTimeSlots,
     setScheduleType,
+    setScheduleOnHoliday,
     setAutoOpenType,
     setSlotMaxCount,
     setMinOpenCount,
@@ -254,6 +257,10 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
         if (/类型:团课/.test(rawNote) || sourceMode === 'group') {
           setScheduleType('group');
         }
+        // 「节假日排课」开关回填：结构化字段优先，历史数据回落到 note 里的 `节假日排课:` 元信息。
+        // 此前该行只被下面过滤掉、从不解析回开关，导致每次编辑都被重置为默认「否」。
+        const holidayOnFromNote = rawNote.match(/节假日排课:(是|否)/)?.[1] === '是';
+        setScheduleOnHoliday(sch.skip_holiday === false ? true : holidayOnFromNote);
         // 预约设置优先从班级回填（见下方 selectedClass effect）；note 仅作兼容兜底
         const noteAuto = rawNote.match(/自动开班:(manual|full|time|full_or_time)/);
         if (noteAuto?.[1]) setAutoOpenType(noteAuto[1] as AutoOpenType);

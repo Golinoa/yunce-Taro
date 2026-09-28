@@ -56,6 +56,8 @@ interface BackendScheduleDetailResponse {
   operatorTeacherName?: null | string;
   reminderMinutes?: null | number;
   room?: null | string;
+  /** 节假日是否跳过排课（来自排课表单「节假日排课」开关的反值） */
+  skipHoliday?: boolean;
   startDate?: null | string;
   startTime: string;
   studentId?: null | string;
@@ -206,6 +208,7 @@ function mapBackendSchedule(
     updated_at: 'updatedAt' in item ? item.updatedAt : item.createdAt,
     rule_status: item.status,
     stopped_at: item.stoppedAt || undefined,
+    skip_holiday: 'skipHoliday' in item ? Boolean(item.skipHoliday) : undefined,
     class_info: classInfo?.name ? { name: classInfo.name } : undefined,
     teacher_name: teacherName,
     operator_teacher_name: operatorTeacherName,
@@ -301,6 +304,11 @@ export const scheduleService = {
       start_date?: string;
       end_date?: string;
       maxOccurrences?: number;
+      /**
+       * 生成课次时是否跳过节假日（排课表单「节假日排课」开关的反值：选「否」⇒ true）。
+       * ⚠️ 曾漏传此参数，后端始终走 default(true)，导致「节假日排课=是」形同虚设。
+       */
+      skipHoliday?: boolean;
     },
   ): Promise<Schedule> => {
     const created = await post<BackendScheduleDetailResponse>('/schedules', {
@@ -314,6 +322,7 @@ export const scheduleService = {
       room: data.room,
       note: data.note,
       ignoreConflict: data.ignoreConflict === true,
+      skipHoliday: data.skipHoliday,
     });
     return mapBackendSchedule(created);
   },
@@ -324,6 +333,8 @@ export const scheduleService = {
       start_date?: string;
       end_date?: string;
       maxOccurrences?: number;
+      /** 见 create 的 skipHoliday 说明 */
+      skipHoliday?: boolean;
     },
   ): Promise<Schedule | null> => {
     const updated = await put<BackendScheduleDetailResponse>(`/schedules/${scheduleId}`, {
@@ -337,6 +348,7 @@ export const scheduleService = {
       room: data.room,
       note: data.note,
       ignoreConflict: data.ignoreConflict === true,
+      skipHoliday: data.skipHoliday,
     });
     return mapBackendSchedule(updated);
   },

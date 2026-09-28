@@ -73,6 +73,8 @@ export interface ScheduleMainViewsProps {
   reminderEnabled?: boolean;
   /** 点击铃铛：页面在点击回调内同步调起微信授权面板 */
   onReminderClick?: () => void;
+  /** 该日是否放假（日历日期右上角标「休」） */
+  isHoliday?: (date: dayjs.Dayjs) => boolean;
   selectedDate: dayjs.Dayjs;
   /** 私教视图刷新令牌：下拉刷新时递增，透传给 TrialBookingView 触发它自己重拉 */
   privateReloadToken: number;
@@ -156,6 +158,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     isParent,
     reminderEnabled,
     onReminderClick,
+    isHoliday,
     selectedDate,
     privateReloadToken,
     currentTime,
@@ -335,6 +338,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         <TrialBookingView
           className="min-h-0 flex-1"
           isParent={isParent}
+          isHoliday={isHoliday}
           reloadToken={privateReloadToken}
           onSuccess={() => {
             const firstClassTab = tabs.find((item) => item.mode === 'class');
