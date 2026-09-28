@@ -1,10 +1,9 @@
 import { View } from '@tarojs/components';
 import cn from 'classnames';
 import React from 'react';
-import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import { useThemeStore } from '@/stores/theme';
 
-/** 构建期常量：生产构建恒为 false，DCE 整棵移除 MockIdentitySwitcher（P-05/B-02） */
+/** 构建期常量：生产构建恒为 false，DCE 整棵移除调试用子树（P-05/B-02） */
 const isDebugBuild = process.env.TARO_ENABLE_LOCAL_DEBUG === 'true';
 
 interface PageContainerProps {
@@ -33,8 +32,9 @@ const PageContainer: React.FC<PageContainerProps> = ({
       )}
     >
       {children}
-      {/* 仅 debug 构建挂载；生产构建常量折叠后整棵子树被移除，组件代码/样式不再进包 */}
-      {isDebugBuild && <MockIdentitySwitcher />}
+      {/* MockIdentitySwitcher 已于 2026-09-28 按用户要求彻底移除（含组件与全部引用）；
+          需要恢复时从 git 历史（components/MockIdentitySwitcher）找回。 */}
+      {isDebugBuild && null}
     </View>
   );
 };
