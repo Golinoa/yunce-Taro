@@ -58,6 +58,8 @@ interface BackendTodayScheduleItem {
   startTime: string;
   subject?: null | string;
   teacherName?: null | string;
+  checkedCount?: number;
+  totalCount?: number;
 }
 
 interface BackendTodayScheduleResponse {
@@ -98,9 +100,9 @@ function mapTodayScheduleItem(item: BackendTodayScheduleItem): HomeScheduleItem 
     updated_at: new Date().toISOString(),
     note: item.note || item.className || '未命名课程',
     class_info: item.className ? { name: item.className } : undefined,
-    status: mapBackendScheduleStatus(item.startTime, item.endTime),
-    checked_count: 0,
-    total_count: 0,
+    status: mapBackendScheduleStatus(item.startTime, item.endTime, item.checkedCount),
+    checked_count: item.checkedCount ?? 0,
+    total_count: item.totalCount ?? 0,
     teacher_name: item.teacherName || undefined,
     room: item.room || undefined,
     category_label: item.subject || undefined,
@@ -284,6 +286,8 @@ interface BackendParentHomeResponse {
     note?: string | null;
     color?: string | null;
     teacherName?: string | null;
+    checkedCount?: number;
+    totalCount?: number;
   }>;
   recentRecords?: Array<{
     id: string;
@@ -333,13 +337,13 @@ function mapBackendParentHome(data: BackendParentHomeResponse): ParentHomeData {
       updated_at: new Date().toISOString(),
       note: s.note || s.class?.name || '未命名课程',
       class_info: s.class ? { name: s.class.name } : undefined,
-      status: mapBackendScheduleStatus(s.startTime, s.endTime),
+      status: mapBackendScheduleStatus(s.startTime, s.endTime, s.checkedCount),
       teacher_name: s.teacherName || undefined,
       category_label: s.class?.subject || undefined,
       color: toScheduleColor(s.color || undefined),
       schedule_kind: 'schedule',
-      checked_count: 0,
-      total_count: 0,
+      checked_count: s.checkedCount ?? 0,
+      total_count: s.totalCount ?? 0,
     })),
     packages: (packageCards.length > 0 ? packageCards : allPackages).slice(0, 2),
     unreadCount: data.stats?.unreadNotificationCount ?? 0,
@@ -378,6 +382,7 @@ function getMinutesOfDay(time: string): number {
 function mapBackendScheduleStatus(
   startTime: string,
   endTime: string,
+  checkedCount?: number,
 ): NonNullable<Schedule['status']> {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -385,8 +390,12 @@ function mapBackendScheduleStatus(
   const endMinutes = getMinutesOfDay(endTime);
 
   if (currentMinutes > endMinutes) {
-    // 后端接口已结束状态由后端决定（点名信息在 record），前端无法区分 done/unattended，
-    // 默认按已结束展示 done，避免误判；具体是否点名由详情接口返回
+    // 已下课：后端已按今天这节课的真实点名记录算出 checkedCount。
+    // checkedCount === 0 → 老师还没点名（未点名）；有记录 → 已点名（done）。
+    // 不传 checkedCount（旧接口无此字段）时沿用旧的 done 展示，避免无数据误判。
+    if (checkedCount !== undefined && checkedCount === 0) {
+      return 'unattended';
+    }
     return 'done';
   }
 
@@ -434,7 +443,11 @@ function mapBackendTeacherHome(aggregate: BackendTeacherHomeResponse) {
         updated_at: new Date().toISOString(),
         note: schedule.note || schedule.class?.name || '未命名课程',
         class_info: schedule.class ? { name: schedule.class.name } : undefined,
-        status: mapBackendScheduleStatus(schedule.startTime, schedule.endTime),
+        status: mapBackendScheduleStatus(
+          schedule.startTime,
+          schedule.endTime,
+          schedule.checkedCount ?? undefined,
+        ),
         checked_count: schedule.checkedCount ?? 0,
         total_count: schedule.totalCount ?? 0,
         teacher_name: schedule.teacherName || teacher.nickname || teacher.name || '授课老师',

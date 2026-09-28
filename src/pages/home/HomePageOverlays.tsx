@@ -8,7 +8,6 @@ import CampusSelectSheet from '@/components/home/CampusSelectSheet';
 import CompleteTodoSheet from '@/components/home/CompleteTodoSheet';
 import ExpandableFabMenu from '@/components/home/ExpandableFabMenu';
 import HomeCampusGuideDialog from '@/components/home/HomeCampusGuideDialog';
-import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import AddCustomTodoPopover from '@/components/my-todos/AddCustomTodoPopover';
 import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import RelationConfirmSheet from '@/components/RelationConfirmSheet';
@@ -23,6 +22,12 @@ import { TODO_CATEGORY_INBOX_ID } from '@/utils/todo-categories';
 import type { CollaboratorSummary } from '@/utils/todo-collaborator-select';
 import type { HomeTab } from './home-todo-derived';
 
+/**
+ * 身份切换器（dev 徽标 + 快速切换身份面板）总开关。
+ *
+ * 2026-09-28 按用户要求**暂时关闭**：dev 包里也不再显示。
+ * 需要恢复时把下面这个常量改回 `true` 即可（改 `false` 后整棵子树会被常量折叠移除）。
+ */
 export interface HomeFabAction {
   key: string;
   label: string;
@@ -31,7 +36,6 @@ export interface HomeFabAction {
 }
 
 export interface HomePageOverlaysProps {
-  isDebugBuild: boolean;
   isStaff: boolean;
   isParent: boolean;
   showCampusSheet: boolean;
@@ -105,7 +109,6 @@ export interface HomePageOverlaysProps {
 
 const HomePageOverlays: React.FC<HomePageOverlaysProps> = (props) => {
   const {
-    isDebugBuild,
     isStaff,
     isParent,
     showCampusSheet,
@@ -223,9 +226,6 @@ const HomePageOverlays: React.FC<HomePageOverlaysProps> = (props) => {
       />
 
       <HomeCampusGuideDialog visible={campusGuideVisible} onClose={onCloseCampusGuide} />
-
-      {/* 仅 debug 构建挂载；生产构建常量折叠后整棵子树被移除 */}
-      {isDebugBuild && <MockIdentitySwitcher />}
     </>
   );
 };

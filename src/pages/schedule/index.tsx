@@ -1,5 +1,5 @@
 import { View } from '@tarojs/components';
-import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
+import Taro, { useDidShow, usePullDownRefresh, useShareAppMessage } from '@tarojs/taro';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -143,7 +143,6 @@ const SchedulePage: React.FC = () => {
   const [dangerActionState, setDangerActionState] = useState<ScheduleDangerActionState>({
     visible: false,
     type: null,
-    item: null,
   });
   const { categories, fetchList: fetchCategories } = useCourseCategoryStore();
   /** 当前激活的 Tab key */
@@ -171,6 +170,11 @@ const SchedulePage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'schedule' | 'booking'>('schedule');
   /** 排课视图内二级模式：fixed=固定排课, open=开放预约（由 activeTab 派生） */
   const [scheduleSubMode, setScheduleSubMode] = useState<'fixed' | 'open'>('fixed');
+  /**
+   * 私教视图（TrialBookingView）刷新令牌：下拉刷新时递增。
+   * 该视图自带数据加载（老师/时段/预约记录），页面侧只能通过令牌触发它重拉。
+   */
+  const [privateReloadToken, setPrivateReloadToken] = useState(0);
   /** 开放预约视图：各日期各开放班级的时段，key 为 YYYY-MM-DD */
   const [openClassSlots, setOpenClassSlots] = useState<
     Record<string, Record<string, ClassBookingSlot[]>>
@@ -212,7 +216,6 @@ const SchedulePage: React.FC = () => {
     filteredClasses,
     pausedClasses,
     teacherById,
-    scheduleById,
     getDateDotType,
     getOpenDateDotType,
     batchClassOptions,
@@ -283,6 +286,7 @@ const SchedulePage: React.FC = () => {
     loadMonthRecords,
     loadTemporaryReschedules,
     refreshDateData,
+    pullRefresh,
     lastScheduleAuxFetchAtRef,
   } = useScheduleLoaders({
     currentUserId,
@@ -405,6 +409,29 @@ const SchedulePage: React.FC = () => {
     void loadTemporaryReschedules();
   });
 
+  /**
+   * 下拉刷新：把「当前 Tab 上能看到的数据」整批重拉。
+   *
+   * 用的是**页面级**下拉（`index.config.ts` 的 `enablePullDownRefresh`）—— 内容虽然在
+   * 各视图内层 ScrollView 里滚动，但页面根是 `h-screen + overflow-hidden`、页面本身不滚动，
+   * 与 `package-settings/pages/my-todos`、`package-student/pages/students` 同一套路。
+   *
+   * 覆盖范围：班课/团课（排课+点名统计+临时调课，团课再加开放时段）、场地（场地列表）；
+   * 私教视图由它自己的 `reloadToken` 触发。指示器必须显式 `stopPullDownRefresh`，否则一直转。
+   */
+  usePullDownRefresh(() => {
+    void (async () => {
+      try {
+        if (activeTab?.mode === 'private') {
+          setPrivateReloadToken((token) => token + 1);
+        }
+        await pullRefresh({ withVenues: activeTab?.type === 'venue' });
+      } finally {
+        Taro.stopPullDownRefresh();
+      }
+    })();
+  });
+
   const notifyStudentAndParents = useCallback(
     async (studentId: string, title: string, content: string) => {
       try {
@@ -434,46 +461,33 @@ const SchedulePage: React.FC = () => {
     setDangerActionState({
       visible: false,
       type: null,
-      item: null,
     });
   }, []);
 
-  const {
-    handleCancelLesson,
-    handleRestoreLesson,
-    handleSuspendLesson,
-    handleSuspendOpenSlot,
-    handleResumeClass,
-    handleConfirmDangerAction,
-  } = useScheduleDangerActions({
-    selectedDate,
-    currentTime,
-    activeTheme: themeStore.activeTheme,
-    lessonRecords,
-    setLessonRecords,
-    setOpenClassSlots,
-    setClasses,
-    setSchedules,
-    setSelectedClassId,
-    setBatchClassSheetVisible,
-    setBatchSelectedClassIds,
-    setDangerActionSubmitting,
-    dangerActionState,
-    setDangerActionState,
-    closeDangerActionDialog,
-    scheduleById,
-    filteredClasses,
-    selectedBatchClasses,
-    selectedClassId,
-    filterAllClassId: FILTER_ALL_CLASS,
-    currentTeacherId,
-    currentUserId,
-    currentCampusId,
-    profileId: profile?.id,
-    profileName: profile?.name,
-    profileRole: profile?.currentContext?.role,
-    notifyStudentAndParents,
-  });
+  const { handleSuspendOpenSlot, handleResumeClass, handleConfirmDangerAction } =
+    useScheduleDangerActions({
+      currentTime,
+      activeTheme: themeStore.activeTheme,
+      setOpenClassSlots,
+      setClasses,
+      setSchedules,
+      setSelectedClassId,
+      setBatchClassSheetVisible,
+      setBatchSelectedClassIds,
+      setDangerActionSubmitting,
+      dangerActionState,
+      setDangerActionState,
+      closeDangerActionDialog,
+      selectedBatchClasses,
+      selectedClassId,
+      filterAllClassId: FILTER_ALL_CLASS,
+      currentUserId,
+      currentCampusId,
+      profileId: profile?.id,
+      profileName: profile?.name,
+      profileRole: profile?.currentContext?.role,
+      notifyStudentAndParents,
+    });
 
   const {
     handleOpenBookSheet,
@@ -482,9 +496,6 @@ const SchedulePage: React.FC = () => {
     handleSupplement,
     handlePrimaryAction,
     handleRollCall,
-    handleEditSchedule,
-    handleClassReschedule,
-    handleScheduleRuleAction,
     handleCreateSchedule,
     handleManageBookingConfig,
     handleBatchAction,
@@ -564,6 +575,7 @@ const SchedulePage: React.FC = () => {
           tabs={tabs}
           isParent={isParent}
           selectedDate={selectedDate}
+          privateReloadToken={privateReloadToken}
           currentTime={currentTime}
           loading={loading}
           swiperCurrent={swiperCurrent}
@@ -610,12 +622,6 @@ const SchedulePage: React.FC = () => {
           onPrimaryAction={handlePrimaryAction}
           onRollCall={handleRollCall}
           onSupplement={handleSupplement}
-          onEditSchedule={handleEditSchedule}
-          onClassReschedule={handleClassReschedule}
-          onCancelLesson={handleCancelLesson}
-          onRestoreLesson={handleRestoreLesson}
-          onSuspendLesson={handleSuspendLesson}
-          onScheduleRuleAction={handleScheduleRuleAction}
           onResumeClass={handleResumeClass}
           onOpenClassSlotConfig={handleOpenClassSlotConfig}
           onProxyBooking={handleProxyBooking}

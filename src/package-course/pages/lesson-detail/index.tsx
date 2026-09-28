@@ -432,8 +432,8 @@ const LessonDetail: React.FC = () => {
       urgent: '即将上课',
       upcoming: '待上课',
       active: '上课中',
-      done: '已完成',
-      ended: '已下课',
+      done: '已点名',
+      ended: '未点名',
       cancelled: '已取消',
     };
     const statusColorMap: Record<string, string> = {

@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import ParentGlassShell from '@/components/home/ParentGlassShell';
 import Icon from '@/components/Icon';
 import type { Schedule } from '@/types/schedule';
+import { resolveScheduleDisplayTitle } from '@/utils/schedule-note-display';
 
 const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
 /** 首页竖排最多展示 2 张，刚好一屏内看完 */
@@ -59,7 +60,13 @@ const ParentScheduleSection: React.FC<ParentScheduleSectionProps> = ({
       ) : (
         <View className="flex flex-col gap-[12rpx]">
           {visible.map((item) => {
-            const title = item.note || item.class_info?.name || '未命名课程';
+            // 同 TodayScheduleCard：note 里含排课规则元信息，标题以班级名称为准
+            const title = resolveScheduleDisplayTitle({
+              note: item.note,
+              classInfoName: item.class_info?.name,
+              scheduleKind: item.schedule_kind,
+              trialMode: item.trial_mode,
+            });
             const teacher = item.teacher_name || '授课老师';
             const timeLabel = `${formatWeekday(item.day_of_week)} ${item.start_time}-${item.end_time}`;
             const tag = item.category_label;

@@ -27,6 +27,27 @@ export function setRefreshSignal(key: RefreshSignalKey): void {
   }
 }
 
+/**
+ * 只读探测信号时间戳（**不消费**）。
+ *
+ * 与 `consumeRefreshSignal` 的区别：后者会删除信号——那是信号"归属页"（如课表页）的权利，
+ * 别处抢着 consume 会让归属页丢掉这次刷新机会。本函数只读取 `setRefreshSignal` 写入的时间戳，
+ * 由调用方拿它跟**自己手上快照的写入时间**比较，判断"快照是否早于某次写操作"。
+ *
+ * 典型用途：点名页名单内存快照——信号晚于快照即视为过期，直接回源。
+ * 返回 null 表示无信号 / 值非法 / 读取出错。
+ */
+export function peekRefreshSignal(key: RefreshSignalKey): number | null {
+  try {
+    const raw = Taro.getStorageSync(key);
+    const at = Number(raw);
+    return Number.isFinite(at) && at > 0 ? at : null;
+  } catch (err) {
+    logError('peekRefreshSignal', err);
+    return null;
+  }
+}
+
 /** 若存在信号则清除并返回 true */
 export function consumeRefreshSignal(key: RefreshSignalKey): boolean {
   try {

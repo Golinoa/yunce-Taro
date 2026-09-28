@@ -1,11 +1,11 @@
 import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 import {
+  buildBatchRescheduleSelectPath,
   buildBookingPagePath,
   buildCheckinLessonFormPath,
   buildLessonFormPath,
   buildOpenSlotRollCallPath,
-  buildScheduleFormReschedulePath,
   buildSupplementLessonFormPath,
   buildViewOnlyLessonFormPath,
   resolveSchedulePrimaryActionKind,
@@ -106,7 +106,13 @@ describe('schedule-lesson-nav (Q2-1)', () => {
         opened_schedule_id: 'sch',
       }),
     ).toContain('scheduleId=sch');
-    expect(buildScheduleFormReschedulePath('s1', '2026-09-02')).toContain('mode=reschedule');
     expect(buildBookingPagePath('2026-09-02')).toContain('/booking/index?date=');
+  });
+
+  it('批量调课入口：带源日期与预选班级（点名页与卡片共用）', () => {
+    const url = buildBatchRescheduleSelectPath('2026-09-28', 'cls-1');
+    expect(url).toContain('/package-course/pages/batch-reschedule-select/index');
+    expect(url).toContain('date=2026-09-28');
+    expect(url).toContain('classId=cls-1');
   });
 });

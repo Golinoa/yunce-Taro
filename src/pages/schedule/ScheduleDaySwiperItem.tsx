@@ -7,17 +7,11 @@ import React from 'react';
 import Empty from '@/components/Empty';
 import ScheduleActionButton from '@/components/schedule/ScheduleActionButton';
 import ScheduleCard from '@/components/schedule/ScheduleCard';
-import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import type { Class } from '@/types/class';
 import type { LessonSharePayload } from '@/utils/lesson-share';
-import {
-  getCardActionVisibility,
-  isHistoricalClassCard,
-  isUpcomingClassCard,
-} from '@/utils/schedule-card-actions';
+import { isHistoricalClassCard, isUpcomingClassCard } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
-import type { ScheduleDangerActionType } from '@/utils/schedule-danger-meta';
-import { canOperateHistoricalLesson, canSuspendThisLesson } from '@/utils/schedule-guard';
+import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import type dayjs from 'dayjs';
 
 export interface ScheduleDaySummary {
@@ -32,8 +26,6 @@ export interface ScheduleDaySwiperItemProps {
   summary: ScheduleDaySummary;
   loading: boolean;
   currentTime: dayjs.Dayjs;
-  openCardId: string | null;
-  onOpenCardIdChange: (id: string | null) => void;
   isParent: boolean;
   currentCampusId: string;
   currentTeacherId: string;
@@ -46,15 +38,6 @@ export interface ScheduleDaySwiperItemProps {
   onPrimaryAction: (item: ScheduleCardItem, date: dayjs.Dayjs) => void;
   onRollCall: (item: ScheduleCardItem, date: dayjs.Dayjs) => void;
   onSupplement: (item: ScheduleCardItem, date: dayjs.Dayjs) => void;
-  onEditSchedule: (item: ScheduleCardItem) => void;
-  onClassReschedule: (item: ScheduleCardItem) => void;
-  onCancelLesson: (item: ScheduleCardItem) => void;
-  onRestoreLesson: (item: ScheduleCardItem) => void;
-  onSuspendLesson: (item: ScheduleCardItem) => void;
-  onScheduleRuleAction: (
-    item: ScheduleCardItem,
-    action: Extract<ScheduleDangerActionType, 'pause-rule' | 'resume-rule' | 'stop-rule'>,
-  ) => void;
   onResumeClass: (classId: string, className: string) => void;
 }
 
@@ -64,8 +47,6 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
   summary,
   loading,
   currentTime,
-  openCardId,
-  onOpenCardIdChange,
   isParent,
   currentCampusId,
   currentTeacherId,
@@ -78,23 +59,11 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
   onPrimaryAction,
   onRollCall,
   onSupplement,
-  onEditSchedule,
-  onClassReschedule,
-  onCancelLesson,
-  onRestoreLesson,
-  onSuspendLesson,
-  onScheduleRuleAction,
   onResumeClass,
 }) => {
   return (
     <View className="h-full bg-muted">
-      <ScrollView
-        className="h-full"
-        scrollY
-        enhanced
-        showScrollbar={false}
-        onScroll={() => onOpenCardIdChange(null)}
-      >
+      <ScrollView className="h-full" scrollY enhanced showScrollbar={false}>
         <View className="min-h-full">
           <View className="px-[24rpx] py-[12rpx]">
             <Text className="text-[28rpx] text-foreground-secondary">
@@ -123,8 +92,11 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
 
             <View className="flex flex-col gap-[14rpx]">
               {cards.map((item) => {
-                const actionVisibility = getCardActionVisibility(item, date, currentTime);
-                const isCancelled = item.status === 'cancelled';
+                /**
+                 * 注：原先老师侧这里套了一层左滑（编辑/停课/调课/暂停规则/停止规则/取消），
+                 * 这些操作已收拢进点名页（详情页）：调课 / 编辑（班级或排课规则）/ 停课 /
+                 * 删除排课，停课后详情页同一位置给「恢复本节课」，故左滑整体移除。
+                 */
                 const cardBody = (
                   <ScheduleCard
                     item={item}
@@ -248,73 +220,13 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
                 }
 
                 return (
-                  <SwappableScheduleCard
+                  <View
                     key={item.id}
-                    cardId={item.id}
-                    openCardId={openCardId}
-                    onOpenChange={onOpenCardIdChange}
+                    className="rounded-[16rpx]"
                     onClick={() => onPrimaryAction(item, date)}
-                    actions={[
-                      {
-                        label: '编辑',
-                        variant: 'default',
-                        onClick: () => onEditSchedule(item),
-                        disabled: !actionVisibility.showEditAndReschedule,
-                      },
-                      {
-                        label: '停课',
-                        variant: 'warning',
-                        onClick: () => {
-                          void onSuspendLesson(item);
-                        },
-                        disabled: !canSuspendThisLesson(item, date, currentTime),
-                      },
-                      ...(item.ruleStatus === 'PAUSED'
-                        ? [
-                            {
-                              label: '恢复规则',
-                              variant: 'warning' as const,
-                              onClick: () => onScheduleRuleAction(item, 'resume-rule'),
-                            },
-                          ]
-                        : [
-                            {
-                              label: '暂停规则',
-                              variant: 'warning' as const,
-                              onClick: () => onScheduleRuleAction(item, 'pause-rule'),
-                            },
-                          ]),
-                      ...(item.ruleStatus !== 'STOPPED'
-                        ? [
-                            {
-                              label: '停止规则',
-                              variant: 'danger' as const,
-                              onClick: () => onScheduleRuleAction(item, 'stop-rule'),
-                            },
-                          ]
-                        : []),
-                      {
-                        label: '调课',
-                        variant: 'warning',
-                        onClick: () => onClassReschedule(item),
-                        disabled: !actionVisibility.showEditAndReschedule,
-                      },
-                      isCancelled
-                        ? {
-                            label: '恢复',
-                            variant: 'warning',
-                            onClick: () => void onRestoreLesson(item),
-                          }
-                        : {
-                            label: '取消',
-                            variant: 'danger',
-                            onClick: () => void onCancelLesson(item),
-                            disabled: !actionVisibility.showCancelLesson,
-                          },
-                    ]}
                   >
                     {cardBody}
-                  </SwappableScheduleCard>
+                  </View>
                 );
               })}
             </View>

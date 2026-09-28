@@ -45,7 +45,14 @@ export interface ClassLessonPanelProps {
   homework: string;
   isAlreadyChecked: boolean;
   canEditClass: boolean;
-  isClassPaused: boolean;
+  /** 有 scheduleId 且非过去日期 → 可调课（只动这一天） */
+  canReschedule: boolean;
+  /** 有 scheduleId 且本节课尚未点名 → 可临时停课 */
+  canSuspendLesson: boolean;
+  /** 本节课已被取消（＝停过课）→ 同一位置改给「恢复本节课」 */
+  canRestoreLesson: boolean;
+  /** 恢复请求进行中（按钮显示"恢复中"并禁用） */
+  restoring: boolean;
   studentSearchKeyword: string;
   /** 学员列表加载中（列表为空时用占位替代"暂无学员"） */
   studentsLoading: boolean;
@@ -63,7 +70,16 @@ export interface ClassLessonPanelProps {
   studentRemarkDrafts: Record<string, string>;
   recordByStudentId: Map<string, LessonRecord>;
   onHomeworkChange: (value: string) => void;
-  onToggleClassPause: () => void;
+  /** 调课：进批量调课页（只影响这一天） */
+  onReschedule: () => void;
+  /** 编辑：弹出「编辑班级 / 编辑排课规则」二选一，进入对应页面 */
+  onEdit: () => void;
+  /** 停课：仅停今天这一节，弹出理由输入后通知家长 */
+  onSuspendLesson: () => void;
+  /** 恢复本节课：删掉停课时写入的 cancelled 记录，回到未点名 */
+  onRestoreLesson: () => Promise<void>;
+  /** 删除：删除这条排课规则（不可恢复），确定文案「删除排课」 */
+  onDeleteSchedule: () => void;
   onSelectClass: (classId: string) => void;
   onStudentSearchChange: (value: string) => void;
   onHoursChange: (value: number) => void;
@@ -92,7 +108,10 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
   homework,
   isAlreadyChecked,
   canEditClass,
-  isClassPaused,
+  canReschedule,
+  canSuspendLesson,
+  canRestoreLesson,
+  restoring,
   studentSearchKeyword,
   studentsLoading,
   hoursUsed,
@@ -109,7 +128,11 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
   studentRemarkDrafts,
   recordByStudentId,
   onHomeworkChange,
-  onToggleClassPause,
+  onReschedule,
+  onEdit,
+  onSuspendLesson,
+  onRestoreLesson,
+  onDeleteSchedule,
   onSelectClass,
   onStudentSearchChange,
   onHoursChange,
@@ -159,39 +182,88 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
               </View>
             </View>
             {!isAlreadyChecked ? (
-              <View className="flex shrink-0 flex-row items-center gap-[12rpx]">
+              <View className="flex shrink-0 flex-wrap items-center justify-end gap-[10rpx]">
+                {/* 调课：只把今天这一节换到别的时间段（长期仍挂原排课规则） */}
+                <View
+                  className={cn(
+                    'flex items-center justify-center rounded-[10rpx] px-[18rpx] py-[10rpx]',
+                    canReschedule ? 'bg-primary' : 'bg-muted',
+                  )}
+                  onClick={() => {
+                    if (canReschedule) onReschedule();
+                  }}
+                >
+                  <Text
+                    className={cn(
+                      'text-[24rpx] font-medium leading-none',
+                      canReschedule ? 'text-primary-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    调课
+                  </Text>
+                </View>
+
+                {/* 编辑：弹出「编辑班级 / 编辑排课规则」二选一（两者是不同页面） */}
                 {canEditClass ? (
                   <View
-                    className="flex items-center justify-center rounded-[12rpx] bg-primary px-[28rpx] py-[12rpx]"
-                    onClick={() => {
-                      if (!selectedClassId) {
-                        Taro.showToast({ title: '缺少班级信息', icon: 'none' });
-                        return;
-                      }
-                      Taro.navigateTo({
-                        url: `/package-course/pages/course-form/index?id=${encodeURIComponent(selectedClassId)}&type=class`,
-                      });
-                    }}
+                    className="flex items-center justify-center rounded-[10rpx] bg-primary px-[18rpx] py-[10rpx]"
+                    onClick={() => onEdit()}
                   >
                     <Text className="text-[24rpx] font-medium leading-none text-primary-foreground">
                       编辑
                     </Text>
                   </View>
                 ) : null}
-                <View
-                  className={cn(
-                    'flex items-center justify-center rounded-[12rpx] px-[28rpx] py-[12rpx]',
-                    isClassPaused ? 'bg-primary' : 'border border-warning/30 bg-warning/10',
-                  )}
-                  onClick={() => void onToggleClassPause()}
-                >
-                  <Text
+
+                {/* 停课：只停今天这一节（可填理由，确定后通知家长）。
+                    已取消（＝停过课）时同一个位置变成「恢复本节课」 */}
+                {canRestoreLesson ? (
+                  <View
                     className={cn(
-                      'text-[24rpx] font-medium leading-none',
-                      isClassPaused ? 'text-primary-foreground' : 'text-warning',
+                      'flex items-center justify-center rounded-[10rpx] px-[18rpx] py-[10rpx]',
+                      restoring ? 'bg-muted' : 'border border-success/30 bg-success/10',
                     )}
+                    onClick={() => {
+                      if (!restoring) void onRestoreLesson();
+                    }}
                   >
-                    {isClassPaused ? '恢复' : '停课'}
+                    <Text
+                      className={cn(
+                        'text-[24rpx] font-medium leading-none',
+                        restoring ? 'text-muted-foreground' : 'text-success',
+                      )}
+                    >
+                      {restoring ? '恢复中' : '恢复本节课'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View
+                    className={cn(
+                      'flex items-center justify-center rounded-[10rpx] px-[18rpx] py-[10rpx]',
+                      canSuspendLesson ? 'border border-warning/30 bg-warning/10' : 'bg-muted',
+                    )}
+                    onClick={() => {
+                      if (canSuspendLesson) onSuspendLesson();
+                    }}
+                  >
+                    <Text
+                      className={cn(
+                        'text-[24rpx] font-medium leading-none',
+                        canSuspendLesson ? 'text-warning' : 'text-muted-foreground',
+                      )}
+                    >
+                      停课
+                    </Text>
+                  </View>
+                )}
+
+                {/* 删除：删除这条排课规则，删后不可找回 */}
+                <View
+                  className="flex items-center justify-center rounded-[10rpx] border border-destructive-30 bg-destructive-10 px-[18rpx] py-[10rpx]"
+                  onClick={() => onDeleteSchedule()}
+                >
+                  <Text className="text-[24rpx] font-medium leading-none text-destructive">
+                    删除
                   </Text>
                 </View>
               </View>

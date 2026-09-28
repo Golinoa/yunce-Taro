@@ -254,7 +254,7 @@ export const subscribeMessageService = {
     const variables = prompt.payload ?? {};
     const classNavigateUrl =
       typeof variables.classId === 'string' && variables.classId
-        ? `/package-course/pages/course-form/index?id=${encodeURIComponent(variables.classId)}&type=class`
+        ? `/package-course/pages/course-form/index?id=${encodeURIComponent(variables.classId)}&mode=class`
         : undefined;
     const navigateUrl =
       typeof variables.navigateUrl === 'string' ? variables.navigateUrl : classNavigateUrl;

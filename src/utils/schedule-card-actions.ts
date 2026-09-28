@@ -1,97 +1,14 @@
 /**
- * 课表卡片操作可见性纯函数（Q2-1）
+ * 课表卡片纯判定（Q2-1）
  *
- * 从 pages/schedule/index.tsx 抽出：过去/非过去日期下的取消、编辑改期、删除按钮规则。
+ * 说明（2026-09-28）：原先这里还有一组「卡片操作可见性」函数
+ * （`getCardActionVisibility` / `shouldShowCancelLessonAction` /
+ * `shouldShowEditAndRescheduleButtons` / `shouldShowDeleteButton` /
+ * `canCancelLessonButton` / `isPastScheduleDate`），它们只服务于**课表卡片左滑按钮**；
+ * 左滑已整体移除（操作收口到点名页），这组函数随之删除。
  */
 import type { ScheduleCardStatus } from '@/utils/schedule-card-status';
 import type dayjs from 'dayjs';
-
-/** 按钮可见性判断所需的最小卡片字段 */
-export interface ScheduleCardActionFields {
-  canCancelLesson: boolean;
-  isTemporaryAdjusted?: boolean;
-  startTime: string;
-  status: ScheduleCardStatus;
-}
-
-export function isPastScheduleDate(selectedDate: dayjs.Dayjs, now: dayjs.Dayjs): boolean {
-  return selectedDate.isBefore(now, 'day');
-}
-
-export function canCancelLessonButton(
-  selectedDate: dayjs.Dayjs,
-  startTime: string,
-  now: dayjs.Dayjs,
-): boolean {
-  void startTime;
-  return !isPastScheduleDate(selectedDate, now);
-}
-
-export function shouldShowCancelLessonAction(
-  item: Pick<ScheduleCardActionFields, 'canCancelLesson' | 'status' | 'startTime'>,
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-): boolean {
-  if (!item.canCancelLesson || item.status === 'cancelled' || item.status === 'done') {
-    return false;
-  }
-  return canCancelLessonButton(selectedDate, item.startTime, now);
-}
-
-export function shouldShowEditAndRescheduleButtons(
-  selectedDate: dayjs.Dayjs,
-  startTime: string,
-  now: dayjs.Dayjs,
-  isTemporaryAdjusted: boolean,
-  status: ScheduleCardStatus,
-): boolean {
-  void startTime;
-  void isTemporaryAdjusted;
-  if (status === 'done' || status === 'cancelled') {
-    return false;
-  }
-  return !isPastScheduleDate(selectedDate, now);
-}
-
-export function shouldShowDeleteButton(
-  selectedDate: dayjs.Dayjs,
-  startTime: string,
-  now: dayjs.Dayjs,
-  isTemporaryAdjusted: boolean,
-): boolean {
-  void selectedDate;
-  void startTime;
-  void now;
-  void isTemporaryAdjusted;
-  return true;
-}
-
-export function getCardActionVisibility(
-  item: Pick<
-    ScheduleCardActionFields,
-    'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'
-  >,
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-) {
-  return {
-    canManageBeforeStart: !isPastScheduleDate(selectedDate, now),
-    showEditAndReschedule: shouldShowEditAndRescheduleButtons(
-      selectedDate,
-      item.startTime,
-      now,
-      Boolean(item.isTemporaryAdjusted),
-      item.status,
-    ),
-    showCancelLesson: shouldShowCancelLessonAction(item, selectedDate, now),
-    showDelete: shouldShowDeleteButton(
-      selectedDate,
-      item.startTime,
-      now,
-      Boolean(item.isTemporaryAdjusted),
-    ),
-  };
-}
 
 /** 历史课：已过日期，或当日已下课/已点名 */
 export function isHistoricalClassCard(

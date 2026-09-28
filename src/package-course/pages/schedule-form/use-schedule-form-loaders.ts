@@ -496,7 +496,7 @@ export function useScheduleFormLoaders(params: UseScheduleFormLoadersParams) {
                   className: selectedClass?.name || '',
                   role: profileRole ?? undefined,
                   navigateUrl: classId
-                    ? `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&type=class`
+                    ? `/package-course/pages/course-form/index?id=${encodeURIComponent(classId)}&mode=class`
                     : undefined,
                 });
               } catch (error) {

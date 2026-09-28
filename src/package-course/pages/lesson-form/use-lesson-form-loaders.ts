@@ -26,6 +26,14 @@ import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
+import { withCache } from '@/utils/cache-helpers';
+import { TTL } from '@/utils/data-freshness';
+import {
+  buildLessonRosterKey,
+  readLessonRoster,
+  writeLessonRoster,
+  type LessonRosterSnapshot,
+} from '@/utils/lesson-roster-cache';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import {
@@ -173,8 +181,24 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         return;
       }
 
-      const configuredTeacherIds = classInfo.teachers?.length
-        ? classInfo.teachers
+      /**
+       * 归一化班级老师 id。
+       *
+       * `Class.teachers` 前端类型写的是 `string[]`，但后端同一字段历史上存过**两种形态**：
+       * 字符串数组，以及 `{ id }` 对象数组（后端自己的读取处 `class.service.ts` 也兼容两种）。
+       * 之前这里直接 `.map(id => options.find(t => t.id === id))`：一旦是对象形态，查找必然
+       * 全部落空，于是回落到 `teacher_id`（后端更新班级时**不写这一列**，拿到的是旧值），
+       * 再兜底到 `currentTeacherId` —— 表现为「在班级编辑页改了老师，点名页还是旧老师、
+       * 甚至显示成当前登录人」。
+       */
+      const rawTeachers = Array.isArray(classInfo.teachers) ? classInfo.teachers : [];
+      const normalizedTeacherIds = rawTeachers
+        .map((item) =>
+          typeof item === 'string' ? item : (item as unknown as { id?: string })?.id || '',
+        )
+        .filter(Boolean);
+      const configuredTeacherIds = normalizedTeacherIds.length
+        ? normalizedTeacherIds
         : classInfo.teacher_id
           ? [classInfo.teacher_id]
           : [];
@@ -301,6 +325,74 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setTrialLeadMap,
   ]);
 
+  /**
+   * 拉取「班级名单」（班级信息 + 正式学员 + 当日已确认补课学员）——**慢变部分，走内存快照**。
+   *
+   * 点名记录 / 课包 / 科目 / 请假审批仍在调用方单独直拉：它们属资损域（§1.1 D1），不进缓存。
+   * `force: true` 用于"我刚写完数据"的场景（点名/补录保存后刷新），跳过缓存直接回源。
+   */
+  const fetchClassRoster = useCallback(
+    async (classId: string, opts?: { force?: boolean }): Promise<LessonRosterSnapshot> => {
+      const cacheKey = buildLessonRosterKey({ userId: currentUserId, classId, lessonDate });
+      if (!opts?.force) {
+        const cached = readLessonRoster(cacheKey);
+        if (cached) {
+          return cached;
+        }
+      }
+
+      // 课包由 loadPackageMapsForStudents 统一按学员并发拉取；
+      // 这里显式关掉 getStudents 的默认补包，避免同一批学员被重复请求一遍（N+1）。
+      const [classInfo, formalStudents] = await Promise.all([
+        classService.getById(classId),
+        classService.getStudents(classId, { includePackages: false }),
+      ]);
+
+      // 点名入口必须把当天已确认的补课学员并入列表；否则会出现
+      //「课表预约成功，但点名页看不到补课学员」。
+      const makeupStudentIds: string[] = [];
+      let students = formalStudents;
+      try {
+        const makeupBookings = await makeupBookingService.getByClassDate({
+          classId,
+          lessonDate,
+        });
+        const formalIds = new Set(formalStudents.map((student) => student.id));
+        const extraStudents = await Promise.all(
+          makeupBookings
+            .filter((booking) => {
+              makeupStudentIds.push(booking.student_id);
+              return !formalIds.has(booking.student_id);
+            })
+            .map(async (booking) => {
+              try {
+                return await studentService.getById(booking.student_id);
+              } catch (err) {
+                logError('load makeup student', err);
+                return null;
+              }
+            }),
+        );
+        students = [
+          ...extraStudents.filter((student): student is Student => Boolean(student)),
+          ...formalStudents,
+        ];
+      } catch (err) {
+        logError('load class makeup students', err);
+      }
+
+      const snapshot: LessonRosterSnapshot = { classInfo, students, makeupStudentIds };
+      // 班级信息取不到（不存在 / 无权限 / 请求失败）时不落缓存：
+      // 否则一次瞬时失败会把「空名单」锁住整个 TTL，老师会看到"这个班没学员"。
+      // 注意空学员是合法状态（新建班），只以 classInfo 是否存在为准。
+      if (classInfo) {
+        writeLessonRoster(cacheKey, snapshot);
+      }
+      return snapshot;
+    },
+    [currentUserId, lessonDate],
+  );
+
   useEffect(() => {
     if (isEditEntryAttempt) {
       return;
@@ -308,11 +400,15 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
 
     const loadData = async () => {
       const [classList, teacherList, campusList, scheduledIds] = await Promise.all([
-        // L3：显式传当前校区，班级列表按所选校区返回
+        // L3：显式传当前校区，班级列表按所选校区返回（store 内已带 TTL 缓存）
         fetchClassesByTeacher(currentTeacherId, campusId),
-        teacherService.getList(),
-        campusService.getList(),
-        classService.getScheduledClassIds(),
+        // 以下三项为慢变字典，走仓库统一的 withCache 持久缓存：
+        // 重进详情页不再重复打后端，缩短「进入即加载」的体感。
+        withCache('lesson-form', 'teacher-list', TTL.list, () => teacherService.getList()),
+        withCache('lesson-form', 'campus-list', TTL.campus, () => campusService.getList()),
+        withCache('lesson-form', 'scheduled-class-ids', TTL.list, () =>
+          classService.getScheduledClassIds(),
+        ),
       ]);
       setClasses(classList.filter((item) => item.status === 'active' || item.status === 'paused'));
       setScheduledClassIds(new Set(scheduledIds));
@@ -327,6 +423,19 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
           teacherList.find((teacher) => teacher.name === profileName);
         return matchedTeacher?.id || currentTeacherId;
       });
+
+      // 选中班级的基础信息（名称/教室/老师/校区）已在 classList 缓存里，
+      // 提前同步写出，让详情页头部在点名名单返回前就渲染出来，避免整页空白/加载感。
+      // 名单回来后会用 classService.getById 的新鲜 classInfo 再覆盖一次，不引入陈旧值。
+      const prefetchedClass = classIdParam
+        ? classList.find((item) => item.id === classIdParam) || null
+        : null;
+      if (prefetchedClass) {
+        setSelectedClassId(classIdParam);
+        setCampusId((prev) => prev || prefetchedClass.campus_id || mainCampusId);
+        applyClassTeacherDefaults(prefetchedClass, teacherList);
+        applyClassLessonDefaults(prefetchedClass);
+      }
 
       if (studentIdParam) {
         const stu = await studentService.getById(studentIdParam);
@@ -348,43 +457,16 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       if (classIdParam) {
         setClassStudentsLoading(true);
         try {
-          // 课包由下方 loadPackageMapsForStudents 统一按学员并发拉取；
-          // 这里显式关掉 getStudents 的默认补包，避免同一批学员被重复请求一遍（N+1）。
-          const [classInfo, formalStudents] = await Promise.all([
-            classService.getById(classIdParam),
-            classService.getStudents(classIdParam, { includePackages: false }),
-          ]);
-          // 点名入口必须把当天已确认的补课学员并入列表；原初始化路径只拉正式班级学员，
-          // 导致“课表预约成功，但点名页看不到补课学员”。
-          let students = formalStudents;
-          const makeupIds = new Set<string>();
-          try {
-            const makeupBookings = await makeupBookingService.getByClassDate({
-              classId: classIdParam,
-              lessonDate,
-            });
-            const formalIds = new Set(formalStudents.map((student) => student.id));
-            const extraStudents = await Promise.all(
-              makeupBookings
-                .filter((booking) => {
-                  makeupIds.add(booking.student_id);
-                  return !formalIds.has(booking.student_id);
-                })
-                .map((booking) => studentService.getById(booking.student_id)),
-            );
-            students = [
-              ...extraStudents.filter((student): student is Student => Boolean(student)),
-              ...formalStudents,
-            ];
-          } catch (err) {
-            logError('load initial makeup students', err);
-          }
-          setMakeupStudentIds(makeupIds);
+          // 名单（班级信息 + 正式学员 + 当日补课学员）走内存快照：
+          // 短窗口内重复进同一班级直接复用，不再重打 getById / getStudents / 补课预约。
+          const roster = await fetchClassRoster(classIdParam);
+          setMakeupStudentIds(new Set(roster.makeupStudentIds));
           setSelectedClassId(classIdParam);
-          setCampusId(classInfo?.campus_id || mainCampusId);
-          applyClassTeacherDefaults(classInfo, teacherList);
-          applyClassLessonDefaults(classInfo);
-          setClassStudents(students);
+          setCampusId(roster.classInfo?.campus_id || mainCampusId);
+          applyClassTeacherDefaults(roster.classInfo, teacherList);
+          applyClassLessonDefaults(roster.classInfo);
+          setClassStudents(roster.students);
+          const students = roster.students;
           const approvedLeaveIds = await loadApprovedLeaveStudentIds(students);
 
           const existingRecords = await loadLessonRecordsByDate();
@@ -423,6 +505,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     currentTeacherId,
     currentUserId,
     fetchClassesByTeacher,
+    fetchClassRoster,
     applyClassTeacherDefaults,
     applyClassLessonDefaults,
     isEditEntryAttempt,
@@ -504,15 +587,15 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
   }, [hoursUsed, selectedStudent, mode, autoMatchPackage]);
 
   const loadClassStudents = useCallback(
-    async (classId: string) => {
+    async (classId: string, opts?: { force?: boolean }) => {
       setSelectedClassId(classId);
       setClassStudentsLoading(true);
       try {
-        // 同上：课包交给 loadPackageMapsForStudents 并发拉，避免 getStudents 默认补包再来一遍。
-        const [classInfo, students] = await Promise.all([
-          classService.getById(classId),
-          classService.getStudents(classId, { includePackages: false }),
-        ]);
+        // 名单（班级信息 + 正式学员 + 当日补课学员）走内存快照；
+        // `force: true` 用于"我刚写完"的刷新场景（点名/补录保存后），跳过缓存直接回源。
+        const roster = await fetchClassRoster(classId, opts);
+        const classInfo = roster.classInfo;
+        const mergedStudents = roster.students;
         if (classInfo?.campus_id) {
           setCampusId(classInfo.campus_id);
         }
@@ -533,37 +616,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         applyClassTeacherDefaults(classInfo, teacherOptions);
         applyClassLessonDefaults(classInfo);
 
-        let mergedStudents = students;
-        const nextMakeupIds = new Set<string>();
-        try {
-          const makeupBookings = await makeupBookingService.getByClassDate({
-            classId,
-            lessonDate,
-          });
-          if (makeupBookings.length > 0) {
-            const formalIds = new Set(students.map((s) => s.id));
-            const extra: Student[] = [];
-            for (const booking of makeupBookings) {
-              nextMakeupIds.add(booking.student_id);
-              if (formalIds.has(booking.student_id)) continue;
-              try {
-                const stu = await studentService.getById(booking.student_id);
-                if (stu) {
-                  extra.push(stu);
-                  formalIds.add(stu.id);
-                }
-              } catch (err) {
-                logError('load makeup student', err);
-              }
-            }
-            if (extra.length > 0) {
-              mergedStudents = [...extra, ...students];
-            }
-          }
-        } catch (err) {
-          logError('load makeup bookings', err);
-        }
-        setMakeupStudentIds(nextMakeupIds);
+        setMakeupStudentIds(new Set(roster.makeupStudentIds));
         setClassStudents(mergedStudents);
         const approvedLeaveIds = await loadApprovedLeaveStudentIds(mergedStudents);
 
@@ -598,6 +651,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     [
       applyClassTeacherDefaults,
       applyClassLessonDefaults,
+      fetchClassRoster,
       hoursUsed,
       loadApprovedLeaveStudentIds,
       loadLessonRecordsByDate,

@@ -25,6 +25,7 @@ import type { TeacherUIModel } from '@/types/teacher';
 import { uploadImage } from '@/utils/image-upload';
 import { logError } from '@/utils/logger';
 import { SUCCESS_TOAST_MS } from '@/utils/post-save-navigation';
+import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import { COURSE_MODE_LABELS, type FormErrors, type PickerType } from './course-form-constants';
 import { setLeaveGuard } from './course-form-leave-guard';
 import {
@@ -579,7 +580,7 @@ export function useCourseFormActions(params: UseCourseFormActionsParams) {
                   classId: courseId,
                   className: name.trim(),
                   role: profile?.currentContext?.role,
-                  navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&type=class`,
+                  navigateUrl: `/package-course/pages/course-form/index?id=${encodeURIComponent(courseId)}&mode=class`,
                 });
               } catch (error) {
                 logError('subscribe E02A after class assign', error);
@@ -620,6 +621,19 @@ export function useCourseFormActions(params: UseCourseFormActionsParams) {
       // 保存成功后关闭离开确认，避免返回时再弹「未保存」误扰
       setLeaveGuard(false);
       guardArmedRef.current = false;
+      /**
+       * 班级写入成功 → 广播刷新信号。
+       *
+       * 课表卡片上的「上课老师」是**从班级解析**出来的（`utils/schedule-card-status.ts` 的
+       * `getTeacherNames` 优先读 `classInfo.teachers` / `teacher_id`），而课表页只在
+       * `useDidShow` 收到 `REFRESH_SIGNAL.schedule` 时才重拉基础数据（`loadBaseData`）。
+       * 此前本页保存完只弹 toast + 退页、**一个信号都不发** ⇒ 卡片上的老师要等下次冷启动
+       * 或 TTL 过期才变，表现为「编辑改了上课老师，课表卡片/详情页不马上更新」。
+       * 对比：排课规则编辑页 `use-schedule-form-save.ts` 是有发的。
+       */
+      if (isClassMode) {
+        emitScheduleRelatedRefresh();
+      }
       // 清理本次会话的持久化标记，避免影响下次编辑同一课程时的状态判断
       try {
         Taro.removeStorageSync(`course-form-loaded-${formStorageScope}`);

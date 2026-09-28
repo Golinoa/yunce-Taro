@@ -10,7 +10,6 @@ import {
   filterCancelledRecordsForRestore,
   filterClassesAfterBatchDelete,
   filterSchedulesAfterBatchDelete,
-  mergeLessonRecordsForDate,
   removeCancelledRecordsForDate,
   resolveBatchDeleteToast,
 } from './schedule-danger-logic';
@@ -121,37 +120,6 @@ describe('removeCancelledRecordsForDate', () => {
     ];
     const next = removeCancelledRecordsForDate(records, 'c1', '2026-09-01');
     expect(next.map((r) => r.id)).toEqual(['r2']);
-  });
-});
-
-describe('mergeLessonRecordsForDate', () => {
-  it('替换同班同日旧记录并追加新建', () => {
-    const prev = [
-      makeLessonRecord({
-        id: 'old',
-        student_id: 's1',
-        lesson_date: '2026-09-01',
-        class_id: 'c1',
-        status: 'normal',
-      }),
-      makeLessonRecord({
-        id: 'other-day',
-        student_id: 's2',
-        lesson_date: '2026-09-02',
-        class_id: 'c1',
-      }),
-    ];
-    const created = [
-      makeLessonRecord({
-        id: 'new1',
-        student_id: 's1',
-        lesson_date: '2026-09-01',
-        class_id: 'c1',
-        status: 'cancelled',
-      }),
-    ];
-    const next = mergeLessonRecordsForDate(prev, 'c1', '2026-09-01', created);
-    expect(next.map((r) => r.id)).toEqual(['other-day', 'new1']);
   });
 });
 

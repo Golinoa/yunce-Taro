@@ -77,7 +77,7 @@ export interface UseLessonFormActionsParams {
   } | null;
   submitLockRef: MutableRefObject<SubmitLock>;
   invalidateStudents: (userId?: string) => void;
-  loadClassStudents: (classId: string) => Promise<void> | void;
+  loadClassStudents: (classId: string, opts?: { force?: boolean }) => Promise<void> | void;
   loadLessonRecordsByDate: () => Promise<LessonRecord[]>;
   setCheckedStudentIds: Dispatch<SetStateAction<Set<string>>>;
   setLeaveStudentIds: Dispatch<SetStateAction<Set<string>>>;
@@ -533,7 +533,8 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       emitScheduleRefreshSignal();
       Taro.showToast({ title, icon: 'success' });
       if (selectedClassId) {
-        await loadClassStudents(selectedClassId);
+        // 刚写完点名/补录：名单内存快照必须跳过（force），否则会读到写之前的旧名单
+        await loadClassStudents(selectedClassId, { force: true });
       }
     },
     [emitScheduleRefreshSignal, loadClassStudents, selectedClassId],

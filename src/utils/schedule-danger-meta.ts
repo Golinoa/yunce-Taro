@@ -1,13 +1,15 @@
 /**
  * 课表危险操作弹窗文案（Q2-1）
  */
-export type ScheduleDangerActionType =
-  | 'cancel'
-  | 'delete'
-  | 'batch-delete'
-  | 'pause-rule'
-  | 'resume-rule'
-  | 'stop-rule';
+/**
+ * 危险操作类型。
+ *
+ * 2026-09-28 收口：`pause-rule` / `resume-rule` / `stop-rule`（单条循环排课的暂停/恢复/停止）
+ * 与 `cancel`（取消本节开课，≡ 停课）、`delete`（单节删除）已随**课表卡片左滑**一并移除 ——
+ * 排课级操作统一收口到点名页（调课 / 编辑 / 停课 / 恢复本节课 / 删除排课）。
+ * 现存唯一入口是批量操作的「解散班级」。
+ */
+export type ScheduleDangerActionType = 'batch-delete';
 
 export type DangerActionMeta = {
   title: string;
@@ -18,62 +20,16 @@ export type DangerActionMeta = {
 
 export function buildDangerActionMeta(input: {
   type: ScheduleDangerActionType | null;
-  item?: { className: string; startTime: string; endTime: string } | null;
-  lessonDate: string;
+  /** 所选班级数（解散班级提示用） */
   batchCount: number;
 }): DangerActionMeta | null {
   if (!input.type) return null;
-
-  if (input.type === 'pause-rule') {
-    return {
-      title: '暂停循环排课',
-      confirmText: '确认暂停',
-      tone: 'warning',
-      description: '暂停只停止未来课表展示，规则和历史课节保留；之后可以恢复。',
-    };
-  }
-  if (input.type === 'resume-rule') {
-    return {
-      title: '恢复循环排课',
-      confirmText: '确认恢复',
-      tone: 'warning',
-      description: '恢复后规则将继续生成未来课表，已保留的历史课节不变。',
-    };
-  }
-  if (input.type === 'stop-rule') {
-    return {
-      title: '停止循环排课',
-      confirmText: '确认停止',
-      tone: 'danger',
-      description: '停止只影响未来课表，历史课节和规则记录保留；停止后不能恢复，请新建规则。',
-    };
-  }
-
-  if (input.type === 'batch-delete') {
-    return {
-      title: '删除提示',
-      confirmText: '确认删除',
-      tone: 'danger',
-      description: `确认删除所选 ${input.batchCount} 个班级吗？删除后会向相关学员发送班级解散通知。`,
-    };
-  }
-
-  if (!input.item) return null;
-
-  if (input.type === 'cancel') {
-    return {
-      title: '取消开课提醒',
-      confirmText: '确认取消开课',
-      tone: 'warning',
-      description: `是否确定取消【${input.item.className}】${input.lessonDate} ${input.item.startTime}-${input.item.endTime}的课，取消后不可恢复并自动发送取消开课提醒给学员`,
-    };
-  }
 
   return {
     title: '删除提示',
     confirmText: '确认删除',
     tone: 'danger',
-    description: '确认要批量删除所选课节吗，删除后将不能恢复?',
+    description: `确认删除所选 ${input.batchCount} 个班级吗？删除后会向相关学员发送班级解散通知。`,
   };
 }
 
@@ -87,19 +43,6 @@ export function buildRestoreLessonConfirmContent(input: {
     title: '恢复开课',
     content: `确定恢复【${input.className}】${input.lessonDate} ${input.startTime}-${input.endTime} 的课程吗？`,
     confirmText: '恢复',
-  };
-}
-
-export function buildSuspendLessonConfirmContent(input: {
-  className: string;
-  lessonDate: string;
-  startTime: string;
-  endTime: string;
-}): { title: string; content: string; confirmText: string } {
-  return {
-    title: '停课确认',
-    content: `确定停课【${input.className}】${input.lessonDate} ${input.startTime}-${input.endTime}？停课后本节课临时取消，将向学员家长发送站内通知与订阅消息。`,
-    confirmText: '确认停课',
   };
 }
 
@@ -136,26 +79,6 @@ export function buildSuspendNotifyCopy(input: { className: string; changeTime: s
     content: `${input.changeTime} 的课程已临时停课取消，请留意老师后续安排。`,
     changeReason: '本节课临时停课',
   };
-}
-
-export function buildCancelLessonNotifyCopy(input: {
-  className: string;
-  lessonDate: string;
-  startTime: string;
-  endTime: string;
-}): { title: string; content: string } {
-  return {
-    title: `${input.className}已取消`,
-    content: `${input.lessonDate} ${input.startTime}-${input.endTime} 的课程已取消`,
-  };
-}
-
-export function buildCancelLessonRecordContent(input: {
-  className: string;
-  startTime: string;
-  endTime: string;
-}): string {
-  return `取消开课：${input.className} ${input.startTime}-${input.endTime}`;
 }
 
 export function buildSuspendLessonRecordContent(input: {

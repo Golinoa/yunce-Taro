@@ -209,20 +209,20 @@ const LeadBookingDetailPage: React.FC = () => {
                 <Text className="text-[32rpx] font-bold text-white">
                   {signedCount}/{totalCount}
                 </Text>
-                <Text className="text-[20rpx] text-white/80">已签到</Text>
+                <Text className="text-[20rpx] text-white/80">已点名</Text>
               </View>
             </View>
           </View>
         </View>
       </View>
 
-      {/* 签到统计卡片 */}
+      {/* 点名统计卡片 */}
       <View className="relative z-10 -mt-[40rpx] mx-[24rpx] rounded-[24rpx] bg-white px-[24rpx] py-[24rpx] shadow-[0_8rpx_24rpx_rgba(15,23,42,0.04)]">
         <View className="flex items-center justify-between">
           <View>
             <Text className="text-[32rpx] font-bold text-foreground">
-              已签到
-              <Text className="text-primary">{signedCount}</Text>人 · 待签
+              已点名
+              <Text className="text-primary">{signedCount}</Text>人 · 待点名
               <Text className="text-warning">{totalCount - signedCount}</Text>人
             </Text>
             <Text className="mt-[6rpx] text-[24rpx] text-muted-foreground">

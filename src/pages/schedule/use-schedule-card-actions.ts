@@ -5,18 +5,14 @@ import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { CourseCategoryMode } from '@/types/course-category';
-import { getCardActionVisibility } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
-import type { ScheduleDangerActionType } from '@/utils/schedule-danger-meta';
 import {
+  buildBatchRescheduleSelectPath,
   buildBookingPagePath,
   buildCheckinLessonFormPath,
-  buildScheduleFormEditPath,
-  buildScheduleFormReschedulePath,
   buildSupplementLessonFormPath,
   buildViewOnlyLessonFormPath,
   resolveSchedulePrimaryActionKind,
-  validateEditScheduleNav,
   validateRollCallNav,
   validateSupplementNav,
 } from '@/utils/schedule-lesson-nav';
@@ -158,36 +154,6 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
     Taro.navigateTo({ url: buildCheckinLessonFormPath(item, actionDate) });
   }, []);
 
-  const handleEditSchedule = useCallback(
-    (item: ScheduleCardItem) => {
-      const visibility = getCardActionVisibility(item, selectedDate, currentTime);
-      const error = validateEditScheduleNav(item, selectedDate, currentTime, visibility);
-      if (error) {
-        Taro.showToast({ title: error, icon: 'none' });
-        return;
-      }
-      Taro.navigateTo({
-        url: buildScheduleFormEditPath(item.id),
-      });
-    },
-    [currentTime, selectedDate],
-  );
-
-  /** 班级调课：这一天整班换到别的时间（仅本次），长期仍挂在原排课规则上 */
-  const handleClassReschedule = useCallback(
-    (item: ScheduleCardItem) => {
-      const visibility = getCardActionVisibility(item, selectedDate, currentTime);
-      if (!visibility.showEditAndReschedule) {
-        Taro.showToast({ title: '过去日期课程不支持调课', icon: 'none' });
-        return;
-      }
-      Taro.navigateTo({
-        url: buildScheduleFormReschedulePath(item.id, selectedDate.format('YYYY-MM-DD')),
-      });
-    },
-    [currentTime, selectedDate],
-  );
-
   const handleCreateSchedule = useCallback(
     (sourceMode?: string) => {
       const mode = sourceMode || activeTabMode || 'class';
@@ -202,16 +168,6 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
   const handleManageBookingConfig = useCallback(() => {
     setTeacherSwitchSheetVisible(true);
   }, [setTeacherSwitchSheetVisible]);
-
-  const handleScheduleRuleAction = useCallback(
-    (
-      item: ScheduleCardItem,
-      action: Extract<ScheduleDangerActionType, 'pause-rule' | 'resume-rule' | 'stop-rule'>,
-    ) => {
-      setDangerActionState({ visible: true, type: action, item });
-    },
-    [setDangerActionState],
-  );
 
   const handleBatchAction = useCallback(() => {
     const initialSelectedIds =
@@ -244,10 +200,9 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
           Taro.showToast({ title: '过去的日期不能批量调课', icon: 'none' });
           return;
         }
-        const date = encodeURIComponent(selectedDate.format('YYYY-MM-DD'));
-        const classId = encodeURIComponent(selectedClassId || '');
+        const date = selectedDate.format('YYYY-MM-DD');
         void Taro.navigateTo({
-          url: `/package-course/pages/batch-reschedule-select/index?date=${date}&classId=${classId}`,
+          url: buildBatchRescheduleSelectPath(date, selectedClassId || ''),
         });
         return;
       }
@@ -272,7 +227,6 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
     setDangerActionState({
       visible: true,
       type: 'batch-delete',
-      item: null,
     });
   }, [batchSelectedClassIds.length, setDangerActionState]);
 
@@ -284,11 +238,8 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
     handleViewHistoricalLesson,
     handlePrimaryAction,
     handleRollCall,
-    handleEditSchedule,
-    handleClassReschedule,
     handleCreateSchedule,
     handleManageBookingConfig,
-    handleScheduleRuleAction,
     handleBatchAction,
     toggleBatchClassSelection,
     handleSelectAllBatchClasses,

@@ -26,9 +26,11 @@ import LessonFormFooter from './LessonFormFooter';
 import LessonFormHeader from './LessonFormHeader';
 import LessonFormSheets from './LessonFormSheets';
 import SingleLessonPanel from './SingleLessonPanel';
+import SuspendReasonDialog from './SuspendReasonDialog';
 import { useLessonFormActions } from './use-lesson-form-actions';
 import { useLessonFormHelpers } from './use-lesson-form-helpers';
 import { useLessonFormLoaders } from './use-lesson-form-loaders';
+import { useLessonFormScheduleActions } from './use-lesson-form-schedule-actions';
 import type { StudentEditSheetTarget } from './StudentEditSheet';
 
 const LessonForm: React.FC = () => {
@@ -48,6 +50,17 @@ const LessonForm: React.FC = () => {
 
   const classIdParam = useMemo(() => {
     const v = routeParams.classId || '';
+    return v ? decodeURIComponent(v) : '';
+  }, [routeParams]);
+
+  /**
+   * 排课 id。
+   *
+   * `buildLessonFormPath` 一直会把它拼进 query（卡片入口必带），但本页此前从未读取
+   * ⇒ 参数被静默丢弃。单次调课 / 删除排课都依赖它。
+   */
+  const scheduleIdParam = useMemo(() => {
+    const v = routeParams.scheduleId || '';
     return v ? decodeURIComponent(v) : '';
   }, [routeParams]);
 
@@ -524,7 +537,6 @@ const LessonForm: React.FC = () => {
 
   const {
     isClassPaused,
-    handleToggleClassPause,
     isClassDirectEntry,
     shouldShowModeTabs,
     displayLessonTime,
@@ -560,6 +572,49 @@ const LessonForm: React.FC = () => {
     studentSubjects,
     hoursUsed,
   });
+
+  // ===== 排课级操作：单次调课 / 临时停课（只停今天这一节）/ 删除排课 =====
+  // 三者都依赖 URL 里的 scheduleId（见 scheduleIdParam 说明）。
+  const [suspendSheetVisible, setSuspendSheetVisible] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+
+  const {
+    canReschedule,
+    canSuspendLesson,
+    canRestoreLesson,
+    suspending,
+    restoring,
+    handleReschedule,
+    handleEdit,
+    handleSuspendLesson,
+    handleRestoreLesson,
+    handleDeleteSchedule,
+  } = useLessonFormScheduleActions({
+    scheduleId: scheduleIdParam,
+    classId: selectedClassId,
+    className: selectedClass?.name || '',
+    lessonDate,
+    /** 班级固定上课时间优先，取不到时回落到页面展示的时间 */
+    startTime: selectedClass?.start_time || displayLessonTime,
+    endTime: selectedClass?.end_time || displayLessonTime,
+    suspendReason,
+    isAlreadyChecked,
+    existingClassRecords,
+    profileId: profile?.id,
+    currentUserId,
+    /** 写入记录的老师取页面上展示的那位，保证记录与界面一致 */
+    teacherId: selectedTeachingTeacherId || currentTeacherId,
+    assistantTeacherId: selectedAssistantTeacherId,
+  });
+
+  const handleOpenSuspendSheet = useCallback(() => {
+    setSuspendReason('');
+    setSuspendSheetVisible(true);
+  }, []);
+
+  const handleConfirmSuspend = useCallback(() => {
+    void handleSuspendLesson();
+  }, [handleSuspendLesson]);
 
   /** 课表卡片带 action=supplement 进入：已点名后自动打开补录选人（须在 30 天窗口内） */
   useEffect(() => {
@@ -640,7 +695,10 @@ const LessonForm: React.FC = () => {
             homework={homework}
             isAlreadyChecked={isAlreadyChecked}
             canEditClass={canEditClass}
-            isClassPaused={isClassPaused}
+            canReschedule={canReschedule}
+            canSuspendLesson={canSuspendLesson}
+            canRestoreLesson={canRestoreLesson}
+            restoring={restoring}
             studentSearchKeyword={studentSearchKeyword}
             studentsLoading={classStudentsLoading}
             hoursUsed={hoursUsed}
@@ -657,7 +715,11 @@ const LessonForm: React.FC = () => {
             studentRemarkDrafts={studentRemarkDrafts}
             recordByStudentId={recordByStudentId}
             onHomeworkChange={setHomework}
-            onToggleClassPause={() => void handleToggleClassPause()}
+            onReschedule={handleReschedule}
+            onEdit={handleEdit}
+            onSuspendLesson={handleOpenSuspendSheet}
+            onRestoreLesson={handleRestoreLesson}
+            onDeleteSchedule={handleDeleteSchedule}
             onSelectClass={handleSelectClass}
             onStudentSearchChange={setStudentSearchKeyword}
             onHoursChange={setHoursUsed}
@@ -737,6 +799,21 @@ const LessonForm: React.FC = () => {
           setLessonDatePickerVisible(false);
         }}
       />
+
+      {/* 停课确认（居中弹框；只停今天这一节，理由选填） */}
+      {mode === 'class' ? (
+        <SuspendReasonDialog
+          visible={suspendSheetVisible}
+          className={selectedClass?.name || ''}
+          lessonDate={lessonDate}
+          displayLessonTime={displayLessonTime}
+          reason={suspendReason}
+          submitting={suspending}
+          onReasonChange={setSuspendReason}
+          onClose={() => setSuspendSheetVisible(false)}
+          onConfirm={handleConfirmSuspend}
+        />
+      ) : null}
     </PageContainer>
   );
 };

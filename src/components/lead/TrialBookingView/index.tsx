@@ -45,6 +45,11 @@ export interface TrialBookingViewProps {
   onSuccess?: () => void;
   /** 外部触发的刷新版本号（例如老师预约开关变化后递增） */
   refreshKey?: number;
+  /**
+   * 外部触发的「重新拉取数据」令牌：数值变化即重跑 loadData。
+   * 目前由课表页的下拉刷新递增（本视图自带数据加载，页面侧只能靠令牌触发）。
+   */
+  reloadToken?: number;
   /** 老师预约开关弹窗是否显示（由外部加号按钮控制） */
   switchSheetVisible?: boolean;
   /** 关闭老师预约开关弹窗 */
@@ -279,6 +284,7 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
   initialTeacherId,
   className,
   refreshKey,
+  reloadToken,
   switchSheetVisible = false,
   onSwitchSheetClose,
   isParent = false,
@@ -345,6 +351,16 @@ const TrialBookingView: React.FC<TrialBookingViewProps> = ({
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  /**
+   * 外部令牌触发的重拉（课表页下拉刷新）。
+   * 只在令牌**变化**时重跑：初始值 0 / undefined 不触发，避免与上面的首次加载重复请求。
+   */
+  useEffect(() => {
+    if (!reloadToken) return;
+    void loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅响应令牌变化，不跟随 loadData 身份变化重复请求
+  }, [reloadToken]);
 
   /** 日历红点：有预约的日期显示红点，过去的预约显示灰点 */
   const getDateDotType = useCallback(

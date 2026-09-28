@@ -1,53 +1,21 @@
 /**
  * 课表危险操作纯逻辑（供 use-schedule-danger-actions 与单测共用）
- * 使用场景：恢复取消记录筛选、消课记录合并、开放时段休息态、批量解散结果文案。
+ * 使用场景：恢复取消记录筛选、开放时段休息态、批量解散结果文案。
  */
 import type { Class, ClassBookingSlot } from '@/types/class';
-import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 
-/** 恢复开课时：筛出当日该班已取消记录。 */
-export function filterCancelledRecordsForRestore(
-  lessonRecords: LessonRecord[],
-  classId: string,
-  lessonDate: string,
-): LessonRecord[] {
-  return lessonRecords.filter(
-    (record) =>
-      record.class_id === classId &&
-      record.lesson_date === lessonDate &&
-      record.status === 'cancelled',
-  );
-}
-
-/** 写入停课/取消记录后：去掉同班同日旧记录再追加新建。 */
-export function mergeLessonRecordsForDate(
-  prev: LessonRecord[],
-  classId: string,
-  lessonDate: string,
-  createdRecords: LessonRecord[],
-): LessonRecord[] {
-  const filtered = prev.filter(
-    (record) => !(record.class_id === classId && record.lesson_date === lessonDate),
-  );
-  return [...filtered, ...createdRecords];
-}
+/**
+ * 恢复开课时：筛出当日该班已取消记录。
+ * 实现已下沉到 `@/utils/lesson-record-cancel`（点名页「恢复本节课」共用同一口径），
+ * 这里保留同名导出，避免改动既有调用方与单测。
+ */
+export {
+  filterCancelledRecordsForRestore,
+  removeCancelledRecordsForDate,
+} from '@/utils/lesson-record-cancel';
 
 /** 恢复开课成功后：移除当日该班 cancelled 记录。 */
-export function removeCancelledRecordsForDate(
-  prev: LessonRecord[],
-  classId: string,
-  lessonDate: string,
-): LessonRecord[] {
-  return prev.filter(
-    (record) =>
-      !(
-        record.class_id === classId &&
-        record.lesson_date === lessonDate &&
-        record.status === 'cancelled'
-      ),
-  );
-}
 
 /** 团课停课：将指定 slot 标记为 rest（不可变更新）。 */
 export function applyOpenSlotRestStatus(

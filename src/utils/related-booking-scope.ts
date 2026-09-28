@@ -184,7 +184,7 @@ export function resolveMyBookingActions(
       canCheckIn: active && isTeacherOrOperator,
       canCancel: active && canMutate,
       canVenueCheckIn: false,
-      checkInLabel: card.sourceType === 'trial_group' ? '点名' : '签到',
+      checkInLabel: '点名',
     };
   }
 

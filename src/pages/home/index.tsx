@@ -98,8 +98,6 @@ const HOME_QUERY_STALE_TIME_MS = 30_000;
  * - Tab 切换：今日课表 / 待办事项 / 最近消课
  */
 const Home: React.FC = () => {
-  /** 构建期常量：生产构建恒为 false，DCE 整棵移除 MockIdentitySwitcher（P-05/B-02） */
-  const isDebugBuild = process.env.TARO_ENABLE_LOCAL_DEBUG === 'true';
   const { profile, currentRole, currentIdentity, applyAuthPayload } = useAuth();
   const {
     campuses,
@@ -893,7 +891,6 @@ const Home: React.FC = () => {
       </View>
 
       <HomePageOverlays
-        isDebugBuild={isDebugBuild}
         isStaff={isStaffRole(currentRole)}
         isParent={isParentRole(currentRole)}
         showCampusSheet={showCampusSheet}

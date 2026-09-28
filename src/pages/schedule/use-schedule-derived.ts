@@ -76,7 +76,6 @@ export function useScheduleDerived(params: UseScheduleDerivedParams) {
     openSlotDates,
     batchSelectedClassIds,
     dangerActionState,
-    selectedDate,
   } = params;
 
   /** 根据课程分类生成顶部 Tab：基础模式 Tab + 场地 + 独立展示分类，统一按 sortOrder 排序 */
@@ -259,11 +258,9 @@ export function useScheduleDerived(params: UseScheduleDerivedParams) {
     () =>
       buildDangerActionMeta({
         type: dangerActionState.type,
-        item: dangerActionState.item,
-        lessonDate: selectedDate.format('YYYY-MM-DD'),
         batchCount: selectedBatchClasses.length,
       }),
-    [dangerActionState.item, dangerActionState.type, selectedBatchClasses.length, selectedDate],
+    [dangerActionState.type, selectedBatchClasses.length],
   );
 
   const renderDateCards = useCallback(

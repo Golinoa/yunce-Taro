@@ -1,19 +1,16 @@
 /**
  * 点名页停课 / 图片上传 / 模式派生 / 学员列表过滤（Q2-2 收口）
  */
-import Taro from '@tarojs/taro';
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
-import { classService, uploadService } from '@/services';
-import { getThemeHexColors, type ThemeKey } from '@/theme';
+import { uploadService } from '@/services';
+import type { ThemeKey } from '@/theme';
 import type { Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { Student } from '@/types/student';
 import { chooseImageTemp } from '@/utils/image-upload';
-import { logError } from '@/utils/logger';
 import { runImageUploadFlow } from '@/utils/upload-flow';
-import { formatTime } from './lesson-form-datetime';
 import { isWithinLessonOperateWindow } from './lesson-operate';
 import type { CheckinStatus } from './checkin-status';
 
@@ -57,8 +54,6 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
     homeworkImages,
     setHomeworkImages,
     setUploading,
-    setClasses,
-    themeActiveTheme,
     classStudents,
     studentSearchKeyword,
     attendanceFilter,
@@ -76,50 +71,18 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
 
   const isClassPaused = selectedClass?.status === 'paused';
 
-  const handleToggleClassPause = useCallback(async () => {
-    if (!selectedClassId || !selectedClass) {
-      Taro.showToast({ title: '缺少班级信息', icon: 'none' });
-      return;
-    }
-    const pausing = selectedClass.status !== 'paused';
-    const confirmResult = await Taro.showModal({
-      title: pausing ? '停课确认' : '恢复上课',
-      content: pausing
-        ? `确定暂停【${selectedClass.name}】？停课后课表不再展示该班排课/开放时段，可随时恢复。`
-        : `确定恢复【${selectedClass.name}】上课？`,
-      confirmText: pausing ? '确认停课' : '恢复上课',
-      confirmColor: getThemeHexColors(themeActiveTheme).primary,
-    });
-    if (!confirmResult.confirm) return;
-
-    try {
-      const updated = pausing
-        ? await classService.pause(selectedClassId)
-        : await classService.resume(selectedClassId);
-      if (!updated) {
-        Taro.showToast({ title: pausing ? '停课失败' : '恢复失败', icon: 'none' });
-        return;
-      }
-      setClasses((prev) =>
-        prev.map((item) =>
-          item.id === selectedClassId ? { ...item, status: pausing ? 'paused' : 'active' } : item,
-        ),
-      );
-      Taro.showToast({ title: pausing ? '已停课' : '已恢复上课', icon: 'success' });
-      if (pausing) {
-        setTimeout(() => Taro.navigateBack(), 500);
-      }
-    } catch (err) {
-      logError('LessonForm toggle class pause', err);
-      Taro.showToast({ title: '操作失败，请重试', icon: 'none' });
-    }
-  }, [selectedClass, selectedClassId, setClasses, themeActiveTheme]);
-
   const isClassDirectEntry = Boolean(classIdParam);
   const shouldShowModeTabs = !isClassDirectEntry;
 
-  /** 手动消课：展示当前操作时间（不使用班级固定上课时间） */
-  const displayLessonTime = lessonTime || formatTime(new Date());
+  /** 头部大字号展示的"本节课时间"：优先用班级固定上课时间（最权威，来自排课规则），
+   *  没有班级（课时/手动消课）时才回落到进入页携带的时间参数 lessonTime。
+   *  注意：绝不再回落到实时时钟（formatTime(new Date())）——详情页打开的可能是
+   *  历史课或未来课，显示"现在几点"会让老师误以为在显示当前正在上的课，是错的。 */
+  const classScheduledTime =
+    selectedClass?.start_time && selectedClass?.end_time
+      ? `${selectedClass.start_time}-${selectedClass.end_time}`
+      : null;
+  const displayLessonTime = classScheduledTime || lessonTime || '';
 
   /** 30 天操作窗口：可补录 / 修改；超时或 viewOnly 仅查看 */
   const canModifyLesson = useMemo(() => {
@@ -241,7 +204,6 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
 
   return {
     isClassPaused,
-    handleToggleClassPause,
     isClassDirectEntry,
     shouldShowModeTabs,
     displayLessonTime,

@@ -6,12 +6,13 @@ import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
 import { classColorHex } from '@/theme';
 import type { Schedule, CourseStatus } from '@/types/schedule';
+import { resolveScheduleDisplayTitle } from '@/utils/schedule-note-display';
 
 export interface TodayScheduleCardProps {
   schedules: Schedule[];
   /** 卡片标题，默认"今日课表" */
   title?: string;
-  /** 私教预约一键签到（不跳转） */
+  /** 私教预约一键点名（不跳转） */
   onPrivateCheckIn?: (bookingId: string) => Promise<void>;
   /** 场地预约确认到场 */
   onVenueCheckIn?: (venueBookingId: string) => Promise<void>;
@@ -37,7 +38,7 @@ function getBtnText(status: CourseStatus, item: Schedule): string {
     return status === 'done' ? '已确认' : '确认到场';
   }
   if (item.trial_mode === 'private') {
-    return status === 'done' ? '已签到' : '签到';
+    return status === 'done' ? '已点名' : '点名';
   }
   if (status === 'done') return '查看';
   if (status === 'urgent') return '立即点名';
@@ -223,7 +224,14 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
       <View className="flex flex-col gap-[20rpx]">
         {sortedSchedules.map((item) => {
           const status: CourseStatus = item.status || 'upcoming';
-          const displayName = item.note || item.class_info?.name || '未命名';
+          // 标题：正式排课以班级名称为准。排课备注(note)里含系统拼接的规则元信息
+          // （"类型:班课 | 规则:weekly | 开始:…"），直接当标题会把这串元信息显示出来。
+          const displayName = resolveScheduleDisplayTitle({
+            note: item.note,
+            classInfoName: item.class_info?.name,
+            scheduleKind: item.schedule_kind,
+            trialMode: item.trial_mode,
+          });
           const teacherName = item.teacher_name || '老师';
           const checked = item.checked_count || 0;
           const total = item.total_count || 0;
@@ -238,8 +246,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
           const isInlineCheckIn =
             (item.trial_mode === 'private' && !!item.booking_id) ||
             (item.schedule_kind === 'venue' && !!item.venue_booking_id);
-          const progressLabel =
-            item.trial_mode === 'private' || item.schedule_kind === 'venue' ? '已签到' : '已点名';
+          const progressLabel = '已点名';
 
           return (
             <View
@@ -354,12 +361,7 @@ const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
                       )}
                       {isDone && (
                         <View className="course-tag-done rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
-                          <Text className="text-[20rpx] font-medium">已完成</Text>
-                        </View>
-                      )}
-                      {isEnded && (
-                        <View className="course-tag-ended rounded-[8rpx] flex items-center shrink-0 whitespace-nowrap px-[14rpx] py-[4rpx]">
-                          <Text className="text-[20rpx] font-medium">已下课</Text>
+                          <Text className="text-[20rpx] font-medium">已点名</Text>
                         </View>
                       )}
                       {!isDone && !isEnded && !isUnattended && !isActive && categoryLabel && (

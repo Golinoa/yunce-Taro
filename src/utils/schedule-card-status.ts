@@ -129,8 +129,8 @@ export function resolveScheduleStatus(params: {
         checkedCount,
         hintText:
           totalCount > 0
-            ? `已完成 ${checkedCount}/${totalCount} 人消课`
-            : `已完成 ${checkedCount} 条消课记录`,
+            ? `已点名 ${checkedCount}/${totalCount} 人消课`
+            : `已点名 ${checkedCount} 条消课记录`,
         countdownText: undefined,
         tags: [],
         hasMakeup,
@@ -140,7 +140,7 @@ export function resolveScheduleStatus(params: {
     return {
       status: 'ended' as const,
       checkedCount,
-      hintText: '已下课，尚未登记消课记录',
+      hintText: '未点名，尚未登记消课记录',
       countdownText: undefined,
       tags: [],
       hasMakeup,

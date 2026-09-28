@@ -247,30 +247,86 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
     ],
   );
 
-  const loadBaseData = useCallback(async () => {
-    if (!currentUserId) {
-      return;
-    }
-    setLoading(true);
-    try {
-      if (isParent) {
-        const kids = await studentService.getByParent(profileId || currentUserId);
-        const classIdSet = new Set<string>();
-        kids.forEach((kid) => {
-          (kid.class_ids || []).forEach((id) => classIdSet.add(id));
-        });
-        setParentClassIds(classIdSet);
+  /**
+   * 基础数据加载（排课 / 班级 / 老师 / 学员头像 / 试听预约 / 分类）。
+   *
+   * `silent: true` 时不切全局 loading 骨架 —— 下拉刷新已由系统指示器给出反馈，
+   * 再叠一层骨架会让列表闪一下。
+   */
+  const loadBaseData = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!currentUserId) {
+        return;
+      }
+      if (!opts?.silent) {
+        setLoading(true);
+      }
+      try {
+        if (isParent) {
+          const kids = await studentService.getByParent(profileId || currentUserId);
+          const classIdSet = new Set<string>();
+          kids.forEach((kid) => {
+            (kid.class_ids || []).forEach((id) => classIdSet.add(id));
+          });
+          setParentClassIds(classIdSet);
 
-        const classList = (
-          await Promise.all([...classIdSet].map((id) => classService.getById(id)))
-        ).filter(Boolean) as Class[];
-        const scheduleList = await scheduleService.listForParent([...classIdSet], currentCampusId);
-        const teacherList = await teacherService.getList(currentCampusId);
+          const classList = (
+            await Promise.all([...classIdSet].map((id) => classService.getById(id)))
+          ).filter(Boolean) as Class[];
+          const scheduleList = await scheduleService.listForParent(
+            [...classIdSet],
+            currentCampusId,
+          );
+          const teacherList = await teacherService.getList(currentCampusId);
 
+          const classStudentsList = await Promise.all(
+            classList.map(async (classItem) => ({
+              classId: classItem.id,
+              students: kids.filter((kid) => (kid.class_ids || []).includes(classItem.id)),
+            })),
+          );
+          const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};
+          classStudentsList.forEach((item) => {
+            nextClassStudentAvatars[item.classId] = item.students.map((student) => ({
+              id: student.id,
+              name: student.name,
+              avatar: student.avatar_url,
+            }));
+          });
+
+          setSchedules(scheduleList);
+          setClasses(classList);
+          setTeachers(teacherList);
+          setClassStudentAvatars(nextClassStudentAvatars);
+          setTrialBookingKeys(new Set());
+          return;
+        }
+
+        const [scheduleList, classList, teacherList, leadBookings] = await Promise.all([
+          scheduleService.getByTeacher(currentUserId, currentCampusId),
+          classService.getByTeacher(currentUserId, currentCampusId),
+          teacherService.getList(currentCampusId),
+          // 试听预约和分类是课表增强数据；失败时不得阻断核心课表渲染。
+          leadService.getLeadBookingsByTeacher(currentTeacherId).catch((err) => {
+            logError('SchedulePage load lead bookings', err);
+            return [];
+          }),
+          Promise.resolve()
+            .then(() => fetchCategories())
+            .catch((err) => {
+              logError('SchedulePage load categories', err);
+              return undefined;
+            }),
+        ]);
         const classStudentsList = await Promise.all(
           classList.map(async (classItem) => ({
             classId: classItem.id,
-            students: kids.filter((kid) => (kid.class_ids || []).includes(classItem.id)),
+            students: await classService
+              .getStudents(classItem.id, { includePackages: false })
+              .catch((err) => {
+                logError(`SchedulePage load class students: ${classItem.id}`, err);
+                return [];
+              }),
           })),
         );
         const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};
@@ -281,85 +337,45 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
             avatar: student.avatar_url,
           }));
         });
-
+        const nextTrialBookingKeys = buildTrialBookingKeys(leadBookings);
         setSchedules(scheduleList);
         setClasses(classList);
         setTeachers(teacherList);
         setClassStudentAvatars(nextClassStudentAvatars);
-        setTrialBookingKeys(new Set());
-        return;
+        setTrialBookingKeys(nextTrialBookingKeys);
+        void calendarSyncService.maybePromptOnSchedulePage({
+          userId: currentUserId,
+          teacherId: currentUserId,
+          role: currentRole ?? undefined,
+          campusId: currentCampusId,
+          scheduleCount: scheduleList.length,
+        });
+      } catch (err) {
+        logError('SchedulePage loadBaseData', err);
+        // 口径：无权限/拉数失败 → 空白课表，不用失败 toast 打断
+      } finally {
+        if (!opts?.silent) {
+          setLoading(false);
+        }
       }
-
-      const [scheduleList, classList, teacherList, leadBookings] = await Promise.all([
-        scheduleService.getByTeacher(currentUserId, currentCampusId),
-        classService.getByTeacher(currentUserId, currentCampusId),
-        teacherService.getList(currentCampusId),
-        // 试听预约和分类是课表增强数据；失败时不得阻断核心课表渲染。
-        leadService.getLeadBookingsByTeacher(currentTeacherId).catch((err) => {
-          logError('SchedulePage load lead bookings', err);
-          return [];
-        }),
-        Promise.resolve()
-          .then(() => fetchCategories())
-          .catch((err) => {
-            logError('SchedulePage load categories', err);
-            return undefined;
-          }),
-      ]);
-      const classStudentsList = await Promise.all(
-        classList.map(async (classItem) => ({
-          classId: classItem.id,
-          students: await classService
-            .getStudents(classItem.id, { includePackages: false })
-            .catch((err) => {
-              logError(`SchedulePage load class students: ${classItem.id}`, err);
-              return [];
-            }),
-        })),
-      );
-      const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};
-      classStudentsList.forEach((item) => {
-        nextClassStudentAvatars[item.classId] = item.students.map((student) => ({
-          id: student.id,
-          name: student.name,
-          avatar: student.avatar_url,
-        }));
-      });
-      const nextTrialBookingKeys = buildTrialBookingKeys(leadBookings);
-      setSchedules(scheduleList);
-      setClasses(classList);
-      setTeachers(teacherList);
-      setClassStudentAvatars(nextClassStudentAvatars);
-      setTrialBookingKeys(nextTrialBookingKeys);
-      void calendarSyncService.maybePromptOnSchedulePage({
-        userId: currentUserId,
-        teacherId: currentUserId,
-        role: currentRole ?? undefined,
-        campusId: currentCampusId,
-        scheduleCount: scheduleList.length,
-      });
-    } catch (err) {
-      logError('SchedulePage loadBaseData', err);
-      // 口径：无权限/拉数失败 → 空白课表，不用失败 toast 打断
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    currentCampusId,
-    currentRole,
-    currentTeacherId,
-    currentUserId,
-    fetchCategories,
-    isParent,
-    profileId,
-    setClassStudentAvatars,
-    setClasses,
-    setLoading,
-    setParentClassIds,
-    setSchedules,
-    setTeachers,
-    setTrialBookingKeys,
-  ]);
+    },
+    [
+      currentCampusId,
+      currentRole,
+      currentTeacherId,
+      currentUserId,
+      fetchCategories,
+      isParent,
+      profileId,
+      setClassStudentAvatars,
+      setClasses,
+      setLoading,
+      setParentClassIds,
+      setSchedules,
+      setTeachers,
+      setTrialBookingKeys,
+    ],
+  );
 
   const loadMonthRecords = useCallback(async () => {
     if (!currentUserId) {
@@ -420,6 +436,51 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
     void loadOpenSlotDates();
   }, [loadOpenSlotDates]);
 
+  /**
+   * 下拉刷新：把「当前屏幕上看到的数据」整批重拉。
+   *
+   * - 基础数据（排课/班级/老师/学员头像/试听预约/分类）→ `loadBaseData({ silent: true })`
+   *   （静默：下拉指示器已经给了反馈，不再切全局骨架，否则列表会闪一下）
+   * - 点名统计与临时调课 → `loadMonthRecords` + `loadTemporaryReschedules`
+   * - 团课视图（`open` 子模式）→ 当前日期前后各一天的开放时段，与日历切换同一口径
+   * - 场地视图 → `loadVenues`（由调用方按当前 Tab 传入 `withVenues`）
+   *
+   * 私教视图（`TrialBookingView`）的数据由它自己加载，页面通过其 `reloadToken` 触发，
+   * 不在这里重复实现。
+   */
+  const pullRefresh = useCallback(
+    async (opts?: { withVenues?: boolean }) => {
+      const tasks: Promise<unknown>[] = [
+        loadBaseData({ silent: true }),
+        loadMonthRecords(),
+        loadTemporaryReschedules(),
+      ];
+      if (opts?.withVenues) {
+        tasks.push(loadVenues());
+      }
+      if (viewMode === 'schedule' && scheduleSubMode === 'open') {
+        tasks.push(
+          loadOpenClassSlots(selectedDate, true),
+          loadOpenClassSlots(selectedDate.add(1, 'day'), true),
+          loadOpenClassSlots(selectedDate.subtract(1, 'day'), true),
+          loadOpenSlotDates(),
+        );
+      }
+      await Promise.all(tasks);
+    },
+    [
+      loadBaseData,
+      loadMonthRecords,
+      loadOpenClassSlots,
+      loadOpenSlotDates,
+      loadTemporaryReschedules,
+      loadVenues,
+      scheduleSubMode,
+      selectedDate,
+      viewMode,
+    ],
+  );
+
   return {
     loadVenues,
     loadOpenClassSlots,
@@ -428,6 +489,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
     loadMonthRecords,
     loadTemporaryReschedules,
     refreshDateData,
+    pullRefresh,
     lastScheduleAuxFetchAtRef,
   };
 }

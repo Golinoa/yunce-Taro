@@ -339,14 +339,14 @@ const LeadDetailPage: React.FC = () => {
       try {
         const updated = await leadService.checkInPrivateLeadBooking(booking.id);
         if (!updated) {
-          Taro.showToast({ title: '签到失败', icon: 'none' });
+          Taro.showToast({ title: '点名失败', icon: 'none' });
           return;
         }
-        Taro.showToast({ title: '已签到', icon: 'success' });
+        Taro.showToast({ title: '已点名', icon: 'success' });
         if (lead) void loadData(lead.id);
       } catch (err) {
         logError('lead-detail checkIn', err);
-        Taro.showToast({ title: '签到失败', icon: 'none' });
+        Taro.showToast({ title: '点名失败', icon: 'none' });
       } finally {
         setBookingActingId(null);
       }
@@ -638,7 +638,7 @@ const LeadDetailPage: React.FC = () => {
                         className="rounded-[8rpx] bg-success/10 px-[20rpx] py-[8rpx]"
                         onClick={() => void handleBookingCheckIn(booking)}
                       >
-                        <Text className="text-[22rpx] text-success">签到</Text>
+                        <Text className="text-[22rpx] text-success">点名</Text>
                       </View>
                       <View
                         className="rounded-[8rpx] bg-warning/10 px-[20rpx] py-[8rpx]"

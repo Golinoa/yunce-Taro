@@ -15,8 +15,8 @@ export type CourseType = 'normal' | 'art' | 'music' | 'dance' | 'tech' | 'englis
  * - urgent: 即将上课（5分钟内）
  * - upcoming: 待上课
  * - active: 上课中（已到开课时间、未下课）
- * - done: 已完成（全部点名/无学生）
- * - unattended: 已下课但未点名（提醒色，禁止查看）
+ * - done: 已点名（已有今日消课记录 / 无学生）
+ * - unattended: 未点名（下课但无今日消课记录，提醒色，禁止查看）
  * - ended: 已取消/作废
  */
 export type CourseStatus = 'urgent' | 'upcoming' | 'active' | 'done' | 'unattended' | 'ended';

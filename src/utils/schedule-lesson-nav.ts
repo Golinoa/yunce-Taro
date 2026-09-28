@@ -2,10 +2,7 @@
  * 课表 → 点名/消课页导航（Q2-1）
  * 统一 URL 与前置校验，避免 pages/schedule 内多处手拼 query。
  */
-import {
-  isHistoricalClassCard,
-  type ScheduleCardActionFields,
-} from '@/utils/schedule-card-actions';
+import { isHistoricalClassCard } from '@/utils/schedule-card-actions';
 import type { ScheduleCardStatus } from '@/utils/schedule-card-status';
 import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import type dayjs from 'dayjs';
@@ -152,32 +149,21 @@ export function buildScheduleFormEditPath(scheduleId: string): string {
   return `/package-course/pages/schedule-form/index?id=${encodeURIComponent(scheduleId)}`;
 }
 
-export function buildScheduleFormReschedulePath(scheduleId: string, lessonDate: string): string {
+/**
+ * 批量调课「选择班级」页（`batch-reschedule-select`）。
+ *
+ * 课表卡片左滑「调课」与点名页「调课」共用同一入口：进页即预选该班级，选好新日期/时段后
+ * 进入 `batch-reschedule-confirm` 确认，**只覆盖当天课次、不影响长期排课规则**。
+ *
+ * ⚠️ 该页会把早于今天的日期收敛到今天，所以调用方要自己拦「过去的日期不能调课」。
+ */
+export function buildBatchRescheduleSelectPath(lessonDate: string, classId: string): string {
   return (
-    `/package-course/pages/schedule-form/index?id=${encodeURIComponent(scheduleId)}` +
-    `&mode=reschedule&lessonDate=${encodeURIComponent(lessonDate)}`
+    `/package-course/pages/batch-reschedule-select/index` +
+    `?date=${encodeURIComponent(lessonDate)}&classId=${encodeURIComponent(classId)}`
   );
 }
 
 export function buildBookingPagePath(date: string): string {
   return `/package-course/pages/booking/index?date=${encodeURIComponent(date)}`;
-}
-
-/** 编辑前校验文案；null 表示可跳转 */
-export function validateEditScheduleNav(
-  item: Pick<
-    ScheduleCardActionFields,
-    'canCancelLesson' | 'isTemporaryAdjusted' | 'startTime' | 'status'
-  >,
-  selectedDate: dayjs.Dayjs,
-  now: dayjs.Dayjs,
-  visibility: { showEditAndReschedule: boolean },
-): string | null {
-  if (isHistoricalClassCard(item.status, selectedDate, now)) {
-    return '历史课程不支持编辑';
-  }
-  if (!visibility.showEditAndReschedule) {
-    return '当前课程不支持编辑';
-  }
-  return null;
 }

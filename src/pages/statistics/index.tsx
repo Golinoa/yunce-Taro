@@ -4,7 +4,6 @@ import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Card from '@/components/Card';
 import Icon from '@/components/Icon';
-import MockIdentitySwitcher from '@/components/MockIdentitySwitcher';
 import SegmentedControl from '@/components/SegmentedControl';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
 import { dataCenterService } from '@/services/data-center';
@@ -34,9 +33,13 @@ import { syncTabBarByProfile } from '@/utils/tab-bar';
  * - 财务/会员/卡项/薪资 四大数据卡片
  * - 右下角悬浮「记一笔」按钮
  */
+/**
+ * 身份切换器（dev 徽标 + 快速切换身份面板）总开关。
+ *
+ * 2026-09-28 按用户要求**暂时关闭**：dev 包里也不再显示。
+ * 需要恢复时把下面这个常量改回 `true` 即可（改 `false` 后整棵子树会被常量折叠移除）。
+ */
 const DataCenter: React.FC = () => {
-  /** 构建期常量：生产构建恒为 false，DCE 整棵移除 MockIdentitySwitcher（P-05/B-02） */
-  const isDebugBuild = process.env.TARO_ENABLE_LOCAL_DEBUG === 'true';
   const { activeTheme } = useThemeStore();
   const { profile } = useAuth();
   const campuses = useCampusStore((s) => s.campuses);
@@ -596,9 +599,6 @@ const DataCenter: React.FC = () => {
           <Text className="text-[20rpx] text-white font-medium mt-[4rpx]">记一笔</Text>
         </View>
       </View>
-
-      {/* 仅 debug 构建挂载；生产构建常量折叠后整棵子树被移除 */}
-      {isDebugBuild && <MockIdentitySwitcher />}
     </View>
   );
 };

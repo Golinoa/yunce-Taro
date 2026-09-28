@@ -12,7 +12,7 @@ import type { TeacherUIModel } from '@/types/teacher';
 import type { BookableVenue } from '@/types/venue-booking';
 import type { LessonSharePayload } from '@/utils/lesson-share';
 import type { ScheduleCardItem, ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
-import type { DangerActionMeta, ScheduleDangerActionType } from '@/utils/schedule-danger-meta';
+import type { DangerActionMeta } from '@/utils/schedule-danger-meta';
 import OpenClassScheduleList from './OpenClassScheduleList';
 import ScheduleBatchSheets, {
   type ScheduleBatchActionType as BatchActionType,
@@ -70,6 +70,8 @@ export interface ScheduleMainViewsProps {
   tabs: ScheduleTabItem[];
   isParent: boolean;
   selectedDate: dayjs.Dayjs;
+  /** 私教视图刷新令牌：下拉刷新时递增，透传给 TrialBookingView 触发它自己重拉 */
+  privateReloadToken: number;
   currentTime: dayjs.Dayjs;
   loading: boolean;
   swiperCurrent: number;
@@ -118,15 +120,6 @@ export interface ScheduleMainViewsProps {
   onPrimaryAction: (item: ScheduleCardItem, date: dayjs.Dayjs) => void;
   onRollCall: (item: ScheduleCardItem, date: dayjs.Dayjs) => void;
   onSupplement: (item: ScheduleCardItem, date: dayjs.Dayjs) => void;
-  onEditSchedule: (item: ScheduleCardItem) => void;
-  onClassReschedule: (item: ScheduleCardItem) => void;
-  onCancelLesson: (item: ScheduleCardItem) => void;
-  onRestoreLesson: (item: ScheduleCardItem) => void;
-  onSuspendLesson: (item: ScheduleCardItem) => void;
-  onScheduleRuleAction: (
-    item: ScheduleCardItem,
-    action: Extract<ScheduleDangerActionType, 'pause-rule' | 'resume-rule' | 'stop-rule'>,
-  ) => void;
   onResumeClass: (classId: string, className: string) => void;
   onOpenClassSlotConfig: (classId: string, dateStr: string) => void;
   onProxyBooking: (slot: ClassBookingSlot) => void;
@@ -158,6 +151,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     tabs,
     isParent,
     selectedDate,
+    privateReloadToken,
     currentTime,
     loading,
     swiperCurrent,
@@ -202,12 +196,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     onPrimaryAction,
     onRollCall,
     onSupplement,
-    onEditSchedule,
-    onClassReschedule,
-    onCancelLesson,
-    onRestoreLesson,
-    onSuspendLesson,
-    onScheduleRuleAction,
     onResumeClass,
     onOpenClassSlotConfig,
     onProxyBooking,
@@ -250,8 +238,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
                 summary={summary}
                 loading={loading}
                 currentTime={currentTime}
-                openCardId={openCardId}
-                onOpenCardIdChange={onOpenCardIdChange}
                 isParent={isParent}
                 currentCampusId={currentCampusId}
                 currentTeacherId={currentTeacherId}
@@ -264,12 +250,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
                 onPrimaryAction={onPrimaryAction}
                 onRollCall={onRollCall}
                 onSupplement={onSupplement}
-                onEditSchedule={onEditSchedule}
-                onClassReschedule={onClassReschedule}
-                onCancelLesson={onCancelLesson}
-                onRestoreLesson={onRestoreLesson}
-                onSuspendLesson={onSuspendLesson}
-                onScheduleRuleAction={onScheduleRuleAction}
                 onResumeClass={onResumeClass}
               />
             );
@@ -347,6 +327,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         <TrialBookingView
           className="min-h-0 flex-1"
           isParent={isParent}
+          reloadToken={privateReloadToken}
           onSuccess={() => {
             const firstClassTab = tabs.find((item) => item.mode === 'class');
             const targetKey = firstClassTab?.key || tabs[0]?.key || '';

@@ -99,7 +99,7 @@ function MyBookingCardView({
               onClick={() => !busy && onCheckIn(item)}
             >
               <Text className="text-[22rpx] text-primary-foreground">
-                {actions.checkInLabel || '签到'}
+                {actions.checkInLabel || '点名'}
               </Text>
             </View>
           ) : null}
@@ -250,14 +250,14 @@ const MyBookingsPage: React.FC = () => {
         try {
           const updated = await leadService.checkInPrivateLeadBooking(p.bookingId);
           if (!updated) {
-            Taro.showToast({ title: '签到失败', icon: 'none' });
+            Taro.showToast({ title: '点名失败', icon: 'none' });
             return;
           }
-          Taro.showToast({ title: '已签到', icon: 'success' });
+          Taro.showToast({ title: '已点名', icon: 'success' });
           void loadBookings();
         } catch (err) {
           logError('my-bookings checkIn', err);
-          Taro.showToast({ title: '签到失败', icon: 'none' });
+          Taro.showToast({ title: '点名失败', icon: 'none' });
         } finally {
           setActingId(null);
         }

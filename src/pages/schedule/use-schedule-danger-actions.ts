@@ -4,54 +4,35 @@
 import Taro from '@tarojs/taro';
 import dayjs from 'dayjs';
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
-import {
-  calendarSyncService,
-  classBookingService,
-  classService,
-  lessonRecordService,
-  notificationService,
-  scheduleService,
-  studentService,
-} from '@/services';
+import { classBookingService, classService, notificationService, studentService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { subscribeMessageService } from '@/services/subscribe-message';
 import { getThemeHexColors, type ThemeKey } from '@/theme';
 import type { Class, ClassBookingSlot } from '@/types/class';
-import type { LessonRecord } from '@/types/lesson-record';
 import type { UserRole } from '@/types/profile';
 import type { Schedule } from '@/types/schedule';
 import { createOperationLock, type OperationLock } from '@/utils/batch-operation';
 import { logError } from '@/utils/logger';
-import { getCardActionVisibility } from '@/utils/schedule-card-actions';
-import type { ScheduleCardItem } from '@/utils/schedule-card-build';
 import {
-  buildCancelLessonNotifyCopy,
-  buildCancelLessonRecordContent,
   buildDissolveClassNotifyContent,
-  buildRestoreLessonConfirmContent,
   buildResumeClassConfirmContent,
-  buildSuspendLessonConfirmContent,
-  buildSuspendLessonRecordContent,
   buildSuspendNotifyCopy,
   buildSuspendOpenSlotConfirmContent,
   formatLessonChangeTime,
   type ScheduleDangerActionType,
 } from '@/utils/schedule-danger-meta';
-import { canSuspendOpenSlot, canSuspendThisLesson } from '@/utils/schedule-guard';
+import { canSuspendOpenSlot } from '@/utils/schedule-guard';
 import {
   applyOpenSlotRestStatus,
-  filterCancelledRecordsForRestore,
   filterClassesAfterBatchDelete,
   filterSchedulesAfterBatchDelete,
-  mergeLessonRecordsForDate,
-  removeCancelledRecordsForDate,
   resolveBatchDeleteToast,
 } from './schedule-danger-logic';
 
 export interface ScheduleDangerActionState {
   visible: boolean;
+  /** 现存唯一类型：批量解散班级（其余危险操作已随卡片左滑移除） */
   type: ScheduleDangerActionType | null;
-  item: ScheduleCardItem | null;
 }
 
 export interface ScheduleBatchClassOption {
@@ -60,11 +41,8 @@ export interface ScheduleBatchClassOption {
 }
 
 export interface UseScheduleDangerActionsParams {
-  selectedDate: dayjs.Dayjs;
   currentTime: dayjs.Dayjs;
   activeTheme: ThemeKey;
-  lessonRecords: LessonRecord[];
-  setLessonRecords: Dispatch<SetStateAction<LessonRecord[]>>;
   setOpenClassSlots: Dispatch<SetStateAction<Record<string, Record<string, ClassBookingSlot[]>>>>;
   setClasses: Dispatch<SetStateAction<Class[]>>;
   setSchedules: Dispatch<SetStateAction<Schedule[]>>;
@@ -75,12 +53,9 @@ export interface UseScheduleDangerActionsParams {
   dangerActionState: ScheduleDangerActionState;
   setDangerActionState: Dispatch<SetStateAction<ScheduleDangerActionState>>;
   closeDangerActionDialog: () => void;
-  scheduleById: Record<string, Schedule>;
-  filteredClasses: Class[];
   selectedBatchClasses: ScheduleBatchClassOption[];
   selectedClassId: string;
   filterAllClassId: string;
-  currentTeacherId: string;
   currentUserId: string;
   currentCampusId: string;
   profileId?: string;
@@ -91,11 +66,8 @@ export interface UseScheduleDangerActionsParams {
 
 export function useScheduleDangerActions(params: UseScheduleDangerActionsParams) {
   const {
-    selectedDate,
     currentTime,
     activeTheme,
-    lessonRecords,
-    setLessonRecords,
     setOpenClassSlots,
     setClasses,
     setSchedules,
@@ -104,14 +76,10 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
     setBatchSelectedClassIds,
     setDangerActionSubmitting,
     dangerActionState,
-    setDangerActionState,
     closeDangerActionDialog,
-    scheduleById,
-    filteredClasses,
     selectedBatchClasses,
     selectedClassId,
     filterAllClassId,
-    currentTeacherId,
     currentUserId,
     currentCampusId,
     profileId,
@@ -121,184 +89,6 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
   } = params;
 
   const batchOperationLockRef = useRef<OperationLock>(createOperationLock());
-
-  const handleCancelLesson = useCallback(
-    async (item: ScheduleCardItem) => {
-      const visibility = getCardActionVisibility(item, selectedDate, currentTime);
-      if (!visibility.showCancelLesson) {
-        Taro.showToast({ title: '过去日期课程不可取消开课', icon: 'none' });
-        return;
-      }
-
-      setDangerActionState({
-        visible: true,
-        type: 'cancel',
-        item,
-      });
-    },
-    [currentTime, selectedDate, setDangerActionState],
-  );
-
-  const handleRestoreLesson = useCallback(
-    async (item: ScheduleCardItem) => {
-      const classId = item.classId;
-      if (!classId) {
-        Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
-        return;
-      }
-
-      const lessonDate = selectedDate.format('YYYY-MM-DD');
-      const cancelledRecords = filterCancelledRecordsForRestore(lessonRecords, classId, lessonDate);
-
-      if (cancelledRecords.length === 0) {
-        Taro.showToast({ title: '未找到取消记录', icon: 'none' });
-        return;
-      }
-
-      const confirmCopy = buildRestoreLessonConfirmContent({
-        className: item.className,
-        lessonDate,
-        startTime: item.startTime,
-        endTime: item.endTime,
-      });
-      const confirmResult = await Taro.showModal({
-        title: confirmCopy.title,
-        content: confirmCopy.content,
-        confirmText: confirmCopy.confirmText,
-        confirmColor: getThemeHexColors(activeTheme).primary,
-      });
-
-      if (!confirmResult.confirm) {
-        return;
-      }
-
-      // 并发锁：已有批量操作执行中则忽略本次，避免重复请求
-      const lock = batchOperationLockRef.current;
-      if (lock.isLocked()) return;
-      try {
-        await lock.run('restore-lesson', async () => {
-          await Promise.all(
-            cancelledRecords.map((record) => lessonRecordService.remove(record.id)),
-          );
-          setLessonRecords((prev) => removeCancelledRecordsForDate(prev, classId, lessonDate));
-          Taro.showToast({ title: '已恢复本次课程', icon: 'success' });
-        });
-      } catch (err) {
-        logError('SchedulePage restore lesson', err);
-        Taro.showToast({ title: '恢复失败，请重试', icon: 'none' });
-      }
-    },
-    [activeTheme, lessonRecords, selectedDate, setLessonRecords],
-  );
-
-  /** 停课：仅未开课的这一节临时取消，并向学员家长发站内 + 订阅消息 */
-  const handleSuspendLesson = useCallback(
-    async (item: ScheduleCardItem) => {
-      const classId = item.classId;
-      if (!classId) {
-        Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
-        return;
-      }
-      if (!canSuspendThisLesson(item, selectedDate, currentTime)) {
-        Taro.showToast({ title: '仅未开课的课程可停课', icon: 'none' });
-        return;
-      }
-
-      const lessonDate = selectedDate.format('YYYY-MM-DD');
-      const confirmCopy = buildSuspendLessonConfirmContent({
-        className: item.className,
-        lessonDate,
-        startTime: item.startTime,
-        endTime: item.endTime,
-      });
-      const confirmResult = await Taro.showModal({
-        title: confirmCopy.title,
-        content: confirmCopy.content,
-        confirmText: confirmCopy.confirmText,
-        confirmColor: getThemeHexColors(activeTheme).primary,
-      });
-      if (!confirmResult.confirm) return;
-
-      const scheduleInfo = scheduleById[item.id];
-      const selectedClass =
-        filteredClasses.find((classItem) => classItem.id === item.classId) || null;
-      const className = selectedClass?.name || item.className;
-      const changeTime = formatLessonChangeTime({
-        lessonDate,
-        startTime: item.startTime,
-        endTime: item.endTime,
-      });
-      const notifyCopy = buildSuspendNotifyCopy({ className, changeTime });
-
-      // 并发锁：已有批量操作执行中则忽略本次，避免重复创建停课记录
-      const lock = batchOperationLockRef.current;
-      if (lock.isLocked()) return;
-      try {
-        await lock.run('suspend-lesson', async () => {
-          const students = await classService.getStudents(classId);
-          const createdRecords: LessonRecord[] = [];
-
-          for (const student of students) {
-            const createdRecord = await lessonRecordService.create({
-              teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
-              operator_teacher_id: currentTeacherId,
-              assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
-              student_id: student.id,
-              package_id: '',
-              class_id: item.classId,
-              lesson_date: lessonDate,
-              hours_used: 0,
-              status: 'cancelled',
-              content: buildSuspendLessonRecordContent({
-                className: item.className,
-                startTime: item.startTime,
-                endTime: item.endTime,
-              }),
-            });
-            createdRecords.push(createdRecord);
-
-            const parents = await studentService.getParents(student.id);
-            for (const binding of parents) {
-              await notificationService.send({
-                sender_id: profileId || currentUserId,
-                receiver_id: binding.parent_id,
-                title: notifyCopy.title,
-                content: notifyCopy.content,
-                related_id: student.id,
-                type: 'schedule_change',
-              });
-              await subscribeMessageService.sendScheduleChangeToReceiver({
-                receiverUserId: binding.parent_id,
-                bizKey: `lesson-suspend:${item.id}:${lessonDate}:${binding.parent_id}`,
-                className,
-                changeTime,
-                changeReason: notifyCopy.changeReason,
-              });
-            }
-          }
-
-          setLessonRecords((prev) =>
-            mergeLessonRecordsForDate(prev, classId, lessonDate, createdRecords),
-          );
-          Taro.showToast({ title: '已停课并通知家长', icon: 'success' });
-        });
-      } catch (err) {
-        logError('SchedulePage suspend lesson', err);
-        Taro.showToast({ title: '停课失败，请重试', icon: 'none' });
-      }
-    },
-    [
-      activeTheme,
-      currentTeacherId,
-      currentTime,
-      currentUserId,
-      filteredClasses,
-      profileId,
-      scheduleById,
-      selectedDate,
-      setLessonRecords,
-    ],
-  );
 
   /** 团课停课：仅未开课时段，设为休息并通知已约学员家长 */
   const handleSuspendOpenSlot = useCallback(
@@ -396,127 +186,9 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
   );
 
   const handleConfirmDangerAction = useCallback(async () => {
-    const item = dangerActionState.item;
     if (!dangerActionState.type) {
       return;
     }
-
-    if (
-      dangerActionState.type === 'pause-rule' ||
-      dangerActionState.type === 'resume-rule' ||
-      dangerActionState.type === 'stop-rule'
-    ) {
-      if (!item) return;
-      setDangerActionSubmitting(true);
-      const action = dangerActionState.type.replace('-rule', '') as 'pause' | 'resume' | 'stop';
-      try {
-        const updated = await scheduleService.changeRuleStatus(item.id, action);
-        setSchedules((prev) =>
-          prev.map((schedule) =>
-            schedule.id === item.id
-              ? { ...schedule, rule_status: updated.rule_status, stopped_at: updated.stopped_at }
-              : schedule,
-          ),
-        );
-        closeDangerActionDialog();
-        Taro.showToast({
-          title:
-            action === 'pause'
-              ? '循环排课已暂停'
-              : action === 'stop'
-                ? '循环排课已停止'
-                : '循环排课已恢复',
-          icon: 'success',
-        });
-      } catch (err) {
-        logError('SchedulePage change schedule rule status', err);
-        Taro.showToast({ title: '规则状态更新失败，请重试', icon: 'none' });
-      } finally {
-        setDangerActionSubmitting(false);
-      }
-      return;
-    }
-
-    if (dangerActionState.type === 'cancel') {
-      if (!item) {
-        return;
-      }
-      const classId = item.classId;
-      if (!classId) {
-        Taro.showToast({ title: '当前课程缺少班级信息', icon: 'none' });
-        return;
-      }
-
-      const lessonDate = selectedDate.format('YYYY-MM-DD');
-      const scheduleInfo = scheduleById[item.id];
-      const selectedClass =
-        filteredClasses.find((classItem) => classItem.id === item.classId) || null;
-
-      setDangerActionSubmitting(true);
-      // 并发锁：已有批量操作执行中则忽略本次（与 submitting 双保险）
-      const lock = batchOperationLockRef.current;
-      if (lock.isLocked()) {
-        setDangerActionSubmitting(false);
-        return;
-      }
-      try {
-        await lock.run('cancel-lesson', async () => {
-          const students = await classService.getStudents(classId);
-          const createdRecords: LessonRecord[] = [];
-
-          for (const student of students) {
-            const createdRecord = await lessonRecordService.create({
-              teacher_id: scheduleInfo?.teacher_id || currentTeacherId,
-              operator_teacher_id: currentTeacherId,
-              assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
-              student_id: student.id,
-              package_id: '',
-              class_id: item.classId,
-              lesson_date: lessonDate,
-              hours_used: 0,
-              status: 'cancelled',
-              content: buildCancelLessonRecordContent({
-                className: item.className,
-                startTime: item.startTime,
-                endTime: item.endTime,
-              }),
-            });
-
-            createdRecords.push(createdRecord);
-
-            const cancelNotify = buildCancelLessonNotifyCopy({
-              className: selectedClass?.name || item.className,
-              lessonDate,
-              startTime: item.startTime,
-              endTime: item.endTime,
-            });
-            const parents = await studentService.getParents(student.id);
-            for (const binding of parents) {
-              await notificationService.send({
-                sender_id: profileId || currentUserId,
-                receiver_id: binding.parent_id,
-                title: cancelNotify.title,
-                content: cancelNotify.content,
-                related_id: student.id,
-              });
-            }
-          }
-
-          setLessonRecords((prev) =>
-            mergeLessonRecordsForDate(prev, classId, lessonDate, createdRecords),
-          );
-          closeDangerActionDialog();
-          Taro.showToast({ title: '已取消本次课程', icon: 'success' });
-        });
-      } catch (err) {
-        logError('SchedulePage cancel lesson', err);
-        Taro.showToast({ title: '取消失败，请重试', icon: 'none' });
-      } finally {
-        setDangerActionSubmitting(false);
-      }
-      return;
-    }
-
     if (dangerActionState.type === 'batch-delete') {
       const targetClasses = selectedBatchClasses;
       if (targetClasses.length === 0) {
@@ -590,59 +262,27 @@ export function useScheduleDangerActions(params: UseScheduleDangerActionsParams)
       }
       return;
     }
-
-    if (!item) {
-      return;
-    }
-
-    setDangerActionSubmitting(true);
-    try {
-      await scheduleService.remove(item.id);
-      setSchedules((prev) => prev.filter((schedule) => schedule.id !== item.id));
-      closeDangerActionDialog();
-      Taro.showToast({ title: '排课规则已删除', icon: 'success' });
-      void calendarSyncService.syncAfterScheduleChange({
-        userId: currentUserId,
-        teacherId: currentUserId,
-        campusId: currentCampusId,
-        role: profileRole,
-      });
-    } catch (err) {
-      logError('SchedulePage remove schedule', err);
-      Taro.showToast({ title: '删除失败，请重试', icon: 'none' });
-    } finally {
-      setDangerActionSubmitting(false);
-    }
   }, [
     closeDangerActionDialog,
     currentCampusId,
-    currentTeacherId,
     currentUserId,
-    dangerActionState.item,
     dangerActionState.type,
     filterAllClassId,
-    filteredClasses,
     notifyStudentAndParents,
     profileId,
     profileName,
     profileRole,
-    scheduleById,
     selectedBatchClasses,
     selectedClassId,
-    selectedDate,
     setBatchClassSheetVisible,
     setBatchSelectedClassIds,
     setClasses,
     setDangerActionSubmitting,
-    setLessonRecords,
     setSchedules,
     setSelectedClassId,
   ]);
 
   return {
-    handleCancelLesson,
-    handleRestoreLesson,
-    handleSuspendLesson,
     handleSuspendOpenSlot,
     handleResumeClass,
     handleConfirmDangerAction,

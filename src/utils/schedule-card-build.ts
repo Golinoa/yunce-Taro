@@ -14,6 +14,7 @@ import {
   type ScheduleCardStatus,
 } from '@/utils/schedule-card-status';
 import { parseTimeToMinutes } from '@/utils/schedule-guard';
+import { stripScheduleNoteMeta } from '@/utils/schedule-note-display';
 import type dayjs from 'dayjs';
 
 export type ScheduleCardStudentAvatar = {
@@ -106,7 +107,9 @@ export function buildScheduleCardsForDate(input: {
         (schedule.class_id
           ? {
               id: schedule.class_id,
-              name: schedule.class_info?.name || schedule.note || '未命名班级',
+              // 兜底用 note 时必须先剥掉排课规则元信息（"类型:班课 | 规则:weekly | 开始:…"）
+              name:
+                schedule.class_info?.name || stripScheduleNoteMeta(schedule.note) || '未命名班级',
               teacher_id: '',
               created_at: '',
               updated_at: '',
@@ -144,7 +147,11 @@ export function buildScheduleCardsForDate(input: {
         classId: schedule.class_id,
         campusId: classInfo?.campus_id,
         detailRecordId: recordList[0]?.id,
-        className: classInfo?.name || schedule.class_info?.name || schedule.note || '未命名班级',
+        className:
+          classInfo?.name ||
+          schedule.class_info?.name ||
+          stripScheduleNoteMeta(schedule.note) ||
+          '未命名班级',
         startTime: schedule.start_time,
         endTime: schedule.end_time,
         leadTeacherName,
