@@ -95,7 +95,10 @@ describe('filterCancelledRecordsForRestore', () => {
         status: 'cancelled',
       }),
     ];
-    const result = filterCancelledRecordsForRestore(records, 'c1', '2026-09-01');
+    const result = filterCancelledRecordsForRestore(records, {
+      classId: 'c1',
+      lessonDate: '2026-09-01',
+    });
     expect(result.map((r) => r.id)).toEqual(['r1']);
   });
 });
@@ -118,7 +121,34 @@ describe('removeCancelledRecordsForDate', () => {
         status: 'cancelled',
       }),
     ];
-    const next = removeCancelledRecordsForDate(records, 'c1', '2026-09-01');
+    const next = removeCancelledRecordsForDate(records, {
+      classId: 'c1',
+      lessonDate: '2026-09-01',
+    });
+    expect(next.map((r) => r.id)).toEqual(['r2']);
+  });
+
+  it('私教课（无班级）按学员匹配：只移除该学员的取消记录', () => {
+    const records = [
+      makeLessonRecord({
+        id: 'r1',
+        student_id: 's1',
+        lesson_date: '2026-09-01',
+        class_id: '',
+        status: 'cancelled',
+      }),
+      makeLessonRecord({
+        id: 'r2',
+        student_id: 's2',
+        lesson_date: '2026-09-01',
+        class_id: '',
+        status: 'cancelled',
+      }),
+    ];
+    const next = removeCancelledRecordsForDate(records, {
+      studentId: 's1',
+      lessonDate: '2026-09-01',
+    });
     expect(next.map((r) => r.id)).toEqual(['r2']);
   });
 });

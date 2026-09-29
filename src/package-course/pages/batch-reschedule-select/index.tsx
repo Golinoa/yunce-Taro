@@ -11,6 +11,7 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import { useHolidayCheck } from '@/hooks/use-holiday-check';
 import {
   classService,
   scheduleService,
@@ -82,6 +83,8 @@ const BatchRescheduleSelectPage: React.FC = () => {
   const [teachers, setTeachers] = useState<TeacherUIModel[]>([]);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  /** 选调课日期时能看到哪天放假（日期右上角「休」） */
+  const isHoliday = useHolidayCheck();
 
   const loadData = useCallback(async () => {
     if (!currentUserId) {
@@ -357,6 +360,7 @@ const BatchRescheduleSelectPage: React.FC = () => {
           onClose={() => setCalendarVisible(false)}
           onSelect={setSelectedDate}
           getDateDotType={getDateDotType}
+          isHoliday={isHoliday}
           disablePastDates
         />
       </View>

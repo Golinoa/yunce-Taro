@@ -10,6 +10,7 @@ import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import WorkflowHeaderCard from '@/components/reschedule/WorkflowHeaderCard';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
+import { useHolidayCheck } from '@/hooks/use-holiday-check';
 import {
   classService,
   notificationService,
@@ -86,6 +87,8 @@ const BatchRescheduleConfirmPage: React.FC = () => {
   const [calendarVisible, setCalendarVisible] = useState(false);
   /** 调课理由（选填）：填了随通知发给家长；不填也会发通知，用通用文案兜底 */
   const [reason, setReason] = useState('');
+  /** 选新日期时能看到哪天放假（日期右上角「休」） */
+  const isHoliday = useHolidayCheck();
 
   const sourceWeekday = useMemo(
     () => (dayjs(sourceDate).day() || 7) as Schedule['day_of_week'],
@@ -503,6 +506,7 @@ const BatchRescheduleConfirmPage: React.FC = () => {
           onClose={() => setCalendarVisible(false)}
           onSelect={setTargetDate}
           getDateDotType={getDateDotType}
+          isHoliday={isHoliday}
           disablePastDates
         />
       </View>

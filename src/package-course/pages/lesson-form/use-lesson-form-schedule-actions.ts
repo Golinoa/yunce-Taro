@@ -41,6 +41,8 @@ export interface UseLessonFormScheduleActionsParams {
   /** 排课 id（来自 URL）。为空时三个操作全部不可用 */
   scheduleId: string;
   classId: string;
+  /** 私教（1对1）课次没有班级：此时按学员匹配取消记录，保证也能恢复 */
+  studentId?: string;
   className: string;
   /** YYYY-MM-DD */
   lessonDate: string;
@@ -87,6 +89,7 @@ export function useLessonFormScheduleActions(
   const {
     scheduleId,
     classId,
+    studentId,
     className,
     lessonDate,
     startTime,
@@ -110,7 +113,8 @@ export function useLessonFormScheduleActions(
   const canSuspendLesson = Boolean(scheduleId) && !isAlreadyChecked;
   /** 取消 ≡ 停课：停课后这节课就是「已取消」，此时同一个位置给「恢复本节课」 */
   const canRestoreLesson =
-    Boolean(scheduleId) && isLessonCancelled(existingClassRecords, classId, lessonDate);
+    Boolean(scheduleId) &&
+    isLessonCancelled(existingClassRecords, { classId, studentId, lessonDate });
 
   /**
    * 调课：进**批量调课**选择页（与课表卡片左滑「调课」同一入口）。
@@ -280,15 +284,16 @@ export function useLessonFormScheduleActions(
    */
   const handleRestoreLesson = useCallback(async () => {
     if (restoring) return;
-    if (!classId) {
-      Taro.showToast({ title: '缺少班级信息，无法恢复', icon: 'none' });
+    // 班课看班级、私教看学员——两者都没有才无法定位这节课的记录
+    if (!classId && !studentId) {
+      Taro.showToast({ title: '缺少班级或学员信息，无法恢复', icon: 'none' });
       return;
     }
-    const cancelledRecords = filterCancelledRecordsForRestore(
-      existingClassRecords,
+    const cancelledRecords = filterCancelledRecordsForRestore(existingClassRecords, {
       classId,
+      studentId,
       lessonDate,
-    );
+    });
     if (cancelledRecords.length === 0) {
       Taro.showToast({ title: '未找到取消记录', icon: 'none' });
       return;

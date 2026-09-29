@@ -592,6 +592,8 @@ const LessonForm: React.FC = () => {
   } = useLessonFormScheduleActions({
     scheduleId: scheduleIdParam,
     classId: selectedClassId,
+    // 私教课次没有班级：把学员带下去，取消判定与「恢复本节课」按学员匹配
+    studentId: studentIdParam,
     className: selectedClass?.name || '',
     lessonDate,
     /** 班级固定上课时间优先，取不到时回落到页面展示的时间 */

@@ -1,9 +1,11 @@
 /**
- * 课表页假期标识：日历日期右上角标「休」。
+ * 假期日期判断：给日历在放假日期的数字右上角标「休」。
  *
- * 数据走 `GET /holidays/calendar`（所有角色可读，**家长端**也能看到）。
+ * 数据走 `GET /holidays/calendar`（所有角色可读，家长端也能看到）。
  * 一次拉取覆盖较长区间（含过去与未来），避免随日历滑动反复请求。
- * 拉取失败只记日志：假期标识是增强信息，不能影响课表主功能。
+ * 拉取失败只记日志：假期标识是增强信息，不能影响主功能。
+ *
+ * 课表页（含私教视图）与各处的「选择日期」弹层共用本 hook，保证口径一致。
  */
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,7 +18,7 @@ const RANGE_FUTURE_DAYS = 365;
 
 type HolidayRange = { startDate: string; endDate: string };
 
-export function useScheduleHolidayCheck(): (date: dayjs.Dayjs) => boolean {
+export function useHolidayCheck(): (date: dayjs.Dayjs) => boolean {
   const [ranges, setRanges] = useState<HolidayRange[]>([]);
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function useScheduleHolidayCheck(): (date: dayjs.Dayjs) => boolean {
         if (!alive) return;
         setRanges(list.map((item) => ({ startDate: item.startDate, endDate: item.endDate })));
       } catch (error) {
-        logError('schedule.holidayCheck.load', error);
+        logError('holidayCheck.load', error);
       }
     })();
     return () => {

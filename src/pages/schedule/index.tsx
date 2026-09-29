@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
+import { useHolidayCheck } from '@/hooks/use-holiday-check';
 import { notificationService, studentService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import { useCourseCategoryStore } from '@/stores/course-category';
@@ -47,7 +48,6 @@ import {
   type ScheduleDangerActionState,
 } from './use-schedule-danger-actions';
 import { useScheduleDerived } from './use-schedule-derived';
-import { useScheduleHolidayCheck } from './use-schedule-holiday-check';
 import { useScheduleLoaders } from './use-schedule-loaders';
 import { useScheduleOpenSlotActions } from './use-schedule-open-slot-actions';
 
@@ -330,7 +330,7 @@ const SchedulePage: React.FC = () => {
   });
 
   /** 日历「休」标识：放假日期的右上角标记（教师端/家长端共用） */
-  const isHolidayDate = useScheduleHolidayCheck();
+  const isHolidayDate = useHolidayCheck();
 
   const handleMainTabChange = useCallback(
     (tabKey: string, tabIndex: number) => {

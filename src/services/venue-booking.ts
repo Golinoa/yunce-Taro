@@ -45,6 +45,9 @@ interface BackendVenueBooking {
 
 const mapStatus = (status?: string): VenueBookingRecord['status'] => {
   const upper = String(status || '').toUpperCase();
+  // 因机构放假被系统取消：对用户同样是「已取消」。
+  // 若不显式处理会落到兜底分支显示成"待确认"，造成误导。
+  if (upper === 'CANCELLED_BY_HOLIDAY') return 'cancelled';
   if (upper === 'CANCELLED') return 'cancelled';
   if (upper === 'COMPLETED') return 'checked_in';
   if (upper === 'CONFIRMED') return 'confirmed';
