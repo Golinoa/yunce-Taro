@@ -18,10 +18,18 @@ const RANGE_FUTURE_DAYS = 365;
 
 type HolidayRange = { startDate: string; endDate: string };
 
-export function useHolidayCheck(): (date: dayjs.Dayjs) => boolean {
+/**
+ * @param options.enabled 身份就绪开关（默认 true）。
+ *   未就绪时**不发请求**：否则页面挂载瞬间可能因 token/机构尚未解析拿到 401，
+ *   而本 hook 不会自动重试 ⇒ 整个会话都拿不到假期、日历不显示「休」。
+ *   身份就绪后 enabled 变 true 会自动触发拉取。
+ */
+export function useHolidayCheck(options?: { enabled?: boolean }): (date: dayjs.Dayjs) => boolean {
+  const enabled = options?.enabled ?? true;
   const [ranges, setRanges] = useState<HolidayRange[]>([]);
 
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     void (async () => {
       try {
@@ -38,7 +46,7 @@ export function useHolidayCheck(): (date: dayjs.Dayjs) => boolean {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [enabled]);
 
   return useCallback(
     (date: dayjs.Dayjs) => {

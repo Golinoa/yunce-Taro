@@ -329,8 +329,11 @@ const SchedulePage: React.FC = () => {
     disabled: isParent,
   });
 
-  /** 日历「休」标识：放假日期的右上角标记（教师端/家长端共用） */
-  const isHolidayDate = useHolidayCheck();
+  /**
+   * 日历「休」标识：放假日期的右上角标记（教师端/家长端共用）。
+   * 必须等身份就绪再拉——挂载瞬间 token/机构可能尚未解析，此时请求会 401 且本 hook 不自动重试。
+   */
+  const isHolidayDate = useHolidayCheck({ enabled: Boolean(currentRole) });
 
   const handleMainTabChange = useCallback(
     (tabKey: string, tabIndex: number) => {
