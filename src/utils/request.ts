@@ -10,7 +10,7 @@ import { reportLocalDebug } from '@/utils/local-debug';
 import { logRequestIssue } from '@/utils/logger';
 /** P0 取证仪表：只记录，不干预（详见该文件说明） */
 import { beginRequest } from '@/utils/request-instrument';
-import { syncServerClock } from '@/utils/server-clock';
+import { serverNow, syncServerClock } from '@/utils/server-clock';
 import { singleFlight } from '@/utils/single-flight';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
@@ -142,8 +142,9 @@ function readAccessToken(): string | null {
     const session = JSON.parse(raw);
     const expiresAt = Number(session.expires_at ?? 0);
     if (!session.access_token) return null;
-    // 提前 60 秒视为过期，便于静默刷新
-    if (!Number.isFinite(expiresAt) || expiresAt * 1000 < Date.now() + 60_000) {
+    // 提前 60 秒视为过期，便于静默刷新；过期判断用服务器时钟（serverNow），
+    // 避免设备时钟偏快/偏慢（弱网+离线后常见）误判 token 过期 → 触发刷新 → 弱网下刷新失败级联。
+    if (!Number.isFinite(expiresAt) || expiresAt * 1000 < serverNow() + 60_000) {
       return null;
     }
     return session.access_token || null;

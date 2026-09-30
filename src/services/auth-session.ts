@@ -28,7 +28,7 @@ import type {
   UserRole,
 } from '@/types/profile';
 import type { ParentStorefrontItem, ParentStorefrontsResult } from '@/types/storefront';
-import { get, post, put, refreshSessionOnce } from '@/utils/request';
+import { get, post, put, refreshSessionOnce, ApiError } from '@/utils/request';
 import { decodeAccessTokenClaims, pickRealTenantId } from '@/utils/tenant-id';
 
 const persistLocalProfile = (profile: Profile | null): void => {
@@ -72,18 +72,34 @@ const readStoredSession = (): AuthSession | null => {
   }
 };
 
+/** 读取本地已落盘的 profile（弱网/抖动时作为会话恢复的兜底，不抛错） */
+const readStoredProfile = (): Profile | null => {
+  try {
+    const raw = Taro.getStorageSync(USER_PROFILE_KEY);
+    if (!raw) return null;
+    const profile = JSON.parse(raw) as Profile;
+    return profile?.identities?.length ? profile : null;
+  } catch {
+    return null;
+  }
+};
+
 export async function getSession(): Promise<{
   session: AuthSession | null;
   profile: Profile | null;
 }> {
-  try {
-    const storedSession = readStoredSession();
-    if (!storedSession) {
-      return { session: null, profile: null };
-    }
+  const storedSession = readStoredSession();
+  if (!storedSession) {
+    return { session: null, profile: null };
+  }
 
-    // /auth/me 不能接受条件缓存：当前请求层不把无 body 的 304 当作成功响应，
-    // 否则冷启动会误清登录态，后续业务页没有 profile 也就不会请求数据。
+  // 弱网 / 后端抖动兜底：网络失败、超时、5xx、429 都**不得**清登录态。
+  // 返回本地已有的 session + 上一次落盘的 profile，让路由守卫保持「已登录」、
+  // 页面用缓存身份继续渲染；待网络恢复后，下次 refreshProfile / 业务请求再回源。
+  // 只有 401/403（凭据确已失效：过期刷新被拒 / 离职被风控）才清态，交回路由守卫收口跳登录。
+  // 否则会退化成「弱网自杀」：一次 /auth/me 抖动 → 清态 → 守卫把人踢去登录页。
+  const lastKnownProfile = readStoredProfile();
+  try {
     const user = await get<BackendUserInfo>(AUTH_ENDPOINTS.me, undefined, {
       header: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
     });
@@ -109,9 +125,14 @@ export async function getSession(): Promise<{
       session: storedSession,
       profile: baseProfile,
     };
-  } catch {
-    clearStoredAuth();
-    return { session: null, profile: null };
+  } catch (err) {
+    if (err instanceof ApiError && (err.code === 401 || err.code === 403)) {
+      // 凭据确已失效：清态，交回路由守卫收口跳登录（与 request 层 terminateSession 口径一致）
+      clearStoredAuth();
+      return { session: null, profile: null };
+    }
+    // 网络/超时/5xx/429：保留登录态，返回本地缓存身份（弱网不下线）
+    return { session: storedSession, profile: lastKnownProfile };
   }
 }
 
