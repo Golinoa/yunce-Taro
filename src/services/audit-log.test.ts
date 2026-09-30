@@ -68,7 +68,7 @@ describe('auditLogService 可见范围', () => {
     expect(isAuditLogManager('parent')).toBe(false);
   });
 
-  it('record 不再生成本地假成功，写入由业务接口后端审计', async () => {
+  it('record 为静默 no-op：写入由后端业务接口落审计，前端不发请求也不抛错', async () => {
     const { auditLogService } = await import('@/services/audit-log');
     await expect(
       auditLogService.record({
@@ -79,6 +79,9 @@ describe('auditLogService 可见范围', () => {
         targetType: 'lesson_record',
         detail: '编辑课时',
       }),
-    ).rejects.toThrow('审计日志由后端业务写接口记录');
+    ).resolves.toBeUndefined();
+    // 关键：审计写入已下沉到后端业务写接口，前端既不自造流水也不发请求
+    // （旧实现抛「接口未接通」会污染调用方 try/catch，2026-09-30 改为 no-op）
+    expect(getMock).not.toHaveBeenCalled();
   });
 });
