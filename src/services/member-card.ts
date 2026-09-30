@@ -46,6 +46,8 @@ function mapCard(raw: BackendMemberCard): MemberCardDetail {
     totalGiftCount: raw.totalGiftCount != null ? Number(raw.totalGiftCount) : undefined,
     remainingGiftCount: raw.remainingGiftCount != null ? Number(raw.remainingGiftCount) : undefined,
     consumedValue: raw.consumedValue != null ? Number(raw.consumedValue) : undefined,
+    // 剩余价值（分）：与 consumedValue 同单价推算，二者之和 ≈ 购卡价（口径见后端 DEC-012 ④）
+    remainingValue: raw.remainingValue != null ? Number(raw.remainingValue) : undefined,
   };
 }
 

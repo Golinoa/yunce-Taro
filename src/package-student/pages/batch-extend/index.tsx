@@ -268,7 +268,7 @@ const BatchExtendPage: React.FC = () => {
                   key={row.memberCardId}
                   className={`rounded-[16rpx] p-[20rpx] ${
                     row.outcome === 'invalid'
-                      ? 'bg-status-danger/10'
+                      ? 'bg-destructive/10'
                       : row.outcome === 'extend'
                         ? 'bg-muted'
                         : 'bg-warning/10'
@@ -281,7 +281,7 @@ const BatchExtendPage: React.FC = () => {
                     <Text
                       className={`text-[24rpx] ${
                         row.outcome === 'invalid'
-                          ? 'text-status-danger'
+                          ? 'text-destructive'
                           : row.outcome === 'extend'
                             ? 'text-primary'
                             : 'text-warning'
@@ -307,7 +307,7 @@ const BatchExtendPage: React.FC = () => {
               确认延期
             </Button>
             {invalidCount > 0 && (
-              <Text className="block text-[22rpx] text-status-danger mt-[10rpx]">
+              <Text className="block text-[22rpx] text-destructive mt-[10rpx]">
                 {invalidCount} 张卡的新到期日不晚于当前到期日，请调整后重试
               </Text>
             )}

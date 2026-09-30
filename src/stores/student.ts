@@ -7,6 +7,8 @@ import { studentService } from '@/services/student';
 import type { Student } from '@/types/student';
 import { TTL } from '@/utils/data-freshness';
 import { logError } from '@/utils/logger';
+import { REFRESH_SIGNAL, peekRefreshSignal } from '@/utils/refresh-signal';
+import { filterSoftDeletedStudents } from '@/utils/student-filter';
 
 interface StudentState {
   /** 按 teacherId 缓存的学员列表 */
@@ -48,8 +50,21 @@ export const useStudentStore = create<StudentState>((set, get) => ({
     const now = Date.now();
     const cacheKey = campusId ? `${teacherId}:${campusId}` : teacherId;
 
-    // 缓存有效且非强制刷新
-    if (!force && cache[cacheKey] && lastFetch[cacheKey] && now - lastFetch[cacheKey] < CACHE_TTL) {
+    // 缓存有效且非强制刷新。
+    // ⚠️ 必须再比对 students 刷新信号（peek，不消费归属页的信号）：
+    // 软删除学员只 setRefreshSignal、不走本 store 的 invalidate，
+    // 若只看 TTL，删除后 60s 内约课/点名等页面仍会拿到含已删学员的旧名单
+    // （用户口径 2026-09-30：软删除过滤口径全局封装在本 store 一处）。
+    const signalAt = peekRefreshSignal(REFRESH_SIGNAL.students);
+    const staleBySignal =
+      signalAt !== null && lastFetch[cacheKey] !== undefined && signalAt > lastFetch[cacheKey];
+    if (
+      !force &&
+      !staleBySignal &&
+      cache[cacheKey] &&
+      lastFetch[cacheKey] &&
+      now - lastFetch[cacheKey] < CACHE_TTL
+    ) {
       return cache[cacheKey];
     }
 
@@ -60,7 +75,10 @@ export const useStudentStore = create<StudentState>((set, get) => ({
 
     const request = (async () => {
       try {
-        const list = await studentService.getByTeacher(teacherId, campusId);
+        // 全局唯一软删除过滤口径：名单只返回 active 学员，剔除已软删除（status='deleted'）。
+        const list = filterSoftDeletedStudents(
+          await studentService.getByTeacher(teacherId, campusId),
+        );
         set((s) => ({
           cache: { ...s.cache, [cacheKey]: list },
           loading: { ...s.loading, [cacheKey]: false },
