@@ -395,6 +395,8 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         lessonDate={bookSheetItem ? selectedDate.format('YYYY-MM-DD') : ''}
         startTime={bookSheetItem?.startTime || ''}
         endTime={bookSheetItem?.endTime || ''}
+        /** 本节所属排课编号：写进预约 ⇒ 日后同日调课改了时段，预约仍认得这一节 */
+        scheduleId={bookSheetItem?.id || ''}
         teacherId={currentTeacherId}
         teacherName={bookSheetItem?.leadTeacherName}
         onClose={onCloseBookSheet}

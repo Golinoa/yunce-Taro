@@ -43,6 +43,12 @@ export interface BookTrialByClassSheetProps {
   endTime: string;
   teacherId?: string;
   teacherName?: string;
+  /**
+   * 本节所属排课的编号（课表卡片的 `id`）。
+   * 试听/补课都会把它一起存进预约 ⇒ 以后这节课被同日调课改了时段，
+   * 预约仍认得它（排课编号不变）。拿不到就留空，读取端按「班级+日期+时段」兜底。
+   */
+  scheduleId?: string;
   onClose: () => void;
   /**
    * 预约成功回调，返回班级、日期、**本节时段**与本次预约类型（补课 / 试听）。
@@ -67,6 +73,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
   endTime,
   teacherId,
   teacherName,
+  scheduleId,
   onClose,
   onSuccess,
 }) => {
@@ -228,6 +235,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           endTime,
           teacherId,
           teacherName,
+          scheduleId,
           source: 'teacher',
           note: note.trim() || undefined,
           createdBy: userId,
@@ -261,6 +269,8 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
         lessonDate,
         startTime,
         endTime,
+        /** 「哪一节」的排课编号：存下来后，同日调课改了时段也不会让预约失配 */
+        referenceScheduleId: scheduleId,
         teacherId: bookingTeacherId,
         teacherName,
         operatorId: userId,
@@ -290,6 +300,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     lessonDate,
     startTime,
     endTime,
+    scheduleId,
     bookingTeacherId,
     teacherId,
     teacherName,

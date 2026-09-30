@@ -5,6 +5,56 @@ import type { MakeupBooking } from '@/types/makeup-booking';
 import { get, post } from '@/utils/request';
 import { normalizeLessonStartTime } from '@/utils/schedule-card-build';
 
+/**
+ * 后端响应（camelCase）→ 前端 `MakeupBooking`（snake_case）。
+ *
+ * ⚠️ 早先这里**直接把响应当成前端类型用**（没有任何映射），但后端 `mapBooking`
+ * 返回的是 camelCase（`lessonDate` / `startTime` / `studentId`…），前端类型是 snake_case
+ * ⇒ `b.lesson_date` / `b.start_time` 恒为 undefined，
+ * 下面 `getByClassDate` 的防御过滤（`b.lesson_date === params.lessonDate`）会把
+ * **所有补课预约过滤掉** —— 表现为「补课学员从不出现在点名名单」。
+ */
+const mapBackendMakeupBooking = (row: {
+  id: string;
+  studentId: string;
+  classId: string;
+  campusId?: string | null;
+  lessonDate: string;
+  startTime: string;
+  endTime: string;
+  teacherId?: string | null;
+  teacherName?: string | null;
+  source?: string | null;
+  leaveRequestId?: string | null;
+  originalClassId?: string | null;
+  /** 属于哪一节（排课编号）；家长请假生成的补课为 null */
+  scheduleId?: string | null;
+  note?: string | null;
+  status?: string | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}): MakeupBooking => ({
+  id: row.id,
+  student_id: row.studentId,
+  class_id: row.classId,
+  campus_id: row.campusId ?? undefined,
+  lesson_date: row.lessonDate,
+  start_time: row.startTime,
+  end_time: row.endTime,
+  teacher_id: row.teacherId ?? '',
+  teacher_name: row.teacherName ?? undefined,
+  source: (row.source as MakeupBooking['source']) ?? 'teacher',
+  leave_request_id: row.leaveRequestId ?? undefined,
+  original_class_id: row.originalClassId ?? undefined,
+  schedule_id: row.scheduleId ?? null,
+  note: row.note ?? undefined,
+  status: (row.status as MakeupBooking['status']) ?? 'confirmed',
+  created_by: row.createdBy ?? '',
+  created_at: row.createdAt ?? '',
+  updated_at: row.updatedAt ?? '',
+});
+
 export async function createMakeupBooking(params: {
   studentId: string;
   classId: string;
@@ -16,10 +66,16 @@ export async function createMakeupBooking(params: {
   source: 'teacher' | 'parent';
   leaveRequestId?: string;
   originalClassId?: string;
+  /**
+   * 「哪一节」的排课编号（课表卡片的 `id`）。
+   * 传了之后，即使这节课后来被同日调课改了时段，预约仍认得它（编号不变）。
+   * 家长请假自动生成的补课拿不到 ⇒ 不传，读取端按「班级+日期+时段」兜底。
+   */
+  scheduleId?: string;
   note?: string;
   createdBy: string;
 }): Promise<MakeupBooking> {
-  return post<MakeupBooking>('/makeup-bookings', {
+  const created = await post<Record<string, unknown>>('/makeup-bookings', {
     studentId: params.studentId,
     classId: params.classId,
     lessonDate: params.lessonDate,
@@ -30,8 +86,10 @@ export async function createMakeupBooking(params: {
     source: params.source,
     leaveRequestId: params.leaveRequestId,
     originalClassId: params.originalClassId,
+    scheduleId: params.scheduleId,
     note: params.note,
   });
+  return mapBackendMakeupBooking(created as Parameters<typeof mapBackendMakeupBooking>[0]);
 }
 
 export async function getMakeupBookingsByClassDate(params: {
@@ -40,10 +98,13 @@ export async function getMakeupBookingsByClassDate(params: {
   /** 本节的开始时段（`09:00`）；给了就只认落在这一节的预约 */
   startTime?: string;
 }): Promise<MakeupBooking[]> {
-  const data = await get<{ list: MakeupBooking[] }>('/makeup-bookings', {
+  const data = await get<{ list: Record<string, unknown>[] }>('/makeup-bookings', {
     classId: params.classId,
     lessonDate: params.lessonDate,
   });
+  const rows = (data.list || []).map((row) =>
+    mapBackendMakeupBooking(row as Parameters<typeof mapBackendMakeupBooking>[0]),
+  );
   // 防御过滤：补课预约必须严格落在请求的这节课（class_id + lesson_date）。
   // 不能只信后端的 lessonDate 过滤——若线上后端旧版本忽略该参数返回了全量预约，
   // 名单合并处会把其他日期的补课学员并进本节课，表现为「补课作用于整条排课规则」。
@@ -52,7 +113,7 @@ export async function getMakeupBookingsByClassDate(params: {
   // 的补课学员也并进来。调用方给了 startTime 时再收窄到本节；拿不到本节时段
   // （例如从班级列表进入点名页）时保持原行为，不误伤。
   const targetStartTime = normalizeLessonStartTime(params.startTime);
-  return (data.list || []).filter(
+  return rows.filter(
     (b) =>
       b.status === 'confirmed' &&
       b.lesson_date === params.lessonDate &&

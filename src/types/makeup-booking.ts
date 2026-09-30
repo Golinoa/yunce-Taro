@@ -19,6 +19,12 @@ export interface MakeupBooking {
   leave_request_id?: string;
   /** 原班级（家长从原课调来） */
   original_class_id?: string;
+  /**
+   * 「哪一节」的排课编号（Schedule.id）。
+   * 有了它就能按编号定位课节 —— 同日临时调课改了时段也不会失配。
+   * 家长请假自动生成的补课拿不到 ⇒ 为 null，读取端按「班级+日期+时段」兜底。
+   */
+  schedule_id?: string | null;
   note?: string;
   status: 'confirmed' | 'cancelled' | 'completed';
   created_by: string;

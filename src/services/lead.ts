@@ -412,6 +412,11 @@ export async function bookTrialByClass(params: {
   lessonDate: string;
   startTime: string;
   endTime: string;
+  /**
+   * 「哪一节」的排课编号（课表卡片 `id`）。
+   * 存进预约后，这节课被同日调课改了时段也不会失配（排课编号不变）。
+   */
+  referenceScheduleId?: string;
   teacherId?: string;
   teacherName?: string;
   operatorId?: string;
@@ -421,6 +426,7 @@ export async function bookTrialByClass(params: {
     leadId: params.leadId,
     classId: params.classId,
     className: params.className,
+    referenceScheduleId: params.referenceScheduleId,
     courseId: params.classId,
     courseName: params.className || '试听课',
     campusId: params.campusId || '',
