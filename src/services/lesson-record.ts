@@ -200,7 +200,13 @@ function mapBackendLessonRecord(
 
   return {
     id: item.id,
-    teacher_id: '',
+    /**
+     * ⚠️ 早先这里把 `teacher_id` 硬编码成 `''` ⇒ 流水账卡片取不到主讲，落回「未知教师」。
+     * 后端两个记录接口已返回 `teacherId` / `teacherName`，这里照实映射。
+     */
+    teacher_id: 'teacherId' in item ? item.teacherId || '' : '',
+    operator_teacher_id:
+      'operatorTeacherId' in item ? item.operatorTeacherId || undefined : undefined,
     student_id:
       'studentId' in item
         ? item.studentId
@@ -261,6 +267,10 @@ function mapBackendLessonRecord(
         : undefined,
     teacher: teacherName ? { name: teacherName } : undefined,
     operator_teacher: operatorTeacherName ? { name: operatorTeacherName } : undefined,
+    /**
+     * 助教：`LessonRecord` **没有助教列**（后端从未存储），所以这里永远是 undefined。
+     * 保留字段只为兼容旧类型；不要为了让 UI 显示而凭空造值。
+     */
     assistant_teacher: assistantTeacherName ? { name: assistantTeacherName } : undefined,
   };
 }
