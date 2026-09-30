@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-30
 status: active
 owner: @product
 source: 角色体系混乱导致的权限误判
@@ -9,8 +9,8 @@ source: 角色体系混乱导致的权限误判
 
 > **触发条件**：涉及 `UserRole`、`orgRole`、`campusRole`、`identity`、角色文案、权限判定的任何改动，**必须先读完两份文档再动手**：
 >
-> - 技术口径：[`../../Docs/2026-09-11-role-naming-rules.md`](../../Docs/2026-09-11-role-naming-rules.md)
-> - 业务口径（用户已拍板）：[`../../Docs/2026-09-11-role-boundary.md`](../../Docs/2026-09-11-role-boundary.md)
+> - 技术口径：[`../../../Docs/2026-09-11-role-naming-rules.md`](../../../Docs/2026-09-11-role-naming-rules.md)
+> - 业务口径（用户已拍板）：[`../../../Docs/2026-09-11-role-boundary.md`](../../../Docs/2026-09-11-role-boundary.md)
 >
 > 两份冲突时以**业务边界**为准，并反馈修订技术文档。
 
