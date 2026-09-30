@@ -51,8 +51,14 @@ export interface ClassLessonPanelProps {
   canSuspendLesson: boolean;
   /** 本节课已被取消（＝停过课）→ 同一位置改给「恢复本节课」 */
   canRestoreLesson: boolean;
+  /** 本节课因机构放假停课（与课表卡片「放假停课」角标同源）：头部挂停课态、停课按钮换成「恢复」 */
+  holidaySuspended?: boolean;
   /** 恢复请求进行中（按钮显示"恢复中"并禁用） */
   restoring: boolean;
+  /** 本节课是否为过去日期（过去日期下，编辑/删除也置灰） */
+  isPastLessonDate: boolean;
+  /** 有 scheduleId 且非过去日期 → 可删除排课（过去日期置灰） */
+  canDeleteSchedule: boolean;
   studentSearchKeyword: string;
   /** 学员列表加载中（列表为空时用占位替代"暂无学员"） */
   studentsLoading: boolean;
@@ -78,6 +84,8 @@ export interface ClassLessonPanelProps {
   onSuspendLesson: () => void;
   /** 恢复本节课：删掉停课时写入的 cancelled 记录，回到未点名 */
   onRestoreLesson: () => Promise<void>;
+  /** 节假日停课的「恢复」：调课到其他正常日期即可自动解除停课（停课态按日期推导） */
+  onRestoreHolidayLesson?: () => void;
   /** 删除：删除这条排课规则（不可恢复），确定文案「删除排课」 */
   onDeleteSchedule: () => void;
   onSelectClass: (classId: string) => void;
@@ -111,7 +119,10 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
   canReschedule,
   canSuspendLesson,
   canRestoreLesson,
+  holidaySuspended,
   restoring,
+  isPastLessonDate,
+  canDeleteSchedule,
   studentSearchKeyword,
   studentsLoading,
   hoursUsed,
@@ -132,6 +143,7 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
   onEdit,
   onSuspendLesson,
   onRestoreLesson,
+  onRestoreHolidayLesson,
   onDeleteSchedule,
   onSelectClass,
   onStudentSearchChange,
@@ -156,9 +168,17 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
               <Text className="block text-[44rpx] font-bold leading-[56rpx] text-foreground">
                 {displayLessonTime}
               </Text>
-              <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
-                {lessonDate}（{getWeekday(lessonDate)}）
-              </Text>
+              <View className="mt-[12rpx] flex items-center gap-[12rpx]">
+                <Text className="text-[24rpx] text-muted-foreground">
+                  {lessonDate}（{getWeekday(lessonDate)}）
+                </Text>
+                {/* 节假日停课态：与课表卡片「放假停课」角标同源（holidaySuspended 路由参数） */}
+                {holidaySuspended ? (
+                  <View className="rounded-[8rpx] bg-warning/15 px-[12rpx] py-[2rpx]">
+                    <Text className="text-[20rpx] font-semibold text-warning">放假停课</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text className="mt-[12rpx] block text-[24rpx] text-muted-foreground">
                 老师：{selectedTeachingTeacher?.name || profileName || '-'}
               </Text>
@@ -203,20 +223,32 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
                   </Text>
                 </View>
 
-                {/* 编辑：弹出「编辑班级 / 编辑排课规则」二选一（两者是不同页面） */}
-                {canEditClass ? (
+                {/* 编辑：弹出「编辑班级 / 编辑排课规则」二选一（两者是不同页面）。
+                    过去日期下置灰（不可编辑历史课次）。 */}
+                {canEditClass || isPastLessonDate ? (
                   <View
-                    className="flex items-center justify-center rounded-[10rpx] bg-primary px-[18rpx] py-[10rpx]"
-                    onClick={() => onEdit()}
+                    className={cn(
+                      'flex items-center justify-center rounded-[10rpx] px-[18rpx] py-[10rpx]',
+                      canEditClass ? 'bg-primary' : 'bg-muted',
+                    )}
+                    onClick={() => {
+                      if (canEditClass) onEdit();
+                    }}
                   >
-                    <Text className="text-[24rpx] font-medium leading-none text-primary-foreground">
+                    <Text
+                      className={cn(
+                        'text-[24rpx] font-medium leading-none',
+                        canEditClass ? 'text-primary-foreground' : 'text-muted-foreground',
+                      )}
+                    >
                       编辑
                     </Text>
                   </View>
                 ) : null}
 
                 {/* 停课：只停今天这一节（可填理由，确定后通知家长）。
-                    已取消（＝停过课）时同一个位置变成「恢复本节课」 */}
+                    已取消（＝停过课）时同一个位置变成「恢复本节课」；
+                    节假日停课（放假角标同源）时变成「恢复」——调课到其他正常日期即自动解除停课 */}
                 {canRestoreLesson ? (
                   <View
                     className={cn(
@@ -234,6 +266,26 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
                       )}
                     >
                       {restoring ? '恢复中' : '恢复本节课'}
+                    </Text>
+                  </View>
+                ) : holidaySuspended && onRestoreHolidayLesson ? (
+                  <View
+                    className={cn(
+                      'flex items-center justify-center rounded-[10rpx] px-[18rpx] py-[10rpx]',
+                      isPastLessonDate ? 'bg-muted' : 'border border-success/30 bg-success/10',
+                    )}
+                    onClick={() => {
+                      // 过去的日期无法调课（调课页会把日期收敛到今天，进去误导），置灰（用户口径 2026-09-30）
+                      if (!isPastLessonDate) onRestoreHolidayLesson();
+                    }}
+                  >
+                    <Text
+                      className={cn(
+                        'text-[24rpx] font-medium leading-none',
+                        isPastLessonDate ? 'text-muted-foreground' : 'text-success',
+                      )}
+                    >
+                      恢复
                     </Text>
                   </View>
                 ) : (
@@ -257,15 +309,30 @@ const ClassLessonPanel: React.FC<ClassLessonPanelProps> = ({
                   </View>
                 )}
 
-                {/* 删除：删除这条排课规则，删后不可找回 */}
-                <View
-                  className="flex items-center justify-center rounded-[10rpx] border border-destructive-30 bg-destructive-10 px-[18rpx] py-[10rpx]"
-                  onClick={() => onDeleteSchedule()}
-                >
-                  <Text className="text-[24rpx] font-medium leading-none text-destructive">
-                    删除
-                  </Text>
-                </View>
+                {/* 删除：删除这条排课规则，删后不可找回。
+                    过去日期下置灰（不可删除历史课次）。 */}
+                {canDeleteSchedule || isPastLessonDate ? (
+                  <View
+                    className={cn(
+                      'flex items-center justify-center rounded-[10rpx] px-[18rpx] py-[10rpx]',
+                      canDeleteSchedule
+                        ? 'border border-destructive-30 bg-destructive-10'
+                        : 'bg-muted',
+                    )}
+                    onClick={() => {
+                      if (canDeleteSchedule) onDeleteSchedule();
+                    }}
+                  >
+                    <Text
+                      className={cn(
+                        'text-[24rpx] font-medium leading-none',
+                        canDeleteSchedule ? 'text-destructive' : 'text-muted-foreground',
+                      )}
+                    >
+                      删除
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </View>

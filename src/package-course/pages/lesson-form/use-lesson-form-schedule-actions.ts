@@ -66,10 +66,12 @@ export interface UseLessonFormScheduleActionsParams {
 export interface LessonFormScheduleActions {
   /** 有排课 id 且非过去日期才可调课 */
   canReschedule: boolean;
-  /** 有排课 id 且未点名才可停课 */
+  /** 有排课 id 且未点名才可停课（过去日期也不可停） */
   canSuspendLesson: boolean;
-  /** 本节课已被取消（停课）→ 可把它恢复回未点名状态 */
+  /** 本节课已被取消（停课）→ 可把它恢复回未点名状态（过去日期不可恢复） */
   canRestoreLesson: boolean;
+  /** 本节课是否为过去的日期（过去日期下，调课/编辑/停课/删除均置灰） */
+  isPastLessonDate: boolean;
   suspending: boolean;
   restoring: boolean;
   deleting: boolean;
@@ -110,10 +112,11 @@ export function useLessonFormScheduleActions(
   /** 过去的日期不能调课：批量调课页会把早于今天的日期收敛到今天，进去会误导 */
   const isPastLessonDate = useMemo(() => dayjs(lessonDate).isBefore(dayjs(), 'day'), [lessonDate]);
   const canReschedule = Boolean(scheduleId) && !isPastLessonDate;
-  const canSuspendLesson = Boolean(scheduleId) && !isAlreadyChecked;
+  const canSuspendLesson = Boolean(scheduleId) && !isAlreadyChecked && !isPastLessonDate;
   /** 取消 ≡ 停课：停课后这节课就是「已取消」，此时同一个位置给「恢复本节课」 */
   const canRestoreLesson =
     Boolean(scheduleId) &&
+    !isPastLessonDate &&
     isLessonCancelled(existingClassRecords, { classId, studentId, lessonDate });
 
   /**
@@ -367,6 +370,7 @@ export function useLessonFormScheduleActions(
     canReschedule,
     canSuspendLesson,
     canRestoreLesson,
+    isPastLessonDate,
     suspending,
     restoring,
     deleting,

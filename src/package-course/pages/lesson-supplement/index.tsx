@@ -8,13 +8,7 @@ import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import {
-  classService,
-  lessonRecordService,
-  packageService,
-  scheduleService,
-  studentService,
-} from '@/services';
+import { classService, lessonRecordService, packageService, scheduleService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { subjectService } from '@/services/campus';
 import { useStudentStore } from '@/stores';
@@ -120,7 +114,9 @@ const LessonSupplementPage: React.FC = () => {
         classService.getById(classId),
         scheduleId ? scheduleService.getById(scheduleId) : Promise.resolve(null),
         classService.getStudents(classId),
-        currentUserId ? studentService.getByTeacher(currentUserId) : Promise.resolve([]),
+        currentUserId
+          ? useStudentStore.getState().fetchByTeacher(currentUserId)
+          : Promise.resolve([]),
       ]);
 
       const recordQueryTeacherId = schedule?.teacher_id || currentUserId;

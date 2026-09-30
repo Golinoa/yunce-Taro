@@ -35,7 +35,6 @@ import type { StudentEditSheetTarget } from './StudentEditSheet';
 
 const LessonForm: React.FC = () => {
   const { profile, currentRole } = useAuth();
-  const canEditClass = currentRole === 'admin' || currentRole === 'principal';
   const themeStore = useThemeStore();
 
   const routeParams = useMemo(() => {
@@ -88,6 +87,12 @@ const LessonForm: React.FC = () => {
   /** 课表超时历史卡：强制仅查看 */
   const viewOnlyParam = useMemo(() => {
     const v = routeParams.viewOnly || '';
+    return (v ? decodeURIComponent(v) : '') === '1';
+  }, [routeParams]);
+
+  /** 该节课因机构放假停课（课表卡片「放假停课」角标同源，随路由带来） */
+  const holidaySuspendedParam = useMemo(() => {
+    const v = routeParams.holidaySuspended || '';
     return (v ? decodeURIComponent(v) : '') === '1';
   }, [routeParams]);
 
@@ -319,9 +324,18 @@ const LessonForm: React.FC = () => {
 
   const handleOpenSupplementSheet = useCallback(async () => {
     await loadAllStudentsIfNeeded();
+    // 当日已约补课、但还没落库签到的学员已在名单里（fetchClassRoster 合并当日补课预约），
+    // 补录选人弹层只列"不在名单中的学员"，选不到他们 —— 直接并入可编辑集合，
+    // 进补录态后这些卡片即可直接签到（用户口径 2026-09-30：过去课约完补课来详情页签到）。
+    const pendingMakeupIds = [...makeupStudentIds].filter(
+      (studentId) => !recordByStudentId.has(studentId),
+    );
+    if (pendingMakeupIds.length > 0) {
+      setSupplementStudentIds((prev) => new Set([...prev, ...pendingMakeupIds]));
+    }
     setAddStudentSheetPurpose('supplement');
     setShowAddStudentSheet(true);
-  }, [loadAllStudentsIfNeeded]);
+  }, [loadAllStudentsIfNeeded, makeupStudentIds, recordByStudentId]);
 
   const handleEnterEditMode = useCallback(() => {
     setAttendanceBaseline(
@@ -335,7 +349,13 @@ const LessonForm: React.FC = () => {
   }, [checkedStudentIds, classStudents, leaveStudentIds]);
 
   const handleCancelSupplement = useCallback(() => {
-    setClassStudents((prev) => prev.filter((student) => !supplementStudentIds.has(student.id)));
+    // 补课预约学员（makeupStudentIds）本来就在班级名单里，取消补录只回滚签到状态，
+    // 不能把他们移出名单（那是给"弹层新加的临时学员"准备的回滚）。
+    setClassStudents((prev) =>
+      prev.filter(
+        (student) => !supplementStudentIds.has(student.id) || makeupStudentIds.has(student.id),
+      ),
+    );
     setCheckedStudentIds((prev) => {
       const next = new Set(prev);
       supplementStudentIds.forEach((studentId) => next.delete(studentId));
@@ -348,7 +368,7 @@ const LessonForm: React.FC = () => {
     });
     setSupplementStudentIds(new Set());
     setAttendanceMode('view');
-  }, [supplementStudentIds]);
+  }, [makeupStudentIds, supplementStudentIds]);
 
   const isStudentCardDisabled = useCallback(
     (studentId: string) => {
@@ -498,6 +518,7 @@ const LessonForm: React.FC = () => {
     lessonDate,
     selectedTeachingTeacherId,
     selectedAssistantTeacherId,
+    teacherOptions,
     currentTeacherId,
     currentUserId,
     campusId,
@@ -582,6 +603,7 @@ const LessonForm: React.FC = () => {
     canReschedule,
     canSuspendLesson,
     canRestoreLesson,
+    isPastLessonDate,
     suspending,
     restoring,
     handleReschedule,
@@ -609,6 +631,11 @@ const LessonForm: React.FC = () => {
     assistantTeacherId: selectedAssistantTeacherId,
   });
 
+  /** 过去的课程：调课/编辑/停课/删除四个按钮全部置灰（canReschedule 已在 hook 内按日期判断） */
+  const canEditClass =
+    (currentRole === 'admin' || currentRole === 'principal') && !isPastLessonDate;
+  const canDeleteSchedule = Boolean(scheduleIdParam) && !isPastLessonDate;
+
   const handleOpenSuspendSheet = useCallback(() => {
     setSuspendReason('');
     setSuspendSheetVisible(true);
@@ -617,6 +644,23 @@ const LessonForm: React.FC = () => {
   const handleConfirmSuspend = useCallback(() => {
     void handleSuspendLesson();
   }, [handleSuspendLesson]);
+
+  /**
+   * 节假日停课的「恢复」：放假停课是按日期推导的（见 schedule-card-build.ts 的
+   * holidaySuspended 注释），没有可删的 cancelled 记录，所以不能走 handleRestoreLesson；
+   * 恢复上课 = 把这节课调到其他正常日期（单次调课只影响这一天），调完目标日期不是
+   * 放假日，停课态自动解除。handleReschedule 内部已拦过去日期。
+   */
+  const handleRestoreHolidayLesson = useCallback(() => {
+    Taro.showModal({
+      title: '恢复这节课',
+      content: '该节课因机构放假停课。把它调到其他正常日期后即自动恢复上课，是否前往调课？',
+      confirmText: '去调课',
+      success: (res) => {
+        if (res.confirm) handleReschedule();
+      },
+    });
+  }, [handleReschedule]);
 
   /** 课表卡片带 action=supplement 进入：已点名后自动打开补录选人（须在 30 天窗口内） */
   useEffect(() => {
@@ -700,7 +744,10 @@ const LessonForm: React.FC = () => {
             canReschedule={canReschedule}
             canSuspendLesson={canSuspendLesson}
             canRestoreLesson={canRestoreLesson}
+            holidaySuspended={holidaySuspendedParam}
             restoring={restoring}
+            isPastLessonDate={isPastLessonDate}
+            canDeleteSchedule={canDeleteSchedule}
             studentSearchKeyword={studentSearchKeyword}
             studentsLoading={classStudentsLoading}
             hoursUsed={hoursUsed}
@@ -721,6 +768,7 @@ const LessonForm: React.FC = () => {
             onEdit={handleEdit}
             onSuspendLesson={handleOpenSuspendSheet}
             onRestoreLesson={handleRestoreLesson}
+            onRestoreHolidayLesson={handleRestoreHolidayLesson}
             onDeleteSchedule={handleDeleteSchedule}
             onSelectClass={handleSelectClass}
             onStudentSearchChange={setStudentSearchKeyword}

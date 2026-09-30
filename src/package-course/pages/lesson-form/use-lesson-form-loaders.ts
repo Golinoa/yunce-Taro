@@ -36,6 +36,7 @@ import {
 } from '@/utils/lesson-roster-cache';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
+import { isSameLessonStartTime, parseLessonStartTime } from '@/utils/schedule-card-build';
 import {
   buildClassAttendanceState,
   buildTrialCheckinMap,
@@ -44,6 +45,59 @@ import {
   resolveClassAttendanceMode,
 } from './lesson-attendance-load';
 import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
+
+/**
+ * 把「已落库补录学员」并入班级名单快照。
+ *
+ * 补录（status:'makeup' 的消课记录）学员不在 roster 快照（正式 + 当日补课预约）内，
+ * 导致「添加补录学员后保存刷新 / 重新进入详情页」看不到该学员。
+ * 这里从本节课已落库记录里挑出 status='makeup' 且既非正式、也非当日补课预约的学员，
+ * 拉取真实档案后并入名单，并把其 id 交给 supplementStudentIds 用于高亮。
+ */
+async function resolveRosterWithSupplement(
+  roster: LessonRosterSnapshot,
+  existing: LessonRecord[],
+  classId: string,
+  lessonDate: string,
+): Promise<{ students: Student[]; supplementIds: Set<string> }> {
+  const rosterMakeupIds = new Set(roster.makeupStudentIds);
+  const formalIds = new Set(roster.students.map((student) => student.id));
+  const supplementIds = new Set(
+    existing
+      .filter(
+        (record) =>
+          record.class_id === classId &&
+          record.lesson_date === lessonDate &&
+          record.status === 'makeup' &&
+          !rosterMakeupIds.has(record.student_id) &&
+          !formalIds.has(record.student_id),
+      )
+      .map((record) => record.student_id),
+  );
+  if (supplementIds.size === 0) {
+    return { students: roster.students, supplementIds: new Set() };
+  }
+  try {
+    const extras = await Promise.all(
+      [...supplementIds].map(async (studentId) => {
+        try {
+          return await studentService.getById(studentId);
+        } catch (err) {
+          logError('load supplement student for roster', err);
+          return null;
+        }
+      }),
+    );
+    const extraStudents = extras.filter((student): student is Student => Boolean(student));
+    return {
+      students: [...roster.students, ...extraStudents],
+      supplementIds,
+    };
+  } catch (err) {
+    logError('resolve roster supplement students', err);
+    return { students: roster.students, supplementIds: new Set() };
+  }
+}
 
 export interface UseLessonFormLoadersParams {
   isEditEntryAttempt: boolean;
@@ -173,6 +227,13 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setSubjectOptions,
   } = params;
 
+  /**
+   * 本节开始时段（`09:00`）。用于把试听/补课预约收窄到「这一节」：
+   * 同一班同一天可能排多节课，只按班级+日期合并会让别的课也带上这些学员。
+   * 页面未带 lessonTime（从班级列表进入等）时为空串 ⇒ 过滤函数自动放行。
+   */
+  const lessonStartTime = parseLessonStartTime(lessonTimeParam);
+
   const applyClassTeacherDefaults = useCallback(
     (classInfo: Class | null, options: TeacherUIModel[]) => {
       if (!classInfo) {
@@ -287,7 +348,12 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         status: 'confirmed',
       });
       const classBookings = bookings.filter(
-        (b) => b.class_id === selectedClassId && b.lesson_date === lessonDate,
+        (b) =>
+          b.class_id === selectedClassId &&
+          b.lesson_date === lessonDate &&
+          // 同班同一天可能有多节课：只认「本节的时段」。
+          // 页面没带时段（例如从班级列表进来）时不过滤，保持原行为。
+          isSameLessonStartTime(b.start_time, lessonStartTime),
       );
       setTrialBookings(classBookings);
 
@@ -319,6 +385,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     currentTeacherId,
     existingClassRecords,
     lessonDate,
+    lessonStartTime,
     selectedClassId,
     setTrialBookings,
     setTrialCheckinMap,
@@ -333,7 +400,13 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
    */
   const fetchClassRoster = useCallback(
     async (classId: string, opts?: { force?: boolean }): Promise<LessonRosterSnapshot> => {
-      const cacheKey = buildLessonRosterKey({ userId: currentUserId, classId, lessonDate });
+      const cacheKey = buildLessonRosterKey({
+        userId: currentUserId,
+        classId,
+        lessonDate,
+        // 名单已按时段收窄：同班同一天两节课的名单不同，key 必须带上时段
+        startTime: lessonStartTime,
+      });
       if (!opts?.force) {
         const cached = readLessonRoster(cacheKey);
         if (cached) {
@@ -356,6 +429,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         const makeupBookings = await makeupBookingService.getByClassDate({
           classId,
           lessonDate,
+          // 只并「本节」的补课学员：同班同一天多节课时，别把别的课的补课学员并进来
+          startTime: lessonStartTime || undefined,
         });
         const formalIds = new Set(formalStudents.map((student) => student.id));
         const extraStudents = await Promise.all(
@@ -390,7 +465,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       }
       return snapshot;
     },
-    [currentUserId, lessonDate],
+    [currentUserId, lessonDate, lessonStartTime],
   );
 
   useEffect(() => {
@@ -465,23 +540,28 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
           setCampusId(roster.classInfo?.campus_id || mainCampusId);
           applyClassTeacherDefaults(roster.classInfo, teacherList);
           applyClassLessonDefaults(roster.classInfo);
-          setClassStudents(roster.students);
-          const students = roster.students;
-          const approvedLeaveIds = await loadApprovedLeaveStudentIds(students);
+          const approvedLeaveIds = await loadApprovedLeaveStudentIds(roster.students);
 
           const existingRecords = await loadLessonRecordsByDate();
+          const { students: withSupplement, supplementIds } = await resolveRosterWithSupplement(
+            roster,
+            existingRecords,
+            classIdParam,
+            lessonDate,
+          );
+          setClassStudents(withSupplement);
           const attendance = buildClassAttendanceState({
             records: existingRecords,
             classId: classIdParam,
             lessonDate,
-            studentIds: students.map((student) => student.id),
+            studentIds: withSupplement.map((student) => student.id),
           });
           setExistingClassRecords(attendance.classRecords);
           setIsAlreadyChecked(attendance.hasRecords);
           setCheckedStudentIds(attendance.checkedStudentIds);
           setLeaveStudentIds(new Set([...attendance.leaveStudentIds, ...approvedLeaveIds]));
           setRecordByStudentId(attendance.recordByStudentId);
-          setSupplementStudentIds(new Set());
+          setSupplementStudentIds(supplementIds);
           setAttendanceMode(
             resolveClassAttendanceMode({
               hasRecords: attendance.hasRecords,
@@ -490,7 +570,10 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
             }),
           );
 
-          const { packages, subjects } = await loadPackageMapsForStudents(students, hoursUsed);
+          const { packages, subjects } = await loadPackageMapsForStudents(
+            withSupplement,
+            hoursUsed,
+          );
           setStudentPackages(packages);
           setStudentSubjects(subjects);
         } finally {
@@ -617,22 +700,28 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         applyClassLessonDefaults(classInfo);
 
         setMakeupStudentIds(new Set(roster.makeupStudentIds));
-        setClassStudents(mergedStudents);
         const approvedLeaveIds = await loadApprovedLeaveStudentIds(mergedStudents);
 
         const existing = await loadLessonRecordsByDate();
+        const { students: withSupplement, supplementIds } = await resolveRosterWithSupplement(
+          roster,
+          existing,
+          classId,
+          lessonDate,
+        );
         const attendance = buildClassAttendanceState({
           records: existing,
           classId,
           lessonDate,
-          studentIds: mergedStudents.map((student) => student.id),
+          studentIds: withSupplement.map((student) => student.id),
         });
+        setClassStudents(withSupplement);
         setExistingClassRecords(attendance.classRecords);
         setIsAlreadyChecked(attendance.hasRecords);
         setCheckedStudentIds(attendance.checkedStudentIds);
         setLeaveStudentIds(new Set([...attendance.leaveStudentIds, ...approvedLeaveIds]));
         setRecordByStudentId(attendance.recordByStudentId);
-        setSupplementStudentIds(new Set());
+        setSupplementStudentIds(supplementIds);
         setAttendanceMode(
           resolveClassAttendanceMode({
             hasRecords: attendance.hasRecords,

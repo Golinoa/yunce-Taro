@@ -21,6 +21,7 @@ import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
+import type { TeacherUIModel } from '@/types/teacher';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
@@ -55,6 +56,8 @@ export interface UseLessonFormActionsParams {
   lessonDate: string;
   selectedTeachingTeacherId: string;
   selectedAssistantTeacherId: string;
+  /** 教师管理在册教师列表：提交前校验授课教师有效（防「教师不存在」） */
+  teacherOptions: TeacherUIModel[];
   currentTeacherId: string;
   currentUserId: string;
   campusId: string;
@@ -120,6 +123,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     lessonDate,
     selectedTeachingTeacherId,
     selectedAssistantTeacherId,
+    teacherOptions,
     currentTeacherId,
     currentUserId,
     campusId,
@@ -288,6 +292,27 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   const classAbsentCount = absentStudents.length;
   const allSelectableChecked =
     classStudents.length > 0 && classCheckedCount === classStudents.length;
+
+  /**
+   * 提交前校验授课教师必须是「教师管理」在册教师（教师管理列表能找到的 Teacher.id）。
+   *
+   * 背景（用户口径 2026-09-30，问题 5）：班级教师解析失败 / 教师已软删除离职 /
+   * 校长等无教师档账号兜底到 currentTeacherId（非 Teacher.id）时，消课请求会被后端
+   * 以「教师不存在」拒绝，且逐条失败；这里提前拦截并给出可操作的提示。
+   */
+  const guardTeachingTeacher = useCallback((): boolean => {
+    const valid =
+      Boolean(selectedTeachingTeacherId) &&
+      teacherOptions.some((teacher) => teacher.id === selectedTeachingTeacherId);
+    if (!valid) {
+      Taro.showToast({
+        title: '授课老师无效或已离职，请重新选择授课老师后再保存',
+        icon: 'none',
+        duration: 3000,
+      });
+    }
+    return valid;
+  }, [selectedTeachingTeacherId, teacherOptions]);
 
   const addableStudents = useMemo(
     () =>
@@ -593,6 +618,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   );
 
   const handleSupplementSave = useCallback(async () => {
+    if (!guardTeachingTeacher()) return;
     await executeSupplementSave({
       selectedClassId,
       supplementStudentIds,
@@ -616,6 +642,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     classStudents,
     currentUserId,
     getStudentCheckinStatus,
+    guardTeachingTeacher,
     hoursUsed,
     profile,
     recordByStudentId,
@@ -624,6 +651,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   ]);
 
   const handleIncrementalEditSave = useCallback(async () => {
+    if (!guardTeachingTeacher()) return;
     await executeIncrementalEditSave({
       selectedClassId,
       classStudents,
@@ -641,6 +669,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     buildPersistShared,
     classStudents,
     getStudentCheckinStatus,
+    guardTeachingTeacher,
     hoursUsed,
     recordByStudentId,
     selectedClassId,
@@ -692,6 +721,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   ]);
 
   const handleClassSubmit = useCallback(async () => {
+    if (!guardTeachingTeacher()) return;
     await executeClassSubmit({
       selectedClassId,
       selectedClassName,
@@ -733,6 +763,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     content,
     currentTeacherId,
     currentUserId,
+    guardTeachingTeacher,
     homework,
     homeworkImages,
     hoursUsed,

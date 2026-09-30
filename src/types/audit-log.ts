@@ -9,10 +9,12 @@
 
 /** 值得记录的操作动作枚举 */
 export type AuditAction =
-  | 'lesson.checkin' // 点名签到（批量消课，汇总一条）
+  | 'lesson.checkin' // 点名签到（含补录签到 / 单人消课，汇总一条）
   | 'lesson.record' // 单人消课 / 补课登记
   | 'lesson.edit_hours' // 编辑课时（高权限，仅管理角色）
   | 'lesson.revoke' // 撤销消课
+  | 'lesson.trial_checkin' // 试听签到 / 标记未到
+  | 'lesson.trial_booking' // 试听预约取消 / 恢复
   | 'card.issue' // 会员开卡
   | 'card.recharge' // 会员卡充值/调整剩余
   | 'salary.confirm' // 薪资核对
@@ -36,6 +38,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'lesson.record': '单人消课/补课',
   'lesson.edit_hours': '编辑课时',
   'lesson.revoke': '撤销消课',
+  'lesson.trial_checkin': '试听签到',
+  'lesson.trial_booking': '试听预约变更',
   'card.issue': '会员开卡',
   'card.recharge': '充值/调整剩余',
   'salary.confirm': '薪资核对',

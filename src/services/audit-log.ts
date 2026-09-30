@@ -40,9 +40,12 @@ function mapBackendAuditLog(raw: Record<string, unknown>): AuditLogEntry {
 }
 
 export const auditLogService = {
-  record: async (_input: AuditLogInput): Promise<AuditLogEntry> => {
-    throw new Error('[接口未接通] 审计日志由后端业务写接口记录');
-  },
+  /**
+   * 审计写入已下沉到后端业务写接口（点名/补签/编辑课时/撤销/试听签到等自动补流水）。
+   * 前端不再写入——保留空实现仅兼容历史调用点，避免抛「接口未接通」误报
+   * （用户口径 2026-09-30：签到流水必须可追溯操作人，由后端落 AuditLog）。
+   */
+  record: async (_input: AuditLogInput): Promise<void> => {},
 
   query: async (viewer: AuditLogViewer, query?: AuditLogQuery): Promise<AuditLogPage> => {
     const safeQuery: AuditLogQuery = {
