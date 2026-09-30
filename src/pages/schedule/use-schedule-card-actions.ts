@@ -6,10 +6,13 @@ import dayjs from 'dayjs';
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { CourseCategoryMode } from '@/types/course-category';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
+import { buildTrialLessonKey } from '@/utils/schedule-card-build';
+import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import {
   buildBatchRescheduleSelectPath,
   buildBookingPagePath,
   buildCheckinLessonFormPath,
+  buildLessonFormPath,
   buildSupplementLessonFormPath,
   buildViewOnlyLessonFormPath,
   resolveSchedulePrimaryActionKind,
@@ -33,6 +36,8 @@ export interface UseScheduleCardActionsParams {
   batchClassOptions: ScheduleBatchClassOptionLite[];
   batchSelectedClassIds: string[];
   loadBaseData: () => Promise<void> | void;
+  /** 当前打开中的约试听/补课弹层对应的卡片（预约成功后取本节课导航信息） */
+  bookSheetItem: ScheduleCardItem | null;
   setBookSheetItem: Dispatch<SetStateAction<ScheduleCardItem | null>>;
   setBookSheetVisible: Dispatch<SetStateAction<boolean>>;
   setTrialBookingKeys: Dispatch<SetStateAction<Set<string>>>;
@@ -55,6 +60,7 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
     batchClassOptions,
     batchSelectedClassIds,
     loadBaseData,
+    bookSheetItem,
     setBookSheetItem,
     setBookSheetVisible,
     setTrialBookingKeys,
@@ -80,20 +86,61 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
   }, [setBookSheetItem, setBookSheetVisible]);
 
   const handleBookTrialByClassSuccess = useCallback(
-    ({ classId, lessonDate }: { classId: string; lessonDate: string }) => {
+    ({
+      classId,
+      lessonDate,
+      startTime,
+      mode,
+    }: {
+      classId: string;
+      lessonDate: string;
+      /** 本次预约落在哪一节（时段）；缺省时退回触发弹层的卡片时段 */
+      startTime?: string;
+      mode: 'makeup' | 'trial';
+    }) => {
+      // 收口前先取本节课导航信息（scheduleId / 时段来自触发弹层的卡片）
+      const navItem = bookSheetItem;
       // 子弹层会调用 onClose，但微信端在回调后可能仍保留父级 visible 状态；
       // 这里同步收口父级状态，避免预约成功后弹框残留。
       setBookSheetVisible(false);
       setBookSheetItem(null);
-      // 预约成功后本地标记该班级时段为试听，并刷新课表数据
+      // 预约成功后本地只标记「被预约的那一节课」为试听（班级+日期+时段），
+      // 不能按整班/整天标记：同一班同一天可能有多节课，按天标记会让别的课也挂上试听。
+      const lessonStartTime = startTime || navItem?.startTime;
       setTrialBookingKeys((prev) => {
         const next = new Set(prev);
-        next.add(`${classId}|${lessonDate}`);
+        next.add(buildTrialLessonKey(classId, lessonDate, lessonStartTime));
         return next;
       });
       void loadBaseData();
+      // 引导进入这节课的详情页签到（用户口径 2026-09-30：过去课也允许约，
+      // 约完直接去点名页——名单会自动带上刚约的补课/试听学员和已签到数据）。
+      if (!classId || !lessonDate) return;
+      if (!canOperateHistoricalLesson(dayjs(lessonDate), dayjs())) {
+        Taro.showToast({
+          title: '已超过 30 天补录期限，预约已保存，但无法再补签到',
+          icon: 'none',
+          duration: 2500,
+        });
+        return;
+      }
+      const lessonTime =
+        navItem?.startTime && navItem?.endTime
+          ? `${navItem.startTime}-${navItem.endTime}`
+          : undefined;
+      Taro.navigateTo({
+        url: buildLessonFormPath({
+          scheduleId: navItem?.id,
+          classId,
+          lessonDate,
+          lessonTime,
+          // 补课学员若这节课已点名，点名页会自动打开补录并把他们列为可签到；
+          // 尚未点名时该参数被忽略，直接进普通点名。
+          action: mode === 'makeup' ? 'supplement' : undefined,
+        }),
+      });
     },
-    [loadBaseData, setBookSheetItem, setBookSheetVisible, setTrialBookingKeys],
+    [bookSheetItem, loadBaseData, setBookSheetItem, setBookSheetVisible, setTrialBookingKeys],
   );
 
   /** 卡片「补录」：仅历史课且 30 天内 */

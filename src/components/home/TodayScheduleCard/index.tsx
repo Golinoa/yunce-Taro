@@ -6,6 +6,7 @@ import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import Icon from '@/components/Icon';
 import { classColorHex } from '@/theme';
 import type { Schedule, CourseStatus } from '@/types/schedule';
+import { buildLessonFormPath } from '@/utils/schedule-lesson-nav';
 import {
   resolveScheduleDisplayTitle,
   sanitizeScheduleTagLabel,
@@ -108,8 +109,18 @@ function getCountdownText(startTime: string): string | null {
   return `⏱ ${diffMin}分钟后`;
 }
 
+/**
+ * 首页卡片 → 点名页。
+ *
+ * ⚠️ 必须走 `buildLessonFormPath`：与课表页（`buildCheckinLessonFormPath` 等）同一套拼参。
+ * 此前这里手拼 URL 且**漏了 `lessonTime`** ⇒ 详情页拿不到本节排课时间，只能回落到
+ * 班级时间（一个班有多节课时会显示成错的那一节），和从课表页进去看到的时间对不上。
+ */
 function navigateToSchedule(item: Schedule): void {
   const lessonDate = dayjs().format('YYYY-MM-DD');
+  /** 本节排课时间（HH:mm-HH:mm）；缺任一端就不传——详情页回落班级时间比传半截更安全 */
+  const lessonTime =
+    item.start_time && item.end_time ? `${item.start_time}-${item.end_time}` : undefined;
 
   if (item.schedule_kind === 'venue' && item.room_id) {
     Taro.navigateTo({
@@ -121,11 +132,12 @@ function navigateToSchedule(item: Schedule): void {
   const bookingId = item.booking_id;
   if (bookingId && item.trial_mode !== 'private') {
     Taro.navigateTo({
-      url:
-        `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(item.class_id || '')}` +
-        `&lessonDate=${encodeURIComponent(lessonDate)}` +
-        `&lessonTime=${encodeURIComponent(`${item.start_time}-${item.end_time}`)}` +
-        `&hasTrialStudent=1`,
+      url: buildLessonFormPath({
+        classId: item.class_id || '',
+        lessonDate,
+        lessonTime,
+        hasTrialStudent: true,
+      }),
     });
     return;
   }
@@ -138,11 +150,14 @@ function navigateToSchedule(item: Schedule): void {
   }
 
   Taro.navigateTo({
-    url:
-      `/package-course/pages/lesson-form/index?scheduleId=${encodeURIComponent(item.id)}` +
-      `&classId=${encodeURIComponent(item.class_id || '')}` +
-      `&lessonDate=${encodeURIComponent(lessonDate)}` +
-      `&hasTrialStudent=${item.has_trial_student ? '1' : '0'}`,
+    url: buildLessonFormPath({
+      scheduleId: item.id,
+      classId: item.class_id || '',
+      lessonDate,
+      lessonTime,
+      // 只在确有试听学员时传 1：课表详情页按 === '1' 判定，传 '0' 是脏参数
+      hasTrialStudent: Boolean(item.has_trial_student),
+    }),
   });
 }
 

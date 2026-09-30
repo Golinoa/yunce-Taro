@@ -13,6 +13,8 @@ export type LessonFormNavFields = {
   hasTrialStudent?: boolean;
   status: ScheduleCardStatus;
   bookingTag?: string;
+  /** 该节课因机构放假停课（与课表卡片「放假停课」角标同一判定来源） */
+  holidaySuspended?: boolean;
   /**
    * 这节课的排课时间（`Schedule.startTime/endTime`）。
    *
@@ -30,6 +32,8 @@ export type LessonFormNavParams = {
   lessonDate: string;
   lessonTime?: string;
   hasTrialStudent?: boolean;
+  /** 该节课因机构放假停课：详情页头部挂「放假停课」态、停课按钮换成「恢复」 */
+  holidaySuspended?: boolean;
   action?: 'supplement';
   viewOnly?: boolean;
 };
@@ -47,6 +51,9 @@ export function buildLessonFormPath(params: LessonFormNavParams): string {
   }
   if (params.hasTrialStudent) {
     query.push('hasTrialStudent=1');
+  }
+  if (params.holidaySuspended) {
+    query.push('holidaySuspended=1');
   }
   if (params.action === 'supplement') {
     query.push('action=supplement');
@@ -123,6 +130,7 @@ export function buildSupplementLessonFormPath(
     lessonDate: actionDate.format('YYYY-MM-DD'),
     lessonTime: buildLessonTimeRange(item),
     hasTrialStudent: item.hasTrialStudent,
+    holidaySuspended: item.holidaySuspended,
     action: item.status === 'done' ? 'supplement' : undefined,
   });
 }
@@ -137,6 +145,7 @@ export function buildViewOnlyLessonFormPath(
     lessonDate: actionDate.format('YYYY-MM-DD'),
     lessonTime: buildLessonTimeRange(item),
     hasTrialStudent: item.hasTrialStudent,
+    holidaySuspended: item.holidaySuspended,
     viewOnly: true,
   });
 }
@@ -151,6 +160,7 @@ export function buildCheckinLessonFormPath(
     lessonDate: actionDate.format('YYYY-MM-DD'),
     lessonTime: buildLessonTimeRange(item),
     hasTrialStudent: item.hasTrialStudent,
+    holidaySuspended: item.holidaySuspended,
   });
 }
 

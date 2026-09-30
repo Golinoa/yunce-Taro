@@ -147,7 +147,11 @@ export interface ScheduleMainViewsProps {
   onCreateSchedule: () => void;
   onManageBookingConfig: () => void;
   onCloseBookSheet: () => void;
-  onBookTrialByClassSuccess: (payload: { classId: string; lessonDate: string }) => void;
+  onBookTrialByClassSuccess: (payload: {
+    classId: string;
+    lessonDate: string;
+    mode: 'makeup' | 'trial';
+  }) => void;
 }
 
 const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {

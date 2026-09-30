@@ -138,4 +138,22 @@ describe('schedule-lesson-nav (Q2-1)', () => {
     expect(url).toContain('date=2026-09-28');
     expect(url).toContain('classId=cls-1');
   });
+
+  it('节假日停课：holidaySuspended 随卡片带入详情页（三个入口一致）', () => {
+    const item = {
+      id: 's1',
+      classId: 'c1',
+      status: 'upcoming' as const,
+      holidaySuspended: true,
+    };
+    // 与课表卡片「放假停课」角标同源：点名/补录/仅查看三条路都必须带过去，
+    // 详情页据此挂「放假停课」态并把停课按钮换成「恢复」。
+    expect(buildCheckinLessonFormPath(item, NOW)).toContain('holidaySuspended=1');
+    expect(buildSupplementLessonFormPath(item, NOW)).toContain('holidaySuspended=1');
+    expect(buildViewOnlyLessonFormPath(item, NOW)).toContain('holidaySuspended=1');
+    // 未停课的课不带该参数，详情页不误挂停课态
+    expect(buildCheckinLessonFormPath({ ...item, holidaySuspended: undefined }, NOW)).not.toContain(
+      'holidaySuspended=',
+    );
+  });
 });

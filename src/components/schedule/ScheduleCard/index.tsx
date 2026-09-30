@@ -39,6 +39,8 @@ export interface ScheduleCardItem {
   hasTrialStudent?: boolean;
   canCancelLesson: boolean;
   isTemporaryAdjusted?: boolean;
+  /** 该节课因机构放假而停课（右上角显示橙色「放假停课」角标，优先于「取消」） */
+  holidaySuspended?: boolean;
   campusId?: string;
   students?: ScheduleCardStudentAvatar[];
 }
@@ -107,11 +109,23 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
       )}
       onClick={() => onClick?.(item)}
     >
-      {item.status === 'cancelled' ? (
-        <View className="absolute right-0 top-0 overflow-hidden rounded-tr-[14rpx]">
-          <View className="rounded-bl-[16rpx] bg-destructive px-[20rpx] py-[10rpx] shadow-card">
-            <Text className="text-[20rpx] font-semibold tracking-[2rpx] text-destructive-foreground">
-              取消
+      {/* 右上角角标：放假停课（橙，优先）/ 已取消（红）。
+          z-30 盖住分享按钮（z-10）：停课/取消课次的分享无意义，角标必须完整可见（用户口径 2026-09-30） */}
+      {item.holidaySuspended || item.status === 'cancelled' ? (
+        <View className="absolute right-0 top-0 z-30 overflow-hidden rounded-tr-[14rpx]">
+          <View
+            className={cn(
+              'rounded-bl-[16rpx] px-[20rpx] py-[10rpx] shadow-card',
+              item.holidaySuspended ? 'bg-warning' : 'bg-destructive',
+            )}
+          >
+            <Text
+              className={cn(
+                'text-[20rpx] font-semibold tracking-[2rpx]',
+                item.holidaySuspended ? 'text-warning-foreground' : 'text-destructive-foreground',
+              )}
+            >
+              {item.holidaySuspended ? '放假停课' : '取消'}
             </Text>
           </View>
         </View>

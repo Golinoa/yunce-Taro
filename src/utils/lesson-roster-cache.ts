@@ -24,6 +24,7 @@ import type { Class } from '@/types/class';
 import type { Student } from '@/types/student';
 import { TTL } from '@/utils/data-freshness';
 import { REFRESH_SIGNAL, peekRefreshSignal } from '@/utils/refresh-signal';
+import { normalizeLessonStartTime } from '@/utils/schedule-card-build';
 
 /**
  * 有效期取 **L1 Tab 短鲜窗口（60s）**：点名页偏履约场景，宁可短一点；
@@ -46,6 +47,11 @@ export interface LessonRosterKeyParts {
   classId: string;
   /** 上课日期（页面按天点名，同班不同天不能互用名单） */
   lessonDate: string;
+  /**
+   * 本节开始时段。同班同一天可能排多节课（如 09:00 与 14:00），
+   * 名单里合并的是「本节」的补课学员 ⇒ 同天不同节也不能互用名单。
+   */
+  startTime?: string | null;
 }
 
 /** 影响"名单是否可信"的写信号：学员增删改 / 班级辅数据 / 排课（含补课预约） */
@@ -61,7 +67,8 @@ type CacheEntry = { at: number; data: LessonRosterSnapshot };
 const store = new Map<string, CacheEntry>();
 
 export function buildLessonRosterKey(parts: LessonRosterKeyParts): string {
-  return `${parts.userId || '-'}|${parts.classId}|${parts.lessonDate}`;
+  const startTime = normalizeLessonStartTime(parts.startTime);
+  return `${parts.userId || '-'}|${parts.classId}|${parts.lessonDate}|${startTime}`;
 }
 
 /**

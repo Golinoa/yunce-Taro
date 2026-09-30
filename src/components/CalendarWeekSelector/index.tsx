@@ -14,7 +14,8 @@ export interface CalendarWeekSelectorProps {
   /** 日期下方红点/灰点状态 */
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
   /**
-   * 该日是否放假：是则在**日期数字右上角**标一个主题色「休」字（比数字小 2 档字号）。
+   * 该日是否放假：是则在**日期圆圈右上角外侧**标一个橙色「休」字（比数字小 3 档字号）。
+   * 放在圈外是为了不压到选中状态的圆圈（背景 + 描边）上。
    * 数据来自 `/holidays/calendar`（所有角色可读，家长端也能看到）。
    */
   isHoliday?: (date: dayjs.Dayjs) => boolean;
@@ -383,9 +384,10 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
           >
             {date.date()}
           </Text>
-          {/* 放假「休」：数字右上角，主题色，比数字小 2 档字号（28→24） */}
+          {/* 放假「休」：圆圈右上角外侧，橙色，比数字小 3 档字号（28→22）。
+              偏移 30 = 字宽 22 + 选中描边外扩 4 + 留白 4（同上，描边往外撑） */}
           {holiday ? (
-            <Text className="absolute right-[-2rpx] top-[-8rpx] text-[24rpx] font-medium leading-[24rpx] text-primary">
+            <Text className="absolute right-[-30rpx] top-[4rpx] text-[22rpx] font-medium leading-[22rpx] text-warning">
               休
             </Text>
           ) : null}
@@ -447,9 +449,11 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             >
               {date.date()}
             </Text>
-            {/* 放假「休」：数字右上角，主题色，比数字小 2 档字号（30→26） */}
+            {/* 放假「休」：圆圈右上角外侧，橙色，比数字小 3 档字号（30→24）。
+                偏移 32 = 字宽 24 + 选中描边外扩 4 + 留白 4
+                —— View 默认 content-box，选中态 border-[4rpx] 是往外撑的，收小就会压到圆圈 */}
             {holiday ? (
-              <Text className="absolute right-[-2rpx] top-[-6rpx] text-[26rpx] font-medium leading-[26rpx] text-primary">
+              <Text className="absolute right-[-32rpx] top-[4rpx] text-[24rpx] font-medium leading-[24rpx] text-warning">
                 休
               </Text>
             ) : null}

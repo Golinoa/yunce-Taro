@@ -54,6 +54,8 @@ export interface UseScheduleDerivedParams {
   batchSelectedClassIds: string[];
   dangerActionState: ScheduleDangerActionState;
   selectedDate: dayjs.Dayjs;
+  /** 该日期是否为机构放假（课表页由 useHolidayCheck 提供，用于给卡片打「放假停课」标记） */
+  isHolidayDate?: (date: dayjs.Dayjs) => boolean;
 }
 
 export function useScheduleDerived(params: UseScheduleDerivedParams) {
@@ -76,6 +78,7 @@ export function useScheduleDerived(params: UseScheduleDerivedParams) {
     openSlotDates,
     batchSelectedClassIds,
     dangerActionState,
+    isHolidayDate,
   } = params;
 
   /** 根据课程分类生成顶部 Tab：基础模式 Tab + 场地 + 独立展示分类，统一按 sortOrder 排序 */
@@ -176,6 +179,7 @@ export function useScheduleDerived(params: UseScheduleDerivedParams) {
         classStudentAvatars,
         trialBookingKeys,
         currentTeacherName,
+        isHolidayDate: isHolidayDate?.(date) ?? false,
       }),
     [
       classById,
@@ -189,6 +193,7 @@ export function useScheduleDerived(params: UseScheduleDerivedParams) {
       teacherById,
       trialBookingKeys,
       temporaryReschedules,
+      isHolidayDate,
     ],
   );
 

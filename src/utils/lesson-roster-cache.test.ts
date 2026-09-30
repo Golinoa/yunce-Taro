@@ -100,7 +100,7 @@ describe('lesson-roster-cache', () => {
     expect(taroStub.map.has(REFRESH_SIGNAL.schedule)).toBe(true);
   });
 
-  it('key 维度隔离：userId / classId / lessonDate 任一不同都不复用', () => {
+  it('key 维度隔离：userId / classId / lessonDate / 本节时段 任一不同都不复用', () => {
     writeLessonRoster(key(), snapshot, 1_000);
     const otherUser = buildLessonRosterKey({
       userId: 'user-2',
@@ -117,7 +117,14 @@ describe('lesson-roster-cache', () => {
       classId: 'class-1',
       lessonDate: '2026-09-29',
     });
-    [otherUser, otherClass, otherDate].forEach((k) => {
+    // 同班同一天的另一节课：名单里合并的补课学员不同，不能复用
+    const otherStartTime = buildLessonRosterKey({
+      userId: 'user-1',
+      classId: 'class-1',
+      lessonDate: '2026-09-28',
+      startTime: '14:00',
+    });
+    [otherUser, otherClass, otherDate, otherStartTime].forEach((k) => {
       expect(readLessonRoster(k, 1_001)).toBeNull();
     });
   });

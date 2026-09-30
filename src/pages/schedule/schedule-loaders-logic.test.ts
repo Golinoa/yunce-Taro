@@ -128,14 +128,23 @@ describe('buildMonthAuxDateRange', () => {
 });
 
 describe('buildTrialBookingKeys', () => {
-  it('pending/confirmed 且含 class_id、lesson_date 才纳入', () => {
+  it('pending/confirmed 且含 class_id、lesson_date 才纳入，键带本节时段', () => {
     const keys = buildTrialBookingKeys([
-      { class_id: 'c1', lesson_date: '2026-09-01', status: 'pending' },
-      { class_id: 'c2', lesson_date: '2026-09-02', status: 'confirmed' },
-      { class_id: 'c3', lesson_date: '2026-09-03', status: 'cancelled' },
-      { class_id: null, lesson_date: '2026-09-04', status: 'pending' },
-      { class_id: 'c5', lesson_date: null, status: 'pending' },
+      { class_id: 'c1', lesson_date: '2026-09-01', start_time: '09:00', status: 'pending' },
+      { class_id: 'c2', lesson_date: '2026-09-02', start_time: '14:00', status: 'confirmed' },
+      { class_id: 'c3', lesson_date: '2026-09-03', start_time: '10:00', status: 'cancelled' },
+      { class_id: null, lesson_date: '2026-09-04', start_time: '10:00', status: 'pending' },
+      { class_id: 'c5', lesson_date: null, start_time: '10:00', status: 'pending' },
     ]);
-    expect([...keys].sort()).toEqual(['c1|2026-09-01', 'c2|2026-09-02']);
+    expect([...keys].sort()).toEqual(['c1|2026-09-01|09:00', 'c2|2026-09-02|14:00']);
+  });
+
+  it('同班同一天的不同时段互不串味', () => {
+    const keys = buildTrialBookingKeys([
+      { class_id: 'c1', lesson_date: '2026-09-01', start_time: '09:00', status: 'pending' },
+      { class_id: 'c1', lesson_date: '2026-09-01', start_time: '14:00', status: 'confirmed' },
+    ]);
+    expect([...keys].sort()).toEqual(['c1|2026-09-01|09:00', 'c1|2026-09-01|14:00']);
+    expect(keys.has('c1|2026-09-01|10:00')).toBe(false);
   });
 });

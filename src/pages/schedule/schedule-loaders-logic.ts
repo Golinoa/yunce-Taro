@@ -3,6 +3,7 @@
  * 使用场景：开放时段缓存跳过、月度区间、试听 key、开放班过滤——无 React / 无 IO。
  */
 import type { Class } from '@/types/class';
+import { buildTrialLessonKey } from '@/utils/schedule-card-build';
 import type { Dayjs } from 'dayjs';
 
 /** 过滤开放预约班级。 */
@@ -58,10 +59,16 @@ export function buildMonthAuxDateRange(selectedDate: Dayjs): MonthRangeStrings {
 export interface TrialBookingLike {
   class_id?: string | null;
   lesson_date?: string | null;
+  /** 本节课时段；缺它就无法区分「同一天的第几节课」 */
+  start_time?: string | null;
   status?: string | null;
 }
 
-/** 试听标签 key：`classId|lessonDate`，仅 pending/confirmed。 */
+/**
+ * 试听标签 key：`classId|lessonDate|startTime`，仅 pending/confirmed。
+ *
+ * 键的口径定义在 `@/utils/schedule-card-build`（与课表卡片判定、点名名单过滤共用同一真源）。
+ */
 export function buildTrialBookingKeys(bookings: TrialBookingLike[]): Set<string> {
   return new Set<string>(
     bookings
@@ -71,6 +78,6 @@ export function buildTrialBookingKeys(bookings: TrialBookingLike[]): Set<string>
           Boolean(b.lesson_date) &&
           (b.status === 'pending' || b.status === 'confirmed'),
       )
-      .map((b) => `${b.class_id}|${b.lesson_date}`),
+      .map((b) => buildTrialLessonKey(b.class_id, b.lesson_date, b.start_time)),
   );
 }

@@ -181,7 +181,10 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
                       )
                     }
                     footerAction={
-                      isParent || !isUpcomingClassCard(item.status) ? undefined : (
+                      /* 约试听/补课：原先只对未来课开放，过去课「忘了加人」就无法补约。
+                         现放宽为非家长、非已取消的课次都显示（含过去课与当日已下课）；
+                         添加成功后引导进详情页签到（见 use-schedule-card-actions.ts）。 */
+                      isParent || item.status === 'cancelled' ? undefined : (
                         <View
                           className="flex min-h-[48rpx] items-center px-[4rpx] active:opacity-70"
                           hoverStopPropagation
@@ -196,10 +199,14 @@ const ScheduleDaySwiperItem: React.FC<ScheduleDaySwiperItemProps> = ({
                       )
                     }
                     showStudentRow={
+                      /* 底部行（学员头像 + 约试听/补课）的显示条件必须与 footerAction 对齐：
+                         过去课即使一个学员都没有，也要把行渲染出来，否则「约试听/补课」入口
+                         会连同行一起被隐藏 —— 防漏填补不上的闭环就断了（用户口径 2026-09-30）。 */
                       item.status !== 'cancelled' &&
                       (isUpcomingClassCard(item.status) ||
                         item.status === 'active' ||
-                        (item.students?.length || 0) > 0)
+                        (item.students?.length || 0) > 0 ||
+                        !isParent)
                     }
                   />
                 );

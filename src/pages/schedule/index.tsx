@@ -212,6 +212,13 @@ const SchedulePage: React.FC = () => {
 
   const [teacherSwitchSheetVisible, setTeacherSwitchSheetVisible] = useState(false);
 
+  /**
+   * 放假判断 hook：日历「休」标识 + 课表卡片「放假停课」标记共用（教师端/家长端）。
+   * 必须等身份就绪再拉——挂载瞬间 token/机构可能尚未解析，此时请求会 401 且本 hook 不自动重试。
+   * ⚠️ 必须放在 useScheduleDerived 之前：卡片构建时要用它打标记。
+   */
+  const isHolidayDate = useHolidayCheck({ enabled: Boolean(currentRole) });
+
   const {
     tabs,
     activeTab,
@@ -244,6 +251,7 @@ const SchedulePage: React.FC = () => {
     batchSelectedClassIds,
     dangerActionState,
     selectedDate,
+    isHolidayDate,
   });
 
   /** 初始化默认选中第一个 Tab；新增分类后默认选中该分类；分类变化导致当前 Tab 不存在时回退到第一个 */
@@ -328,12 +336,6 @@ const SchedulePage: React.FC = () => {
     campusId: currentCampusId || undefined,
     disabled: isParent,
   });
-
-  /**
-   * 日历「休」标识：放假日期的右上角标记（教师端/家长端共用）。
-   * 必须等身份就绪再拉——挂载瞬间 token/机构可能尚未解析，此时请求会 401 且本 hook 不自动重试。
-   */
-  const isHolidayDate = useHolidayCheck({ enabled: Boolean(currentRole) });
 
   const handleMainTabChange = useCallback(
     (tabKey: string, tabIndex: number) => {
@@ -531,6 +533,7 @@ const SchedulePage: React.FC = () => {
     batchClassOptions,
     batchSelectedClassIds,
     loadBaseData,
+    bookSheetItem,
     setBookSheetItem,
     setBookSheetVisible,
     setTrialBookingKeys,

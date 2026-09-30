@@ -23,6 +23,70 @@ export type ScheduleCardStudentAvatar = {
   avatar?: string;
 };
 
+/**
+ * 试听预约与本节日课的匹配口径（唯一真源，课表角标与点名名单共用）。
+ *
+ * ⚠️ 必须带时段：一个班可能在同一天排多节课（例如 09:00 与 14:00，各自一条排课规则）。
+ * 只按「班级 + 日期」匹配会把当天的每一节课都标成试听——用户视角就是
+ * 「我只给一节课加了试听，结果整条排课规则/整天的课都带试听」。
+ *
+ * 口径与 `MakeupBooking` 的唯一键一致（student + class + date + startTime + status），
+ * 即：**一条预约只作用于它当时那一节课**。
+ */
+
+/** 时段归一化：`09:00:00` / `09:00` → `09:00`；空值 → 空串 */
+export function normalizeLessonStartTime(value?: string | null): string {
+  return (value ?? '').trim().slice(0, 5);
+}
+
+/** 从课表/卡片传下来的 `09:00-10:00` 中取出开始时段；无值返回空串（＝不按时段过滤） */
+export function parseLessonStartTime(lessonTime?: string | null): string {
+  return normalizeLessonStartTime((lessonTime ?? '').split('-')[0]);
+}
+
+/**
+ * 预约的时段是否属于目标这一节。
+ * 目标时段为空（例如从班级列表进入点名页、页面拿不到具体是哪一节）时**不过滤**，
+ * 保持原行为——宁可多显示也不能因为少个参数把该出现的学员吞掉。
+ *
+ * 已知边界：若某节课在「同一天内」被临时调课改了时段，调课前下的预约（时段仍是旧值）
+ * 不再命中这节课。跨日期调课本来就会因日期不匹配而失配，属既有口径，不是本次引入。
+ */
+export function isSameLessonStartTime(
+  bookingStartTime?: string | null,
+  targetStartTime?: string | null,
+): boolean {
+  const target = normalizeLessonStartTime(targetStartTime);
+  if (!target) return true;
+  return normalizeLessonStartTime(bookingStartTime) === target;
+}
+
+/** 试听预约匹配键：`classId|lessonDate|startTime` */
+export function buildTrialLessonKey(
+  classId?: string | null,
+  lessonDate?: string | null,
+  startTime?: string | null,
+): string {
+  return `${classId ?? ''}|${lessonDate ?? ''}|${normalizeLessonStartTime(startTime)}`;
+}
+
+/**
+ * 本节课是否有试听预约。
+ * 时段缺失的历史预约（键尾为空串）按「整日」兜底命中，避免老数据静默丢角标。
+ */
+export function hasTrialBookingForLesson(
+  keys: Set<string>,
+  classId?: string | null,
+  lessonDate?: string | null,
+  startTime?: string | null,
+): boolean {
+  if (!classId || !lessonDate) return false;
+  return (
+    keys.has(buildTrialLessonKey(classId, lessonDate, startTime)) ||
+    keys.has(buildTrialLessonKey(classId, lessonDate, null))
+  );
+}
+
 export type ScheduleCardItem = {
   id: string;
   classId?: string;
@@ -43,6 +107,13 @@ export type ScheduleCardItem = {
   hasTrialStudent?: boolean;
   canCancelLesson: boolean;
   isTemporaryAdjusted?: boolean;
+  /**
+   * 该节课因机构放假而停课。
+   * 判定：该日期是机构放假日，且排课规则的 `skip_holiday` 不为 false（即"节假日不排课"）。
+   * **按日期直接判，不依赖停课记录是否已写入**——加了放假当场就能看到，
+   * 不必等老师重新保存假期去触发自动停课。
+   */
+  holidaySuspended?: boolean;
   ruleStatus?: Schedule['rule_status'];
   students?: ScheduleCardStudentAvatar[];
 };
@@ -62,6 +133,8 @@ export function buildScheduleCardsForDate(input: {
   classStudentAvatars: Record<string, ScheduleCardStudentAvatar[]>;
   trialBookingKeys: Set<string>;
   currentTeacherName: string;
+  /** 该日期是否为机构放假（课表页由 useHolidayCheck 提供；不传视为不放假） */
+  isHolidayDate?: boolean;
 }): ScheduleCardItem[] {
   const dateStr = input.date.format('YYYY-MM-DD');
   const weekday = (input.date.day() || 7) as Schedule['day_of_week'];
@@ -163,12 +236,15 @@ export function buildScheduleCardsForDate(input: {
         status: statusResult.status,
         countdownText: statusResult.countdownText,
         bookingTag: isBookingSchedule(schedule) ? '约' : undefined,
-        hasTrialStudent: Boolean(
-          schedule.class_id &&
-          input.trialBookingKeys.has(`${schedule.class_id}|${input.date.format('YYYY-MM-DD')}`),
+        hasTrialStudent: hasTrialBookingForLesson(
+          input.trialBookingKeys,
+          schedule.class_id,
+          dateStr,
+          schedule.start_time,
         ),
         canCancelLesson: statusResult.status !== 'cancelled',
         isTemporaryAdjusted: Boolean(schedule.__temporaryAdjusted),
+        holidaySuspended: Boolean(input.isHolidayDate) && schedule.skip_holiday !== false,
         ruleStatus: schedule.rule_status,
         students: schedule.class_id ? input.classStudentAvatars[schedule.class_id] || [] : [],
       };
