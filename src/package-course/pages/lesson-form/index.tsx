@@ -266,6 +266,8 @@ const LessonForm: React.FC = () => {
       setLessonTime,
       lessonDateParam,
       lessonTimeParam,
+      // 「哪一节」的判定依据：同班同一天多节课时用它隔离考勤/补课记录
+      scheduleIdParam,
       setClasses,
       setScheduledClassIds,
       setTeacherOptions,
@@ -516,6 +518,8 @@ const LessonForm: React.FC = () => {
     addStudentSheetPurpose,
     hoursUsed,
     lessonDate,
+    // 「哪一节」的判定依据：同班同一天多节课时用它隔离考勤/补课记录
+    scheduleId: scheduleIdParam,
     selectedTeachingTeacherId,
     selectedAssistantTeacherId,
     teacherOptions,

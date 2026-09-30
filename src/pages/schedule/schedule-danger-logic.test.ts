@@ -101,6 +101,43 @@ describe('filterCancelledRecordsForRestore', () => {
     });
     expect(result.map((r) => r.id)).toEqual(['r1']);
   });
+
+  it('同班同日多节课：带 scheduleId 时只恢复本节，删不到另一节的停课记录', () => {
+    const records = [
+      makeLessonRecord({
+        id: 'r-0900',
+        student_id: 's1',
+        lesson_date: '2026-09-01',
+        class_id: 'c1',
+        schedule_id: 's-0900',
+        status: 'cancelled',
+      }),
+      makeLessonRecord({
+        id: 'r-1400',
+        student_id: 's1',
+        lesson_date: '2026-09-01',
+        class_id: 'c1',
+        schedule_id: 's-1400',
+        status: 'cancelled',
+      }),
+    ];
+
+    expect(
+      filterCancelledRecordsForRestore(records, {
+        classId: 'c1',
+        lessonDate: '2026-09-01',
+        scheduleId: 's-0900',
+      }).map((r) => r.id),
+    ).toEqual(['r-0900']);
+
+    // 拿不到 scheduleId（老入口）⇒ 不区分，保持原行为
+    expect(
+      filterCancelledRecordsForRestore(records, {
+        classId: 'c1',
+        lessonDate: '2026-09-01',
+      }).map((r) => r.id),
+    ).toEqual(['r-0900', 'r-1400']);
+  });
 });
 
 describe('removeCancelledRecordsForDate', () => {

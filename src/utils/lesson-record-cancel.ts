@@ -12,23 +12,34 @@
  * 也恢复不了。现改为按「归属」匹配：有班级按班级，否则按学员。
  */
 import type { LessonRecord } from '@/types/lesson-record';
+import { isSameLessonSchedule } from '@/utils/lesson-record-scope';
 
 /**
  * 一节课的归属：班课/团课/自定义课程用 `classId`，私教 1对1 用 `studentId`。
  * 两者都给时以 `classId` 为准。
+ *
+ * ⚠️ 2026-09-30 补充：同班同一天可能排多节课（09:00 与 14:00 各一条规则），
+ * 光按班级+日期会让「恢复本节课」**删到另一节课的停课记录**、也会把另一节误判成已取消。
+ * 因此再按 `scheduleId` 收窄（口径见 `isSameLessonSchedule`：任一侧为空则不区分）。
  */
 export type LessonOwnerTarget = {
   classId?: string | null;
   studentId?: string | null;
   lessonDate: string;
+  /** 本节排课规则 ID；拿不到就不按「哪一节」区分 */
+  scheduleId?: string | null;
 };
 
 /** 记录是否属于该节课 */
 function belongsToLesson(record: LessonRecord, target: LessonOwnerTarget): boolean {
   if (record.lesson_date !== target.lessonDate) return false;
-  if (target.classId) return record.class_id === target.classId;
-  if (target.studentId) return record.student_id === target.studentId;
-  return false;
+  const ownerMatches = target.classId
+    ? record.class_id === target.classId
+    : target.studentId
+      ? record.student_id === target.studentId
+      : false;
+  if (!ownerMatches) return false;
+  return isSameLessonSchedule(record.schedule_id, target.scheduleId);
 }
 
 /** 该节课所有「已取消」记录（恢复操作的对象） */

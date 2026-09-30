@@ -54,6 +54,8 @@ export interface UseLessonFormActionsParams {
   addStudentSheetPurpose: 'attendance' | 'supplement';
   hoursUsed: number;
   lessonDate: string;
+  /** 本节排课规则 ID：写进消课记录，用于区分「同班同一天的另一节课」 */
+  scheduleId: string;
   selectedTeachingTeacherId: string;
   selectedAssistantTeacherId: string;
   /** 教师管理在册教师列表：提交前校验授课教师有效（防「教师不存在」） */
@@ -121,6 +123,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     addStudentSheetPurpose,
     hoursUsed,
     lessonDate,
+    scheduleId,
     selectedTeachingTeacherId,
     selectedAssistantTeacherId,
     teacherOptions,
@@ -568,6 +571,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   const buildPersistShared = useCallback(
     () => ({
       lessonDate,
+      scheduleId,
       hoursUsed,
       selectedClassId,
       selectedTeachingTeacherId,
@@ -597,6 +601,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       performance,
       profile?.id,
       room,
+      scheduleId,
       selectedAssistantTeacherId,
       selectedClassId,
       selectedTeachingTeacherId,
@@ -682,6 +687,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       matchedPackage,
       hoursUsed,
       lessonDate,
+      scheduleId,
       selectedTeachingTeacherId,
       currentTeacherId,
       currentUserId,
@@ -707,6 +713,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     currentTeacherId,
     currentUserId,
     lessonDate,
+    scheduleId,
     content,
     performance,
     homework,
@@ -736,6 +743,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       classAbsentCount,
       hoursUsed,
       lessonDate,
+      scheduleId,
       selectedTeachingTeacherId,
       currentTeacherId,
       selectedAssistantTeacherId,
@@ -770,6 +778,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     invalidateStudents,
     handleSubmitSuccessReturn,
     lessonDate,
+    scheduleId,
     loadLessonRecordsByDate,
     leaveStudents,
     absentStudents,

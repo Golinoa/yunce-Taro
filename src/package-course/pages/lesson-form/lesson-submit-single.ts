@@ -16,6 +16,8 @@ export async function executeSingleDeduct(input: {
   matchedPackage?: CoursePackage | null;
   hoursUsed: number;
   lessonDate: string;
+  /** 本节排课规则 ID：写入记录后用于区分「同班同一天的另一节课」 */
+  scheduleId?: string;
   selectedTeachingTeacherId?: string;
   currentTeacherId?: string;
   currentUserId?: string;
@@ -55,6 +57,7 @@ export async function executeSingleDeduct(input: {
         operator_teacher_id: input.currentTeacherId || input.selectedTeachingTeacherId,
         student_id: selectedStudent.id,
         package_id: matchedPackage.id,
+        schedule_id: input.scheduleId || undefined,
         lesson_date: input.lessonDate,
         hours_used: input.hoursUsed,
         content: input.content.trim() || undefined,

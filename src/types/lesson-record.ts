@@ -50,6 +50,12 @@ export interface LessonRecord {
   class_id?: string;
   /** 班级名称（考勤管理用） */
   class_name?: string;
+  /**
+   * 本节所属排课规则 ID（「哪一节」的唯一依据）。
+   * 同班同一天可能排多节课（09:00 / 14:00 两条规则）而消课记录没有时段列，
+   * 只能靠它把记录归到「这一节」；为空表示调用方没带，读取端按「不区分」兜底。
+   */
+  schedule_id?: string;
   /** 上课校区 ID */
   campus_id?: string;
   /** 上课教室 */

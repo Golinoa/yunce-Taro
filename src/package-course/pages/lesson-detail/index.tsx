@@ -16,6 +16,7 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import { isAdmin, isStaffRole, useAuth } from '@/utils/auth';
+import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -167,8 +168,13 @@ const LessonDetail: React.FC = () => {
             : [Promise.resolve(null), Promise.resolve([])],
         );
 
-        const lessonRecords = records.filter(
-          (item) => item.class_id === targetClassId && item.lesson_date === lessonDateParam,
+        const lessonRecords = records.filter((item) =>
+          isRecordOfLesson(item, {
+            classId: targetClassId,
+            lessonDate: lessonDateParam,
+            // 同班同一天多节课：只认本节记录，避免把另一节的记录当成本节展示
+            scheduleId: scheduleIdParam,
+          }),
         );
         const checkedRecords = lessonRecords.filter((item) =>
           ['normal', 'makeup'].includes(item.status || 'normal'),

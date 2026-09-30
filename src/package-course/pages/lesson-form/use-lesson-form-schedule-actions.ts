@@ -117,7 +117,7 @@ export function useLessonFormScheduleActions(
   const canRestoreLesson =
     Boolean(scheduleId) &&
     !isPastLessonDate &&
-    isLessonCancelled(existingClassRecords, { classId, studentId, lessonDate });
+    isLessonCancelled(existingClassRecords, { classId, studentId, lessonDate, scheduleId });
 
   /**
    * 调课：进**批量调课**选择页（与课表卡片左滑「调课」同一入口）。
@@ -221,6 +221,7 @@ export function useLessonFormScheduleActions(
           student_id: student.id,
           package_id: '',
           class_id: classId,
+          schedule_id: scheduleId || undefined,
           lesson_date: lessonDate,
           hours_used: 0,
           status: 'cancelled',
@@ -296,6 +297,8 @@ export function useLessonFormScheduleActions(
       classId,
       studentId,
       lessonDate,
+      // 只恢复本节：同班同一天多节课时不能把另一节的停课记录一起删掉
+      scheduleId,
     });
     if (cancelledRecords.length === 0) {
       Taro.showToast({ title: '未找到取消记录', icon: 'none' });
@@ -327,7 +330,17 @@ export function useLessonFormScheduleActions(
     } finally {
       setRestoring(false);
     }
-  }, [classId, className, endTime, existingClassRecords, lessonDate, restoring, startTime]);
+  }, [
+    classId,
+    className,
+    endTime,
+    existingClassRecords,
+    lessonDate,
+    restoring,
+    scheduleId,
+    startTime,
+    studentId,
+  ]);
 
   /**
    * 删除排课：删除的是**这条排课规则本身**（后端 `DELETE /schedules/:id` 硬删）。

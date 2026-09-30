@@ -6,6 +6,7 @@ import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
+import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { pickBestPackage } from '@/utils/package-helper';
 import { getLessonRecordPriority, isWithinLessonOperateWindow } from './lesson-operate';
 import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
@@ -65,13 +66,17 @@ export function buildClassAttendanceState(input: {
   classId: string;
   lessonDate: string;
   studentIds: string[];
+  /** 本节排课规则 ID；给了才区分「同班同一天的另一节课」，拿不到按不区分兜底 */
+  scheduleId?: string;
 }): ClassAttendanceState {
   const studentIdSet = new Set(input.studentIds);
   const classRecords = input.records.filter(
     (record) =>
-      record.class_id === input.classId &&
-      record.lesson_date === input.lessonDate &&
-      studentIdSet.has(record.student_id),
+      isRecordOfLesson(record, {
+        classId: input.classId,
+        lessonDate: input.lessonDate,
+        scheduleId: input.scheduleId,
+      }) && studentIdSet.has(record.student_id),
   );
 
   const checkedStudentIds = new Set<string>();
@@ -117,13 +122,17 @@ export function buildTrialCheckinMap(input: {
   records: LessonRecord[];
   classId: string;
   lessonDate: string;
+  /** 本节排课规则 ID；给了才区分「同班同一天的另一节课」 */
+  scheduleId?: string;
 }): Record<string, CheckinStatus> {
   const trialStudentIds = new Set(input.bookings.map((b) => b.trial_student_id));
   const trialRecords = input.records.filter(
     (record) =>
-      record.class_id === input.classId &&
-      record.lesson_date === input.lessonDate &&
-      trialStudentIds.has(record.student_id),
+      isRecordOfLesson(record, {
+        classId: input.classId,
+        lessonDate: input.lessonDate,
+        scheduleId: input.scheduleId,
+      }) && trialStudentIds.has(record.student_id),
   );
 
   const initMap: Record<string, CheckinStatus> = {};

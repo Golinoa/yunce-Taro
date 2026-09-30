@@ -9,6 +9,8 @@ import { ApiError, del, get, post, put } from '@/utils/request';
 interface BackendLessonRecordListItem {
   classId?: null | string;
   className?: null | string;
+  /** 本节所属排课规则 ID；同班同一天多节课时用它区分（后端 by-range 必须返回） */
+  scheduleId?: null | string;
   content?: null | string;
   createdAt: string;
   duration: number;
@@ -56,6 +58,10 @@ interface BackendLessonRecordDetailResponse {
     id: string;
     name: string;
   } | null;
+  /** 本节所属排课规则（详情接口带回对象形式） */
+  schedule?: {
+    id: string;
+  } | null;
   content?: null | string;
   createdAt: string;
   duration: number;
@@ -97,6 +103,8 @@ interface BackendLessonRecordDetailResponse {
 interface BackendLessonRecordCreateResponse {
   classId?: null | string;
   className?: null | string;
+  /** 本节所属排课规则 ID（后端回传，前端据此把记录归到「这一节」） */
+  scheduleId?: null | string;
   content?: null | string;
   createdAt: string;
   duration: number;
@@ -235,6 +243,10 @@ function mapBackendLessonRecord(
         : undefined,
     class_id: classInfo?.id || undefined,
     class_name: classInfo?.name || undefined,
+    schedule_id:
+      ('scheduleId' in item ? item.scheduleId : undefined) ||
+      ('schedule' in item && item.schedule?.id ? item.schedule.id : undefined) ||
+      undefined,
     campus_id: ('campusId' in item ? item.campusId : undefined) || undefined,
     room: ('room' in item ? item.room : undefined) || undefined,
     created_at: item.createdAt,
@@ -273,6 +285,12 @@ function buildLessonRecordPayload(
     packageId: data.package_id || undefined,
     memberCardId: data.member_card_id || undefined,
     classId: data.class_id || undefined,
+    /**
+     * 「哪一节」的排课 ID。同班同一天可能排多节课（如 09:00 与 14:00 两条规则），
+     * LessonRecord 没有时段列，只能靠它区分；不传时后端存 null，
+     * 读取端按「不区分」兜底（宁可多显示，不能吞记录）。
+     */
+    scheduleId: data.schedule_id || undefined,
     campusId: data.campus_id || undefined,
     room: data.room,
     lessonDate: normalizeLessonDate(data.lesson_date) || new Date().toISOString().slice(0, 10),

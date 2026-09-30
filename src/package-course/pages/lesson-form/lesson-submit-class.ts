@@ -8,6 +8,7 @@ import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
+import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import type { SubmitLock } from '@/utils/submit-lock';
@@ -28,6 +29,11 @@ export async function executeClassSubmit(input: {
   classAbsentCount: number;
   hoursUsed: number;
   lessonDate: string;
+  /**
+   * 本节排课规则 ID（URL 参数）。写入消课记录后，才能区分「同班同一天的另一节课」：
+   * 否则同一天两节课的点名/考勤会互相污染，重复点名保护也会失效。
+   */
+  scheduleId?: string;
   selectedTeachingTeacherId?: string;
   currentTeacherId?: string;
   selectedAssistantTeacherId?: string;
@@ -94,8 +100,12 @@ export async function executeClassSubmit(input: {
       const trialStudentIds = new Set(input.trialBookings.map((b) => b.trial_student_id));
       const existingSubmitRecords = existingRecords.filter(
         (record) =>
-          record.class_id === selectedClassId &&
-          record.lesson_date === lessonDateValue &&
+          // 只清理「本节」的旧记录：同班同一天的另一节课不能在提交本节时被删掉
+          isRecordOfLesson(record, {
+            classId: selectedClassId,
+            lessonDate: lessonDateValue,
+            scheduleId: input.scheduleId,
+          }) &&
           (input.classStudents.some((student) => student.id === record.student_id) ||
             trialStudentIds.has(record.student_id)),
       );
@@ -113,6 +123,7 @@ export async function executeClassSubmit(input: {
         operator_teacher_id: input.currentTeacherId || input.selectedTeachingTeacherId,
         assistant_teacher_id: input.selectedAssistantTeacherId || undefined,
         class_id: selectedClassId,
+        schedule_id: input.scheduleId || undefined,
         lesson_date: lessonDateValue,
         campus_id: input.campusId || undefined,
         room: input.room || undefined,

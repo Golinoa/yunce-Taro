@@ -89,6 +89,49 @@ describe('lesson-attendance-load (Q2-2)', () => {
     expect(state.recordByStudentId.get('b')?.id).toBe('2');
   });
 
+  it('同班同一天多节课：带 scheduleId 时只认本节记录（09:00 点完名不影响 14:00）', () => {
+    const records = [
+      {
+        id: 'r-0900',
+        student_id: 'a',
+        class_id: 'c1',
+        lesson_date: '2026-09-02',
+        schedule_id: 's-0900',
+        status: 'normal',
+      },
+    ] as never[];
+
+    const morning = buildClassAttendanceState({
+      classId: 'c1',
+      lessonDate: '2026-09-02',
+      studentIds: ['a'],
+      records,
+      scheduleId: 's-0900',
+    });
+    expect(morning.hasRecords).toBe(true);
+    expect([...morning.checkedStudentIds]).toEqual(['a']);
+
+    // 当天 14:00 那节不能被 09:00 的记录带成「已点名」
+    const afternoon = buildClassAttendanceState({
+      classId: 'c1',
+      lessonDate: '2026-09-02',
+      studentIds: ['a'],
+      records,
+      scheduleId: 's-1400',
+    });
+    expect(afternoon.hasRecords).toBe(false);
+    expect([...afternoon.checkedStudentIds]).toEqual([]);
+
+    // 拿不到 scheduleId（从班级列表进入）⇒ 不区分，保持原行为
+    const unknownLesson = buildClassAttendanceState({
+      classId: 'c1',
+      lessonDate: '2026-09-02',
+      studentIds: ['a'],
+      records,
+    });
+    expect(unknownLesson.hasRecords).toBe(true);
+  });
+
   it('resolveClassAttendanceMode：已点名或超窗为 view', () => {
     const now = new Date('2026-09-02T12:00:00');
     expect(

@@ -15,6 +15,8 @@ export type PersistAttendanceContext = {
   isSupplement?: boolean;
   existingRecord?: LessonRecord;
   lessonDate: string;
+  /** 本节排课规则 ID：写入记录后用于区分「同班同一天的另一节课」 */
+  scheduleId?: string;
   hoursUsed: number;
   selectedClassId?: string | null;
   selectedTeachingTeacherId?: string;
@@ -45,6 +47,7 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
     assistant_teacher_id: ctx.selectedAssistantTeacherId || undefined,
     student_id: student.id,
     class_id: ctx.selectedClassId || undefined,
+    schedule_id: ctx.scheduleId || undefined,
     lesson_date: ctx.lessonDate,
     campus_id: ctx.campusId || undefined,
     room: ctx.room || undefined,

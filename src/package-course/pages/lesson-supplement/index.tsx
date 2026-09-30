@@ -19,6 +19,7 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import { hasTrialPackage, pickBestPackage } from '@/utils/package-helper';
@@ -130,7 +131,8 @@ const LessonSupplementPage: React.FC = () => {
 
       const recordsByStudent = new Map<string, LessonRecord>();
       records
-        .filter((record) => record.class_id === classId && record.lesson_date === lessonDate)
+        // 只认「本节」的记录：同班同一天多节课时不能把另一节的签到/请假当成本节的
+        .filter((record) => isRecordOfLesson(record, { classId, lessonDate, scheduleId }))
         .forEach((record) => {
           const currentRecord = recordsByStudent.get(record.student_id);
           if (getRecordPriority(record) >= getRecordPriority(currentRecord)) {
@@ -329,8 +331,8 @@ const LessonSupplementPage: React.FC = () => {
         const matchedPackage = matchedPackageByStudent.get(student.id);
         const placeholderRecords = existingRecords.filter(
           (record) =>
-            record.class_id === classId &&
-            record.lesson_date === lessonDate &&
+            // 占位（请假/未到）也必须属于本节，否则会把另一节的占位删掉
+            isRecordOfLesson(record, { classId, lessonDate, scheduleId }) &&
             record.student_id === student.id &&
             ['leave', 'absent'].includes(record.status || 'normal'),
         );
@@ -349,6 +351,7 @@ const LessonSupplementPage: React.FC = () => {
             student_id: student.id,
             package_id: matchedPackage?.id || '',
             class_id: classId,
+            schedule_id: scheduleId || undefined,
             lesson_date: lessonDate,
             hours_used: hoursUsed,
             status: 'makeup',
@@ -427,6 +430,7 @@ const LessonSupplementPage: React.FC = () => {
     handleSafeGoBack,
     hoursUsed,
     invalidateStudents,
+    scheduleId,
     lessonDate,
     lessonTime,
     matchedPackageByStudent,

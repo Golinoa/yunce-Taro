@@ -6,6 +6,10 @@ import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
+// 时段归一化的实现已收敛到 lesson-identity（唯一真源）。本文件**内部**也要调用它，
+// 所以这里必须 import —— 下面那句 `export ... from` 只是对外继续暴露名字，
+// **再导出不会把标识符带进本模块作用域**（踩过：`normalizeLessonStartTime is not defined`）。
+import { normalizeLessonStartTime } from '@/utils/lesson-identity';
 import {
   getClassCardStatusRank,
   getTeacherNames,
@@ -24,7 +28,7 @@ export type ScheduleCardStudentAvatar = {
 };
 
 /**
- * 试听预约与本节日课的匹配口径（唯一真源，课表角标与点名名单共用）。
+ * 试听预约与本节日课的匹配口径（课表角标与点名名单共用）。
  *
  * ⚠️ 必须带时段：一个班可能在同一天排多节课（例如 09:00 与 14:00，各自一条排课规则）。
  * 只按「班级 + 日期」匹配会把当天的每一节课都标成试听——用户视角就是
@@ -32,34 +36,18 @@ export type ScheduleCardStudentAvatar = {
  *
  * 口径与 `MakeupBooking` 的唯一键一致（student + class + date + startTime + status），
  * 即：**一条预约只作用于它当时那一节课**。
- */
-
-/** 时段归一化：`09:00:00` / `09:00` → `09:00`；空值 → 空串 */
-export function normalizeLessonStartTime(value?: string | null): string {
-  return (value ?? '').trim().slice(0, 5);
-}
-
-/** 从课表/卡片传下来的 `09:00-10:00` 中取出开始时段；无值返回空串（＝不按时段过滤） */
-export function parseLessonStartTime(lessonTime?: string | null): string {
-  return normalizeLessonStartTime((lessonTime ?? '').split('-')[0]);
-}
-
-/**
- * 预约的时段是否属于目标这一节。
- * 目标时段为空（例如从班级列表进入点名页、页面拿不到具体是哪一节）时**不过滤**，
- * 保持原行为——宁可多显示也不能因为少个参数把该出现的学员吞掉。
  *
- * 已知边界：若某节课在「同一天内」被临时调课改了时段，调课前下的预约（时段仍是旧值）
- * 不再命中这节课。跨日期调课本来就会因日期不匹配而失配，属既有口径，不是本次引入。
+ * ⚠️ 时段归一化 / 时段比对已收敛到 `@/utils/lesson-identity`（唯一真源），
+ * 本文件改为再导出，保持既有调用方与单测不变。
+ * 「编号优先、时段兜底」的新口径见 `lesson-identity.isBookingOfLesson`，
+ * 本文件的 `buildTrialLessonKey` / `hasTrialBookingForLesson` 仍是旧口径（只比时段），
+ * 迁移见 `changes/lesson-identity-feature`。
  */
-export function isSameLessonStartTime(
-  bookingStartTime?: string | null,
-  targetStartTime?: string | null,
-): boolean {
-  const target = normalizeLessonStartTime(targetStartTime);
-  if (!target) return true;
-  return normalizeLessonStartTime(bookingStartTime) === target;
-}
+export {
+  normalizeLessonStartTime,
+  parseLessonStartTime,
+  isSameLessonStartTime,
+} from '@/utils/lesson-identity';
 
 /** 试听预约匹配键：`classId|lessonDate|startTime` */
 export function buildTrialLessonKey(

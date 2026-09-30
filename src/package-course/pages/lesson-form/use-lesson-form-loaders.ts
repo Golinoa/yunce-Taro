@@ -28,6 +28,7 @@ import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { withCache } from '@/utils/cache-helpers';
 import { TTL } from '@/utils/data-freshness';
+import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import {
   buildLessonRosterKey,
   readLessonRoster,
@@ -59,6 +60,7 @@ async function resolveRosterWithSupplement(
   existing: LessonRecord[],
   classId: string,
   lessonDate: string,
+  scheduleId?: string,
 ): Promise<{ students: Student[]; supplementIds: Set<string> }> {
   const rosterMakeupIds = new Set(roster.makeupStudentIds);
   const formalIds = new Set(roster.students.map((student) => student.id));
@@ -66,8 +68,7 @@ async function resolveRosterWithSupplement(
     existing
       .filter(
         (record) =>
-          record.class_id === classId &&
-          record.lesson_date === lessonDate &&
+          isRecordOfLesson(record, { classId, lessonDate, scheduleId }) &&
           record.status === 'makeup' &&
           !rosterMakeupIds.has(record.student_id) &&
           !formalIds.has(record.student_id),
@@ -124,6 +125,8 @@ export interface UseLessonFormLoadersParams {
   setLessonTime: Dispatch<SetStateAction<string>>;
   lessonDateParam: string;
   lessonTimeParam: string;
+  /** 本节排课规则 ID（URL 参数）；同班同一天多节课时用它隔离考勤/补课记录 */
+  scheduleIdParam: string;
   setClasses: Dispatch<SetStateAction<Class[]>>;
   setScheduledClassIds: Dispatch<SetStateAction<Set<string>>>;
   setTeacherOptions: Dispatch<SetStateAction<TeacherUIModel[]>>;
@@ -191,6 +194,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setLessonTime,
     lessonDateParam,
     lessonTimeParam,
+    scheduleIdParam,
     setClasses,
     setScheduledClassIds,
     setTeacherOptions,
@@ -233,6 +237,12 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
    * 页面未带 lessonTime（从班级列表进入等）时为空串 ⇒ 过滤函数自动放行。
    */
   const lessonStartTime = parseLessonStartTime(lessonTimeParam);
+
+  /**
+   * 本节排课规则 ID：消课记录靠它区分「同班同一天的另一节课」。
+   * 从班级列表等入口进来时为空 ⇒ 判定函数自动放行（不区分）。
+   */
+  const lessonScheduleId = scheduleIdParam.trim();
 
   const applyClassTeacherDefaults = useCallback(
     (classInfo: Class | null, options: TeacherUIModel[]) => {
@@ -373,6 +383,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
           records: existingClassRecords,
           classId: selectedClassId,
           lessonDate,
+          scheduleId: lessonScheduleId,
         }),
       );
     } catch (err) {
@@ -385,6 +396,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     currentTeacherId,
     existingClassRecords,
     lessonDate,
+    lessonScheduleId,
     lessonStartTime,
     selectedClassId,
     setTrialBookings,
@@ -548,6 +560,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
             existingRecords,
             classIdParam,
             lessonDate,
+            lessonScheduleId,
           );
           setClassStudents(withSupplement);
           const attendance = buildClassAttendanceState({
@@ -555,6 +568,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
             classId: classIdParam,
             lessonDate,
             studentIds: withSupplement.map((student) => student.id),
+            scheduleId: lessonScheduleId,
           });
           setExistingClassRecords(attendance.classRecords);
           setIsAlreadyChecked(attendance.hasRecords);
@@ -703,17 +717,24 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         const approvedLeaveIds = await loadApprovedLeaveStudentIds(mergedStudents);
 
         const existing = await loadLessonRecordsByDate();
+        /**
+         * 这里可能是在表单里**换成了另一个班级**：URL 上的 scheduleId 只属于 URL 那个班，
+         * 套到别的班会把该班真实记录误判成「另一节」而被过滤掉 ⇒ 换班时不带 scheduleId。
+         */
+        const rosterScheduleId = classId === classIdParam ? lessonScheduleId : '';
         const { students: withSupplement, supplementIds } = await resolveRosterWithSupplement(
           roster,
           existing,
           classId,
           lessonDate,
+          rosterScheduleId,
         );
         const attendance = buildClassAttendanceState({
           records: existing,
           classId,
           lessonDate,
           studentIds: withSupplement.map((student) => student.id),
+          scheduleId: rosterScheduleId,
         });
         setClassStudents(withSupplement);
         setExistingClassRecords(attendance.classRecords);
@@ -740,8 +761,10 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     [
       applyClassTeacherDefaults,
       applyClassLessonDefaults,
+      classIdParam,
       fetchClassRoster,
       hoursUsed,
+      lessonScheduleId,
       loadApprovedLeaveStudentIds,
       loadLessonRecordsByDate,
       lessonDate,
