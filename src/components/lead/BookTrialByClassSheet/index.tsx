@@ -21,9 +21,9 @@ import {
   classService,
   leadService,
   makeupBookingService,
-  studentService,
   subscribeMessageService,
 } from '@/services';
+import { useStudentStore } from '@/stores';
 import { useCampusStore } from '@/stores/campus';
 import type { Class } from '@/types/class';
 import type { Lead } from '@/types/lead';
@@ -44,8 +44,17 @@ export interface BookTrialByClassSheetProps {
   teacherId?: string;
   teacherName?: string;
   onClose: () => void;
-  /** 预约成功回调，返回班级和日期 */
-  onSuccess?: (payload: { classId: string; lessonDate: string }) => void;
+  /**
+   * 预约成功回调，返回班级、日期、**本节时段**与本次预约类型（补课 / 试听）。
+   * 必须带 startTime：同一班同一天可能排多节课，只按班级+日期标记会把当天的
+   * 每一节课都当成有试听。
+   */
+  onSuccess?: (payload: {
+    classId: string;
+    lessonDate: string;
+    startTime: string;
+    mode: 'makeup' | 'trial';
+  }) => void;
 }
 
 const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
@@ -127,7 +136,8 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     setStudentPickerVisible(true);
     setLoading(true);
     Promise.all([
-      studentService.getByTeacher(userId, resolvedCampusId || undefined),
+      // 复用学员 store 的统一入口：自带软删除过滤，保证补课学员列表不含已删除学员。
+      useStudentStore.getState().fetchByTeacher(userId, resolvedCampusId || undefined),
       classId
         ? classService.getStudents(classId, { includePackages: false })
         : Promise.resolve([] as Student[]),
@@ -223,7 +233,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           createdBy: userId,
         });
         Taro.showToast({ title: '补课预约成功', icon: 'success' });
-        onSuccess?.({ classId, lessonDate });
+        onSuccess?.({ classId, lessonDate, startTime, mode: 'makeup' });
         onClose();
         return;
       }
@@ -261,7 +271,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
       void subscribeMessageService.runFlow('E24', {
         bookingLabel: `试听·${bookingClassName}`,
       });
-      onSuccess?.({ classId, lessonDate });
+      onSuccess?.({ classId, lessonDate, startTime, mode: 'trial' });
       onClose();
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
