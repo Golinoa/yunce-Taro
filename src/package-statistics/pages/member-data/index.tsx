@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -10,6 +10,12 @@ import { dataCenterService } from '@/services/data-center';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { MemberDetailType } from '@/types/data-center';
+import {
+  currentDateKey,
+  formatPeriodDateText,
+  normalizeAnchorValue,
+  parseDateKey,
+} from '@/utils/format';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -17,7 +23,7 @@ import { withRouteGuard } from '@/utils/route-guard';
  * 会员数据详情页
  *
  * 展示会员详细数据，包含：
- * - 顶部渐变头部：标题 + 返回 + 场馆名 + 日期选择 + 日/月/年切换
+ * - 顶部渐变头部：标题 + 返回 + 场馆名 + 日期选择（可点选）+ 日/月/年切换
  * - KPI 概览卡片：在籍总数/新增会员/流失会员/客资数量 4列
  * - 雷达图：六维分析（购买力/到店频率/课程参与/社交活跃/满意度/续卡意愿）
  * - 数据明细：会员列表
@@ -32,14 +38,22 @@ const MemberData: React.FC = () => {
 
   const [data, setData] = useState<MemberDetailType | null>(null);
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
+  /** 锚点日期（YYYY-MM-DD）：进入页面默认今天；后端按 periodType 取当天/整月/整年 */
+  const [anchor, setAnchor] = useState(currentDateKey);
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const { setLoading } = useDelayedLoading();
+
+  /** 日历文案：随周期切换（日/月/年），默认显示当月 */
+  const periodDateText = formatPeriodDateText(period, parseDateKey(anchor));
+  /** 日历可选粒度与周期一致 */
+  const pickerFields = period;
 
   /** 加载数据 */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const result = await dataCenterService.getMemberDetail({
+        date: anchor,
         periodType: period,
         campusId: currentCampusId,
       });
@@ -49,7 +63,7 @@ const MemberData: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentCampusId, period, setLoading]);
+  }, [anchor, currentCampusId, period, setLoading]);
 
   useEffect(() => {
     loadData();
@@ -194,11 +208,19 @@ const MemberData: React.FC = () => {
       <View className="bg-gradient-diffuse-top pb-[60rpx] px-[32rpx] pt-[24rpx] relative overflow-hidden">
         {/* 日期选择 + 周期切换 */}
         <View className="flex items-center justify-between relative z-10">
-          <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
-            <Icon name="mdi-calendar" size={24} color="muted" />
-            <Text className="text-[26rpx] text-foreground font-medium">2025年8月</Text>
-            <Icon name="mdi-chevron-down" size={20} color="muted" />
-          </View>
+          <Picker
+            mode="date"
+            fields={pickerFields}
+            value={anchor}
+            end={currentDateKey()}
+            onChange={(event) => setAnchor(normalizeAnchorValue(String(event.detail.value)))}
+          >
+            <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
+              <Icon name="mdi-calendar" size={24} color="muted" />
+              <Text className="text-[26rpx] text-foreground font-medium">{periodDateText}</Text>
+              <Icon name="mdi-chevron-down" size={20} color="muted" />
+            </View>
+          </Picker>
           <View className="w-[240rpx]">
             <SegmentedControl
               options={[

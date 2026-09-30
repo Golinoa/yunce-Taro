@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Canvas } from '@tarojs/components';
+import { View, Text, ScrollView, Canvas, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,6 +10,12 @@ import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import { getThemeHexColors } from '@/theme';
 import type { FinanceDetailType, RevenueTrendItem } from '@/types/data-center';
+import {
+  currentDateKey,
+  formatPeriodDateText,
+  normalizeAnchorValue,
+  parseDateKey,
+} from '@/utils/format';
 import { navigateToOnce } from '@/utils/navigation';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
@@ -48,6 +54,8 @@ const FinanceData: React.FC = () => {
   const { activeTheme } = useThemeStore();
   const [data, setData] = useState<FinanceDetailType | null>(null);
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
+  /** 锚点日期（YYYY-MM-DD）：进入页面默认今天；后端按 periodType 取当天/整月/整年 */
+  const [anchor, setAnchor] = useState(currentDateKey);
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const canvasIdRef = useRef(`fc-${Math.random().toString(36).slice(2, 9)}`);
 
@@ -63,6 +71,7 @@ const FinanceData: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       const result = await dataCenterService.getFinanceDetail({
+        date: anchor,
         periodType: period,
         campusId: currentCampusId,
       });
@@ -70,7 +79,7 @@ const FinanceData: React.FC = () => {
     } catch {
       Taro.showToast({ title: '数据加载失败', icon: 'none' });
     }
-  }, [currentCampusId, period]);
+  }, [anchor, currentCampusId, period]);
 
   useEffect(() => {
     loadData();
@@ -94,12 +103,9 @@ const FinanceData: React.FC = () => {
     return value.toLocaleString();
   };
 
-  /** 获取当前周期的日期显示文本 */
-  const periodDateText = useMemo(() => {
-    if (period === 'day') return '2026年08月15日';
-    if (period === 'month') return '2025年8月';
-    return '2025年';
-  }, [period]);
+  /** 日历文案（随周期与锚点变化）；pickerFields 让可选粒度与周期一致 */
+  const periodDateText = formatPeriodDateText(period, parseDateKey(anchor));
+  const pickerFields = period;
 
   /** 绘制折线图 */
   const drawLineChart = useCallback(() => {
@@ -274,17 +280,20 @@ const FinanceData: React.FC = () => {
     <View className={cn(`theme-${activeTheme}`, 'min-h-screen bg-background')}>
       {/* 顶部渐变头部 */}
       <View className="bg-gradient-diffuse-top pb-[48rpx] px-[32rpx] pt-[24rpx] relative overflow-hidden">
-        {/* 场馆名称（左侧） */}
-        <View className="mb-[24rpx] relative z-10">
-          <Text className="text-[32rpx] font-bold text-foreground">云策健身</Text>
-        </View>
-
         {/* 日期选择 + 周期切换 */}
         <View className="flex items-center justify-between relative z-10">
-          <View className="flex items-center gap-[8rpx]">
-            <Text className="text-[44rpx] font-bold text-foreground">{periodDateText}</Text>
-            <Icon name="mdi-chevron-down" size={24} color="muted" />
-          </View>
+          <Picker
+            mode="date"
+            fields={pickerFields}
+            value={anchor}
+            end={currentDateKey()}
+            onChange={(event) => setAnchor(normalizeAnchorValue(String(event.detail.value)))}
+          >
+            <View className="flex items-center gap-[8rpx]">
+              <Text className="text-[44rpx] font-bold text-foreground">{periodDateText}</Text>
+              <Icon name="mdi-chevron-down" size={24} color="muted" />
+            </View>
+          </Picker>
           <View className="w-[240rpx]">
             <SegmentedControl
               options={[

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -10,6 +10,12 @@ import { dataCenterService } from '@/services/data-center';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CardDetailType } from '@/types/data-center';
+import {
+  currentDateKey,
+  formatPeriodDateText,
+  normalizeAnchorValue,
+  parseDateKey,
+} from '@/utils/format';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -17,7 +23,7 @@ import { withRouteGuard } from '@/utils/route-guard';
  * 卡项数据详情页
  *
  * 展示卡项详细数据，包含：
- * - 顶部渐变头部：标题 + 返回 + 场馆名 + 日期选择 + 日/月/年切换
+ * - 顶部渐变头部：标题 + 返回 + 场馆名 + 日期选择（可点选）+ 日/月/年切换
  * - KPI 概览卡片：耗卡数据/售卡数据/剩余卡项/卡片到期 4列
  * - 数据明细卡片：售卡/耗卡 Tab 切换
  */
@@ -31,15 +37,23 @@ const CardData: React.FC = () => {
 
   const [data, setData] = useState<CardDetailType | null>(null);
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
+  /** 锚点日期（YYYY-MM-DD）：进入页面默认今天；后端按 periodType 取当天/整月/整年 */
+  const [anchor, setAnchor] = useState(currentDateKey);
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const [detailTab, setDetailTab] = useState<'sold' | 'consumed'>('sold');
   const { setLoading } = useDelayedLoading();
+
+  /** 日历文案：随周期切换（日/月/年），默认显示当月 */
+  const periodDateText = formatPeriodDateText(period, parseDateKey(anchor));
+  /** 日历可选粒度与周期一致 */
+  const pickerFields = period;
 
   /** 加载数据 */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const result = await dataCenterService.getCardDetail({
+        date: anchor,
         periodType: period,
         campusId: currentCampusId,
       });
@@ -49,7 +63,7 @@ const CardData: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentCampusId, period, setLoading]);
+  }, [anchor, currentCampusId, period, setLoading]);
 
   useEffect(() => {
     loadData();
@@ -78,7 +92,9 @@ const CardData: React.FC = () => {
     if (!data) return null;
 
     const list = detailTab === 'sold' ? data.soldList : data.consumedList;
-    const maxAmount = Math.max(...list.map((item) => item.amount));
+    /** 防御：耗卡明细历史上不含 amount，直接点会造成 undefined.toLocaleString() 白屏 */
+    const amountOf = (item: { amount?: number }) => item.amount ?? 0;
+    const maxAmount = Math.max(...list.map((item) => amountOf(item)), 1);
 
     return (
       <View className="flex flex-col gap-[20rpx]">
@@ -87,9 +103,13 @@ const CardData: React.FC = () => {
             <View className="flex items-center justify-between">
               <Text className="text-[28rpx] font-medium text-foreground">{item.cardName}</Text>
               <View className="flex items-center gap-[16rpx]">
-                <Text className="text-[24rpx] text-muted-foreground">{item.count}张</Text>
+                <Text className="text-[24rpx] text-muted-foreground">
+                  {item.count}
+                  {/* 售卡行是「张」，耗卡行是划扣「次」——两 Tab 语义不同，单位必须区分 */}
+                  {detailTab === 'sold' ? '张' : '次'}
+                </Text>
                 <Text className="text-[28rpx] font-bold text-foreground">
-                  ¥{item.amount.toLocaleString()}
+                  ¥{amountOf(item).toLocaleString()}
                 </Text>
               </View>
             </View>
@@ -98,7 +118,7 @@ const CardData: React.FC = () => {
                 className={`h-full rounded-full ${
                   detailTab === 'sold' ? 'bg-progress-primary' : 'bg-progress-purple'
                 }`}
-                style={{ width: `${maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0}%` }}
+                style={{ width: `${maxAmount > 0 ? (amountOf(item) / maxAmount) * 100 : 0}%` }}
               />
             </View>
           </View>
@@ -113,11 +133,19 @@ const CardData: React.FC = () => {
       <View className="bg-gradient-diffuse-top pb-[60rpx] px-[32rpx] pt-[24rpx] relative overflow-hidden">
         {/* 日期选择 + 周期切换 */}
         <View className="flex items-center justify-between relative z-10">
-          <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
-            <Icon name="mdi-calendar" size={24} color="muted" />
-            <Text className="text-[26rpx] text-foreground font-medium">2025年8月</Text>
-            <Icon name="mdi-chevron-down" size={20} color="muted" />
-          </View>
+          <Picker
+            mode="date"
+            fields={pickerFields}
+            value={anchor}
+            end={currentDateKey()}
+            onChange={(event) => setAnchor(normalizeAnchorValue(String(event.detail.value)))}
+          >
+            <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
+              <Icon name="mdi-calendar" size={24} color="muted" />
+              <Text className="text-[26rpx] text-foreground font-medium">{periodDateText}</Text>
+              <Icon name="mdi-chevron-down" size={20} color="muted" />
+            </View>
+          </Picker>
           <View className="w-[240rpx]">
             <SegmentedControl
               options={[

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Picker } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -10,6 +10,12 @@ import { dataCenterService } from '@/services/data-center';
 import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { SalaryDetailType } from '@/types/data-center';
+import {
+  currentDateKey,
+  formatPeriodDateText,
+  normalizeAnchorValue,
+  parseDateKey,
+} from '@/utils/format';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -17,7 +23,7 @@ import { withRouteGuard } from '@/utils/route-guard';
  * 薪资数据详情页
  *
  * 展示薪资详细数据，包含：
- * - 顶部渐变头部：标题 + 返回 + 场馆名 + 日期选择 + 月/年切换
+ * - 顶部渐变头部：标题 + 返回 + 场馆名 + 日期选择（可点选）+ 月/年切换
  * - KPI 概览卡片：总薪资/固定薪资成本/团课/私教课 4列
  * - 柱状趋势图：薪资趋势
  * - 教练列表：头像+姓名+业绩/课时/耗卡
@@ -32,14 +38,22 @@ const SalaryData: React.FC = () => {
 
   const [data, setData] = useState<SalaryDetailType | null>(null);
   const [period, setPeriod] = useState<'month' | 'year'>('month');
+  /** 锚点日期（YYYY-MM-DD）：进入页面默认今天；周期为「月/年」时后端取所在整月/整年 */
+  const [anchor, setAnchor] = useState(currentDateKey);
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const { setLoading } = useDelayedLoading();
+
+  /** 日历文案：随周期切换（月/年），默认显示当月 */
+  const periodDateText = formatPeriodDateText(period, parseDateKey(anchor));
+  /** 日历可选粒度：年 → 只选年；月 → 选到月 */
+  const pickerFields = period === 'year' ? 'year' : 'month';
 
   /** 加载数据 */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const result = await dataCenterService.getSalaryDetail({
+        date: anchor,
         periodType: period,
         campusId: currentCampusId,
       });
@@ -49,7 +63,7 @@ const SalaryData: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentCampusId, period, setLoading]);
+  }, [anchor, currentCampusId, period, setLoading]);
 
   useEffect(() => {
     loadData();
@@ -137,11 +151,19 @@ const SalaryData: React.FC = () => {
       <View className="bg-gradient-diffuse-top pb-[60rpx] px-[32rpx] pt-[24rpx] relative overflow-hidden">
         {/* 日期选择 + 周期切换 */}
         <View className="flex items-center justify-between relative z-10">
-          <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
-            <Icon name="mdi-calendar" size={24} color="muted" />
-            <Text className="text-[26rpx] text-foreground font-medium">2025年8月</Text>
-            <Icon name="mdi-chevron-down" size={20} color="muted" />
-          </View>
+          <Picker
+            mode="date"
+            fields={pickerFields}
+            value={anchor}
+            end={currentDateKey()}
+            onChange={(event) => setAnchor(normalizeAnchorValue(String(event.detail.value)))}
+          >
+            <View className="flex items-center gap-[8rpx] bg-card/80 backdrop-blur-sm px-[20rpx] py-[12rpx] rounded-full shadow-card">
+              <Icon name="mdi-calendar" size={24} color="muted" />
+              <Text className="text-[26rpx] text-foreground font-medium">{periodDateText}</Text>
+              <Icon name="mdi-chevron-down" size={20} color="muted" />
+            </View>
+          </Picker>
           <View className="w-[240rpx]">
             <SegmentedControl
               options={[

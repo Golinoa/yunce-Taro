@@ -35,27 +35,37 @@ export interface RevenueTrendQueryParams extends DataCenterScopeParams {
   period: 'day' | 'week' | 'month' | 'year';
 }
 
-/** 财务详情请求参数 */
-export interface FinanceDetailQueryParams extends DataCenterScopeParams {
+/**
+ * 详情请求共用的「锚点」参数。
+ *
+ * 锚点统一用 `date`(YYYY-MM-DD)，后端按 periodType 推导区间：
+ * day = 当天 / month = 整月 / year = 整年。
+ * `month`(YYYY-MM) 仅保留给旧调用方，新代码不要再传。
+ */
+export interface DetailAnchorParams extends DataCenterScopeParams {
+  /** 锚点日期 YYYY-MM-DD（缺省 = 今天） */
   date?: string;
+  /** @deprecated 请改用 date */
+  month?: string;
+}
+
+/** 财务详情请求参数 */
+export interface FinanceDetailQueryParams extends DetailAnchorParams {
   periodType?: 'day' | 'month' | 'year';
 }
 
 /** 会员详情请求参数 */
-export interface MemberDetailQueryParams extends DataCenterScopeParams {
-  month?: string;
+export interface MemberDetailQueryParams extends DetailAnchorParams {
   periodType?: 'day' | 'month' | 'year';
 }
 
 /** 卡项详情请求参数 */
-export interface CardDetailQueryParams extends DataCenterScopeParams {
-  month?: string;
+export interface CardDetailQueryParams extends DetailAnchorParams {
   periodType?: 'day' | 'month' | 'year';
 }
 
-/** 薪资详情请求参数 */
-export interface SalaryDetailQueryParams extends DataCenterScopeParams {
-  month?: string;
+/** 薪资详情请求参数（薪资只有月份粒度，不提供「日」） */
+export interface SalaryDetailQueryParams extends DetailAnchorParams {
   periodType?: 'month' | 'year';
 }
 
@@ -66,6 +76,21 @@ function appendCampusQuery(base: string, campusId?: string): string {
   if (!campusId) return base;
   const sep = base.includes('?') ? '&' : '?';
   return `${base}${sep}campusId=${encodeURIComponent(campusId)}`;
+}
+
+/**
+ * 拼接详情接口 query：**跳过空值**。
+ *
+ * 原实现用 `params.month || ''` 无条件拼串，URL 里会留下空值的 `month=`；
+ * 后端 zod 正则拒绝空串（`.optional()` 放不过 `''`），于是稳定 400。
+ * 这里统一丢弃 undefined / null / 空串，从源头消除该问题。
+ */
+function buildDetailQuery(base: string, entries: Array<[string, string | undefined]>): string {
+  const search = entries
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${key}=${encodeURIComponent(value as string)}`);
+  if (search.length === 0) return base;
+  return `${base}?${search.join('&')}`;
 }
 
 // ============================================
@@ -218,10 +243,12 @@ export const dataCenterService = {
   /** 获取财务详情 */
   getFinanceDetail: (params: FinanceDetailQueryParams): Promise<FinanceDetailType> =>
     get<FinanceDetailType>(
-      appendCampusQuery(
-        `/data-center/finance/detail?date=${params.date || ''}&periodType=${params.periodType || ''}`,
-        params.campusId,
-      ),
+      buildDetailQuery('/data-center/finance/detail', [
+        ['date', params.date],
+        ['month', params.month],
+        ['periodType', params.periodType],
+        ['campusId', params.campusId],
+      ]),
     ),
 
   // ---------- 会员数据 ----------
@@ -232,10 +259,12 @@ export const dataCenterService = {
   /** 获取会员详情 */
   getMemberDetail: (params: MemberDetailQueryParams): Promise<MemberDetailType> =>
     get<MemberDetailType>(
-      appendCampusQuery(
-        `/data-center/member/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-        params.campusId,
-      ),
+      buildDetailQuery('/data-center/member/detail', [
+        ['date', params.date],
+        ['month', params.month],
+        ['periodType', params.periodType],
+        ['campusId', params.campusId],
+      ]),
     ),
 
   // ---------- 卡项数据 ----------
@@ -246,10 +275,12 @@ export const dataCenterService = {
   /** 获取卡项详情 */
   getCardDetail: (params: CardDetailQueryParams): Promise<CardDetailType> =>
     get<CardDetailType>(
-      appendCampusQuery(
-        `/data-center/card/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-        params.campusId,
-      ),
+      buildDetailQuery('/data-center/card/detail', [
+        ['date', params.date],
+        ['month', params.month],
+        ['periodType', params.periodType],
+        ['campusId', params.campusId],
+      ]),
     ),
 
   // ---------- 薪资数据 ----------
@@ -260,10 +291,12 @@ export const dataCenterService = {
   /** 获取薪资详情 */
   getSalaryDetail: (params: SalaryDetailQueryParams): Promise<SalaryDetailType> =>
     get<SalaryDetailType>(
-      appendCampusQuery(
-        `/data-center/salary/detail?month=${params.month || ''}&periodType=${params.periodType || ''}`,
-        params.campusId,
-      ),
+      buildDetailQuery('/data-center/salary/detail', [
+        ['date', params.date],
+        ['month', params.month],
+        ['periodType', params.periodType],
+        ['campusId', params.campusId],
+      ]),
     ),
 
   // ---------- 记一�?----------

@@ -192,7 +192,14 @@ export interface CardSoldItem {
 export interface CardConsumedItem {
   id: string;
   cardName: string;
+  /** 本次划扣**次数**（= ceil(课时)，至少 1；与消耗账本 lesson_deduct 同口径） */
   count: number;
+  /**
+   * 耗卡价值（元）—— **估算值**：
+   * `划扣次数 × purchasePrice / max(totalCount, 1)`，分母不可用记 0。
+   * 系统不存在逐次消耗的金额，故不得用于对账/分成/业绩，也不得与「收入」相加
+   * （口径见后端 PRODUCT.md DEC-012 ④）。
+   */
   amount: number;
   date: string;
 }
@@ -203,7 +210,11 @@ export interface CardDetailType {
   month: string;
   /** 周期类型 */
   periodType: 'day' | 'month' | 'year';
-  /** 耗卡数据（元） */
+  /**
+   * 耗卡数据（元）—— **估算值**（不是财务口径的课消收入）：
+   * Σ(区间内划扣次数) × `purchasePrice / max(totalCount, 1)`。
+   * 后端口径见 PRODUCT.md DEC-012 ④；次数口径另由 `consumedTimes` 提供。
+   */
   cardConsumed: number;
   /** 售卡数据（元） */
   cardSold: number;
