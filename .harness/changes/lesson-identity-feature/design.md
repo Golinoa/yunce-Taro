@@ -5,7 +5,7 @@ status: active
 
 # 课节身份统一（「哪一节课」只认排课编号）
 
-**Status: Draft**（未 Approved 不开始编码）
+**Status: Approved**（用户 2026-09-30 批准开工）
 
 ## 目标
 

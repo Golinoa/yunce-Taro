@@ -5,15 +5,15 @@ status: active
 
 # 进度 checklist
 
-**Status: Draft**（等 Approved → In Progress）
+**Status: In Progress**（块 0 已完成）
 
 ## 计划中
 
-### 块 0 · 口径地基（Approved 后第一步，**业务行为零变化**）
-- [ ] 前端 `src/utils/lesson-identity.ts`：收敛 `isRecordOfLesson` / `isSameLessonSchedule` / `hasTrialBookingForLesson` / `isSameLessonStartTime` 到唯一真源
-- [ ] 后端 `src/utils/lesson-identity.ts`：等价实现（同名函数、同语义）
-- [ ] 两侧各跑**同一批逐字一致**的表驱动用例（前端 vitest / 后端 jest）
-- [ ] 现有调用点**不动** ⇒ 跑完系统行为零变化，只是口径被固化并被测试盯住
+### 块 0 · 口径地基（Approved 后第一步，**业务行为零变化**） ✅ **已完成 2026-09-30**
+- [x] 前端 `src/utils/lesson-identity.ts`：收敛 `isRecordOfLesson` / `isSameLessonSchedule` / `hasTrialBookingForLesson` / `isSameLessonStartTime` 到唯一真源
+- [x] 后端 `src/utils/lesson-identity.ts`：等价实现（同名函数、同语义）
+- [x] 两侧各跑**同一批逐字一致**的表驱动用例（前端 vitest / 后端 jest）
+- [x] 现有调用点**不动** ⇒ 跑完系统行为零变化，只是口径被固化并被测试盯住
 
 ### 块 1 · 无关身份的独立修复（可先做、独立回归）
 - [ ] 后端 `listLessonRecords` + `getRecordsByRange` 补老师字段

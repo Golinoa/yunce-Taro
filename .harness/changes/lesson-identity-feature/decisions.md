@@ -64,3 +64,20 @@ status: active
 - **决定**：纳入本次。后端两处记录序列化补老师字段；前端去掉 `teacher_id: ''` 硬编码、补 `operator_teacher_id` / `assistant_teacher_id`。
 - **依据**：核对用户验收三项时发现的真缺陷 —— **现在就显示「未知教师」**，不是删规则之后才有。
 - **特点**：与"哪一节"无关，**可独立先做、独立回归**。
+
+## D10 · 块 0 复核：两处**语义放宽**，已确认实际输入下等价
+
+收敛到唯一真源时，新实现相对旧实现有两点放宽（对抗式复核逐条对过）：
+
+1. **日期比较改为归一后比较**（`normalizeLessonDate` 取前 10 位），旧实现是严格 `!==`。
+   ⇒ 若记录 `lesson_date` 是 datetime 串、目标是 `YYYY-MM-DD`，新实现会判为同一天（旧实现不会）。
+2. **归属对象支持私教**（`studentId`），旧实现只比 `classId`；且两边都无归属时新实现返回 `false`
+   （旧实现在 `target.classId === undefined` 且 `record.class_id === undefined` 时会放行）。
+
+**为什么安全**：前端 `mapBackendLessonRecord` 已把 `lesson_date` 归一成 10 位；
+现有调用方传入的 target **都带 `classId`**（私教路径尚未接入）。⇒ 现有输入下行为完全一致。
+
+**验证**：受影响单测全绿（`lesson-record-scope` / `schedule-card-build` / `schedule-danger-logic` /
+`lesson-attendance-load`，共 42+ 条），`tsc` 0 错。
+
+⚠️ 若后续有调用方开始传 `studentId` 或传未归一的日期，行为会变化 —— 那时按新口径（更正确）走，不必回退。
