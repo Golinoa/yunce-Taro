@@ -81,3 +81,67 @@ status: active
 `lesson-attendance-load`，共 42+ 条），`tsc` 0 错。
 
 ⚠️ 若后续有调用方开始传 `studentId` 或传未归一的日期，行为会变化 —— 那时按新口径（更正确）走，不必回退。
+
+## D11 · 匹配用「双键」：编号键优先命中，时段键保留兜底
+
+- **决定**：试听角标/名单匹配时，每条预约**同时**产出「编号键 `#scheduleId|classId|lessonDate`」与
+  「时段键 `classId|lessonDate|startTime`」；判定顺序 = **编号优先 → 时段兜底**。
+  （补课侧直接复用真源谓词 `isBookingOfLesson`，同样编号优先、时段兜底。）
+- **为什么不只用编号**：老预约（`reference_schedule_id` 为空，如家长请假生成的补课）没有编号，
+  只认编号会把它们全部丢掉 ⇒ 学员从名单消失。
+- **为什么不用「编号唯一」的严格版**：严格版要求"双方都有编号才比编号、否则比时段"，
+  在**两条规则撞同一时段**时会误判（现无冲突校验）。双键版在那种情况下会**多显示**，
+  符合项目底线「宁可多显示，不能吞学员」。
+- **代价（已知边界）**：同班同天两条规则撞同一时段时，编号不同的预约可能被时段键算进来。
+  已在 `hasTrialBookingForLesson` 注释与本文件登记。
+
+## D12 · 顺手修的两个真实缺陷（归因说明）
+
+1. **补课预约被全部过滤掉**（前端 `services/makeup-booking.ts`）
+   - 后端 `mapBooking` 返回 **camelCase**，前端类型是 **snake_case**，而 service **没有任何映射**
+     ⇒ `b.lesson_date` / `b.start_time` 恒为 `undefined`，`getByClassDate` 的防御过滤把
+     **所有补课预约全部过滤掉**（表现为「补课学员从不出现在点名名单」）。
+   - **归因**：**既有缺陷，非本次引入**（`git diff c63347f` 显示该过滤早于本次工作）。
+     但块 2 要往这个链条上挂 `schedule_id`，不修就等于白做 ⇒ 本次一并修，并加 3 条单测钉住。
+2. **前端 2 条一直红的用例**（`src/home/__tests__/home.service.test.ts`）
+   - mock 漏了 `prisma.subject` ⇒ 课表用例一跑到「科目转 name」就崩。
+   - **归因**：**既有缺陷**（已用还原法验证：HEAD 版本同样 2 条红）。不修就无法判定本次改动是否引入回归 ⇒ 本次修掉。
+
+## D13 · `LessonRecord` 没有助教列 ⇒ 不补这个字段
+
+- **决定**：记录接口只返回 `teacherId/teacherName` 与 `operatorTeacherId/operatorTeacherName`，
+  **不加助教字段**。
+- **依据**：真实库 `LessonRecord` 的列里**没有** `assistantTeacherId`（助教从未落库），
+  前端类型里的 `assistant_teacher_id` 是空的承诺。为了让 UI 好看而凭空造值 = 埋更深的坑。
+
+## D11 · 匹配用「双键」：编号键优先命中，时段键保留兜底
+
+- **决定**：试听角标/名单匹配时，每条预约**同时**产出「编号键 `#scheduleId|classId|lessonDate`」与
+  「时段键 `classId|lessonDate|startTime`」；判定顺序 = **编号优先 → 时段兜底**。
+  （补课侧直接复用真源谓词 `isBookingOfLesson`，同样编号优先、时段兜底。）
+- **为什么不只用编号**：老预约（`reference_schedule_id` 为空，如家长请假生成的补课）没有编号，
+  只认编号会把它们全部丢掉 ⇒ 学员从名单消失。
+- **为什么不用「编号唯一」的严格版**：严格版要求"双方都有编号才比编号、否则比时段"，
+  在**两条规则撞同一时段**时会误判（现无冲突校验）。双键版在那种情况下会**多显示**，
+  符合项目底线「宁可多显示，不能吞学员」。
+- **代价（已知边界）**：同班同天两条规则撞同一时段时，编号不同的预约可能被时段键算进来。
+  已在 `hasTrialBookingForLesson` 注释与本文件登记。
+
+## D12 · 顺手修的两个真实缺陷（归因说明）
+
+1. **补课预约被全部过滤掉**（前端 `services/makeup-booking.ts`）
+   - 后端 `mapBooking` 返回 **camelCase**，前端类型是 **snake_case**，而 service **没有任何映射**
+     ⇒ `b.lesson_date` / `b.start_time` 恒为 `undefined`，`getByClassDate` 的防御过滤把
+     **所有补课预约全部过滤掉**（表现为「补课学员从不出现在点名名单」）。
+   - **归因**：**既有缺陷，非本次引入**（`git diff c63347f` 显示该过滤早于本次工作）。
+     但块 2 要往这个链条上挂 `schedule_id`，不修就等于白做 ⇒ 本次一并修，并加 3 条单测钉住。
+2. **前端 2 条一直红的用例**（`src/home/__tests__/home.service.test.ts`）
+   - mock 漏了 `prisma.subject` ⇒ 课表用例一跑到「科目转 name」就崩。
+   - **归因**：**既有缺陷**（已用还原法验证：HEAD 版本同样 2 条红）。不修就无法判定本次改动是否引入回归 ⇒ 本次修掉。
+
+## D13 · `LessonRecord` 没有助教列 ⇒ 不补这个字段
+
+- **决定**：记录接口只返回 `teacherId/teacherName` 与 `operatorTeacherId/operatorTeacherName`，
+  **不加助教字段**。
+- **依据**：真实库 `LessonRecord` 的列里**没有** `assistantTeacherId`（助教从未落库），
+  前端类型里的 `assistant_teacher_id` 是空的承诺。为了让 UI 好看而凭空造值 = 埋更深的坑。
