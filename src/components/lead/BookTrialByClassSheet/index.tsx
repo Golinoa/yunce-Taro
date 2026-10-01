@@ -9,6 +9,7 @@
 import { View, Text, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
+import dayjs from 'dayjs';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ActionButton from '@/components/ActionButton';
 import Avatar from '@/components/Avatar';
@@ -30,6 +31,9 @@ import type { Lead } from '@/types/lead';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
+import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
+import { autoCheckInMakeupStudent } from './auto-checkin';
 
 type InputMode = 'makeup' | 'select' | 'input';
 
@@ -77,7 +81,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const userId = session?.user.id || '';
   const currentCampusId = useCampusStore((s) => s.currentCampusId);
   const resolvedCampusId = campusId || currentCampusId || '';
@@ -227,20 +231,83 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     setSubmitting(true);
     try {
       if (mode === 'makeup' && selectedStudent) {
+        const targetStudent = selectedStudent;
+        /**
+         * 超 30 天的历史课本就不能补录（`canOperateHistoricalLesson` 是既有口径）⇒
+         * 只建补课、不签到，并在二次确认里说清楚，避免"以为签上了"。
+         */
+        const canCheckIn = canOperateHistoricalLesson(dayjs(lessonDate), dayjs());
+        /**
+         * 二次确认（用户口径 2026-10-01）：明确告知「确定即自动签到」，
+         * 取消就中断添加流程，不做任何写入。
+         */
+        const confirmed = await new Promise<boolean>((resolve) => {
+          void Taro.showModal({
+            title: canCheckIn ? '补课并签到' : '仅添加补课',
+            content: canCheckIn
+              ? `将为「${targetStudent.name}」在本节课签到并消课 1 课时，确定吗？`
+              : `本节课已超过 30 天补录期限，只能添加补课、无法签到。仍要添加「${targetStudent.name}」吗？`,
+            confirmText: canCheckIn ? '确定并签到' : '仅添加',
+            cancelText: '取消',
+            success: (res) => resolve(Boolean(res.confirm)),
+            fail: () => resolve(false),
+          });
+        });
+        if (!confirmed) return;
+
         await makeupBookingService.create({
-          studentId: selectedStudent.id,
+          studentId: targetStudent.id,
           classId,
           lessonDate,
           startTime,
           endTime,
-          teacherId,
+          /**
+           * ⚠️ 不再上报 `teacherId`：老师归属由**后端按这节课的配置**解析
+           * （`Schedule.teacherId` → 兜底 `Class.teacherId`）。历史上这里传的是
+           * 「当前操作人的 identity id」，校长账号会传成 Profile.id ⇒ 后端 404「教师不存在」。
+           */
           teacherName,
           scheduleId,
           source: 'teacher',
           note: note.trim() || undefined,
           createdBy: userId,
         });
-        Taro.showToast({ title: '补课预约成功', icon: 'success' });
+        // 写后失效：课表卡片与点名页名单快照要能看到这条补课（原缺口 G1）
+        setRefreshSignal(REFRESH_SIGNAL.schedule);
+
+        if (!canCheckIn) {
+          Taro.showToast({ title: '补课已添加（超 30 天不可签到）', icon: 'none', duration: 2200 });
+          onSuccess?.({ classId, lessonDate, startTime, mode: 'makeup' });
+          onClose();
+          return;
+        }
+
+        // 确定后「添加并且签到」：复用点名页的单人消课链路（幂等，不会重复消课）
+        const checkin = await autoCheckInMakeupStudent({
+          student: targetStudent,
+          classId,
+          scheduleId,
+          lessonDate,
+          campusId: bookingCampusId,
+          currentUserId: userId,
+          currentTeacherId: bookingTeacherId,
+          profile,
+        });
+
+        if (checkin.ok) {
+          Taro.showToast({
+            title: checkin.alreadyCheckedIn ? '已在补课名单（已签到）' : '已添加并签到',
+            icon: 'success',
+            duration: 1800,
+          });
+        } else {
+          Taro.showToast({ title: '补课已添加，未签到', icon: 'none', duration: 1500 });
+          if (checkin.reason) {
+            setTimeout(() => {
+              Taro.showToast({ title: checkin.reason!.slice(0, 32), icon: 'none', duration: 2500 });
+            }, 1600);
+          }
+        }
         onSuccess?.({ classId, lessonDate, startTime, mode: 'makeup' });
         onClose();
         return;
@@ -302,9 +369,9 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     endTime,
     scheduleId,
     bookingTeacherId,
-    teacherId,
     teacherName,
     userId,
+    profile,
     mode,
     selectedLead,
     selectedStudent,

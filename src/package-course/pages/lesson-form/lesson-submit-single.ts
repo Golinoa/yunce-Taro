@@ -18,6 +18,13 @@ export async function executeSingleDeduct(input: {
   lessonDate: string;
   /** 本节排课规则 ID：写入记录后用于区分「同班同一天的另一节课」 */
   scheduleId?: string;
+  /** 所属班级：班课里的单人签到必须带上，卡片/名单才能按班级匹配到这条记录 */
+  classId?: string;
+  /**
+   * 记录类型。默认不传 = 后端按 normal 落库（历史行为）。
+   * 「补课并签到」场景必须传 `makeup`（与班级点名的口径一致：补课学员记 makeup）。
+   */
+  recordStatus?: 'normal' | 'makeup';
   selectedTeachingTeacherId?: string;
   currentTeacherId?: string;
   currentUserId?: string;
@@ -36,6 +43,8 @@ export async function executeSingleDeduct(input: {
   setSubmitting: (v: boolean) => void;
   invalidateStudents: (userId?: string) => void;
   onSuccess: () => void;
+  /** 失败回调（toast 之后调用）：调用方需要自行判断成败时用（例如自动签到要报原因） */
+  onError?: (err: unknown) => void;
 }): Promise<void> {
   const error = validateSingleSubmit({
     hasStudent: !!input.selectedStudent,
@@ -57,9 +66,11 @@ export async function executeSingleDeduct(input: {
         operator_teacher_id: input.currentTeacherId || input.selectedTeachingTeacherId,
         student_id: selectedStudent.id,
         package_id: matchedPackage.id,
+        class_id: input.classId || undefined,
         schedule_id: input.scheduleId || undefined,
         lesson_date: input.lessonDate,
         hours_used: input.hoursUsed,
+        status: input.recordStatus,
         content: input.content.trim() || undefined,
         performance: input.performance > 0 ? `${input.performance}星` : undefined,
         homework: input.homework.trim() || undefined,
@@ -103,6 +114,7 @@ export async function executeSingleDeduct(input: {
     } catch (err) {
       logError('submit lesson', err);
       Taro.showToast({ title: '提交失败，请重试', icon: 'none' });
+      input.onError?.(err);
     }
   });
 

@@ -118,6 +118,14 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
         return next;
       });
       void loadBaseData();
+      /**
+       * 补课：弹层里已经完成「建预约 + 自动签到」（用户口径 2026-10-01）⇒
+       * **不再跳详情页**（原来 `action=supplement` 那一步已被自动签到取代），只刷新课表。
+       * 试听：仍沿用「约完进详情页签到」的老流程。
+       */
+      if (mode === 'makeup') {
+        return;
+      }
       // 引导进入这节课的详情页签到（用户口径 2026-09-30：过去课也允许约，
       // 约完直接去点名页——名单会自动带上刚约的补课/试听学员和已签到数据）。
       if (!classId || !lessonDate) return;
@@ -139,9 +147,8 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
           classId,
           lessonDate,
           lessonTime,
-          // 补课学员若这节课已点名，点名页会自动打开补录并把他们列为可签到；
-          // 尚未点名时该参数被忽略，直接进普通点名。
-          action: mode === 'makeup' ? 'supplement' : undefined,
+          // 走到这里只剩试听（补课在上面已 return，改由弹层自动签到完成）：
+          // 试听学员在这节课上签到即可，不需补录参数。
         }),
       });
     },
