@@ -147,7 +147,11 @@ const mapBackendLessonRecordStatus = (
   return 'normal';
 };
 
-function mapBackendLessonRecord(
+/**
+ * 后端记录 → 前端 `LessonRecord`（导出以便对「哪几列必须原样带过来」写回归测试：
+ * 见 `lesson-record-mapper.test.ts`，对应 rule `50-lesson-identity` 规则 1）。
+ */
+export function mapBackendLessonRecord(
   item:
     | BackendLessonRecordCreateResponse
     | BackendLessonRecordDetailResponse
@@ -179,6 +183,15 @@ function mapBackendLessonRecord(
           id: 'classId' in item ? item.classId || '' : '',
           name: 'className' in item ? item.className || '' : '',
         };
+  /**
+   * ⚠️ 班级 id 以**扁平 `classId` 优先**，`class` 对象只作兜底。
+   *
+   * 原因：列表接口（`GET /lesson-records`）返回的 `class` 只有 `name`（没有 `id`），
+   * 若只认 `class.id`，`class_id` 就会恒为 undefined ⇒ 依赖它的
+   * 「这节课点过名没有 / 重复点名保护 / 补课试听的幂等」全部判不中。
+   * 后端三个取数口都应返回扁平 `classId`（rule `50-lesson-identity` 规则 1）。
+   */
+  const resolvedClassId = ('classId' in item ? item.classId || '' : '') || classInfo?.id || '';
   const teacherName =
     'teacher' in item && item.teacher
       ? item.teacher.name
@@ -247,7 +260,7 @@ function mapBackendLessonRecord(
           ? item.updatedAt
           : item.createdAt
         : undefined,
-    class_id: classInfo?.id || undefined,
+    class_id: resolvedClassId || undefined,
     class_name: classInfo?.name || undefined,
     schedule_id:
       ('scheduleId' in item ? item.scheduleId : undefined) ||

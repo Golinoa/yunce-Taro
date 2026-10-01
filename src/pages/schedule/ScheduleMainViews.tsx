@@ -11,6 +11,7 @@ import type { Class, ClassBookingSlot } from '@/types/class';
 import type { TeacherUIModel } from '@/types/teacher';
 import type { BookableVenue } from '@/types/venue-booking';
 import type { LessonSharePayload } from '@/utils/lesson-share';
+import { isHistoricalClassCard } from '@/utils/schedule-card-actions';
 import type { ScheduleCardItem, ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
 import type { DangerActionMeta } from '@/utils/schedule-danger-meta';
 import OpenClassScheduleList from './OpenClassScheduleList';
@@ -413,6 +414,15 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         endTime={bookSheetItem?.endTime || ''}
         /** 本节所属排课编号：写进预约 ⇒ 日后同日调课改了时段，预约仍认得这一节 */
         scheduleId={bookSheetItem?.id || ''}
+        /**
+         * 是否已下课：用卡片状态真源判定，与「补录」按钮的显隐同口径。
+         * 只有已下课的课才允许「确定即签到」；未来课只建预约（签到=人到了，不能提前发生）。
+         */
+        historical={
+          bookSheetItem
+            ? isHistoricalClassCard(bookSheetItem.status, selectedDate, currentTime)
+            : false
+        }
         teacherId={currentTeacherId}
         teacherName={bookSheetItem?.leadTeacherName}
         onClose={onCloseBookSheet}

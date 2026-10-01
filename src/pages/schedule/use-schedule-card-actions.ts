@@ -7,12 +7,10 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import type { CourseCategoryMode } from '@/types/course-category';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
 import { buildTrialLessonKey, buildTrialLessonScheduleKey } from '@/utils/schedule-card-build';
-import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import {
   buildBatchRescheduleSelectPath,
   buildBookingPagePath,
   buildCheckinLessonFormPath,
-  buildLessonFormPath,
   buildSupplementLessonFormPath,
   buildViewOnlyLessonFormPath,
   resolveSchedulePrimaryActionKind,
@@ -90,7 +88,6 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
       classId,
       lessonDate,
       startTime,
-      mode,
     }: {
       classId: string;
       lessonDate: string;
@@ -119,38 +116,12 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
       });
       void loadBaseData();
       /**
-       * 补课：弹层里已经完成「建预约 + 自动签到」（用户口径 2026-10-01）⇒
-       * **不再跳详情页**（原来 `action=supplement` 那一步已被自动签到取代），只刷新课表。
-       * 试听：仍沿用「约完进详情页签到」的老流程。
+       * 补课 / 试听**统一口径**（用户 2026-10-01）：
+       * 弹层里已经完成「建预约 + 自动签到」（已下课的课）或「仅建预约」（未来课），
+       * 所以这里**一律不再跳详情页**——原来那句「约完进点名页手动点签到」的引导已作废。
+       * 只负责刷新课表与挂试听角标；toast 由弹层给（它知道签到结果）。
        */
-      if (mode === 'makeup') {
-        return;
-      }
-      // 引导进入这节课的详情页签到（用户口径 2026-09-30：过去课也允许约，
-      // 约完直接去点名页——名单会自动带上刚约的补课/试听学员和已签到数据）。
-      if (!classId || !lessonDate) return;
-      if (!canOperateHistoricalLesson(dayjs(lessonDate), dayjs())) {
-        Taro.showToast({
-          title: '已超过 30 天补录期限，预约已保存，但无法再补签到',
-          icon: 'none',
-          duration: 2500,
-        });
-        return;
-      }
-      const lessonTime =
-        navItem?.startTime && navItem?.endTime
-          ? `${navItem.startTime}-${navItem.endTime}`
-          : undefined;
-      Taro.navigateTo({
-        url: buildLessonFormPath({
-          scheduleId: navItem?.id,
-          classId,
-          lessonDate,
-          lessonTime,
-          // 走到这里只剩试听（补课在上面已 return，改由弹层自动签到完成）：
-          // 试听学员在这节课上签到即可，不需补录参数。
-        }),
-      });
+      return;
     },
     [bookSheetItem, loadBaseData, setBookSheetItem, setBookSheetVisible, setTrialBookingKeys],
   );

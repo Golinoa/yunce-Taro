@@ -33,7 +33,33 @@ import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
-import { autoCheckInMakeupStudent } from './auto-checkin';
+import {
+  autoCheckInMakeupStudent,
+  autoCheckInTrialStudent,
+  hasCheckedInLesson,
+  type AutoCheckInResult,
+} from './auto-checkin';
+
+/**
+ * 二次确认（用户口径 2026-10-01）：**只有「确定」才继续写入**；
+ * 选「取消」= 中断整个添加流程，一条数据都不写、弹层也不关。
+ */
+async function askCheckInConfirm(params: {
+  title: string;
+  content: string;
+  confirmText: string;
+}): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    void Taro.showModal({
+      title: params.title,
+      content: params.content,
+      confirmText: params.confirmText,
+      cancelText: '取消',
+      success: (res) => resolve(Boolean(res.confirm)),
+      fail: () => resolve(false),
+    });
+  });
+}
 
 type InputMode = 'makeup' | 'select' | 'input';
 
@@ -53,6 +79,14 @@ export interface BookTrialByClassSheetProps {
    * 预约仍认得它（排课编号不变）。拿不到就留空，读取端按「班级+日期+时段」兜底。
    */
   scheduleId?: string;
+  /**
+   * 这节课是否**已下课**（过去日期，或当日已下课/已点名）。
+   *
+   * 由调用方用同一个真源 `isHistoricalClassCard(卡片 status, 日期, now)` 算好传进来，
+   * 不要在这里自己按时间猜——否则会出现「卡片上没有补录按钮、弹层里却能签到」的口径分裂。
+   * 用途：只有已下课的课才谈得上「签到」；未来课只能建预约。
+   */
+  historical?: boolean;
   onClose: () => void;
   /**
    * 预约成功回调，返回班级、日期、**本节时段**与本次预约类型（补课 / 试听）。
@@ -78,6 +112,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
   teacherId,
   teacherName,
   scheduleId,
+  historical = false,
   onClose,
   onSuccess,
 }) => {
@@ -230,29 +265,38 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
 
     setSubmitting(true);
     try {
+      /**
+       * 本节课能不能「签到」——补课与试听**共用同一个判定**：
+       * 只有**已下课**的课才谈得上签到（人到了），且要在 30 天补录期内
+       * （`canOperateHistoricalLesson` 是既有口径）。未来课只能建预约。
+       */
+      const canCheckIn = historical && canOperateHistoricalLesson(dayjs(lessonDate), dayjs());
+
       if (mode === 'makeup' && selectedStudent) {
         const targetStudent = selectedStudent;
-        /**
-         * 超 30 天的历史课本就不能补录（`canOperateHistoricalLesson` 是既有口径）⇒
-         * 只建补课、不签到，并在二次确认里说清楚，避免"以为签上了"。
-         */
-        const canCheckIn = canOperateHistoricalLesson(dayjs(lessonDate), dayjs());
         /**
          * 二次确认（用户口径 2026-10-01）：明确告知「确定即自动签到」，
          * 取消就中断添加流程，不做任何写入。
          */
-        const confirmed = await new Promise<boolean>((resolve) => {
-          void Taro.showModal({
-            title: canCheckIn ? '补课并签到' : '仅添加补课',
-            content: canCheckIn
-              ? `将为「${targetStudent.name}」在本节课签到并消课 1 课时，确定吗？`
-              : `本节课已超过 30 天补录期限，只能添加补课、无法签到。仍要添加「${targetStudent.name}」吗？`,
-            confirmText: canCheckIn ? '确定并签到' : '仅添加',
-            cancelText: '取消',
-            success: (res) => resolve(Boolean(res.confirm)),
-            fail: () => resolve(false),
-          });
-        });
+        const confirmed = await askCheckInConfirm(
+          canCheckIn
+            ? {
+                title: '补课并签到',
+                content: `将为「${targetStudent.name}」在本节课签到并消课 1 课时，确定吗？`,
+                confirmText: '确定并签到',
+              }
+            : historical
+              ? {
+                  title: '仅添加补课',
+                  content: `本节课已超过 30 天补录期限，只能添加补课、无法签到。仍要添加「${targetStudent.name}」吗？`,
+                  confirmText: '仅添加',
+                }
+              : {
+                  title: '添加补课',
+                  content: `将为「${targetStudent.name}」添加本节课的补课（本节课还没下课，届时在点名页签到）。确定吗？`,
+                  confirmText: '确定',
+                },
+        );
         if (!confirmed) return;
 
         await makeupBookingService.create({
@@ -276,7 +320,11 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
         setRefreshSignal(REFRESH_SIGNAL.schedule);
 
         if (!canCheckIn) {
-          Taro.showToast({ title: '补课已添加（超 30 天不可签到）', icon: 'none', duration: 2200 });
+          Taro.showToast({
+            title: historical ? '补课已添加（超 30 天不可签到）' : '补课已添加',
+            icon: 'none',
+            duration: 2200,
+          });
           onSuccess?.({ classId, lessonDate, startTime, mode: 'makeup' });
           onClose();
           return;
@@ -313,7 +361,10 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
         return;
       }
 
+      // ==================== 试听：与补课**同一套**「确定即添加并签到」流程 ====================
       let leadId = selectedLead?.id;
+      let trialStudentId = selectedLead?.trial_student_id || '';
+      let trialStudentName = selectedLead?.child_name || childName.trim() || '试听学员';
 
       if (mode === 'input') {
         const newLead = await leadService.createLead(
@@ -326,7 +377,60 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
           userId,
         );
         leadId = newLead.id;
+        trialStudentId = newLead.trial_student_id;
+        trialStudentName = newLead.child_name || childName.trim() || '试听学员';
       }
+
+      /**
+       * 幂等前置检查：该学员本节已签到 ⇒ 不重复建预约、不重复写记录。
+       * 放在建单之前，是因为后端对「同线索同时段重复预约」会直接 422 拦下，
+       * 先判掉能让"再点一次"得到一个说得清的结果而不是一句报错。
+       */
+      if (trialStudentId) {
+        try {
+          if (
+            await hasCheckedInLesson({
+              studentId: trialStudentId,
+              classId,
+              lessonDate,
+              scheduleId,
+            })
+          ) {
+            Taro.showToast({
+              title: `${trialStudentName} 已在本节课签到`,
+              icon: 'none',
+              duration: 2000,
+            });
+            onSuccess?.({ classId, lessonDate, startTime, mode: 'trial' });
+            onClose();
+            return;
+          }
+        } catch (err) {
+          // 查不到旧记录不能当"没签到"（宁可多一次后端校验，也不能重复写记录）
+          logError('BookTrialByClassSheet trial checkin precheck', err);
+        }
+      }
+
+      const trialConfirmed = await askCheckInConfirm(
+        canCheckIn
+          ? {
+              title: '试听并签到',
+              content: `将为「${trialStudentName}」在本节课签到（试听不消课时），确定吗？`,
+              confirmText: '确定并签到',
+            }
+          : historical
+            ? {
+                title: '仅添加试听',
+                content: `本节课已超过 30 天补录期限，只能添加预约、无法签到。仍要添加「${trialStudentName}」吗？`,
+                confirmText: '仅添加',
+              }
+            : {
+                title: '预约试听',
+                content: `将为「${trialStudentName}」预约本节课的试听（本节课还没下课，届时在点名页签到）。确定吗？`,
+                confirmText: '确定',
+              },
+      );
+      if (!trialConfirmed) return;
 
       await leadService.bookTrialByClass({
         leadId: leadId!,
@@ -343,11 +447,53 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
         operatorId: userId,
         note: note.trim() || undefined,
       });
-
-      Taro.showToast({ title: '预约成功', icon: 'success' });
+      // 写后失效：课表角标与点名页名单快照要立刻看到这条预约（与补课同口径）
+      setRefreshSignal(REFRESH_SIGNAL.schedule);
       void subscribeMessageService.runFlow('E24', {
         bookingLabel: `试听·${bookingClassName}`,
       });
+
+      if (!canCheckIn) {
+        Taro.showToast({
+          title: historical ? '预约成功（超 30 天不可签到）' : '预约成功',
+          icon: 'success',
+          duration: 2000,
+        });
+        onSuccess?.({ classId, lessonDate, startTime, mode: 'trial' });
+        onClose();
+        return;
+      }
+
+      // 确定后「添加并且签到」：试听不消课时，只写一条 NORMAL 的试听签到记录
+      const trialCheckin: AutoCheckInResult = trialStudentId
+        ? await autoCheckInTrialStudent({
+            studentId: trialStudentId,
+            studentName: trialStudentName,
+            classId,
+            scheduleId,
+            lessonDate,
+            currentTeacherId: bookingTeacherId,
+          })
+        : { ok: false, reason: '未取到试听学员信息，请进点名页手动签到' };
+
+      if (trialCheckin.ok) {
+        Taro.showToast({
+          title: trialCheckin.alreadyCheckedIn ? '已在试听名单（已签到）' : '已添加并签到',
+          icon: 'success',
+          duration: 1800,
+        });
+      } else {
+        Taro.showToast({ title: '预约成功，未签到', icon: 'none', duration: 1500 });
+        if (trialCheckin.reason) {
+          setTimeout(() => {
+            Taro.showToast({
+              title: trialCheckin.reason!.slice(0, 32),
+              icon: 'none',
+              duration: 2500,
+            });
+          }, 1600);
+        }
+      }
       onSuccess?.({ classId, lessonDate, startTime, mode: 'trial' });
       onClose();
     } catch (error) {
@@ -372,6 +518,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     teacherName,
     userId,
     profile,
+    historical,
     mode,
     selectedLead,
     selectedStudent,
