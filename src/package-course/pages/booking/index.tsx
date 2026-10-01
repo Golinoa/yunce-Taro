@@ -220,7 +220,7 @@ const MyBookingsPage: React.FC = () => {
       void Taro.navigateTo({
         url:
           `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(p.classId)}` +
-          `&date=${encodeURIComponent(p.lessonDate)}`,
+          `&lessonDate=${encodeURIComponent(p.lessonDate)}`,
       });
       return;
     }
@@ -240,7 +240,7 @@ const MyBookingsPage: React.FC = () => {
         void Taro.navigateTo({
           url:
             `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(p.classId)}` +
-            `&date=${encodeURIComponent(p.lessonDate || item.date)}` +
+            `&lessonDate=${encodeURIComponent(p.lessonDate || item.date)}` +
             `&leadBookingId=${encodeURIComponent(p.bookingId)}`,
         });
         return;

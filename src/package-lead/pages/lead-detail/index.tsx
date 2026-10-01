@@ -330,7 +330,7 @@ const LeadDetailPage: React.FC = () => {
         void Taro.navigateTo({
           url:
             `/package-course/pages/lesson-form/index?classId=${encodeURIComponent(booking.class_id)}` +
-            `&date=${encodeURIComponent(booking.lesson_date)}` +
+            `&lessonDate=${encodeURIComponent(booking.lesson_date)}` +
             `&leadBookingId=${encodeURIComponent(booking.id)}`,
         });
         return;

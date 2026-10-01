@@ -64,7 +64,10 @@ const LessonForm: React.FC = () => {
   }, [routeParams]);
 
   const lessonDateParam = useMemo(() => {
-    const v = routeParams.lessonDate || '';
+    // 兼容读 `date`：历史上有入口（预约页 / 线索详情）传的是 `date=xxx`，
+    // 而本页只认 `lessonDate` ⇒ 会静默回落到「今天」，老师以为打开了指定那节课。
+    // 调用方已统一改成 `lessonDate`，这里保留兜底以防还有遗漏入口。
+    const v = routeParams.lessonDate || routeParams.date || '';
     return v ? decodeURIComponent(v) : '';
   }, [routeParams]);
 
