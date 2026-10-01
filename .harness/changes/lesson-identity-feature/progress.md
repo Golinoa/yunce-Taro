@@ -5,7 +5,7 @@ status: active
 
 # 进度 checklist
 
-**Status: In Progress**（块 0–3 已完成；块 4 与日期参数修复未做）
+**Status: In Progress**（块 0–5 已完成；剩真机验收与后端全量测试）
 
 ## 已完成
 
@@ -39,14 +39,15 @@ status: active
 - [x] 补 4 条角标/键单测（调课后仍命中 / 另一节不误标 / 无编号回落时段）
 - [x] 后端 `home-today-schedule.service.ts` 试听去重改「编号优先、时段兜底」
 
-## 未完成
+### 块 4 · 让老师指明「第几节」（无节次信息的入口） ✅ **2026-10-01**
+- [x] `scheduleService.getDayLessons(date)`：复用后端 `/schedules/today?date=`（服务端已推导，**不新增接口**）
+- [x] `useClassDayLessons` + `resolveLessonSelection`（纯函数）：1 节自动带 / ≥2 节必须选 / 0 节退回不区分
+- [x] `ClassDayLessonPicker`：≥2 节时才渲染；显示时段、老师、已点名进度
+- [x] 未选节次拦提交；选中后按该节重新取记录并按该节时段过滤补课/试听名单
+- [x] 7 条单测（含"≥2 节未选必须拦""0 节退回不区分"）
 
-### 块 4 · 让老师指明「第几节」（从班级列表入口）
-- [ ] 解析当天课次（排课规则 + 临时调课叠加）
-- [ ] 1 节自动带；≥2 节弹出选择；未选不让提交
-
-### 块 5 · 日期参数名 bug
-- [ ] `booking/index.tsx` 与 `lead-detail/index.tsx` 传 `date=`，点名页只读 `lessonDate` ⇒ 打开的是「今天」
+### 块 5 · 日期参数名 bug ✅ **2026-10-01**
+- [x] `booking/index.tsx`（2 处）与 `lead-detail/index.tsx`（1 处）传 `date=` ⇒ 点名页只读 `lessonDate` ⇒ 静默回到「今天」；已统一改 `&lessonDate=`，点名页加 `date` 兜底读
 
 ## 验证
 
@@ -55,8 +56,8 @@ status: active
 - [x] 后端 `tsc --noEmit` / eslint / prettier 全清
 - [x] 后端 jest 相关范围（`lesson-record` / `makeup-booking` / `leave-request` / `home` / `utils`）**133 条**通过
 - [ ] 后端 jest **全量**（未跑，等用户指示）
-- [ ] 重编译 dev 包（向用户申请，需先关微信开发者工具）
-- [ ] 真机 / 开发者工具验收：见 `design.md` 验收标准
+- [x] 重编译 dev 包（dev 模式，`env -u NODE_OPTIONS … taro build`：117 页 / 0 missing，主包 1487.8KB/1536KB；并做了产物级验证）
+- [ ] 真机 / 开发者工具验收：见 `design.md` 验收标准（**已具备测试条件**）（**已具备测试条件**）
 
 ## 时间线
 
