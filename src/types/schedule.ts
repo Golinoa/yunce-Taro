@@ -45,7 +45,11 @@ export interface Schedule {
   reminder_minutes?: number;
   created_at: string;
   updated_at: string;
-  /** 重复规则状态；停止/暂停不等同于删除已生成课节。 */
+  /**
+   * 重复规则状态。可操作语义只有两种：`ACTIVE`（进行中）/ `STOPPED`（已停止）。
+   * 「停止」只停未来、**不影响已生成的课节与消课记录**（2026-10-02 口径统一：
+   * 旧的 `PAUSED` 暂停语义已整套移除，枚举值保留仅为 DB 兼容）。
+   */
   rule_status?: ScheduleRuleStatus;
   stopped_at?: string;
   /**

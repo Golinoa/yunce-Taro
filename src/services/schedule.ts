@@ -386,16 +386,6 @@ export const scheduleService = {
     await del(`/schedules/${scheduleId}`);
     return;
   },
-  changeRuleStatus: async (
-    scheduleId: string,
-    action: 'pause' | 'resume' | 'stop',
-  ): Promise<Schedule> => {
-    const updated = await post<BackendScheduleDetailResponse>(
-      `/schedules/${scheduleId}/rule-status`,
-      { action },
-    );
-    return mapBackendSchedule(updated);
-  },
   checkConflict: async (params: {
     teacherId: string;
     dayOfWeek: number;
