@@ -152,3 +152,112 @@ describe('试听角标只作用于「那一节课」', () => {
     expect(hasTrialBookingForLesson(new Set(keys), 'c1', '2026-10-05', '14:00')).toBe(false);
   });
 });
+
+/**
+ * 用户口径 2026-10-01（真实投诉）：「我删了一条排课规则，**历史日期下已经上过课的卡片也消失了**」。
+ * 卡片是由规则推导的 ⇒ 规则一没，所有日期的卡片全没了；而记录没有时段列，重建不出卡片。
+ * ⇒ 删除 = 软停止（`STOPPED` + `stoppedAt`），读取端按「日期 ≤ stoppedAt」收窄：**停之前的历史照旧，停之后不再出课**。
+ */
+describe('schedule-card-build · 已删除/停止规则的日期收窄', () => {
+  // 2026-09-24 / 10-01 / 10-08 都是周四（day_of_week=4）
+  const stoppedRule = {
+    id: 's1',
+    day_of_week: 4,
+    start_time: '14:00',
+    end_time: '15:00',
+    class_id: 'c1',
+    teacher_id: 't1',
+    created_at: '',
+    updated_at: '',
+    rule_status: 'STOPPED',
+    stopped_at: '2026-10-01T09:30:00.000Z',
+  };
+
+  const buildFor = (dateStr: string) =>
+    buildScheduleCardsForDate({
+      date: dayjs(dateStr),
+      now: dayjs('2026-10-20T09:00:00'),
+      filteredSchedules: [stoppedRule] as never[],
+      scheduleById: {} as never,
+      temporaryReschedules: [],
+      lessonRecords: [],
+      selectedClassId: '',
+      classById: {} as never,
+      teacherById: {} as never,
+      classStudentAvatars: {},
+      trialBookingKeys: new Set<string>(),
+      currentTeacherName: '张老师',
+    });
+
+  it('停止日之前的历史日期照旧出卡片（历史不能消失）', () => {
+    expect(buildFor('2026-09-24').map((card) => card.id)).toEqual(['s1']);
+  });
+
+  it('停止当天仍算出课（按天比较，与后端 d <= stoppedAt 一致）', () => {
+    expect(buildFor('2026-10-01').map((card) => card.id)).toEqual(['s1']);
+  });
+
+  it('停止之后不再出卡片（以后不该再有课）', () => {
+    expect(buildFor('2026-10-08')).toEqual([]);
+  });
+
+  it('ACTIVE 规则不受影响', () => {
+    const activeRule = { ...stoppedRule, rule_status: 'ACTIVE', stopped_at: undefined };
+    const cards = buildScheduleCardsForDate({
+      date: dayjs('2026-10-08'),
+      now: dayjs('2026-10-20T09:00:00'),
+      filteredSchedules: [activeRule] as never[],
+      scheduleById: {} as never,
+      temporaryReschedules: [],
+      lessonRecords: [],
+      selectedClassId: '',
+      classById: {} as never,
+      teacherById: {} as never,
+      classStudentAvatars: {},
+      trialBookingKeys: new Set<string>(),
+      currentTeacherName: '张老师',
+    });
+    expect(cards.map((card) => card.id)).toEqual(['s1']);
+  });
+
+  /**
+   * 用户最可能紧接着做的动作：删掉旧规则 → 用排课表单重建一条（表单「开始日期」默认 = 今天）。
+   * 期望：历史日期只有**老规则**那一张卡片（新规则不该回填历史），未来日期只有**新规则**那张。
+   */
+  it('删了再重建：历史不重复、未来只有新规则', () => {
+    const oldStopped = {
+      ...stoppedRule,
+      id: 'old',
+      rule_status: 'STOPPED',
+      stopped_at: '2026-10-01T09:30:00.000Z',
+    };
+    const rebuilt = {
+      ...stoppedRule,
+      id: 'new',
+      rule_status: 'ACTIVE',
+      stopped_at: undefined,
+      start_date: '2026-10-01',
+    };
+
+    const build = (dateStr: string) =>
+      buildScheduleCardsForDate({
+        date: dayjs(dateStr),
+        now: dayjs('2026-10-20T09:00:00'),
+        filteredSchedules: [oldStopped, rebuilt] as never[],
+        scheduleById: {} as never,
+        temporaryReschedules: [],
+        lessonRecords: [],
+        selectedClassId: '',
+        classById: {} as never,
+        teacherById: {} as never,
+        classStudentAvatars: {},
+        trialBookingKeys: new Set<string>(),
+        currentTeacherName: '张老师',
+      });
+
+    // 历史日期：只有老规则（新规则的开始日期在今天之后才生效）
+    expect(build('2026-09-24').map((card) => card.id)).toEqual(['old']);
+    // 未来日期：只有新规则（老规则已停止）
+    expect(build('2026-10-08').map((card) => card.id)).toEqual(['new']);
+  });
+});

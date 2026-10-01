@@ -49,6 +49,13 @@ export interface Schedule {
   rule_status?: ScheduleRuleStatus;
   stopped_at?: string;
   /**
+   * 规则有效期（排课表单「开始日期」/「结束日期」，`YYYY-MM-DD`）。
+   * 空缺 = 不设限。**展开课次时必须按它收窄**（真源 `isScheduleRuleEffectiveOnDate`），
+   * 否则「开始日期=下月」的规则会提前出现在课表上；「删了再重建」还会让历史日期同时渲染老/新两条规则。
+   */
+  start_date?: string;
+  end_date?: string;
+  /**
    * 节假日是否跳过（＝排课表单「节假日排课」开关的反值）。
    * true/undefined＝遇放假自动停课；false＝节假日照常上课。
    */

@@ -19,6 +19,7 @@ import {
 } from '@/utils/schedule-card-status';
 import { parseTimeToMinutes } from '@/utils/schedule-guard';
 import { stripScheduleNoteMeta } from '@/utils/schedule-note-display';
+import { isScheduleRuleEffectiveOnDate } from '@/utils/schedule-rule-effective';
 import type dayjs from 'dayjs';
 
 export type ScheduleCardStudentAvatar = {
@@ -179,11 +180,18 @@ export function buildScheduleCardsForDate(input: {
       return acc;
     }, []);
 
+  /**
+   * 可见规则 = 今天这个星期几命中的规则（剔除被临时调走的），再叠加两重收窄：
+   * - 临时调入的课次（调课目标日）；
+   * - **规则在本日是否仍成立**（`isScheduleRuleEffectiveOnDate`）：已删除/停止的规则
+   *   只在 stop 日及更早的日期出课 ⇒ **删规则不会抹掉历史课表**（用户口径 2026-10-01）。
+   */
   const visibleSchedules: ScheduleWithTempFlag[] = [
     ...input.filteredSchedules
       .filter((schedule) => schedule.day_of_week === weekday)
-      .filter((schedule) => !movedOutScheduleIdSet.has(schedule.id)),
-    ...movedInSchedules,
+      .filter((schedule) => !movedOutScheduleIdSet.has(schedule.id))
+      .filter((schedule) => isScheduleRuleEffectiveOnDate(schedule, input.date)),
+    ...movedInSchedules.filter((schedule) => isScheduleRuleEffectiveOnDate(schedule, input.date)),
   ];
 
   return visibleSchedules

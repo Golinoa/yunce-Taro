@@ -358,8 +358,13 @@ export function useLessonFormScheduleActions(
     void (async () => {
       const confirmResult = await Taro.showModal({
         title: '删除排课',
+        /**
+         * 文案跟着口径走（用户 2026-10-01）：删除 = **自今日起停止排课**，不是抹掉历史。
+         * 旧文案写的是"该规则下的所有日期课程都会从课表移除"——那正是当前行为的描述，
+         * 也是用户这次否掉的那一条（历史日期上已经上过课的卡片不能消失）。
+         */
         content:
-          '这会删除整条排课规则：该规则下的所有日期课程都会从课表移除，且无法找回。已产生的点名记录会保留。',
+          '这会停止整条排课规则：自今天起不再生成课表。历史日期的课表与已产生的点名记录都会保留。',
         confirmText: '删除排课',
       });
       if (!confirmResult.confirm) return;
@@ -368,7 +373,7 @@ export function useLessonFormScheduleActions(
       try {
         await scheduleService.remove(scheduleId);
         emitScheduleRelatedRefresh();
-        Taro.showToast({ title: '已删除排课', icon: 'success' });
+        Taro.showToast({ title: '已停止排课', icon: 'success' });
         setTimeout(() => Taro.navigateBack(), 600);
       } catch (err) {
         logError('LessonForm delete schedule', err);

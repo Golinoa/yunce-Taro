@@ -7,6 +7,7 @@ import {
   type PaginatedResponse,
 } from '@/utils/pagination';
 import { get, post } from '@/utils/request';
+import { isScheduleRuleEffectiveOnDate } from '@/utils/schedule-rule-effective';
 
 interface SaveBatchParams {
   teacherId: string;
@@ -184,10 +185,16 @@ export const temporaryRescheduleService = {
       return { hasConflict: false, conflicts: [] };
     }
     const targetDow = dayjs(targetDate).day();
+    /**
+     * 落在目标日期的既有课次 = 同一老师、同星期几、且**这条规则在目标日期仍然成立**。
+     * 最后一条是必须的：已删除/停止的规则不该再参与冲突判定，
+     * 否则「删掉一门课以后，那个时间点永远调不进别的课」。
+     */
     const staying = allSchedules.filter(
       (s) =>
         s.teacher_id === teacherId &&
         Number(s.day_of_week) === targetDow &&
+        isScheduleRuleEffectiveOnDate(s, targetDate) &&
         !movingSchedules.some((m) => m.id === s.id),
     );
     const adjusted = await temporaryRescheduleService.getByTeacherAndRange(

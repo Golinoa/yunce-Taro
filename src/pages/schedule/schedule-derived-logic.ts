@@ -7,6 +7,7 @@ import type { Class } from '@/types/class';
 import type { CourseCategoryConfig, CourseCategoryMode } from '@/types/course-category';
 import type { Schedule } from '@/types/schedule';
 import type { TemporaryReschedule } from '@/types/temporary-reschedule';
+import { isScheduleRuleEffectiveOnDate } from '@/utils/schedule-rule-effective';
 import type { Dayjs } from 'dayjs';
 
 export type ScheduleTabType = 'category' | 'venue';
@@ -158,7 +159,9 @@ export function resolveDateDotType(params: ResolveDateDotTypeParams): CalendarDo
     (item) =>
       item.day_of_week === weekday &&
       (!selectedClassId || item.class_id === selectedClassId) &&
-      !movedOutScheduleIdSet.has(item.id),
+      !movedOutScheduleIdSet.has(item.id) &&
+      // 与卡片同口径：已删除/停止的规则只在 stop 日及更早出课（否则红点与卡片会打架）
+      isScheduleRuleEffectiveOnDate(item, date),
   ).length;
   const movedInCount = temporaryReschedules.filter(
     (item) =>

@@ -234,6 +234,14 @@ function mapBackendSchedule(
     updated_at: 'updatedAt' in item ? item.updatedAt : item.createdAt,
     rule_status: item.status,
     stopped_at: item.stoppedAt || undefined,
+    /**
+     * 规则有效期：后端两个接口都返回了（`startDate`/`endDate`），前端此前**没接**，
+     * 导致展开课次时无法按有效期收窄（真源 `isScheduleRuleEffectiveOnDate`）。
+     * 典型后果：排课时设了「开始日期 = 下月」，本周课表就已经排上了；
+     * 以及「删了规则再重建」时新规则会回填到历史日期，同一节课出现两张卡片。
+     */
+    start_date: item.startDate || undefined,
+    end_date: item.endDate || undefined,
     skip_holiday: 'skipHoliday' in item ? Boolean(item.skipHoliday) : undefined,
     class_info: classInfo?.name ? { name: classInfo.name } : undefined,
     teacher_name: teacherName,

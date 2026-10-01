@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-09-30
+last_updated: 2026-10-01
 status: active
 owner: @frontend
-source: 用户实测事故 2026-09-30 两条：①「只给一节课加了试听学员，结果整条排课规则/整天的课都带试听」；②「同日临时调课后，试听学员从点名名单里消失了」。根因都是「哪一节课」的判定口径错。
+source: 用户实测事故 2026-09-30 两条：①「只给一节课加了试听学员，结果整条排课规则/整天的课都带试听」；②「同日临时调课后，试听学员从点名名单里消失了」。根因都是「哪一节课」的判定口径错。**2026-10-01 追加**：用户实测「删掉一条排课规则后，历史日期上已经上过课的卡片也消失了」⇒ 删规则改为软停止，且**所有按日期展开课次的地方必须按「规则有效期 + 停止日」收窄**（规则 6）。
 ---
 
 # 45 · 课节身份（「哪一节课」）判定口径
@@ -105,8 +105,31 @@ source: 用户实测事故 2026-09-30 两条：①「只给一节课加了试听
 | --- | --- |
 | 记录属于哪一节 | `src/utils/lesson-record-scope.ts` → `isRecordOfLesson` / `isSameLessonSchedule` |
 | 预约属于哪一节 / 试听角标 | `src/utils/schedule-card-build.ts` → `buildTrialLessonKey` / `hasTrialBookingForLesson` / `isSameLessonStartTime` / `normalizeLessonStartTime` |
+| **规则在某天还成不成立**（有效期 + 停止日） | `src/utils/schedule-rule-effective.ts` → `isScheduleRuleEffectiveOnDate` |
 
 > 后续会把两处收敛成 `src/utils/lesson-identity.ts`（见 `../changes/lesson-identity-feature/`），**在那之前以上两处即唯一真源**。
+
+### 规则 6：展开课次必须按「规则有效期 + 停止日」收窄（2026-10-01 用户口径）
+
+```md
+❌ 只按 `day_of_week` 展开规则就渲染课次（卡片 / 红点 / 调课 / 日历同步 / 冲突预检）
+   ⇒ ① 排课时设的「开始日期/结束日期」被静默忽略（后端 `dateRangeFilter` 已生效 ⇒ 与首页今日课表打架）；
+      ② **「删了规则再重建」**（新规则 start_date 默认=今天）会把新规则回填到历史日期
+         ⇒ 同一节课出现**两张卡片**；
+      ③ 删掉/停止的规则在**所有日期**继续出课（历史该留、未来不该留，方向刚好反了）。
+
+✅ FIX: 一律过 `isScheduleRuleEffectiveOnDate(rule, date)`：
+       `start_date ≤ 日期 ≤ end_date`（空缺不设限）+（若 `STOPPED`）`日期 ≤ stopped_at`。
+   ⚠️ **必须全量覆盖 5 个消费方**，漏一处就是口径分裂：
+       课表卡片 `schedule-card-build` / 日历红点 `schedule-derived-logic` / 批量调课 `visible-schedules` /
+       日历同步 `services/calendar-sync` / 调课冲突预检 `services/temporary-reschedule`。
+   ⚠️ 前端类型与 mapper 要带 `start_date` / `end_date`（后端早就返回，前端曾整列丢弃）。
+
+🧭 口径：**排课规则 = 计划；历史课表 = 资产。删规则只删未来、历史必须照旧渲染。**
+   用户原话（2026-10-01）：「删除规则，历史课程卡片也要渲染，记录保存，这是账本不能删，只删未来的排课。」
+
+📖 See: `../../../yunce-back/yunce-backend/.harness/changes/schedule-soft-delete/design.md`（含边界清单 B1–B9）
+```
 
 ## 验收（改完必做）
 
@@ -115,3 +138,6 @@ source: 用户实测事故 2026-09-30 两条：①「只给一节课加了试听
 - [ ] 同日临时调课后 ⇒ 调课前下的试听/补课预约**仍在名单与角标里**
 - [x] 从**没有节次信息的入口**（首页快速消课 / 预约页 / 线索详情）⇒ 点名页让老师指明「第几节」：
       该班当天 **1 节自动带**、**≥2 节必须选**（未选拦提交）、**0 节退回不区分**
+- [x] 删掉一条排课规则 ⇒ **历史日期的卡片仍在**（含已点名的状态）、**未来日期不再出卡片**、
+      日历红点同步、流水账不变（2026-10-01 用户口径；单测：`schedule-rule-effective` / `schedule-card-build` / `schedule-derived-logic`）
+- [x] 「删了再重建」⇒ 历史只有老卡片、未来只有新卡片，**不重复**（同一批单测）

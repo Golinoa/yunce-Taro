@@ -477,6 +477,44 @@ describe('resolveDateDotType', () => {
       }),
     ).toBe('none');
   });
+
+  /**
+   * 用户口径 2026-10-01：删除排课 = 自今日起停止排课，历史保留。
+   * 红点必须与卡片同口径，否则会出现「日历有点、点进去没课」。
+   */
+  it('已删除/停止的规则：停止日之前照旧点亮，之后不点亮', () => {
+    const stopped = makeSchedule({
+      id: 's1',
+      class_id: 'cl1',
+      day_of_week: 1,
+      rule_status: 'STOPPED',
+      stopped_at: '2026-09-08T09:00:00.000Z',
+    });
+
+    // 停止日之前的那周一（09-07）仍然有课
+    expect(
+      resolveDateDotType({
+        date: monday,
+        currentTime: NOW,
+        filteredSchedules: [stopped],
+        selectedClassId: '',
+        temporaryReschedules: [],
+        calendarWeekdaySet: new Set([1]),
+      }),
+    ).toBe('active');
+
+    // 停止日之后的周一（09-14）不再有课
+    expect(
+      resolveDateDotType({
+        date: monday.add(7, 'day'),
+        currentTime: NOW,
+        filteredSchedules: [stopped],
+        selectedClassId: '',
+        temporaryReschedules: [],
+        calendarWeekdaySet: new Set([1]),
+      }),
+    ).toBe('none');
+  });
 });
 
 describe('resolveOpenDateDotType', () => {

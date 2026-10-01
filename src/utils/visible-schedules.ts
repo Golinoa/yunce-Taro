@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import type { Schedule, TemporaryReschedule } from '@/types';
+import { isScheduleRuleEffectiveOnDate } from '@/utils/schedule-rule-effective';
 
 export interface VisibleScheduleInstance extends Schedule {
   __temporaryAdjusted?: boolean;
@@ -15,6 +16,10 @@ interface BuildVisibleSchedulesParams {
  * 按具体日期组装“实际会显示在当天”的课程实例：
  * 1. 去掉被临时调走的固定排课
  * 2. 补上从其他日期临时调入的课程
+ * 3. **去掉本日已经不再成立的规则**（已删除/停止的规则只在 stop 日及更早出课）
+ *
+ * 第 3 条与课表卡片同口径（`isScheduleRuleEffectiveOnDate`）：删除排课 = 自今日起停止排课、历史保留。
+ * 少了这一步，调课/选课次界面会继续把"已删除的课"当成真实存在的课次列出来。
  */
 export function buildVisibleSchedulesForDate({
   date,
@@ -57,7 +62,8 @@ export function buildVisibleSchedulesForDate({
   return [
     ...schedules
       .filter((item) => item.day_of_week === weekday)
-      .filter((item) => !movedOutScheduleIdSet.has(item.id)),
-    ...movedInSchedules,
+      .filter((item) => !movedOutScheduleIdSet.has(item.id))
+      .filter((item) => isScheduleRuleEffectiveOnDate(item, dateStr)),
+    ...movedInSchedules.filter((item) => isScheduleRuleEffectiveOnDate(item, dateStr)),
   ].sort((left, right) => left.start_time.localeCompare(right.start_time));
 }

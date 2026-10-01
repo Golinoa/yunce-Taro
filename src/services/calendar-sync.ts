@@ -32,6 +32,7 @@ import {
   promptPhoneCalendarPermissionSetting,
 } from '@/utils/phone-calendar';
 import { post } from '@/utils/request';
+import { isScheduleRuleEffectiveOnDate } from '@/utils/schedule-rule-effective';
 
 const EVENT_MAP_STORAGE_KEY = 'yunce:calendar-sync-event-map';
 
@@ -144,11 +145,17 @@ export function expandScheduleOccurrences(
         return acc;
       }, []);
 
+    /**
+     * 与课表卡片同口径的收窄：已删除/停止的规则只在 stop 日及更早出课。
+     * 否则「删了排课」以后，往手机日历里仍然会持续写入**未来**的课次（用户看不到实体课，
+     * 却被日历提醒 —— 属于同一口径漏在别的出口）。
+     */
     const visibleSchedules = [
       ...schedules
         .filter((schedule) => schedule.day_of_week === weekday)
-        .filter((schedule) => !movedOutScheduleIdSet.has(schedule.id)),
-      ...movedInSchedules,
+        .filter((schedule) => !movedOutScheduleIdSet.has(schedule.id))
+        .filter((schedule) => isScheduleRuleEffectiveOnDate(schedule, dateStr)),
+      ...movedInSchedules.filter((schedule) => isScheduleRuleEffectiveOnDate(schedule, dateStr)),
     ];
 
     visibleSchedules.forEach((schedule) => {
