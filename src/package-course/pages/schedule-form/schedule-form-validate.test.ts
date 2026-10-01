@@ -29,7 +29,6 @@ describe('schedule-form-validate (Q2-3)', () => {
     selectedDays: [3] as DayOfWeek[],
     endMode: 'never' as const,
     endDate: '',
-    endCount: 1,
     freeDates: [] as string[],
     selectedClass: null as null,
   };
@@ -73,14 +72,24 @@ describe('schedule-form-validate (Q2-3)', () => {
         selectedClass: { type: 'limited', total_lessons: 10, used_lessons: 10 },
       }),
     ).toBe('该班级课时已用完，无法继续排课');
+    // 限课时班不能选「不结束」，必须给结束日期（旧设计里的「按次数」已移除）
     expect(
       getScheduleFormSubmitBlockedReason({
         ...base,
-        endMode: 'by_count',
-        endCount: 5,
+        endMode: 'never',
         selectedClass: { type: 'limited', total_lessons: 10, used_lessons: 8 },
       }),
-    ).toContain('按次数不能超过剩余课时');
+    ).toBe('该班级已开启结束课时限制，请选择结束日期');
+    // 限日期范围内预计次数超过剩余课时
+    expect(
+      getScheduleFormSubmitBlockedReason({
+        ...base,
+        endMode: 'by_date',
+        endDate: '2026-12-31',
+        selectedDays: [3] as DayOfWeek[],
+        selectedClass: { type: 'limited', total_lessons: 10, used_lessons: 8 },
+      }),
+    ).toContain('超过剩余课时');
   });
 
   it('validateRescheduleSaveInput', () => {
@@ -155,7 +164,6 @@ describe('schedule-form-save helpers (Q2-3)', () => {
       startDate: '2026-09-02',
       endMode: 'never',
       endDate: '',
-      endCount: 1,
       scheduleOnHoliday: false,
       consumedHours: 1,
     });

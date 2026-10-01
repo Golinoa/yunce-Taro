@@ -32,7 +32,7 @@ export interface ScheduleRuleEffectiveLike {
   stopped_at?: string;
   /** 规则生效首日（排课表单「开始日期」，默认今天）；空缺 = 不设下限 */
   start_date?: string;
-  /** 规则生效末日（排课表单「结束日期」/按次数结束）；空缺 = 不设上限 */
+  /** 规则生效末日（排课表单「结束日期」，选「限日期」时才有）；空缺 = 不设上限 */
   end_date?: string;
 }
 

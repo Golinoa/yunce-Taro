@@ -109,7 +109,6 @@ const ScheduleForm: React.FC = () => {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('weekly');
   const [endMode, setEndMode] = useState<EndMode>('never');
   const [endDate, setEndDate] = useState(dayjs().add(1, 'month').format('YYYY-MM-DD'));
-  const [endCount, setEndCount] = useState(10);
   /** 节假日是否排课：是=true，否=false（默认否） */
   const [scheduleOnHoliday, setScheduleOnHoliday] = useState(false);
   const [freeDates, setFreeDates] = useState<string[]>([]);
@@ -415,14 +414,12 @@ const ScheduleForm: React.FC = () => {
         selectedDays,
         endMode,
         endDate,
-        endCount,
         freeDates,
         selectedClass,
       }),
     [
       classId,
       currentUserId,
-      endCount,
       endDate,
       endMode,
       freeDates,
@@ -474,7 +471,6 @@ const ScheduleForm: React.FC = () => {
     startDate,
     endMode,
     endDate,
-    endCount,
     scheduleOnHoliday,
     consumedHours,
     selectedDays,
@@ -585,7 +581,6 @@ const ScheduleForm: React.FC = () => {
             selectedDays={selectedDays}
             endMode={endMode}
             endDate={endDate}
-            endCount={endCount}
             scheduleOnHoliday={scheduleOnHoliday}
             freeDates={freeDates}
             onSchedulingModeChange={setSchedulingMode}
@@ -594,7 +589,6 @@ const ScheduleForm: React.FC = () => {
             onToggleWeekday={toggleWeekday}
             onOpenEndModePicker={() => setEndModePickerVisible(true)}
             onOpenEndDateCalendar={() => setEndDateCalendarVisible(true)}
-            onEndCountChange={setEndCount}
             onScheduleOnHolidayChange={setScheduleOnHoliday}
             onOpenHolidaySettings={openHolidaySettings}
             onOpenFreeCalendar={openFreeCalendar}

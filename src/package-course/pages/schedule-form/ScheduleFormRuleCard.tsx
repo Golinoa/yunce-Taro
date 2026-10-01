@@ -6,7 +6,6 @@ import cn from 'classnames';
 import dayjs from 'dayjs';
 import React from 'react';
 import Icon from '@/components/Icon';
-import Stepper from '@/components/Stepper';
 import type { DayOfWeek } from '@/types/schedule';
 import {
   END_MODE_OPTIONS,
@@ -25,7 +24,6 @@ export type ScheduleFormRuleCardProps = {
   selectedDays: DayOfWeek[];
   endMode: EndMode;
   endDate: string;
-  endCount: number;
   scheduleOnHoliday: boolean;
   freeDates: string[];
   onSchedulingModeChange: (mode: SchedulingMode) => void;
@@ -34,7 +32,6 @@ export type ScheduleFormRuleCardProps = {
   onToggleWeekday: (day: DayOfWeek) => void;
   onOpenEndModePicker: () => void;
   onOpenEndDateCalendar: () => void;
-  onEndCountChange: (value: number) => void;
   onScheduleOnHolidayChange: (value: boolean) => void;
   onOpenHolidaySettings: () => void;
   onOpenFreeCalendar: () => void;
@@ -48,7 +45,6 @@ const ScheduleFormRuleCard: React.FC<ScheduleFormRuleCardProps> = ({
   selectedDays,
   endMode,
   endDate,
-  endCount,
   scheduleOnHoliday,
   freeDates,
   onSchedulingModeChange,
@@ -57,7 +53,6 @@ const ScheduleFormRuleCard: React.FC<ScheduleFormRuleCardProps> = ({
   onToggleWeekday,
   onOpenEndModePicker,
   onOpenEndDateCalendar,
-  onEndCountChange,
   onScheduleOnHolidayChange,
   onOpenHolidaySettings,
   onOpenFreeCalendar,
@@ -176,13 +171,6 @@ const ScheduleFormRuleCard: React.FC<ScheduleFormRuleCardProps> = ({
               <Text className="text-[28rpx] text-foreground">{endDate}</Text>
               <Icon name="mdi-chevron-right" size={24} color="mutedForeground" />
             </View>
-          </View>
-        ) : null}
-
-        {endMode === 'by_count' ? (
-          <View className="flex items-center justify-between border-b border-border/60 py-[24rpx]">
-            <Text className="text-[28rpx] text-foreground">上课次数</Text>
-            <Stepper value={endCount} min={1} max={999} step={1} onChange={onEndCountChange} />
           </View>
         ) : null}
 

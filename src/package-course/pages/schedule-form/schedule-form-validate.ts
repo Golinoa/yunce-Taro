@@ -19,9 +19,8 @@ export type ScheduleFormSubmitInput = {
   startDate: string;
   repeatMode: string;
   selectedDays: DayOfWeek[];
-  endMode: 'by_date' | 'by_count' | 'never';
+  endMode: 'by_date' | 'never';
   endDate: string;
-  endCount: number;
   freeDates: string[];
   selectedClass?: {
     type?: string;
@@ -97,23 +96,14 @@ export function getScheduleFormSubmitBlockedReason(input: ScheduleFormSubmitInpu
     ) {
       return '结束日期不能早于开始日期';
     }
-    if (input.endMode === 'by_count' && input.endCount < 1) return '按次数至少为 1';
 
     if (input.selectedClass?.type === 'limited') {
       const remaining = getLimitedClassRemaining(input.selectedClass);
       if (remaining <= 0) return '该班级课时已用完，无法继续排课';
       if (input.endMode === 'never') {
-        return '该班级已开启结束课时限制，请选择限日期或按次数';
+        return '该班级已开启结束课时限制，请选择结束日期';
       }
-      if (input.endMode === 'by_count' && input.endCount > remaining) {
-        return `按次数不能超过剩余课时（剩余 ${remaining}）`;
-      }
-      if (
-        input.endMode === 'by_date' &&
-        input.startDate &&
-        input.endDate &&
-        input.selectedDays.length > 0
-      ) {
+      if (input.startDate && input.endDate && input.selectedDays.length > 0) {
         const projected = countProjectedLessonsInRange(
           input.startDate,
           input.endDate,

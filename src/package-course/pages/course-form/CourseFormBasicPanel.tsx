@@ -126,7 +126,7 @@ const CourseFormBasicPanel: React.FC<CourseFormBasicPanelProps> = ({
             onInput={(e) => onMaxLessonsInput(e.detail.value)}
             inputType="number"
             error={errors.maxLessons}
-            helperText="与排课「限日期/按次数」同时生效，先到先结束"
+            helperText="与排课规则的「结束日期」同时生效，先到先结束"
           />
         ) : null}
       </>

@@ -7,7 +7,14 @@ import type { DayOfWeek } from '@/types/schedule';
 export type AutoOpenType = NonNullable<Class['auto_open_type']>;
 export type SchedulingMode = 'rule' | 'free';
 export type RepeatMode = 'weekly' | 'biweekly' | 'alternate';
-export type EndMode = 'never' | 'by_date' | 'by_count';
+/**
+ * 规则排课的结束方式。
+ *
+ * ⚠️ 2026-10-01 移除旧设计里的 `by_count`（按次数）：它只在表单上留了控件与一行备注，
+ * 后端从来没有任何一列存它、排课也不受影响（选"10 次"实际永不结束），属"界面先做、
+ * 后端未实现"的半成品。用户口径：直接把旧设计移除，保留「不结束 / 限日期」两种。
+ */
+export type EndMode = 'never' | 'by_date';
 
 export interface TimeSlotPair {
   id: number;
@@ -57,5 +64,4 @@ export const REPEAT_OPTIONS: { label: string; value: RepeatMode }[] = [
 export const END_MODE_OPTIONS: { label: string; value: EndMode }[] = [
   { label: '不结束', value: 'never' },
   { label: '限日期', value: 'by_date' },
-  { label: '按次数', value: 'by_count' },
 ];

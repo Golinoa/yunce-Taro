@@ -62,7 +62,6 @@ export interface UseScheduleFormSaveParams {
   startDate: string;
   endMode: EndMode;
   endDate: string;
-  endCount: number;
   scheduleOnHoliday: boolean;
   consumedHours: number;
   selectedDays: DayOfWeek[];
@@ -113,7 +112,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
     startDate,
     endMode,
     endDate,
-    endCount,
     scheduleOnHoliday,
     consumedHours,
     selectedDays,
@@ -281,7 +279,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
         startDate,
         endMode,
         endDate,
-        endCount,
         scheduleOnHoliday,
         consumedHours,
       });
@@ -382,7 +379,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
             ignoreConflict?: boolean;
             start_date?: string;
             end_date?: string;
-            maxOccurrences?: number;
             skipHoliday?: boolean;
           } = {
             teacher_id: selectedTeachingTeacherId || currentUserId,
@@ -400,8 +396,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
             skipHoliday,
             start_date: ruleStartDate || primary.dateHint,
             end_date: ruleEndDate,
-            maxOccurrences:
-              schedulingMode === 'rule' && endMode === 'by_count' ? endCount : undefined,
           };
           await scheduleService.update(scheduleId, data);
         } else {
@@ -411,7 +405,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               ignoreConflict?: boolean;
               start_date?: string;
               end_date?: string;
-              maxOccurrences?: number;
               skipHoliday?: boolean;
             } = {
               teacher_id: selectedTeachingTeacherId || currentUserId,
@@ -431,12 +424,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
               end_date:
                 ruleEndDate ||
                 (t.dateHint && selectedClass?.type === 'limited' ? t.dateHint : undefined),
-              maxOccurrences:
-                schedulingMode === 'rule' && endMode === 'by_count'
-                  ? endCount
-                  : schedulingMode === 'free' && selectedClass?.type === 'limited'
-                    ? 1
-                    : undefined,
             };
             await scheduleService.create(data);
           }
@@ -493,7 +480,6 @@ export function useScheduleFormSave(params: UseScheduleFormSaveParams) {
     color,
     consumedHours,
     currentUserId,
-    endCount,
     endDate,
     endMode,
     freeDates,

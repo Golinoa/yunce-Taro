@@ -52,9 +52,8 @@ export function buildScheduleRuleNote(input: {
   schedulingMode: 'rule' | 'free';
   repeatMode: string;
   startDate: string;
-  endMode: 'by_date' | 'by_count' | 'never';
+  endMode: 'by_date' | 'never';
   endDate: string;
-  endCount: number;
   scheduleOnHoliday: boolean;
   consumedHours: number;
 }): string {
@@ -76,9 +75,6 @@ export function buildScheduleRuleNote(input: {
     input.schedulingMode === 'rule' ? `开始:${input.startDate}` : null,
     input.schedulingMode === 'rule' && input.endMode === 'by_date'
       ? `结束日期:${input.endDate}`
-      : null,
-    input.schedulingMode === 'rule' && input.endMode === 'by_count'
-      ? `次数:${input.endCount}`
       : null,
     input.schedulingMode === 'rule' && input.endMode === 'never' ? '结束:不结束' : null,
     input.schedulingMode === 'rule' ? `节假日排课:${input.scheduleOnHoliday ? '是' : '否'}` : null,

@@ -337,7 +337,6 @@ export const scheduleService = {
       ignoreConflict?: boolean;
       start_date?: string;
       end_date?: string;
-      maxOccurrences?: number;
       /**
        * 生成课次时是否跳过节假日（排课表单「节假日排课」开关的反值：选「否」⇒ true）。
        * ⚠️ 曾漏传此参数，后端始终走 default(true)，导致「节假日排课=是」形同虚设。
@@ -352,7 +351,6 @@ export const scheduleService = {
       endTime: data.end_time,
       startDate: data.start_date,
       endDate: data.end_date,
-      maxOccurrences: data.maxOccurrences,
       room: data.room,
       note: data.note,
       ignoreConflict: data.ignoreConflict === true,
@@ -366,7 +364,6 @@ export const scheduleService = {
       ignoreConflict?: boolean;
       start_date?: string;
       end_date?: string;
-      maxOccurrences?: number;
       /** 见 create 的 skipHoliday 说明 */
       skipHoliday?: boolean;
     },
@@ -378,7 +375,6 @@ export const scheduleService = {
       endTime: data.end_time,
       startDate: data.start_date,
       endDate: data.end_date,
-      maxOccurrences: data.maxOccurrences,
       room: data.room,
       note: data.note,
       ignoreConflict: data.ignoreConflict === true,
