@@ -1,7 +1,7 @@
 ---
-last_updated: 2026-09-19
+last_updated: 2026-10-01
 status: active
-source: 全模块联调期；src/data 已删除；2026-09-19 增补成功码判定与 TTL 时间源
+source: 全模块联调期；src/data 已删除；2026-09-19 增补成功码判定与 TTL 时间源；2026-10-01 增补「枚举字段全量映射」（点名状态事故：leave/absent 漏发 ⇒ 请假被记成已签到、缺勤 422 建不出来）
 ---
 
 # R40 数据与 Service 铁律
@@ -88,4 +88,40 @@ if (serverNow() - box.at >= ttlMs) return null;
 适用范围：`utils/cache-store.ts`、`services/membership-cache.ts` 等**持久化缓存**的读写时间戳。页内 `useRef` 级会话 TTL（`utils/data-freshness.ts`）不强制。
 
 📖 See: ../../docs/diagnostics/2026-09-19-frontend-cache-layer-plan.md（§2 G7）；../../docs/diagnostics/2026-09-19-cache-layer-governance-audit.md
+
+## 枚举字段必须**全量映射**，不许"漏了就丢"（2026-10-01 点名状态事故）
+
+❌ 写方向（前端 → 后端）的枚举映射只列几个分支，其余取值落成 `undefined`，
+   而请求体又用 `...(status ? { status } : {})` 把该字段**整个省略**：
+
+```ts
+// ❌ 漏了 leave / absent
+const status = data.status === 'cancelled' ? 'CANCELLED'
+  : data.status === 'makeup' ? 'MAKEUP'
+  : data.status === 'normal' || !data.status ? 'NORMAL'
+  : undefined;
+```
+
+✅ FIX: 用**闭集 `Record`** 覆盖类型的全部取值，并让"没给"与"显式值"分开表达：
+
+```ts
+/** 写方向的唯一真源；与读方向的 mapBackendXxxStatus 成对放在同一文件 */
+const FRONTEND_TO_BACKEND_LESSON_STATUS: Record<NonNullable<LessonRecord['status']>, string> = {
+  normal: 'NORMAL', makeup: 'MAKEUP', leave: 'LEAVE', absent: 'ABSENT', cancelled: 'CANCELLED',
+};
+// ...
+status: data.status ? FRONTEND_TO_BACKEND_LESSON_STATUS[data.status] : 'NORMAL',
+```
+
+并要求补 `it.each` 覆盖**每一个取值**的回归测试（如 `services/lesson-record-status.test.ts`）。
+
+⚠️ **为什么这是"静默失效"级别**：后端普遍有默认值兜底（`const status = input.status ?? LessonStatus.NORMAL`），
+所以**字段缺失会被后端解释成一个合法值**，前端拿不到任何报错。2026-10-01 实测后果：
+`leave` 漏发 ⇒ 请假被记成 `NORMAL` ⇒ **点名页把请假学员显示成"已签到"**（读方向 `mapRecordStatusToCheckin` 本来就按 `leave` 设计）；
+`absent` 漏发 ⇒ 缺勤路径同时带 `createDebt: true`，撞后端规则 `if (input.createDebt && !isAbsent) throw 422「只有缺勤记录可以创建欠课」`
+⇒ **缺勤记录根本建不出来**，连带欠课（`LessonDebt`）功能整条不可达。
+推论：**"这条路径很久没被跑通"往往不是没人用，而是它一直在静默失败。**
+
+📖 See: ../../docs/diagnostics（同类静默失效家族：45-lesson-identity 的 `classId` 漏列、R40 的「响应成功码判定」）
+
 

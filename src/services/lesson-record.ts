@@ -148,6 +148,26 @@ const mapBackendLessonRecordStatus = (
 };
 
 /**
+ * 前端状态 → 后端大写枚举（写方向；读方向见上面的 `mapBackendLessonRecordStatus`）。
+ *
+ * 🔴 **必须是全量映射，不能只列几个分支**：后端 `lessonStatusSchema` 只认这 5 个大写值，
+ * 而且建记录时 `status = input.status ?? NORMAL` ⇒ 前端**少发/漏发**该字段会被静默当成"正常出勤"。
+ * 2026-10-01 实测到的真实后果（原实现漏了 leave/absent）：
+ * - `leave` 漏发 ⇒ 请假被记成 `NORMAL`，"请假"在点名里显示成"已点名"；
+ * - `absent` 漏发 ⇒ 缺勤路径同时带 `createDebt: true`，撞后端规则
+ *   `if (input.createDebt && !isAbsent) throw 422「只有缺勤记录可以创建欠课」`
+ *   ⇒ **缺勤记录根本建不出来**（点名提交时落进失败清单）。
+ * 回归测试：`src/services/lesson-record-status.test.ts`。
+ */
+const FRONTEND_TO_BACKEND_LESSON_STATUS: Record<NonNullable<LessonRecord['status']>, string> = {
+  normal: 'NORMAL',
+  makeup: 'MAKEUP',
+  leave: 'LEAVE',
+  absent: 'ABSENT',
+  cancelled: 'CANCELLED',
+};
+
+/**
  * 后端记录 → 前端 `LessonRecord`（导出以便对「哪几列必须原样带过来」写回归测试：
  * 见 `lesson-record-mapper.test.ts`，对应 rule `50-lesson-identity` 规则 1）。
  */
@@ -291,15 +311,6 @@ export function mapBackendLessonRecord(
 function buildLessonRecordPayload(
   data: Omit<LessonRecord, 'id' | 'created_at' | 'updated_at'> | Partial<LessonRecord>,
 ) {
-  const status =
-    data.status === 'cancelled'
-      ? 'CANCELLED'
-      : data.status === 'makeup'
-        ? 'MAKEUP'
-        : data.status === 'normal' || !data.status
-          ? 'NORMAL'
-          : undefined;
-
   return {
     studentId: data.student_id || '',
     teacherId: data.teacher_id || undefined,
@@ -326,7 +337,11 @@ function buildLessonRecordPayload(
     // 单学员备注 → 后端 remark 字段
     remark: data.note,
     createDebt: data.create_debt,
-    ...(status ? { status } : {}),
+    /**
+     * 状态一律显式发出（见 `FRONTEND_TO_BACKEND_LESSON_STATUS` 的注释）：
+     * **缺失**会被后端按默认值落成 `NORMAL`，而"没说"和"正常出勤"是两件事。
+     */
+    status: data.status ? FRONTEND_TO_BACKEND_LESSON_STATUS[data.status] : 'NORMAL',
   };
 }
 
