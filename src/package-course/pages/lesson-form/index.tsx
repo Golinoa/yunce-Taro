@@ -20,6 +20,7 @@ import {
   type CheckinStatus,
   type ClassAttendanceMode,
 } from './checkin-status';
+import ClassDayLessonPicker from './ClassDayLessonPicker';
 import ClassLessonPanel from './ClassLessonPanel';
 import { formatDate, formatTime } from './lesson-form-datetime';
 import LessonFormFooter from './LessonFormFooter';
@@ -27,6 +28,7 @@ import LessonFormHeader from './LessonFormHeader';
 import LessonFormSheets from './LessonFormSheets';
 import SingleLessonPanel from './SingleLessonPanel';
 import SuspendReasonDialog from './SuspendReasonDialog';
+import { useClassDayLessons } from './use-class-day-lessons';
 import { useLessonFormActions } from './use-lesson-form-actions';
 import { useLessonFormHelpers } from './use-lesson-form-helpers';
 import { useLessonFormLoaders } from './use-lesson-form-loaders';
@@ -190,6 +192,21 @@ const LessonForm: React.FC = () => {
   /** G1-1：同步锁，挡住 setState 生效前的连点双提交 */
   const submitLockRef = useRef(createSubmitLock());
 
+  /**
+   * 「哪一节」：入口没带排课编号时（首页快速消课 / 预约页 / 线索详情），
+   * 用当天该班的课次把它补出来。1 节自动带；≥2 节必须让老师选。
+   */
+  const classDayLessons = useClassDayLessons({
+    enabled: mode === 'class',
+    classId: selectedClassId,
+    lessonDate,
+    scheduleIdParam,
+  });
+  /** 真正用于「哪一节」判定的排课编号（URL 优先 > 自动带 > 老师手选） */
+  const effectiveScheduleId = classDayLessons.effectiveScheduleId;
+  /** 已定位到具体某一节时，用那一节的时段（补课 / 试听名单按时段过滤） */
+  const effectiveLessonTimeParam = lessonTimeParam || classDayLessons.effectiveLessonTime;
+
   // ===== 校区 / 教室 =====
   const { currentCampusId } = useCampusStore();
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
@@ -268,9 +285,11 @@ const LessonForm: React.FC = () => {
       setLessonDate,
       setLessonTime,
       lessonDateParam,
-      lessonTimeParam,
+      // 已定位到具体某一节时用那一节的时段（否则沿用 URL 传来的）
+      lessonTimeParam: effectiveLessonTimeParam,
       // 「哪一节」的判定依据：同班同一天多节课时用它隔离考勤/补课记录
-      scheduleIdParam,
+      // （URL 没带时由 useClassDayLessons 补出来：1 节自动带、≥2 节老师手选）
+      scheduleIdParam: effectiveScheduleId,
       setClasses,
       setScheduledClassIds,
       setTeacherOptions,
@@ -522,7 +541,8 @@ const LessonForm: React.FC = () => {
     hoursUsed,
     lessonDate,
     // 「哪一节」的判定依据：同班同一天多节课时用它隔离考勤/补课记录
-    scheduleId: scheduleIdParam,
+    // （URL 没带时由 useClassDayLessons 补出来）
+    scheduleId: effectiveScheduleId,
     selectedTeachingTeacherId,
     selectedAssistantTeacherId,
     teacherOptions,
@@ -619,7 +639,7 @@ const LessonForm: React.FC = () => {
     handleRestoreLesson,
     handleDeleteSchedule,
   } = useLessonFormScheduleActions({
-    scheduleId: scheduleIdParam,
+    scheduleId: effectiveScheduleId,
     classId: selectedClassId,
     // 私教课次没有班级：把学员带下去，取消判定与「恢复本节课」按学员匹配
     studentId: studentIdParam,
@@ -641,7 +661,20 @@ const LessonForm: React.FC = () => {
   /** 过去的课程：调课/编辑/停课/删除四个按钮全部置灰（canReschedule 已在 hook 内按日期判断） */
   const canEditClass =
     (currentRole === 'admin' || currentRole === 'principal') && !isPastLessonDate;
-  const canDeleteSchedule = Boolean(scheduleIdParam) && !isPastLessonDate;
+  const canDeleteSchedule = Boolean(effectiveScheduleId) && !isPastLessonDate;
+
+  /**
+   * 提交前拦一道：该班当天有多节课、老师还没选是哪一节时**不允许提交**。
+   * 不拦的话记录会落成"没有节次"，同班同一天多节仍会互相串——
+   * 那正是这个功能要解决的根因（给 09:00 点完名，14:00 进去显示成已点名）。
+   */
+  const handleSubmitGuarded = useCallback(() => {
+    if (classDayLessons.needsPick) {
+      Taro.showToast({ title: '请先选择是哪一节课', icon: 'none' });
+      return;
+    }
+    handleSubmit();
+  }, [classDayLessons.needsPick, handleSubmit]);
 
   const handleOpenSuspendSheet = useCallback(() => {
     setSuspendReason('');
@@ -732,6 +765,15 @@ const LessonForm: React.FC = () => {
           />
         )}
 
+        {/* ====== 选「哪一节」：入口未带排课编号、且该班当天多节时才渲染 ====== */}
+        {mode === 'class' && (
+          <ClassDayLessonPicker
+            lessons={classDayLessons.classLessons}
+            pickedScheduleId={classDayLessons.pickedScheduleId}
+            onPick={classDayLessons.setPickedScheduleId}
+          />
+        )}
+
         {/* ====== 班级模式 ====== */}
         {mode === 'class' && (
           <ClassLessonPanel
@@ -809,7 +851,7 @@ const LessonForm: React.FC = () => {
           onOpenSupplementSheet={handleOpenSupplementSheet}
           onEnterEditMode={handleEnterEditMode}
           onCancelSupplement={handleCancelSupplement}
-          onSubmit={handleSubmit}
+          onSubmit={handleSubmitGuarded}
         />
       </View>
 

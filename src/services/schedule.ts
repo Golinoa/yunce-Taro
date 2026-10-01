@@ -2,8 +2,34 @@
  * 排课 Service（Q2-4，从 student.ts 抽出）
  */
 import type { Schedule, ScheduleRuleStatus } from '@/types/schedule';
+import { normalizeLessonStartTime } from '@/utils/lesson-identity';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
 import { del, get, post, put } from '@/utils/request';
+
+/** `/schedules/today?date=` 返回的一天课次（服务端已做规则+调课+节假日推导） */
+export interface ScheduleDayLesson {
+  /** 排课编号＝「哪一节」的身份 */
+  scheduleId: string;
+  classId: string | null;
+  className: string;
+  startTime: string;
+  endTime: string;
+  teacherName?: string;
+  checkedCount: number;
+  totalCount: number;
+}
+
+interface BackendDayScheduleItem {
+  id: string;
+  startTime: string;
+  endTime: string;
+  class?: { id: string; name: string; subject?: null | string } | null;
+  teacherName?: string;
+  checkedCount?: number;
+  totalCount?: number;
+  /** 有值＝这是试听/补课预约卡，不是排课规则 */
+  bookingId?: string;
+}
 
 interface BackendScheduleListItem {
   classId?: null | string;
@@ -411,6 +437,36 @@ export const scheduleService = {
         })),
       },
       dateHint,
+    );
+  },
+
+  /**
+   * 某一天的课次列表（服务端推导：排课规则 + 临时调课叠加 + 节假日停课 + 点名进度）。
+   *
+   * 用途：从「没有节次信息」的入口（首页快速消课 / 预约页 / 线索详情）进点名页时，
+   * 需要知道**这个班当天有哪几节课**，才能按「排课编号」定位到具体那一节
+   * （同班同一天可以排多节课，只按班级+日期分不清）。
+   *
+   * 复用后端 `/schedules/today?date=`（它接受 date 参数），不新增接口、不自己再推导一遍。
+   */
+  getDayLessons: async (date: string): Promise<ScheduleDayLesson[]> => {
+    const data = await get<{ schedules?: BackendDayScheduleItem[] }>(
+      `/schedules/today?date=${encodeURIComponent(date)}`,
+    );
+    return (
+      (data.schedules || [])
+        // 试听/补课预约卡不是「排课规则」，不参与选节次
+        .filter((item) => !item.bookingId)
+        .map((item) => ({
+          scheduleId: item.id,
+          classId: item.class?.id ?? null,
+          className: item.class?.name ?? '',
+          startTime: normalizeLessonStartTime(item.startTime),
+          endTime: normalizeLessonStartTime(item.endTime),
+          teacherName: item.teacherName,
+          checkedCount: item.checkedCount ?? 0,
+          totalCount: item.totalCount ?? 0,
+        }))
     );
   },
 };
