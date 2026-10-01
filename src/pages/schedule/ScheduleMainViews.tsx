@@ -27,6 +27,14 @@ const SCHEDULE_CARD_SWIPER_DURATION = 260;
 interface ScheduleDateSwiperProps {
   dates: dayjs.Dayjs[];
   current: number;
+  /**
+   * 日期窗口同步令牌（来自 useDateSwiperWindow）。
+   *
+   * 必须作为 `<Swiper key>`：`current` 是数字页码，窗口前插/重排后同一页码代表另一个日期，
+   * 而 Taro 只在值变化时才下发 `current` —— 一旦 native 与 JS 状态错开就再也拉不回来
+   * （表现：日历有选中态、卡片却是别的日期「没课」）。编号语义变化时靠重挂载强制对齐。
+   */
+  syncKey: string;
   onChange: (e: { detail?: { current?: number; source?: string } }) => void;
   onAnimationFinish: (e: { detail?: { current?: number; source?: string } }) => void;
   children: (date: dayjs.Dayjs) => React.ReactNode;
@@ -42,11 +50,13 @@ interface ScheduleDateSwiperProps {
 const ScheduleDateSwiper: React.FC<ScheduleDateSwiperProps> = ({
   dates,
   current,
+  syncKey,
   onChange,
   onAnimationFinish,
   children,
 }) => (
   <Swiper
+    key={syncKey}
     className="bg-schedule-page"
     style={{ flex: 1, minHeight: 0 }}
     current={current}
@@ -82,6 +92,8 @@ export interface ScheduleMainViewsProps {
   loading: boolean;
   swiperCurrent: number;
   scheduleDateWindow: dayjs.Dayjs[];
+  /** 日期 Swiper 同步令牌，见 ScheduleDateSwiperProps.syncKey */
+  scheduleSwiperSyncKey: string;
   openCardId: string | null;
   onOpenCardIdChange: (id: string | null) => void;
   currentCampusId: string;
@@ -169,6 +181,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     loading,
     swiperCurrent,
     scheduleDateWindow,
+    scheduleSwiperSyncKey,
     openCardId,
     onOpenCardIdChange,
     currentCampusId,
@@ -239,6 +252,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         <ScheduleDateSwiper
           dates={scheduleDateWindow}
           current={swiperCurrent}
+          syncKey={scheduleSwiperSyncKey}
           onChange={onSwiperChange}
           onAnimationFinish={onSwiperFinish}
         >
@@ -276,6 +290,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         <ScheduleDateSwiper
           dates={scheduleDateWindow}
           current={swiperCurrent}
+          syncKey={scheduleSwiperSyncKey}
           onChange={onSwiperChange}
           onAnimationFinish={onSwiperFinish}
         >
@@ -359,6 +374,7 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
         <ScheduleDateSwiper
           dates={scheduleDateWindow}
           current={swiperCurrent}
+          syncKey={scheduleSwiperSyncKey}
           onChange={onSwiperChange}
           onAnimationFinish={onSwiperFinish}
         >

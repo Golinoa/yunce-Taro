@@ -384,6 +384,7 @@ const SchedulePage: React.FC = () => {
   const {
     dateWindow: scheduleDateWindow,
     swiperCurrent,
+    swiperSyncKey: scheduleSwiperSyncKey,
     handleCalendarChange: handleScheduleDateChange,
     handleSwiperChange,
     handleSwiperAnimationFinish: handleSwiperFinish,
@@ -605,6 +606,7 @@ const SchedulePage: React.FC = () => {
           loading={loading}
           swiperCurrent={swiperCurrent}
           scheduleDateWindow={scheduleDateWindow}
+          scheduleSwiperSyncKey={scheduleSwiperSyncKey}
           openCardId={openCardId}
           onOpenCardIdChange={setOpenCardId}
           currentCampusId={currentCampusId || ''}

@@ -51,6 +51,7 @@ const CalendarSwiper: React.FC<CalendarSwiperProps> = ({
   const {
     dateWindow,
     swiperCurrent,
+    swiperSyncKey,
     handleCalendarChange,
     handleSwiperChange,
     handleSwiperAnimationFinish,
@@ -74,6 +75,7 @@ const CalendarSwiper: React.FC<CalendarSwiperProps> = ({
       {toolbar && <View className="flex-shrink-0 bg-schedule-page">{toolbar}</View>}
 
       <Swiper
+        key={swiperSyncKey}
         className="bg-schedule-page"
         style={{ flex: 1, minHeight: 0 }}
         current={swiperCurrent}
