@@ -49,7 +49,7 @@ export {
   isSameLessonStartTime,
 } from '@/utils/lesson-identity';
 
-/** 试听预约匹配键：`classId|lessonDate|startTime` */
+/** 试听预约匹配键（按时段）：`classId|lessonDate|startTime` */
 export function buildTrialLessonKey(
   classId?: string | null,
   lessonDate?: string | null,
@@ -59,16 +59,42 @@ export function buildTrialLessonKey(
 }
 
 /**
+ * 试听预约匹配键（按**排课编号**）：`#scheduleId|classId|lessonDate`
+ *
+ * 为什么还要这一个键：时段是**可变属性** —— 临时调课只写 `TemporaryReschedule`、
+ * 从不改 `Schedule` 行，所以这节课改到 11:00 后，预约里存的 09:00 就永远对不上了。
+ * 排课编号不变 ⇒ 用它就能认回同一节课（这正是「同日调课后试听学员消失」的修法）。
+ */
+export function buildTrialLessonScheduleKey(
+  classId?: string | null,
+  lessonDate?: string | null,
+  scheduleId?: string | null,
+): string {
+  return `#${(scheduleId ?? '').trim()}|${classId ?? ''}|${lessonDate ?? ''}`;
+}
+
+/**
  * 本节课是否有试听预约。
- * 时段缺失的历史预约（键尾为空串）按「整日」兜底命中，避免老数据静默丢角标。
+ *
+ * 判定顺序：**编号优先 → 时段兜底**。
+ * - 命中编号键 ⇒ 属于这一节（哪怕时段已经因调课而变了）；
+ * - 否则按时段兜底（老预约没存编号；或页面压根不知道是哪一节）；
+ * - 时段缺失的历史预约（键尾为空串）按「整日」兜底命中，避免老数据静默丢角标。
+ *
+ * ⚠️ 已知边界（刻意保留，遵循「宁可多显示，不能吞学员」）：
+ * 若同一班同一天有两条规则撞到**同一时段**（同日调课目前不校验冲突，才可能发生），
+ * 编号不同的预约也可能因时段相同而被算进来。相比"把该出现的学员吞掉"，这是更可接受的一侧。
  */
 export function hasTrialBookingForLesson(
   keys: Set<string>,
   classId?: string | null,
   lessonDate?: string | null,
   startTime?: string | null,
+  scheduleId?: string | null,
 ): boolean {
   if (!classId || !lessonDate) return false;
+  const scheduleKey = buildTrialLessonScheduleKey(classId, lessonDate, scheduleId);
+  if (scheduleId && keys.has(scheduleKey)) return true;
   return (
     keys.has(buildTrialLessonKey(classId, lessonDate, startTime)) ||
     keys.has(buildTrialLessonKey(classId, lessonDate, null))
@@ -229,6 +255,8 @@ export function buildScheduleCardsForDate(input: {
           schedule.class_id,
           dateStr,
           schedule.start_time,
+          // 本节所属排课编号：卡片 id 就是它（调课叠加时 id 仍是原规则的，见上方 movedInSchedules）
+          schedule.id,
         ),
         canCancelLesson: statusResult.status !== 'cancelled',
         isTemporaryAdjusted: Boolean(schedule.__temporaryAdjusted),

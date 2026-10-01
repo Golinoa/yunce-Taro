@@ -28,6 +28,7 @@ import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { withCache } from '@/utils/cache-helpers';
 import { TTL } from '@/utils/data-freshness';
+import { isBookingOfLesson } from '@/utils/lesson-identity';
 import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import {
   buildLessonRosterKey,
@@ -37,7 +38,7 @@ import {
 } from '@/utils/lesson-roster-cache';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
-import { isSameLessonStartTime, parseLessonStartTime } from '@/utils/schedule-card-build';
+import { parseLessonStartTime } from '@/utils/schedule-card-build';
 import {
   buildClassAttendanceState,
   buildTrialCheckinMap,
@@ -357,13 +358,23 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         endDate: lessonDate,
         status: 'confirmed',
       });
-      const classBookings = bookings.filter(
-        (b) =>
-          b.class_id === selectedClassId &&
-          b.lesson_date === lessonDate &&
-          // 同班同一天可能有多节课：只认「本节的时段」。
-          // 页面没带时段（例如从班级列表进来）时不过滤，保持原行为。
-          isSameLessonStartTime(b.start_time, lessonStartTime),
+      const classBookings = bookings.filter((b) =>
+        // 归属 + 日期 + 「哪一节」统一走真源：编号优先、时段兜底。
+        // 这样这节课被同日调课改了时段，调课前下的试听预约仍在名单里。
+        isBookingOfLesson(
+          {
+            class_id: b.class_id,
+            lesson_date: b.lesson_date,
+            schedule_id: b.reference_schedule_id,
+            start_time: b.start_time,
+          },
+          {
+            classId: selectedClassId,
+            lessonDate,
+            startTime: lessonStartTime,
+            scheduleId: lessonScheduleId,
+          },
+        ),
       );
       setTrialBookings(classBookings);
 
@@ -443,6 +454,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
           lessonDate,
           // 只并「本节」的补课学员：同班同一天多节课时，别把别的课的补课学员并进来
           startTime: lessonStartTime || undefined,
+          // 排课编号：有了它，这节课被同日调课改了时段，补课学员也不会丢
+          scheduleId: lessonScheduleId || undefined,
         });
         const formalIds = new Set(formalStudents.map((student) => student.id));
         const extraStudents = await Promise.all(
@@ -477,7 +490,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       }
       return snapshot;
     },
-    [currentUserId, lessonDate, lessonStartTime],
+    [currentUserId, lessonDate, lessonStartTime, lessonScheduleId],
   );
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildScheduleCardsForDate,
   buildTrialLessonKey,
+  buildTrialLessonScheduleKey,
   hasTrialBookingForLesson,
   summarizeScheduleCards,
 } from '@/utils/schedule-card-build';
@@ -129,5 +130,25 @@ describe('试听角标只作用于「那一节课」', () => {
   it('历史预约缺时段时按整日兜底，不掉角标', () => {
     const keys = [buildTrialLessonKey('c1', '2026-10-05', '')];
     expect(hasTrialBookingForLesson(new Set(keys), 'c1', '2026-10-05', '14:00')).toBe(true);
+  });
+
+  it('排课编号优先：这节课被同日调课改了时段，预约仍认得它', () => {
+    // 预约当时记的是 09:00 那一节（编号 s1）
+    const keys = [buildTrialLessonScheduleKey('c1', '2026-10-05', 's1')];
+    // 该节已被调到 11:00：只比时段会失配（＝用户反馈「调课后试听学员消失」）
+    expect(hasTrialBookingForLesson(new Set(keys), 'c1', '2026-10-05', '11:00', 's1')).toBe(true);
+  });
+
+  it('排课编号优先：同班同天另一节不因时段相同被误标', () => {
+    const keys = [buildTrialLessonScheduleKey('c1', '2026-10-05', 's1')];
+    // s2 这一节编号不同 ⇒ 不是它的试听（用时段键也命中不了 14:00）
+    expect(hasTrialBookingForLesson(new Set(keys), 'c1', '2026-10-05', '14:00', 's2')).toBe(false);
+  });
+
+  it('没有排课编号（老预约 / 班级列表入口）时回落比时段', () => {
+    const keys = [buildTrialLessonKey('c1', '2026-10-05', '09:00')];
+    // 目标无编号 ⇒ 只能按时段判定
+    expect(hasTrialBookingForLesson(new Set(keys), 'c1', '2026-10-05', '09:00')).toBe(true);
+    expect(hasTrialBookingForLesson(new Set(keys), 'c1', '2026-10-05', '14:00')).toBe(false);
   });
 });

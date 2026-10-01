@@ -2,8 +2,8 @@
  * 补课预约 Service
  */
 import type { MakeupBooking } from '@/types/makeup-booking';
+import { isBookingOfLesson } from '@/utils/lesson-identity';
 import { get, post } from '@/utils/request';
-import { normalizeLessonStartTime } from '@/utils/schedule-card-build';
 
 /**
  * 后端响应（camelCase）→ 前端 `MakeupBooking`（snake_case）。
@@ -97,6 +97,11 @@ export async function getMakeupBookingsByClassDate(params: {
   lessonDate: string;
   /** 本节的开始时段（`09:00`）；给了就只认落在这一节的预约 */
   startTime?: string;
+  /**
+   * 本节所属排课编号。给了就按**编号优先**判定（同日调课改了时段也不会失配），
+   * 没给就只按时段兜底（老预约 / 从班级列表入口）。
+   */
+  scheduleId?: string;
 }): Promise<MakeupBooking[]> {
   const data = await get<{ list: Record<string, unknown>[] }>('/makeup-bookings', {
     classId: params.classId,
@@ -110,14 +115,25 @@ export async function getMakeupBookingsByClassDate(params: {
   // 名单合并处会把其他日期的补课学员并进本节课，表现为「补课作用于整条排课规则」。
   //
   // 同班同一天还可能排多节课（09:00 与 14:00）：只按班级+日期会把同一天**另一节课**
-  // 的补课学员也并进来。调用方给了 startTime 时再收窄到本节；拿不到本节时段
-  // （例如从班级列表进入点名页）时保持原行为，不误伤。
-  const targetStartTime = normalizeLessonStartTime(params.startTime);
+  // 的补课学员也并进来 ⇒「哪一节」统一走真源 `isBookingOfLesson`（编号优先、时段兜底）。
+  // 拿了本节编号后，即使这节课后来被同日调课改了时段，补课学员也不会丢。
   return rows.filter(
     (b) =>
       b.status === 'confirmed' &&
-      b.lesson_date === params.lessonDate &&
-      (!targetStartTime || normalizeLessonStartTime(b.start_time) === targetStartTime),
+      isBookingOfLesson(
+        {
+          class_id: b.class_id,
+          lesson_date: b.lesson_date,
+          schedule_id: b.schedule_id,
+          start_time: b.start_time,
+        },
+        {
+          classId: params.classId,
+          lessonDate: params.lessonDate,
+          startTime: params.startTime,
+          scheduleId: params.scheduleId,
+        },
+      ),
   );
 }
 

@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { CourseCategoryMode } from '@/types/course-category';
 import type { ScheduleCardItem } from '@/utils/schedule-card-build';
-import { buildTrialLessonKey } from '@/utils/schedule-card-build';
+import { buildTrialLessonKey, buildTrialLessonScheduleKey } from '@/utils/schedule-card-build';
 import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import {
   buildBatchRescheduleSelectPath,
@@ -110,6 +110,11 @@ export function useScheduleCardActions(params: UseScheduleCardActionsParams) {
       setTrialBookingKeys((prev) => {
         const next = new Set(prev);
         next.add(buildTrialLessonKey(classId, lessonDate, lessonStartTime));
+        // 同时按「排课编号」标记：这节课以后被同日调课改了时段，角标也不会丢
+        const scheduleId = navItem?.id;
+        if (scheduleId) {
+          next.add(buildTrialLessonScheduleKey(classId, lessonDate, scheduleId));
+        }
         return next;
       });
       void loadBaseData();

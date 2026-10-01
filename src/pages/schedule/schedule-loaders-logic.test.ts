@@ -147,4 +147,19 @@ describe('buildTrialBookingKeys', () => {
     expect([...keys].sort()).toEqual(['c1|2026-09-01|09:00', 'c1|2026-09-01|14:00']);
     expect(keys.has('c1|2026-09-01|10:00')).toBe(false);
   });
+
+  it('带排课编号的预约额外产出「编号键」（调课改时段后仍认得这一节）', () => {
+    const keys = buildTrialBookingKeys([
+      {
+        class_id: 'c1',
+        lesson_date: '2026-09-01',
+        start_time: '09:00',
+        schedule_id: 's1',
+        status: 'confirmed',
+      },
+    ]);
+    // 时段键 + 编号键都要有
+    expect(keys.has('c1|2026-09-01|09:00')).toBe(true);
+    expect(keys.has('#s1|c1|2026-09-01')).toBe(true);
+  });
 });

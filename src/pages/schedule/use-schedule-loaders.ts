@@ -337,7 +337,16 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
             avatar: student.avatar_url,
           }));
         });
-        const nextTrialBookingKeys = buildTrialBookingKeys(leadBookings);
+        const nextTrialBookingKeys = buildTrialBookingKeys(
+          // 试听预约里「哪一节」的字段叫 reference_schedule_id，统一成 schedule_id
+          leadBookings.map((b) => ({
+            class_id: b.class_id,
+            lesson_date: b.lesson_date,
+            start_time: b.start_time,
+            schedule_id: b.reference_schedule_id,
+            status: b.status,
+          })),
+        );
         setSchedules(scheduleList);
         setClasses(classList);
         setTeachers(teacherList);
