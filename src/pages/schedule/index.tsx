@@ -135,8 +135,6 @@ const SchedulePage: React.FC = () => {
   const [temporaryReschedules, setTemporaryReschedules] = useState<TemporaryReschedule[]>([]);
   const [trialBookingKeys, setTrialBookingKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  /** 当前左滑打开按钮的卡片 ID，用于卡片互斥 */
-  const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [batchActionType, setBatchActionType] = useState<BatchActionType>('reschedule');
   const [batchActionSheetVisible, setBatchActionSheetVisible] = useState(false);
   const [batchClassSheetVisible, setBatchClassSheetVisible] = useState(false);
@@ -343,7 +341,6 @@ const SchedulePage: React.FC = () => {
       const tab = tabs.find((item) => item.key === tabKey);
       if (!tab) return;
       setActiveTabKey(tabKey);
-      setOpenCardId(null);
 
       const containerWidthPx = rpxToPx(750 - TAB_RIGHT_FIXED_WIDTH_RPX);
       const tabWidthPx = rpxToPx(TAB_WIDTH_RPX);
@@ -375,7 +372,6 @@ const SchedulePage: React.FC = () => {
   const handleDateChangeWithRefresh = useCallback(
     (date: dayjs.Dayjs) => {
       setSelectedDate(date);
-      setOpenCardId(null);
       refreshDateData(date);
     },
     [refreshDateData],
@@ -485,30 +481,29 @@ const SchedulePage: React.FC = () => {
     });
   }, []);
 
-  const { handleSuspendOpenSlot, handleResumeClass, handleConfirmDangerAction } =
-    useScheduleDangerActions({
-      currentTime,
-      activeTheme: themeStore.activeTheme,
-      setOpenClassSlots,
-      setClasses,
-      setSchedules,
-      setSelectedClassId,
-      setBatchClassSheetVisible,
-      setBatchSelectedClassIds,
-      setDangerActionSubmitting,
-      dangerActionState,
-      setDangerActionState,
-      closeDangerActionDialog,
-      selectedBatchClasses,
-      selectedClassId,
-      filterAllClassId: FILTER_ALL_CLASS,
-      currentUserId,
-      currentCampusId,
-      profileId: profile?.id,
-      profileName: profile?.name,
-      profileRole: profile?.currentContext?.role,
-      notifyStudentAndParents,
-    });
+  const { handleResumeClass, handleConfirmDangerAction } = useScheduleDangerActions({
+    currentTime,
+    activeTheme: themeStore.activeTheme,
+    setOpenClassSlots,
+    setClasses,
+    setSchedules,
+    setSelectedClassId,
+    setBatchClassSheetVisible,
+    setBatchSelectedClassIds,
+    setDangerActionSubmitting,
+    dangerActionState,
+    setDangerActionState,
+    closeDangerActionDialog,
+    selectedBatchClasses,
+    selectedClassId,
+    filterAllClassId: FILTER_ALL_CLASS,
+    currentUserId,
+    currentCampusId,
+    profileId: profile?.id,
+    profileName: profile?.name,
+    profileRole: profile?.currentContext?.role,
+    notifyStudentAndParents,
+  });
 
   const {
     handleOpenBookSheet,
@@ -550,11 +545,8 @@ const SchedulePage: React.FC = () => {
     handleOpenClassSlotConfig,
     handleProxyBooking,
     handleOpenSlotRollCall,
-    handleEditOpenSlot,
     handleParentBookOpenSlot,
     handleParentCancelOpenSlot,
-    handleCancelOpenSlot,
-    handleRestoreOpenSlot,
   } = useScheduleOpenSlotActions({
     filteredClasses,
     campuses,
@@ -607,8 +599,6 @@ const SchedulePage: React.FC = () => {
           swiperCurrent={swiperCurrent}
           scheduleDateWindow={scheduleDateWindow}
           scheduleSwiperSyncKey={scheduleSwiperSyncKey}
-          openCardId={openCardId}
-          onOpenCardIdChange={setOpenCardId}
           currentCampusId={currentCampusId || ''}
           currentTeacherId={currentTeacherId}
           currentUserId={currentUserId}
@@ -653,10 +643,6 @@ const SchedulePage: React.FC = () => {
           onOpenClassSlotConfig={handleOpenClassSlotConfig}
           onProxyBooking={handleProxyBooking}
           onOpenSlotRollCall={handleOpenSlotRollCall}
-          onEditOpenSlot={handleEditOpenSlot}
-          onCancelOpenSlot={handleCancelOpenSlot}
-          onRestoreOpenSlot={handleRestoreOpenSlot}
-          onSuspendOpenSlot={handleSuspendOpenSlot}
           onParentBookOpenSlot={handleParentBookOpenSlot}
           onParentCancelOpenSlot={handleParentCancelOpenSlot}
           onCloseBatchActionSheet={() => setBatchActionSheetVisible(false)}

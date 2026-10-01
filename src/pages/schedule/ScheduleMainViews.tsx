@@ -95,8 +95,6 @@ export interface ScheduleMainViewsProps {
   scheduleDateWindow: dayjs.Dayjs[];
   /** 日期 Swiper 同步令牌，见 ScheduleDateSwiperProps.syncKey */
   scheduleSwiperSyncKey: string;
-  openCardId: string | null;
-  onOpenCardIdChange: (id: string | null) => void;
   currentCampusId: string;
   currentTeacherId: string;
   currentUserId: string;
@@ -143,10 +141,6 @@ export interface ScheduleMainViewsProps {
   onOpenClassSlotConfig: (classId: string, dateStr: string) => void;
   onProxyBooking: (slot: ClassBookingSlot) => void;
   onOpenSlotRollCall: (slot: ClassBookingSlot) => void;
-  onEditOpenSlot: (slot: ClassBookingSlot) => void;
-  onCancelOpenSlot: (slot: ClassBookingSlot) => void;
-  onRestoreOpenSlot: (slot: ClassBookingSlot) => void;
-  onSuspendOpenSlot: (slot: ClassBookingSlot, className: string) => void;
   onParentBookOpenSlot: (slot: ClassBookingSlot) => void;
   onParentCancelOpenSlot: (slot: ClassBookingSlot) => void;
   onCloseBatchActionSheet: () => void;
@@ -183,8 +177,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     swiperCurrent,
     scheduleDateWindow,
     scheduleSwiperSyncKey,
-    openCardId,
-    onOpenCardIdChange,
     currentCampusId,
     currentTeacherId,
     currentUserId,
@@ -227,10 +219,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
     onOpenClassSlotConfig,
     onProxyBooking,
     onOpenSlotRollCall,
-    onEditOpenSlot,
-    onCancelOpenSlot,
-    onRestoreOpenSlot,
-    onSuspendOpenSlot,
     onParentBookOpenSlot,
     onParentCancelOpenSlot,
     onCloseBatchActionSheet,
@@ -302,8 +290,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
               openClassSlots={openClassSlots}
               loadingOpenSlotDates={loadingOpenSlotDates}
               errorOpenSlotDates={errorOpenSlotDates}
-              openCardId={openCardId}
-              onOpenCardIdChange={onOpenCardIdChange}
               teacherById={teacherById}
               currentTime={currentTime}
               isParent={isParent}
@@ -317,10 +303,6 @@ const ScheduleMainViews: React.FC<ScheduleMainViewsProps> = (props) => {
               onOpenClassSlotConfig={onOpenClassSlotConfig}
               onProxyBooking={onProxyBooking}
               onOpenSlotRollCall={onOpenSlotRollCall}
-              onEditOpenSlot={onEditOpenSlot}
-              onCancelOpenSlot={onCancelOpenSlot}
-              onRestoreOpenSlot={onRestoreOpenSlot}
-              onSuspendOpenSlot={onSuspendOpenSlot}
               onResumeClass={onResumeClass}
               onRunCardButtonAction={onRunCardButtonAction}
               onParentBookOpenSlot={onParentBookOpenSlot}

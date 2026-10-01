@@ -1,10 +1,10 @@
 /**
  * 试听预约详情页 package-lead/pages/lead-booking-detail
  *
- * 从课表「记录」Tab 点击卡片进入，展示：
+ * 从课表「私教/约课」视图点击预约卡片进入（2026-10-02 起为卡片操作的唯一收拢处）：
  * - 顶部橙色头部：课程名、老师、日期时间、签到统计
  * - 会员预约名单：已签到 / 待签
- * - 底部主操作按钮：根据状态显示「全部已签到」「取消预约」或「恢复预约」
+ * - 底部操作按钮：编辑预约（员工端）/ 取消预约 / 恢复预约（按状态显示）
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useLoad, useDidShow } from '@tarojs/taro';
@@ -15,7 +15,7 @@ import Icon from '@/components/Icon';
 import { leadService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import type { LeadBooking } from '@/types/lead';
-import { isPrincipalOrAbove, useAuth } from '@/utils/auth';
+import { isPrincipalOrAbove, isStaffRole, useAuth } from '@/utils/auth';
 import { resolveTeachingActorId } from '@/utils/trial-booking-scope';
 import { useNavSafeHeight } from '@/utils/use-nav-safe-height';
 
@@ -139,14 +139,33 @@ const LeadBookingDetailPage: React.FC = () => {
     }
   }, [booking, loadBooking]);
 
+  /** 编辑入口（2026-10-02 收拢：卡片左滑移除后，编辑从详情页进；家长端不显示） */
+  const handleEdit = useCallback(() => {
+    if (!params.bookingId) return;
+    void Taro.navigateTo({
+      url: `/package-lead/pages/lead-booking-edit/index?bookingId=${encodeURIComponent(params.bookingId)}`,
+    });
+  }, [params.bookingId]);
+
   const bottomAction = useMemo(() => {
     if (!booking) return null;
-    if (booking.status === 'cancelled') {
-      return { label: '恢复预约', variant: 'primary' as const, action: handleRestore };
+    const items: Array<{
+      label: string;
+      variant: 'primary' | 'ghost';
+      action: () => void;
+    }> = [];
+    // 编辑收拢到详情页（与班级课卡「点击进详情、详情里操作」同口径）
+    if (isStaffRole(role)) {
+      items.push({ label: '编辑预约', variant: 'ghost', action: handleEdit });
     }
-    // G1-2：体验课签到未接通 — 砍掉「全部已签到」假入口，仅保留取消
-    return { label: '取消预约', variant: 'ghost' as const, action: handleCancel };
-  }, [booking, handleCancel, handleRestore]);
+    if (booking.status === 'cancelled') {
+      items.push({ label: '恢复预约', variant: 'primary', action: handleRestore });
+    } else {
+      // G1-2：体验课签到未接通 — 砍掉「全部已签到」假入口，仅保留取消
+      items.push({ label: '取消预约', variant: 'ghost', action: handleCancel });
+    }
+    return items;
+  }, [booking, handleCancel, handleEdit, handleRestore, role]);
 
   if (loading) {
     return (
@@ -263,34 +282,22 @@ const LeadBookingDetailPage: React.FC = () => {
         style={{ paddingTop: '20rpx', paddingBottom: 'env(safe-area-inset-bottom, 20rpx)' }}
       >
         <View className="flex items-center gap-[20rpx] pb-[20rpx]">
-          {Array.isArray(bottomAction) ? (
-            bottomAction.map((act) => (
-              <View
-                key={act.label}
-                className={cn(
-                  'center h-[80rpx] flex-1 rounded-button text-[30rpx] font-medium transition-all active:scale-95',
-                  act.variant === 'primary'
-                    ? 'bg-primary text-white active:bg-primary/90'
-                    : 'border border-border bg-white text-foreground active:bg-muted',
-                )}
-                onClick={act.action}
-              >
-                {act.label}
-              </View>
-            ))
-          ) : bottomAction ? (
-            <View
-              className={cn(
-                'center h-[80rpx] w-full rounded-button text-[30rpx] font-medium transition-all active:scale-95',
-                bottomAction.variant === 'primary'
-                  ? 'bg-primary text-white active:bg-primary/90'
-                  : 'border border-border bg-white text-foreground active:bg-muted',
-              )}
-              onClick={bottomAction.action}
-            >
-              {bottomAction.label}
-            </View>
-          ) : null}
+          {Array.isArray(bottomAction)
+            ? bottomAction.map((act) => (
+                <View
+                  key={act.label}
+                  className={cn(
+                    'center h-[80rpx] flex-1 rounded-button text-[30rpx] font-medium transition-all active:scale-95',
+                    act.variant === 'primary'
+                      ? 'bg-primary text-white active:bg-primary/90'
+                      : 'border border-border bg-white text-foreground active:bg-muted',
+                  )}
+                  onClick={act.action}
+                >
+                  {act.label}
+                </View>
+              ))
+            : null}
         </View>
       </View>
     </View>

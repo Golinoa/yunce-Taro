@@ -8,7 +8,6 @@ import React from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import ScheduleActionButton from '@/components/schedule/ScheduleActionButton';
-import SwappableScheduleCard from '@/components/schedule/SwappableScheduleCard';
 import { BRAND_LOGO } from '@/constants/brand';
 import type { Class, ClassBookingSlot } from '@/types/class';
 import { CLASS_LEVEL_LABELS, CLASS_LEVEL_BADGE_WRAP, CLASS_LEVEL_BADGE_TEXT } from '@/types/class';
@@ -17,7 +16,7 @@ import type { LessonSharePayload } from '@/utils/lesson-share';
 import { readParentBookings } from '@/utils/parent-bookings';
 import type { ScheduleCardStudentAvatar } from '@/utils/schedule-card-build';
 import { getDurationText } from '@/utils/schedule-card-status';
-import { canSuspendOpenSlot, parseTimeToMinutes } from '@/utils/schedule-guard';
+import { parseTimeToMinutes } from '@/utils/schedule-guard';
 import type dayjs from 'dayjs';
 
 /** 开放预约卡片最多展示的前 x 个已约学员头像 */
@@ -29,8 +28,6 @@ export interface OpenClassScheduleListProps {
   openClassSlots: Record<string, Record<string, ClassBookingSlot[]>>;
   loadingOpenSlotDates: Set<string>;
   errorOpenSlotDates: Set<string>;
-  openCardId: string | null;
-  onOpenCardIdChange: (id: string | null) => void;
   teacherById: Record<string, TeacherUIModel>;
   currentTime: dayjs.Dayjs;
   isParent: boolean;
@@ -44,10 +41,6 @@ export interface OpenClassScheduleListProps {
   onOpenClassSlotConfig: (classId: string, dateStr: string) => void;
   onProxyBooking: (slot: ClassBookingSlot) => void;
   onOpenSlotRollCall: (slot: ClassBookingSlot) => void;
-  onEditOpenSlot: (slot: ClassBookingSlot) => void;
-  onCancelOpenSlot: (slot: ClassBookingSlot) => void;
-  onRestoreOpenSlot: (slot: ClassBookingSlot) => void;
-  onSuspendOpenSlot: (slot: ClassBookingSlot, className: string) => void;
   onResumeClass: (classId: string, className: string) => void;
   onRunCardButtonAction: (action: () => void) => void;
   onParentBookOpenSlot: (slot: ClassBookingSlot) => void;
@@ -61,8 +54,6 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
   openClassSlots,
   loadingOpenSlotDates,
   errorOpenSlotDates,
-  openCardId,
-  onOpenCardIdChange,
   teacherById,
   currentTime,
   isParent,
@@ -76,10 +67,6 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
   onOpenClassSlotConfig,
   onProxyBooking,
   onOpenSlotRollCall,
-  onEditOpenSlot,
-  onCancelOpenSlot,
-  onRestoreOpenSlot,
-  onSuspendOpenSlot,
   onResumeClass,
   onRunCardButtonAction,
   onParentBookOpenSlot,
@@ -112,13 +99,7 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
 
   return (
     <View className="h-full bg-muted">
-      <ScrollView
-        className="h-full"
-        scrollY
-        enhanced
-        showScrollbar={false}
-        onScroll={() => onOpenCardIdChange(null)}
-      >
+      <ScrollView className="h-full" scrollY enhanced showScrollbar={false}>
         <View className="min-h-full">
           <View className="px-[24rpx] py-[12rpx]">
             <Text className="text-[28rpx] text-foreground-secondary">
@@ -351,41 +332,9 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
                     </View>
                   </View>
                 ) : (
-                  <SwappableScheduleCard
+                  <View
                     key={slot.id}
-                    cardId={slot.id}
-                    openCardId={openCardId}
-                    onOpenChange={onOpenCardIdChange}
-                    radiusClassName="rounded-[24rpx]"
                     onClick={() => onOpenClassSlotConfig(slot.class_id, slot.lesson_date)}
-                    actions={[
-                      {
-                        label: '编辑',
-                        variant: 'default',
-                        onClick: () => onEditOpenSlot(slot),
-                      },
-                      {
-                        label: '停课',
-                        variant: 'warning',
-                        onClick: () =>
-                          void onSuspendOpenSlot(
-                            slot,
-                            openClassMap[slot.class_id]?.name || slot.class_name || '该班级',
-                          ),
-                        disabled: !canSuspendOpenSlot(slot, currentTime),
-                      },
-                      isRest
-                        ? {
-                            label: '恢复',
-                            variant: 'warning',
-                            onClick: () => onRestoreOpenSlot(slot),
-                          }
-                        : {
-                            label: '取消',
-                            variant: 'danger',
-                            onClick: () => onCancelOpenSlot(slot),
-                          },
-                    ]}
                   >
                     <View
                       className={cn(
@@ -549,7 +498,7 @@ const OpenClassScheduleList: React.FC<OpenClassScheduleListProps> = ({
                         </Text>
                       </View>
                     </View>
-                  </SwappableScheduleCard>
+                  </View>
                 );
               })}
             </View>
