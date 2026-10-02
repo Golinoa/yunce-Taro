@@ -34,7 +34,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({
    *
    * ⚠️ 这里不能直接套 `filterActiveStudents`：那是给 `Student`（status 为
    * `active / deleted`）用的，而 `StudentRelationRef.status` 是后端原始枚举
-   * （`ACTIVE / GRADUATED / INACTIVE`），两者不同源。
+   * （`ACTIVE / INACTIVE`），两者不同源。
    */
   const referredStudents = (student.referred_students || []).filter(
     (item) => item.status !== 'INACTIVE',

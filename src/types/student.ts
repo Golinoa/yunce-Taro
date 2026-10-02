@@ -36,8 +36,8 @@ export interface StudentSubjectHours {
 export interface StudentRelationRef {
   id: string;
   name: string;
-  /** ACTIVE / GRADUATED / INACTIVE；INACTIVE 表示已删除（前端应剔除或标注） */
-  status: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+  /** ACTIVE / INACTIVE；INACTIVE 表示已删除（前端应剔除或标注） */
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface Student {

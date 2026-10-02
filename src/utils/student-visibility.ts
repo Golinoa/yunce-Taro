@@ -8,7 +8,7 @@ import type { Student } from '@/types/student';
  * 因此**客户端必须自行剔除**，否则删除后列表依旧显示该学员。
  *
  * 与 `services/student.ts` 的 `mapBackendStudentStatus` 配套：
- * 只有 `ACTIVE` 映射为 `'active'`，其余（`INACTIVE` / `GRADUATED`）一律为 `'deleted'`。
+ * 只有 `ACTIVE` 映射为 `'active'`，`INACTIVE`（已删除）映射为 `'deleted'`。
  *
  * 容错：`status` 缺省（老数据 / 字段未下发）时视为在籍，避免误隐藏学员。
  */

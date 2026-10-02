@@ -33,7 +33,7 @@ interface BackendStudentListItem {
   parentCount?: number;
   phone?: null | string;
   remark?: null | string;
-  status?: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+  status?: 'ACTIVE' | 'INACTIVE';
   totalHours?: number;
   usedHours?: number;
   attendanceCount?: number;
@@ -116,14 +116,14 @@ interface BackendStudentDetailResponse {
   referrerStudent?: null | {
     id: string;
     name: string;
-    status: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+    status: 'ACTIVE' | 'INACTIVE';
   };
   referredStudents?: Array<{
     id: string;
     name: string;
-    status: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+    status: 'ACTIVE' | 'INACTIVE';
   }>;
-  status?: 'ACTIVE' | 'GRADUATED' | 'INACTIVE';
+  status?: 'ACTIVE' | 'INACTIVE';
   teacher?: {
     id: string;
     institution?: null | string;
@@ -138,7 +138,7 @@ const mapBackendGender = (gender?: null | 'FEMALE' | 'MALE'): Student['gender'] 
 };
 
 const mapBackendStudentStatus = (
-  status?: 'ACTIVE' | 'GRADUATED' | 'INACTIVE',
+  status?: 'ACTIVE' | 'INACTIVE',
 ): Student['status'] => {
   return status === 'ACTIVE' ? 'active' : 'deleted';
 };
