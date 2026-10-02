@@ -47,8 +47,8 @@ export interface LegacyImportPreviewRow {
   willCreateSubject?: boolean;
   /** true = 该科目没有可用的次数卡种，提交时会自动建「{科目名}课时卡」 */
   willCreateCardType?: boolean;
-  /** true = 没填剩余课时，需要用户在界面上补一个数字 */
-  needsHours?: boolean;
+  /** true = 这行只建档、不录课时（缺科目或缺剩余课时） */
+  profileOnly?: boolean;
   /** true = 该学员该科目已有期初入账（再次上传时默认不勾） */
   alreadyImported?: boolean;
   candidates?: LegacyImportCandidate[];
@@ -73,8 +73,8 @@ export interface LegacyImportPreview {
     pendingRows: number;
     newRows: number;
     errorRows: number;
-    /** 没填剩余课时、需要补数字的行数 */
-    missingHoursRows?: number;
+    /** 只建档、不录课时的行数 */
+    profileRows?: number;
     newStudents: number;
     reusedStudents: number;
   };
@@ -103,7 +103,8 @@ export interface LegacyImportCommitRow {
   cardTypeId?: string;
   /** 科目名：卡种 id 缺失时靠它解析/自动创建 */
   subjectName?: string;
-  remainingCount: number;
+  /** 剩余课时（选填）：不传 / 0 = 这行只建档，不挂课时卡 */
+  remainingCount?: number;
   expiry?: string;
   /** 该张卡的缴费金额（分）；不传按 0 处理 */
   purchasePrice?: number;

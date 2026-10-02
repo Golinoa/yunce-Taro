@@ -235,14 +235,24 @@ const LegacyHoursImportPage: React.FC = () => {
       // 若被 dup 吸收，未消歧/缺课时的行会被默认提交 ⇒ 后端整批拒绝，违反"提醒≠阻断"。
       if (row.status === 'error') group = 'err';
       else if (row.alreadyImported) group = 'done';
-      else if ((row.candidates?.length ?? 0) > 1) group = 'ambig';
-      else if (row.needsHours) group = 'miss';
+      /**
+       * ⚠️ 用后端给的 `status === 'pending'` 判定，**不要**改成数 `candidates.length`。
+       *
+       * 候选列表是「在册同名」列表，长度与"要不要消歧"并不等价：一旦它为空（后端不再给候选），
+       * 数长度会得到 0 ⇒ 这行落进 `ready` ⇒ 默认勾选 ⇒ 提交时既没有 studentId 也没有 newStudent
+       * ⇒ 后端硬门禁 409 且 commit 是单事务 ⇒ **整批回滚、一行都没写入**（违反红线 3）。
+       * 以 status 为准，这行就必然进 ambig、必然要求用户做决定。
+       */ else if (row.status === 'pending') group = 'ambig';
       else if ((nameCount.get(row.name) ?? 0) > 1) group = 'dup';
       else if (row.status === 'new') group = 'neu';
       else group = 'ready';
 
-      // 默认勾选：信息齐全的行才勾；待处理（需指定/缺课时）和已入账默认不勾
-      const checked = group === 'dup' || group === 'neu' || group === 'ready';
+      /**
+       * 默认勾选：信息齐全的行才勾；待处理（需指定学员）和已入账默认不勾。
+       * 老学员 + 只建档（没填课时）没有任何要写入的内容 ⇒ 默认不勾，
+       * 免得用户提交后看到"成功导入"却什么都没变。
+       */
+      const checked = group === 'dup' || group === 'neu' || (group === 'ready' && !row.profileOnly);
       return { checked, group, row };
     });
   }, []);
@@ -653,6 +663,14 @@ const LegacyHoursImportPage: React.FC = () => {
       return <Text className="tag bg-muted text-muted-foreground">已入账</Text>;
     }
     if (state.group === 'dup') return <Text className="tag bg-warning/10 text-warning">重名</Text>;
+    // 只建档的行：新学员要建成 ⇒「仅建档」；老学员档案已在、又没课时 ⇒「无需导入」
+    if (state.row.profileOnly) {
+      return (
+        <Text className="tag bg-muted text-muted-foreground">
+          {state.group === 'ready' ? '无需导入' : '仅建档'}
+        </Text>
+      );
+    }
     if (state.group === 'neu')
       return <Text className="tag bg-primary/10 text-primary">新学员</Text>;
     return <Text className="tag bg-success/10 text-success">就绪</Text>;
@@ -662,8 +680,8 @@ const LegacyHoursImportPage: React.FC = () => {
     const hourText =
       typeof state.hours === 'number'
         ? state.hours
-        : state.group === 'miss' && needsDecision(state)
-          ? '—'
+        : state.row.profileOnly
+          ? '只建档'
           : state.row.remainingCount;
 
     // 无法导入：只读展示 + 原因，不给勾选框（勾了也提交不了）
@@ -748,7 +766,7 @@ const LegacyHoursImportPage: React.FC = () => {
           </Text>
         </View>
         <Text className="text-[23rpx] text-muted-foreground shrink-0">
-          {state.row.subjectName} · {hourText}
+          {state.row.subjectName ? `${state.row.subjectName} · ${hourText}` : hourText}
         </Text>
         {renderTag(state)}
         {(pending || state.skipped) && <Icon name="mdi-chevron-right" size={23} color="muted" />}
@@ -1071,7 +1089,8 @@ const LegacyHoursImportPage: React.FC = () => {
                 steps: [
                   '点下面的按钮，下载模板',
                   <>
-                    <Text className="font-semibold text-foreground">姓名、科目、课时</Text>三列必填
+                    <Text className="font-semibold text-foreground">只有姓名必填</Text>
+                    ，其余都可以留空
                   </>,
                   '一个学员一个科目占一行',
                   <>
@@ -1141,8 +1160,8 @@ const LegacyHoursImportPage: React.FC = () => {
 
             {renderBanner(
               'warn',
-              '姓名、科目、剩余课时必须有',
-              '缺任何一列，整行都进不来。手机号主要用来认老学员，填了更准。',
+              '只有学员姓名必填',
+              '科目、课时、手机号都可以留空。想把课时一起导进来，就把「科目」和「剩余课时」两列都填上。',
             )}
           </>
         )}
@@ -1262,7 +1281,7 @@ const LegacyHoursImportPage: React.FC = () => {
               renderBanner(
                 'ok',
                 `${fileMeta?.total ?? rows.length} 行全部可以导入`,
-                '姓名、科目、剩余课时都齐了，没有需要你确认的行。',
+                '没有需要你确认的行，可以直接导入。',
               )}
 
             {isRework
