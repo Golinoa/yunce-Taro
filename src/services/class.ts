@@ -255,8 +255,7 @@ export const classService = {
   /**
    * 班级学员列表。
    *
-   * 课时来源 = 会员卡：**不再逐学员补拉课包**（课包已于 2026-10-02 整套移除，
-   * 且点名页的课时由 `loadMemberCardMapsForStudents` 统一并发获取）。
+   * 课时来源 = 会员卡，由点名页的 `loadMemberCardMapsForStudents` 统一并发获取。
    */
   getStudents: async (classId: string): Promise<Student[]> => {
     const list = await get<

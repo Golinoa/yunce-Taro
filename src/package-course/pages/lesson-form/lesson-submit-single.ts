@@ -17,10 +17,7 @@ import { validateSingleSubmit, withSubmitLock } from './lesson-submit';
 
 export async function executeSingleDeduct(input: {
   selectedStudent?: Student | null;
-  /**
-   * 会员卡（第二本账）：**没有可用旧课包**时用它扣减。
-   * 不传 = 与改前完全一致（只有会员卡的学员否则点不了名）。
-   */
+  /** 本次消课要扣的会员卡。 */
   matchedMemberCard?: MemberCardDetail | null;
   hoursUsed: number;
   lessonDate: string;
@@ -66,7 +63,7 @@ export async function executeSingleDeduct(input: {
   }
 
   const selectedStudent = input.selectedStudent!;
-  // 扣哪张卡（唯一口径；课包已整套移除）
+  // 扣哪张卡（唯一口径见 utils/lesson-deduction-source）
   const deduction = resolveLessonDeduction({
     memberCards: input.matchedMemberCard ? [input.matchedMemberCard] : [],
     hoursNeeded: input.hoursUsed,

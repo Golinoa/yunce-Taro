@@ -37,7 +37,7 @@ export interface ClassStudentsCardProps {
   onChange: (studentIds: string[]) => void;
 }
 
-/** 计算学员剩余课时总和（跨多张会员卡；课包已整套移除） */
+/** 计算学员剩余课时总和（跨多张会员卡） */
 function computeRemaining(student: Student): number {
   const cards = student.member_cards;
   if (!cards || cards.length === 0) return 0;

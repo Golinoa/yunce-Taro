@@ -32,7 +32,7 @@ export type PersistAttendanceContext = {
   performance: number;
   homework: string;
   homeworkImages: string[];
-  /** 学员会员卡（新账本，含卡种科目）：旧课包优先，没有才用它扣减 */
+  /** 学员会员卡（含卡种科目）：点名扣减的课时来源 */
   studentMemberCards?: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   studentRemarkDrafts: Record<string, string>;
@@ -61,7 +61,7 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
   if (status === 'checked') {
     const cards = ctx.studentMemberCards?.get(student.id) ?? [];
     const studentSubject = ctx.studentSubjects.get(student.id);
-    // 扣哪张卡（唯一口径见 utils/lesson-deduction-source；课包已移除）
+    // 扣哪张卡（唯一口径见 utils/lesson-deduction-source）
     const deduction = resolveLessonDeduction({
       memberCards: cards,
       hoursNeeded: ctx.hoursUsed,
@@ -97,7 +97,7 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
       title: ctx.isSupplement ? `${student.name} 已补录签到` : `${student.name} 课时已核销`,
       /**
        * ⚠️ 剩余课时以**后端返回的 `remaining_hours` 为准**；拿不到时才本地推算，
-       * 而且必须按"这一笔实际扣的是哪本账"来算（课包用课包余额，会员卡用卡余额）。
+       * 而且必须按"这一笔实际扣的是哪张卡"来算。
        */
       content: ctx.isSupplement
         ? `${ctx.lessonDate} 已补录 ${ctx.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
@@ -142,7 +142,6 @@ export async function notifyCrossSubjectIfNeeded(input: {
   student: Student;
   /**
    * 扣减来源的名称（会员卡卡种名）。
-   * ⚠️ 不按课包对象建模：课包已整套移除，扣减来源只有会员卡。
    */
   sourceName: string;
   studentSubject?: Subject | null;

@@ -50,7 +50,7 @@ function formatDate(date?: string): string {
   return d.isValid() ? d.format('YYYY-MM-DD') : '-';
 }
 
-/** 会员卡展示行（唯一账本；课包已整套移除） */
+/** 会员卡展示行 */
 type ChildCardView = {
   id: string;
   name: string;

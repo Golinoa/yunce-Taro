@@ -17,10 +17,8 @@ interface BackendStudentListItem {
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
   inviteCode?: null | string;
-  /** 学员有效课包覆盖的科目 id 集合（已由 subjectHours 派生，兼容保留） */
-  packageSubjectIds?: string[];
   /**
-   * 学员每个科目的可用剩余（2026-10-02 起）：旧课包 ∪ 会员卡，接口**一次给全**，
+   * 学员每个科目的可用剩余（来源 = 会员卡），接口**一次给全**，
    * 切换科目标签不发请求。
    * ⚠️ 缺失 = undefined，绝不能被 `?? []` 抹成空数组（会让科目过滤恒放行）。
    */
@@ -74,7 +72,7 @@ interface BackendStudentDetailResponse {
     schedule?: null | string;
     subject?: null | string;
   }>;
-  /** 会员卡（唯一账本；课包已移除）：详情接口返回真实卡明细 */
+  /** 会员卡：详情接口返回真实卡明细 */
   memberCards?: Array<{
     id: string;
     status: string;
@@ -172,9 +170,8 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
     updated_at: item.createdAt,
     /**
      * ⚠️ 缺失保持 `undefined`（不再 `?? []`）：「接口没给」和「确实没有科目」必须可分，
-     * 否则前端会把"不知道"当成"无课包 ⇒ 通用 ⇒ 放行"，科目过滤形同虚设。
+     * 否则前端会把"不知道"当成"无科目 ⇒ 通用 ⇒ 放行"，科目过滤形同虚设。
      */
-    package_subject_ids: item.packageSubjectIds,
     subject_hours: item.subjectHours?.map((item_) => ({
       subjectId: item_.subjectId,
       subjectName: item_.subjectName,
@@ -239,7 +236,7 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
     created_at: item.createdAt,
     updated_at: item.createdAt,
     /**
-     * 会员卡明细 → 课时摘要（唯一账本；课包已于 2026-10-02 整套移除）。
+     * 会员卡明细 → 课时摘要。
      * 口径与后端 `utils/lesson-hours` 一致：总量优先取快照 `totalCount`，老卡回落 卡种 count + 赠送。
      */
     member_cards: (item.memberCards || []).map((card) => {
@@ -334,7 +331,6 @@ export interface InitialStudentPackagePayload {
  *
  * 会员卡余额变化（发卡 / 追加次数 / 消课 / 导入）后**必须**调用 ——
  * 学员列表、课表卡片、点名页的「剩余课时」都读它。
- * 课包已整套移除，本函数取代原先的 `invalidatePackagesCache`。
  */
 export const invalidateStudentListCache = (): void => {
   useStudentStore.setState({ cache: {}, loading: {}, lastFetch: {} });

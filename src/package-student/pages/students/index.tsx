@@ -524,7 +524,7 @@ const Students: React.FC = () => {
     if (memberSubTab !== 'all') {
       const today = dayjs();
       result = result.filter((s) => {
-        // 课时来源 = 会员卡（唯一账本；课包已整套移除）
+        // 课时来源 = 会员卡
         const cards = s.member_cards || [];
         const hasActive = cards.some((c) => c.status === 'active');
         const hasFrozen = cards.some((c) => c.status === 'frozen');

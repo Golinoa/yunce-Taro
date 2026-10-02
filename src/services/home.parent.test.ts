@@ -42,7 +42,7 @@ describe('homeService 家长端', () => {
     ]);
     expect(teacherEntries).toHaveLength(6);
     expect(teacherEntries[0]?.label).toBe('学员');
-    expect(managerEntries[0]?.label).toBe('课时充值');
+    expect(managerEntries[0]?.label).toBe('课时导入');
     expect(homeService.getQuickEntries(null)).toEqual(managerEntries);
   });
 
@@ -57,14 +57,14 @@ describe('homeService 家长端', () => {
           packages: [
             {
               id: 'pkg-1',
-              name: '钢琴课包',
+              name: '钢琴课时卡',
               totalHours: 60,
               usedHours: 45,
               remainingHours: 15,
             },
             {
               id: 'pkg-2',
-              name: '乐理课包',
+              name: '乐理课时卡',
               totalHours: 24,
               usedHours: 19,
               remainingHours: 5,

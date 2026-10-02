@@ -41,10 +41,7 @@ export interface LessonRecord {
   revoke_reason?: string;
   /** 是否跨科目消课 */
   is_cross_subject?: boolean;
-  /**
-   * 扣减来源的卡种科目（会员卡；课包已整套移除）。
-   * 仅用于跨科目提醒文案。
-   */
+  /** 扣减来源的卡种科目，仅用于跨科目提醒文案。 */
   source_subject?: string;
   /** 班级科目 */
   class_subject?: string;

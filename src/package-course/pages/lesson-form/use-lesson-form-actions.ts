@@ -75,7 +75,7 @@ export interface UseLessonFormActionsParams {
   supplementStudentIds: Set<string>;
   attendanceBaseline: Map<string, CheckinStatus>;
   selectedStudent: Student | null;
-  /** 单人模式当前选中的会员卡（唯一账本；课包已移除） */
+  /** 单人模式当前选中的会员卡 */
   matchedCard: MemberCardDetail | null;
   profile?: {
     id?: string;
@@ -459,7 +459,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       }
 
       /**
-       * 加人时并发取会员卡（唯一账本；课包已移除）：取不到卡的学员提交时会被提示
+       * 加人时并发取会员卡：取不到卡的学员提交时会被提示
        * 「无可扣课时」，所以取卡失败**不阻断加人**。
        */
       const cardEntries = await Promise.all(
@@ -674,7 +674,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
 
   const handleSingleSubmit = useCallback(async () => {
     /**
-     * 扣哪张卡由单人面板选定的会员卡决定（课包已整套移除）。
+     * 扣哪张卡由单人面板选定的会员卡决定。
      * 未选中时兜底按规则挑一张；取卡失败不阻断流程，由 executeSingleDeduct 统一提示。
      */
     let matchedMemberCard: MemberCardDetail | null = matchedCard;

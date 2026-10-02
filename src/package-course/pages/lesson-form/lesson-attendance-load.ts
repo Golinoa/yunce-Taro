@@ -158,7 +158,7 @@ export async function fetchApprovedLeaveStudentIds(input: {
   });
 }
 
-/** 学员课包/学科加载并发上限：班级大时也不瞬间打爆后端 */
+/** 会员卡/学科加载并发上限：班级大时也不瞬间打爆后端 */
 const CARD_LOAD_CONCURRENCY = 6;
 
 /** 有上限的并发 map：保持入参顺序，具体错误由回调内部消化 */
@@ -184,7 +184,7 @@ async function mapWithConcurrency<T, R>(
 /**
  * 批量解析学员「会员卡 + 学科」。
  *
- * 课包已于 2026-10-02 整套移除：**唯一账本是会员卡**，学院科目取自卡种的 `cardTypeSubjectId`。
+ * 唯一账本是会员卡，学员科目取自卡种的 `cardTypeSubjectId`。
  * 并发上限 6，且同一 subject_id 只查一次（同班同科不重复拉）。
  * 无语义前置：取不到卡时 `memberCards` 落空数组、`subjects` 落 null（由提交侧提示「无可扣课时」）。
  */

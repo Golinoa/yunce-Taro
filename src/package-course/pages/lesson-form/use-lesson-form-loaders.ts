@@ -150,7 +150,7 @@ export interface UseLessonFormLoadersParams {
   setSupplementStudentIds: Dispatch<SetStateAction<Set<string>>>;
   setAttendanceMode: Dispatch<SetStateAction<ClassAttendanceMode>>;
   setStudentSubjects: Dispatch<SetStateAction<Map<string, Subject | null>>>;
-  /** 学员会员卡（第二本账）：旧课包优先，没有才用它扣减 */
+  /** 学员会员卡：点名扣减的课时来源 */
   setStudentMemberCards: Dispatch<SetStateAction<Map<string, MemberCardDetail[]>>>;
   setTrialBookings: Dispatch<SetStateAction<LeadBooking[]>>;
   setTrialCheckinMap: Dispatch<SetStateAction<Record<string, CheckinStatus>>>;
@@ -419,7 +419,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
   /**
    * 拉取「班级名单」（班级信息 + 正式学员 + 当日已确认补课学员）——**慢变部分，走内存快照**。
    *
-   * 点名记录 / 课包 / 科目 / 请假审批仍在调用方单独直拉：它们属资损域（§1.1 D1），不进缓存。
+   * 点名记录 / 会员卡 / 科目 / 请假审批仍在调用方单独直拉：它们属资损域（§1.1 D1），不进缓存。
    * `force: true` 用于"我刚写完数据"的场景（点名/补录保存后刷新），跳过缓存直接回源。
    */
   const fetchClassRoster = useCallback(
@@ -659,7 +659,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
   );
 
   /**
-   * 单人模式自动挑卡：课包已整套移除，唯一账本是会员卡。
+   * 单人模式自动挑卡。
    * 挑卡规则与提交口径同源（`utils/lesson-deduction-source`）。
    */
   const autoMatchCard = useCallback(

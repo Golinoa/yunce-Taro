@@ -18,8 +18,8 @@ export interface LessonConsumptionDetailItem {
   totalHours: number;
   attendanceStatusText?: string;
   attendanceStatusClassName?: string;
-  packageTagText?: '即将到期' | '需续费';
-  packageTagClassName?: string;
+  hoursTagText?: '即将到期' | '需续费';
+  hoursTagClassName?: string;
   description: string;
 }
 
@@ -122,14 +122,14 @@ function getAttendanceStatusClass(status?: RecordStatus): string {
   return 'bg-primary-bg text-primary';
 }
 
-function getPackageTag(remainingHours: number): '即将到期' | '需续费' | undefined {
+function getHoursTag(remainingHours: number): '即将到期' | '需续费' | undefined {
   if (remainingHours <= 0) return '需续费';
   if (remainingHours <= 8) return '需续费';
   if (remainingHours <= 16) return '即将到期';
   return undefined;
 }
 
-function getPackageTagClass(tag?: '即将到期' | '需续费'): string {
+function getHoursTagClass(tag?: '即将到期' | '需续费'): string {
   if (tag === '需续费') {
     return 'bg-destructive-5 text-destructive';
   }
@@ -185,7 +185,7 @@ function mapRecordToDetail(
   const totalHours = Math.max((record.hours_used || 0) + remainingHours, remainingHours);
   const recordStatus = record.status as RecordStatus | undefined;
   const attendanceStatusText = getAttendanceStatusLabel(recordStatus);
-  const packageTagText = getPackageTag(remainingHours);
+  const hoursTagText = getHoursTag(remainingHours);
 
   return {
     id: record.id,
@@ -200,8 +200,8 @@ function mapRecordToDetail(
     attendanceStatusClassName: attendanceStatusText
       ? getAttendanceStatusClass(recordStatus)
       : undefined,
-    packageTagText,
-    packageTagClassName: getPackageTagClass(packageTagText),
+    hoursTagText,
+    hoursTagClassName: getHoursTagClass(hoursTagText),
     // 课程内容优先；无内容时用扣减卡/班级名。不展示「个人消课/班级消课」这类注释性占位文案。
     description: record.content?.trim() || record.member_card_name || record.class_name || '',
   };
@@ -345,14 +345,14 @@ const StudentConsumptionRow: React.FC<StudentConsumptionRowProps> = ({
               <Text className="text-[18rpx] font-bold">{detail.attendanceStatusText}</Text>
             </View>
           ) : null}
-          {detail.packageTagText ? (
+          {detail.hoursTagText ? (
             <View
               className={cn(
                 'flex items-center shrink-0 whitespace-nowrap px-[10rpx] py-[2rpx] rounded-[8rpx]',
-                detail.packageTagClassName,
+                detail.hoursTagClassName,
               )}
             >
-              <Text className="text-[18rpx] font-bold">{detail.packageTagText}</Text>
+              <Text className="text-[18rpx] font-bold">{detail.hoursTagText}</Text>
             </View>
           ) : null}
         </View>

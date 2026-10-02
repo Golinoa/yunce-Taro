@@ -48,10 +48,7 @@ export async function executeClassSubmit(input: {
   homeworkImages: string[];
   campusId?: string;
   room?: string;
-  /**
-   * 学员的会员卡（新账本，含卡种科目）。旧课包优先，只有**没有可用旧课包**时才用它扣减 ——
-   * 只有会员卡的学员此前在本页会直接报「无可用课包」，根本点不了名。
-   */
+  /** 学员的会员卡（含卡种科目）：点名扣减的课时来源。 */
   studentMemberCards?: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   studentRemarkDrafts: Record<string, string>;
@@ -140,10 +137,7 @@ export async function executeClassSubmit(input: {
       for (const student of input.presentStudents) {
         const cards = input.studentMemberCards?.get(student.id) ?? [];
         const studentSubject = input.studentSubjects.get(student.id);
-        /**
-         * 扣哪张卡：规则（科目匹配、状态、剩余校验）全在 `utils/lesson-deduction-source`。
-         * 课包已整套移除，唯一来源 = 会员卡。
-         */
+        /** 扣哪张卡：规则（科目匹配、状态、剩余校验）全在 `utils/lesson-deduction-source`。 */
         const deduction = resolveLessonDeduction({
           memberCards: cards,
           hoursNeeded: input.hoursUsed,

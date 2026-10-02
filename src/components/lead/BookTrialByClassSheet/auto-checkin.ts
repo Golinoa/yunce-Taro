@@ -108,7 +108,7 @@ export async function autoCheckInMakeupStudent(
   }
 
   /**
-   * ② 扣减来源：**会员卡**（唯一账本；课包已于 2026-10-02 整套移除）。
+   * ② 扣减来源：**会员卡**。
    * 挑选规则与点名页共用 `utils/lesson-deduction-source`。
    */
   let matchedMemberCard: MemberCardDetail | null = null;

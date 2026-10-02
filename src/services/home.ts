@@ -652,8 +652,8 @@ export const homeService = {
   },
 
   /**
-   * 家长端首页聚合：今日课表 + 课包概览 + 孩子列表
-   * 对接 GET /home/parent；Mock 用本地学员/排课/课包拼装
+   * 家长端首页聚合：今日课表 + 课时概览 + 孩子列表
+   * 对接 GET /home/parent；Mock 用本地学员/排课/课时拼装
    */
   getParent: async (_profileId: string, campusId?: string): Promise<ParentHomeData | null> => {
     try {

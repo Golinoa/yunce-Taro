@@ -195,7 +195,7 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
   /** 学员扣课/剩余/课程显示 */
   const getStudentCardInfo = useCallback(
     (student: Student) => {
-      // 课时来源 = 会员卡（课包已整套移除）
+      // 课时来源 = 会员卡
       const cards = studentMemberCards.get(student.id) ?? [];
       const totalRemaining = cards.reduce((sum, card) => sum + getMemberCardRemaining(card), 0);
       if (cards.length === 0) {

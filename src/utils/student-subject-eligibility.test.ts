@@ -55,7 +55,7 @@ describe('getSubjectRemaining', () => {
     expect(getSubjectRemaining(s, PIANO)).toBe(0);
   });
 
-  it('两本账同一科目 ⇒ 后端已合并，取合并后的剩余', () => {
+  it('同一科目有多张卡 ⇒ 后端已合并，取合并后的剩余', () => {
     const s = student({
       subject_hours: [
         {

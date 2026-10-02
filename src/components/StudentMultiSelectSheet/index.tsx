@@ -87,7 +87,7 @@ const StudentRow: React.FC<{
   const [expanded, setExpanded] = useState(false);
 
   /**
-   * 展示用的会员卡列表（唯一账本；课包已整套移除）。
+   * 展示用的会员卡列表。
    * ⚠️ 只用于**展示卡名**；「能不能加」一律走 `utils/student-subject-eligibility`。
    */
   const cards = useMemo(
@@ -338,7 +338,7 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
     }
 
     /**
-     * 科目过滤（2026-10-02 重写）：按 `subject_hours` 判，不再看聚合假卡包。
+     * 科目过滤：按 `subject_hours` 判。
      *
      * - 选了具体科目 ⇒ 只显示**有这个科目**的学员（剩 0 的也显示，好让人看到"上完了"）；
      * - `subject_hours` 缺失（接口没给）⇒ 放行，不能因为数据缺失把人全过滤掉；

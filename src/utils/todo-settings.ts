@@ -17,7 +17,7 @@ export interface TodoSettings {
   attendanceCheckin: boolean;
   /** 学员课时不足 / 续费提醒 */
   studentRecharge: boolean;
-  /** 课包即将到期等财务类提醒 */
+  /** 会员卡即将到期等财务类提醒 */
   financePackage: boolean;
   /** 请假待审批 */
   leavePending: boolean;

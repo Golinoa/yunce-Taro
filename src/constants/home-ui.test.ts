@@ -66,7 +66,7 @@ describe('home-ui 快捷入口常量', () => {
     expect(labels.includes('课时充值')).toBe(false);
   });
 
-  it('校长/管理员金刚区保留教务工具且首项为课时导入（课包页已删，改指向课时导入）', () => {
+  it('校长/管理员金刚区保留教务工具且首项为课时导入', () => {
     expect(HOME_QUICK_ENTRIES.length).toBe(8);
     expect(HOME_QUICK_ENTRIES[0]?.label).toBe('课时导入');
     expect(HOME_QUICK_ENTRIES[0]?.url).toContain(

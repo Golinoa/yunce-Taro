@@ -478,7 +478,7 @@ export const lessonRecordService = {
     return;
   },
 
-  /** 修改消课记录；课时变更由后端在同一事务内同步课包/欠课 */
+  /** 修改消课记录；课时变更由后端在同一事务内同步会员卡/欠课 */
   update: async (
     recordId: string,
     updates: {
@@ -499,7 +499,7 @@ export const lessonRecordService = {
     return mapBackendLessonRecord(updated);
   },
 
-  /** 撤销消课记录（恢复课包余额，按扣减来源分别回加） */
+  /** 撤销消课记录（恢复会员卡余额，按扣减来源分别回加） */
   revoke: async (recordId: string, _operatorId: string, _reason: string) => {
     await put(`/lesson-records/${recordId}`, {
       status: 'CANCELLED',

@@ -39,7 +39,7 @@ export const FEE_METHOD_OPTIONS = [
 export type StudentType = 'new' | 'old';
 
 /**
- * 老生历史课包草稿（**沿用原设计：科目库口径**，2026-09-27 应用户要求回滚 UI）。
+ * 老生历史课时草稿（**沿用原设计：科目库口径**）。
  *
  * - 科目来自**科目库**（与卡包弹框不同：弹框选的是卡种）；
  * - 有效期**可留空 = 永久**（`expireEnabled` 关闭即永久）；
@@ -93,7 +93,7 @@ export interface UseStudentFormReturn {
 
   studentType: StudentType;
   setStudentType: React.Dispatch<React.SetStateAction<StudentType>>;
-  /** 老生：多课包迁移（科目库口径草稿；增删改由表单处理，提交时映射为卡种） */
+  /** 老生：多张课时卡迁移（科目库口径草稿；增删改由表单处理，提交时映射为卡种） */
   legacyPackages: LegacyPackageDraft[];
   addLegacyPackage: () => void;
   removeLegacyPackage: (id: string) => void;
@@ -346,7 +346,7 @@ export function useStudentForm(): UseStudentFormReturn {
     }
 
     if (!isEdit) {
-      // ⚠️ 必填只有学员姓名：历史课包为**选填**——没填就直接建档，填了才逐行校验
+      // ⚠️ 必填只有学员姓名：历史课时卡为**选填**——没填就直接建档，填了才逐行校验
       if (studentType === 'old' && legacyPackages.length > 0) {
         for (let i = 0; i < legacyPackages.length; i += 1) {
           const pkg = legacyPackages[i];
@@ -393,7 +393,7 @@ export function useStudentForm(): UseStudentFormReturn {
     }
 
     if (!isEdit && studentType === 'old' && legacyPackages.length > 0) {
-      // 历史课包选填：没填直接建档；填了才逐行校验（与 validate() 同一套规则）
+      // 历史课时卡选填：没填直接建档；填了才逐行校验（与 validate() 同一套规则）
       for (let i = 0; i < legacyPackages.length; i += 1) {
         const pkg = legacyPackages[i];
         const label = legacyPackages.length > 1 ? `课时卡${i + 1}` : '课时卡';

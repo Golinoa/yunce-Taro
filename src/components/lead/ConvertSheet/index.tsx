@@ -10,7 +10,6 @@ import type { ConversionType } from '@/types/lead';
  * ConvertSheet - 转正式学员弹窗
  *
  * 流程：推荐选班（非必选）→ 确认转化。
- * 2026-10-02：课包已整套移除 ⇒ 原「选课包充值」步骤一并删除（课时改由会员卡承载）。
  */
 
 export interface ConvertSheetProps {
@@ -24,10 +23,7 @@ export interface ConvertSheetProps {
   /** 试听过的班级 ID 列表（优先推荐） */
   trialClassIds?: string[];
   /** 提交回调 */
-  /**
-   * 提交回调。
-   * 2026-10-02：课包已整套移除 ⇒ 不再有 `packageId`（转化只落班级 + 备注）。
-   */
+  /** 提交回调。 */
   onSubmit: (params: {
     leadId: string;
     conversionType: ConversionType;
@@ -38,7 +34,7 @@ export interface ConvertSheetProps {
   className?: string;
 }
 
-/** 转化步骤（课包步骤已随概念移除） */
+/** 转化步骤 */
 type Step = 'class' | 'confirm';
 
 const ConvertSheet: React.FC<ConvertSheetProps> = ({

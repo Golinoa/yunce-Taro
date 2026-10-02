@@ -77,7 +77,7 @@ const LessonSupplementPage: React.FC = () => {
   const [classStudents, setClassStudents] = useState<Student[]>([]);
   const [teacherStudents, setTeacherStudents] = useState<Student[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  /** 学员会员卡（唯一账本；课包已整套移除）：补录提交时的扣减来源 */
+  /** 学员会员卡：补录提交时的扣减来源 */
   const [studentMemberCards, setStudentMemberCards] = useState<Map<string, MemberCardDetail[]>>(
     new Map(),
   );

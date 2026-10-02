@@ -1,6 +1,6 @@
 /**
  * 课时状态判断工具
- * 根据剩余课时、课包可用性和校区预警阈值返回卡片状态
+ * 根据剩余课时、会员卡可用性和校区预警阈值返回卡片状态
  */
 import type { StudentCardStatus, StudentProgress } from '@/types/student';
 import { getAlertThreshold } from '@/utils/alert-config';
@@ -61,8 +61,6 @@ export function getHoursColorClass(
  * - 正常：有可用卡且未触及预警
  *
  * 透支（owe）：若仍有可用卡 → 黄；若无可用卡 → 红
- *
- * 2026-10-02：口径由「课包」改为**会员卡**（唯一账本），字段名随之为 `member_cards`。
  */
 export function getStudentCardStatus(
   student: {
@@ -140,7 +138,7 @@ export function getProgressGradientClass(status: StudentCardStatus): string {
   }
 }
 
-/** 计算学员总课时进度（会员卡口径；课包已整套移除） */
+/** 计算学员总课时进度 */
 export function calcStudentProgress(student: {
   member_cards?: { total_count: number; remaining_count: number }[];
 }): StudentProgress {

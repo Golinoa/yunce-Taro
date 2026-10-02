@@ -140,7 +140,7 @@ const LessonForm: React.FC = () => {
   const [studentSubjects, setStudentSubjects] = useState<Map<string, Subject | null>>(new Map());
   /**
    * 学员会员卡（含卡种科目）：点名扣减的**第二本账**。
-   * 唯一账本 —— 只有会员卡的学员此前根本点不了名（旧课包已整套移除）。
+   * 只有会员卡的学员此前根本点不了名。
    */
   const [studentMemberCards, setStudentMemberCards] = useState<Map<string, MemberCardDetail[]>>(
     new Map(),

@@ -90,16 +90,9 @@ export interface Student {
   created_at: string;
   updated_at: string;
   /**
-   * 学员**有效课包**覆盖的科目 id 集合（去重；学员列表接口返回，2026-10-02 起）。
+   * 学员**每个科目**的可用剩余课时（学员列表接口一次返回）。
    *
-   * ⚠️ 已由 `subject_hours` 派生，新代码一律用 `subject_hours`（它带"每个科目剩多少"）。
-   * 这里保留只为兼容既有调用；「空数组 = 通用放行」是**历史坑**（缺失被 `?? []` 抹平），勿再依赖。
-   */
-  package_subject_ids?: string[];
-  /**
-   * 学员**每个科目**的可用剩余课时（学员列表接口一次返回，2026-10-02 起）。
-   *
-   * - 来源 = 会员卡（唯一账本；课包已于 2026-10-02 整套移除）；
+   * - 来源 = 会员卡；
    * - ⚠️ **字段缺失 = `undefined`**（接口没给），与"给了一个空数组"含义不同：
    *   缺失 ⇒ 不知道，按"不拦"处理；空数组 ⇒ 确实一个科目的课都没有。
    *   别再用 `?? []` 把两者抹平（曾导致科目过滤恒放行）。
@@ -107,7 +100,7 @@ export interface Student {
   subject_hours?: StudentSubjectHours[];
   // 关联查询字段
   /**
-   * 会员卡课时摘要（唯一账本）。
+   * 会员卡课时摘要。
    *
    * ⚠️ 列表接口只返回**聚合值**（后端 `totalHours/usedHours` 已按会员卡算好），
    * 所以列表侧会合成一条 `id = {studentId}-aggregate` 的汇总卡用于展示与状态判断；
@@ -157,13 +150,6 @@ export type StudentFilter = 'all' | 'sufficient' | 'low' | 'expiring' | 'expired
 
 /** 科目筛选 */
 export type SubjectFilter = string;
-
-/** 课包标签（卡片展示用） */
-export interface PackageTag {
-  name: string;
-  remainingHours: number;
-  color: 'primary' | 'amber' | 'danger' | 'purple' | 'accent' | 'info';
-}
 
 /** 欠课信息 */
 export interface OweInfo {
