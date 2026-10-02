@@ -17,6 +17,8 @@ interface BackendStudentListItem {
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
   inviteCode?: null | string;
+  /** 学员有效课包覆盖的科目 id 集合（2026-10-02 起，供添加学员弹窗按科目过滤） */
+  packageSubjectIds?: string[];
   name: string;
   nickname?: null | string;
   parentCount?: number;
@@ -155,6 +157,7 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
     status: mapBackendStudentStatus(item.status),
     created_at: item.createdAt,
     updated_at: item.createdAt,
+    package_subject_ids: item.packageSubjectIds ?? [],
     course_packages:
       totalHours > 0 || usedHours > 0
         ? [

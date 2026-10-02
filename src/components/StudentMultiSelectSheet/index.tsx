@@ -48,15 +48,47 @@ export interface StudentMultiSelectSheetProps {
 
 const ALL_SUBJECT_VALUE = 'all';
 
-/** 解析出「有效」的关联科目 ID：空值或不在科目列表中的一律视为未关联 */
-const resolveEffectiveSubjectId = (subjectId?: string, subjects: Subject[] = []) =>
-  subjectId && subjects.some((s) => s.id === subjectId) ? subjectId : undefined;
+/**
+ * 解析出「有效」的关联科目 ID。
+ * 2026-10-02 修复：班级的 `subject` 是自由字符串、存在**两代数据**（新数据存 Subject UUID、
+ * 种子/老数据存中文名称），原来只按 id 比对 ⇒ 名称永远不命中 ⇒ 过滤回落「全部科目」失效。
+ * 现在同时接受 id 与名称，命中后统一归一化为 Subject.id。
+ */
+export const resolveEffectiveSubjectId = (subjectId?: string, subjects: Subject[] = []) => {
+  if (!subjectId) return undefined;
+  const hit = subjects.find((s) => s.id === subjectId || s.name === subjectId);
+  return hit?.id;
+};
 
 /** 计算与当前科目筛选匹配的会员卡（无科目约束/通用卡始终匹配） */
 const getRelevantPackages = (student: Student, filterSubjectId: string) => {
   const packages = student.course_packages || [];
   if (filterSubjectId === ALL_SUBJECT_VALUE) return packages;
   return packages.filter((pkg) => !pkg.subject_id || pkg.subject_id === filterSubjectId);
+};
+
+/**
+ * 判断学员是否匹配当前科目筛选。
+ *
+ * 2026-10-02 修复过滤失效的根因：学员**列表**接口只返回课时聚合，前端把每个学员映射成
+ * 一个**无科目的"课时汇总"假卡包** ⇒ `pkg.subject_id` 恒为空 ⇒ 按"通用卡"恒放行 ⇒ 过滤形同虚设。
+ * 现在列表接口返回 `package_subject_ids`（学员有效课包覆盖的科目集合），优先按它判定：
+ * - 有集合且非空 ⇒ 只放行覆盖了所选科目的学员；
+ * - 集合为空 ⇒ 无课包（可能只有会员卡等通用余额）⇒ 视为通用、放行（与"无科目约束的卡始终匹配"同口径）；
+ * - 字段缺失（旧缓存/其他数据源）⇒ 回落旧的卡包比对逻辑，行为不变。
+ */
+export const matchSubjectFilter = (
+  student: Pick<Student, 'course_packages' | 'package_subject_ids'>,
+  subjectFilterId: string,
+): boolean => {
+  if (subjectFilterId === ALL_SUBJECT_VALUE) return true;
+  if (student.package_subject_ids) {
+    const ids = student.package_subject_ids;
+    if (ids.length === 0) return true;
+    return ids.includes(subjectFilterId);
+  }
+  const packages = student.course_packages || [];
+  return packages.some((pkg) => !pkg.subject_id || pkg.subject_id === subjectFilterId);
 };
 
 /** 单个学员行：勾选框在右，展示对应科目会员卡（多卡可展开），课时信息精简 */
@@ -232,14 +264,6 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
     },
     [tempIds, atCapacity, maxSelectable],
   );
-
-  /** 判断学员是否匹配当前科目筛选 */
-  const matchSubjectFilter = (student: Student, subjectFilterId: string) => {
-    if (subjectFilterId === ALL_SUBJECT_VALUE) return true;
-    const packages = student.course_packages || [];
-    // 学员课包关联了该科目，或课包为通用（无 subject_id）时均视为符合
-    return packages.some((pkg) => !pkg.subject_id || pkg.subject_id === subjectFilterId);
-  };
 
   /** 按搜索、科目、未排班、已勾选过滤后的学员 */
   const filteredStudents = useMemo(() => {

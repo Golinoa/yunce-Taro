@@ -75,6 +75,12 @@ export interface Student {
   status?: 'active' | 'deleted';
   created_at: string;
   updated_at: string;
+  /**
+   * 学员**有效课包**覆盖的科目 id 集合（去重；学员列表接口返回，2026-10-02 起）。
+   * 「添加学员」弹窗按它做科目过滤——列表里的 `course_packages` 是课时聚合假包（无科目），
+   * 之前过滤恒放行。空数组 = 无课包（可能只有会员卡等通用余额）⇒ 视为通用、不过滤。
+   */
+  package_subject_ids?: string[];
   // 关联查询字段
   course_packages?: {
     id: string;
