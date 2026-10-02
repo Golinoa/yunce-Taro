@@ -15,6 +15,23 @@ export interface StudentContact {
   phone: string;
 }
 
+/** 学员科目剩余课时的来源账本 */
+export type SubjectHoursSource = 'memberCard' | 'package';
+
+/**
+ * 学员在**某一个科目**上的可用剩余（学员列表接口 `subjectHours`）。
+ *
+ * `remaining` 为 0 的科目**也会返回** —— 界面要显示"钢琴剩 0 课时"，
+ * 不能让"已经上完"和"压根没有"看起来一样。
+ */
+export interface StudentSubjectHours {
+  /** 归一后的科目标识（通常是 Subject.id；老数据可能是中文名） */
+  subjectId: string;
+  subjectName: string;
+  remaining: number;
+  sources: SubjectHoursSource[];
+}
+
 /**
  * 推荐关系里的「对方学员」最小引用（B9 / R8）。
  *
@@ -77,10 +94,20 @@ export interface Student {
   updated_at: string;
   /**
    * 学员**有效课包**覆盖的科目 id 集合（去重；学员列表接口返回，2026-10-02 起）。
-   * 「添加学员」弹窗按它做科目过滤——列表里的 `course_packages` 是课时聚合假包（无科目），
-   * 之前过滤恒放行。空数组 = 无课包（可能只有会员卡等通用余额）⇒ 视为通用、不过滤。
+   *
+   * ⚠️ 已由 `subject_hours` 派生，新代码一律用 `subject_hours`（它带"每个科目剩多少"）。
+   * 这里保留只为兼容既有调用；「空数组 = 通用放行」是**历史坑**（缺失被 `?? []` 抹平），勿再依赖。
    */
   package_subject_ids?: string[];
+  /**
+   * 学员**每个科目**的可用剩余课时（学员列表接口一次返回，2026-10-02 起）。
+   *
+   * - 两本账取并集：旧课包（`package`，遗留账本，存量仍在消耗）+ 会员卡（`memberCard`）；
+   * - ⚠️ **字段缺失 = `undefined`**（接口没给），与"给了一个空数组"含义不同：
+   *   缺失 ⇒ 不知道，按"不拦"处理；空数组 ⇒ 确实一个科目的课都没有。
+   *   别再用 `?? []` 把两者抹平（曾导致科目过滤恒放行）。
+   */
+  subject_hours?: StudentSubjectHours[];
   // 关联查询字段
   course_packages?: {
     id: string;

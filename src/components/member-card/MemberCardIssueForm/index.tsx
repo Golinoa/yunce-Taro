@@ -20,6 +20,7 @@ import { auditLogService } from '@/services/audit-log';
 import { cardTypeService } from '@/services/card-type';
 import { lessonDebtService } from '@/services/lesson-debt';
 import { memberCardService } from '@/services/member-card';
+import { useStudentStore } from '@/stores';
 import type { CardType, CardTypeKind } from '@/types/card-type';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
@@ -48,6 +49,11 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
   const { profile } = useAuth();
   const operatorName = profile?.name || '';
   const operatorId = profile?.id || '';
+  /**
+   * 发卡会改变学员「每个科目的可用课时」（弹窗过滤/显示/校验都依赖它）
+   * ⇒ 必须让学员列表缓存失效，否则回到班级页看到的还是发卡前的旧数据。
+   */
+  const invalidateStudents = useStudentStore((state) => state.invalidate);
 
   const [cardTypes, setCardTypes] = useState<CardType[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
@@ -258,6 +264,8 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
        *    会导致 `onSuccess`/`navigateBack` 永不执行。
        */
       const finish = () => {
+        // 先失效学员缓存（含按科目课时），再回调 —— 保证回到列表页时拿到发卡后的数据
+        invalidateStudents(operatorId);
         if (onSuccess) onSuccess();
         else Taro.navigateBack();
         void (async () => {
@@ -309,6 +317,7 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
     operatorName,
     profile,
     handlePendingDebt,
+    invalidateStudents,
     onSuccess,
   ]);
 

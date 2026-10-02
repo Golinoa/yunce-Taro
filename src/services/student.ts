@@ -17,8 +17,19 @@ interface BackendStudentListItem {
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
   inviteCode?: null | string;
-  /** 学员有效课包覆盖的科目 id 集合（2026-10-02 起，供添加学员弹窗按科目过滤） */
+  /** 学员有效课包覆盖的科目 id 集合（已由 subjectHours 派生，兼容保留） */
   packageSubjectIds?: string[];
+  /**
+   * 学员每个科目的可用剩余（2026-10-02 起）：旧课包 ∪ 会员卡，接口**一次给全**，
+   * 切换科目标签不发请求。
+   * ⚠️ 缺失 = undefined，绝不能被 `?? []` 抹成空数组（会让科目过滤恒放行）。
+   */
+  subjectHours?: {
+    subjectId: string;
+    subjectName: string;
+    remaining: number;
+    sources: ('package' | 'memberCard')[];
+  }[];
   name: string;
   nickname?: null | string;
   parentCount?: number;
@@ -157,7 +168,17 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
     status: mapBackendStudentStatus(item.status),
     created_at: item.createdAt,
     updated_at: item.createdAt,
-    package_subject_ids: item.packageSubjectIds ?? [],
+    /**
+     * ⚠️ 缺失保持 `undefined`（不再 `?? []`）：「接口没给」和「确实没有科目」必须可分，
+     * 否则前端会把"不知道"当成"无课包 ⇒ 通用 ⇒ 放行"，科目过滤形同虚设。
+     */
+    package_subject_ids: item.packageSubjectIds,
+    subject_hours: item.subjectHours?.map((item_) => ({
+      subjectId: item_.subjectId,
+      subjectName: item_.subjectName,
+      remaining: Number(item_.remaining ?? 0),
+      sources: item_.sources ?? [],
+    })),
     course_packages:
       totalHours > 0 || usedHours > 0
         ? [

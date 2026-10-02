@@ -20,6 +20,11 @@ import Icon from '@/components/Icon';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import type { Subject } from '@/types/campus';
 import type { Student } from '@/types/student';
+import {
+  evaluateStudent,
+  type StudentEligibility,
+  type SubjectTarget,
+} from '@/utils/student-subject-eligibility';
 
 export interface StudentMultiSelectSheetProps {
   /** 弹窗显隐 */
@@ -40,6 +45,11 @@ export interface StudentMultiSelectSheetProps {
   maxSelectable?: number;
   /** 是否展示「未排班」快捷筛选（仅新增/编辑课程页开启） */
   showUnscheduledFilter?: boolean;
+  /**
+   * 严格模式：默认「没有该科目的课时」只是软提醒（可勾，确认前提示）；
+   * 开启后升级为硬拦（不可勾）。剩 0 一律硬拦，与这个开关无关。
+   */
+  strictMode?: boolean;
   /** 关闭 */
   onClose: () => void;
   /** 确认选择 */
@@ -60,45 +70,32 @@ export const resolveEffectiveSubjectId = (subjectId?: string, subjects: Subject[
   return hit?.id;
 };
 
-/** 计算与当前科目筛选匹配的会员卡（无科目约束/通用卡始终匹配） */
+/**
+ * 计算与当前科目筛选匹配的会员卡（无科目约束/通用卡始终匹配）。
+ *
+ * ⚠️ 只用于**展示**（列表里的 course_packages 是聚合假包，无科目维度），
+ * 过滤与校验一律走 `utils/student-subject-eligibility`，别再用它判"能不能加"。
+ */
 const getRelevantPackages = (student: Student, filterSubjectId: string) => {
   const packages = student.course_packages || [];
   if (filterSubjectId === ALL_SUBJECT_VALUE) return packages;
   return packages.filter((pkg) => !pkg.subject_id || pkg.subject_id === filterSubjectId);
 };
 
-/**
- * 判断学员是否匹配当前科目筛选。
- *
- * 2026-10-02 修复过滤失效的根因：学员**列表**接口只返回课时聚合，前端把每个学员映射成
- * 一个**无科目的"课时汇总"假卡包** ⇒ `pkg.subject_id` 恒为空 ⇒ 按"通用卡"恒放行 ⇒ 过滤形同虚设。
- * 现在列表接口返回 `package_subject_ids`（学员有效课包覆盖的科目集合），优先按它判定：
- * - 有集合且非空 ⇒ 只放行覆盖了所选科目的学员；
- * - 集合为空 ⇒ 无课包（可能只有会员卡等通用余额）⇒ 视为通用、放行（与"无科目约束的卡始终匹配"同口径）；
- * - 字段缺失（旧缓存/其他数据源）⇒ 回落旧的卡包比对逻辑，行为不变。
- */
-export const matchSubjectFilter = (
-  student: Pick<Student, 'course_packages' | 'package_subject_ids'>,
-  subjectFilterId: string,
-): boolean => {
-  if (subjectFilterId === ALL_SUBJECT_VALUE) return true;
-  if (student.package_subject_ids) {
-    const ids = student.package_subject_ids;
-    if (ids.length === 0) return true;
-    return ids.includes(subjectFilterId);
-  }
-  const packages = student.course_packages || [];
-  return packages.some((pkg) => !pkg.subject_id || pkg.subject_id === subjectFilterId);
-};
-
-/** 单个学员行：勾选框在右，展示对应科目会员卡（多卡可展开），课时信息精简 */
+/** 单个学员行：勾选框在右，展示该科目剩余课时（多卡可展开），不可加入时灰显并写明原因 */
 const StudentRow: React.FC<{
   student: Student;
   checked: boolean;
   disabled: boolean;
   filterSubjectId: string;
+  /**
+   * 当前科目的判定结果（由 `utils/student-subject-eligibility` 算出）。
+   * `undefined` = 当前是「全部科目」视图，不做科目维度校验。
+   */
+  eligibility?: StudentEligibility;
+  subjectLabel?: string;
   onToggle: () => void;
-}> = ({ student, checked, disabled, filterSubjectId, onToggle }) => {
+}> = ({ student, checked, disabled, filterSubjectId, eligibility, subjectLabel, onToggle }) => {
   const [expanded, setExpanded] = useState(false);
 
   const packages = useMemo(
@@ -110,9 +107,26 @@ const StudentRow: React.FC<{
     [student.course_packages],
   );
 
+  /**
+   * 课时文案：选了具体科目就显示**该科目**的剩余（不再显示跨科目总数），
+   * 没有科目维度数据（旧接口/全部科目视图）才回落总数。
+   */
+  const hoursText = (() => {
+    if (eligibility?.remaining === null || eligibility?.remaining === undefined) {
+      return `${totalRemaining} 课时`;
+    }
+    if (eligibility.blocking && eligibility.label) return eligibility.label;
+    return `${subjectLabel || '该科目'} ${eligibility.remaining} 课时`;
+  })();
+
+  const blocked = Boolean(eligibility?.blocking);
+
   return (
     <View
-      className="flex flex-row items-center gap-[20rpx] px-[16rpx] py-[28rpx] press-bg border-b-[2rpx] border-border/40"
+      className={cn(
+        'flex flex-row items-center gap-[20rpx] px-[16rpx] py-[28rpx] press-bg border-b-[2rpx] border-border/40',
+        blocked && 'opacity-60',
+      )}
       onClick={onToggle}
     >
       {/* 头像：统一 StudentAvatar */}
@@ -158,16 +172,20 @@ const StudentRow: React.FC<{
               )}
             </>
           )}
-          {/* 课时信息：极简 */}
+          {/* 课时信息：选了科目就显示「该科目」的剩余，不可加入时转成红色原因 */}
           <Text
-            className={cn(
-              'text-[22rpx]',
-              totalRemaining > 0 ? 'text-muted-foreground' : 'text-muted-foreground/70',
-            )}
+            className={cn('text-[22rpx]', blocked ? 'text-destructive' : 'text-muted-foreground')}
           >
-            {totalRemaining} 课时
+            {hoursText}
           </Text>
         </View>
+
+        {/* 软提醒：没有该科目的课时（可勾，但确认时会再提示一次） */}
+        {eligibility && !eligibility.ok && !eligibility.blocking && eligibility.label && (
+          <Text className="text-[22rpx] text-warning">
+            {eligibility.label}，加入后点名将无可用课时
+          </Text>
+        )}
 
         {/* 展开后的全部会员卡名称 */}
         {expanded && packages.length > 1 && (
@@ -217,6 +235,7 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
   subjects = [],
   maxSelectable,
   showUnscheduledFilter = false,
+  strictMode = false,
   onClose,
   onConfirm,
 }) => {
@@ -243,11 +262,48 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
   // 是否已到容纳上限（用于禁止继续勾选）
   const atCapacity = !!maxSelectable && maxSelectable > 0 && tempIds.length >= maxSelectable;
 
+  /**
+   * 当前选中的科目（undefined = 「全部科目」视图 ⇒ 不做科目维度的过滤与校验）。
+   * 口径统一走 `utils/student-subject-eligibility`，本组件不再自己判"能不能加"。
+   */
+  const activeSubject = useMemo(
+    () =>
+      filterSubjectId === ALL_SUBJECT_VALUE
+        ? undefined
+        : subjects.find((s) => s.id === filterSubjectId),
+    [filterSubjectId, subjects],
+  );
+  const subjectTarget: SubjectTarget | undefined = useMemo(
+    () => (activeSubject ? { id: activeSubject.id, name: activeSubject.name } : undefined),
+    [activeSubject],
+  );
+
+  /** 每个学员在当前科目下的判定结果（无科目视图时为 undefined） */
+  const evaluate = useCallback(
+    (student: Student): StudentEligibility | undefined =>
+      subjectTarget
+        ? evaluateStudent(student, subjectTarget, {
+            strictMode,
+            subjectLabel: activeSubject?.name,
+          })
+        : undefined,
+    [subjectTarget, strictMode, activeSubject?.name],
+  );
+
   const toggle = useCallback(
     (id: string) => {
       // 已选中：随时允许取消
       if (tempIds.includes(id)) {
         setTempIds((prev) => prev.filter((i) => i !== id));
+        return;
+      }
+      // 硬拦：这个科目没有可用课时（剩 0，或严格模式下压根没有该科目）
+      const student = students.find((item) => item.id === id);
+      if (student && evaluate(student)?.blocking) {
+        Taro.showToast({
+          title: evaluate(student)?.label ?? '该学员没有本课程的可用课时',
+          icon: 'none',
+        });
         return;
       }
       // 单选上限 1：点选新学员直接替换，无需先取消
@@ -262,7 +318,7 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
       }
       setTempIds((prev) => [...prev, id]);
     },
-    [tempIds, atCapacity, maxSelectable],
+    [tempIds, atCapacity, maxSelectable, students, evaluate],
   );
 
   /** 按搜索、科目、未排班、已勾选过滤后的学员 */
@@ -286,19 +342,80 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
       return students.filter((s) => matchKeyword(s) && (s.class_ids?.length ?? 0) === 0);
     }
 
+    /**
+     * 科目过滤（2026-10-02 重写）：按 `subject_hours` 判，不再看聚合假卡包。
+     *
+     * - 选了具体科目 ⇒ 只显示**有这个科目**的学员（剩 0 的也显示，好让人看到"上完了"）；
+     * - `subject_hours` 缺失（接口没给）⇒ 放行，不能因为数据缺失把人全过滤掉；
+     * - 「全部科目」视图不做科目过滤。
+     */
     return students.filter((student) => {
       if (!matchKeyword(student)) return false;
-      // 科目过滤
-      if (!matchSubjectFilter(student, filterSubjectId)) return false;
-      return true;
+      if (!activeSubject) return true;
+      if (!student.subject_hours) return true;
+      return student.subject_hours.some(
+        (item) =>
+          item.subjectId === activeSubject.id ||
+          item.subjectName === activeSubject.name ||
+          item.subjectId === activeSubject.name,
+      );
     });
-  }, [students, keyword, filterSubjectId, unscheduledOnly, selectedOnly, tempIds]);
+  }, [students, keyword, unscheduledOnly, selectedOnly, tempIds, activeSubject]);
 
-  const handleConfirm = () => {
+  /**
+   * 确认：先把「硬拦」的人剔除（理论上勾不上，防缓存脏数据绕过），
+   * 再把「软提醒」的人列出来要一次确认 —— 允许机构"先排课、后补卡"。
+   */
+  const handleConfirm = async () => {
     if (tempIds.length === 0) {
       Taro.showToast({ title: '请至少选择 1 名学员', icon: 'none' });
       return;
     }
+
+    /**
+     * ⚠️ 只校验**本次新勾选**的人：编辑班级时，原来就在班里的学员可能课时已经用完，
+     * 若把他也算进硬拦 ⇒ 整个班级都保存不了（只能先把他移出去）。
+     * 存量成员只做展示（灰显/提示），不阻塞保存。
+     */
+    const existingIds = new Set(selectedIds);
+    const newlyAdded = tempIds
+      .filter((id) => !existingIds.has(id))
+      .map((id) => students.find((item) => item.id === id))
+      .filter((item): item is Student => Boolean(item));
+    const blocking = subjectTarget
+      ? newlyAdded
+          .map((student) => ({ student, result: evaluate(student) }))
+          .filter((item) => item.result?.blocking)
+      : [];
+    const warned = subjectTarget
+      ? newlyAdded
+          .map((student) => ({ student, result: evaluate(student) }))
+          .filter((item) => item.result && !item.result.ok && !item.result.blocking)
+      : [];
+
+    if (blocking.length > 0) {
+      Taro.showToast({
+        title: `${blocking[0].student.name}${blocking[0].result?.label ?? '不可加入'}`,
+        icon: 'none',
+      });
+      return;
+    }
+
+    if (warned.length > 0) {
+      const names = warned
+        .map((item) => item.student.name)
+        .slice(0, 3)
+        .join('、');
+      const more = warned.length > 3 ? ` 等 ${warned.length} 人` : '';
+      const { confirm } = await Taro.showModal({
+        title: '确认加入',
+        content: `${names}${more}没有${activeSubject?.name ?? '该科目'}的课时，加入后点名将没有可用课时。仍要加入吗？`,
+        confirmText: '仍要加入',
+        cancelText: '返回修改',
+      });
+      if (!confirm) return;
+    }
+
     onConfirm(tempIds);
     onClose();
   };
@@ -457,16 +574,23 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
           <ScrollView scrollY className="flex-1 min-h-0">
             {/* 顶部 pt-[16rpx]：第一排学员与上方统计栏留出间距，避免贴头（全引用处统一生效） */}
             <View className="flex flex-col pt-[16rpx]">
-              {filteredStudents.map((s) => (
-                <StudentRow
-                  key={s.id}
-                  student={s}
-                  checked={tempIds.includes(s.id)}
-                  disabled={atCapacity && !tempIds.includes(s.id)}
-                  filterSubjectId={filterSubjectId}
-                  onToggle={() => toggle(s.id)}
-                />
-              ))}
+              {filteredStudents.map((s) => {
+                const eligibility = evaluate(s);
+                return (
+                  <StudentRow
+                    key={s.id}
+                    student={s}
+                    checked={tempIds.includes(s.id)}
+                    disabled={
+                      (atCapacity && !tempIds.includes(s.id)) || Boolean(eligibility?.blocking)
+                    }
+                    filterSubjectId={filterSubjectId}
+                    eligibility={eligibility}
+                    subjectLabel={activeSubject?.name}
+                    onToggle={() => toggle(s.id)}
+                  />
+                );
+              })}
             </View>
           </ScrollView>
         )}
@@ -478,7 +602,9 @@ const StudentMultiSelectSheet: React.FC<StudentMultiSelectSheetProps> = ({
               'w-full py-[24rpx] rounded-full flex items-center justify-center press-scale',
               tempIds.length > 0 ? 'bg-primary shadow-float' : 'bg-muted',
             )}
-            onClick={handleConfirm}
+            onClick={() => {
+              void handleConfirm();
+            }}
           >
             <Text
               className={cn(
