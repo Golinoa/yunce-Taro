@@ -59,7 +59,7 @@ export async function executeSingleDeduct(input: {
   const error = validateSingleSubmit({
     hasStudent: !!input.selectedStudent,
     // 有课包或会员卡任一个就能消课（"有扣减来源"）
-    hasPackage: !!(input.matchedPackage || input.matchedMemberCard),
+    hasPackage: !!input.matchedMemberCard,
     hoursUsed: input.hoursUsed,
   });
   if (error) {
@@ -68,10 +68,8 @@ export async function executeSingleDeduct(input: {
   }
 
   const selectedStudent = input.selectedStudent!;
-  const matchedPackage = input.matchedPackage ?? null;
-  // 扣哪本账：旧课包优先，没有才落会员卡（口径见 utils/lesson-deduction-source）
+  // 扣哪张卡（唯一口径；课包已整套移除）
   const deduction = resolveLessonDeduction({
-    packages: matchedPackage ? [matchedPackage] : [],
     memberCards: input.matchedMemberCard ? [input.matchedMemberCard] : [],
     hoursNeeded: input.hoursUsed,
   });
@@ -87,8 +85,8 @@ export async function executeSingleDeduct(input: {
         teacher_id: input.selectedTeachingTeacherId || input.currentTeacherId || '',
         operator_teacher_id: input.currentTeacherId || input.selectedTeachingTeacherId,
         student_id: selectedStudent.id,
-        package_id: deduction.kind === 'package' ? deduction.id : '',
-        member_card_id: deduction.kind === 'memberCard' ? deduction.id : undefined,
+        package_id: '',
+        member_card_id: deduction.id,
         class_id: input.classId || undefined,
         schedule_id: input.scheduleId || undefined,
         lesson_date: input.lessonDate,
@@ -108,8 +106,6 @@ export async function executeSingleDeduct(input: {
         title: `${selectedStudent.name} 课时已消课`,
         content: `本次消课 ${input.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
           createdRecord.remaining_hours,
-          deduction,
-          matchedPackage ?? undefined,
           input.matchedMemberCard ?? undefined,
           input.hoursUsed,
         )} 课时`,
@@ -125,12 +121,11 @@ export async function executeSingleDeduct(input: {
           operatorRole: input.profile?.currentContext?.role || 'unknown',
           targetType: 'lesson_record',
           targetId: createdRecord.id,
-          detail: `单人消课：学员「${selectedStudent.name}」消课 ${input.hoursUsed} 课时（来源「${deduction.name}」）`,
+          detail: `单人消课：学员「${selectedStudent.name}」消课 ${input.hoursUsed} 课时（会员卡「${deduction.name}」）`,
           meta: {
             studentId: selectedStudent.id,
             studentName: selectedStudent.name,
-            packageId: deduction.kind === 'package' ? deduction.id : undefined,
-            memberCardId: deduction.kind === 'memberCard' ? deduction.id : undefined,
+            memberCardId: deduction.id,
             hours: input.hoursUsed,
           },
         });

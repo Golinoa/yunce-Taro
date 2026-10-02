@@ -1,31 +1,17 @@
 /**
- * 「这次点名扣哪本账」的用例。
+ * 「这次点名扣哪张卡」的用例。
  *
- * 这条链路是资损链路：挑错卡 = 扣错科目的次数。两端都要锁死：
- * ① 有旧课包时必须仍走旧课包（零回归）；② 没旧课包时要能落到正确科目的会员卡上。
+ * 口径：**唯一来源 = 会员卡**（课包已于 2026-10-02 整套移除）。
+ * 挑错卡 = 扣错科目的次数，所以科目匹配、状态、剩余三条都要锁死。
  */
 import { describe, expect, it } from 'vitest';
-import type { CoursePackage } from '@/types/course-package';
 import type { MemberCardDetail } from '@/types/member-card';
 import {
   getMemberCardRemaining,
   pickMemberCardForLesson,
   resolveLessonDeduction,
+  resolveRemainingAfterDeduct,
 } from '@/utils/lesson-deduction-source';
-import { pickBestPackage } from '@/utils/package-helper';
-
-const pkg = (over: Partial<CoursePackage> = {}): CoursePackage =>
-  ({
-    id: 'pkg-1',
-    name: '钢琴课时包',
-    total_hours: 20,
-    remaining_hours: 10,
-    purchased_remaining: 10,
-    bonus_remaining: 0,
-    status: 'active',
-    created_at: '',
-    ...over,
-  }) as CoursePackage;
 
 const card = (over: Partial<MemberCardDetail> = {}): MemberCardDetail =>
   ({
@@ -59,6 +45,10 @@ describe('getMemberCardRemaining', () => {
     expect(getMemberCardRemaining(card({ remainingCount: undefined, remainingGiftCount: 3 }))).toBe(
       3,
     );
+  });
+
+  it('传 undefined 算 0（调用方不必先判空）', () => {
+    expect(getMemberCardRemaining(undefined)).toBe(0);
   });
 });
 
@@ -102,60 +92,47 @@ describe('pickMemberCardForLesson', () => {
   });
 });
 
-describe('resolveLessonDeduction', () => {
-  it('有旧课包 ⇒ 走旧课包（存量行为零回归）', () => {
+describe('resolveLessonDeduction（唯一来源 = 会员卡）', () => {
+  it('有该科目可用卡 ⇒ 返回该卡', () => {
     const result = resolveLessonDeduction({
-      packages: [pkg({ id: 'pkg-1', subject_id: 'sub-piano' })],
-      memberCards: [card({ cardTypeSubjectId: 'sub-piano' })],
-      hoursNeeded: 1,
-      subject: PIANO,
-    });
-    expect(result).toEqual({ kind: 'package', id: 'pkg-1', name: '钢琴课时包' });
-  });
-
-  it('旧课包的选择结果与改前逐字一致（不许按科目偏袒）', () => {
-    const packages = [
-      pkg({ id: 'pkg-piano', subject_id: 'sub-piano', end_date: '2026-12-31' }),
-      pkg({ id: 'pkg-general', subject_id: undefined, end_date: '2026-06-30' }),
-    ];
-    const result = resolveLessonDeduction({
-      packages,
-      memberCards: [],
-      hoursNeeded: 1,
-      subject: PIANO,
-    });
-    // 与"不传科目"的既有口径完全一致：谁早到期谁先扣
-    expect(result?.id).toBe(pickBestPackage(packages, 1)?.id);
-    expect(result?.id).toBe('pkg-general');
-  });
-
-  it('没有旧课包、有该科目会员卡 ⇒ 扣会员卡（本次要修的场景）', () => {
-    const result = resolveLessonDeduction({
-      packages: [],
       memberCards: [card({ id: 'card-piano', cardTypeSubjectId: 'sub-piano' })],
       hoursNeeded: 1,
       subject: PIANO,
     });
-    expect(result).toEqual({ kind: 'memberCard', id: 'card-piano', name: '钢琴 20 次卡' });
+    expect(result).toEqual({ id: 'card-piano', name: '钢琴 20 次卡' });
   });
 
   it('只有别的科目的卡 ⇒ null（不猜、不扣错科目）', () => {
-    const result = resolveLessonDeduction({
-      packages: [],
-      memberCards: [card({ cardTypeSubjectId: 'sub-art' })],
-      hoursNeeded: 1,
-      subject: PIANO,
-    });
-    expect(result).toBeNull();
+    expect(
+      resolveLessonDeduction({
+        memberCards: [card({ cardTypeSubjectId: 'sub-art' })],
+        hoursNeeded: 1,
+        subject: PIANO,
+      }),
+    ).toBeNull();
   });
 
-  it('两本账都没有 ⇒ null', () => {
+  it('没有可用卡 ⇒ null', () => {
     expect(
-      resolveLessonDeduction({ packages: [], memberCards: [], hoursNeeded: 1, subject: PIANO }),
+      resolveLessonDeduction({ memberCards: [card({ remainingCount: 0 })], hoursNeeded: 1 }),
     ).toBeNull();
   });
 
   it('数据还没加载（undefined）不会抛错，返回 null', () => {
     expect(resolveLessonDeduction({ hoursNeeded: 1, subject: PIANO })).toBeNull();
+  });
+});
+
+describe('resolveRemainingAfterDeduct', () => {
+  it('优先用后端返回的剩余', () => {
+    expect(resolveRemainingAfterDeduct(9, card({ remainingCount: 8 }), 1)).toBe(9);
+  });
+
+  it('后端没给 ⇒ 本地按卡余额推算', () => {
+    expect(resolveRemainingAfterDeduct(null, card({ remainingCount: 8 }), 3)).toBe(5);
+  });
+
+  it('推算结果不为负', () => {
+    expect(resolveRemainingAfterDeduct(undefined, card({ remainingCount: 1 }), 5)).toBe(0);
   });
 });

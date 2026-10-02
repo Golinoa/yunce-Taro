@@ -140,15 +140,13 @@ export async function executeClassSubmit(input: {
       };
 
       for (const student of input.presentStudents) {
-        const pkg = input.studentPackages.get(student.id);
         const cards = input.studentMemberCards?.get(student.id) ?? [];
         const studentSubject = input.studentSubjects.get(student.id);
         /**
-         * 扣哪本账：**旧课包优先**（存量行为不变），没有才落会员卡。
-         * 规则（含科目匹配、状态、剩余校验）全在 `utils/lesson-deduction-source`。
+         * 扣哪张卡：规则（科目匹配、状态、剩余校验）全在 `utils/lesson-deduction-source`。
+         * 课包已整套移除，唯一来源 = 会员卡。
          */
         const deduction = resolveLessonDeduction({
-          packages: pkg ? [pkg] : [],
           memberCards: cards,
           hoursNeeded: input.hoursUsed,
           subject: studentSubject
@@ -156,29 +154,24 @@ export async function executeClassSubmit(input: {
             : undefined,
         });
         if (!deduction) {
-          failList.push({ name: student.name, reason: '无可用课包/会员卡次数' });
+          failList.push({ name: student.name, reason: '无可扣课时（会员卡）' });
           continue;
         }
 
         try {
-          // 跨科目判定：课包看自身科目，会员卡看卡种科目
-          const deductionSubjectId =
-            deduction.kind === 'package'
-              ? pkg?.subject_id
-              : cards.find((item) => item.id === deduction.id)?.cardTypeSubjectId;
+          // 跨科目判定：看卡种科目与班级/学员科目是否一致
+          const deductionSubjectId = cards.find(
+            (item) => item.id === deduction.id,
+          )?.cardTypeSubjectId;
           const isCrossSubject =
             !!deductionSubjectId && !!studentSubject && deductionSubjectId !== studentSubject.id;
 
           const createdRecord = await lessonRecordService.create({
             ...teacherPayload,
             student_id: student.id,
-            /**
-             * 扣减来源二选一：旧课包 → `package_id`，会员卡 → `member_card_id`。
-             * 未被选中的那个一律留空（`buildLessonRecordPayload` 会把空串转成 undefined），
-             * 后端「一次消课只能选一个来源」的 422 因此不会被误触。
-             */
-            package_id: deduction.kind === 'package' ? deduction.id : '',
-            member_card_id: deduction.kind === 'memberCard' ? deduction.id : undefined,
+            /** 扣减来源：会员卡（`package_id` 恒空；课包已整套移除） */
+            package_id: '',
+            member_card_id: deduction.id,
             hours_used: input.hoursUsed,
             is_cross_subject: isCrossSubject || undefined,
             package_subject: isCrossSubject ? deduction.name : undefined,
@@ -205,8 +198,6 @@ export async function executeClassSubmit(input: {
             title: `${student.name} 课时已核销`,
             content: `本次核销 ${input.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
               createdRecord.remaining_hours,
-              deduction,
-              pkg,
               cards.find((item) => item.id === deduction.id),
               input.hoursUsed,
             )} 课时`,

@@ -133,7 +133,7 @@ const SingleLessonPanel: React.FC<SingleLessonPanelProps> = ({
                   </Text>
                 </View>
               ) : (
-                <Text className="text-[30rpx] text-destructive">无可用课包</Text>
+                <Text className="text-[30rpx] text-destructive">无可扣课时</Text>
               )}
             </FormRow>
 

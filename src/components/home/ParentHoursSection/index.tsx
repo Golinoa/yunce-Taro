@@ -70,7 +70,7 @@ const ParentHoursSection: React.FC<ParentHoursSectionProps> = ({
       {displayPackages.length === 0 ? (
         <View className="parent-glass-inner flex flex-col items-center px-[28rpx] py-[48rpx]">
           <Icon name="mdi-wallet-outline" size="lg" color="muted" />
-          <Text className="mt-[12rpx] text-[24rpx] text-muted-foreground">暂无课包</Text>
+          <Text className="mt-[12rpx] text-[24rpx] text-muted-foreground">暂无课时卡</Text>
           <View
             className="mt-[24rpx] w-full rounded-[20rpx] bg-primary py-[22rpx] press-scale"
             onClick={goBilling}

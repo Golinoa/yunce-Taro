@@ -13,16 +13,14 @@
  *   自行推导，客户端上报的 teacher_id 后端不采信（`lesson-record.service.ts` 只读 operatorTeacherId）。
  */
 import { executeSingleDeduct } from '@/package-course/pages/lesson-form/lesson-submit-single';
-import { lessonRecordService, memberCardService, packageService } from '@/services';
+import { lessonRecordService, memberCardService } from '@/services';
 import { useStudentStore } from '@/stores';
-import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import { pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
 import { isRecordOfLesson } from '@/utils/lesson-identity';
 import { logError } from '@/utils/logger';
-import { pickBestPackage } from '@/utils/package-helper';
 import { createSubmitLock } from '@/utils/submit-lock';
 
 /** 记签到记录时视为「已消课」的状态（与班级点名口径一致） */
@@ -109,30 +107,19 @@ export async function autoCheckInMakeupStudent(
     return { ok: false, reason: '无法确认本节课签到状态，请进点名页手动签到' };
   }
 
-  // ② 扣减来源：与点名页共用同一个挑选函数
-  let matchedPackage: CoursePackage | null = null;
-  try {
-    const packages = await packageService.getActiveByStudent(params.student.id);
-    matchedPackage = pickBestPackage(packages, hoursUsed);
-  } catch (err) {
-    logError('autoCheckInMakeupStudent load packages', err);
-    return { ok: false, reason: '读取课包失败，请进点名页手动签到' };
-  }
   /**
-   * 没有可用旧课包 ⇒ 兜底找会员卡（新账本）。
-   * 只有会员卡的学员此前会直接报"没有可用课包"，签到走不下去。
+   * ② 扣减来源：**会员卡**（唯一账本；课包已于 2026-10-02 整套移除）。
+   * 挑选规则与点名页共用 `utils/lesson-deduction-source`。
    */
   let matchedMemberCard: MemberCardDetail | null = null;
-  if (!matchedPackage) {
-    try {
-      const cards = await memberCardService.getByStudent(params.student.id);
-      matchedMemberCard = pickMemberCardForLesson(cards, hoursUsed);
-    } catch (err) {
-      logError('autoCheckInMakeupStudent load member cards', err);
-      return { ok: false, reason: '读取课时来源失败，请进点名页手动签到' };
-    }
+  try {
+    const cards = await memberCardService.getByStudent(params.student.id);
+    matchedMemberCard = pickMemberCardForLesson(cards, hoursUsed);
+  } catch (err) {
+    logError('autoCheckInMakeupStudent load member cards', err);
+    return { ok: false, reason: '读取课时失败，请进点名页手动签到' };
   }
-  if (!matchedPackage && !matchedMemberCard) {
+  if (!matchedMemberCard) {
     return { ok: false, reason: `${params.student.name} 没有可用课时，无法签到` };
   }
 
@@ -141,7 +128,6 @@ export async function autoCheckInMakeupStudent(
   let failureReason = '';
   await executeSingleDeduct({
     selectedStudent: params.student,
-    matchedPackage,
     matchedMemberCard,
     hoursUsed,
     lessonDate: params.lessonDate,

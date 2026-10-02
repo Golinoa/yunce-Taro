@@ -77,7 +77,7 @@ describe('lesson-submit helpers (Q2-2)', () => {
       '请选择学生',
     );
     expect(validateSingleSubmit({ hasStudent: true, hasPackage: false, hoursUsed: 1 })).toBe(
-      '没有可用课包',
+      '没有可扣课时（会员卡）',
     );
     expect(validateSingleSubmit({ hasStudent: true, hasPackage: true, hoursUsed: 0 })).toBe(
       '消课课时必须大于0',

@@ -61,29 +61,27 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
   };
 
   if (status === 'checked') {
-    const pkg = ctx.studentPackages.get(student.id);
     const cards = ctx.studentMemberCards?.get(student.id) ?? [];
     const studentSubject = ctx.studentSubjects.get(student.id);
-    // 扣哪本账：旧课包优先，没有才落会员卡（口径见 utils/lesson-deduction-source）
+    // 扣哪张卡（唯一口径见 utils/lesson-deduction-source；课包已移除）
     const deduction = resolveLessonDeduction({
-      packages: pkg ? [pkg] : [],
       memberCards: cards,
       hoursNeeded: ctx.hoursUsed,
       subject: studentSubject ? { id: studentSubject.id, name: studentSubject.name } : undefined,
     });
     if (!deduction) {
-      throw new Error(`${student.name}：无可用课包/会员卡次数`);
+      throw new Error(`${student.name}：无可扣课时（会员卡）`);
     }
     const memberCard = cards.find((item) => item.id === deduction.id);
-    const deductionSubjectId =
-      deduction.kind === 'package' ? pkg?.subject_id : memberCard?.cardTypeSubjectId;
     const isCrossSubject =
-      !!deductionSubjectId && !!studentSubject && deductionSubjectId !== studentSubject.id;
+      !!memberCard?.cardTypeSubjectId &&
+      !!studentSubject &&
+      memberCard.cardTypeSubjectId !== studentSubject.id;
 
     const createdRecord = await lessonRecordService.create({
       ...basePayload,
-      package_id: deduction.kind === 'package' ? deduction.id : '',
-      member_card_id: deduction.kind === 'memberCard' ? deduction.id : undefined,
+      package_id: '',
+      member_card_id: deduction.id,
       hours_used: ctx.hoursUsed,
       status: ctx.isSupplement || ctx.makeupStudentIds.has(student.id) ? 'makeup' : 'normal',
       is_cross_subject: isCrossSubject || undefined,
@@ -107,15 +105,11 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
       content: ctx.isSupplement
         ? `${ctx.lessonDate} 已补录 ${ctx.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
             createdRecord.remaining_hours,
-            deduction,
-            pkg,
             memberCard,
             ctx.hoursUsed,
           )} 课时`
         : `本次核销 ${ctx.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
             createdRecord.remaining_hours,
-            deduction,
-            pkg,
             memberCard,
             ctx.hoursUsed,
           )} 课时`,

@@ -30,7 +30,7 @@ const StudentCard: React.FC<StudentCardProps> = ({
 
   // 课包状态副标题
   const subtitle = noPackage
-    ? '无可用课包'
+    ? '无可扣课时'
     : isOwe
       ? `欠课 · ${subject ? subject.name : matchedPackage!.name}仅剩${matchedPackage!.remaining_hours}课时`
       : `${subject ? `${subject.icon} ${subject.name}` : matchedPackage!.name} · 剩余${matchedPackage!.remaining_hours}课时`;

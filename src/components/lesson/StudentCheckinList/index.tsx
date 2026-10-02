@@ -54,7 +54,7 @@ const StudentCheckinList: React.FC<StudentCheckinListProps> = ({
       const subtitle = isLeave
         ? '家长已请假，本节课自动记为请假'
         : noPackage
-          ? '无可用课包'
+          ? '无可扣课时'
           : isOwe
             ? `欠课 · ${subject ? subject.name : pkg!.name}仅剩${pkg!.remaining_hours}课时`
             : `${subject ? subject.name : pkg!.name} · ${pkg!.remaining_hours}课时`;

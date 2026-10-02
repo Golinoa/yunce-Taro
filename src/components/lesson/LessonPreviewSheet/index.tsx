@@ -157,7 +157,7 @@ const LessonPreviewSheet: React.FC<LessonPreviewSheetProps> = ({
 
                 {item.status === 'error' && (
                   <Text className="mt-1 text-[26rpx] text-danger">
-                    {item.warningText || '无可用课包'}
+                    {item.warningText || '无可扣课时'}
                   </Text>
                 )}
               </View>

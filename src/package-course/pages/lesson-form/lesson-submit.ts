@@ -48,7 +48,7 @@ export function validateSingleSubmit(input: {
   hoursUsed: number;
 }): string | null {
   if (!input.hasStudent) return '请选择学生';
-  if (!input.hasPackage) return '没有可用课包';
+  if (!input.hasPackage) return '没有可扣课时（会员卡）';
   return validateHoursUsed(input.hoursUsed);
 }
 
