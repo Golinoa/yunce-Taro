@@ -109,7 +109,15 @@ export interface ResolveDeductionInput {
 export function resolveLessonDeduction(input: ResolveDeductionInput): LessonDeductionSource | null {
   const { packages, memberCards, hoursNeeded, subject } = input;
 
-  const pkg = pickBestPackage(packages ?? [], hoursNeeded, subject?.id);
+  /**
+   * ⚠️ **旧课包这条路径必须与改前逐字等价**：调用 `pickBestPackage` 时**不传科目**。
+   *
+   * 调用方给的 `subject` 是"这一节要上的科目"（有时是班级科目、有时是学员课包科目），
+   * 而 `pickBestPackage(pkgs, hours, subjectId)` 的第二优先级会用科目挑包 ——
+   * 传进去等于**悄悄改变了存量选包结果**（同一个学员可能被换着扣不同的包），
+   * 而本节要修的只是"没有旧课包时用会员卡"。科目匹配只用于**挑会员卡**。
+   */
+  const pkg = pickBestPackage(packages ?? [], hoursNeeded);
   if (pkg) return { kind: 'package', id: pkg.id, name: pkg.name };
 
   const card = pickMemberCardForLesson(memberCards ?? [], hoursNeeded, subject);

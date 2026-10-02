@@ -12,6 +12,7 @@ import {
   pickMemberCardForLesson,
   resolveLessonDeduction,
 } from '@/utils/lesson-deduction-source';
+import { pickBestPackage } from '@/utils/package-helper';
 
 const pkg = (over: Partial<CoursePackage> = {}): CoursePackage =>
   ({
@@ -110,6 +111,22 @@ describe('resolveLessonDeduction', () => {
       subject: PIANO,
     });
     expect(result).toEqual({ kind: 'package', id: 'pkg-1', name: '钢琴课时包' });
+  });
+
+  it('旧课包的选择结果与改前逐字一致（不许按科目偏袒）', () => {
+    const packages = [
+      pkg({ id: 'pkg-piano', subject_id: 'sub-piano', end_date: '2026-12-31' }),
+      pkg({ id: 'pkg-general', subject_id: undefined, end_date: '2026-06-30' }),
+    ];
+    const result = resolveLessonDeduction({
+      packages,
+      memberCards: [],
+      hoursNeeded: 1,
+      subject: PIANO,
+    });
+    // 与"不传科目"的既有口径完全一致：谁早到期谁先扣
+    expect(result?.id).toBe(pickBestPackage(packages, 1)?.id);
+    expect(result?.id).toBe('pkg-general');
   });
 
   it('没有旧课包、有该科目会员卡 ⇒ 扣会员卡（本次要修的场景）', () => {
