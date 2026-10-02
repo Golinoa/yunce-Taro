@@ -5,7 +5,12 @@ import { lessonRecordService, notificationService } from '@/services';
 import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
+import {
+  resolveLessonDeduction,
+  resolveRemainingAfterDeduct,
+} from '@/utils/lesson-deduction-source';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import type { CheckinStatus } from './checkin-status';
 
@@ -29,6 +34,8 @@ export type PersistAttendanceContext = {
   homework: string;
   homeworkImages: string[];
   studentPackages: Map<string, CoursePackage>;
+  /** 学员会员卡（新账本，含卡种科目）：旧课包优先，没有才用它扣减 */
+  studentMemberCards?: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   studentRemarkDrafts: Record<string, string>;
   makeupStudentIds: Set<string>;
@@ -55,21 +62,32 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
 
   if (status === 'checked') {
     const pkg = ctx.studentPackages.get(student.id);
-    if (!pkg) {
-      throw new Error(`${student.name}：无可用课包`);
-    }
-
+    const cards = ctx.studentMemberCards?.get(student.id) ?? [];
     const studentSubject = ctx.studentSubjects.get(student.id);
+    // 扣哪本账：旧课包优先，没有才落会员卡（口径见 utils/lesson-deduction-source）
+    const deduction = resolveLessonDeduction({
+      packages: pkg ? [pkg] : [],
+      memberCards: cards,
+      hoursNeeded: ctx.hoursUsed,
+      subject: studentSubject ? { id: studentSubject.id, name: studentSubject.name } : undefined,
+    });
+    if (!deduction) {
+      throw new Error(`${student.name}：无可用课包/会员卡次数`);
+    }
+    const memberCard = cards.find((item) => item.id === deduction.id);
+    const deductionSubjectId =
+      deduction.kind === 'package' ? pkg?.subject_id : memberCard?.cardTypeSubjectId;
     const isCrossSubject =
-      !!pkg.subject_id && !!studentSubject && pkg.subject_id !== studentSubject.id;
+      !!deductionSubjectId && !!studentSubject && deductionSubjectId !== studentSubject.id;
 
     const createdRecord = await lessonRecordService.create({
       ...basePayload,
-      package_id: pkg.id,
+      package_id: deduction.kind === 'package' ? deduction.id : '',
+      member_card_id: deduction.kind === 'memberCard' ? deduction.id : undefined,
       hours_used: ctx.hoursUsed,
       status: ctx.isSupplement || ctx.makeupStudentIds.has(student.id) ? 'makeup' : 'normal',
       is_cross_subject: isCrossSubject || undefined,
-      package_subject: isCrossSubject ? pkg.name : undefined,
+      package_subject: isCrossSubject ? deduction.name : undefined,
       class_subject: isCrossSubject ? studentSubject?.name : undefined,
       content: ctx.isSupplement ? '补录签到' : ctx.content.trim() || undefined,
       note: ctx.studentRemarkDrafts[student.id] || ctx.existingRecord?.note || undefined,
@@ -82,13 +100,25 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
       studentId: student.id,
       senderId: ctx.senderId,
       title: ctx.isSupplement ? `${student.name} 已补录签到` : `${student.name} 课时已核销`,
+      /**
+       * ⚠️ 剩余课时以**后端返回的 `remaining_hours` 为准**；拿不到时才本地推算，
+       * 而且必须按"这一笔实际扣的是哪本账"来算（课包用课包余额，会员卡用卡余额）。
+       */
       content: ctx.isSupplement
-        ? `${ctx.lessonDate} 已补录 ${ctx.hoursUsed} 课时，剩余 ${
-            createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - ctx.hoursUsed, 0)
-          } 课时`
-        : `本次核销 ${ctx.hoursUsed} 课时，剩余 ${
-            createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - ctx.hoursUsed, 0)
-          } 课时`,
+        ? `${ctx.lessonDate} 已补录 ${ctx.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
+            createdRecord.remaining_hours,
+            deduction,
+            pkg,
+            memberCard,
+            ctx.hoursUsed,
+          )} 课时`
+        : `本次核销 ${ctx.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
+            createdRecord.remaining_hours,
+            deduction,
+            pkg,
+            memberCard,
+            ctx.hoursUsed,
+          )} 课时`,
       logLabel: 'lesson-form notify parents after checkin',
     });
     return;
@@ -121,7 +151,11 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
 export async function notifyCrossSubjectIfNeeded(input: {
   senderId: string;
   student: Student;
-  pkg: CoursePackage;
+  /**
+   * 扣减来源的名称（课包名或会员卡名）。
+   * ⚠️ 不再收 `pkg: CoursePackage`：扣减来源可能是会员卡，那时根本没有课包对象。
+   */
+  sourceName: string;
   studentSubject?: Subject | null;
   hoursUsed: number;
   isCrossSubject: boolean;
@@ -131,7 +165,7 @@ export async function notifyCrossSubjectIfNeeded(input: {
     sender_id: input.senderId,
     receiver_id: 'principal',
     title: '跨科目消课提醒',
-    content: `${input.student.name} 使用「${input.pkg.name}」课包消课 ${input.hoursUsed} 课时（班级科目：${input.studentSubject?.name || '通用'}）`,
+    content: `${input.student.name} 使用「${input.sourceName}」消课 ${input.hoursUsed} 课时（班级科目：${input.studentSubject?.name || '通用'}）`,
     related_id: input.student.id,
   });
 }

@@ -1,10 +1,11 @@
 /**
  * 点名页加载侧：请假过滤 / 记录回填 / 试听映射 / 课包匹配（Q2-2 续）
  */
-import { leaveService, packageService, subjectService } from '@/services';
+import { leaveService, memberCardService, packageService, subjectService } from '@/services';
 import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { pickBestPackage } from '@/utils/package-helper';
@@ -195,11 +196,19 @@ export async function loadPackageMapsForStudents(
 ): Promise<{
   packages: Map<string, CoursePackage>;
   subjects: Map<string, Subject | null>;
+  /**
+   * 学员的会员卡（新账本）—— **旧课包优先，没有可用课包时才用它扣减**。
+   *
+   * 存"全部可用次数卡"而不在这里挑：挑卡要按科目匹配，而科目可能来自班级、
+   * 也可能来自学员自己的课包，选择时机放在**提交那一刻**（`resolveLessonDeduction`）更准。
+   */
+  memberCards: Map<string, MemberCardDetail[]>;
 }> {
   const packages = new Map<string, CoursePackage>();
   const subjects = new Map<string, Subject | null>();
+  const memberCards = new Map<string, MemberCardDetail[]>();
   if (students.length === 0) {
-    return { packages, subjects };
+    return { packages, subjects, memberCards };
   }
 
   const bestByStudent = await mapWithConcurrency(
@@ -210,6 +219,22 @@ export async function loadPackageMapsForStudents(
       return pickBestPackage(pkgs, hoursUsed);
     },
   );
+
+  /**
+   * 会员卡与课包**并发**拉取（各自独立失败，不影响另一方）：
+   * 只有会员卡的学员此前在本页拿不到任何可用课时 ⇒ 直接点不了名。
+   * TODO(性能)：后端如有批量「按学员查卡」接口，这里可收敛成一次请求。
+   */
+  await mapWithConcurrency(students, PACKAGE_LOAD_CONCURRENCY, async (student, index) => {
+    try {
+      const cards = await memberCardService.getByStudent(student.id);
+      memberCards.set(student.id, cards ?? []);
+    } catch {
+      // 取卡失败不阻断点名：该学员退化为"无可用课时"，走既有失败提示
+      memberCards.set(student.id, []);
+    }
+    return index;
+  });
 
   const subjectIds = new Set<string>();
   bestByStudent.forEach((best, index) => {
@@ -231,5 +256,5 @@ export async function loadPackageMapsForStudents(
     );
   });
 
-  return { packages, subjects };
+  return { packages, subjects, memberCards };
 }

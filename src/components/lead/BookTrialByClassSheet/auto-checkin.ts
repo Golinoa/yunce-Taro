@@ -13,11 +13,13 @@
  *   自行推导，客户端上报的 teacher_id 后端不采信（`lesson-record.service.ts` 只读 operatorTeacherId）。
  */
 import { executeSingleDeduct } from '@/package-course/pages/lesson-form/lesson-submit-single';
-import { lessonRecordService, packageService } from '@/services';
+import { lessonRecordService, memberCardService, packageService } from '@/services';
 import { useStudentStore } from '@/stores';
 import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
+import { pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
 import { isRecordOfLesson } from '@/utils/lesson-identity';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
@@ -116,8 +118,22 @@ export async function autoCheckInMakeupStudent(
     logError('autoCheckInMakeupStudent load packages', err);
     return { ok: false, reason: '读取课包失败，请进点名页手动签到' };
   }
+  /**
+   * 没有可用旧课包 ⇒ 兜底找会员卡（新账本）。
+   * 只有会员卡的学员此前会直接报"没有可用课包"，签到走不下去。
+   */
+  let matchedMemberCard: MemberCardDetail | null = null;
   if (!matchedPackage) {
-    return { ok: false, reason: `${params.student.name} 没有可用课包，无法签到` };
+    try {
+      const cards = await memberCardService.getByStudent(params.student.id);
+      matchedMemberCard = pickMemberCardForLesson(cards, hoursUsed);
+    } catch (err) {
+      logError('autoCheckInMakeupStudent load member cards', err);
+      return { ok: false, reason: '读取课时来源失败，请进点名页手动签到' };
+    }
+  }
+  if (!matchedPackage && !matchedMemberCard) {
+    return { ok: false, reason: `${params.student.name} 没有可用课时，无法签到` };
   }
 
   // ③ 复用点名页的单人消课链路（自动签到记 makeup，与班级点名口径一致）
@@ -126,6 +142,7 @@ export async function autoCheckInMakeupStudent(
   await executeSingleDeduct({
     selectedStudent: params.student,
     matchedPackage,
+    matchedMemberCard,
     hoursUsed,
     lessonDate: params.lessonDate,
     scheduleId: params.scheduleId,

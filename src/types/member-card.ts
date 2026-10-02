@@ -60,6 +60,15 @@ export interface MemberCard {
 export interface MemberCardDetail extends MemberCard {
   /** 卡种类型 */
   cardTypeKind: CardTypeKind;
+  /**
+   * 卡种绑定的科目（2026-10-02 起，后端会员卡接口返回）。
+   *
+   * 会员卡**自己没有科目列** —— 科目挂在卡种上。点名消课要按班级科目挑卡，
+   * 没有这两个字段就只能"随便挑一张"（挑错 = 扣错科目的课时）。
+   * 旧数据可能只填了名称、没填 id ⇒ 判定时两个都要看。
+   */
+  cardTypeSubjectId?: string;
+  cardTypeSubjectName?: string;
   /** 卡种总次数（次卡） */
   cardTypeCount?: number;
   /**

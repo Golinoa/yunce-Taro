@@ -5,7 +5,12 @@ import Taro from '@tarojs/taro';
 import { lessonRecordService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import type { CoursePackage } from '@/types/course-package';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
+import {
+  resolveLessonDeduction,
+  resolveRemainingAfterDeduct,
+} from '@/utils/lesson-deduction-source';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
 import type { SubmitLock } from '@/utils/submit-lock';
@@ -14,6 +19,11 @@ import { validateSingleSubmit, withSubmitLock } from './lesson-submit';
 export async function executeSingleDeduct(input: {
   selectedStudent?: Student | null;
   matchedPackage?: CoursePackage | null;
+  /**
+   * 会员卡（第二本账）：**没有可用旧课包**时用它扣减。
+   * 不传 = 与改前完全一致（只有会员卡的学员否则点不了名）。
+   */
+  matchedMemberCard?: MemberCardDetail | null;
   hoursUsed: number;
   lessonDate: string;
   /** 本节排课规则 ID：写入记录后用于区分「同班同一天的另一节课」 */
@@ -48,7 +58,8 @@ export async function executeSingleDeduct(input: {
 }): Promise<void> {
   const error = validateSingleSubmit({
     hasStudent: !!input.selectedStudent,
-    hasPackage: !!input.matchedPackage,
+    // 有课包或会员卡任一个就能消课（"有扣减来源"）
+    hasPackage: !!(input.matchedPackage || input.matchedMemberCard),
     hoursUsed: input.hoursUsed,
   });
   if (error) {
@@ -57,7 +68,18 @@ export async function executeSingleDeduct(input: {
   }
 
   const selectedStudent = input.selectedStudent!;
-  const matchedPackage = input.matchedPackage!;
+  const matchedPackage = input.matchedPackage ?? null;
+  // 扣哪本账：旧课包优先，没有才落会员卡（口径见 utils/lesson-deduction-source）
+  const deduction = resolveLessonDeduction({
+    packages: matchedPackage ? [matchedPackage] : [],
+    memberCards: input.matchedMemberCard ? [input.matchedMemberCard] : [],
+    hoursNeeded: input.hoursUsed,
+  });
+  if (!deduction) {
+    Taro.showToast({ title: '该学员没有可用课时', icon: 'none' });
+    input.onError?.(new Error('无可扣减来源'));
+    return;
+  }
 
   const result = await withSubmitLock(input.submitLock, input.setSubmitting, async () => {
     try {
@@ -65,7 +87,8 @@ export async function executeSingleDeduct(input: {
         teacher_id: input.selectedTeachingTeacherId || input.currentTeacherId || '',
         operator_teacher_id: input.currentTeacherId || input.selectedTeachingTeacherId,
         student_id: selectedStudent.id,
-        package_id: matchedPackage.id,
+        package_id: deduction.kind === 'package' ? deduction.id : '',
+        member_card_id: deduction.kind === 'memberCard' ? deduction.id : undefined,
         class_id: input.classId || undefined,
         schedule_id: input.scheduleId || undefined,
         lesson_date: input.lessonDate,
@@ -83,10 +106,13 @@ export async function executeSingleDeduct(input: {
         studentId: selectedStudent.id,
         senderId: input.profile?.id || '',
         title: `${selectedStudent.name} 课时已消课`,
-        content: `本次消课 ${input.hoursUsed} 课时，剩余 ${
-          createdRecord.remaining_hours ??
-          Math.max(matchedPackage.remaining_hours - input.hoursUsed, 0)
-        } 课时`,
+        content: `本次消课 ${input.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
+          createdRecord.remaining_hours,
+          deduction,
+          matchedPackage ?? undefined,
+          input.matchedMemberCard ?? undefined,
+          input.hoursUsed,
+        )} 课时`,
         logLabel: 'lesson-form notify parents after single deduct',
       });
 
@@ -99,11 +125,12 @@ export async function executeSingleDeduct(input: {
           operatorRole: input.profile?.currentContext?.role || 'unknown',
           targetType: 'lesson_record',
           targetId: createdRecord.id,
-          detail: `单人消课：学员「${selectedStudent.name}」消课 ${input.hoursUsed} 课时（课包「${matchedPackage.name || matchedPackage.id}」）`,
+          detail: `单人消课：学员「${selectedStudent.name}」消课 ${input.hoursUsed} 课时（来源「${deduction.name}」）`,
           meta: {
             studentId: selectedStudent.id,
             studentName: selectedStudent.name,
-            packageId: matchedPackage.id,
+            packageId: deduction.kind === 'package' ? deduction.id : undefined,
+            memberCardId: deduction.kind === 'memberCard' ? deduction.id : undefined,
             hours: input.hoursUsed,
           },
         });

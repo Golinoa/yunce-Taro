@@ -12,6 +12,7 @@ export { notificationService } from './notification';
 export { studentParentService } from './student-parents';
 export { courseTemplateService } from './course-template';
 export { cardTypeService } from './card-type';
+export { memberCardService } from './member-card';
 export type { FeeMethod } from './student';
 export { temporaryRescheduleService } from './temporary-reschedule';
 export { makeupBookingService } from './makeup-booking';

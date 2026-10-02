@@ -7,7 +7,12 @@ import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
+import {
+  resolveLessonDeduction,
+  resolveRemainingAfterDeduct,
+} from '@/utils/lesson-deduction-source';
 import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
@@ -45,6 +50,11 @@ export async function executeClassSubmit(input: {
   campusId?: string;
   room?: string;
   studentPackages: Map<string, CoursePackage>;
+  /**
+   * 学员的会员卡（新账本，含卡种科目）。旧课包优先，只有**没有可用旧课包**时才用它扣减 ——
+   * 只有会员卡的学员此前在本页会直接报「无可用课包」，根本点不了名。
+   */
+  studentMemberCards?: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   studentRemarkDrafts: Record<string, string>;
   trialLeadMap: Record<string, Lead | undefined>;
@@ -131,23 +141,47 @@ export async function executeClassSubmit(input: {
 
       for (const student of input.presentStudents) {
         const pkg = input.studentPackages.get(student.id);
-        if (!pkg) {
-          failList.push({ name: student.name, reason: '无可用课包' });
+        const cards = input.studentMemberCards?.get(student.id) ?? [];
+        const studentSubject = input.studentSubjects.get(student.id);
+        /**
+         * 扣哪本账：**旧课包优先**（存量行为不变），没有才落会员卡。
+         * 规则（含科目匹配、状态、剩余校验）全在 `utils/lesson-deduction-source`。
+         */
+        const deduction = resolveLessonDeduction({
+          packages: pkg ? [pkg] : [],
+          memberCards: cards,
+          hoursNeeded: input.hoursUsed,
+          subject: studentSubject
+            ? { id: studentSubject.id, name: studentSubject.name }
+            : undefined,
+        });
+        if (!deduction) {
+          failList.push({ name: student.name, reason: '无可用课包/会员卡次数' });
           continue;
         }
 
         try {
-          const studentSubject = input.studentSubjects.get(student.id);
+          // 跨科目判定：课包看自身科目，会员卡看卡种科目
+          const deductionSubjectId =
+            deduction.kind === 'package'
+              ? pkg?.subject_id
+              : cards.find((item) => item.id === deduction.id)?.cardTypeSubjectId;
           const isCrossSubject =
-            !!pkg.subject_id && !!studentSubject && pkg.subject_id !== studentSubject.id;
+            !!deductionSubjectId && !!studentSubject && deductionSubjectId !== studentSubject.id;
 
           const createdRecord = await lessonRecordService.create({
             ...teacherPayload,
             student_id: student.id,
-            package_id: pkg.id,
+            /**
+             * 扣减来源二选一：旧课包 → `package_id`，会员卡 → `member_card_id`。
+             * 未被选中的那个一律留空（`buildLessonRecordPayload` 会把空串转成 undefined），
+             * 后端「一次消课只能选一个来源」的 422 因此不会被误触。
+             */
+            package_id: deduction.kind === 'package' ? deduction.id : '',
+            member_card_id: deduction.kind === 'memberCard' ? deduction.id : undefined,
             hours_used: input.hoursUsed,
             is_cross_subject: isCrossSubject || undefined,
-            package_subject: isCrossSubject ? pkg.name : undefined,
+            package_subject: isCrossSubject ? deduction.name : undefined,
             class_subject: isCrossSubject ? studentSubject?.name : undefined,
             content: input.content.trim() || undefined,
             note: input.studentRemarkDrafts[student.id] || undefined,
@@ -159,7 +193,7 @@ export async function executeClassSubmit(input: {
           await notifyCrossSubjectIfNeeded({
             senderId: input.profileId || '',
             student,
-            pkg,
+            sourceName: deduction.name,
             studentSubject,
             hoursUsed: input.hoursUsed,
             isCrossSubject,
@@ -169,9 +203,13 @@ export async function executeClassSubmit(input: {
             studentId: student.id,
             senderId: input.profileId || '',
             title: `${student.name} 课时已核销`,
-            content: `本次核销 ${input.hoursUsed} 课时，剩余 ${
-              createdRecord.remaining_hours ?? Math.max(pkg.remaining_hours - input.hoursUsed, 0)
-            } 课时`,
+            content: `本次核销 ${input.hoursUsed} 课时，剩余 ${resolveRemainingAfterDeduct(
+              createdRecord.remaining_hours,
+              deduction,
+              pkg,
+              cards.find((item) => item.id === deduction.id),
+              input.hoursUsed,
+            )} 课时`,
             logLabel: 'lesson-form notify parents after class checkin',
           });
 

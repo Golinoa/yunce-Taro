@@ -24,6 +24,7 @@ import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { withCache } from '@/utils/cache-helpers';
@@ -151,6 +152,8 @@ export interface UseLessonFormLoadersParams {
   setAttendanceMode: Dispatch<SetStateAction<ClassAttendanceMode>>;
   setStudentPackages: Dispatch<SetStateAction<Map<string, CoursePackage>>>;
   setStudentSubjects: Dispatch<SetStateAction<Map<string, Subject | null>>>;
+  /** 学员会员卡（第二本账）：旧课包优先，没有才用它扣减 */
+  setStudentMemberCards: Dispatch<SetStateAction<Map<string, MemberCardDetail[]>>>;
   setTrialBookings: Dispatch<SetStateAction<LeadBooking[]>>;
   setTrialCheckinMap: Dispatch<SetStateAction<Record<string, CheckinStatus>>>;
   setTrialLeadMap: Dispatch<SetStateAction<Record<string, Lead>>>;
@@ -218,6 +221,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setAttendanceMode,
     setStudentPackages,
     setStudentSubjects,
+    setStudentMemberCards,
     setTrialBookings,
     setTrialCheckinMap,
     setTrialLeadMap,
@@ -597,12 +601,13 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
             }),
           );
 
-          const { packages, subjects } = await loadPackageMapsForStudents(
+          const { packages, subjects, memberCards } = await loadPackageMapsForStudents(
             withSupplement,
             hoursUsed,
           );
           setStudentPackages(packages);
           setStudentSubjects(subjects);
+          setStudentMemberCards(memberCards);
         } finally {
           setClassStudentsLoading(false);
         }
@@ -764,9 +769,13 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
           }),
         );
 
-        const { packages, subjects } = await loadPackageMapsForStudents(mergedStudents, hoursUsed);
+        const { packages, subjects, memberCards } = await loadPackageMapsForStudents(
+          mergedStudents,
+          hoursUsed,
+        );
         setStudentPackages(packages);
         setStudentSubjects(subjects);
+        setStudentMemberCards(memberCards);
       } finally {
         setClassStudentsLoading(false);
       }
@@ -779,6 +788,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       hoursUsed,
       lessonScheduleId,
       loadApprovedLeaveStudentIds,
+
+      setStudentMemberCards,
       loadLessonRecordsByDate,
       lessonDate,
       setAttendanceMode,

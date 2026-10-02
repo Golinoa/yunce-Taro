@@ -10,6 +10,7 @@ import type { Class } from '@/types/class';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -139,6 +140,13 @@ const LessonForm: React.FC = () => {
   const [leaveStudentIds, setLeaveStudentIds] = useState<Set<string>>(new Set());
   const [studentPackages, setStudentPackages] = useState<Map<string, CoursePackage>>(new Map());
   const [studentSubjects, setStudentSubjects] = useState<Map<string, Subject | null>>(new Map());
+  /**
+   * 学员会员卡（含卡种科目）：点名扣减的**第二本账**。
+   * 旧课包优先，只有没有可用旧课包时才用它 —— 只有会员卡的学员此前根本点不了名。
+   */
+  const [studentMemberCards, setStudentMemberCards] = useState<Map<string, MemberCardDetail[]>>(
+    new Map(),
+  );
   const [showAddStudentSheet, setShowAddStudentSheet] = useState(false);
   const [addStudentSheetPurpose, setAddStudentSheetPurpose] = useState<'attendance' | 'supplement'>(
     'attendance',
@@ -312,6 +320,7 @@ const LessonForm: React.FC = () => {
       setAttendanceMode,
       setStudentPackages,
       setStudentSubjects,
+      setStudentMemberCards,
       setTrialBookings,
       setTrialCheckinMap,
       setTrialLeadMap,
@@ -556,6 +565,7 @@ const LessonForm: React.FC = () => {
     homeworkImages,
     studentPackages,
     studentSubjects,
+    studentMemberCards,
     makeupStudentIds,
     supplementStudentIds,
     attendanceBaseline,
@@ -577,6 +587,7 @@ const LessonForm: React.FC = () => {
     setClassStudents,
     setStudentPackages,
     setStudentSubjects,
+    setStudentMemberCards,
     setShowAddStudentSheet,
     setSupplementStudentIds,
     setAttendanceMode,

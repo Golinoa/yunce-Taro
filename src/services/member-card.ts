@@ -35,6 +35,9 @@ function mapCard(raw: BackendMemberCard): MemberCardDetail {
     cardNo: raw.cardNo ? String(raw.cardNo) : undefined,
     remark: raw.remark ? String(raw.remark) : undefined,
     cardTypeKind: (raw.cardTypeKind as MemberCardDetail['cardTypeKind']) || 'count',
+    // 卡种科目：点名按科目挑卡的依据（会员卡自身无科目列）
+    cardTypeSubjectId: raw.cardTypeSubjectId ? String(raw.cardTypeSubjectId) : undefined,
+    cardTypeSubjectName: raw.cardTypeSubjectName ? String(raw.cardTypeSubjectName) : undefined,
     cardTypeCount: raw.cardTypeCount != null ? Number(raw.cardTypeCount) : undefined,
     // 总课时快照（B3）：历史卡可能为 null，展示口径见 utils/member-card-hours.ts
     totalCount: raw.totalCount != null ? Number(raw.totalCount) : undefined,

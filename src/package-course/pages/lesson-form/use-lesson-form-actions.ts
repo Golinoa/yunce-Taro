@@ -10,6 +10,7 @@ import {
   type SetStateAction,
 } from 'react';
 import {
+  memberCardService,
   packageService,
   lessonRecordService,
   classService,
@@ -20,8 +21,10 @@ import type { Subject } from '@/types/campus';
 import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
+import { pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
 import { logError } from '@/utils/logger';
 import { pickBestPackage } from '@/utils/package-helper';
 import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
@@ -69,6 +72,8 @@ export interface UseLessonFormActionsParams {
   homework: string;
   homeworkImages: string[];
   studentPackages: Map<string, CoursePackage>;
+  /** 学员会员卡（第二本账，含卡种科目）：旧课包优先，没有才用它扣减 */
+  studentMemberCards: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   makeupStudentIds: Set<string>;
   supplementStudentIds: Set<string>;
@@ -95,6 +100,7 @@ export interface UseLessonFormActionsParams {
   setClassStudents: Dispatch<SetStateAction<Student[]>>;
   setStudentPackages: Dispatch<SetStateAction<Map<string, CoursePackage>>>;
   setStudentSubjects: Dispatch<SetStateAction<Map<string, Subject | null>>>;
+  setStudentMemberCards: Dispatch<SetStateAction<Map<string, MemberCardDetail[]>>>;
   setShowAddStudentSheet: Dispatch<SetStateAction<boolean>>;
   setSupplementStudentIds: Dispatch<SetStateAction<Set<string>>>;
   setAttendanceMode: Dispatch<SetStateAction<ClassAttendanceMode>>;
@@ -137,6 +143,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     homeworkImages,
     studentPackages,
     studentSubjects,
+    studentMemberCards,
     makeupStudentIds,
     supplementStudentIds,
     attendanceBaseline,
@@ -158,6 +165,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     setClassStudents,
     setStudentPackages,
     setStudentSubjects,
+    setStudentMemberCards,
     setShowAddStudentSheet,
     setSupplementStudentIds,
     setAttendanceMode,
@@ -466,16 +474,23 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
         return;
       }
 
+      /**
+       * 课包与会员卡并发拉取：只查课包的话，只有会员卡的学员加进来也点不了名
+       * （提交时找不到扣减来源）。取卡失败不阻断加人，退回"无可用课时"的既有提示。
+       */
       const packageEntries = await Promise.all(
         appendedStudents.map(async (student) => {
-          const pkgs = await packageService.getActiveByStudent(student.id);
+          const [pkgs, cards] = await Promise.all([
+            packageService.getActiveByStudent(student.id),
+            memberCardService.getByStudent(student.id).catch(() => [] as MemberCardDetail[]),
+          ]);
           const best = pickBestPackage(pkgs, hoursUsed);
           if (!best) {
-            return { studentId: student.id, pkg: null, subject: null };
+            return { studentId: student.id, pkg: null, subject: null, cards };
           }
 
           const subject = best.subject_id ? await subjectService.getById(best.subject_id) : null;
-          return { studentId: student.id, pkg: best, subject };
+          return { studentId: student.id, pkg: best, subject, cards };
         }),
       );
 
@@ -507,6 +522,13 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
         });
         return next;
       });
+      setStudentMemberCards((prev) => {
+        const next = new Map(prev);
+        packageEntries.forEach(({ studentId, cards }) => {
+          next.set(studentId, cards ?? []);
+        });
+        return next;
+      });
       setShowAddStudentSheet(false);
 
       if (addStudentSheetPurpose === 'supplement') {
@@ -521,6 +543,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       leaveStudentIds,
       setAttendanceMode,
       setCheckedStudentIds,
+      setStudentMemberCards,
       setClassStudents,
       setShowAddStudentSheet,
       setStudentPackages,
@@ -585,6 +608,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       homeworkImages,
       studentPackages,
       studentSubjects,
+      studentMemberCards,
       studentRemarkDrafts,
       makeupStudentIds,
       senderId: profile?.id || '',
@@ -605,6 +629,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       selectedAssistantTeacherId,
       selectedClassId,
       selectedTeachingTeacherId,
+      studentMemberCards,
       studentPackages,
       studentRemarkDrafts,
       studentSubjects,
@@ -682,9 +707,23 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
   ]);
 
   const handleSingleSubmit = useCallback(async () => {
+    /**
+     * 没有可用旧课包时，兜底找会员卡：只有会员卡的学员此前在本页直接报"无可用课包"。
+     * 取卡失败不阻断流程，由 executeSingleDeduct 统一提示。
+     */
+    let matchedMemberCard: MemberCardDetail | null = null;
+    if (selectedStudent && !matchedPackage) {
+      try {
+        const cards = await memberCardService.getByStudent(selectedStudent.id);
+        matchedMemberCard = pickMemberCardForLesson(cards, hoursUsed);
+      } catch (err) {
+        logError('lesson-form single deduct load member cards', err);
+      }
+    }
     await executeSingleDeduct({
       selectedStudent,
       matchedPackage,
+      matchedMemberCard,
       hoursUsed,
       lessonDate,
       scheduleId,
@@ -756,6 +795,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       room,
       studentPackages,
       studentSubjects,
+      studentMemberCards,
       studentRemarkDrafts,
       trialLeadMap,
       profileId: profile?.id,
@@ -791,6 +831,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     selectedClassId,
     selectedTeachingTeacherId,
     classAbsentCount,
+    studentMemberCards,
     studentPackages,
     studentRemarkDrafts,
     studentSubjects,
