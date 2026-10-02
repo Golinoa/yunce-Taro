@@ -12,12 +12,43 @@ export interface MemberCardRechargeFormProps {
   onSuccess?: () => void;
 }
 
+export type RechargeCountsResult =
+  | { ok: true; amount: number; gift: number }
+  | { ok: false; message: string };
+
+/**
+ * 解析并校验「追加次数 / 赠送次数」——**二选一填即可**（2026-10-02 用户口径）。
+ * 都留空或都为 0 ⇒ 至少填一项；填了的必须是非负整数（只送不买、只买不送均合法）。
+ */
+export const resolveRechargeCounts = (
+  amountText: string,
+  giftText: string,
+): RechargeCountsResult => {
+  const hasAmount = amountText.trim() !== '';
+  const hasGift = giftText.trim() !== '';
+  if (!hasAmount && !hasGift) {
+    return { ok: false, message: '追加次数与赠送次数至少填一项' };
+  }
+  const amount = hasAmount ? Number(amountText) : 0;
+  const gift = hasGift ? Number(giftText) : 0;
+  if (!Number.isInteger(amount) || amount < 0) {
+    return { ok: false, message: '追加次数必须是非负整数' };
+  }
+  if (!Number.isInteger(gift) || gift < 0) {
+    return { ok: false, message: '赠送次数必须是非负整数' };
+  }
+  if (amount + gift < 1) {
+    return { ok: false, message: '追加次数与赠送次数至少填一项' };
+  }
+  return { ok: true, amount, gift };
+};
+
 /** 为已有次卡追加权益；所有写入均走 MemberCard adjustment 契约。 */
 const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student, onSuccess }) => {
   const [cards, setCards] = useState<MemberCardDetail[]>([]);
   const [cardId, setCardId] = useState('');
   const [amount, setAmount] = useState('');
-  const [giftAmount, setGiftAmount] = useState('0');
+  const [giftAmount, setGiftAmount] = useState('');
   const [price, setPrice] = useState('0');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [reason, setReason] = useState('会员卡充值');
@@ -49,14 +80,10 @@ const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student
   const selectedCard = useMemo(() => cards.find((item) => item.id === cardId), [cards, cardId]);
 
   const submit = async () => {
-    const count = Number(amount);
-    const gift = Number(giftAmount || 0);
-    const paid = Number(price || 0);
     if (!selectedCard) return Taro.showToast({ title: '请选择已有会员卡', icon: 'none' });
-    if (!Number.isInteger(count) || count <= 0)
-      return Taro.showToast({ title: '追加次数必须是正整数', icon: 'none' });
-    if (!Number.isInteger(gift) || gift < 0)
-      return Taro.showToast({ title: '赠送次数无效', icon: 'none' });
+    const counts = resolveRechargeCounts(amount, giftAmount);
+    if (!counts.ok) return Taro.showToast({ title: counts.message, icon: 'none' });
+    const paid = Number(price || 0);
     if (!Number.isFinite(paid) || paid < 0)
       return Taro.showToast({ title: '实收金额无效', icon: 'none' });
     if (!reason.trim()) return Taro.showToast({ title: '请填写追加原因', icon: 'none' });
@@ -65,8 +92,8 @@ const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student
     try {
       await memberCardService.recharge({
         memberCardId: selectedCard.id,
-        amount: count,
-        giftAmount: gift,
+        amount: counts.amount,
+        giftAmount: counts.gift,
         purchasePrice: Math.round(paid * 100),
         paymentMethod: paymentMethod.trim() || undefined,
         reason: reason.trim(),
@@ -119,18 +146,18 @@ const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student
       <View className="bg-white rounded-[24rpx] p-[28rpx] shadow-soft mt-[20rpx]">
         <FormInput
           label="追加次数"
-          required
           type="number"
           value={amount}
           onInput={(e) => setAmount(e.detail.value || '')}
-          placeholder="请输入次数"
+          placeholder="与赠送次数二选一"
+          hint="追加次数与赠送次数二选一填即可"
         />
         <FormInput
           label="赠送次数"
           type="number"
           value={giftAmount}
-          onInput={(e) => setGiftAmount(e.detail.value || '0')}
-          placeholder="0"
+          onInput={(e) => setGiftAmount(e.detail.value || '')}
+          placeholder="选填"
         />
         <FormInput
           label="实收金额（元）"

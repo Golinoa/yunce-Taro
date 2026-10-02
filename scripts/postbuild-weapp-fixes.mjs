@@ -116,8 +116,17 @@ function ensureDevToolsProjectConfig() {
     if (fileName === 'project.config.json') {
       config.miniprogramRoot = './';
     }
-    fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
-    written += 1;
+    try {
+      fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+      written += 1;
+    } catch (error) {
+      // 微信开发者工具打开 dist 时会独占锁住 project.private.config.json（EPERM）。
+      // 该文件通常已存在且内容不变 ⇒ 写失败只警告，**不得**阻塞后面的
+      // chunk 修复/验证/静态资源/包体审计（否则整个 postbuild 门禁断在最后一步）。
+      console.warn(
+        `[postbuild-weapp-fixes] skip writing ${fileName} (locked?): ${error?.code ?? error?.message}`,
+      );
+    }
   }
 
   if (written > 0) {
