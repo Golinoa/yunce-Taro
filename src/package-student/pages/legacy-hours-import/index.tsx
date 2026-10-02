@@ -29,7 +29,11 @@ import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { campusService } from '@/services/campus';
-import { LegacyImportFileError, legacyHoursImportService } from '@/services/legacy-hours-import';
+import {
+  describeImportFailure,
+  LegacyImportFileError,
+  legacyHoursImportService,
+} from '@/services/legacy-hours-import';
 import type {
   LegacyImportConfig,
   LegacyImportPreviewRow,
@@ -499,6 +503,9 @@ const LegacyHoursImportPage: React.FC = () => {
       // 缺课时行用用户填的数字；其余用表格里的值
       remainingCount: typeof state.hours === 'number' ? state.hours : state.row.remainingCount,
       expiry: state.row.expiry,
+      // 迁移历史账单的缴费金额（后端按「分」收）与学员备注
+      purchasePrice: state.row.purchasePrice,
+      remark: state.row.remark,
     }));
 
     if (payload.length === 0) {
@@ -685,6 +692,16 @@ const LegacyHoursImportPage: React.FC = () => {
 
     const pending = needsDecision(state);
     const muted = !state.checked && !pending;
+    /**
+     * 迁移过来的附带信息（有才显示）：缴费金额按「元」展示（后端给的是分）。
+     * 账单迁移场景下用户要能逐行核对金额，不能只显示课时。
+     */
+    const extraText = [
+      state.row.purchasePrice ? `¥${(state.row.purchasePrice / 100).toFixed(2)}` : '',
+      state.row.remark ? `备注：${state.row.remark}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
     return (
       <View
@@ -708,13 +725,23 @@ const LegacyHoursImportPage: React.FC = () => {
         ) : (
           <CircleCheckbox checked={state.checked} size={36} />
         )}
-        <Text
-          className={`flex-1 min-w-0 truncate text-[27rpx] font-medium ${
-            muted ? 'text-muted-foreground' : 'text-foreground'
-          }`}
-        >
-          {state.row.name}
-        </Text>
+        <View className="flex-1 min-w-0">
+          <Text
+            className={`block truncate text-[27rpx] font-medium ${
+              muted ? 'text-muted-foreground' : 'text-foreground'
+            }`}
+          >
+            {state.row.name}
+          </Text>
+          {/* 固定渲染、用 CSS 显隐（本仓既有约束：Taro reconciler 下子节点数量不能变） */}
+          <Text
+            className={`block truncate text-[21rpx] text-muted-foreground mt-[4rpx] ${
+              extraText ? '' : 'opacity-0 h-0 overflow-hidden'
+            }`}
+          >
+            {extraText}
+          </Text>
+        </View>
         <Text className="text-[23rpx] text-muted-foreground shrink-0">
           {state.row.subjectName} · {hourText}
         </Text>
@@ -1143,7 +1170,11 @@ const LegacyHoursImportPage: React.FC = () => {
         {stage === 'failed' && (
           <>
             {renderFileCard(true)}
-            {renderBanner('bad', '这个格式导入不了', errorText || '请检查表格格式后重试。')}
+            {renderBanner(
+              'bad',
+              describeImportFailure(errorText),
+              errorText || '没能读出这份表格，请确认是按模板填写的。',
+            )}
 
             <View className="bg-card rounded-card shadow-card overflow-hidden">
               <View
@@ -1158,7 +1189,7 @@ const LegacyHoursImportPage: React.FC = () => {
                     重新选择文件
                   </Text>
                   <Text className="block text-[24rpx] text-muted-foreground mt-[6rpx]">
-                    换成 .xlsx 格式即可
+                    重新选一份填好的表格
                   </Text>
                 </View>
                 <Icon name="mdi-chevron-right" size={26} color="muted" />

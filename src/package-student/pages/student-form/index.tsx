@@ -185,6 +185,21 @@ const StudentForm: React.FC = () => {
               error={errors.name}
             />
 
+            {/*
+              推荐人：**只能从学员列表选，不允许手输**（存 studentId 而非姓名快照，
+              学员改名要跟随；手输无法保证指向唯一学员）。
+            */}
+            <FormRow label="推荐人" onClick={() => setReferrerPickerVisible(true)}>
+              <Text
+                className={cn(
+                  'text-[30rpx]',
+                  referrerStudentId ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {referrerName || '选填'}
+              </Text>
+            </FormRow>
+
             <FormRow label="性别">
               <View className="flex flex-row gap-[16rpx]">
                 {['男', '女'].map((g) => (
@@ -444,16 +459,28 @@ const StudentForm: React.FC = () => {
               )}
             </Card>
           ) : null}
-          {/* 更多资料：建档时通常不填，收起来减少干扰 */}
+          {/* 更多资料：建档时通常不填，手风琴收起减少干扰 */}
           <Card className="p-[32rpx]" marginBottom={false}>
-            {/* 只用 Switch 控制展开：FormRow 再挂 onClick 会与 Switch 的 onChange 双触发抵消 */}
-            <FormRow
-              label="更多资料"
-              helperText="昵称、出生日期、推荐人、家庭地址、备注"
-              border={moreOpen}
+            {/* 手风琴头：整行点击展开/收起。**只挂这一个点击回调** —— 再叠 Switch 的 onChange 会双触发互相抵消 */}
+            <View
+              className={cn(
+                'flex flex-row items-center justify-between press-scale',
+                moreOpen && 'border-b-[2rpx] border-border/30 pb-[24rpx]',
+              )}
+              onClick={() => setMoreOpen(!moreOpen)}
             >
-              <Switch checked={moreOpen} onChange={setMoreOpen} />
-            </FormRow>
+              <Text className="text-[30rpx] text-foreground">更多资料</Text>
+              <View className="flex flex-row items-center gap-[8rpx]">
+                <Text className="text-[26rpx] text-muted-foreground">
+                  {moreOpen ? '收起' : '展开'}
+                </Text>
+                <Icon
+                  name={moreOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'}
+                  size={30}
+                  color="mutedForeground"
+                />
+              </View>
+            </View>
 
             {moreOpen ? (
               <View>
@@ -483,20 +510,6 @@ const StudentForm: React.FC = () => {
                     <Icon name="mdi-calendar" size="sm" color="muted" />
                   </View>
                 </FormRow>
-                {/*
-              B9 / R8 推荐人：**只能从学员列表选，不允许手输**。
-              理由：推荐关系存 studentId 而非姓名快照（学员改名要跟随），手输无法保证指向唯一学员。
-            */}
-                <FormRow label="推荐人" onClick={() => setReferrerPickerVisible(true)}>
-                  <Text
-                    className={cn(
-                      'text-[30rpx]',
-                      referrerStudentId ? 'text-foreground' : 'text-muted-foreground',
-                    )}
-                  >
-                    {referrerName || '选填'}
-                  </Text>
-                </FormRow>
 
                 <FormRow
                   label="家庭地址"
@@ -515,7 +528,7 @@ const StudentForm: React.FC = () => {
                   placeholder="过敏史、接送要求等（选填）"
                   value={note}
                   onInput={(e) => setNote(e.detail.value || '')}
-                  maxlength={200}
+                  maxlength={191}
                   minHeight="120rpx"
                   className="w-full bg-background rounded-[16rpx] px-[20rpx] py-[16rpx]"
                 />

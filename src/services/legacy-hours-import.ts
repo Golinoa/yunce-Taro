@@ -28,6 +28,10 @@ export interface LegacyImportPreviewRow {
   subjectName: string;
   remainingCount: number;
   expiry?: string;
+  /** 该张卡的缴费金额（**分**，迁移历史账单用） */
+  purchasePrice?: number;
+  /** 学员备注（学员级） */
+  remark?: string;
   studentId?: string;
   studentName?: string;
   cardTypeId?: string;
@@ -84,6 +88,10 @@ export interface LegacyImportCommitRow {
   cardTypeId: string;
   remainingCount: number;
   expiry?: string;
+  /** 该张卡的缴费金额（分）；不传按 0 处理 */
+  purchasePrice?: number;
+  /** 学员备注；新建学员直接写入，已有学员仅在系统备注为空时补写 */
+  remark?: string;
 }
 
 export interface LegacyImportRecord {
@@ -142,6 +150,22 @@ const FALLBACK_TEMPLATE_NAME = '老生课时导入模板.xlsx';
  * 后端已做过一次清洗（去路径分隔符与控制字符），这里再兜一层是因为
  * `saveFile` 的 filePath 一旦含 `/` 会写到别的目录、含控制字符会直接失败。
  */
+
+/**
+ * D 屏（识别失败）横幅标题：按错误原文挑一句人话。
+ *
+ * ⚠️ 原来标题**写死**「这个格式导入不了」⇒ 连「表格里没填一行数据」都被说成格式问题，
+ * 用户会去反复调格式、白折腾。这里只把真·格式问题归到那一句。
+ */
+export function describeImportFailure(message: string | null | undefined): string {
+  const text = message ?? '';
+  if (/还没有填写学员数据|没有可导入的数据行/.test(text)) return '表格里还没有学员数据';
+  if (/未找到表头行/.test(text)) return '没找到表头那一行';
+  if (/最多 500 行/.test(text)) return '一次最多导入 500 行';
+  if (/\.xlsx|格式|列结构|没有工作表|读不出来/.test(text)) return '这个格式导入不了';
+  return '这份表没读成功';
+}
+
 export function safeLocalFileName(raw: string | null | undefined): string {
   const cleaned = (raw ?? '')
     .replace(/[\u0000-\u001f\u007f/\\]/g, '')
@@ -300,10 +324,23 @@ export const legacyHoursImportService = {
         } finally {
           currentUploadTask = null;
         }
+        /**
+         * ⚠️ 失败时**必须把后端的原话读出来**。
+         *
+         * 原实现非 2xx 一律 `throw new Error('预览失败，请重试')`，把后端的
+         * 「表格里还没有填写学员数据」「未找到表头行」等具体原因整条丢掉 ⇒
+         * 用户只看到一句无信息的提示，以为是"格式不对"。
+         */
+        const payload = (() => {
+          try {
+            return JSON.parse(uploaded.data || '{}') as ApiEnvelope<LegacyImportPreview>;
+          } catch {
+            return { code: uploaded.statusCode } as ApiEnvelope<LegacyImportPreview>;
+          }
+        })();
         if (uploaded.statusCode < 200 || uploaded.statusCode >= 300) {
-          throw new Error('预览失败，请重试');
+          throw new Error(payload.message || `预览失败（HTTP ${uploaded.statusCode}）`);
         }
-        const payload = JSON.parse(uploaded.data) as ApiEnvelope<LegacyImportPreview>;
         if (payload.code !== 200 || !payload.data) {
           throw new Error(payload.message || '预览失败');
         }
