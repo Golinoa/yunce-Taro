@@ -36,6 +36,7 @@ import {
 } from './student-detail-constants';
 import StudentDetailFab from './StudentDetailFab';
 import StudentDetailHeader from './StudentDetailHeader';
+import StudentDeleteSheet from '@/components/student/StudentDeleteSheet';
 import StudentDetailSkeleton from './StudentDetailSkeleton';
 import StudentDetailTabBar from './StudentDetailTabBar';
 import { useStudentDetailActions } from './use-student-detail-actions';
@@ -210,6 +211,16 @@ const StudentDetail: React.FC = () => {
         onBack={actions.goBack}
         onEdit={isTeacher ? actions.goToEditStudent : undefined}
         onDeleteStudent={isTeacher ? actions.handleDeleteStudent : undefined}
+        onUnfreeze={
+          isTeacher
+            ? () => {
+                // 解冻成功后状态变了，重新拉一次详情才能把「冻结中」标签去掉
+                void actions.handleUnfreezeStudent().then((ok) => {
+                  if (ok) void loadData();
+                });
+              }
+            : undefined
+        }
         onCopyPhone={actions.handleCopyPhone}
         onCallPhone={actions.handleCallPhone}
         onSendMessage={actions.handleSendMessage}
@@ -307,6 +318,19 @@ const StudentDetail: React.FC = () => {
           onCancel={() => setLegacyPackagesVisible(false)}
         />
       </Dialog>
+
+      {/* 删除学员：先摊开"他名下还有什么"，再选「冻结 / 继续删除」 */}
+      <StudentDeleteSheet
+        visible={actions.deleteSheet.visible}
+        studentName={student.name}
+        preview={actions.deleteSheet.preview}
+        mode="delete"
+        loading={actions.deleteSheet.loading}
+        submitting={actions.deleteSheet.submitting}
+        onClose={actions.handleCloseDeleteSheet}
+        onFreeze={actions.handleFreezeStudent}
+        onConfirm={actions.handleConfirmDeleteStudent}
+      />
     </View>
   );
 };

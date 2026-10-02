@@ -6,7 +6,12 @@ import { studentParentService } from '@/services/student-parents';
 import { useStudentStore } from '@/stores/student';
 import type { FeeMethod } from '@/types/fee';
 import type { Student } from '@/types/student';
-import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
+import {
+  API_PAGE_SIZE_BATCH,
+  asPaginatedResponse,
+  fetchAllPages,
+  type PaginatedResponse,
+} from '@/utils/pagination';
 import { del, get, patch, post, put } from '@/utils/request';
 
 interface BackendStudentListItem {
@@ -33,7 +38,7 @@ interface BackendStudentListItem {
   parentCount?: number;
   phone?: null | string;
   remark?: null | string;
-  status?: 'ACTIVE' | 'INACTIVE';
+  status?: 'ACTIVE' | 'FROZEN' | 'INACTIVE';
   totalHours?: number;
   usedHours?: number;
   attendanceCount?: number;
@@ -49,6 +54,54 @@ interface BackendStudentListResponse {
     totalPages: number;
   };
 }
+
+/** 「删除前检查」的返回：与后端 `getStudentDeletePreview` 一一对应 */
+export interface StudentDeletePreview {
+  /** 删除（移入回收站）会动的东西 */
+  softDelete: {
+    remainingHours: number;
+    classCount: number;
+    activeScheduleCount: number;
+    parentCount: number;
+  };
+  /** 彻底删除会一并清掉的流水（弹窗里逐条列出） */
+  purge: {
+    remainingHours: number;
+    memberCardCount: number;
+    lessonRecordCount: number;
+    adjustmentCount: number;
+    classStudentCount: number;
+    parentBindingCount: number;
+    leaveRequestCount: number;
+    followRecordCount: number;
+    lessonDebtCount: number;
+    bookingCount: number;
+    scheduleCount: number;
+    makeupBookingCount: number;
+    privateLessonBookingCount: number;
+    /** 他推荐来的学员数（删除后这些人会变成"无推荐人"） */
+    referrerCount: number;
+  };
+}
+
+/** 回收站卡片数据（极简：姓名 / 删除时间 / 剩余课时 / 有无家长） */
+export interface RecycleBinStudent {
+  id: string;
+  name: string;
+  phone?: null | string;
+  avatar?: null | string;
+  /** 删除时间（升级前的老数据没有，后端用最后修改时间兜底） */
+  deletedAt: string;
+  parentCount: number;
+  /** 剩余课时：老师判断"该不该恢复"的依据，必须显示 */
+  remainingHours: number;
+  originalTeacherId: null | string;
+  originalTeacherName: null | string;
+  /** 原负责老师是否仍在职：在职 → 恢复时让用户选归属；已离职 → 后端强制归操作人 */
+  originalTeacherActive: boolean;
+}
+
+export type RecycleBinPageResult = PaginatedResponse<RecycleBinStudent>;
 
 export interface StudentPageResult {
   list: Student[];
@@ -116,14 +169,14 @@ interface BackendStudentDetailResponse {
   referrerStudent?: null | {
     id: string;
     name: string;
-    status: 'ACTIVE' | 'INACTIVE';
+    status: 'ACTIVE' | 'FROZEN' | 'INACTIVE';
   };
   referredStudents?: Array<{
     id: string;
     name: string;
-    status: 'ACTIVE' | 'INACTIVE';
+    status: 'ACTIVE' | 'FROZEN' | 'INACTIVE';
   }>;
-  status?: 'ACTIVE' | 'INACTIVE';
+  status?: 'ACTIVE' | 'FROZEN' | 'INACTIVE';
   teacher?: {
     id: string;
     institution?: null | string;
@@ -137,9 +190,10 @@ const mapBackendGender = (gender?: null | 'FEMALE' | 'MALE'): Student['gender'] 
   return undefined;
 };
 
-const mapBackendStudentStatus = (
-  status?: 'ACTIVE' | 'INACTIVE',
-): Student['status'] => {
+const mapBackendStudentStatus = (status?: 'ACTIVE' | 'FROZEN' | 'INACTIVE'): Student['status'] => {
+  // 冻结（休学）≠ 已删除：冻结学员**仍要在列表里显示**（打「冻结中」标签），
+  // 只有 INACTIVE（回收站）才算"已删除"、从在籍列表剔除。
+  if (status === 'FROZEN') return 'frozen';
   return status === 'ACTIVE' ? 'active' : 'deleted';
 };
 
@@ -482,10 +536,58 @@ export const studentService = {
     return mapBackendStudentListItem(updated);
   },
 
-  /** 删除学员（软删除） */
+  /** 删除学员（软删除 = 移入回收站） */
   remove: async (studentId: string) => {
     await del(`/students/${studentId}`);
     return;
+  },
+
+  /** 删除前检查：他名下还有什么（供「冻结 / 继续删除」与「彻底删除」两个弹窗） */
+  getDeletePreview: async (studentId: string): Promise<StudentDeletePreview> => {
+    return get<StudentDeletePreview>(`/students/${studentId}/delete-preview`);
+  },
+
+  /** 冻结（休学）：只改状态；课时 / 班级 / 课表 / 家长绑定全部保留，可随时解冻 */
+  freeze: async (studentId: string): Promise<{ frozen: boolean; status: string }> => {
+    return post<{ frozen: boolean; status: string }>(`/students/${studentId}/freeze`, {});
+  },
+
+  /** 解冻：回到在册（冻结期间什么都没动过） */
+  unfreeze: async (studentId: string): Promise<{ unfrozen: boolean; status: string }> => {
+    return post<{ unfrozen: boolean; status: string }>(`/students/${studentId}/unfreeze`, {});
+  },
+
+  /** 回收站列表（可见范围与学员列表一致，按删除时间倒序） */
+  getRecycleBin: async (params: {
+    page?: number;
+    pageSize?: number;
+    keyword?: string;
+    campusId?: string;
+  }): Promise<RecycleBinPageResult> => {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 20;
+    const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (params.keyword) search.set('keyword', params.keyword);
+    if (params.campusId) search.set('campusId', params.campusId);
+    const data = await get<PaginatedResponse<RecycleBinStudent> | RecycleBinStudent[]>(
+      `/students/recycle-bin?${search.toString()}`,
+    );
+    return asPaginatedResponse<RecycleBinStudent>(data, page, pageSize);
+  },
+
+  /** 从回收站恢复；`assignee` 决定归还原老师还是归给自己（原老师已离职时后端强制归操作人） */
+  restore: async (
+    studentId: string,
+    assignee: 'me' | 'original' = 'original',
+  ): Promise<{ restored: boolean; teacherId: string }> => {
+    return post<{ restored: boolean; teacherId: string }>(`/students/${studentId}/restore`, {
+      assignee,
+    });
+  },
+
+  /** 彻底删除（不可恢复）：仅限回收站内的学员，且剩余课时必须为 0 */
+  purge: async (studentId: string): Promise<void> => {
+    await del(`/students/${studentId}/purge`);
   },
 
   /** 家长自助添加子女（建档 + 绑定） */

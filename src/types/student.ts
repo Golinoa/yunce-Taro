@@ -37,7 +37,7 @@ export interface StudentRelationRef {
   id: string;
   name: string;
   /** ACTIVE / INACTIVE；INACTIVE 表示已删除（前端应剔除或标注） */
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'FROZEN' | 'INACTIVE';
 }
 
 export interface Student {
@@ -83,7 +83,11 @@ export interface Student {
   contacts?: StudentContact[];
   /** 已加入的班级 ID 列表（空表示尚未排班） */
   class_ids?: string[];
-  status?: 'active' | 'deleted';
+  /**
+   * `active` = 在册；`frozen` = 冻结中（休学，仍显示在列表并打标签）；
+   * `deleted` = 已删除（在回收站，前端从在籍列表剔除）。
+   */
+  status?: 'active' | 'deleted' | 'frozen';
   created_at: string;
   updated_at: string;
   /**

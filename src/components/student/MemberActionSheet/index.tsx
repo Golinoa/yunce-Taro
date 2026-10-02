@@ -18,10 +18,12 @@ export interface MemberActionSheetProps {
   onBatchImport: () => void;
   onBatchExtend: () => void;
   onBlacklist: () => void;
+  /** 学员回收站：软删除的学员都在这里，可恢复 / 彻底删除 */
+  onRecycleBin: () => void;
 }
 
 interface ActionOption {
-  key: 'new_card' | 'batch_import' | 'batch_extend' | 'blacklist';
+  key: 'new_card' | 'batch_import' | 'batch_extend' | 'blacklist' | 'recycle_bin';
   label: string;
   desc: string;
 }
@@ -31,6 +33,7 @@ const OPTIONS: ActionOption[] = [
   { key: 'batch_import', label: '批量导入课时', desc: '用 Excel 模板批量导入老生剩余课时' },
   { key: 'batch_extend', label: '批量延期', desc: '批量管理会员卡有效期' },
   { key: 'blacklist', label: '门店黑名单', desc: '禁止指定手机号进入本门店' },
+  { key: 'recycle_bin', label: '回收站', desc: '已删除的学员，可恢复或彻底删除' },
 ];
 
 const MemberActionSheet: React.FC<MemberActionSheetProps> = ({
@@ -40,6 +43,7 @@ const MemberActionSheet: React.FC<MemberActionSheetProps> = ({
   onBatchImport,
   onBatchExtend,
   onBlacklist,
+  onRecycleBin,
 }) => {
   const handleSelect = useCallback(
     (key: ActionOption['key']) => {
@@ -50,9 +54,10 @@ const MemberActionSheet: React.FC<MemberActionSheetProps> = ({
         if (key === 'batch_import') onBatchImport();
         if (key === 'batch_extend') onBatchExtend();
         if (key === 'blacklist') onBlacklist();
+        if (key === 'recycle_bin') onRecycleBin();
       }, 200);
     },
-    [onClose, onNewCard, onBatchImport, onBatchExtend, onBlacklist],
+    [onClose, onNewCard, onBatchImport, onBatchExtend, onBlacklist, onRecycleBin],
   );
 
   return (

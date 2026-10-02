@@ -18,6 +18,8 @@ export interface StudentDetailHeaderProps {
   onEdit?: () => void;
   /** 删除学员入口（软删除，仅教职工传入，家长端不显示） */
   onDeleteStudent?: () => void;
+  /** 解冻入口（仅冻结中的学员显示） */
+  onUnfreeze?: () => void;
   onCopyPhone: () => void;
   onCallPhone: () => void;
   onSendMessage: () => void;
@@ -29,6 +31,7 @@ const StudentDetailHeader: React.FC<StudentDetailHeaderProps> = ({
   onBack,
   onEdit,
   onDeleteStudent,
+  onUnfreeze,
   onCopyPhone,
   onCallPhone,
   onSendMessage,
@@ -66,6 +69,12 @@ const StudentDetailHeader: React.FC<StudentDetailHeaderProps> = ({
                 color="muted"
               />
             )}
+            {/* 冻结（休学）：课时 / 班级 / 课表 / 家长绑定都还在，只是不参与点名 */}
+            {student.status === 'frozen' && (
+              <Text className="rounded-[8rpx] bg-warning/10 px-[12rpx] py-[2rpx] text-[22rpx] text-warning">
+                冻结中
+              </Text>
+            )}
           </View>
           <View className="flex items-center gap-[16rpx] mt-[16rpx]">
             {student.phone && (
@@ -98,8 +107,8 @@ const StudentDetailHeader: React.FC<StudentDetailHeaderProps> = ({
           </View>
         </View>
 
-        {/* 姓名 行右侧操作：编辑 / 删除（软删除，仅教职工可见） */}
-        {(onEdit || onDeleteStudent) && (
+        {/* 姓名 行右侧操作：编辑 / 解冻 / 删除（均仅教职工可见） */}
+        {(onEdit || onDeleteStudent || onUnfreeze) && (
           <View className="flex flex-row items-center gap-[12rpx] flex-shrink-0">
             {onEdit && (
               <View
@@ -107,6 +116,14 @@ const StudentDetailHeader: React.FC<StudentDetailHeaderProps> = ({
                 onClick={onEdit}
               >
                 <Text className="text-[24rpx] font-medium text-primary">编辑</Text>
+              </View>
+            )}
+            {onUnfreeze && student.status === 'frozen' && (
+              <View
+                className="rounded-full bg-card/80 px-[20rpx] py-[10rpx] center press-scale shadow-soft"
+                onClick={onUnfreeze}
+              >
+                <Text className="text-[24rpx] font-medium text-primary">解冻</Text>
               </View>
             )}
             {onDeleteStudent && (

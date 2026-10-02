@@ -47,6 +47,7 @@ export default defineAppConfig({
         'pages/renewal-reminder/index',
         'pages/legacy-hours-import/index',
         'pages/batch-extend/index',
+        'pages/student-recycle-bin/index',
       ],
     },
     {

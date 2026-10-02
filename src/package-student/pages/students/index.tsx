@@ -642,6 +642,11 @@ const Students: React.FC = () => {
     Taro.showToast({ title: '门店黑名单功能开发中', icon: 'none' });
   }, []);
 
+  /** 学员回收站：软删除的学员在这里恢复 / 彻底删除 */
+  const handleRecycleBin = useCallback(() => {
+    Taro.navigateTo({ url: '/package-student/pages/student-recycle-bin/index' });
+  }, []);
+
   const handleSortSelect = (value: StudentSort) => {
     setSortBy(value);
     setSortOpen(false);
@@ -868,9 +873,17 @@ const Students: React.FC = () => {
                     <StudentAvatar name={student.name} src={student.avatar_url} size="md" />
                     {/* 信息 */}
                     <View className="flex-1 min-w-0">
-                      <Text className="text-[32rpx] font-semibold text-foreground">
-                        {student.name}
-                      </Text>
+                      <View className="flex items-center gap-[12rpx]">
+                        <Text className="text-[32rpx] font-semibold text-foreground">
+                          {student.name}
+                        </Text>
+                        {/* 冻结（休学）学员仍在列表里显示，但打标签说明他不参与点名 */}
+                        {student.status === 'frozen' ? (
+                          <Text className="px-[12rpx] py-[2rpx] rounded-[8rpx] bg-warning/10 text-[22rpx] text-warning">
+                            冻结中
+                          </Text>
+                        ) : null}
+                      </View>
                       {(student.nickname || student.phone || student.birthday) && (
                         <View className="flex items-center gap-[12rpx] mt-[4rpx]">
                           {student.nickname ? (
@@ -1085,6 +1098,7 @@ const Students: React.FC = () => {
         onBatchImport={handleBatchImport}
         onBatchExtend={handleBatchExtend}
         onBlacklist={handleBlacklist}
+        onRecycleBin={handleRecycleBin}
       />
     </View>
   );
