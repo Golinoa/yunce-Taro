@@ -93,6 +93,8 @@ export const memberCardService = {
     subjectId?: string;
     studentId: string;
     remainingCount: number;
+    /** 期初实收金额（分）。不填 = 0 */
+    purchasePrice?: number;
     validStart?: string;
     /** 有效期。**留空 = 永久有效**（后端落 `expiredAt=null`，卡包按"永久卡"展示） */
     expiredAt?: string;

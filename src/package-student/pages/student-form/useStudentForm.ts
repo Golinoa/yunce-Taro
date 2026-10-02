@@ -1,7 +1,6 @@
 import Taro from '@tarojs/taro';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { ContactItem } from '@/components/ContactList';
-import type { ScheduleItem } from '@/components/InstallmentPanel';
 import {
   submitLegacyRows,
   type LegacyRow,
@@ -9,7 +8,6 @@ import {
 import { studentService, subscribeMessageService } from '@/services';
 import { useCampusStore, useStudentStore } from '@/stores';
 import type { CampusUIModel, Subject } from '@/types/campus';
-import type { FeeMethod } from '@/types/fee';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import {
@@ -52,6 +50,8 @@ export interface LegacyPackageDraft {
   subjectId: string;
   subjectName: string;
   remainingHours: string;
+  /** 期初实收金额（**元**，字符串）。留空 = 0。迁移账单用 */
+  purchaseAmount: string;
   expireEnabled: boolean;
   expireDate: string;
 }
@@ -62,7 +62,6 @@ export interface FormErrors {
   phone?: string;
   birthday?: string;
   legacyPackages?: string;
-  feeAmount?: string;
 }
 
 /** useStudentForm 返回值类型 */
@@ -84,11 +83,6 @@ export interface UseStudentFormReturn {
   setNote: React.Dispatch<React.SetStateAction<string>>;
   avatarUrl: string;
   setAvatarUrl: React.Dispatch<React.SetStateAction<string>>;
-  feeAmount: string;
-  setFeeAmount: React.Dispatch<React.SetStateAction<string>>;
-  feeMethod: string;
-  setFeeMethod: React.Dispatch<React.SetStateAction<string>>;
-
   studentType: StudentType;
   setStudentType: React.Dispatch<React.SetStateAction<StudentType>>;
   /** 老生：多张课时卡迁移（科目库口径草稿；增删改由表单处理，提交时映射为卡种） */
@@ -98,22 +92,8 @@ export interface UseStudentFormReturn {
   updateLegacyPackage: (id: string, patch: Partial<LegacyPackageDraft>) => void;
   subjects: Subject[];
 
-  /** 可选：缴费信息 */
-  paymentEnabled: boolean;
-  setPaymentEnabled: React.Dispatch<React.SetStateAction<boolean>>;
-
   contacts: ContactItem[];
   setContacts: React.Dispatch<React.SetStateAction<ContactItem[]>>;
-
-  installmentEnabled: boolean;
-  setInstallmentEnabled: React.Dispatch<React.SetStateAction<boolean>>;
-  installmentPeriod: number;
-  setInstallmentPeriod: React.Dispatch<React.SetStateAction<number>>;
-  schedule: ScheduleItem[];
-  setSchedule: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
-
-  feeMethodOther: string;
-  setFeeMethodOther: React.Dispatch<React.SetStateAction<string>>;
 
   /** 推荐人学员 ID（B9 / R8，只记关系）；空串 = 没有 / 清除 */
   referrerStudentId: string;
@@ -156,23 +136,13 @@ export function useStudentForm(): UseStudentFormReturn {
   const [address, setAddress] = useState('');
   const [note, setNote] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [feeAmount, setFeeAmount] = useState('');
-  const [feeMethod, setFeeMethod] = useState<string>('');
-
   const [studentType, setStudentType] = useState<StudentType>('new');
   const [legacyPackages, setLegacyPackages] = useState<LegacyPackageDraft[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
-  const [paymentEnabled, setPaymentEnabled] = useState(false);
-
   const [contacts, setContacts] = useState<ContactItem[]>([
     { id: '1', relation: '妈妈', phone: '' },
   ]);
-
-  const [installmentEnabled, setInstallmentEnabled] = useState(false);
-  const [installmentPeriod, setInstallmentPeriod] = useState(3);
-  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
-  const [feeMethodOther, setFeeMethodOther] = useState('');
 
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
   const currentCampusId = useCampusStore((state) => state.currentCampusId);
@@ -268,9 +238,6 @@ export function useStudentForm(): UseStudentFormReturn {
         setAddress(stu.address || '');
         setNote(stu.note || '');
         setAvatarUrl(stu.avatar_url || '');
-        setFeeAmount(stu.fee_amount ? String(stu.fee_amount) : '');
-        setFeeMethod(stu.fee_method || '');
-        setPaymentEnabled(Boolean(stu.fee_amount || stu.fee_method));
         setCampusId(stu.campus_id || preferredCampusId);
         // 联系方式：有则回填；没有时若学员原本留过手机号，补一条「家长」行避免丢数据
         setContacts(
@@ -328,6 +295,7 @@ export function useStudentForm(): UseStudentFormReturn {
         subjectId: '',
         subjectName: '',
         remainingHours: '',
+        purchaseAmount: '',
         expireEnabled: false,
         expireDate: '',
       },
@@ -383,6 +351,11 @@ export function useStudentForm(): UseStudentFormReturn {
             errs.legacyPackages = `请填写${label}的剩余课时`;
             break;
           }
+          const amountRaw = (pkg.purchaseAmount ?? '').trim();
+          if (amountRaw && (!Number.isFinite(Number(amountRaw)) || Number(amountRaw) < 0)) {
+            errs.legacyPackages = `${label}的缴费金额需为不小于 0 的数字`;
+            break;
+          }
           if (pkg.expireEnabled && !pkg.expireDate) {
             errs.legacyPackages = `请选择${label}的到期日期`;
             break;
@@ -391,14 +364,9 @@ export function useStudentForm(): UseStudentFormReturn {
       }
     }
 
-    if (paymentEnabled && feeAmount.trim()) {
-      const amount = parseFloat(feeAmount);
-      if (isNaN(amount) || amount < 0) errs.feeAmount = '金额不能为负数';
-    }
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [name, contacts, birthday, isEdit, studentType, legacyPackages, feeAmount, paymentEnabled]);
+  }, [name, contacts, birthday, isEdit, studentType, legacyPackages]);
 
   const submitBlockedReason = useMemo(() => {
     if (!name.trim()) return '请输入学员姓名';
@@ -428,51 +396,16 @@ export function useStudentForm(): UseStudentFormReturn {
         if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) {
           return `请填写${label}的剩余课时`;
         }
+        const amountRaw = (pkg.purchaseAmount ?? '').trim();
+        if (amountRaw && (!Number.isFinite(Number(amountRaw)) || Number(amountRaw) < 0)) {
+          return `${label}的缴费金额需为不小于 0 的数字`;
+        }
         if (pkg.expireEnabled && !pkg.expireDate) return `请选择${label}的到期日期`;
       }
     }
 
-    if (paymentEnabled) {
-      if (feeAmount.trim()) {
-        const amount = parseFloat(feeAmount);
-        if (Number.isNaN(amount) || amount < 0) return '缴费金额不能为负数';
-      }
-      if (feeMethod === 'other' && !feeMethodOther.trim()) {
-        return '请填写具体支付方式';
-      }
-      if (installmentEnabled) {
-        const amount = parseFloat(feeAmount || '0');
-        if (!feeAmount || Number.isNaN(amount) || amount <= 0) return '分期付款前请先填写缴费金额';
-        if (!schedule.length) return '请完善分期付款计划';
-        if (
-          schedule.some(
-            (item) =>
-              !item.date ||
-              !item.amount ||
-              Number.isNaN(parseFloat(String(item.amount))) ||
-              parseFloat(String(item.amount)) <= 0,
-          )
-        ) {
-          return '请填写完整的分期付款计划';
-        }
-      }
-    }
-
     return '';
-  }, [
-    name,
-    contacts,
-    birthday,
-    isEdit,
-    studentType,
-    legacyPackages,
-    paymentEnabled,
-    feeAmount,
-    feeMethod,
-    feeMethodOther,
-    installmentEnabled,
-    schedule,
-  ]);
+  }, [name, contacts, birthday, isEdit, studentType, legacyPackages]);
 
   const canSubmit = useMemo(() => !submitBlockedReason, [submitBlockedReason]);
 
@@ -506,13 +439,8 @@ export function useStudentForm(): UseStudentFormReturn {
     setAddress('');
     setNote('');
     setAvatarUrl('');
-    setFeeAmount('');
-    setFeeMethod('');
     setLegacyPackages([]);
     setStudentType('new');
-    setPaymentEnabled(false);
-    setInstallmentEnabled(false);
-    setSchedule([]);
     setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
     setCampusId(defaultCampusId);
     // B9 / R8：继续新增时必须一并清空推荐人，否则会串到下一个学员
@@ -555,12 +483,6 @@ export function useStudentForm(): UseStudentFormReturn {
       }
 
       const teacherId = currentUserId;
-      const feePayload = paymentEnabled
-        ? {
-            fee_amount: feeAmount ? parseFloat(feeAmount) : undefined,
-            fee_method: (feeMethod || undefined) as FeeMethod | undefined,
-          }
-        : { fee_amount: undefined, fee_method: undefined };
 
       let newStudent: Student | undefined;
 
@@ -585,7 +507,6 @@ export function useStudentForm(): UseStudentFormReturn {
           note: note.trim() || undefined,
           contacts,
           avatar_url: remoteAvatar,
-          ...feePayload,
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
           teacher_id: teacherId,
@@ -615,6 +536,7 @@ export function useStudentForm(): UseStudentFormReturn {
         const legacyRows: LegacyRow[] = legacyPackages.map((pkg) => ({
           subjectId: pkg.subjectId,
           remainingCount: String(parseInt(pkg.remainingHours, 10)),
+          purchaseAmount: pkg.purchaseAmount,
           expiredAt: pkg.expireEnabled ? pkg.expireDate : '',
           remark: `新建学员时录入：科目「${pkg.subjectName}」剩余 ${pkg.remainingHours} 课时`,
         }));
@@ -631,7 +553,6 @@ export function useStudentForm(): UseStudentFormReturn {
           note: note.trim() || undefined,
           contacts,
           avatar_url: existingRemoteAvatar,
-          ...feePayload,
           campus_id: campusId || undefined,
           campus_name: campusOptions.find((c) => c.id === campusId)?.name || undefined,
           // B9 / R8：空串 = 明确没有推荐人（后端写入 null）
@@ -728,8 +649,6 @@ export function useStudentForm(): UseStudentFormReturn {
     address,
     note,
     avatarUrl,
-    feeAmount,
-    feeMethod,
     contacts,
     studentId,
     isEdit,
@@ -743,7 +662,6 @@ export function useStudentForm(): UseStudentFormReturn {
     campusOptions,
     referrerStudentId,
     profile?.currentContext?.role,
-    paymentEnabled,
     handleReset,
     defaultCampusId,
   ]);
@@ -768,10 +686,6 @@ export function useStudentForm(): UseStudentFormReturn {
     setNote,
     avatarUrl,
     setAvatarUrl,
-    feeAmount,
-    setFeeAmount,
-    feeMethod,
-    setFeeMethod,
     studentType,
     setStudentType,
     legacyPackages,
@@ -779,18 +693,8 @@ export function useStudentForm(): UseStudentFormReturn {
     removeLegacyPackage,
     updateLegacyPackage,
     subjects,
-    paymentEnabled,
-    setPaymentEnabled,
     contacts,
     setContacts,
-    installmentEnabled,
-    setInstallmentEnabled,
-    installmentPeriod,
-    setInstallmentPeriod,
-    schedule,
-    setSchedule,
-    feeMethodOther,
-    setFeeMethodOther,
     referrerStudentId,
     setReferrerStudentId,
     referrerName,

@@ -1,7 +1,7 @@
 import { View, Text, Input } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Card from '@/components/Card';
 import ContactList from '@/components/ContactList';
@@ -10,7 +10,6 @@ import Empty from '@/components/Empty';
 import FormInput from '@/components/FormInput';
 import FormRow from '@/components/FormRow';
 import Icon from '@/components/Icon';
-import InstallmentPanel from '@/components/InstallmentPanel';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
@@ -19,10 +18,10 @@ import StudentPickerSheet from '@/components/student/StudentPickerSheet';
 import Switch from '@/components/Switch';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
-import { useStudentForm, FEE_METHOD_OPTIONS } from './useStudentForm';
+import { useStudentForm } from './useStudentForm';
 import type { StudentType } from './useStudentForm';
 
-type SelectorType = 'feeMethod' | 'subject' | null;
+type SelectorType = 'subject' | null;
 type DatePickerTarget = { kind: 'birthday' } | { kind: 'expire'; packageId: string } | null;
 
 const StudentForm: React.FC = () => {
@@ -39,6 +38,10 @@ const StudentForm: React.FC = () => {
   const [datePickerTarget, setDatePickerTarget] = useState<DatePickerTarget>(null);
   /** 推荐人选择器（B9 / R8） */
   const [referrerPickerVisible, setReferrerPickerVisible] = useState(false);
+  /** 「更多资料」展开态：低频字段默认收起，减少建档时的视觉负担 */
+  const [moreOpen, setMoreOpen] = useState(false);
+  /** 编辑态若这些字段本来就有值，首次加载后自动展开，避免「有值却看不见」以为丢了 */
+  const moreAutoExpandedRef = useRef(false);
 
   const {
     isEdit,
@@ -56,10 +59,6 @@ const StudentForm: React.FC = () => {
     note,
     setNote,
     avatarUrl,
-    feeAmount,
-    setFeeAmount,
-    feeMethod,
-    setFeeMethod,
     studentType,
     setStudentType,
     legacyPackages,
@@ -67,18 +66,8 @@ const StudentForm: React.FC = () => {
     removeLegacyPackage,
     updateLegacyPackage,
     subjects,
-    paymentEnabled,
-    setPaymentEnabled,
     contacts,
     setContacts,
-    installmentEnabled,
-    setInstallmentEnabled,
-    installmentPeriod,
-    setInstallmentPeriod,
-    schedule,
-    setSchedule,
-    feeMethodOther,
-    setFeeMethodOther,
     referrerStudentId,
     setReferrerStudentId,
     referrerName,
@@ -105,10 +94,11 @@ const StudentForm: React.FC = () => {
     void Taro.setNavigationBarTitle({ title: isEdit ? '编辑学员' : '添加学员' });
   }, [isEdit]);
 
-  const feeMethodLabel = useMemo(() => {
-    if (feeMethod === 'other') return feeMethodOther.trim() || '其他';
-    return FEE_METHOD_OPTIONS.find((item) => item.value === feeMethod)?.label || '请选择';
-  }, [feeMethod, feeMethodOther]);
+  useEffect(() => {
+    if (moreAutoExpandedRef.current || !isEdit || loading) return;
+    moreAutoExpandedRef.current = true;
+    if (nickname || birthday || address || note || referrerStudentId) setMoreOpen(true);
+  }, [isEdit, loading, nickname, birthday, address, note, referrerStudentId]);
 
   const openSelector = (type: SelectorType, packageId?: string) =>
     setSelector({ visible: true, type, packageId });
@@ -170,6 +160,7 @@ const StudentForm: React.FC = () => {
       <View className="min-h-screen pb-[200rpx]">
         <View className="px-[32rpx] py-[24rpx] flex flex-col gap-[24rpx]">
           {/* 基础信息 */}
+          {/* 基础信息：建档案高频填的（姓名 / 性别 / 家长联系方式） */}
           <Card className="p-[32rpx]" marginBottom={false}>
             <FormRow label="头像" border onClick={handleChooseAvatar}>
               {avatarUrl ? (
@@ -194,31 +185,7 @@ const StudentForm: React.FC = () => {
               error={errors.name}
             />
 
-            {/*
-              B9 / R8 推荐人：**只能从学员列表选，不允许手输**。
-              理由：推荐关系存 studentId 而非姓名快照（学员改名要跟随），手输无法保证指向唯一学员。
-              位置按 §9.1 第 16 条：紧贴「学员姓名」下方，避免沉到表单底部不好点选。
-            */}
-            <FormRow label="推荐人" onClick={() => setReferrerPickerVisible(true)}>
-              <Text
-                className={cn(
-                  'text-[30rpx]',
-                  referrerStudentId ? 'text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {referrerName || '选填'}
-              </Text>
-            </FormRow>
-
-            <FormRow
-              label="昵称"
-              editable
-              placeholder="选填，如小名或英文名"
-              value={nickname}
-              onInput={(e) => setNickname(e.detail.value || '')}
-            />
-
-            <FormRow label="性别" border>
+            <FormRow label="性别">
               <View className="flex flex-row gap-[16rpx]">
                 {['男', '女'].map((g) => (
                   <View
@@ -242,36 +209,6 @@ const StudentForm: React.FC = () => {
               </View>
             </FormRow>
 
-            <FormRow
-              label="出生日期"
-              border
-              error={errors.birthday}
-              onClick={() => setDatePickerTarget({ kind: 'birthday' })}
-            >
-              <View className="flex flex-row items-center gap-[8rpx]">
-                <Text
-                  className={cn(
-                    'text-[30rpx]',
-                    birthday ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {birthday || '请选择'}
-                </Text>
-                <Icon name="mdi-calendar" size="sm" color="muted" />
-              </View>
-            </FormRow>
-          </Card>
-
-          {/* 联系信息 */}
-          <Card className="p-[32rpx]" marginBottom={false}>
-            <FormRow
-              label="家庭地址"
-              editable
-              placeholder="选填"
-              value={address}
-              onInput={(e) => setAddress(e.detail.value || '')}
-            />
-
             <View className="pt-[8rpx] pb-[8rpx]">
               <Text className="block text-[30rpx] text-foreground mb-[16rpx]">联系方式</Text>
               <ContactList
@@ -289,7 +226,6 @@ const StudentForm: React.FC = () => {
               ) : null}
             </View>
           </Card>
-
           {/* 课时设置（仅新建） */}
           {!isEdit ? (
             <Card className="p-[32rpx]" marginBottom={false}>
@@ -399,6 +335,34 @@ const StudentForm: React.FC = () => {
                             </View>
                           </View>
 
+                          <View className="flex items-center justify-between border-b border-border/50 px-[24rpx] py-[22rpx]">
+                            <View className="flex items-center gap-[12rpx]">
+                              <Icon name="mdi-currency-cny" size={28} color="mutedForeground" />
+                              <Text className="text-[28rpx] text-foreground">缴费金额</Text>
+                            </View>
+                            <View className="flex items-center gap-[8rpx] rounded-[12rpx] bg-card px-[20rpx] py-[8rpx] min-w-[160rpx]">
+                              <Input
+                                className="text-[26rpx] text-foreground text-right"
+                                type="digit"
+                                placeholder="迁移账单时填"
+                                placeholderClass="input-placeholder"
+                                value={pkg.purchaseAmount}
+                                onInput={(e) =>
+                                  updateLegacyPackage(pkg.id, {
+                                    purchaseAmount: (e.detail.value || '')
+                                      .replace(/[^\d.]/g, '')
+                                      .replace(
+                                        /^(\d*\.)(.*)$/,
+                                        (_m, a, b) => a + b.replace(/\./g, ''),
+                                      )
+                                      .replace(/^(\d*\.\d{2}).*$/, '$1'),
+                                  })
+                                }
+                              />
+                              <Text className="text-[26rpx] text-muted-foreground">元</Text>
+                            </View>
+                          </View>
+
                           <View className="flex items-center justify-between px-[24rpx] py-[22rpx]">
                             <View className="flex items-center gap-[12rpx]">
                               <Icon name="mdi-calendar-clock" size={28} color="mutedForeground" />
@@ -480,123 +444,84 @@ const StudentForm: React.FC = () => {
               )}
             </Card>
           ) : null}
-
-          {/* 可选：缴费信息 */}
+          {/* 更多资料：建档时通常不填，收起来减少干扰 */}
           <Card className="p-[32rpx]" marginBottom={false}>
+            {/* 只用 Switch 控制展开：FormRow 再挂 onClick 会与 Switch 的 onChange 双触发抵消 */}
             <FormRow
-              label="缴费信息"
-              border={paymentEnabled}
-              helperText="选填，开启后填写金额与支付方式"
+              label="更多资料"
+              helperText="昵称、出生日期、推荐人、家庭地址、备注"
+              border={moreOpen}
             >
-              <Switch
-                checked={paymentEnabled}
-                onChange={(on) => {
-                  setPaymentEnabled(on);
-                  if (!on) {
-                    setFeeAmount('');
-                    setFeeMethod('');
-                    setFeeMethodOther('');
-                    setInstallmentEnabled(false);
-                    setSchedule([]);
-                  }
-                }}
-              />
+              <Switch checked={moreOpen} onChange={setMoreOpen} />
             </FormRow>
 
-            {paymentEnabled ? (
-              <>
+            {moreOpen ? (
+              <View>
                 <FormRow
-                  label="缴费金额"
+                  label="昵称"
                   editable
-                  placeholder="0.00"
-                  value={feeAmount}
-                  inputType="digit"
-                  suffix="元"
-                  onInput={(e) => {
-                    const raw = e.detail.value || '';
-                    const filtered = raw
-                      .replace(/[^\d.]/g, '')
-                      .replace(/^(\d*\.)(.*)$/, (_m, a, b) => a + b.replace(/\./g, ''))
-                      // 最多两位小数（与后端 Student.feeAmount Decimal(10,2) 一致）
-                      .replace(/^(\d*\.\d{2}).*$/, '$1');
-                    setFeeAmount(filtered);
-                  }}
+                  placeholder="选填，如小名或英文名"
+                  value={nickname}
+                  onInput={(e) => setNickname(e.detail.value || '')}
                 />
 
-                <FormRow label="支付方式" onClick={() => openSelector('feeMethod')}>
+                <FormRow
+                  label="出生日期"
+                  border
+                  error={errors.birthday}
+                  onClick={() => setDatePickerTarget({ kind: 'birthday' })}
+                >
+                  <View className="flex flex-row items-center gap-[8rpx]">
+                    <Text
+                      className={cn(
+                        'text-[30rpx]',
+                        birthday ? 'text-foreground' : 'text-muted-foreground',
+                      )}
+                    >
+                      {birthday || '请选择'}
+                    </Text>
+                    <Icon name="mdi-calendar" size="sm" color="muted" />
+                  </View>
+                </FormRow>
+                {/*
+              B9 / R8 推荐人：**只能从学员列表选，不允许手输**。
+              理由：推荐关系存 studentId 而非姓名快照（学员改名要跟随），手输无法保证指向唯一学员。
+            */}
+                <FormRow label="推荐人" onClick={() => setReferrerPickerVisible(true)}>
                   <Text
                     className={cn(
                       'text-[30rpx]',
-                      feeMethod ? 'text-foreground' : 'text-muted-foreground',
+                      referrerStudentId ? 'text-foreground' : 'text-muted-foreground',
                     )}
                   >
-                    {feeMethodLabel}
+                    {referrerName || '选填'}
                   </Text>
                 </FormRow>
 
-                {feeMethod === 'other' ? (
-                  <FormRow
-                    label="具体方式"
-                    editable
-                    placeholder="请填写具体支付方式"
-                    value={feeMethodOther}
-                    onInput={(e) => setFeeMethodOther(e.detail.value || '')}
-                  />
-                ) : null}
-
                 <FormRow
-                  label="分期付款"
-                  border={false}
-                  helperText={
-                    !feeAmount || parseFloat(feeAmount) <= 0
-                      ? '请先填写缴费金额'
-                      : '金额较大时可选择分期支付'
-                  }
-                >
-                  <Switch
-                    checked={installmentEnabled}
-                    disabled={!feeAmount || parseFloat(feeAmount) <= 0}
-                    onChange={(on) => {
-                      if (!feeAmount || parseFloat(feeAmount) <= 0) {
-                        Taro.showToast({ title: '请先填写缴费金额', icon: 'none' });
-                        return;
-                      }
-                      setInstallmentEnabled(on);
-                    }}
-                  />
-                </FormRow>
+                  label="家庭地址"
+                  editable
+                  placeholder="选填"
+                  value={address}
+                  onInput={(e) => setAddress(e.detail.value || '')}
+                />
 
-                {installmentEnabled ? (
-                  <View className="pt-[8rpx]">
-                    <InstallmentPanel
-                      totalAmount={feeAmount}
-                      enabled={installmentEnabled}
-                      onToggle={setInstallmentEnabled}
-                      periodCount={installmentPeriod}
-                      onPeriodChange={setInstallmentPeriod}
-                      schedule={schedule}
-                      onScheduleChange={setSchedule}
-                    />
-                  </View>
-                ) : null}
-              </>
+                <Text className="mt-[8rpx] block text-[28rpx] text-foreground mb-[12rpx]">
+                  备注
+                </Text>
+                <FormInput
+                  variant="ghost"
+                  multiline
+                  placeholder="过敏史、接送要求等（选填）"
+                  value={note}
+                  onInput={(e) => setNote(e.detail.value || '')}
+                  maxlength={200}
+                  minHeight="120rpx"
+                  className="w-full bg-background rounded-[16rpx] px-[20rpx] py-[16rpx]"
+                />
+              </View>
             ) : null}
-          </Card>
-
-          {/* 备注 */}
-          <Card className="p-[32rpx]" marginBottom={false}>
-            <Text className="block text-[30rpx] text-foreground mb-[12rpx]">备注</Text>
-            <FormInput
-              variant="ghost"
-              multiline
-              placeholder="过敏史、接送要求等（选填）"
-              value={note}
-              onInput={(e) => setNote(e.detail.value || '')}
-              maxlength={200}
-              minHeight="120rpx"
-              className="w-full bg-background rounded-[16rpx] px-[20rpx] py-[16rpx]"
-            />
-          </Card>
+          </Card>{' '}
         </View>
 
         <View className="fixed left-[32rpx] right-[32rpx] bottom-[calc(32rpx+env(safe-area-inset-bottom))] z-50 flex flex-col gap-[16rpx] rounded-[24rpx] border-[2rpx] border-border/60 bg-background/95 px-[16rpx] py-[16rpx] shadow-float pointer-events-auto">
@@ -631,19 +556,9 @@ const StudentForm: React.FC = () => {
 
         <PickerSheet
           visible={selector.visible}
-          title={selector.type === 'subject' ? '选择科目' : '选择支付方式'}
-          options={
-            selector.type === 'subject'
-              ? subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))
-              : FEE_METHOD_OPTIONS.map(
-                  (item): PickerOption => ({ label: item.label, value: item.value }),
-                )
-          }
-          value={
-            selector.type === 'subject'
-              ? legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''
-              : feeMethod
-          }
+          title="选择科目"
+          options={subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))}
+          value={legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''}
           onClose={closeSelector}
           onConfirm={(v) => {
             if (selector.type === 'subject' && selector.packageId) {
@@ -653,9 +568,6 @@ const StudentForm: React.FC = () => {
                 subjectName: subject?.name || '',
               });
               clearError('legacyPackages');
-            } else if (selector.type === 'feeMethod') {
-              setFeeMethod(v);
-              if (v !== 'other') setFeeMethodOther('');
             }
             closeSelector();
           }}

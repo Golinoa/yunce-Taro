@@ -7,7 +7,7 @@
  *        由表单在学员创建成功后调用 `submitLegacyRows(studentId, rows)` 完成期初入账）。
  *
  * 说明：提交走 `opening` 期初入账接口（B4，原「历史数据迁移」页与接口已下线）。
- * 多科目录单：一科一张卡，同一科目（卡种）只能录一次；金额为 0、不计售卡业绩。
+ * 多科目录单：一科一张卡，同一科目（卡种）只能录一次；可带期初实收金额（迁移账单用）。
  * **有效期允许留空 = 永久有效**（后端落 `expiredAt = null`，卡包按"永久卡"展示）。
  */
 import { Button, Input, Picker, Text, View } from '@tarojs/components';
@@ -22,6 +22,11 @@ export type LegacyRow = {
   cardTypeId?: string;
   subjectId?: string;
   remainingCount: string;
+  /**
+   * 期初实收金额（**元**，字符串以便输入中间态）。留空 = 0。
+   * 用于老生迁移账单（存档"当年交了多少"），不影响课时数。
+   */
+  purchaseAmount?: string;
   /** `YYYY-MM-DD`；**留空 = 永久有效** */
   expiredAt: string;
   remark: string;
@@ -30,9 +35,19 @@ export type LegacyRow = {
 export const newLegacyRow = (): LegacyRow => ({
   cardTypeId: '',
   remainingCount: '',
+  purchaseAmount: '',
   expiredAt: '',
   remark: '',
 });
+
+/** 元（字符串，允许空）→ 分（整数）。空/非法一律 0。 */
+export const toFenAmount = (yuan?: string): number => {
+  const raw = (yuan ?? '').trim();
+  if (!raw) return 0;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.round(value * 100);
+};
 
 /**
  * 校验录入行（组件与学员表单共用，避免两套规则漂移）。
@@ -46,6 +61,11 @@ export const validateLegacyRows = (rows: LegacyRow[]): string | null => {
     return '请完整填写录入信息';
   }
   if (rows.some((row) => Number(row.remainingCount) <= 0)) return '剩余次数必须大于 0';
+  const badAmount = rows.find((row) => {
+    const raw = (row.purchaseAmount ?? '').trim();
+    return raw !== '' && (!Number.isFinite(Number(raw)) || Number(raw) < 0);
+  });
+  if (badAmount) return '缴费金额需为不小于 0 的数字';
   const keys = rows.map((row) => row.cardTypeId || row.subjectId);
   if (new Set(keys).size !== keys.length) return '同一科目只能录入一次';
   return null;
@@ -69,8 +89,10 @@ export const submitLegacyRows = async (studentId: string, rows: LegacyRow[]): Pr
       studentId,
       remainingCount: Number(row.remainingCount),
       expiredAt: toExpiryIso(row.expiredAt),
+      purchasePrice: toFenAmount(row.purchaseAmount),
       remark: row.remark.trim(),
-      idempotencyKey: `opening:${studentId}:${scopeKey}:${row.expiredAt || 'forever'}`,
+      // 金额也进幂等键：改了金额再提交属于新操作，不该静默命中旧卡
+      idempotencyKey: `opening:${studentId}:${scopeKey}:${row.expiredAt || 'forever'}:${toFenAmount(row.purchaseAmount)}`,
     });
   }
 };
@@ -172,8 +194,7 @@ const LegacyPackagesEditor: React.FC<LegacyPackagesEditorProps> = ({
   return (
     <View className="w-full">
       <Text className="block text-[24rpx] text-muted-foreground mb-[20rpx]">
-        按科目录入旧系统剩余次数、有效期与录入依据；期初卡金额为
-        0，不计售卡业绩。有效期留空表示永久有效。
+        按科目录入旧系统剩余次数、有效期与录入依据。有效期留空表示永久有效。
       </Text>
       {loading ? (
         <Text className="text-muted-foreground">加载卡种中...</Text>
