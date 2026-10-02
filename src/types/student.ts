@@ -1,7 +1,6 @@
 /**
  * 学生信息 (students 表)
  */
-import type { FeeMethod } from './fee';
 
 /**
  * 学员联系方式（最多 5 条）。
@@ -64,8 +63,6 @@ export interface Student {
   address?: string;
   note?: string;
   parent_id?: string;
-  fee_amount?: number;
-  fee_method?: FeeMethod;
   /** 所属校区 ID */
   campus_id?: string;
   /** 所属校区名称（冗余展示） */

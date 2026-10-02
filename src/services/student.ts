@@ -85,8 +85,6 @@ interface BackendStudentDetailResponse {
   }>;
   contacts?: Array<{ id?: string; phone: string; relation: string }> | null;
   createdAt: string;
-  feeAmount?: null | number;
-  feeMethod?: null | string;
   gender?: null | 'FEMALE' | 'MALE';
   id: string;
   inviteCode?: null | string;
@@ -209,8 +207,6 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
     // R5 断链字段：此前不回传 ⇒ 编辑页永远回显为空
     address: item.address || undefined,
     campus_id: item.campusId || undefined,
-    fee_amount: item.feeAmount ?? undefined,
-    fee_method: (item.feeMethod as FeeMethod | undefined) || undefined,
     contacts: (item.contacts || []).map((contact, index) => ({
       id: contact.id || `remote-contact-${index}`,
       relation: contact.relation,
@@ -286,10 +282,8 @@ function mapStudentPayload(data: Partial<Student>) {
     phone: data.phone,
     remark: data.note,
     campusId: data.campus_id,
-    // R5 断链字段：此前本函数是「白名单」，以下 4 个键不在其中 ⇒ 压根没上过网络
+    // R5 断链字段：此前本函数是「白名单」，以下键不在其中 ⇒ 压根没上过网络
     address: data.address,
-    feeAmount: data.fee_amount,
-    feeMethod: data.fee_method,
     contacts: contacts.length ? contacts : undefined,
     /**
      * B9 / R8 推荐关系：**三态语义，与文本字段不同，别写成 `?? null`**。
