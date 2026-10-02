@@ -499,7 +499,9 @@ const LegacyHoursImportPage: React.FC = () => {
               phone: state.row.phone || undefined,
             }
           : undefined,
-      cardTypeId: state.row.cardTypeId as string,
+      cardTypeId: state.row.cardTypeId,
+      // 科目名：库里没有这个科目时后端靠它建科目 + 建「{科目名}课时卡」，不阻断这一行
+      subjectName: state.row.subjectName,
       // 缺课时行用用户填的数字；其余用表格里的值
       remainingCount: typeof state.hours === 'number' ? state.hours : state.row.remainingCount,
       expiry: state.row.expiry,
@@ -695,8 +697,11 @@ const LegacyHoursImportPage: React.FC = () => {
     /**
      * 迁移过来的附带信息（有才显示）：缴费金额按「元」展示（后端给的是分）。
      * 账单迁移场景下用户要能逐行核对金额，不能只显示课时。
+     * 「将新建科目/课时卡」提前讲清楚：这批导入会顺手建出这些基础数据，不是悄悄写库。
      */
     const extraText = [
+      state.row.willCreateSubject ? `将新建科目「${state.row.subjectName}」` : '',
+      state.row.willCreateCardType ? `将新建课时卡「${state.row.cardTypeName ?? ''}」` : '',
       state.row.purchasePrice ? `¥${(state.row.purchasePrice / 100).toFixed(2)}` : '',
       state.row.remark ? `备注：${state.row.remark}` : '',
     ]

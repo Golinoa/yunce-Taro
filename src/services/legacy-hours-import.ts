@@ -34,8 +34,19 @@ export interface LegacyImportPreviewRow {
   remark?: string;
   studentId?: string;
   studentName?: string;
+  /**
+   * 该行将挂到的次数卡种。
+   *
+   * **可能为空**：该科目在库里没有可用的次数卡种时，提交会自动建一张「{科目名}课时卡」，
+   * 预览阶段还拿不到它的 id（预览是只读接口，不会为此写库）。
+   */
   cardTypeId?: string;
+  /** 展示用的卡种名：库里没有时就是即将创建的那个名字 */
   cardTypeName?: string;
+  /** true = 科目库没有这个科目，提交时会自动建科目 */
+  willCreateSubject?: boolean;
+  /** true = 该科目没有可用的次数卡种，提交时会自动建「{科目名}课时卡」 */
+  willCreateCardType?: boolean;
   /** true = 没填剩余课时，需要用户在界面上补一个数字 */
   needsHours?: boolean;
   /** true = 该学员该科目已有期初入账（再次上传时默认不勾） */
@@ -85,7 +96,13 @@ export interface LegacyImportCommitRow {
     birthday?: string;
     phone?: string;
   };
-  cardTypeId: string;
+  /**
+   * 次数卡种：预览给的 id。
+   * 为空时后端按 `subjectName` 解析或自动创建卡种（表格里写了库里没有的科目）。
+   */
+  cardTypeId?: string;
+  /** 科目名：卡种 id 缺失时靠它解析/自动创建 */
+  subjectName?: string;
   remainingCount: number;
   expiry?: string;
   /** 该张卡的缴费金额（分）；不传按 0 处理 */
