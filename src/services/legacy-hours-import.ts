@@ -133,6 +133,66 @@ export class LegacyImportFileError extends Error {
   }
 }
 
+/** 运营没上传模板时，前端打开/转发看到的文件名 */
+const FALLBACK_TEMPLATE_NAME = '老生课时导入模板.xlsx';
+
+/**
+ * 把文件名收敛成「微信本地可安全使用」的形状。
+ *
+ * 后端已做过一次清洗（去路径分隔符与控制字符），这里再兜一层是因为
+ * `saveFile` 的 filePath 一旦含 `/` 会写到别的目录、含控制字符会直接失败。
+ */
+export function safeLocalFileName(raw: string | null | undefined): string {
+  const cleaned = (raw ?? '')
+    .replace(/[\u0000-\u001f\u007f/\\]/g, '')
+    .replace(/^\.+/, '')
+    .trim();
+  const named = cleaned.length > 0 ? cleaned : FALLBACK_TEMPLATE_NAME;
+  return /\.[A-Za-z0-9]{1,8}$/.test(named) ? named : `${named}.xlsx`;
+}
+
+/**
+ * 把微信临时文件另存成**原始文件名**，返回可 openDocument 的路径。
+ *
+ * ⚠️ 这是「下载下来的模板叫乱码」的根因修复：`Taro.downloadFile` 只能落到
+ * `tempFilePath`（形如 `wxfile://tmp_9f3a1c.xlsx` 的随机名），直接拿它
+ * `openDocument` 时，用户看到与转发保存出去的就是这个随机名。
+ * 先 `saveFile` 到 `USER_DATA_PATH` 下的原始文件名，再打开，名字才对得上。
+ *
+ * 另存失败不阻断：退回临时路径（名字还是随机，但至少能打开）。
+ */
+async function saveAsOriginalName(tempFilePath: string, fileName: string): Promise<string> {
+  const fs = (
+    Taro as { getFileSystemManager?: () => Taro.FileSystemManager }
+  ).getFileSystemManager?.();
+  const userDataPath = (Taro.env as { USER_DATA_PATH?: string }).USER_DATA_PATH;
+  if (!fs || !userDataPath) return tempFilePath;
+
+  try {
+    const dir = `${userDataPath}/legacy-import-template`;
+    await new Promise<void>((resolve) => {
+      fs.mkdir({ dirPath: dir, success: () => resolve(), fail: () => resolve() });
+    });
+    const target = `${dir}/${fileName}`;
+    // 同名文件已存在时 saveFile 会直接失败（第二次下载就退化成随机名）⇒ 先删掉旧的
+    await new Promise<void>((resolve) => {
+      fs.unlink({ filePath: target, success: () => resolve(), fail: () => resolve() });
+    });
+    await new Promise<void>((resolve, reject) => {
+      fs.saveFile({
+        tempFilePath,
+        filePath: target,
+        success: () => resolve(),
+        fail: (err) => reject(err),
+      });
+    });
+    return target;
+  } catch (err) {
+    console.warn('[legacy-hours-import] 模板另存为原始文件名失败，回落临时路径', err);
+    return tempFilePath;
+  }
+}
+
 export const legacyHoursImportService = {
   /**
    * 下载模板并用系统组件打开（可转发保存）。
@@ -159,9 +219,16 @@ export const legacyHoursImportService = {
     if (downloaded.statusCode !== 200) {
       throw new Error(`模板下载失败（HTTP ${downloaded.statusCode}）`);
     }
+
+    // 用运营上传时的原始文件名打开，避免看到 wxfile://tmp_xxxx 这种随机名
+    const filePath = await saveAsOriginalName(
+      downloaded.tempFilePath,
+      safeLocalFileName(config?.templateFileName),
+    );
+
     try {
       await Taro.openDocument({
-        filePath: downloaded.tempFilePath,
+        filePath,
         fileType: 'xlsx',
         showMenu: true,
       });

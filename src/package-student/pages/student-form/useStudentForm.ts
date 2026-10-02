@@ -76,8 +76,6 @@ export interface UseStudentFormReturn {
   setNickname: React.Dispatch<React.SetStateAction<string>>;
   gender: string;
   setGender: React.Dispatch<React.SetStateAction<string>>;
-  phone: string;
-  setPhone: React.Dispatch<React.SetStateAction<string>>;
   birthday: string;
   setBirthday: React.Dispatch<React.SetStateAction<string>>;
   address: string;
@@ -117,10 +115,6 @@ export interface UseStudentFormReturn {
   feeMethodOther: string;
   setFeeMethodOther: React.Dispatch<React.SetStateAction<string>>;
 
-  campusId: string;
-  setCampusId: React.Dispatch<React.SetStateAction<string>>;
-  campusOptions: CampusUIModel[];
-
   /** 推荐人学员 ID（B9 / R8，只记关系）；空串 = 没有 / 清除 */
   referrerStudentId: string;
   setReferrerStudentId: React.Dispatch<React.SetStateAction<string>>;
@@ -158,7 +152,6 @@ export function useStudentForm(): UseStudentFormReturn {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [gender, setGender] = useState('');
-  const [phone, setPhone] = useState('');
   const [birthday, setBirthday] = useState('');
   const [address, setAddress] = useState('');
   const [note, setNote] = useState('');
@@ -182,6 +175,7 @@ export function useStudentForm(): UseStudentFormReturn {
   const [feeMethodOther, setFeeMethodOther] = useState('');
 
   const [campusOptions, setCampusOptions] = useState<CampusUIModel[]>([]);
+  const currentCampusId = useCampusStore((state) => state.currentCampusId);
   const [campusId, setCampusId] = useState('');
 
   /**
@@ -194,11 +188,20 @@ export function useStudentForm(): UseStudentFormReturn {
   /** 推荐人姓名（仅用于表单展示，提交只发 id） */
   const [referrerName, setReferrerName] = useState('');
 
-  /** 主校区 id：首次进页与「继续新增」重置后都用它作为默认选中项 */
-  const defaultCampusId = useMemo(
-    () => campusOptions.find((campus) => campus.isMain)?.id || '',
-    [campusOptions],
-  );
+  /** 默认校区 = **当前校区**（学员归属不再让用户选）。当前校区不在列表内时回落主校区、再回落第一个 */
+  const defaultCampusId = useMemo(() => {
+    const list = campusOptions;
+    if (list.length === 0) return '';
+    const current = list.find((campus) => campus.id === currentCampusId);
+    if (current) return current.id;
+    return list.find((campus) => campus.isMain)?.id || list[0]?.id || '';
+  }, [campusOptions, currentCampusId]);
+
+  /** 主号码：取第一条填了号码的联系方式（界面不再单列「手机号」输入框） */
+  const primaryPhone = useMemo(() => {
+    const filled = contacts.find((item) => item.phone.trim());
+    return filled ? filled.phone.trim() : '';
+  }, [contacts]);
 
   const updateStudentInCache = useStudentStore((state) => state.updateInCache);
   // 校区/科目为低频参照数据：经 campus store 的 TTL 读取，避免每次进页重复请求
@@ -244,6 +247,12 @@ export function useStudentForm(): UseStudentFormReturn {
       setCampusOptions(campusList);
       setSubjects(subjectList);
       const mainCampusId = campusList.find((campus) => campus.isMain)?.id || '';
+      /** 与 `defaultCampusId` 同一回落链：当前校区 → 主校区 → 第一个校区 */
+      const preferredCampusId =
+        campusList.find((campus) => campus.id === currentCampusId)?.id ||
+        mainCampusId ||
+        campusList[0]?.id ||
+        '';
 
       if (isEdit) {
         const stu = await studentService.getById(studentId);
@@ -255,7 +264,6 @@ export function useStudentForm(): UseStudentFormReturn {
         setName(stu.name || '');
         setNickname(stu.nickname || '');
         setGender(stu.gender === 'male' ? '男' : stu.gender === 'female' ? '女' : '');
-        setPhone(stu.phone || '');
         setBirthday(stu.birthday || '');
         setAddress(stu.address || '');
         setNote(stu.note || '');
@@ -263,10 +271,14 @@ export function useStudentForm(): UseStudentFormReturn {
         setFeeAmount(stu.fee_amount ? String(stu.fee_amount) : '');
         setFeeMethod(stu.fee_method || '');
         setPaymentEnabled(Boolean(stu.fee_amount || stu.fee_method));
-        setCampusId(stu.campus_id || mainCampusId);
-        // 联系方式：有则回填已有值，无则保留一行空白默认项
+        setCampusId(stu.campus_id || preferredCampusId);
+        // 联系方式：有则回填；没有时若学员原本留过手机号，补一条「家长」行避免丢数据
         setContacts(
-          stu.contacts?.length ? stu.contacts : [{ id: '1', relation: '妈妈', phone: '' }],
+          stu.contacts?.length
+            ? stu.contacts
+            : stu.phone
+              ? [{ id: '1', relation: '家长', phone: stu.phone }]
+              : [{ id: '1', relation: '妈妈', phone: '' }],
         );
         // B9 / R8：推荐人必须回填，否则保存会把已有推荐人清掉（空串 = 明确清除）
         setReferrerStudentId(stu.referrer_student_id || '');
@@ -274,7 +286,7 @@ export function useStudentForm(): UseStudentFormReturn {
         return;
       }
 
-      setCampusId(mainCampusId);
+      setCampusId(preferredCampusId);
     } catch (error) {
       logError('init student form', error);
       setLoadError('学员表单初始化失败，请稍后重试');
@@ -292,7 +304,15 @@ export function useStudentForm(): UseStudentFormReturn {
       });
       setLoading(false);
     }
-  }, [currentUserId, isEdit, studentId, fetchCampuses, fetchSubjects, initStartAtRef]);
+  }, [
+    currentUserId,
+    isEdit,
+    studentId,
+    fetchCampuses,
+    fetchSubjects,
+    initStartAtRef,
+    currentCampusId,
+  ]);
 
   useEffect(() => {
     void loadFormData();
@@ -334,7 +354,10 @@ export function useStudentForm(): UseStudentFormReturn {
       errs.name = '姓名最多20个字';
     }
 
-    if (phone.trim() && !/^1[3-9]\d{9}$/.test(phone.trim())) {
+    const badContact = contacts.find(
+      (item) => item.phone.trim() && !/^1[3-9]\d{9}$/.test(item.phone.trim()),
+    );
+    if (badContact) {
       errs.phone = '请输入正确的11位手机号';
     }
 
@@ -375,13 +398,16 @@ export function useStudentForm(): UseStudentFormReturn {
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [name, phone, birthday, isEdit, studentType, legacyPackages, feeAmount, paymentEnabled]);
+  }, [name, contacts, birthday, isEdit, studentType, legacyPackages, feeAmount, paymentEnabled]);
 
   const submitBlockedReason = useMemo(() => {
     if (!name.trim()) return '请输入学员姓名';
     if (name.trim().length > 20) return '学员姓名最多 20 个字';
 
-    if (phone.trim() && !/^1[3-9]\d{9}$/.test(phone.trim())) {
+    const badContact = contacts.find(
+      (item) => item.phone.trim() && !/^1[3-9]\d{9}$/.test(item.phone.trim()),
+    );
+    if (badContact) {
       return '请输入正确的 11 位手机号';
     }
 
@@ -435,7 +461,7 @@ export function useStudentForm(): UseStudentFormReturn {
     return '';
   }, [
     name,
-    phone,
+    contacts,
     birthday,
     isEdit,
     studentType,
@@ -476,7 +502,6 @@ export function useStudentForm(): UseStudentFormReturn {
     setName('');
     setNickname('');
     setGender('');
-    setPhone('');
     setBirthday('');
     setAddress('');
     setNote('');
@@ -489,12 +514,12 @@ export function useStudentForm(): UseStudentFormReturn {
     setInstallmentEnabled(false);
     setSchedule([]);
     setContacts([{ id: '1', relation: '妈妈', phone: '' }]);
-    setCampusId('');
+    setCampusId(defaultCampusId);
     // B9 / R8：继续新增时必须一并清空推荐人，否则会串到下一个学员
     setReferrerStudentId('');
     setReferrerName('');
     setErrors({});
-  }, []);
+  }, [defaultCampusId]);
 
   const handleSave = useCallback(async () => {
     if (saving) return;
@@ -553,7 +578,7 @@ export function useStudentForm(): UseStudentFormReturn {
         const updated = await studentService.update(studentId, {
           name: name.trim(),
           nickname: nickname.trim() || undefined,
-          phone: phone.trim() || undefined,
+          phone: primaryPhone || undefined,
           gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
           birthday: birthday || undefined,
           address: address.trim() || undefined,
@@ -599,7 +624,7 @@ export function useStudentForm(): UseStudentFormReturn {
           teacher_id: teacherId,
           name: name.trim(),
           nickname: nickname.trim() || undefined,
-          phone: phone.trim() || undefined,
+          phone: primaryPhone || undefined,
           gender: gender === '男' ? 'male' : gender === '女' ? 'female' : undefined,
           birthday: birthday || undefined,
           address: address.trim() || undefined,
@@ -635,7 +660,7 @@ export function useStudentForm(): UseStudentFormReturn {
             /**
              * ⚠️ 走专用 `PATCH /students/:id/avatar`，不能用 `studentService.update`：
              * 后者要求 `name` 必填（只传头像会被 400 拦下），且未传的
-             * `nickname / phone / birthday / remark` 会被写成 null 清空。
+             * `nickname / birthday / remark` 会被写成 null 清空。
              * 此前正是因此表现为「学员建好了，头像永远补不上去」。
              */
             await studentService.updateAvatar(newStudent.id, remoteAvatar);
@@ -698,7 +723,7 @@ export function useStudentForm(): UseStudentFormReturn {
     name,
     nickname,
     gender,
-    phone,
+    primaryPhone,
     birthday,
     address,
     note,
@@ -735,8 +760,6 @@ export function useStudentForm(): UseStudentFormReturn {
     setNickname,
     gender,
     setGender,
-    phone,
-    setPhone,
     birthday,
     setBirthday,
     address,
@@ -768,9 +791,6 @@ export function useStudentForm(): UseStudentFormReturn {
     setSchedule,
     feeMethodOther,
     setFeeMethodOther,
-    campusId,
-    setCampusId,
-    campusOptions,
     referrerStudentId,
     setReferrerStudentId,
     referrerName,

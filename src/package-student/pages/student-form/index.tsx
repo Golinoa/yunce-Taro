@@ -22,7 +22,7 @@ import { withRouteGuard } from '@/utils/route-guard';
 import { useStudentForm, FEE_METHOD_OPTIONS } from './useStudentForm';
 import type { StudentType } from './useStudentForm';
 
-type SelectorType = 'campus' | 'feeMethod' | 'subject' | null;
+type SelectorType = 'feeMethod' | 'subject' | null;
 type DatePickerTarget = { kind: 'birthday' } | { kind: 'expire'; packageId: string } | null;
 
 const StudentForm: React.FC = () => {
@@ -49,8 +49,6 @@ const StudentForm: React.FC = () => {
     setNickname,
     gender,
     setGender,
-    phone,
-    setPhone,
     birthday,
     setBirthday,
     address,
@@ -81,9 +79,6 @@ const StudentForm: React.FC = () => {
     setSchedule,
     feeMethodOther,
     setFeeMethodOther,
-    campusId,
-    setCampusId,
-    campusOptions,
     referrerStudentId,
     setReferrerStudentId,
     referrerName,
@@ -114,11 +109,6 @@ const StudentForm: React.FC = () => {
     if (feeMethod === 'other') return feeMethodOther.trim() || '其他';
     return FEE_METHOD_OPTIONS.find((item) => item.value === feeMethod)?.label || '请选择';
   }, [feeMethod, feeMethodOther]);
-
-  const campusLabel = useMemo(
-    () => campusOptions.find((item) => item.id === campusId)?.name || '请选择',
-    [campusId, campusOptions],
-  );
 
   const openSelector = (type: SelectorType, packageId?: string) =>
     setSelector({ visible: true, type, packageId });
@@ -270,33 +260,6 @@ const StudentForm: React.FC = () => {
                 <Icon name="mdi-calendar" size="sm" color="muted" />
               </View>
             </FormRow>
-
-            <FormRow
-              label="手机号"
-              editable
-              placeholder="11位手机号"
-              value={phone}
-              inputType="number"
-              onInput={(e) => {
-                setPhone(e.detail.value || '');
-                clearError('phone');
-              }}
-              error={errors.phone}
-              border={campusOptions.length > 0}
-            />
-
-            {campusOptions.length > 0 ? (
-              <FormRow label="所属校区" border={false} onClick={() => openSelector('campus')}>
-                <Text
-                  className={cn(
-                    'text-[30rpx]',
-                    campusId ? 'text-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {campusLabel}
-                </Text>
-              </FormRow>
-            ) : null}
           </Card>
 
           {/* 联系信息 */}
@@ -311,7 +274,19 @@ const StudentForm: React.FC = () => {
 
             <View className="pt-[8rpx] pb-[8rpx]">
               <Text className="block text-[30rpx] text-foreground mb-[16rpx]">联系方式</Text>
-              <ContactList contacts={contacts} onChange={setContacts} maxCount={5} />
+              <ContactList
+                contacts={contacts}
+                onChange={(next) => {
+                  setContacts(next);
+                  clearError('phone');
+                }}
+                maxCount={5}
+              />
+              {errors.phone ? (
+                <Text className="mt-[12rpx] block text-[24rpx] text-destructive">
+                  {errors.phone}
+                </Text>
+              ) : null}
             </View>
           </Card>
 
@@ -656,34 +631,22 @@ const StudentForm: React.FC = () => {
 
         <PickerSheet
           visible={selector.visible}
-          title={
-            selector.type === 'campus'
-              ? '选择校区'
-              : selector.type === 'subject'
-                ? '选择科目'
-                : '选择支付方式'
-          }
+          title={selector.type === 'subject' ? '选择科目' : '选择支付方式'}
           options={
-            selector.type === 'campus'
-              ? campusOptions.map((c): PickerOption => ({ label: c.name, value: c.id }))
-              : selector.type === 'subject'
-                ? subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))
-                : FEE_METHOD_OPTIONS.map(
-                    (item): PickerOption => ({ label: item.label, value: item.value }),
-                  )
+            selector.type === 'subject'
+              ? subjects.map((s): PickerOption => ({ label: s.name, value: s.id }))
+              : FEE_METHOD_OPTIONS.map(
+                  (item): PickerOption => ({ label: item.label, value: item.value }),
+                )
           }
           value={
-            selector.type === 'campus'
-              ? campusId
-              : selector.type === 'subject'
-                ? legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''
-                : feeMethod
+            selector.type === 'subject'
+              ? legacyPackages.find((p) => p.id === selector.packageId)?.subjectId || ''
+              : feeMethod
           }
           onClose={closeSelector}
           onConfirm={(v) => {
-            if (selector.type === 'campus') {
-              setCampusId(v);
-            } else if (selector.type === 'subject' && selector.packageId) {
+            if (selector.type === 'subject' && selector.packageId) {
               const subject = subjects.find((s) => s.id === v);
               updateLegacyPackage(selector.packageId, {
                 subjectId: v,
