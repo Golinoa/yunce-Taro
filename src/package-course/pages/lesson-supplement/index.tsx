@@ -8,21 +8,21 @@ import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import { useDelayedLoading } from '@/hooks/useDelayedLoading';
-import { classService, lessonRecordService, packageService, scheduleService } from '@/services';
+import { classService, lessonRecordService, memberCardService, scheduleService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { subjectService } from '@/services/campus';
 import { useStudentStore } from '@/stores';
 import type { Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
-import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Schedule } from '@/types/schedule';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
+import { getMemberCardRemaining, pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
 import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import { logError } from '@/utils/logger';
 import { notifyStudentParentsSafe } from '@/utils/notify-student-parents';
-import { hasTrialPackage, pickBestPackage } from '@/utils/package-helper';
 import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -77,7 +77,10 @@ const LessonSupplementPage: React.FC = () => {
   const [classStudents, setClassStudents] = useState<Student[]>([]);
   const [teacherStudents, setTeacherStudents] = useState<Student[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [studentPackages, setStudentPackages] = useState<Map<string, CoursePackage[]>>(new Map());
+  /** 学员会员卡（唯一账本；课包已整套移除）：补录提交时的扣减来源 */
+  const [studentMemberCards, setStudentMemberCards] = useState<Map<string, MemberCardDetail[]>>(
+    new Map(),
+  );
   const [recordByStudentId, setRecordByStudentId] = useState<Map<string, LessonRecord>>(new Map());
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [showAddStudentSheet, setShowAddStudentSheet] = useState(false);
@@ -146,10 +149,10 @@ const LessonSupplementPage: React.FC = () => {
           (student) => !currentClassStudents.some((classStudent) => classStudent.id === student.id),
         ),
       ];
-      const packageEntries = await Promise.all(
+      const cardEntries = await Promise.all(
         allStudents.map(async (student) => {
-          const packages = await packageService.getActiveByStudent(student.id);
-          return [student.id, packages] as const;
+          const cards = (await memberCardService.getByStudent(student.id)) ?? [];
+          return [student.id, cards] as const;
         }),
       );
 
@@ -159,7 +162,7 @@ const LessonSupplementPage: React.FC = () => {
       setTeacherStudents(currentTeacherStudents);
       setStudents(currentClassStudents);
       setRecordByStudentId(recordsByStudent);
-      setStudentPackages(new Map(packageEntries));
+      setStudentMemberCards(new Map(cardEntries));
     } catch (error) {
       logError('LessonSupplement loadData', error);
       Taro.showToast({ title: '补录信息加载失败', icon: 'none' });
@@ -172,13 +175,14 @@ const LessonSupplementPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const matchedPackageByStudent = useMemo(() => {
-    const result = new Map<string, CoursePackage | null>();
-    studentPackages.forEach((packages, studentId) => {
-      result.set(studentId, pickBestPackage(packages, hoursUsed) || null);
+  /** 每个学员本次补录会扣哪张卡（挑卡规则与点名页同源） */
+  const matchedCardByStudent = useMemo(() => {
+    const result = new Map<string, MemberCardDetail | null>();
+    studentMemberCards.forEach((cards, studentId) => {
+      result.set(studentId, pickMemberCardForLesson(cards, hoursUsed) || null);
     });
     return result;
-  }, [hoursUsed, studentPackages]);
+  }, [hoursUsed, studentMemberCards]);
 
   const alreadySignedStudents = useMemo(
     () =>
@@ -328,7 +332,7 @@ const LessonSupplementPage: React.FC = () => {
           : [];
 
       for (const student of selectedStudents) {
-        const matchedPackage = matchedPackageByStudent.get(student.id);
+        const matchedCard = matchedCardByStudent.get(student.id);
         const placeholderRecords = existingRecords.filter(
           (record) =>
             // 占位（请假/未到）也必须属于本节，否则会把另一节的占位删掉
@@ -349,25 +353,24 @@ const LessonSupplementPage: React.FC = () => {
             operator_teacher_id: currentTeacherId || scheduleInfo?.teacher_id,
             assistant_teacher_id: scheduleInfo?.assistant_teacher_id || undefined,
             student_id: student.id,
-            package_id: matchedPackage?.id || '',
             class_id: classId,
             schedule_id: scheduleId || undefined,
             lesson_date: lessonDate,
             hours_used: hoursUsed,
             status: 'makeup',
-            content: matchedPackage ? contentText : `${contentText}（欠课时）`,
+            content: matchedCard ? contentText : `${contentText}（欠课时）`,
           });
 
           await notifyStudentParentsSafe({
             studentId: student.id,
             senderId: profile?.id || '',
             title: `${displayClassName}已补录签到`,
-            content: matchedPackage
+            content: matchedCard
               ? `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，剩余 ${
                   createdRecord.remaining_hours ??
-                  Math.max(matchedPackage.remaining_hours - hoursUsed, 0)
+                  Math.max(getMemberCardRemaining(matchedCard) - hoursUsed, 0)
                 } 课时`
-              : `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，当前暂无可扣课包，已记为欠课时`,
+              : `${lessonDate} ${lessonTime} 已补录 ${hoursUsed} 课时，当前暂无可扣课时，已记为欠课时`,
             logLabel: 'LessonSupplement notify parents',
           });
 
@@ -433,7 +436,7 @@ const LessonSupplementPage: React.FC = () => {
     scheduleId,
     lessonDate,
     lessonTime,
-    matchedPackageByStudent,
+    matchedCardByStudent,
     note,
     profile,
     scheduleInfo?.assistant_teacher_id,
@@ -546,11 +549,10 @@ const LessonSupplementPage: React.FC = () => {
             <View className="mt-[20rpx] flex flex-col gap-[16rpx]">
               {selectableStudents.map((student) => {
                 const selected = selectedStudentIds.has(student.id);
-                const matchedPackage = matchedPackageByStudent.get(student.id);
-                const isTrialStudent = hasTrialPackage(studentPackages.get(student.id));
+                const matchedCard = matchedCardByStudent.get(student.id);
                 const record = recordByStudentId.get(student.id);
                 const isDebtByInsufficient = Boolean(
-                  matchedPackage && matchedPackage.remaining_hours < hoursUsed,
+                  !!matchedCard && getMemberCardRemaining(matchedCard) < hoursUsed,
                 );
 
                 let secondaryText = '';
@@ -570,10 +572,10 @@ const LessonSupplementPage: React.FC = () => {
                   secondaryText = '原记录为缺勤，本次可补录';
                   statusTagText = '缺勤转补录';
                   statusTagClassName = 'bg-warning/10 text-warning';
-                } else if (matchedPackage && !isDebtByInsufficient) {
-                  secondaryText = `使用课包 ${matchedPackage.name}，剩余 ${matchedPackage.remaining_hours} 课时`;
-                } else if (matchedPackage) {
-                  secondaryText = `课包 ${matchedPackage.name} 仅剩 ${matchedPackage.remaining_hours} 课时，补录后记为欠课时`;
+                } else if (matchedCard && !isDebtByInsufficient) {
+                  secondaryText = `使用 ${matchedCard.cardTypeName}，剩余 ${getMemberCardRemaining(matchedCard)} 课时`;
+                } else if (matchedCard) {
+                  secondaryText = `${matchedCard.cardTypeName} 仅剩 ${getMemberCardRemaining(matchedCard)} 课时，补录后记为欠课时`;
                   secondaryClassName = 'text-warning';
                   statusTagText = '欠课时';
                   statusTagClassName = 'bg-warning/10 text-warning';
@@ -599,13 +601,6 @@ const LessonSupplementPage: React.FC = () => {
                           <Text className="shrink-0 text-[28rpx] font-medium text-foreground">
                             {student.name}
                           </Text>
-                          {isTrialStudent ? (
-                            <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
-                              <Text className="text-center text-[20rpx] font-medium text-error">
-                                试听
-                              </Text>
-                            </View>
-                          ) : null}
                           <View
                             className={`rounded-[8rpx] px-[12rpx] py-[4rpx] ${statusTagClassName}`}
                           >
@@ -646,7 +641,6 @@ const LessonSupplementPage: React.FC = () => {
                 <View className="mt-[18rpx] flex flex-col gap-[16rpx]">
                   {alreadySignedStudents.map((student) => {
                     const record = recordByStudentId.get(student.id);
-                    const isTrialStudent = hasTrialPackage(studentPackages.get(student.id));
                     const tagText = record?.status === 'makeup' ? '已补录' : '已签到';
                     const descText =
                       record?.status === 'makeup'
@@ -665,13 +659,6 @@ const LessonSupplementPage: React.FC = () => {
                               <Text className="shrink-0 text-[28rpx] font-medium text-foreground">
                                 {student.name}
                               </Text>
-                              {isTrialStudent ? (
-                                <View className="rounded-[8rpx] bg-error/10 px-[12rpx] py-[4rpx]">
-                                  <Text className="text-center text-[20rpx] font-medium text-error">
-                                    试听
-                                  </Text>
-                                </View>
-                              ) : null}
                               <View className="rounded-[8rpx] bg-white px-[12rpx] py-[4rpx]">
                                 <Text className="text-center text-[20rpx] text-muted-foreground">
                                   {tagText}

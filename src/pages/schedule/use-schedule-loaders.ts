@@ -321,12 +321,10 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
         const classStudentsList = await Promise.all(
           classList.map(async (classItem) => ({
             classId: classItem.id,
-            students: await classService
-              .getStudents(classItem.id, { includePackages: false })
-              .catch((err) => {
-                logError(`SchedulePage load class students: ${classItem.id}`, err);
-                return [];
-              }),
+            students: await classService.getStudents(classItem.id).catch((err) => {
+              logError(`SchedulePage load class students: ${classItem.id}`, err);
+              return [];
+            }),
           })),
         );
         const nextClassStudentAvatars: Record<string, ScheduleCardStudentAvatar[]> = {};

@@ -184,9 +184,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
     Promise.all([
       // 复用学员 store 的统一入口：自带软删除过滤，保证补课学员列表不含已删除学员。
       useStudentStore.getState().fetchByTeacher(userId, resolvedCampusId || undefined),
-      classId
-        ? classService.getStudents(classId, { includePackages: false })
-        : Promise.resolve([] as Student[]),
+      classId ? classService.getStudents(classId) : Promise.resolve([] as Student[]),
     ])
       .then(([list, classStu]) => {
         setStudents(list);

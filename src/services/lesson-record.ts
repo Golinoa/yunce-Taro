@@ -1,7 +1,7 @@
 /**
  * 消课记录 Service（Q2-4，从 student.ts 抽出）
  */
-import type { FeeMethod } from '@/types/course-package';
+import type { FeeMethod } from '@/types/fee';
 import type { LessonRecord } from '@/types/lesson-record';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
 import { ApiError, del, get, post, put } from '@/utils/request';
@@ -246,12 +246,6 @@ export function mapBackendLessonRecord(
         : 'student' in item && item.student?.id
           ? item.student.id
           : '',
-    package_id:
-      'packageId' in item
-        ? item.packageId || ''
-        : 'package' in item && item.package?.id
-          ? item.package.id
-          : '',
     member_card_id: 'memberCardId' in item ? item.memberCardId || undefined : undefined,
     lesson_date: normalizeLessonDate(item.lessonDate),
     hours_used: Number(('hoursUsed' in item ? item.hoursUsed : null) ?? item.duration / 60),
@@ -290,7 +284,7 @@ export function mapBackendLessonRecord(
     room: ('room' in item ? item.room : undefined) || undefined,
     created_at: item.createdAt,
     updated_at: 'updatedAt' in item && item.updatedAt ? item.updatedAt : item.createdAt,
-    course_package: packageName ? { name: packageName } : undefined,
+    member_card_name: packageName || undefined,
     student:
       studentName || studentAvatar
         ? {
@@ -316,7 +310,6 @@ function buildLessonRecordPayload(
     teacherId: data.teacher_id || undefined,
     operatorTeacherId: data.operator_teacher_id || undefined,
     assistantTeacherId: data.assistant_teacher_id || undefined,
-    packageId: data.package_id || undefined,
     memberCardId: data.member_card_id || undefined,
     classId: data.class_id || undefined,
     /**

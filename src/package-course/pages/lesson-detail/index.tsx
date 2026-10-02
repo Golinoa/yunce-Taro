@@ -130,7 +130,7 @@ const LessonDetail: React.FC = () => {
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [showRevokeSheet, setShowRevokeSheet] = useState(false);
-  /** P4：编辑课时（弹窗输入新课时，保存后差额回补/追扣课包） */
+  /** P4：编辑课时（弹窗输入新课时，保存后差额回补/追扣会员卡） */
   const [showEditSheet, setShowEditSheet] = useState(false);
   const [editHours, setEditHours] = useState('');
   const [updating, setUpdating] = useState(false);
@@ -337,7 +337,7 @@ const LessonDetail: React.FC = () => {
     }
   }, [recordId, profile, revokeReason, invalidateStudents, loadRecord, record]);
 
-  /** P4：修改消课课时（差额自动回补/追扣课包） */
+  /** P4：修改消课课时（差额自动回补/追扣会员卡） */
   const handleUpdateHours = useCallback(async () => {
     const v = Number(editHours);
     if (!Number.isFinite(v) || v < 0) {
@@ -377,7 +377,7 @@ const LessonDetail: React.FC = () => {
             logError('todo read clear', e);
           }
         }
-        Taro.showToast({ title: '已保存，差额已同步课包', icon: 'success' });
+        Taro.showToast({ title: '已保存，差额已同步会员卡', icon: 'success' });
         setShowEditSheet(false);
         await loadRecord();
         if (profile?.id) invalidateStudents(profile.id);
@@ -593,7 +593,7 @@ const LessonDetail: React.FC = () => {
   }
 
   const studentName = record.student?.name || '学生';
-  const packageName = record.course_package?.name || '课程';
+  const packageName = record.member_card_name || '课程';
   const cancelledStudentCount = relatedRecords.length;
   const cancelledOperatorTeacherName =
     record.operator_teacher?.name || record.teacher?.name || profile?.name || '未记录';
@@ -630,7 +630,7 @@ const LessonDetail: React.FC = () => {
   const courseContentText = record.content || '暂无';
   const teacherReviewText = record.performance || '暂无';
   const homeworkText = record.homework || '暂无';
-  const crossSubjectText = `班级科目 ${record.class_subject || '通用'} / 课包科目 ${record.package_subject || '通用'}`;
+  const crossSubjectText = `班级科目 ${record.class_subject || '通用'} / 扣减卡科目 ${record.source_subject || '通用'}`;
 
   if (record?.status === 'cancelled') {
     return (
@@ -713,7 +713,7 @@ const LessonDetail: React.FC = () => {
               <Text className="text-[24rpx] text-foreground">{studentName}</Text>
             </View>
             <View className="flex items-center gap-[8rpx]">
-              <Text className="flex-shrink-0 text-[24rpx] text-muted-foreground">课包</Text>
+              <Text className="flex-shrink-0 text-[24rpx] text-muted-foreground">消课卡</Text>
               <Text className="text-[24rpx] text-foreground">{packageName}</Text>
             </View>
           </View>
@@ -825,7 +825,7 @@ const LessonDetail: React.FC = () => {
         >
           <View className="px-[32rpx] py-[32rpx]">
             <Text className="text-[28rpx] text-muted-foreground leading-relaxed">
-              修改本次消课课时。保存后会自动对关联课包做差额处理：改大追扣、改小回补。
+              修改本次消课课时。保存后会自动对关联会员卡做差额处理：改大追扣、改小回补。
             </Text>
             <View className="mt-[32rpx] bg-muted rounded-[24rpx] px-[24rpx] py-[24rpx]">
               <Input
@@ -870,7 +870,7 @@ const LessonDetail: React.FC = () => {
         >
           <View className="px-[32rpx] py-[32rpx]">
             <Text className="text-[28rpx] text-muted-foreground leading-relaxed">
-              撤销后将恢复课包余额（购买{record.purchased_deduct || 0}课时 + 赠送
+              撤销后将恢复会员卡余额（购买{record.purchased_deduct || 0}课时 + 赠送
               {record.bonus_deduct || 0}课时），该操作不可逆。
             </Text>
             <View className="mt-[32rpx]">

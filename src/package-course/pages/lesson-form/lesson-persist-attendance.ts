@@ -3,7 +3,6 @@
  */
 import { lessonRecordService, notificationService } from '@/services';
 import type { Subject } from '@/types/campus';
-import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
@@ -33,7 +32,6 @@ export type PersistAttendanceContext = {
   performance: number;
   homework: string;
   homeworkImages: string[];
-  studentPackages: Map<string, CoursePackage>;
   /** 学员会员卡（新账本，含卡种科目）：旧课包优先，没有才用它扣减 */
   studentMemberCards?: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
@@ -80,12 +78,11 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
 
     const createdRecord = await lessonRecordService.create({
       ...basePayload,
-      package_id: '',
       member_card_id: deduction.id,
       hours_used: ctx.hoursUsed,
       status: ctx.isSupplement || ctx.makeupStudentIds.has(student.id) ? 'makeup' : 'normal',
       is_cross_subject: isCrossSubject || undefined,
-      package_subject: isCrossSubject ? deduction.name : undefined,
+      source_subject: isCrossSubject ? deduction.name : undefined,
       class_subject: isCrossSubject ? studentSubject?.name : undefined,
       content: ctx.isSupplement ? '补录签到' : ctx.content.trim() || undefined,
       note: ctx.studentRemarkDrafts[student.id] || ctx.existingRecord?.note || undefined,
@@ -121,7 +118,6 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
   if (status === 'leave') {
     await lessonRecordService.create({
       ...basePayload,
-      package_id: '',
       hours_used: 0,
       status: 'leave',
       content: ctx.isSupplement ? '补录请假' : '家长已请假，本节课自动记为请假',
@@ -132,7 +128,6 @@ export async function persistStudentAttendanceRecord(ctx: PersistAttendanceConte
 
   await lessonRecordService.create({
     ...basePayload,
-    package_id: '',
     hours_used: ctx.hoursUsed,
     status: 'absent',
     create_debt: true,
@@ -146,8 +141,8 @@ export async function notifyCrossSubjectIfNeeded(input: {
   senderId: string;
   student: Student;
   /**
-   * 扣减来源的名称（课包名或会员卡名）。
-   * ⚠️ 不再收 `pkg: CoursePackage`：扣减来源可能是会员卡，那时根本没有课包对象。
+   * 扣减来源的名称（会员卡卡种名）。
+   * ⚠️ 不按课包对象建模：课包已整套移除，扣减来源只有会员卡。
    */
   sourceName: string;
   studentSubject?: Subject | null;

@@ -10,7 +10,6 @@ import { useClassStore } from '@/stores/class';
 import { useCourseCategoryStore } from '@/stores/course-category';
 import { useCourseTemplateStore } from '@/stores/course-template';
 import { useLeadStore } from '@/stores/lead';
-import { usePackageTemplateStore } from '@/stores/package-template';
 import { useStudentStore } from '@/stores/student';
 import { useTeacherStore } from '@/stores/teacher';
 import { clearAllCache } from '@/utils/cache-store';
@@ -32,7 +31,6 @@ export function resetDomainCaches(scope: ResetDomainCachesScope = 'all'): void {
     lastFetch: {},
     summaryCache: {},
   });
-  usePackageTemplateStore.setState({ cache: {}, loading: {}, lastFetch: {} });
   useTeacherStore.getState().invalidateCache();
   useCourseCategoryStore.getState().invalidateCache();
   useCourseTemplateStore.getState().invalidateCache();

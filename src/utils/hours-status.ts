@@ -8,22 +8,24 @@ import { getAlertThreshold } from '@/utils/alert-config';
 /** 即将过期天数阈值 */
 const EXPIRING_DAYS_THRESHOLD = 30;
 
-type PackageLike = {
-  remaining_hours: number;
+type CardLike = {
+  remaining_count: number;
   status?: string;
-  valid_until?: string;
+  expired_at?: string | null;
 };
 
-/** 课包是否仍可用：进行中且仍有剩余课时、未过有效期 */
-function isUsablePackage(pkg: PackageLike, now = Date.now()): boolean {
-  if (pkg.status === 'expired' || pkg.status === 'frozen') return false;
-  if (pkg.remaining_hours <= 0) return false;
-  if (pkg.valid_until) {
-    const end = new Date(pkg.valid_until).getTime();
+/** 会员卡是否仍可用：进行中且仍有剩余课时、未过有效期 */
+function isUsableCard(card: CardLike, now = Date.now()): boolean {
+  if (card.status === 'usedUp' || card.status === 'frozen' || card.status === 'inactive') {
+    return false;
+  }
+  if (card.remaining_count <= 0) return false;
+  if (card.expired_at) {
+    const end = new Date(card.expired_at).getTime();
     if (Number.isFinite(end) && end < now) return false;
   }
-  // status 缺省或 active / 其它非过期态，且有剩余 → 可用
-  return pkg.status === 'active' || !pkg.status || pkg.status === 'normal';
+  // status 缺省或 active，且有剩余 → 可用
+  return card.status === 'active' || !card.status;
 }
 
 /** 根据剩余课时获取课时数字颜色状态 */
@@ -54,48 +56,43 @@ export function getHoursColorClass(
 
 /**
  * 学员卡片综合状态（边框口径）：
- * - 红：没有任何可用会员卡/课包（全过期、全耗尽、或无包）
- * - 黄：有可用包，但课时 ≤ 校区预警值 / 即将到期 / 已过期包但仍有其它可用包时的不足提醒
- * - 正常：有可用包且未触及预警
+ * - 红：没有任何可用会员卡（全过期、全耗尽、或无卡）
+ * - 黄：有可用卡，但课时 ≤ 校区预警值 / 即将到期 / 已过期卡但仍有其它可用卡时的不足提醒
+ * - 正常：有可用卡且未触及预警
  *
- * 透支（owe）：若仍有可用包 → 黄；若无可用包 → 红
+ * 透支（owe）：若仍有可用卡 → 黄；若无可用卡 → 红
+ *
+ * 2026-10-02：口径由「课包」改为**会员卡**（唯一账本），字段名随之为 `member_cards`。
  */
 export function getStudentCardStatus(
   student: {
-    course_packages?: PackageLike[];
+    member_cards?: CardLike[];
     oweCount?: number;
   },
   threshold = getAlertThreshold(),
 ): StudentCardStatus {
-  const packages = student.course_packages || [];
-  const usable = packages.filter((p) => isUsablePackage(p));
+  const cards = student.member_cards || [];
+  const usable = cards.filter((card) => isUsableCard(card));
 
-  // 没有任何可用课包/会员卡 → 红
+  // 没有任何可用会员卡 → 红
   if (usable.length === 0) {
-    if (packages.length === 0) return 'expired';
-    if (
-      packages.some((p) => p.status === 'expired') ||
-      packages.every((p) => p.remaining_hours <= 0)
-    ) {
-      return 'expired';
-    }
     return 'expired';
   }
 
   // 有可用包时：透支不标红，走黄提醒
   if (student.oweCount && student.oweCount > 0) return 'low';
 
-  // 即将到期（可用包在阈值天数内到期）
+  // 即将到期（可用卡在阈值天数内到期）
   const now = Date.now();
-  const soonExpiring = usable.some((p) => {
-    if (!p.valid_until) return false;
-    const daysLeft = Math.ceil((new Date(p.valid_until).getTime() - now) / (1000 * 60 * 60 * 24));
+  const soonExpiring = usable.some((card) => {
+    if (!card.expired_at) return false;
+    const daysLeft = Math.ceil((new Date(card.expired_at).getTime() - now) / (1000 * 60 * 60 * 24));
     return daysLeft > 0 && daysLeft <= EXPIRING_DAYS_THRESHOLD;
   });
   if (soonExpiring) return 'expiring';
 
-  // 课时不足：任一可用包剩余 ≤ 校区预警值
-  if (usable.some((p) => p.remaining_hours > 0 && p.remaining_hours <= threshold)) {
+  // 课时不足：任一可用卡剩余 ≤ 校区预警值
+  if (usable.some((card) => card.remaining_count > 0 && card.remaining_count <= threshold)) {
     return 'low';
   }
 
@@ -104,8 +101,8 @@ export function getStudentCardStatus(
 
 /**
  * 细**整圈**边框（0.5px 视觉宽度）：
- * - 红：无可用课包
- * - 黄：即将到期 / 课时不足（含有可用包时的透支提醒）
+ * - 红：无可用会员卡
+ * - 黄：即将到期 / 课时不足（含有可用卡时的透支提醒）
  * - 正常：无边框
  *
  * 宽度说明：项目统一用 rpx（750rpx = 屏幕宽 = 375px），故 **0.5px ≈ 1rpx**。
@@ -119,7 +116,7 @@ export function getCardBorderColorClass(status: StudentCardStatus): string {
   switch (status) {
     case 'expired':
     case 'owe':
-      // owe 仅在无可用包时才会走到红（有可用包时 getStudentCardStatus 已映射为 low）
+      // owe 仅在无可用卡时才会走到红（有可用卡时 getStudentCardStatus 已映射为 low）
       return 'border-status-danger';
     case 'low':
     case 'expiring':
@@ -143,25 +140,25 @@ export function getProgressGradientClass(status: StudentCardStatus): string {
   }
 }
 
-/** 计算学员总课时进度 */
+/** 计算学员总课时进度（会员卡口径；课包已整套移除） */
 export function calcStudentProgress(student: {
-  course_packages?: { total_hours: number; remaining_hours: number }[];
+  member_cards?: { total_count: number; remaining_count: number }[];
 }): StudentProgress {
-  const packages = student.course_packages || [];
-  const total = packages.reduce((s, p) => s + p.total_hours, 0);
-  const remaining = packages.reduce((s, p) => s + p.remaining_hours, 0);
+  const cards = student.member_cards || [];
+  const total = cards.reduce((sum, c) => sum + c.total_count, 0);
+  const remaining = cards.reduce((sum, c) => sum + c.remaining_count, 0);
   const used = total - remaining;
   const percentage = total > 0 ? Math.round((used / total) * 100) : 0;
   const status = getHoursColorStatus(remaining);
   return { used, total, percentage, status };
 }
 
-/** 生成课包标签列表 */
+/** 会员卡标签列表（保留占位：调用方按需渲染） */
 
 /** 计算统计摘要 */
 export function calcStudentSummary(
   students: {
-    course_packages?: { remaining_hours: number; status?: string }[];
+    member_cards?: { remaining_count: number; status?: string }[];
     oweCount?: number;
   }[],
 ): { total: number; sufficient: number; low: number; owe: number } {

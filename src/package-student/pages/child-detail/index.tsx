@@ -16,9 +16,9 @@ import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import SegmentedControl from '@/components/SegmentedControl';
-import { lessonRecordService, packageService, studentService } from '@/services';
-import type { CoursePackage } from '@/types/course-package';
+import { lessonRecordService, memberCardService, studentService } from '@/services';
 import type { LessonRecord } from '@/types/lesson-record';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student, StudentParent } from '@/types/student';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 
@@ -50,14 +50,47 @@ function formatDate(date?: string): string {
   return d.isValid() ? d.format('YYYY-MM-DD') : '-';
 }
 
-/** 课包状态文本 */
-function packageStatusText(status: CoursePackage['status']): string {
+/** 会员卡展示行（唯一账本；课包已整套移除） */
+type ChildCardView = {
+  id: string;
+  name: string;
+  status: 'active' | 'usedUp' | 'notActivated' | 'frozen' | 'inactive';
+  remainingHours: number;
+  totalHours: number;
+  expiredAt?: string | null;
+};
+
+function toCardView(card: MemberCardDetail): ChildCardView {
+  const totalHours = card.totalCount ?? (card.cardTypeCount ?? 0) + (card.totalGiftCount ?? 0);
+  const remainingHours = Math.max(0, (card.remainingCount ?? 0) + (card.remainingGiftCount ?? 0));
+  const status: ChildCardView['status'] =
+    card.status === 'usedUp' || card.status === 'frozen' || card.status === 'inactive'
+      ? card.status
+      : card.status === 'notActivated'
+        ? 'notActivated'
+        : 'active';
+  return {
+    id: card.id,
+    name: card.cardTypeName || '课时卡',
+    status,
+    remainingHours,
+    totalHours,
+    expiredAt: card.expiredAt ?? null,
+  };
+}
+
+/** 会员卡状态文本 */
+function cardStatusText(status: ChildCardView['status']): string {
   switch (status) {
     case 'active':
       return '使用中';
-    case 'completed':
+    case 'usedUp':
       return '已用完';
-    case 'expired':
+    case 'notActivated':
+      return '未激活';
+    case 'frozen':
+      return '已冻结';
+    case 'inactive':
       return '已过期';
     case 'frozen':
       return '已冻结';
@@ -80,7 +113,7 @@ const ChildDetail: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<TabKey>('guardians');
 
-  const [packages, setPackages] = useState<CoursePackage[]>([]);
+  const [cards, setCards] = useState<ChildCardView[]>([]);
   const [records, setRecords] = useState<LessonRecord[]>([]);
   const [guardians, setGuardians] = useState<StudentParent[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -117,16 +150,16 @@ const ChildDetail: React.FC = () => {
     }
   }, []);
 
-  // 加载课包和消课记录
+  // 加载会员卡和消课记录
   const loadData = useCallback(async (id: string) => {
     if (!id) return;
     setLoadingData(true);
     try {
-      const [pkgs, recs] = await Promise.all([
-        packageService.getByStudent(id),
+      const [rawCards, recs] = await Promise.all([
+        memberCardService.getByStudent(id),
         lessonRecordService.getByStudent(id),
       ]);
-      setPackages(pkgs);
+      setCards((rawCards ?? []).map(toCardView));
       setRecords(
         recs
           .filter((r) => r.lesson_date)
@@ -134,7 +167,7 @@ const ChildDetail: React.FC = () => {
       );
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('加载课包/记录失败', err);
+      console.error('加载会员卡/记录失败', err);
       Taro.showToast({ title: '数据加载失败', icon: 'none' });
     } finally {
       setLoadingData(false);
@@ -174,9 +207,9 @@ const ChildDetail: React.FC = () => {
     ).length;
     return {
       lessonCount,
-      packageCount: packages.length,
+      packageCount: cards.length,
     };
-  }, [records, packages]);
+  }, [records, cards]);
 
   const relation = student?.relation || '子女';
 
@@ -415,19 +448,19 @@ const ChildDetail: React.FC = () => {
                 <View className="flex items-center justify-between mb-[20rpx]">
                   <Text className="text-[30rpx] font-bold text-foreground">现有会员卡</Text>
                   <View className="tag-primary">
-                    <Text>{packages.length} 张</Text>
+                    <Text>{cards.length} 张</Text>
                   </View>
                 </View>
 
                 {loadingData ? (
                   <Loading text="加载中..." />
-                ) : packages.length === 0 ? (
+                ) : cards.length === 0 ? (
                   <Empty icon="mdi-wallet-outline" description="暂无会员卡" />
                 ) : (
                   <View className="flex flex-col gap-[16rpx]">
-                    {packages.map((pkg) => (
+                    {cards.map((card) => (
                       <View
-                        key={pkg.id}
+                        key={card.id}
                         className="p-[24rpx] rounded-[20rpx] bg-background border border-border/60"
                       >
                         <View className="flex items-center justify-between mb-[14rpx]">
@@ -436,25 +469,25 @@ const ChildDetail: React.FC = () => {
                               <Icon name="mdi-credit-card-outline" size={24} color="primary" />
                             </View>
                             <Text className="text-[28rpx] font-semibold text-foreground">
-                              {pkg.name}
+                              {card.name}
                             </Text>
                           </View>
                           <View
                             className={cn(
                               'tag',
-                              pkg.status === 'active'
+                              card.status === 'active'
                                 ? 'tag-primary'
                                 : 'bg-muted text-muted-foreground',
                             )}
                           >
-                            <Text>{packageStatusText(pkg.status)}</Text>
+                            <Text>{cardStatusText(card.status)}</Text>
                           </View>
                         </View>
 
                         <View className="flex items-center justify-between">
                           <View className="center-col px-[16rpx] py-[10rpx] bg-background rounded-[12rpx]">
                             <Text className="text-[28rpx] font-bold text-foreground">
-                              {pkg.remaining_hours || 0}
+                              {card.remainingHours}
                             </Text>
                             <Text className="text-[20rpx] text-muted-foreground mt-[4rpx]">
                               剩余课时
@@ -463,7 +496,7 @@ const ChildDetail: React.FC = () => {
                           <View className="w-[2rpx] h-[48rpx] bg-border/60" />
                           <View className="center-col px-[16rpx] py-[10rpx] bg-background rounded-[12rpx]">
                             <Text className="text-[28rpx] font-bold text-foreground">
-                              {pkg.total_hours || 0}
+                              {card.totalHours}
                             </Text>
                             <Text className="text-[20rpx] text-muted-foreground mt-[4rpx]">
                               总课时
@@ -472,7 +505,7 @@ const ChildDetail: React.FC = () => {
                           <View className="w-[2rpx] h-[48rpx] bg-border/60" />
                           <View className="center-col px-[16rpx] py-[10rpx] bg-background rounded-[12rpx]">
                             <Text className="text-[28rpx] font-bold text-foreground">
-                              {Math.max((pkg.total_hours || 0) - (pkg.remaining_hours || 0), 0)}
+                              {Math.max(card.totalHours - card.remainingHours, 0)}
                             </Text>
                             <Text className="text-[20rpx] text-muted-foreground mt-[4rpx]">
                               已用课时
@@ -480,9 +513,9 @@ const ChildDetail: React.FC = () => {
                           </View>
                         </View>
 
-                        {pkg.end_date && (
+                        {card.expiredAt && (
                           <Text className="text-[22rpx] text-muted-foreground mt-[14rpx]">
-                            有效期至 {formatDate(pkg.end_date)}
+                            有效期至 {formatDate(card.expiredAt)}
                           </Text>
                         )}
                       </View>

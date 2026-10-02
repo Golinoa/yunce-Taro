@@ -22,7 +22,7 @@ import FormInput from '@/components/FormInput';
 import Icon from '@/components/Icon';
 import PickerSheet, { PickerOption } from '@/components/PickerSheet';
 import { BRAND_LOGO } from '@/constants/brand';
-import { lessonRecordService, packageService, studentService } from '@/services';
+import { lessonRecordService, memberCardService, studentService } from '@/services';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import { resolveAvatarSrc } from '@/utils/avatar-src';
@@ -322,12 +322,12 @@ const ProfileEdit: React.FC = () => {
       const stats: Record<string, { lessonCount: number; packageCount: number }> = {};
       await Promise.all(
         alive.map(async (s) => {
-          const [pkgs, recs] = await Promise.all([
-            packageService.getByStudent(s.id),
+          const [cards, recs] = await Promise.all([
+            memberCardService.getByStudent(s.id),
             lessonRecordService.getByStudent(s.id),
           ]);
           stats[s.id] = {
-            packageCount: pkgs.length,
+            packageCount: cards.length,
             // 上课次数：按实际消耗课时的记录统计
             lessonCount: recs.filter((r) => (r.hours_used || 0) > 0).length,
           };

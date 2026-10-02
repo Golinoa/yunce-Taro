@@ -2,9 +2,9 @@
  * Service 层 — 学员相关 API（真实后端）
  */
 
-import { mapBackendPackageType } from '@/services/package';
 import { studentParentService } from '@/services/student-parents';
-import type { FeeMethod } from '@/types/course-package';
+import { useStudentStore } from '@/stores/student';
+import type { FeeMethod } from '@/types/fee';
 import type { Student } from '@/types/student';
 import { API_PAGE_SIZE_BATCH, asPaginatedResponse, fetchAllPages } from '@/utils/pagination';
 import { del, get, patch, post, put } from '@/utils/request';
@@ -74,14 +74,16 @@ interface BackendStudentDetailResponse {
     schedule?: null | string;
     subject?: null | string;
   }>;
-  coursePackages?: Array<{
+  /** 会员卡（唯一账本；课包已移除）：详情接口返回真实卡明细 */
+  memberCards?: Array<{
     id: string;
-    name: string;
-    status?: string;
-    totalHours: number;
-    type?: null | string;
-    usedHours: number;
-    validEnd?: null | string;
+    status: string;
+    remainingCount?: null | number;
+    remainingGiftCount?: null | number;
+    totalCount?: null | number;
+    totalGiftCount?: null | number;
+    expiredAt?: null | string;
+    cardType?: { id: string; name: string; kind?: string; count?: null | number } | null;
   }>;
   contacts?: Array<{ id?: string; phone: string; relation: string }> | null;
   createdAt: string;
@@ -177,19 +179,17 @@ function mapBackendStudentListItem(item: BackendStudentListItem): Student {
       subjectId: item_.subjectId,
       subjectName: item_.subjectName,
       remaining: Number(item_.remaining ?? 0),
-      sources: item_.sources ?? [],
     })),
-    course_packages:
+    // 课时来源 = 会员卡（唯一账本）：列表接口只给聚合值，这里合成一条汇总卡用于展示与状态判断
+    member_cards:
       totalHours > 0 || usedHours > 0
         ? [
             {
-              id: `${item.id}-aggregate-package`,
+              id: `${item.id}-aggregate-card`,
               name: '课时汇总',
-              total_hours: totalHours,
-              remaining_hours: Math.max(totalHours - usedHours, 0),
-              purchased_remaining: Math.max(totalHours - usedHours, 0),
-              bonus_remaining: 0,
-              status: 'active',
+              total_count: totalHours,
+              remaining_count: Math.max(totalHours - usedHours, 0),
+              status: 'active' as const,
               created_at: item.createdAt,
             },
           ]
@@ -238,18 +238,35 @@ function mapBackendStudentDetail(item: BackendStudentDetailResponse): Student {
     status: mapBackendStudentStatus(item.status),
     created_at: item.createdAt,
     updated_at: item.createdAt,
-    course_packages: (item.coursePackages || []).map((pkg) => ({
-      id: pkg.id,
-      name: pkg.name,
-      type: 'type' in pkg ? mapBackendPackageType(pkg.type) : undefined,
-      total_hours: pkg.totalHours,
-      remaining_hours: Math.max(pkg.totalHours - pkg.usedHours, 0),
-      purchased_remaining: Math.max(pkg.totalHours - pkg.usedHours, 0),
-      bonus_remaining: 0,
-      status:
-        pkg.status === 'ACTIVE' ? 'active' : pkg.status === 'EXPIRED' ? 'expired' : 'completed',
-      created_at: pkg.validEnd || item.createdAt,
-    })),
+    /**
+     * 会员卡明细 → 课时摘要（唯一账本；课包已于 2026-10-02 整套移除）。
+     * 口径与后端 `utils/lesson-hours` 一致：总量优先取快照 `totalCount`，老卡回落 卡种 count + 赠送。
+     */
+    member_cards: (item.memberCards || []).map((card) => {
+      const totalCount =
+        card.totalCount ?? (card.cardType?.count ?? 0) + (card.totalGiftCount ?? 0);
+      const remainingCount = Math.max(
+        0,
+        (card.remainingCount ?? 0) + (card.remainingGiftCount ?? 0),
+      );
+      const rawStatus = card.status;
+      const status: NonNullable<Student['member_cards']>[number]['status'] =
+        rawStatus === 'active' ||
+        rawStatus === 'usedUp' ||
+        rawStatus === 'notActivated' ||
+        rawStatus === 'frozen' ||
+        rawStatus === 'inactive'
+          ? rawStatus
+          : 'active';
+      return {
+        id: card.id,
+        name: card.cardType?.name || '课时卡',
+        total_count: totalCount,
+        remaining_count: remainingCount,
+        status,
+        expired_at: card.expiredAt ?? null,
+      };
+    }),
   };
 }
 
@@ -312,6 +329,17 @@ export interface InitialStudentPackagePayload {
 // ============================================
 // 学员 Service
 // ============================================
+/**
+ * 清空学员列表缓存。
+ *
+ * 会员卡余额变化（发卡 / 追加次数 / 消课 / 导入）后**必须**调用 ——
+ * 学员列表、课表卡片、点名页的「剩余课时」都读它。
+ * 课包已整套移除，本函数取代原先的 `invalidatePackagesCache`。
+ */
+export const invalidateStudentListCache = (): void => {
+  useStudentStore.setState({ cache: {}, loading: {}, lastFetch: {} });
+};
+
 export const studentService = {
   /** 获取学员分页，页面列表按触底逐页加载，禁止一次性拉全量。 */
   getPageByTeacher: async (
@@ -516,15 +544,6 @@ export const studentService = {
    */
   bindParent: studentParentService.bindParent,
 };
-
-// ============================================
-// 课包 Service（实现见 package.ts）
-// ============================================
-export {
-  packageService,
-  packageTemplateService,
-  invalidatePackagesCache,
-} from '@/services/package';
 
 // ============================================
 // 消课记录 Service（实现见 lesson-record.ts）

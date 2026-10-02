@@ -4,7 +4,6 @@
  */
 export { studentService, formatDateCN } from './student';
 export { scheduleService } from './schedule';
-export { packageService, packageTemplateService, invalidatePackagesCache } from './package';
 export { lessonRecordService } from './lesson-record';
 export { classService } from './class';
 export { leaveService } from './leave';

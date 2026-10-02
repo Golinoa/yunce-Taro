@@ -19,7 +19,6 @@ function makeLessonRecord(
 ): LessonRecord {
   return {
     teacher_id: 't1',
-    package_id: 'p1',
     hours_used: 0,
     created_at: '2026-01-01T00:00:00',
     updated_at: '2026-01-01T00:00:00',

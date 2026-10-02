@@ -1,35 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { packageService, subjectService } from '@/services';
-import type { CoursePackage } from '@/types/course-package';
+import { memberCardService, subjectService } from '@/services';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import {
   buildClassAttendanceState,
   buildTrialCheckinMap,
   filterApprovedLeaveStudentIds,
   isDateWithinRange,
-  loadPackageMapsForStudents,
+  loadMemberCardMapsForStudents,
   mapRecordStatusToCheckin,
   resolveClassAttendanceMode,
 } from './lesson-attendance-load';
 
 vi.mock('@/services', () => ({
   leaveService: { getByTeacher: vi.fn(async () => []) },
-  packageService: { getActiveByStudent: vi.fn() },
+  memberCardService: { getByStudent: vi.fn() },
   subjectService: { getById: vi.fn() },
 }));
 
 const student = (id: string) => ({ id }) as Student;
 
-const pkg = (overrides: Partial<CoursePackage>): CoursePackage =>
+const card = (overrides: Partial<MemberCardDetail>): MemberCardDetail =>
   ({
-    id: 'p1',
-    name: '课包',
-    type: 'hour_package',
-    total_hours: 10,
-    remaining_hours: 8,
+    id: 'c1',
     status: 'active',
+    cardTypeName: '课时卡',
+    remainingCount: 8,
+    remainingGiftCount: 0,
     ...overrides,
-  }) as CoursePackage;
+  }) as MemberCardDetail;
 
 describe('lesson-attendance-load (Q2-2)', () => {
   it('isDateWithinRange 含端点', () => {
@@ -259,83 +258,78 @@ describe('lesson-attendance-load (Q2-2)', () => {
   });
 });
 
-describe('loadPackageMapsForStudents：并发 + 同学科只查一次', () => {
+describe('loadMemberCardMapsForStudents：并发 + 同学科只查一次', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('同学科的多个学员：subjectService.getById 只调一次，结果与逐学员查一致', async () => {
-    const getActive = vi.mocked(packageService.getActiveByStudent);
+    const getCards = vi.mocked(memberCardService.getByStudent);
     const getSubject = vi.mocked(subjectService.getById);
-    getActive.mockImplementation(async (studentId: string) => [
-      studentId === 's1'
-        ? pkg({ id: 'p1', subject_id: 'sub-1' })
-        : pkg({ id: 'p2', subject_id: 'sub-1' }),
-    ]);
+    getCards.mockImplementation(async () => [card({ id: 'c1', cardTypeSubjectId: 'sub-1' })]);
     getSubject.mockResolvedValue({ id: 'sub-1', name: '数学' } as never);
 
-    const { packages, subjects } = await loadPackageMapsForStudents(
-      [student('s1'), student('s2'), student('s3')],
-      1,
-    );
+    const { memberCards, subjects } = await loadMemberCardMapsForStudents([
+      student('s1'),
+      student('s2'),
+      student('s3'),
+    ]);
 
-    expect(getActive).toHaveBeenCalledTimes(3);
+    expect(getCards).toHaveBeenCalledTimes(3);
     expect(getSubject).toHaveBeenCalledTimes(1);
-    expect(packages.get('s1')?.id).toBe('p1');
-    expect(packages.get('s2')?.id).toBe('p2');
+    expect(memberCards.get('s1')?.[0]?.id).toBe('c1');
     expect(subjects.get('s1')?.name).toBe('数学');
     expect(subjects.get('s3')?.name).toBe('数学');
   });
 
-  it('无可用课包的学员不进 map；有课包无学科时 subjects 落 null', async () => {
-    const getActive = vi.mocked(packageService.getActiveByStudent);
+  it('无卡的学员：memberCards 落空数组；有卡但卡种无科目时 subjects 落 null', async () => {
+    const getCards = vi.mocked(memberCardService.getByStudent);
     const getSubject = vi.mocked(subjectService.getById);
-    getActive.mockImplementation(async (studentId: string) =>
-      studentId === 'empty' ? [] : [pkg({ id: 'p1' })],
+    getCards.mockImplementation(async (studentId: string) =>
+      studentId === 'empty' ? [] : [card({ id: 'c1' })],
     );
     getSubject.mockClear();
 
-    const { packages, subjects } = await loadPackageMapsForStudents(
-      [student('empty'), student('s1')],
-      1,
-    );
+    const { memberCards, subjects } = await loadMemberCardMapsForStudents([
+      student('empty'),
+      student('s1'),
+    ]);
 
-    expect(packages.has('empty')).toBe(false);
-    expect(subjects.has('empty')).toBe(false);
+    expect(memberCards.get('empty')).toEqual([]);
+    expect(subjects.get('empty')).toBeNull();
     expect(subjects.get('s1')).toBeNull();
     expect(getSubject).not.toHaveBeenCalled();
   });
 
   it('并发有上限：10 个学员不会同时打满 10 个请求', async () => {
-    const getActive = vi.mocked(packageService.getActiveByStudent);
+    const getCards = vi.mocked(memberCardService.getByStudent);
     let running = 0;
     let peak = 0;
-    getActive.mockImplementation(async () => {
+    getCards.mockImplementation(async () => {
       running += 1;
       peak = Math.max(peak, running);
       await new Promise((resolve) => setTimeout(resolve, 5));
       running -= 1;
-      return [] as CoursePackage[];
+      return [] as MemberCardDetail[];
     });
 
-    await loadPackageMapsForStudents(
+    await loadMemberCardMapsForStudents(
       Array.from({ length: 10 }, (_, index) => student(`s${index}`)),
-      1,
     );
 
-    expect(getActive).toHaveBeenCalledTimes(10);
+    expect(getCards).toHaveBeenCalledTimes(10);
     expect(peak).toBeGreaterThan(1);
     expect(peak).toBeLessThanOrEqual(6);
   });
 
   it('空学员列表不发任何请求', async () => {
-    const getActive = vi.mocked(packageService.getActiveByStudent);
-    getActive.mockClear();
+    const getCards = vi.mocked(memberCardService.getByStudent);
+    getCards.mockClear();
 
-    const { packages, subjects } = await loadPackageMapsForStudents([], 1);
+    const { memberCards, subjects } = await loadMemberCardMapsForStudents([]);
 
-    expect(packages.size).toBe(0);
+    expect(memberCards.size).toBe(0);
     expect(subjects.size).toBe(0);
-    expect(getActive).not.toHaveBeenCalled();
+    expect(getCards).not.toHaveBeenCalled();
   });
 });

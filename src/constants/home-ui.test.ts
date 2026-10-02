@@ -66,11 +66,13 @@ describe('home-ui 快捷入口常量', () => {
     expect(labels.includes('课时充值')).toBe(false);
   });
 
-  it('校长/管理员金刚区保留教务工具且首项为课时充值', () => {
+  it('校长/管理员金刚区保留教务工具且首项为课时导入（课包页已删，改指向课时导入）', () => {
     expect(HOME_QUICK_ENTRIES.length).toBe(8);
-    expect(HOME_QUICK_ENTRIES[0]?.label).toBe('课时充值');
-    expect(HOME_QUICK_ENTRIES[0]?.url).toContain('/package-course/pages/package-form/index');
+    expect(HOME_QUICK_ENTRIES[0]?.label).toBe('课时导入');
+    expect(HOME_QUICK_ENTRIES[0]?.url).toContain(
+      '/package-student/pages/legacy-hours-import/index',
+    );
     const parentSet = new Set(PARENT_HOME_QUICK_ENTRIES.map((e) => e.label));
-    expect(parentSet.has('课时充值')).toBe(false);
+    expect(parentSet.has('课时导入')).toBe(false);
   });
 });

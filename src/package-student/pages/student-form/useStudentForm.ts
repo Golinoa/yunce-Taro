@@ -9,7 +9,7 @@ import {
 import { studentService, subscribeMessageService } from '@/services';
 import { useCampusStore, useStudentStore } from '@/stores';
 import type { CampusUIModel, Subject } from '@/types/campus';
-import type { FeeMethod } from '@/types/course-package';
+import type { FeeMethod } from '@/types/fee';
 import type { Student } from '@/types/student';
 import { useAuth } from '@/utils/auth';
 import {
@@ -350,7 +350,7 @@ export function useStudentForm(): UseStudentFormReturn {
       if (studentType === 'old' && legacyPackages.length > 0) {
         for (let i = 0; i < legacyPackages.length; i += 1) {
           const pkg = legacyPackages[i];
-          const label = legacyPackages.length > 1 ? `课包${i + 1}` : '课包';
+          const label = legacyPackages.length > 1 ? `课时卡${i + 1}` : '课时卡';
           if (!pkg.subjectId) {
             errs.legacyPackages = `请选择${label}的科目`;
             break;
@@ -396,7 +396,7 @@ export function useStudentForm(): UseStudentFormReturn {
       // 历史课包选填：没填直接建档；填了才逐行校验（与 validate() 同一套规则）
       for (let i = 0; i < legacyPackages.length; i += 1) {
         const pkg = legacyPackages[i];
-        const label = legacyPackages.length > 1 ? `课包${i + 1}` : '课包';
+        const label = legacyPackages.length > 1 ? `课时卡${i + 1}` : '课时卡';
         if (!pkg.subjectId) return `请选择${label}的科目`;
         const hours = parseInt(pkg.remainingHours, 10);
         if (!pkg.remainingHours.trim() || Number.isNaN(hours) || hours <= 0) {

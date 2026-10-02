@@ -49,7 +49,7 @@ const SubjectManagementPage: React.FC = () => {
    *
    * 同时：科目写入口在本页（subject-form 直连 service，不经 store），
    * 故每次显示都让 store 的科目 TTL 缓存过期，避免其他表单页
-   * （添加学员 / 新建课包 / 新增排课）在 TTL 窗口内读到过期的科目列表。
+   * （添加学员 / 发卡 / 新增排课）在 TTL 窗口内读到过期的科目列表。
    */
   useDidShow(() => {
     useCampusStore.getState().invalidateSubjectsCache();
@@ -74,10 +74,10 @@ const SubjectManagementPage: React.FC = () => {
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
-    // 有关联课包时阻止删除
+    // 有关联会员卡时阻止删除
     if (deleteTarget.courseCount > 0) {
       Taro.showToast({
-        title: `该科目下有 ${deleteTarget.courseCount} 个课包，无法删除`,
+        title: `该科目下有 ${deleteTarget.courseCount} 张会员卡，无法删除`,
         icon: 'none',
         duration: 2500,
       });
@@ -164,7 +164,7 @@ const SubjectManagementPage: React.FC = () => {
                         {subject.teacherCount}教师
                       </Text>
                       <Text className="text-[22rpx] text-muted-foreground">
-                        {subject.courseCount}课包
+                        {subject.courseCount}张卡
                       </Text>
                     </View>
                   </View>

@@ -1,5 +1,8 @@
 /**
- * LegacyPackagesEditor - 老生历史课包录入（R1 + R6 共用一套表单、一条链路）
+ * LegacyPackagesEditor - 老生历史课时录入（R1 + R6 共用一套表单、一条链路）
+ *
+ * ⚠️ 名称保留 `Legacy...`：它是「老生期初入账」的入口，写入的是**会员卡**
+ * （`member-cards/opening`），不是已移除的课包。
  *
  * 使用场景：
  *  - R6：学员详情「卡包」/ 学员列表「会员操作」→ 居中弹框（`studentId` 已知，组件自带提交按钮）；

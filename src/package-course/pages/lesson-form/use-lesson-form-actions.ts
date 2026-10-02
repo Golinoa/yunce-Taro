@@ -11,22 +11,19 @@ import {
 } from 'react';
 import {
   memberCardService,
-  packageService,
   lessonRecordService,
   classService,
   subjectService,
   subscribeMessageService,
 } from '@/services';
 import type { Subject } from '@/types/campus';
-import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
-import { pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
+import { getMemberCardRemaining, pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
 import { logError } from '@/utils/logger';
-import { pickBestPackage } from '@/utils/package-helper';
 import { emitScheduleRelatedRefresh } from '@/utils/refresh-signal';
 import type { SubmitLock } from '@/utils/submit-lock';
 import { resolveLessonSubmitKind } from './lesson-submit';
@@ -71,15 +68,15 @@ export interface UseLessonFormActionsParams {
   performance: number;
   homework: string;
   homeworkImages: string[];
-  studentPackages: Map<string, CoursePackage>;
-  /** 学员会员卡（第二本账，含卡种科目）：旧课包优先，没有才用它扣减 */
+  /** 学员会员卡（唯一账本，含卡种科目）：点名扣减来源 */
   studentMemberCards: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   makeupStudentIds: Set<string>;
   supplementStudentIds: Set<string>;
   attendanceBaseline: Map<string, CheckinStatus>;
   selectedStudent: Student | null;
-  matchedPackage: CoursePackage | null;
+  /** 单人模式当前选中的会员卡（唯一账本；课包已移除） */
+  matchedCard: MemberCardDetail | null;
   profile?: {
     id?: string;
     name?: string;
@@ -98,7 +95,6 @@ export interface UseLessonFormActionsParams {
   setStudentRemarkDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   setRecordByStudentId: Dispatch<SetStateAction<Map<string, LessonRecord>>>;
   setClassStudents: Dispatch<SetStateAction<Student[]>>;
-  setStudentPackages: Dispatch<SetStateAction<Map<string, CoursePackage>>>;
   setStudentSubjects: Dispatch<SetStateAction<Map<string, Subject | null>>>;
   setStudentMemberCards: Dispatch<SetStateAction<Map<string, MemberCardDetail[]>>>;
   setShowAddStudentSheet: Dispatch<SetStateAction<boolean>>;
@@ -141,14 +137,13 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     performance,
     homework,
     homeworkImages,
-    studentPackages,
     studentSubjects,
     studentMemberCards,
     makeupStudentIds,
     supplementStudentIds,
     attendanceBaseline,
     selectedStudent,
-    matchedPackage,
+    matchedCard,
     profile,
     submitLockRef,
     invalidateStudents,
@@ -163,7 +158,6 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     setStudentRemarkDrafts,
     setRecordByStudentId,
     setClassStudents,
-    setStudentPackages,
     setStudentSubjects,
     setStudentMemberCards,
     setShowAddStudentSheet,
@@ -415,18 +409,13 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
         await classService.transferStudent(selectedClassId, targetClassId, student.id);
         Taro.showToast({ title: '调班成功', icon: 'success' });
         setClassStudents((prev) => prev.filter((s) => s.id !== student.id));
-        setStudentPackages((prev) => {
-          const next = new Map(prev);
-          next.delete(student.id);
-          return next;
-        });
         setShowStudentDetailSheet(false);
       } catch (err) {
         logError('transfer student', err);
         Taro.showToast({ title: '调班失败', icon: 'none' });
       }
     },
-    [selectedClassId, setClassStudents, setShowStudentDetailSheet, setStudentPackages],
+    [selectedClassId, setClassStudents, setShowStudentDetailSheet],
   );
 
   const handleRemoveStudent = useCallback(
@@ -447,18 +436,13 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
         await classService.removeStudent(selectedClassId, student.id);
         Taro.showToast({ title: '移除成功', icon: 'success' });
         setClassStudents((prev) => prev.filter((s) => s.id !== student.id));
-        setStudentPackages((prev) => {
-          const next = new Map(prev);
-          next.delete(student.id);
-          return next;
-        });
         setShowStudentDetailSheet(false);
       } catch (err) {
         logError('remove student', err);
         Taro.showToast({ title: '移除失败', icon: 'none' });
       }
     },
-    [selectedClassId, setClassStudents, setShowStudentDetailSheet, setStudentPackages],
+    [selectedClassId, setClassStudents, setShowStudentDetailSheet],
   );
 
   const handleConfirmAddStudents = useCallback(
@@ -475,22 +459,19 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       }
 
       /**
-       * 课包与会员卡并发拉取：只查课包的话，只有会员卡的学员加进来也点不了名
-       * （提交时找不到扣减来源）。取卡失败不阻断加人，退回"无可用课时"的既有提示。
+       * 加人时并发取会员卡（唯一账本；课包已移除）：取不到卡的学员提交时会被提示
+       * 「无可扣课时」，所以取卡失败**不阻断加人**。
        */
-      const packageEntries = await Promise.all(
+      const cardEntries = await Promise.all(
         appendedStudents.map(async (student) => {
-          const [pkgs, cards] = await Promise.all([
-            packageService.getActiveByStudent(student.id),
-            memberCardService.getByStudent(student.id).catch(() => [] as MemberCardDetail[]),
-          ]);
-          const best = pickBestPackage(pkgs, hoursUsed);
-          if (!best) {
-            return { studentId: student.id, pkg: null, subject: null, cards };
-          }
-
-          const subject = best.subject_id ? await subjectService.getById(best.subject_id) : null;
-          return { studentId: student.id, pkg: best, subject, cards };
+          const cards = await memberCardService
+            .getByStudent(student.id)
+            .catch(() => [] as MemberCardDetail[]);
+          const subjectId = (cards ?? [])
+            .map((card) => card.cardTypeSubjectId)
+            .find((value): value is string => Boolean(value));
+          const subject = subjectId ? await subjectService.getById(subjectId) : null;
+          return { studentId: student.id, subject, cards: cards ?? [] };
         }),
       );
 
@@ -504,28 +485,17 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
         });
         return next;
       });
-      setStudentPackages((prev) => {
-        const next = new Map(prev);
-        packageEntries.forEach(({ studentId, pkg }) => {
-          if (pkg) {
-            next.set(studentId, pkg);
-          }
-        });
-        return next;
-      });
       setStudentSubjects((prev) => {
         const next = new Map(prev);
-        packageEntries.forEach(({ studentId, pkg, subject }) => {
-          if (pkg) {
-            next.set(studentId, subject);
-          }
+        cardEntries.forEach(({ studentId, subject }) => {
+          next.set(studentId, subject);
         });
         return next;
       });
       setStudentMemberCards((prev) => {
         const next = new Map(prev);
-        packageEntries.forEach(({ studentId, cards }) => {
-          next.set(studentId, cards ?? []);
+        cardEntries.forEach(({ studentId, cards }) => {
+          next.set(studentId, cards);
         });
         return next;
       });
@@ -539,14 +509,12 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     [
       addStudentSheetPurpose,
       addableStudents,
-      hoursUsed,
       leaveStudentIds,
       setAttendanceMode,
       setCheckedStudentIds,
       setStudentMemberCards,
       setClassStudents,
       setShowAddStudentSheet,
-      setStudentPackages,
       setStudentSubjects,
       setSupplementStudentIds,
     ],
@@ -606,7 +574,6 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       performance,
       homework,
       homeworkImages,
-      studentPackages,
       studentSubjects,
       studentMemberCards,
       studentRemarkDrafts,
@@ -630,7 +597,6 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       selectedClassId,
       selectedTeachingTeacherId,
       studentMemberCards,
-      studentPackages,
       studentRemarkDrafts,
       studentSubjects,
     ],
@@ -708,11 +674,11 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
 
   const handleSingleSubmit = useCallback(async () => {
     /**
-     * 没有可用旧课包时，兜底找会员卡：只有会员卡的学员此前在本页直接报"无可用课包"。
-     * 取卡失败不阻断流程，由 executeSingleDeduct 统一提示。
+     * 扣哪张卡由单人面板选定的会员卡决定（课包已整套移除）。
+     * 未选中时兜底按规则挑一张；取卡失败不阻断流程，由 executeSingleDeduct 统一提示。
      */
-    let matchedMemberCard: MemberCardDetail | null = null;
-    if (selectedStudent && !matchedPackage) {
+    let matchedMemberCard: MemberCardDetail | null = matchedCard;
+    if (selectedStudent && !matchedMemberCard) {
       try {
         const cards = await memberCardService.getByStudent(selectedStudent.id);
         matchedMemberCard = pickMemberCardForLesson(cards, hoursUsed);
@@ -722,7 +688,6 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     }
     await executeSingleDeduct({
       selectedStudent,
-      matchedPackage,
       matchedMemberCard,
       hoursUsed,
       lessonDate,
@@ -746,7 +711,7 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     });
   }, [
     selectedStudent,
-    matchedPackage,
+    matchedCard,
     hoursUsed,
     selectedTeachingTeacherId,
     currentTeacherId,
@@ -793,7 +758,6 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       homeworkImages,
       campusId,
       room,
-      studentPackages,
       studentSubjects,
       studentMemberCards,
       studentRemarkDrafts,
@@ -832,7 +796,6 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
     selectedTeachingTeacherId,
     classAbsentCount,
     studentMemberCards,
-    studentPackages,
     studentRemarkDrafts,
     studentSubjects,
     trialBookings,
@@ -883,15 +846,15 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
 
   const submitText = useMemo(() => {
     if (mode === 'single') {
-      if (!selectedStudent || !matchedPackage) return '确认消课';
-      const isOwe = matchedPackage.remaining_hours < hoursUsed;
+      if (!selectedStudent || !matchedCard) return '确认消课';
+      const isOwe = getMemberCardRemaining(matchedCard) < hoursUsed;
       return isOwe ? `确认消课（欠课${hoursUsed}课时）` : `确认消课 ${hoursUsed}课时`;
     }
     const totalPresent = presentStudents.length + presentTrialBookings.length;
     if (totalPresent === 0) return '确认消课';
     return `确认消课 ${totalPresent}人×${hoursUsed}课时`;
   }, [
-    matchedPackage,
+    matchedCard,
     mode,
     presentStudents.length,
     presentTrialBookings.length,

@@ -129,7 +129,7 @@ const ParentLessonNotesPage: React.FC = () => {
                   <View className="mb-[12rpx] flex flex-row items-center gap-[8rpx]">
                     <Icon name="mdi-book-open-variant" size={22} color="muted" />
                     <Text className="text-[22rpx] text-muted-foreground">
-                      {record.class_name || record.course_package?.name || '课程'}
+                      {record.class_name || record.member_card_name || '课程'}
                     </Text>
                   </View>
                   <Text className="mb-[8rpx] block text-[22rpx] text-muted-foreground">

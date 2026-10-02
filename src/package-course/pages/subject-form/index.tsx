@@ -85,7 +85,7 @@ const SubjectFormPage: React.FC = () => {
       title: '确认删除科目？',
       content:
         totalUsage > 0
-          ? '删除后，关联课程、课包和会员卡的科目将被清空，需要重新补齐。'
+          ? '删除后，关联课程与会员卡的科目将被清空，需要重新补齐。'
           : '删除后无法恢复，确认继续吗？',
       showCancel: true,
       confirmText: '继续删除',
@@ -96,7 +96,7 @@ const SubjectFormPage: React.FC = () => {
     if (totalUsage > 0) {
       const secondConfirm = await Taro.showModal({
         title: '存在关联数据',
-        content: `当前关联 ${latestUsage.courseCount} 个课程/课包和 ${latestUsage.cardCount} 个会员卡种，删除会清空这些关联的科目。仍要删除吗？`,
+        content: `当前关联 ${latestUsage.courseCount} 个课程和 ${latestUsage.cardCount} 个会员卡种，删除会清空这些关联的科目。仍要删除吗？`,
         showCancel: true,
         confirmText: '确认删除',
         cancelText: '返回',
@@ -127,7 +127,7 @@ const SubjectFormPage: React.FC = () => {
     if (renamed && usage.courseCount + usage.cardCount > 0) {
       const confirm = await Taro.showModal({
         title: '同步修改关联数据',
-        content: `该科目已关联 ${usage.courseCount} 个课程/课包和 ${usage.cardCount} 个会员卡种，修改名称后会同步更新关联数据。继续吗？`,
+        content: `该科目已关联 ${usage.courseCount} 个课程和 ${usage.cardCount} 个会员卡种，修改名称后会同步更新关联数据。继续吗？`,
         showCancel: true,
         confirmText: '继续保存',
         cancelText: '取消',

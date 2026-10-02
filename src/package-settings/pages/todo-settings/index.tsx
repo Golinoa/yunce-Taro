@@ -69,13 +69,13 @@ const SETTING_GROUPS: SettingGroup[] = [
     ],
   },
   {
-    title: '财务课包',
+    title: '财务·会员卡',
     requiredModule: 'finance',
     items: [
       {
         key: 'financePackage',
-        label: '课包即将到期',
-        sub: '临近到期的课包进入待办提醒续费',
+        label: '会员卡即将到期',
+        sub: '临近到期的会员卡进入待办提醒续费',
       },
     ],
   },

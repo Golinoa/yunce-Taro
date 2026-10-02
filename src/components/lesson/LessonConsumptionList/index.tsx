@@ -202,8 +202,8 @@ function mapRecordToDetail(
       : undefined,
     packageTagText,
     packageTagClassName: getPackageTagClass(packageTagText),
-    // 课程内容优先；无内容时用课包/班级名。不展示「个人消课/班级消课」这类注释性占位文案。
-    description: record.content?.trim() || record.course_package?.name || record.class_name || '',
+    // 课程内容优先；无内容时用扣减卡/班级名。不展示「个人消课/班级消课」这类注释性占位文案。
+    description: record.content?.trim() || record.member_card_name || record.class_name || '',
   };
 }
 
@@ -273,8 +273,8 @@ export function buildLessonConsumptionSections(
       const firstRecord = cardRecords[0];
       const uniqueStudentIds = new Set(cardRecords.map((item) => item.student_id));
       const teacherDisplayText = getTeacherDisplayText(firstRecord, teacherNameMap);
-      const title = firstRecord.class_name || firstRecord.course_package?.name || '班级消课';
-      const subtitleBase = firstRecord.course_package?.name || '班级消课';
+      const title = firstRecord.class_name || firstRecord.member_card_name || '班级消课';
+      const subtitleBase = firstRecord.member_card_name || '班级消课';
       const subtitle = [teacherDisplayText, subtitleBase].filter(Boolean).join(' · ');
 
       return {

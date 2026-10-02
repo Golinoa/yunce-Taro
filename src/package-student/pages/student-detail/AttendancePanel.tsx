@@ -117,7 +117,7 @@ const AttendancePanel: React.FC<AttendancePanelProps> = ({
                                 <View className="flex items-start justify-between">
                                   <View className="flex-1">
                                     <Text className="text-[28rpx] font-medium text-foreground block">
-                                      {record.course_package?.name || '上课'}
+                                      {record.member_card_name || '上课'}
                                     </Text>
                                     <Text className="text-[24rpx] text-muted-foreground block mt-[4rpx]">
                                       {formatDateCN(record.lesson_date)}

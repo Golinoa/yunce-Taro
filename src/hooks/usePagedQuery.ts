@@ -4,10 +4,10 @@
  * 约定（同类列表改造模板）：
  * - 首屏 pageSize 建议 20～30，禁止一次 pageSize=100/500 当「全部」
  * - 筛选变化必须 reload（page=1），服务端过滤优先于前端全量再滤
- * - 续拉用 loadMore + hasMore；参考 audit-log / 课包流水
+ * - 续拉用 loadMore + hasMore；参考 audit-log / 会员卡流水
  *
  * 优先改造清单：
- * P0 课包流水 getTransactions（已接入 usePagedQuery）
+ * P0 会员卡流水 getTransactions（已接入 usePagedQuery）
  * P1 教师维度全量：students/classes/schedules/lesson-records/getScheduledClassIds
  *     → 已改 fetchAllPages（API_PAGE_SIZE_BATCH）
  * P1.5 leave / packages / notifications / leads / teachers / campuses / temporary-reschedule

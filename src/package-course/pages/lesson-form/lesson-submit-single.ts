@@ -4,7 +4,6 @@
 import Taro from '@tarojs/taro';
 import { lessonRecordService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
-import type { CoursePackage } from '@/types/course-package';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import {
@@ -18,7 +17,6 @@ import { validateSingleSubmit, withSubmitLock } from './lesson-submit';
 
 export async function executeSingleDeduct(input: {
   selectedStudent?: Student | null;
-  matchedPackage?: CoursePackage | null;
   /**
    * 会员卡（第二本账）：**没有可用旧课包**时用它扣减。
    * 不传 = 与改前完全一致（只有会员卡的学员否则点不了名）。
@@ -58,7 +56,7 @@ export async function executeSingleDeduct(input: {
 }): Promise<void> {
   const error = validateSingleSubmit({
     hasStudent: !!input.selectedStudent,
-    // 有课包或会员卡任一个就能消课（"有扣减来源"）
+    // 有会员卡（课时来源）就能消课
     hasPackage: !!input.matchedMemberCard,
     hoursUsed: input.hoursUsed,
   });
@@ -85,7 +83,6 @@ export async function executeSingleDeduct(input: {
         teacher_id: input.selectedTeachingTeacherId || input.currentTeacherId || '',
         operator_teacher_id: input.currentTeacherId || input.selectedTeachingTeacherId,
         student_id: selectedStudent.id,
-        package_id: '',
         member_card_id: deduction.id,
         class_id: input.classId || undefined,
         schedule_id: input.scheduleId || undefined,

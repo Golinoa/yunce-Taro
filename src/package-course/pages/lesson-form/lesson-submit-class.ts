@@ -4,7 +4,6 @@
 import Taro from '@tarojs/taro';
 import { lessonRecordService } from '@/services';
 import type { Subject } from '@/types/campus';
-import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
@@ -49,7 +48,6 @@ export async function executeClassSubmit(input: {
   homeworkImages: string[];
   campusId?: string;
   room?: string;
-  studentPackages: Map<string, CoursePackage>;
   /**
    * 学员的会员卡（新账本，含卡种科目）。旧课包优先，只有**没有可用旧课包**时才用它扣减 ——
    * 只有会员卡的学员此前在本页会直接报「无可用课包」，根本点不了名。
@@ -169,12 +167,10 @@ export async function executeClassSubmit(input: {
           const createdRecord = await lessonRecordService.create({
             ...teacherPayload,
             student_id: student.id,
-            /** 扣减来源：会员卡（`package_id` 恒空；课包已整套移除） */
-            package_id: '',
             member_card_id: deduction.id,
             hours_used: input.hoursUsed,
             is_cross_subject: isCrossSubject || undefined,
-            package_subject: isCrossSubject ? deduction.name : undefined,
+            source_subject: isCrossSubject ? deduction.name : undefined,
             class_subject: isCrossSubject ? studentSubject?.name : undefined,
             content: input.content.trim() || undefined,
             note: input.studentRemarkDrafts[student.id] || undefined,
@@ -216,7 +212,6 @@ export async function executeClassSubmit(input: {
           await lessonRecordService.create({
             ...teacherPayload,
             student_id: student.id,
-            package_id: '',
             hours_used: 0,
             status: 'leave',
             content: '家长已请假，本节课自动记为请假',
@@ -234,7 +229,6 @@ export async function executeClassSubmit(input: {
           await lessonRecordService.create({
             ...teacherPayload,
             student_id: student.id,
-            package_id: '',
             hours_used: input.hoursUsed,
             status: 'absent',
             create_debt: true,
@@ -254,7 +248,6 @@ export async function executeClassSubmit(input: {
           await lessonRecordService.create({
             ...teacherPayload,
             student_id: booking.trial_student_id,
-            package_id: '',
             hours_used: 0,
             status: 'normal',
             content: `试听签到${booking.note ? `（${booking.note}）` : ''}`,
@@ -272,7 +265,6 @@ export async function executeClassSubmit(input: {
           await lessonRecordService.create({
             ...teacherPayload,
             student_id: booking.trial_student_id,
-            package_id: '',
             hours_used: 0,
             status: 'leave',
             content: '试听学员请假',
@@ -290,7 +282,6 @@ export async function executeClassSubmit(input: {
           await lessonRecordService.create({
             ...teacherPayload,
             student_id: booking.trial_student_id,
-            package_id: '',
             hours_used: 0,
             status: 'absent',
             create_debt: false,

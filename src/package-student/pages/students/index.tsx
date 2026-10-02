@@ -71,9 +71,9 @@ const MEMBER_SUB_TAB_OPTIONS: { key: MemberSubTab; label: string }[] = [
 ];
 
 /** 计算学生剩余课时汇总 */
-function calcRemainingHours(packages?: Student['course_packages']): number {
-  if (!packages) return 0;
-  return packages.reduce((sum, p) => sum + (p.remaining_hours || 0), 0);
+function calcRemainingHours(cards?: Student['member_cards']): number {
+  if (!cards) return 0;
+  return cards.reduce((sum, card) => sum + (card.remaining_count || 0), 0);
 }
 
 const Students: React.FC = () => {
@@ -524,9 +524,10 @@ const Students: React.FC = () => {
     if (memberSubTab !== 'all') {
       const today = dayjs();
       result = result.filter((s) => {
-        const packages = s.course_packages || [];
-        const hasActive = packages.some((p) => p.status === 'active');
-        const hasFrozen = packages.some((p) => p.status === 'frozen');
+        // 课时来源 = 会员卡（唯一账本；课包已整套移除）
+        const cards = s.member_cards || [];
+        const hasActive = cards.some((c) => c.status === 'active');
+        const hasFrozen = cards.some((c) => c.status === 'frozen');
         const cardStatus = getStudentCardStatus(s);
         const isBirthdayMonth = s.birthday ? dayjs(s.birthday).month() === today.month() : false;
 
@@ -534,13 +535,13 @@ const Students: React.FC = () => {
           case 'active':
             return hasActive;
           case 'private':
-            // 私教课包：通过课包名称关键词识别（数据完善后可改用类型字段）
-            return packages.some((p) => (p.name || '').includes('私教'));
+            // 私教：通过卡种名称关键词识别（数据完善后可改用类型字段）
+            return cards.some((c) => (c.name || '').includes('私教'));
           case 'renew':
             return cardStatus === 'low' || cardStatus === 'expiring' || cardStatus === 'owe';
           case 'silent':
-            // 沉默学员：有有效课包且剩余课时较多（数据完善后可改用最近消课时间）
-            return hasActive && calcRemainingHours(packages) >= 10;
+            // 沉默学员：有有效卡且剩余课时较多（数据完善后可改用最近消课时间）
+            return hasActive && calcRemainingHours(cards) >= 10;
           case 'frozen':
             return hasFrozen;
           case 'birthday':
@@ -558,9 +559,9 @@ const Students: React.FC = () => {
       result.sort((a, b) => {
         switch (sortBy) {
           case 'hours-desc':
-            return calcRemainingHours(b.course_packages) - calcRemainingHours(a.course_packages);
+            return calcRemainingHours(b.member_cards) - calcRemainingHours(a.member_cards);
           case 'hours-asc':
-            return calcRemainingHours(a.course_packages) - calcRemainingHours(b.course_packages);
+            return calcRemainingHours(a.member_cards) - calcRemainingHours(b.member_cards);
           case 'name-asc':
             return (a.name || '').localeCompare(b.name || '', 'zh');
           case 'name-desc':
@@ -850,7 +851,7 @@ const Students: React.FC = () => {
               const cardStatus = getStudentCardStatus(student);
               const borderColorClass = getCardBorderColorClass(cardStatus);
               const progress = calcStudentProgress(student);
-              const remainingHours = calcRemainingHours(student.course_packages);
+              const remainingHours = calcRemainingHours(student.member_cards);
               const hoursColorClass = getHoursColorClass(remainingHours);
               return (
                 <View
@@ -931,7 +932,7 @@ const Students: React.FC = () => {
                     </View>
                   )}
 
-                  {/* 课时不足 / 无可用课包 → 去充值 */}
+                  {/* 课时不足 / 无可用课时 → 去办卡 */}
                   {(cardStatus === 'low' ||
                     cardStatus === 'expiring' ||
                     cardStatus === 'expired' ||
@@ -946,7 +947,7 @@ const Students: React.FC = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         Taro.navigateTo({
-                          url: `/package-course/pages/package-form/index?studentId=${student.id}`,
+                          url: `/package-student/pages/member-card-issue/index?studentId=${student.id}`,
                         });
                       }}
                     >
@@ -959,11 +960,11 @@ const Students: React.FC = () => {
                         )}
                       >
                         {cardStatus === 'expired'
-                          ? '暂无可用课包，请尽快充值'
+                          ? '暂无可用课时，请尽快办卡'
                           : cardStatus === 'owe'
                             ? '课时透支，请尽快充值'
                             : cardStatus === 'expiring'
-                              ? '课包即将到期，建议续费'
+                              ? '会员卡即将到期，建议续费'
                               : '课时不足，建议充值'}
                       </Text>
                       <View

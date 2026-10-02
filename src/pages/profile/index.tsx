@@ -174,7 +174,7 @@ const Profile: React.FC = () => {
       } else {
         const remainingHours = list.reduce(
           (sum, student) =>
-            sum + Math.max(Number(student.course_packages?.[0]?.remaining_hours ?? 0), 0),
+            sum + Math.max(Number(student.member_cards?.[0]?.remaining_count ?? 0), 0),
           0,
         );
         setParentStatValues({

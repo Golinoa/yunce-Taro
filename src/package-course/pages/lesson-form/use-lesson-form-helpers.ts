@@ -6,10 +6,11 @@ import { uploadService } from '@/services';
 import type { ThemeKey } from '@/theme';
 import type { Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
-import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import { chooseImageTemp } from '@/utils/image-upload';
+import { getMemberCardRemaining } from '@/utils/lesson-deduction-source';
 import { runImageUploadFlow } from '@/utils/upload-flow';
 import { isWithinLessonOperateWindow } from './lesson-operate';
 import type { CheckinStatus } from './checkin-status';
@@ -36,7 +37,7 @@ export interface UseLessonFormHelpersParams {
   trialBookings: LeadBooking[];
   trialLeadMap: Record<string, Lead>;
   trialCheckinMap: Record<string, CheckinStatus>;
-  studentPackages: Map<string, CoursePackage>;
+  studentMemberCards: Map<string, MemberCardDetail[]>;
   studentSubjects: Map<string, Subject | null>;
   hoursUsed: number;
 }
@@ -61,7 +62,7 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
     trialBookings,
     trialLeadMap,
     trialCheckinMap,
-    studentPackages,
+    studentMemberCards,
     studentSubjects,
     hoursUsed,
   } = params;
@@ -194,22 +195,20 @@ export function useLessonFormHelpers(params: UseLessonFormHelpersParams) {
   /** 学员扣课/剩余/课程显示 */
   const getStudentCardInfo = useCallback(
     (student: Student) => {
-      const pkg = studentPackages.get(student.id);
-      if (!pkg) {
-        return { courseName: '无课包', remaining: '无课包', deduct: '0课时' };
+      // 课时来源 = 会员卡（课包已整套移除）
+      const cards = studentMemberCards.get(student.id) ?? [];
+      const totalRemaining = cards.reduce((sum, card) => sum + getMemberCardRemaining(card), 0);
+      if (cards.length === 0) {
+        return { courseName: '无课时', remaining: '无课时', deduct: '0课时' };
       }
-      const remainingText =
-        pkg.expiry_date && !pkg.remaining_hours
-          ? `${Math.max(0, Math.ceil((new Date(pkg.expiry_date).getTime() - Date.now()) / 86400000))}天`
-          : `${pkg.remaining_hours}课时`;
       const subject = studentSubjects.get(student.id);
       return {
-        courseName: subject?.name || pkg.name || '未命名课程',
-        remaining: remainingText,
+        courseName: subject?.name || cards[0].cardTypeName || '课时卡',
+        remaining: `${totalRemaining}课时`,
         deduct: `${hoursUsed}课时`,
       };
     },
-    [hoursUsed, studentPackages, studentSubjects],
+    [hoursUsed, studentMemberCards, studentSubjects],
   );
 
   return {

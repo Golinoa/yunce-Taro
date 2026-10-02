@@ -11,14 +11,15 @@ import StarRating from '@/components/StarRating';
 import Stepper from '@/components/Stepper';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import type { CampusUIModel, Subject } from '@/types/campus';
-import type { CoursePackage } from '@/types/course-package';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
+import { getMemberCardRemaining } from '@/utils/lesson-deduction-source';
 
 export interface SingleLessonPanelProps {
   selectedStudent: Student | null;
-  studentActivePackages: CoursePackage[];
-  matchedPackage: CoursePackage | null | undefined;
+  studentActiveCards: MemberCardDetail[];
+  matchedCard: MemberCardDetail | null | undefined;
   matchedSubject: Subject | null | undefined;
   hoursUsed: number;
   lessonDate: string;
@@ -34,7 +35,7 @@ export interface SingleLessonPanelProps {
   homeworkImages: string[];
   uploading: boolean;
   onOpenStudentPicker: () => void;
-  onOpenPackageSelector: () => void;
+  onOpenCardSelector: () => void;
   onOpenTeacherSelector: () => void;
   onHoursChange: (value: number) => void;
   onOpenDatePicker: () => void;
@@ -50,8 +51,8 @@ export interface SingleLessonPanelProps {
 
 const SingleLessonPanel: React.FC<SingleLessonPanelProps> = ({
   selectedStudent,
-  studentActivePackages,
-  matchedPackage,
+  studentActiveCards,
+  matchedCard,
   matchedSubject,
   hoursUsed,
   lessonDate,
@@ -67,7 +68,7 @@ const SingleLessonPanel: React.FC<SingleLessonPanelProps> = ({
   homeworkImages,
   uploading,
   onOpenStudentPicker,
-  onOpenPackageSelector,
+  onOpenCardSelector,
   onOpenTeacherSelector,
   onHoursChange,
   onOpenDatePicker,
@@ -111,25 +112,25 @@ const SingleLessonPanel: React.FC<SingleLessonPanelProps> = ({
         <>
           <Card className="p-[32rpx]" marginBottom={false}>
             <FormRow
-              label="消课课包"
+              label="消课会员卡"
               required
               border
               helperText={
-                studentActivePackages.length > 1
-                  ? `该学员有 ${studentActivePackages.length} 个课包，请选择本次消课课包`
+                studentActiveCards.length > 1
+                  ? `该学员有 ${studentActiveCards.length} 张会员卡，请选择本次消课扣哪张`
                   : undefined
               }
-              onClick={studentActivePackages.length > 1 ? onOpenPackageSelector : undefined}
+              onClick={studentActiveCards.length > 1 ? onOpenCardSelector : undefined}
             >
-              {matchedPackage ? (
+              {matchedCard ? (
                 <View className="min-w-0 flex-1">
                   <Text className="block text-[30rpx] text-foreground truncate text-right">
-                    {matchedPackage.name}
+                    {matchedCard.cardTypeName}
                   </Text>
                   <Text className="block text-[22rpx] text-muted-foreground text-right mt-[4rpx]">
                     {matchedSubject?.name ? `${matchedSubject.name} · ` : ''}
-                    剩余 {matchedPackage.remaining_hours} 课时
-                    {matchedPackage.remaining_hours < hoursUsed ? ' · 将欠课' : ''}
+                    剩余 {getMemberCardRemaining(matchedCard)} 课时
+                    {getMemberCardRemaining(matchedCard) < hoursUsed ? ' · 将欠课' : ''}
                   </Text>
                 </View>
               ) : (

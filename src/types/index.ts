@@ -37,14 +37,6 @@ export type {
 export type { Student, StudentParent } from './student';
 
 // 课时套餐
-export type {
-  PackageStatus,
-  FeeMethod,
-  CoursePackage,
-  RefundFormData,
-  PackageTransaction,
-  PackageTransactionType,
-} from './course-package';
 
 // 科目
 export type { Subject } from './subject';

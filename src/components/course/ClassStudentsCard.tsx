@@ -37,11 +37,11 @@ export interface ClassStudentsCardProps {
   onChange: (studentIds: string[]) => void;
 }
 
-/** 计算学员剩余课时总和（跨多个 course_package） */
+/** 计算学员剩余课时总和（跨多张会员卡；课包已整套移除） */
 function computeRemaining(student: Student): number {
-  const pkgs = student.course_packages;
-  if (!pkgs || pkgs.length === 0) return 0;
-  return pkgs.reduce((sum, pkg) => sum + (pkg.remaining_hours || 0), 0);
+  const cards = student.member_cards;
+  if (!cards || cards.length === 0) return 0;
+  return cards.reduce((sum, card) => sum + (card.remaining_count || 0), 0);
 }
 
 const ClassStudentsCard: React.FC<ClassStudentsCardProps> = ({

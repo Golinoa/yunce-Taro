@@ -2,30 +2,30 @@ import React, { useMemo } from 'react';
 import PickerSheet from '@/components/PickerSheet';
 
 /**
- * PackageSelectSheet - 会员卡选择底部弹窗
+ * MemberCardSelectSheet - 会员卡选择底部弹窗
  *
  * 在代约页面点击「会员卡」行时弹出，使用滚轮选择器列出某会员的有效卡包。
  * 选项展示格式：卡包名称 | 余 N 次
  */
 
-export interface PackageOption {
+export interface MemberCardOption {
   id: string;
   name: string;
   remainingHours: number;
-  /** 课包所属科目 ID，用于自动匹配课程科目 */
+  /** 卡种所属科目 ID，用于自动匹配课程科目 */
   subjectId?: string;
 }
 
-export interface PackageSelectSheetProps {
+export interface MemberCardSelectSheetProps {
   visible: boolean;
   memberName?: string;
-  options: PackageOption[];
+  options: MemberCardOption[];
   selectedId?: string;
   onClose: () => void;
-  onConfirm: (pkg: PackageOption) => void;
+  onConfirm: (pkg: MemberCardOption) => void;
 }
 
-const PackageSelectSheet: React.FC<PackageSelectSheetProps> = ({
+const MemberCardSelectSheet: React.FC<MemberCardSelectSheetProps> = ({
   visible,
   memberName,
   options,
@@ -61,4 +61,4 @@ const PackageSelectSheet: React.FC<PackageSelectSheetProps> = ({
   );
 };
 
-export default PackageSelectSheet;
+export default MemberCardSelectSheet;

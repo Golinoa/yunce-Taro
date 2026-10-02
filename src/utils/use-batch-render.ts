@@ -1,7 +1,7 @@
 /**
  * 长列表分批渲染（P-02）
  *
- * 背景：students / card-member-list / recharge-records 等列表全量 map 渲染，
+ * 背景：students / card-member-list 等列表全量 map 渲染，
  * 无任何分批或虚拟化机制，数据量大时首屏渲染节点过多、交互卡顿。
  *
  * 本模块提供：

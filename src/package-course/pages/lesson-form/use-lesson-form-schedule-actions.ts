@@ -219,7 +219,6 @@ export function useLessonFormScheduleActions(
           operator_teacher_id: currentUserId || '',
           assistant_teacher_id: assistantTeacherId || undefined,
           student_id: student.id,
-          package_id: '',
           class_id: classId,
           schedule_id: scheduleId || undefined,
           lesson_date: lessonDate,

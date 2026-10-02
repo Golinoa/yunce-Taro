@@ -4,8 +4,8 @@ import cn from 'classnames';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
-import PackageSelectSheet from '@/components/proxy-booking/PackageSelectSheet';
-import type { PackageOption } from '@/components/proxy-booking/PackageSelectSheet';
+import MemberCardSelectSheet from '@/components/proxy-booking/MemberCardSelectSheet';
+import type { MemberCardOption } from '@/components/proxy-booking/MemberCardSelectSheet';
 import { homeService, leadService, subscribeMessageService, teacherService } from '@/services';
 import type { TeacherUIModel } from '@/types/teacher';
 import { useAuth } from '@/utils/auth';
@@ -93,7 +93,7 @@ const AddProxyBookingPage: React.FC = () => {
 
   const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
   const [note, setNote] = useState('');
-  const [memberPackages, setMemberPackages] = useState<Record<string, PackageOption[]>>({});
+  const [memberPackages, setMemberPackages] = useState<Record<string, MemberCardOption[]>>({});
   const [packageSheet, setPackageSheet] = useState<{
     visible: boolean;
     memberId?: string;
@@ -143,7 +143,7 @@ const AddProxyBookingPage: React.FC = () => {
         missingIds.map(async (id) => {
           try {
             const list = await homeService.getPackagesByStudent(id);
-            const options: PackageOption[] = list
+            const options: MemberCardOption[] = list
               .filter((pkg) => (pkg.status || 'active') === 'active')
               .map((pkg) => ({
                 id: pkg.id,
@@ -252,7 +252,7 @@ const AddProxyBookingPage: React.FC = () => {
   }, []);
 
   const handlePackageConfirm = useCallback(
-    (pkg: PackageOption) => {
+    (pkg: MemberCardOption) => {
       const memberId = packageSheet.memberId;
       if (!memberId) return;
       setPackageSheet((prev) => ({ ...prev, visible: false }));
@@ -463,7 +463,7 @@ const AddProxyBookingPage: React.FC = () => {
       </View>
 
       {/* 会员卡选择弹窗 */}
-      <PackageSelectSheet
+      <MemberCardSelectSheet
         visible={packageSheet.visible}
         memberName={packageSheet.memberName}
         options={packageSheet.memberId ? memberPackages[packageSheet.memberId] || [] : []}

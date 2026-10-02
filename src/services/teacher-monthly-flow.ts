@@ -140,7 +140,7 @@ function mapLessonRecords(records: LessonRecord[]): TeacherLessonItem[] {
   for (const record of records) {
     if (record.status === 'cancelled') continue;
     const date = record.lesson_date?.slice(0, 10) || '';
-    const courseName = record.class_name || record.course_package?.name || '消课';
+    const courseName = record.class_name || record.member_card_name || '消课';
     const key = `${date}|${courseName}|${record.class_id || ''}`;
     const hours = Number(record.hours_used) || 0;
     const existing = groups.get(key);

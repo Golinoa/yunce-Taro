@@ -53,7 +53,7 @@ const STATUS_BG: Record<PreviewStatus, string> = {
 /**
  * LessonPreviewSheet - 班级消课预览弹窗
  *
- * 班级消课确认前展示每位学员的课包匹配结果和扣减预览，
+ * 班级消课确认前展示每位学员的扣减来源（会员卡）与扣减预览，
  * 支持跳过特定学员，确认后只对未跳过学员执行消课。
  */
 const LessonPreviewSheet: React.FC<LessonPreviewSheetProps> = ({

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const request = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock('@/utils/request', () => request);
-vi.mock('@/services/student', () => ({ invalidatePackagesCache: vi.fn() }));
+vi.mock('@/services/student', () => ({ invalidateStudentListCache: vi.fn() }));
 
 describe('memberCardService.recharge', () => {
   beforeEach(() => vi.resetAllMocks());

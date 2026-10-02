@@ -1,7 +1,7 @@
 /**
  * Member card records — real API under /card-types/member-cards*
  */
-import { invalidatePackagesCache } from '@/services/student';
+import { invalidateStudentListCache } from '@/services/student';
 import type { CardType } from '@/types/card-type';
 import type { CardTypeStatKey, MemberCard, MemberCardDetail } from '@/types/member-card';
 import { asPaginatedResponse, type PaginatedResponse } from '@/utils/pagination';
@@ -77,7 +77,7 @@ export const memberCardService = {
         idempotencyKey: data.idempotencyKey,
       },
     );
-    invalidatePackagesCache(updated.studentId);
+    invalidateStudentListCache();
     const detail = await memberCardService.getById(String(updated.id));
     if (!detail) throw new Error('追加次数成功但读取会员卡失败');
     return detail;
@@ -101,7 +101,7 @@ export const memberCardService = {
     idempotencyKey: string;
   }): Promise<MemberCardDetail> => {
     const created = await post<BackendMemberCard>('/card-types/member-cards/opening', data);
-    invalidatePackagesCache(data.studentId);
+    invalidateStudentListCache();
     const detail = await memberCardService.getById(String(created.id));
     if (!detail) throw new Error('迁移会员卡创建成功但读取失败');
     return detail;
@@ -181,7 +181,7 @@ export const memberCardService = {
       cardNo: data.cardNo,
       totalGiftCount: (data as { totalGiftCount?: number }).totalGiftCount ?? 0,
     });
-    invalidatePackagesCache(data.studentId);
+    invalidateStudentListCache();
     // Issue returns raw row; refetch detail for FE shape
     const detail = await memberCardService.getById(String(created.id));
     if (detail) return detail;

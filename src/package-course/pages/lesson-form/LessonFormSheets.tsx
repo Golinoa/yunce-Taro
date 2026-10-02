@@ -7,12 +7,13 @@ import PickerSheet, { type PickerOption } from '@/components/PickerSheet';
 import StudentMultiSelectSheet from '@/components/StudentMultiSelectSheet';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
-import type { CoursePackage } from '@/types/course-package';
+import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
+import { getMemberCardRemaining } from '@/utils/lesson-deduction-source';
 import StudentEditSheet, { type StudentEditSheetTarget } from './StudentEditSheet';
 
-export type LessonFormSelectorType = 'teacher' | 'campus' | 'room' | 'package' | null;
+export type LessonFormSelectorType = 'teacher' | 'campus' | 'room' | 'card' | null;
 
 export interface LessonFormSheetsProps {
   showStudentPicker: boolean;
@@ -44,10 +45,10 @@ export interface LessonFormSheetsProps {
   teacherOptions: TeacherUIModel[];
   campusOptions: CampusUIModel[];
   rooms: Room[];
-  studentActivePackages: CoursePackage[];
+  studentActiveCards: MemberCardDetail[];
   selectedTeachingTeacherId: string;
   campusId: string;
-  matchedPackageId: string;
+  matchedCardId: string;
   room: string;
   onCloseSelector: () => void;
   onConfirmSelector: (value: string) => void;
@@ -85,10 +86,10 @@ const LessonFormSheets: React.FC<LessonFormSheetsProps> = ({
   teacherOptions,
   campusOptions,
   rooms,
-  studentActivePackages,
+  studentActiveCards,
   selectedTeachingTeacherId,
   campusId,
-  matchedPackageId,
+  matchedCardId,
   room,
   onCloseSelector,
   onConfirmSelector,
@@ -100,7 +101,7 @@ const LessonFormSheets: React.FC<LessonFormSheetsProps> = ({
   const selectorTitle = useMemo(() => {
     if (selector.type === 'teacher') return '选择主讲老师';
     if (selector.type === 'campus') return '选择校区';
-    if (selector.type === 'package') return '选择消课课包';
+    if (selector.type === 'card') return '选择消课会员卡';
     return '选择教室';
   }, [selector.type]);
 
@@ -114,24 +115,24 @@ const LessonFormSheets: React.FC<LessonFormSheetsProps> = ({
         ...campusOptions.map((c) => ({ label: c.name, value: c.id })),
       ];
     }
-    if (selector.type === 'package') {
-      return studentActivePackages.map((p) => ({
-        label: `${p.name}（剩 ${p.remaining_hours} 课时）`,
-        value: p.id,
+    if (selector.type === 'card') {
+      return studentActiveCards.map((c) => ({
+        label: `${c.cardTypeName}（剩 ${getMemberCardRemaining(c)} 课时）`,
+        value: c.id,
       }));
     }
     return [
       { label: '请选择', value: '' },
       ...rooms.filter((r) => r.status === 'active').map((r) => ({ label: r.name, value: r.name })),
     ];
-  }, [campusOptions, rooms, selector.type, studentActivePackages, teacherOptions]);
+  }, [campusOptions, rooms, selector.type, studentActiveCards, teacherOptions]);
 
   const selectorValue = useMemo(() => {
     if (selector.type === 'teacher') return selectedTeachingTeacherId;
     if (selector.type === 'campus') return campusId;
-    if (selector.type === 'package') return matchedPackageId;
+    if (selector.type === 'card') return matchedCardId;
     return room;
-  }, [campusId, matchedPackageId, room, selectedTeachingTeacherId, selector.type]);
+  }, [campusId, matchedCardId, room, selectedTeachingTeacherId, selector.type]);
 
   return (
     <>

@@ -3,8 +3,8 @@
  *
  * 期望流程：弹层里选好学员 → 二次确认（提示将自动签到）→ 确定后**添加并且签到** → 返回课表；
  * 不再让老师手动进详情页点签到。**补课与试听共用这一套流程**，差别只有扣减口径：
- * - 补课：扣学员自己的课包/会员卡（1 课时），复用点名页同一条链路 `executeSingleDeduct`；
- * - 试听：**不消课时**（无课包、0 课时、状态 NORMAL），与班级点名的「试听签到」完全同口径。
+ * - 补课：扣学员自己的会员卡（1 课时），复用点名页同一条链路 `executeSingleDeduct`；
+ * - 试听：**不消课时**（不挑卡、0 课时、状态 NORMAL），与班级点名的「试听签到」完全同口径。
  *
  * ⚠️ 本模块**只做编排，不复制消课口径**：
  * - 「是否已签到」复用唯一真源 `isRecordOfLesson` + 同一组「已消课状态」，
@@ -171,8 +171,8 @@ export interface AutoCheckInTrialParams extends LessonCheckInScope {
  * 试听学员签到：**不消课时**。
  *
  * 与班级点名里「试听学员签到」逐字同口径（`lesson-submit-class.ts` 的 `presentTrialBookings`）：
- * 无课包、`hoursUsed = 0`、状态 NORMAL、内容「试听签到」。
- * 不做课包挑选、不做家长通知、不写欠课 —— 试听本来就没有课时可扣。
+ * 不挑卡、`hoursUsed = 0`、状态 NORMAL、内容「试听签到」。
+ * 不做扣减来源挑选、不做家长通知、不写欠课 —— 试听本来就没有课时可扣。
  */
 export async function autoCheckInTrialStudent(
   params: AutoCheckInTrialParams,
@@ -194,13 +194,12 @@ export async function autoCheckInTrialStudent(
     return { ok: false, reason: '无法确认本节课签到状态，请进点名页手动签到' };
   }
 
-  // ② 写试听签到记录（无课包 / 0 课时）
+  // ② 写试听签到记录（不挑卡 / 0 课时）
   try {
     await lessonRecordService.create({
       teacher_id: params.currentTeacherId || '',
       operator_teacher_id: params.currentTeacherId,
       student_id: params.studentId,
-      package_id: '',
       hours_used: 0,
       status: 'normal',
       class_id: params.classId,

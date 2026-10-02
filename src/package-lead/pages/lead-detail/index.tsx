@@ -233,13 +233,7 @@ const LeadDetailPage: React.FC = () => {
   );
 
   const handleConvertSubmit = useCallback(
-    async (params: {
-      leadId: string;
-      conversionType: string;
-      packageId: string;
-      classId?: string;
-      note?: string;
-    }) => {
+    async (params: { leadId: string; conversionType: string; classId?: string; note?: string }) => {
       if (!lead) return;
       try {
         await leadService.createConversion({
@@ -742,7 +736,6 @@ const LeadDetailPage: React.FC = () => {
         visible={showConvert}
         leadId={lead.id}
         childName={lead.child_name}
-        coursePackages={[]}
         classes={[]}
         trialClassIds={bookings
           .filter((b) => b.trial_mode === 'group' && b.class_id && b.status !== 'cancelled')

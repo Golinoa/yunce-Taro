@@ -518,7 +518,6 @@ function mapAggregateRecentRecord(item: BackendAggregateRecentRecord): LessonRec
     id: item.id,
     teacher_id: '',
     student_id: item.student?.id || '',
-    package_id: '',
     lesson_date: normalizeAggregateLessonDate(item.lessonDate),
     hours_used: Number(item.hoursUsed ?? (item.duration ?? 0) / 60),
     status: 'normal',

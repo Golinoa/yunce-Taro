@@ -1,5 +1,5 @@
 /**
- * 点名页数据加载：初始化 / 班级学员 / 试听 / 请假 / 课包 / 教室（Q2-2）
+ * 点名页数据加载：初始化 / 班级学员 / 试听 / 请假 / 会员卡课时 / 教室（Q2-2）
  */
 import {
   useCallback,
@@ -10,7 +10,7 @@ import {
 } from 'react';
 import {
   studentService,
-  packageService,
+  memberCardService,
   lessonRecordService,
   classService,
   subjectService,
@@ -21,7 +21,6 @@ import {
 import { campusService, roomService } from '@/services/campus';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
-import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
@@ -29,6 +28,7 @@ import type { Student } from '@/types/student';
 import type { TeacherUIModel } from '@/types/teacher';
 import { withCache } from '@/utils/cache-helpers';
 import { TTL } from '@/utils/data-freshness';
+import { pickMemberCardForLesson } from '@/utils/lesson-deduction-source';
 import { isBookingOfLesson } from '@/utils/lesson-identity';
 import { isRecordOfLesson } from '@/utils/lesson-record-scope';
 import {
@@ -38,13 +38,12 @@ import {
   type LessonRosterSnapshot,
 } from '@/utils/lesson-roster-cache';
 import { logError } from '@/utils/logger';
-import { pickBestPackage } from '@/utils/package-helper';
 import { parseLessonStartTime } from '@/utils/schedule-card-build';
 import {
   buildClassAttendanceState,
   buildTrialCheckinMap,
   fetchApprovedLeaveStudentIds,
-  loadPackageMapsForStudents,
+  loadMemberCardMapsForStudents,
   resolveClassAttendanceMode,
 } from './lesson-attendance-load';
 import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
@@ -119,8 +118,8 @@ export interface UseLessonFormLoadersParams {
   classStudents: Student[];
   existingClassRecords: LessonRecord[];
   teacherOptions: TeacherUIModel[];
-  matchedPackage: CoursePackage | null;
-  packageManualRef: MutableRefObject<boolean>;
+  matchedCard: MemberCardDetail | null;
+  cardManualRef: MutableRefObject<boolean>;
   fetchClassesByTeacher: (teacherId: string, campusId?: string) => Promise<Class[]>;
   setMode: Dispatch<SetStateAction<'single' | 'class'>>;
   setLessonDate: Dispatch<SetStateAction<string>>;
@@ -137,7 +136,7 @@ export interface UseLessonFormLoadersParams {
   setSelectedTeachingTeacherId: Dispatch<SetStateAction<string>>;
   setSelectedAssistantTeacherId: Dispatch<SetStateAction<string>>;
   setSelectedStudent: Dispatch<SetStateAction<Student | null>>;
-  setMatchedPackage: Dispatch<SetStateAction<CoursePackage | null>>;
+  setMatchedCard: Dispatch<SetStateAction<MemberCardDetail | null>>;
   setMatchedSubject: Dispatch<SetStateAction<Subject | null>>;
   setSelectedClassId: Dispatch<SetStateAction<string>>;
   setClassStudents: Dispatch<SetStateAction<Student[]>>;
@@ -150,7 +149,6 @@ export interface UseLessonFormLoadersParams {
   setRecordByStudentId: Dispatch<SetStateAction<Map<string, LessonRecord>>>;
   setSupplementStudentIds: Dispatch<SetStateAction<Set<string>>>;
   setAttendanceMode: Dispatch<SetStateAction<ClassAttendanceMode>>;
-  setStudentPackages: Dispatch<SetStateAction<Map<string, CoursePackage>>>;
   setStudentSubjects: Dispatch<SetStateAction<Map<string, Subject | null>>>;
   /** 学员会员卡（第二本账）：旧课包优先，没有才用它扣减 */
   setStudentMemberCards: Dispatch<SetStateAction<Map<string, MemberCardDetail[]>>>;
@@ -163,11 +161,11 @@ export interface UseLessonFormLoadersParams {
   setHoursUsed: Dispatch<SetStateAction<number>>;
   setFeeAmount: Dispatch<SetStateAction<string>>;
   setMakeupStudentIds: Dispatch<SetStateAction<Set<string>>>;
-  setStudentActivePackages: Dispatch<SetStateAction<CoursePackage[]>>;
+  setStudentActiveCards: Dispatch<SetStateAction<MemberCardDetail[]>>;
   setSelector: Dispatch<
     SetStateAction<{
       visible: boolean;
-      type: 'teacher' | 'campus' | 'room' | 'package' | null;
+      type: 'teacher' | 'campus' | 'room' | 'card' | null;
     }>
   >;
   setSubjectOptions: Dispatch<SetStateAction<Subject[]>>;
@@ -190,8 +188,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     selectedStudent,
     existingClassRecords,
     teacherOptions,
-    matchedPackage,
-    packageManualRef,
+    matchedCard,
+    cardManualRef,
     fetchClassesByTeacher,
     setMode,
     setLessonDate,
@@ -207,7 +205,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setSelectedTeachingTeacherId,
     setSelectedAssistantTeacherId,
     setSelectedStudent,
-    setMatchedPackage,
+    setMatchedCard,
     setMatchedSubject,
     setSelectedClassId,
     setClassStudents,
@@ -219,7 +217,6 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setRecordByStudentId,
     setSupplementStudentIds,
     setAttendanceMode,
-    setStudentPackages,
     setStudentSubjects,
     setStudentMemberCards,
     setTrialBookings,
@@ -231,7 +228,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     setHoursUsed,
     setFeeAmount,
     setMakeupStudentIds,
-    setStudentActivePackages,
+    setStudentActiveCards,
     setSelector,
     setSubjectOptions,
   } = params;
@@ -441,11 +438,10 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         }
       }
 
-      // 课包由 loadPackageMapsForStudents 统一按学员并发拉取；
-      // 这里显式关掉 getStudents 的默认补包，避免同一批学员被重复请求一遍（N+1）。
+      // 课时由 `loadMemberCardMapsForStudents` 统一按学员并发拉取（会员卡，唯一账本）。
       const [classInfo, formalStudents] = await Promise.all([
         classService.getById(classId),
-        classService.getStudents(classId, { includePackages: false }),
+        classService.getStudents(classId),
       ]);
 
       // 点名入口必须把当天已确认的补课学员并入列表；否则会出现
@@ -546,11 +542,11 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
         if (stu) {
           setSelectedStudent(stu);
           setCampusId(stu.campus_id || mainCampusId);
-          const pkgs = await packageService.getActiveByStudent(stu.id);
-          const best = pickBestPackage(pkgs, hoursUsed);
-          setMatchedPackage(best);
-          if (best?.subject_id) {
-            const sub = await subjectService.getById(best.subject_id);
+          const cards = (await memberCardService.getByStudent(stu.id)) ?? [];
+          const best = pickMemberCardForLesson(cards, hoursUsed);
+          setMatchedCard(best);
+          if (best?.cardTypeSubjectId) {
+            const sub = await subjectService.getById(best.cardTypeSubjectId);
             setMatchedSubject(sub);
           } else {
             setMatchedSubject(null);
@@ -601,11 +597,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
             }),
           );
 
-          const { packages, subjects, memberCards } = await loadPackageMapsForStudents(
-            withSupplement,
-            hoursUsed,
-          );
-          setStudentPackages(packages);
+          const { subjects, memberCards } = await loadMemberCardMapsForStudents(withSupplement);
           setStudentSubjects(subjects);
           setStudentMemberCards(memberCards);
         } finally {
@@ -653,53 +645,57 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
     loadRooms();
   }, [campusId, setRooms]);
 
-  const applyMatchedPackage = useCallback(
-    async (pkg: CoursePackage | null) => {
-      setMatchedPackage(pkg);
-      if (pkg?.subject_id) {
-        const sub = await subjectService.getById(pkg.subject_id);
+  const applyMatchedCard = useCallback(
+    async (card: MemberCardDetail | null) => {
+      setMatchedCard(card);
+      if (card?.cardTypeSubjectId) {
+        const sub = await subjectService.getById(card.cardTypeSubjectId);
         setMatchedSubject(sub);
       } else {
         setMatchedSubject(null);
       }
     },
-    [setMatchedPackage, setMatchedSubject],
+    [setMatchedCard, setMatchedSubject],
   );
 
-  const autoMatchPackage = useCallback(
+  /**
+   * 单人模式自动挑卡：课包已整套移除，唯一账本是会员卡。
+   * 挑卡规则与提交口径同源（`utils/lesson-deduction-source`）。
+   */
+  const autoMatchCard = useCallback(
     async (studentId: string, opts?: { promptIfMultiple?: boolean }) => {
-      const pkgs = await packageService.getActiveByStudent(studentId);
-      setStudentActivePackages(pkgs);
+      const cards = (await memberCardService.getByStudent(studentId)) ?? [];
+      setStudentActiveCards(cards);
 
-      let next: CoursePackage | null = null;
-      if (packageManualRef.current && matchedPackage?.id) {
-        next = pkgs.find((p) => p.id === matchedPackage.id) || null;
+      let next: MemberCardDetail | null = null;
+      if (cardManualRef.current && matchedCard?.id) {
+        next = cards.find((c) => c.id === matchedCard.id) || null;
       }
       if (!next) {
-        next = pickBestPackage(pkgs, hoursUsed);
-        packageManualRef.current = false;
+        next = pickMemberCardForLesson(cards, hoursUsed);
+        cardManualRef.current = false;
       }
-      await applyMatchedPackage(next);
+      await applyMatchedCard(next);
 
-      if (opts?.promptIfMultiple && pkgs.length > 1) {
-        setSelector({ visible: true, type: 'package' });
+      if (opts?.promptIfMultiple && cards.length > 1) {
+        setSelector({ visible: true, type: 'card' });
       }
     },
     [
-      applyMatchedPackage,
+      applyMatchedCard,
       hoursUsed,
-      matchedPackage?.id,
-      packageManualRef,
+      matchedCard?.id,
+      cardManualRef,
       setSelector,
-      setStudentActivePackages,
+      setStudentActiveCards,
     ],
   );
 
   useEffect(() => {
     if (selectedStudent && mode === 'single') {
-      autoMatchPackage(selectedStudent.id);
+      autoMatchCard(selectedStudent.id);
     }
-  }, [hoursUsed, selectedStudent, mode, autoMatchPackage]);
+  }, [hoursUsed, selectedStudent, mode, autoMatchCard]);
 
   const loadClassStudents = useCallback(
     async (classId: string, opts?: { force?: boolean }) => {
@@ -769,11 +765,7 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
           }),
         );
 
-        const { packages, subjects, memberCards } = await loadPackageMapsForStudents(
-          mergedStudents,
-          hoursUsed,
-        );
-        setStudentPackages(packages);
+        const { subjects, memberCards } = await loadMemberCardMapsForStudents(mergedStudents);
         setStudentSubjects(subjects);
         setStudentMemberCards(memberCards);
       } finally {
@@ -785,10 +777,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       applyClassLessonDefaults,
       classIdParam,
       fetchClassRoster,
-      hoursUsed,
       lessonScheduleId,
       loadApprovedLeaveStudentIds,
-
       setStudentMemberCards,
       loadLessonRecordsByDate,
       lessonDate,
@@ -805,7 +795,6 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       setRecordByStudentId,
       setRoom,
       setSelectedClassId,
-      setStudentPackages,
       setStudentSubjects,
       setSupplementStudentIds,
       teacherOptions,
@@ -821,8 +810,8 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
   }, [setSubjectOptions]);
 
   return {
-    applyMatchedPackage,
-    autoMatchPackage,
+    applyMatchedCard,
+    autoMatchCard,
     loadClassStudents,
     loadLessonRecordsByDate,
   };

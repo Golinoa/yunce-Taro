@@ -3,7 +3,7 @@
  *
  * 用于班课等场景从学员列表中多选学员，支持：
  * - 按姓名/手机号搜索
- * - 按科目筛选（基于学员课包的 subject_id），未关联科目时托底「全部科目」
+ * - 按科目筛选（基于学员课时卡的卡种科目），未关联科目时托底「全部科目」
  * - 功能性快捷查看标签：「未排班」(class_ids 为空) 与「已勾选」(当前选中)
  * - 弹窗高度约为当前窗口可用高度的 2/3（windowHeight 比例，非 vh），列表内部滚动，确认按钮固定底部
  * - 勾选框在右侧；超出容纳上限时直接禁止勾选并 toast 提醒，不再允许超额
@@ -70,18 +70,6 @@ export const resolveEffectiveSubjectId = (subjectId?: string, subjects: Subject[
   return hit?.id;
 };
 
-/**
- * 计算与当前科目筛选匹配的会员卡（无科目约束/通用卡始终匹配）。
- *
- * ⚠️ 只用于**展示**（列表里的 course_packages 是聚合假包，无科目维度），
- * 过滤与校验一律走 `utils/student-subject-eligibility`，别再用它判"能不能加"。
- */
-const getRelevantPackages = (student: Student, filterSubjectId: string) => {
-  const packages = student.course_packages || [];
-  if (filterSubjectId === ALL_SUBJECT_VALUE) return packages;
-  return packages.filter((pkg) => !pkg.subject_id || pkg.subject_id === filterSubjectId);
-};
-
 /** 单个学员行：勾选框在右，展示该科目剩余课时（多卡可展开），不可加入时灰显并写明原因 */
 const StudentRow: React.FC<{
   student: Student;
@@ -98,13 +86,20 @@ const StudentRow: React.FC<{
 }> = ({ student, checked, disabled, filterSubjectId, eligibility, subjectLabel, onToggle }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const packages = useMemo(
-    () => getRelevantPackages(student, filterSubjectId),
-    [student, filterSubjectId],
+  /**
+   * 展示用的会员卡列表（唯一账本；课包已整套移除）。
+   * ⚠️ 只用于**展示卡名**；「能不能加」一律走 `utils/student-subject-eligibility`。
+   */
+  const cards = useMemo(
+    () =>
+      (student.member_cards || []).filter(
+        (card) => filterSubjectId === ALL_SUBJECT_VALUE || !card.subject_id,
+      ),
+    [student.member_cards, filterSubjectId],
   );
   const totalRemaining = useMemo(
-    () => (student.course_packages || []).reduce((sum, pkg) => sum + (pkg.remaining_hours || 0), 0),
-    [student.course_packages],
+    () => (student.member_cards || []).reduce((sum, card) => sum + (card.remaining_count || 0), 0),
+    [student.member_cards],
   );
 
   /**
@@ -147,14 +142,14 @@ const StudentRow: React.FC<{
 
         {/* 会员卡：对应科目，多卡折叠，点击展开仅看卡名 */}
         <View className="flex flex-row items-center gap-[8rpx] flex-wrap">
-          {packages.length === 0 ? (
+          {cards.length === 0 ? (
             <Text className="text-[22rpx] text-muted-foreground/70">无会员卡</Text>
           ) : (
             <>
               <View className="px-[12rpx] py-[4rpx] rounded-[8rpx] bg-primary/10">
-                <Text className="text-[22rpx] text-primary">{packages[0].name}</Text>
+                <Text className="text-[22rpx] text-primary">{cards[0].name}</Text>
               </View>
-              {packages.length > 1 && (
+              {cards.length > 1 && (
                 <View
                   className="flex flex-row items-center gap-[2rpx] px-[12rpx] py-[4rpx] rounded-[8rpx] bg-muted active:opacity-70"
                   onClick={(e) => {
@@ -162,7 +157,7 @@ const StudentRow: React.FC<{
                     setExpanded((prev) => !prev);
                   }}
                 >
-                  <Text className="text-[22rpx] text-muted-foreground">等{packages.length}张</Text>
+                  <Text className="text-[22rpx] text-muted-foreground">等{cards.length}张</Text>
                   <Icon
                     name={expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'}
                     size={20}
@@ -188,11 +183,11 @@ const StudentRow: React.FC<{
         )}
 
         {/* 展开后的全部会员卡名称 */}
-        {expanded && packages.length > 1 && (
+        {expanded && cards.length > 1 && (
           <View className="flex flex-row items-center gap-[8rpx] flex-wrap mt-[4rpx]">
-            {packages.map((pkg) => (
-              <View key={pkg.id} className="px-[12rpx] py-[4rpx] rounded-[8rpx] bg-muted">
-                <Text className="text-[22rpx] text-foreground">{pkg.name}</Text>
+            {cards.map((card) => (
+              <View key={card.id} className="px-[12rpx] py-[4rpx] rounded-[8rpx] bg-muted">
+                <Text className="text-[22rpx] text-foreground">{card.name}</Text>
               </View>
             ))}
           </View>

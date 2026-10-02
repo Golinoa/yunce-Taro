@@ -17,13 +17,13 @@ export interface ParentHoursSectionProps {
   packages: ParentHourPackageCard[];
   /** 用于 scroll-into-view 定位 */
   sectionId?: string;
-  /** 无课包时「去续费」兜底跳转的学员 id */
+  /** 无可用课时时「去续费」兜底跳转的学员 id */
   fallbackStudentId?: string;
 }
 
 /**
  * 家长端首页「我的课时」
- * 外层白卡 + 内层淡色磨砂课包卡（1~2 张）
+ * 外层白卡 + 内层淡色磨砂课时卡（1~2 张）
  */
 const ParentHoursSection: React.FC<ParentHoursSectionProps> = ({
   packages,

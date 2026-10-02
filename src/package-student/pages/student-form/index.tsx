@@ -333,8 +333,8 @@ const StudentForm: React.FC = () => {
                 />
                 <Text className="block text-[22rpx] text-muted-foreground mt-[12rpx]">
                   {studentType === 'new'
-                    ? '新生从零开始记录课时，可选课包自动填充'
-                    : '老生只登记剩余课时，可按科目添加多个课包便于迁移'}
+                    ? '新生从零开始记录课时，可选卡种自动填充'
+                    : '老生只登记剩余课时，可按科目添加多张课时卡便于迁移'}
                 </Text>
               </View>
 
@@ -350,7 +350,7 @@ const StudentForm: React.FC = () => {
               ) : (
                 <View>
                   <Text className="mb-[20rpx] block text-[28rpx] font-medium text-foreground">
-                    历史课包
+                    历史课时卡
                   </Text>
 
                   {/* 2026-09-27 回滚：恢复原设计 UI（科目库口径）。
@@ -480,7 +480,7 @@ const StudentForm: React.FC = () => {
                         onClick={addLegacyPackage}
                       >
                         <Icon name="mdi-plus" size={28} color="primary" />
-                        <Text className="text-[26rpx] text-primary">添加课包</Text>
+                        <Text className="text-[26rpx] text-primary">添加课时卡</Text>
                       </View>
                     </>
                   ) : (
@@ -492,7 +492,7 @@ const StudentForm: React.FC = () => {
                         <Icon name="mdi-plus" size={40} color="#ffffff" />
                       </View>
                       <Text className="mt-[20rpx] text-[26rpx] text-muted-foreground">
-                        添加课包
+                        添加课时卡
                       </Text>
                       {errors.legacyPackages ? (
                         <Text className="mt-[12rpx] text-[22rpx] text-destructive">

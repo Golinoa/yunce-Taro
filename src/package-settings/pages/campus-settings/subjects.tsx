@@ -109,10 +109,10 @@ const Subjects: React.FC = () => {
       const subject = subjects.find((s) => s.id === id);
       if (!subject) return;
 
-      // 有关联课包时阻止删除
+      // 有关联会员卡时阻止删除
       if (subject.courseCount > 0) {
         Taro.showToast({
-          title: `该科目下有 ${subject.courseCount} 个课包，无法删除`,
+          title: `该科目下有 ${subject.courseCount} 张会员卡，无法删除`,
           icon: 'none',
           duration: 2500,
         });
@@ -218,7 +218,7 @@ const Subjects: React.FC = () => {
                     {subject.teacherCount}教师
                   </Text>
                   <Text className="text-[22rpx] text-muted-foreground">
-                    {subject.courseCount}课包
+                    {subject.courseCount}张卡
                   </Text>
                 </View>
               </View>

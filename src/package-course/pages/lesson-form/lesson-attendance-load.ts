@@ -1,14 +1,12 @@
 /**
- * 点名页加载侧：请假过滤 / 记录回填 / 试听映射 / 课包匹配（Q2-2 续）
+ * 点名页加载侧：请假过滤 / 记录回填 / 试听映射 / 会员卡课时匹配（Q2-2 续）
  */
-import { leaveService, memberCardService, packageService, subjectService } from '@/services';
+import { leaveService, memberCardService, subjectService } from '@/services';
 import type { Subject } from '@/types/campus';
-import type { CoursePackage } from '@/types/course-package';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
 import { isRecordOfLesson } from '@/utils/lesson-record-scope';
-import { pickBestPackage } from '@/utils/package-helper';
 import { getLessonRecordPriority, isWithinLessonOperateWindow } from './lesson-operate';
 import type { CheckinStatus, ClassAttendanceMode } from './checkin-status';
 
@@ -161,7 +159,7 @@ export async function fetchApprovedLeaveStudentIds(input: {
 }
 
 /** 学员课包/学科加载并发上限：班级大时也不瞬间打爆后端 */
-const PACKAGE_LOAD_CONCURRENCY = 6;
+const CARD_LOAD_CONCURRENCY = 6;
 
 /** 有上限的并发 map：保持入参顺序，具体错误由回调内部消化 */
 async function mapWithConcurrency<T, R>(
@@ -184,77 +182,49 @@ async function mapWithConcurrency<T, R>(
 }
 
 /**
- * 批量解析学员「最优课包 + 学科」。
+ * 批量解析学员「会员卡 + 学科」。
  *
- * 原实现为 `for` + `await` 串行：N 个学员等价于 N 次包请求 + N 次学科请求串行累加。
- * 现在：① 课包并发拉取（带上限）；② 同一 subject_id 只查一次（同班同科不再重复拉）。
- * 结果语义不变：无可用课包的学员不进 map；有课包但无学科的学员 subjects 落 null。
+ * 课包已于 2026-10-02 整套移除：**唯一账本是会员卡**，学院科目取自卡种的 `cardTypeSubjectId`。
+ * 并发上限 6，且同一 subject_id 只查一次（同班同科不重复拉）。
+ * 无语义前置：取不到卡时 `memberCards` 落空数组、`subjects` 落 null（由提交侧提示「无可扣课时」）。
  */
-export async function loadPackageMapsForStudents(
-  students: Student[],
-  hoursUsed: number,
-): Promise<{
-  packages: Map<string, CoursePackage>;
+export async function loadMemberCardMapsForStudents(students: Student[]): Promise<{
   subjects: Map<string, Subject | null>;
-  /**
-   * 学员的会员卡（新账本）—— **旧课包优先，没有可用课包时才用它扣减**。
-   *
-   * 存"全部可用次数卡"而不在这里挑：挑卡要按科目匹配，而科目可能来自班级、
-   * 也可能来自学员自己的课包，选择时机放在**提交那一刻**（`resolveLessonDeduction`）更准。
-   */
   memberCards: Map<string, MemberCardDetail[]>;
 }> {
-  const packages = new Map<string, CoursePackage>();
   const subjects = new Map<string, Subject | null>();
   const memberCards = new Map<string, MemberCardDetail[]>();
   if (students.length === 0) {
-    return { packages, subjects, memberCards };
+    return { subjects, memberCards };
   }
 
-  const bestByStudent = await mapWithConcurrency(
-    students,
-    PACKAGE_LOAD_CONCURRENCY,
-    async (student) => {
-      const pkgs = await packageService.getActiveByStudent(student.id);
-      return pickBestPackage(pkgs, hoursUsed);
-    },
-  );
-
-  /**
-   * 会员卡与课包**并发**拉取（各自独立失败，不影响另一方）：
-   * 只有会员卡的学员此前在本页拿不到任何可用课时 ⇒ 直接点不了名。
-   * TODO(性能)：后端如有批量「按学员查卡」接口，这里可收敛成一次请求。
-   */
-  await mapWithConcurrency(students, PACKAGE_LOAD_CONCURRENCY, async (student, index) => {
+  /** 取卡失败不阻断点名：该学员退化为「无可用课时」，走既有失败提示 */
+  await mapWithConcurrency(students, CARD_LOAD_CONCURRENCY, async (student) => {
     try {
-      const cards = await memberCardService.getByStudent(student.id);
-      memberCards.set(student.id, cards ?? []);
+      memberCards.set(student.id, (await memberCardService.getByStudent(student.id)) ?? []);
     } catch {
-      // 取卡失败不阻断点名：该学员退化为"无可用课时"，走既有失败提示
       memberCards.set(student.id, []);
     }
-    return index;
   });
 
   const subjectIds = new Set<string>();
-  bestByStudent.forEach((best, index) => {
-    if (!best) return;
-    packages.set(students[index].id, best);
-    if (best.subject_id) subjectIds.add(best.subject_id);
+  memberCards.forEach((cards) => {
+    cards.forEach((card) => {
+      if (card.cardTypeSubjectId) subjectIds.add(card.cardTypeSubjectId);
+    });
   });
 
   const subjectCache = new Map<string, Subject | null>();
-  await mapWithConcurrency([...subjectIds], PACKAGE_LOAD_CONCURRENCY, async (subjectId) => {
+  await mapWithConcurrency([...subjectIds], CARD_LOAD_CONCURRENCY, async (subjectId) => {
     subjectCache.set(subjectId, await subjectService.getById(subjectId));
   });
 
-  bestByStudent.forEach((best, index) => {
-    if (!best) return;
-    subjects.set(
-      students[index].id,
-      best.subject_id ? (subjectCache.get(best.subject_id) ?? null) : null,
-    );
+  memberCards.forEach((cards, studentId) => {
+    const subjectId = cards
+      .map((card) => card.cardTypeSubjectId)
+      .find((value): value is string => Boolean(value));
+    subjects.set(studentId, subjectId ? (subjectCache.get(subjectId) ?? null) : null);
   });
 
-  return { packages, subjects, memberCards };
+  return { subjects, memberCards };
 }

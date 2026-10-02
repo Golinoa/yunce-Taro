@@ -1,7 +1,6 @@
 /**
  * 班级 Service（Q2-4，从 student.ts 抽出）
  */
-import { packageService } from '@/services/package';
 import type { Class } from '@/types/class';
 import type { Student } from '@/types/student';
 import { API_PAGE_SIZE_BATCH, fetchAllPages } from '@/utils/pagination';
@@ -253,43 +252,13 @@ export const classService = {
     }, API_PAGE_SIZE_BATCH);
     return list.map(mapBackendClassListItem);
   },
-  getStudents: async (
-    classId: string,
-    options: { includePackages?: boolean } = {},
-  ): Promise<Student[]> => {
-    const includePackages = options.includePackages !== false;
-    const withPackages = async (base: Student[]): Promise<Student[]> => {
-      if (!includePackages) return base;
-      if (base.length === 0) return base;
-      return Promise.all(
-        base.map(async (student) => {
-          if (student.course_packages && student.course_packages.length > 0) return student;
-          try {
-            const packages = await packageService.getByStudent(student.id);
-            return {
-              ...student,
-              course_packages: packages.map((pkg) => ({
-                id: pkg.id,
-                name: pkg.name,
-                type: pkg.type,
-                total_hours: pkg.total_hours,
-                remaining_hours: pkg.remaining_hours,
-                purchased_remaining: pkg.purchased_remaining,
-                bonus_remaining: pkg.bonus_remaining,
-                status: pkg.status,
-                subject_id: pkg.subject_id,
-                fee_amount: pkg.fee_amount,
-                fee_method: pkg.fee_method,
-                created_at: pkg.created_at,
-              })),
-            };
-          } catch {
-            return student;
-          }
-        }),
-      );
-    };
-
+  /**
+   * 班级学员列表。
+   *
+   * 课时来源 = 会员卡：**不再逐学员补拉课包**（课包已于 2026-10-02 整套移除，
+   * 且点名页的课时由 `loadMemberCardMapsForStudents` 统一并发获取）。
+   */
+  getStudents: async (classId: string): Promise<Student[]> => {
     const list = await get<
       Array<{
         avatar?: null | string;
@@ -314,18 +283,15 @@ export const classService = {
         status: 'active' as const,
         created_at: item.joinedAt,
         updated_at: item.joinedAt,
-        // 若后端已带 remainingHours，先写成单包摘要，避免全 0；无则后续 withPackages 补齐
-        course_packages:
+        // 后端已带 remainingHours（按会员卡算好）→ 写成课时摘要；无则留空
+        member_cards:
           Number.isFinite(remaining) && remaining >= 0
             ? [
                 {
                   id: `summary-${item.id}`,
                   name: '课时',
-                  type: 'hour_package' as const,
-                  total_hours: remaining,
-                  remaining_hours: remaining,
-                  purchased_remaining: remaining,
-                  bonus_remaining: 0,
+                  total_count: remaining,
+                  remaining_count: remaining,
                   status: 'active' as const,
                   created_at: item.joinedAt,
                 },
@@ -333,7 +299,7 @@ export const classService = {
             : undefined,
       };
     });
-    return withPackages(mapped);
+    return mapped;
   },
   getStudentCount: async (classId: string) => (await classService.getStudents(classId)).length,
   /**

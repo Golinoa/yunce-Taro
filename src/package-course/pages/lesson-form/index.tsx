@@ -7,7 +7,6 @@ import { useCampusStore } from '@/stores/campus';
 import { useThemeStore } from '@/stores/theme';
 import type { CampusUIModel, Room, Subject } from '@/types/campus';
 import type { Class } from '@/types/class';
-import type { CoursePackage } from '@/types/course-package';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
@@ -122,12 +121,12 @@ const LessonForm: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [showStudentPicker, setShowStudentPicker] = useState(false);
-  const [matchedPackage, setMatchedPackage] = useState<CoursePackage | null>(null);
+  const [matchedCard, setMatchedCard] = useState<MemberCardDetail | null>(null);
   const [matchedSubject, setMatchedSubject] = useState<Subject | null>(null);
-  /** 单人消课：学员当前可用课包列表（多个时需手动选择） */
-  const [studentActivePackages, setStudentActivePackages] = useState<CoursePackage[]>([]);
-  /** 用户是否手动选过课包（避免改课时时被自动匹配冲掉） */
-  const packageManualRef = React.useRef(false);
+  /** 单人消课：学员当前可用会员卡（多张时需手动选择） */
+  const [studentActiveCards, setStudentActiveCards] = useState<MemberCardDetail[]>([]);
+  /** 用户是否手动选过会员卡（避免改课时时被自动匹配冲掉） */
+  const cardManualRef = React.useRef(false);
 
   // ===== 班级模式状态 =====
   const [classes, setClasses] = useState<Class[]>([]);
@@ -138,11 +137,10 @@ const LessonForm: React.FC = () => {
   const [classStudentsLoading, setClassStudentsLoading] = useState(false);
   const [checkedStudentIds, setCheckedStudentIds] = useState<Set<string>>(new Set());
   const [leaveStudentIds, setLeaveStudentIds] = useState<Set<string>>(new Set());
-  const [studentPackages, setStudentPackages] = useState<Map<string, CoursePackage>>(new Map());
   const [studentSubjects, setStudentSubjects] = useState<Map<string, Subject | null>>(new Map());
   /**
    * 学员会员卡（含卡种科目）：点名扣减的**第二本账**。
-   * 旧课包优先，只有没有可用旧课包时才用它 —— 只有会员卡的学员此前根本点不了名。
+   * 唯一账本 —— 只有会员卡的学员此前根本点不了名（旧课包已整套移除）。
    */
   const [studentMemberCards, setStudentMemberCards] = useState<Map<string, MemberCardDetail[]>>(
     new Map(),
@@ -224,7 +222,7 @@ const LessonForm: React.FC = () => {
   /** 统一弹窗选择器（PickerSheet 标准组件）：teacher/campus/room/package */
   const [selector, setSelector] = useState<{
     visible: boolean;
-    type: 'teacher' | 'campus' | 'room' | 'package' | null;
+    type: 'teacher' | 'campus' | 'room' | 'card' | null;
   }>({ visible: false, type: null });
 
   // ===== 班级模式：搜索/扣费/筛选 =====
@@ -268,7 +266,7 @@ const LessonForm: React.FC = () => {
     return () => clearTimeout(timer);
   }, [isEditEntryAttempt]);
 
-  const { applyMatchedPackage, autoMatchPackage, loadClassStudents, loadLessonRecordsByDate } =
+  const { applyMatchedCard, autoMatchCard, loadClassStudents, loadLessonRecordsByDate } =
     useLessonFormLoaders({
       isEditEntryAttempt,
       classIdParam,
@@ -286,8 +284,8 @@ const LessonForm: React.FC = () => {
       classStudents,
       existingClassRecords,
       teacherOptions,
-      matchedPackage,
-      packageManualRef,
+      matchedCard,
+      cardManualRef,
       fetchClassesByTeacher,
       setMode,
       setLessonDate,
@@ -306,7 +304,7 @@ const LessonForm: React.FC = () => {
       setSelectedTeachingTeacherId,
       setSelectedAssistantTeacherId,
       setSelectedStudent,
-      setMatchedPackage,
+      setMatchedCard,
       setMatchedSubject,
       setSelectedClassId,
       setClassStudents,
@@ -318,7 +316,6 @@ const LessonForm: React.FC = () => {
       setRecordByStudentId,
       setSupplementStudentIds,
       setAttendanceMode,
-      setStudentPackages,
       setStudentSubjects,
       setStudentMemberCards,
       setTrialBookings,
@@ -330,7 +327,7 @@ const LessonForm: React.FC = () => {
       setHoursUsed,
       setFeeAmount,
       setMakeupStudentIds,
-      setStudentActivePackages,
+      setStudentActiveCards,
       setSelector,
       setSubjectOptions,
     });
@@ -421,23 +418,23 @@ const LessonForm: React.FC = () => {
 
   const handleSelectStudent = useCallback(
     async (stu: Student) => {
-      packageManualRef.current = false;
+      cardManualRef.current = false;
       setSelectedStudent(stu);
       setCampusId(stu.campus_id || campusId);
       setShowStudentPicker(false);
-      await autoMatchPackage(stu.id, { promptIfMultiple: true });
+      await autoMatchCard(stu.id, { promptIfMultiple: true });
     },
-    [autoMatchPackage, campusId],
+    [autoMatchCard, campusId],
   );
 
-  const handlePickPackage = useCallback(
-    async (packageId: string) => {
-      const pkg = studentActivePackages.find((p) => p.id === packageId) || null;
-      if (!pkg) return;
-      packageManualRef.current = true;
-      await applyMatchedPackage(pkg);
+  const handlePickCard = useCallback(
+    async (cardId: string) => {
+      const card = studentActiveCards.find((c) => c.id === cardId) || null;
+      if (!card) return;
+      cardManualRef.current = true;
+      await applyMatchedCard(card);
     },
-    [applyMatchedPackage, studentActivePackages],
+    [applyMatchedCard, studentActiveCards],
   );
 
   const handleConfirmSingleStudent = useCallback(
@@ -502,12 +499,12 @@ const LessonForm: React.FC = () => {
       else if (selector.type === 'campus') {
         setCampusId(v);
         setRoom('');
-      } else if (selector.type === 'package') {
-        void handlePickPackage(v);
+      } else if (selector.type === 'card') {
+        void handlePickCard(v);
       } else setRoom(v);
       setSelector((prev) => ({ ...prev, visible: false }));
     },
-    [handlePickPackage, selector.type],
+    [handlePickCard, selector.type],
   );
 
   const {
@@ -563,14 +560,13 @@ const LessonForm: React.FC = () => {
     performance,
     homework,
     homeworkImages,
-    studentPackages,
     studentSubjects,
     studentMemberCards,
     makeupStudentIds,
     supplementStudentIds,
     attendanceBaseline,
     selectedStudent,
-    matchedPackage,
+    matchedCard,
     profile,
     submitLockRef,
     invalidateStudents,
@@ -585,7 +581,6 @@ const LessonForm: React.FC = () => {
     setStudentRemarkDrafts,
     setRecordByStudentId,
     setClassStudents,
-    setStudentPackages,
     setStudentSubjects,
     setStudentMemberCards,
     setShowAddStudentSheet,
@@ -627,7 +622,7 @@ const LessonForm: React.FC = () => {
     trialBookings,
     trialLeadMap,
     trialCheckinMap,
-    studentPackages,
+    studentMemberCards,
     studentSubjects,
     hoursUsed,
   });
@@ -744,8 +739,8 @@ const LessonForm: React.FC = () => {
         {mode === 'single' && (
           <SingleLessonPanel
             selectedStudent={selectedStudent}
-            studentActivePackages={studentActivePackages}
-            matchedPackage={matchedPackage}
+            studentActiveCards={studentActiveCards}
+            matchedCard={matchedCard}
             matchedSubject={matchedSubject}
             hoursUsed={hoursUsed}
             lessonDate={lessonDate}
@@ -761,7 +756,7 @@ const LessonForm: React.FC = () => {
             homeworkImages={homeworkImages}
             uploading={uploading}
             onOpenStudentPicker={() => void handleOpenStudentPicker()}
-            onOpenPackageSelector={() => setSelector({ visible: true, type: 'package' })}
+            onOpenCardSelector={() => setSelector({ visible: true, type: 'card' })}
             onOpenTeacherSelector={() => setSelector({ visible: true, type: 'teacher' })}
             onHoursChange={setHoursUsed}
             onOpenDatePicker={() => setLessonDatePickerVisible(true)}
@@ -894,10 +889,10 @@ const LessonForm: React.FC = () => {
         teacherOptions={teacherOptions}
         campusOptions={campusOptions}
         rooms={rooms}
-        studentActivePackages={studentActivePackages}
+        studentActiveCards={studentActiveCards}
         selectedTeachingTeacherId={selectedTeachingTeacherId}
         campusId={campusId}
-        matchedPackageId={matchedPackage?.id || ''}
+        matchedCardId={matchedCard?.id || ''}
         room={room}
         onCloseSelector={() => setSelector((prev) => ({ ...prev, visible: false }))}
         onConfirmSelector={handleConfirmSelector}

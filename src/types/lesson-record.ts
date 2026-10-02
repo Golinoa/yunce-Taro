@@ -1,4 +1,4 @@
-import type { FeeMethod } from './course-package';
+import type { FeeMethod } from './fee';
 
 /**
  * 消课记录 (lesson_records 表)
@@ -11,7 +11,6 @@ export interface LessonRecord {
   /** 助教教师 ID */
   assistant_teacher_id?: string;
   student_id: string;
-  package_id: string;
   member_card_id?: string;
   lesson_date: string;
   hours_used: number;
@@ -42,8 +41,11 @@ export interface LessonRecord {
   revoke_reason?: string;
   /** 是否跨科目消课 */
   is_cross_subject?: boolean;
-  /** 课包科目 */
-  package_subject?: string;
+  /**
+   * 扣减来源的卡种科目（会员卡；课包已整套移除）。
+   * 仅用于跨科目提醒文案。
+   */
+  source_subject?: string;
   /** 班级科目 */
   class_subject?: string;
   /** 班级ID（考勤管理用） */
@@ -63,9 +65,8 @@ export interface LessonRecord {
   created_at: string;
   updated_at: string;
   // 关联查询字段
-  course_package?: {
-    name: string;
-  };
+  /** 扣减来源（会员卡卡种名）；后端 `packageName` 字段现已返回会员卡名 */
+  member_card_name?: string;
   student?: {
     name: string;
     avatar_url?: string;

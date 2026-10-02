@@ -29,8 +29,8 @@ describe('getSubjectRemaining', () => {
   it('返回该科目剩余（不是跨科目总数）', () => {
     const s = student({
       subject_hours: [
-        { subjectId: 'sub-piano', subjectName: '钢琴', remaining: 12, sources: ['package'] },
-        { subjectId: 'sub-art', subjectName: '美术', remaining: 3, sources: ['memberCard'] },
+        { subjectId: 'sub-piano', subjectName: '钢琴', remaining: 12 },
+        { subjectId: 'sub-art', subjectName: '美术', remaining: 3 },
       ],
     });
     expect(getSubjectRemaining(s, PIANO)).toBe(12);
@@ -39,7 +39,7 @@ describe('getSubjectRemaining', () => {
 
   it('老数据把中文名写进 id 列 ⇒ 按名称兜底命中', () => {
     const s = student({
-      subject_hours: [{ subjectId: '钢琴', subjectName: '钢琴', remaining: 5, sources: [] }],
+      subject_hours: [{ subjectId: '钢琴', subjectName: '钢琴', remaining: 5 }],
     });
     expect(getSubjectRemaining(s, { id: 'sub-piano', name: '钢琴' })).toBe(5);
   });
@@ -50,7 +50,7 @@ describe('getSubjectRemaining', () => {
 
   it('有字段但没有这个科目 ⇒ 0', () => {
     const s = student({
-      subject_hours: [{ subjectId: 'sub-art', subjectName: '美术', remaining: 3, sources: [] }],
+      subject_hours: [{ subjectId: 'sub-art', subjectName: '美术', remaining: 3 }],
     });
     expect(getSubjectRemaining(s, PIANO)).toBe(0);
   });
@@ -62,7 +62,6 @@ describe('getSubjectRemaining', () => {
           subjectId: 'sub-piano',
           subjectName: '钢琴',
           remaining: 11,
-          sources: ['package', 'memberCard'],
         },
       ],
     });
@@ -73,18 +72,14 @@ describe('getSubjectRemaining', () => {
 describe('evaluateStudent', () => {
   it('有剩余 ⇒ 通过', () => {
     const s = student({
-      subject_hours: [
-        { subjectId: 'sub-piano', subjectName: '钢琴', remaining: 8, sources: ['package'] },
-      ],
+      subject_hours: [{ subjectId: 'sub-piano', subjectName: '钢琴', remaining: 8 }],
     });
     expect(evaluateStudent(s, PIANO)).toMatchObject({ ok: true, blocking: false, remaining: 8 });
   });
 
   it('剩 0 ⇒ 硬拦 + 写明原因', () => {
     const s = student({
-      subject_hours: [
-        { subjectId: 'sub-piano', subjectName: '钢琴', remaining: 0, sources: ['package'] },
-      ],
+      subject_hours: [{ subjectId: 'sub-piano', subjectName: '钢琴', remaining: 0 }],
     });
     expect(evaluateStudent(s, PIANO)).toMatchObject({
       ok: false,
@@ -116,11 +111,11 @@ describe('partitionStudents', () => {
   it('一次分成 可加 / 硬拦 / 需提醒 三组', () => {
     const ok = student({
       id: 'ok',
-      subject_hours: [{ subjectId: 'sub-piano', subjectName: '钢琴', remaining: 5, sources: [] }],
+      subject_hours: [{ subjectId: 'sub-piano', subjectName: '钢琴', remaining: 5 }],
     });
     const empty = student({
       id: 'empty',
-      subject_hours: [{ subjectId: 'sub-piano', subjectName: '钢琴', remaining: 0, sources: [] }],
+      subject_hours: [{ subjectId: 'sub-piano', subjectName: '钢琴', remaining: 0 }],
     });
     const none = student({ id: 'none', subject_hours: [] });
 

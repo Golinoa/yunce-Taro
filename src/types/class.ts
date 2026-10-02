@@ -1,5 +1,3 @@
-import type { CoursePackage } from './course-package';
-
 /**
  * 班级类型
  */
@@ -127,7 +125,6 @@ export interface ClassStudent {
   id: string;
   class_id: string;
   student_id: string;
-  course_packages?: CoursePackage[];
   created_at: string;
 }
 

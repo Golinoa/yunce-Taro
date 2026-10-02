@@ -3,10 +3,9 @@ import Taro from '@tarojs/taro';
 import React, { useEffect, useMemo, useState } from 'react';
 import FormInput from '@/components/FormInput';
 import { memberCardService } from '@/services/member-card';
-import { useStudentStore } from '@/stores';
+import { invalidateStudentListCache } from '@/services/student';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
-import { useAuth } from '@/utils/auth';
 import { logError } from '@/utils/logger';
 
 export interface MemberCardRechargeFormProps {
@@ -47,9 +46,7 @@ export const resolveRechargeCounts = (
 
 /** 为已有次卡追加权益；所有写入均走 MemberCard adjustment 契约。 */
 const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student, onSuccess }) => {
-  const { profile } = useAuth();
   /** 追加次数会改「该学员该科目的剩余」⇒ 必须让学员列表缓存失效 */
-  const invalidateStudents = useStudentStore((state) => state.invalidate);
   const [cards, setCards] = useState<MemberCardDetail[]>([]);
   const [cardId, setCardId] = useState('');
   const [amount, setAmount] = useState('');
@@ -105,7 +102,7 @@ const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student
         idempotencyKey: `recharge-${student.id}-${selectedCard.id}-${Date.now()}`,
       });
       Taro.showToast({ title: '追加次数成功', icon: 'success' });
-      invalidateStudents(profile?.id || '');
+      invalidateStudentListCache();
       onSuccess?.();
     } catch (error) {
       logError('recharge member card', error);
