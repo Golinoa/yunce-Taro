@@ -95,10 +95,19 @@ function toBackendCardType(
 }
 
 export const cardTypeService = {
-  getList: async (): Promise<CardType[]> => {
+  /**
+   * 卡种列表。
+   *
+   * ⚠️ 后端**默认只返回「预制会员卡」**（在卡种管理里维护的那些）；导入 / 老生录入
+   * 自动生成的「自定义会员卡」必须显式传 `source: 'all'` 才拿得到。
+   * 卡种管理、给学员发卡这类"只认预制卡"的场景保持默认即可；
+   * 只有**按卡种录老生课时**这种要复用自动生成卡种的场景才传 `all`。
+   */
+  getList: async (options?: { source?: 'all' | 'custom' | 'preset' }): Promise<CardType[]> => {
     const data = await get<PaginatedResponse<BackendCardType> | BackendCardType[]>('/card-types', {
       page: 1,
       pageSize: 100,
+      ...(options?.source ? { source: options.source } : {}),
     });
     return asPaginatedResponse(data, 1, 100).list.map(mapCardType);
   },

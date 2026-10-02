@@ -151,8 +151,13 @@ const LegacyPackagesEditor: React.FC<LegacyPackagesEditorProps> = ({
   };
 
   useEffect(() => {
+    /**
+     * ⚠️ 必须传 `source: 'all'`：这里要能选到**导入 / 老生录入自动生成的「自定义会员卡」**
+     * （如「毛笔课时卡」）。后端默认只返「预制会员卡」，不传的话这类卡种在下拉里看不见，
+     * 用户会觉得"系统认不到我的卡包"。
+     */
     cardTypeService
-      .getList()
+      .getList({ source: 'all' })
       .then((items) => {
         setCardTypes(items.filter((item) => item.kind === 'count' && item.status === 'active'));
       })
