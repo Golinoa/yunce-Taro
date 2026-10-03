@@ -131,7 +131,7 @@ const StudentDeleteSheet: React.FC<StudentDeleteSheetProps> = ({
         <Text className="mt-[20rpx] block text-[24rpx] leading-[38rpx] text-muted-foreground">
           {isPurge
             ? '以上记录会被永久删除，无法恢复。'
-            : '删除只会把他移入回收站：课时、上课记录、流水都保留；班级、课表、家长绑定会解除。想暂时停课又不想动这些，选「冻结」。'}
+            : '删除：课时、上课记录、流水都保留，班级 / 课表 / 家长绑定会解除。\n冻结：他的排课会停掉（不能上课），课时、班级、家长绑定全部保留，解冻即恢复。'}
         </Text>
 
         {/* 按钮区 */}

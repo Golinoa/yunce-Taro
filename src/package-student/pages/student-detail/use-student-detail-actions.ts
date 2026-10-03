@@ -91,7 +91,8 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
       .then(() => {
         setRefreshSignal(REFRESH_SIGNAL.students);
         setDeleteSheet((prev) => ({ ...prev, visible: false, submitting: false }));
-        Taro.showToast({ title: '已冻结', icon: 'success' });
+        // 排课也会被一并停掉，明确告诉老师（否则他会奇怪"课表上怎么没这个学员了"）
+        Taro.showToast({ title: '已冻结，排课已停用', icon: 'success' });
       })
       .catch(() => {
         setDeleteSheet((prev) => ({ ...prev, submitting: false }));
@@ -125,7 +126,7 @@ export function useStudentDetailActions(params: UseStudentDetailActionsParams) {
     if (!student) return false;
     const { confirm } = await Taro.showModal({
       title: '解冻学员',
-      content: `解冻「${student.name}」后，他会重新回到点名名单。`,
+      content: `解冻「${student.name}」后，他会重新回到点名名单，冻结时停用的排课也会一并恢复。`,
     });
     if (!confirm) return false;
     try {
