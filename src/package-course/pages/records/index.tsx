@@ -1,9 +1,10 @@
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import DatePickerSheet from '@/components/DatePickerSheet';
 import Empty from '@/components/Empty';
+import Icon from '@/components/Icon';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
   navigateToLessonDetail,
@@ -83,6 +84,8 @@ const RecordsPage: React.FC = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [datePickerField, setDatePickerField] = useState<'start' | 'end' | null>(null);
   const [filterStudentId, setFilterStudentId] = useState('all');
+  /** 学员搜索关键词（教师名下学员多，用搜索定位而不是一排标签） */
+  const [studentKeyword, setStudentKeyword] = useState('');
 
   const dateRange = useMemo<DateRange>(() => {
     if (quickRange === 'week') return getWeekRange();
@@ -173,6 +176,18 @@ const RecordsPage: React.FC = () => {
     return result;
   }, [records, dateRange, filterStudentId]);
 
+  /** 搜索候选：按姓名模糊匹配；点选其中一个即精确筛选到人（避免同名混在一起） */
+  const studentCandidates = useMemo(() => {
+    const keyword = studentKeyword.trim();
+    if (!keyword) return [];
+    return students.filter((student) => student.name?.includes(keyword));
+  }, [students, studentKeyword]);
+
+  const selectedStudentName = useMemo(
+    () => students.find((student) => student.id === filterStudentId)?.name || '',
+    [students, filterStudentId],
+  );
+
   const consumptionSections = useMemo(
     () => buildLessonConsumptionSections(filteredRecords),
     [filteredRecords],
@@ -249,27 +264,61 @@ const RecordsPage: React.FC = () => {
           </View>
         </ScrollView>
 
-        {/* 多孩筛选（教师 / 家长） */}
+        {/* 学员搜索（多学员：教师名下学员多，用搜索定位到人） */}
         {students.length > 1 && (
-          <ScrollView scrollX showScrollbar={false} className="mt-[12rpx] whitespace-nowrap">
-            <View className="inline-flex flex-row gap-[12rpx] pr-[24rpx]">
-              <View
-                className={filterPillClass(filterStudentId === 'all')}
-                onClick={() => setFilterStudentId('all')}
-              >
-                <Text className={filterPillTextClass(filterStudentId === 'all')}>全部</Text>
-              </View>
-              {students.map((s) => (
+          <View className="mt-[12rpx]">
+            <View className="flex flex-row items-center gap-[12rpx] rounded-full bg-card px-[24rpx] py-[14rpx]">
+              <Icon name="mdi-magnify" size={20} color="mutedForeground" />
+              <Input
+                className="h-[44rpx] flex-1 text-[24rpx]"
+                value={studentKeyword}
+                placeholder="搜索学员"
+                placeholderClass="text-muted-foreground"
+                onInput={(event) => setStudentKeyword(event.detail.value)}
+              />
+              {(studentKeyword || filterStudentId !== 'all') && (
                 <View
-                  key={s.id}
-                  className={cn(filterPillClass(filterStudentId === s.id), 'shrink-0')}
-                  onClick={() => setFilterStudentId(s.id)}
+                  className="shrink-0"
+                  onClick={() => {
+                    setStudentKeyword('');
+                    setFilterStudentId('all');
+                  }}
                 >
-                  <Text className={filterPillTextClass(filterStudentId === s.id)}>{s.name}</Text>
+                  <Icon name="mdi-close" size={20} color="mutedForeground" />
                 </View>
-              ))}
+              )}
             </View>
-          </ScrollView>
+
+            {studentKeyword.trim() ? (
+              <View className="mt-[10rpx] flex flex-row flex-wrap gap-[12rpx]">
+                {studentCandidates.length > 0 ? (
+                  studentCandidates.map((student) => (
+                    <View
+                      key={student.id}
+                      className={cn(filterPillClass(filterStudentId === student.id), 'shrink-0')}
+                      onClick={() => {
+                        setFilterStudentId(student.id);
+                        setStudentKeyword('');
+                      }}
+                    >
+                      <Text className={filterPillTextClass(filterStudentId === student.id)}>
+                        {student.name}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text className="text-[22rpx] text-muted-foreground">没有匹配的学员</Text>
+                )}
+              </View>
+            ) : filterStudentId !== 'all' ? (
+              <View className="mt-[10rpx] flex flex-row items-center gap-[12rpx]">
+                <Text className="text-[22rpx] text-muted-foreground">当前筛选</Text>
+                <View className={cn(filterPillClass(true), 'shrink-0')}>
+                  <Text className={filterPillTextClass(true)}>{selectedStudentName}</Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
         )}
       </View>
 
