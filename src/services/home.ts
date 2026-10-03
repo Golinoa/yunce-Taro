@@ -4,6 +4,7 @@
  * 待办请走 `todoService`（唯一出口）。此处仅保留兼容薄封装。
  */
 import type { RecentGroup } from '@/components/home/RecentLessonList';
+import type { StudentHoursOverride } from '@/components/lesson/LessonConsumptionList';
 import {
   HOME_QUICK_ENTRIES,
   PARENT_HOME_QUICK_ENTRIES,
@@ -488,6 +489,10 @@ interface BackendAggregateRecentRecord {
   content?: string | null;
   performance?: string | null;
   student?: { id: string; name: string; avatar?: string | null } | null;
+  teacherId?: string | null;
+  operatorTeacherId?: string | null;
+  teacher?: { name: string } | null;
+  operatorTeacher?: { name: string } | null;
 }
 
 interface BackendHomeAggregateResponse {
@@ -498,6 +503,7 @@ interface BackendHomeAggregateResponse {
   todaySchedules?: unknown[];
   recentRecords?: unknown[];
   students?: unknown[];
+  studentHours?: Record<string, StudentHoursOverride> | null;
   packages?: unknown[];
   todos?: unknown[];
 }
@@ -516,7 +522,8 @@ function normalizeAggregateLessonDate(value?: string | null): string {
 function mapAggregateRecentRecord(item: BackendAggregateRecentRecord): LessonRecord {
   return {
     id: item.id,
-    teacher_id: '',
+    teacher_id: item.teacherId || '',
+    operator_teacher_id: item.operatorTeacherId || '',
     student_id: item.student?.id || '',
     lesson_date: normalizeAggregateLessonDate(item.lessonDate),
     hours_used: Number(item.hoursUsed ?? (item.duration ?? 0) / 60),
@@ -529,6 +536,8 @@ function mapAggregateRecentRecord(item: BackendAggregateRecentRecord): LessonRec
     student: item.student?.name
       ? { name: item.student.name, avatar_url: item.student.avatar || undefined }
       : undefined,
+    teacher: item.teacher?.name ? { name: item.teacher.name } : undefined,
+    operator_teacher: item.operatorTeacher?.name ? { name: item.operatorTeacher.name } : undefined,
   };
 }
 
@@ -539,6 +548,7 @@ export interface HomeAggregate {
   unreadCount: number;
   schedules: HomeScheduleItem[];
   recentRecords: LessonRecord[];
+  studentHours: Record<string, StudentHoursOverride>;
   parentSchedules: HomeScheduleItem[];
   parentPackages: ParentHomePackageCard[];
   parentFallbackStudentId: string;
@@ -692,6 +702,7 @@ export const homeService = {
           unreadCount: data.unreadCount,
           schedules: [],
           recentRecords: [],
+          studentHours: {},
           parentSchedules: parent.todaySchedules,
           parentPackages: parent.packages,
           parentFallbackStudentId: parent.students?.[0]?.id || '',
@@ -724,6 +735,7 @@ export const homeService = {
         recentRecords: (data.recentRecords as BackendAggregateRecentRecord[]).map(
           mapAggregateRecentRecord,
         ),
+        studentHours: (data.studentHours as Record<string, StudentHoursOverride>) ?? {},
         parentSchedules: [],
         parentPackages: [],
         parentFallbackStudentId: '',
@@ -736,6 +748,7 @@ export const homeService = {
         unreadCount: 0,
         schedules: [],
         recentRecords: [],
+        studentHours: {},
         parentSchedules: [],
         parentPackages: [],
         parentFallbackStudentId: '',

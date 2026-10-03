@@ -11,6 +11,7 @@ import type { TodoViewMode } from '@/components/home/TodoToolbar';
 import {
   buildLessonConsumptionSections,
   pickHomeRecentLessonRecords,
+  type StudentHoursOverride,
 } from '@/components/lesson/LessonConsumptionList';
 import { SubscribePromptDialog, SubscribeReminderBar } from '@/components/subscribe';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
@@ -229,6 +230,7 @@ const Home: React.FC = () => {
   detailItemRef.current = detailItem;
 
   const [recentRecords, setRecentRecords] = useState<LessonRecord[]>([]);
+  const [studentHours, setStudentHours] = useState<Record<string, StudentHoursOverride>>({});
   const [unreadCount, setUnreadCount] = useState(0);
   const isFirstMount = useRef(true);
   /** 待确认关系远端查询上次成功时间（TTL 节流用） */
@@ -431,6 +433,7 @@ const Home: React.FC = () => {
     if (!agg || isParent) return;
     setSchedules(agg.schedules);
     setRecentRecords(agg.recentRecords);
+    setStudentHours(agg.studentHours);
   }, [agg, isParent]);
 
   useEffect(() => {
@@ -929,8 +932,11 @@ const Home: React.FC = () => {
   );
 
   const recentSections = useMemo(
-    () => buildLessonConsumptionSections(pickHomeRecentLessonRecords(recentRecords)),
-    [recentRecords],
+    () =>
+      buildLessonConsumptionSections(pickHomeRecentLessonRecords(recentRecords), {
+        studentHours,
+      }),
+    [recentRecords, studentHours],
   );
 
   const handleHomeTabChange = useCallback(
