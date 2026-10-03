@@ -1,10 +1,11 @@
 import { View } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh, useShareAppMessage } from '@tarojs/taro';
+import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import { useHolidayCheck } from '@/hooks/use-holiday-check';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { notificationService, studentService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import { useCourseCategoryStore } from '@/stores/course-category';
@@ -416,8 +417,9 @@ const SchedulePage: React.FC = () => {
       void loadBaseData();
       void loadMonthRecords();
       void loadTemporaryReschedules();
-      // 2026-10-03：新增/删除放假日期后回到课表页也要立刻联动
-      isHolidayDate.reload();
+      // 2026-10-03：新增/删除放假日期后回到课表页也要立刻联动。
+      // 不 await：进页不等假期，页面先出内容，假期落地后日历自动补上「休」。
+      void isHolidayDate.reload();
       return;
     }
     if (isWithinRefetchTtl(lastScheduleAuxFetchAtRef.current)) {
@@ -434,23 +436,24 @@ const SchedulePage: React.FC = () => {
    * 各视图内层 ScrollView 里滚动，但页面根是 `h-screen + overflow-hidden`、页面本身不滚动，
    * 与 `package-settings/pages/my-todos`、`package-student/pages/students` 同一套路。
    *
-   * 覆盖范围：班课/团课（排课+点名统计+临时调课，团课再加开放时段）、场地（场地列表）；
-   * 私教视图由它自己的 `reloadToken` 触发。指示器必须显式 `stopPullDownRefresh`，否则一直转。
+   * 覆盖范围：
+   * - 班课/团课（排课+点名统计+临时调课，团课再加开放时段）；
+   * - 场地（场地列表 + 场地预约开关）；
+   * - 私教视图由它自己的 `reloadToken` 触发；
+   * - 假期日历（日历「休」+ 卡片「放假停课」角标）。
+   *
+   * 指示器由 `usePagePullRefresh` 统一收起（含异常路径），此处只管数据。
    */
-  usePullDownRefresh(() => {
-    void (async () => {
-      try {
-        if (activeTab?.mode === 'private') {
-          setPrivateReloadToken((token) => token + 1);
-        }
-        // 2026-10-03：放假日期改动后课表不联动 —— 假期是独立 hook、原来只拉一次，
-        // 必须显式重拉，否则下拉也刷不出来。
-        isHolidayDate.reload();
-        await pullRefresh({ withVenues: activeTab?.type === 'venue' });
-      } finally {
-        Taro.stopPullDownRefresh();
-      }
-    })();
+  usePagePullRefresh(async () => {
+    if (activeTab?.mode === 'private') {
+      setPrivateReloadToken((token) => token + 1);
+    }
+    // 场地预约开关是 TanStack Query（staleTime 内不重拉），管理员改了开关
+    // 不刷新就看不到「场地」Tab 出现/消失 ⇒ 下拉必须强制回源
+    await venueEnabledQuery.refetch();
+    // 假期是独立 hook，只在挂载时拉一次；不改假期但课表要联动时也一并刷新
+    await isHolidayDate.reload();
+    await pullRefresh({ withVenues: activeTab?.type === 'venue' });
   });
 
   const notifyStudentAndParents = useCallback(

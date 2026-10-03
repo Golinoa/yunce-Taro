@@ -444,19 +444,38 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
   }, [loadOpenSlotDates]);
 
   /**
+   * 清空「开放时段」的内存缓存。
+   *
+   * 为什么需要：`loadOpenClassSlots` 内部有 `openClassSlotsRef` 缓存 + `force` 短路，
+   * 下拉刷新只对**当前日期 ±1 天**传force 生效，日期窗口里其它已缓存的日期仍显示旧时段。
+   * 下拉刷新语义是「全部回源」，所以先把缓存整体作废再重拉当前视图需要的日期。
+   */
+  const clearOpenSlotCache = useCallback(() => {
+    openClassSlotsRef.current = {};
+    loadingOpenSlotDatesRef.current = new Set();
+    errorOpenSlotDatesRef.current = new Set();
+    setOpenClassSlots({});
+    setLoadingOpenSlotDates(new Set());
+    setErrorOpenSlotDates(new Set());
+  }, [setErrorOpenSlotDates, setLoadingOpenSlotDates, setOpenClassSlots]);
+
+  /**
    * 下拉刷新：把「当前屏幕上看到的数据」整批重拉。
    *
+   * 覆盖范围（对齐「下拉 = 看到的就是最新的」）：
    * - 基础数据（排课/班级/老师/学员头像/试听预约/分类）→ `loadBaseData({ silent: true })`
    *   （静默：下拉指示器已经给了反馈，不再切全局骨架，否则列表会闪一下）
    * - 点名统计与临时调课 → `loadMonthRecords` + `loadTemporaryReschedules`
-   * - 团课视图（`open` 子模式）→ 当前日期前后各一天的开放时段，与日历切换同一口径
+   * - 团课视图（`open` 子模式）→ 作废开放时段缓存后重拉当前日期前后各一天 + 红点日期集合
    * - 场地视图 → `loadVenues`（由调用方按当前 Tab 传入 `withVenues`）
    *
    * 私教视图（`TrialBookingView`）的数据由它自己加载，页面通过其 `reloadToken` 触发，
-   * 不在这里重复实现。
+   * 不在这里重复实现；调用方需自行 `await` 该视图的加载完成再收起指示器。
    */
   const pullRefresh = useCallback(
     async (opts?: { withVenues?: boolean }) => {
+      // 场地列表是「当前 Tab 看得见」的数据，无论在哪个 Tab 都该刷：
+      // 排课页顶部 Tab 的显示依赖它，跨 Tab 时列表虽不可见但缓存已是脏的。
       const tasks: Promise<unknown>[] = [
         loadBaseData({ silent: true }),
         loadMonthRecords(),
@@ -466,6 +485,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
         tasks.push(loadVenues());
       }
       if (viewMode === 'schedule' && scheduleSubMode === 'open') {
+        clearOpenSlotCache();
         tasks.push(
           loadOpenClassSlots(selectedDate, true),
           loadOpenClassSlots(selectedDate.add(1, 'day'), true),
@@ -476,6 +496,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
       await Promise.all(tasks);
     },
     [
+      clearOpenSlotCache,
       loadBaseData,
       loadMonthRecords,
       loadOpenClassSlots,
@@ -497,6 +518,7 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
     loadTemporaryReschedules,
     refreshDateData,
     pullRefresh,
+    clearOpenSlotCache,
     lastScheduleAuxFetchAtRef,
   };
 }

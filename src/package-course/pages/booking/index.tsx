@@ -3,7 +3,7 @@
  * 来源：试听 / 团课开放约 / 私教约课 / 场地；卡片类型标签区分，不做类型分栏。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,6 +17,7 @@ import {
   MY_BOOKING_TYPE_BADGE_CLASS,
   MY_BOOKING_TYPE_LABEL,
 } from '@/constants/my-booking';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { leadService, myBookingService, venueBookingService } from '@/services';
 import type { MyBookingCard, MyBookingStatus } from '@/types/my-booking';
 import { useAuth } from '@/utils/auth';
@@ -182,9 +183,7 @@ const MyBookingsPage: React.FC = () => {
     void loadBookings();
   });
 
-  usePullDownRefresh(() => {
-    void loadBookings().finally(() => Taro.stopPullDownRefresh());
-  });
+  usePagePullRefresh(loadBookings);
 
   const filtered = useMemo(() => {
     if (statusTab === 'all') return bookings;

@@ -5,13 +5,14 @@
  * 支持下拉刷新、Tab筛选切换、新增线索。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback } from 'react';
 import Icon from '@/components/Icon';
 import LeadCard from '@/components/lead/LeadCard';
 import PageContainer from '@/components/PageContainer';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { useLeadStore } from '@/stores/lead';
 import type { LeadFilterTab } from '@/types/lead';
 import { useAuth } from '@/utils/auth';
@@ -41,17 +42,14 @@ const MyInvitePage: React.FC = () => {
     }
   });
 
-  // 下拉刷新
-  usePullDownRefresh(() => {
-    if (teacherId) {
-      invalidate(teacherId);
-      Promise.all([
-        fetchCards(teacherId, activeFilterTab, true),
-        fetchSummary(teacherId, true),
-      ]).finally(() => {
-        Taro.stopPullDownRefresh();
-      });
-    }
+  // 下拉刷新：teacherId 为空时也要让指示器收起（原来整个 if 不进，指示器转死）
+  usePagePullRefresh(async () => {
+    if (!teacherId) return;
+    invalidate(teacherId);
+    await Promise.all([
+      fetchCards(teacherId, activeFilterTab, true),
+      fetchSummary(teacherId, true),
+    ]);
   });
 
   // 当前 tab 的缓存 key

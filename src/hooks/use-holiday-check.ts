@@ -8,7 +8,7 @@
  * 课表页（含私教视图）与各处的「选择日期」弹层共用本 hook，保证口径一致。
  */
 import dayjs from 'dayjs';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { holidayService } from '@/services/campus';
 import { logError } from '@/utils/logger';
 
@@ -23,40 +23,57 @@ type HolidayRange = { startDate: string; endDate: string };
  *   未就绪时**不发请求**：否则页面挂载瞬间可能因 token/机构尚未解析拿到 401，
  *   而本 hook 不会自动重试 ⇒ 整个会话都拿不到假期、日历不显示「休」。
  *   身份就绪后 enabled 变 true 会自动触发拉取。
+ *
+ * @returns `isHoliday(date)` 判断函数，挂了 `reload(): Promise<void>`：
+ *   重新拉一次假期，数据落地后 resolve（供下拉刷新 await）。
  */
-export function useHolidayCheck(options?: {
-  enabled?: boolean;
-}): ((date: dayjs.Dayjs) => boolean) & { reload: () => void; reloadToken: number } {
+export function useHolidayCheck(options?: { enabled?: boolean }): ((
+  date: dayjs.Dayjs,
+) => boolean) & {
+  reload: () => Promise<void>;
+} {
   const enabled = options?.enabled ?? true;
   const [ranges, setRanges] = useState<HolidayRange[]>([]);
   /**
-   * 重拉令牌。2026-10-03 用户报「增删放假日期后课表不联动」——
-   * 原来 effect 依赖只有 `[enabled]`，整个会话只拉一次，改完放假毫无反应，
-   * 而且**下拉刷新也刷不到它**（刷的是排课/点名/场地）。
-   * 任何需要「重新读一次假期」的地方（如下拉刷新）自增它即可重拉。
+   * 请求代次。只有最后一次发起的请求允许写 state ——
+   * 连续拉两次时先发的后到，会把新结果覆盖成旧值。
    */
-  const [reloadToken, setReloadToken] = useState(0);
-  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
+  const seqRef = useRef(0);
+
+  /** 实际发起一次拉取，返回本次请求的 Promise */
+  const fetchRanges = useCallback(async (): Promise<void> => {
+    const seq = ++seqRef.current;
+    try {
+      const list = await holidayService.getCalendar({
+        startDate: dayjs().subtract(RANGE_PAST_DAYS, 'day').format('YYYY-MM-DD'),
+        endDate: dayjs().add(RANGE_FUTURE_DAYS, 'day').format('YYYY-MM-DD'),
+      });
+      // 已被更新的请求取代：丢弃这次结果
+      if (seq !== seqRef.current) return;
+      setRanges(list.map((item) => ({ startDate: item.startDate, endDate: item.endDate })));
+    } catch (error) {
+      logError('holidayCheck.load', error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
-    let alive = true;
-    void (async () => {
-      try {
-        const list = await holidayService.getCalendar({
-          startDate: dayjs().subtract(RANGE_PAST_DAYS, 'day').format('YYYY-MM-DD'),
-          endDate: dayjs().add(RANGE_FUTURE_DAYS, 'day').format('YYYY-MM-DD'),
-        });
-        if (!alive) return;
-        setRanges(list.map((item) => ({ startDate: item.startDate, endDate: item.endDate })));
-      } catch (error) {
-        logError('holidayCheck.load', error);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [enabled, reloadToken]);
+    void fetchRanges();
+    // fetchRanges 是稳定引用，这里只在身份就绪那一刻拉一次；
+    // 后续重拉一律走 reload()（能拿到 Promise 供调用方 await）
+  }, [enabled, fetchRanges]);
+
+  /**
+   * 重拉一次假期，**返回本次请求的 Promise**（数据落地后 resolve）。
+   *
+   * 直接调 `fetchRanges` 而不是自增令牌走effect ——
+   * 后者拿不到「这一次请求」的 Promise，调用方 await 不到真实完成时点，
+   * 指示器会先收起、UI 隔一拍才变。
+   */
+  const reload = useCallback(async () => {
+    if (!enabled) return;
+    await fetchRanges();
+  }, [enabled, fetchRanges]);
 
   const isHoliday = useCallback(
     (date: dayjs.Dayjs) => {
@@ -67,9 +84,6 @@ export function useHolidayCheck(options?: {
     [ranges],
   );
 
-  // 返回值上挂 reload / reloadToken，调用方既能直接判断、也能触发重拉
-  return useMemo(
-    () => Object.assign(isHoliday, { reload, reloadToken }),
-    [isHoliday, reload, reloadToken],
-  );
+  // 返回值上挂 reload，调用方既能直接判断、也能触发重拉（并 await 其完成）
+  return useMemo(() => Object.assign(isHoliday, { reload }), [isHoliday, reload]);
 }

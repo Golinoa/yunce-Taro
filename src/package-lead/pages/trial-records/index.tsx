@@ -7,7 +7,7 @@
  * - 签到走点名 / 今日课表，不进半成品预约签到页
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,6 +21,7 @@ import {
   LEAD_BOOKING_STATUS_META,
   getLeadBookingModeLabel,
 } from '@/constants/lead';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { leadService } from '@/services';
 import { useCampusStore } from '@/stores/campus';
 import type { LeadBooking, LeadBookingStatus } from '@/types/lead';
@@ -237,9 +238,7 @@ const TrialRecordsPage: React.FC = () => {
     void loadRecords();
   });
 
-  usePullDownRefresh(() => {
-    void loadRecords().finally(() => Taro.stopPullDownRefresh());
-  });
+  usePagePullRefresh(loadRecords);
 
   const filtered = useMemo(() => {
     if (statusTab === 'all') return bookings;

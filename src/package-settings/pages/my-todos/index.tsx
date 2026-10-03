@@ -6,7 +6,7 @@
  * 布局：导航内今日/全部分段 → 分类 Tab（加号跟随/钉住）→ 状态下拉 + 四象限 Chip → 列表。
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,6 +18,7 @@ import AddTodoCategorySheet from '@/components/my-todos/AddTodoCategorySheet';
 import MyTodoDateGroups from '@/components/my-todos/MyTodoDateGroups';
 import TodoDetailPopover from '@/components/my-todos/TodoDetailPopover';
 import MonthPickerSheet from '@/components/teacher/MonthPickerSheet';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { useOverlayScrollFreeze } from '@/hooks/useOverlayScrollFreeze';
 import { homeService, todoService } from '@/services';
 import { useCampusStore } from '@/stores';
@@ -265,9 +266,7 @@ const MyTodos: React.FC = () => {
     void refreshPage();
   });
 
-  usePullDownRefresh(() => {
-    void reloadTodos().finally(() => Taro.stopPullDownRefresh());
-  });
+  usePagePullRefresh(reloadTodos);
 
   useEffect(() => {
     measureCategoryPlusPin();

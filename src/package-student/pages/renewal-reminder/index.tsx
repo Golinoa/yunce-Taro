@@ -3,7 +3,7 @@
  * 系统设置「预警阈值」已合并到本页设置。
  */
 import { View, Text, ScrollView, Input } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
@@ -11,6 +11,7 @@ import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import StudentListCard from '@/components/student/StudentListCard';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { campusService } from '@/services/campus';
 import { opsAlertService, type RenewalReminderItem } from '@/services/ops-alerts';
 import {
@@ -120,9 +121,7 @@ const RenewalReminderPage: React.FC = () => {
     void load();
   });
 
-  usePullDownRefresh(() => {
-    void load().finally(() => Taro.stopPullDownRefresh());
-  });
+  usePagePullRefresh(load);
 
   const openStudent = useCallback((studentId: string) => {
     void Taro.navigateTo({

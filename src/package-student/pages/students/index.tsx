@@ -1,5 +1,5 @@
 import { View, Text, Input, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import dayjs from 'dayjs';
@@ -11,6 +11,7 @@ import MemberActionSheet from '@/components/student/MemberActionSheet';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import { LEAD_FILTER_TAB_OPTIONS } from '@/constants/lead';
 import { useCurrentCampusId } from '@/hooks/use-current-campus-id';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import { campusService } from '@/services/campus';
 import { studentService } from '@/services/student';
 import { useLeadStore } from '@/stores/lead';
@@ -470,21 +471,19 @@ const Students: React.FC = () => {
   });
 
   // 下拉刷新
-  usePullDownRefresh(async () => {
+  usePagePullRefresh(async () => {
     if (mainTab === 'member') {
       await queryClient.invalidateQueries({
         queryKey: ['students', isTeacher ? 'teacher' : 'parent', actorId],
       });
-    } else {
-      if (teacherId) {
-        invalidate(teacherId);
-        await Promise.all([
-          fetchCards(teacherId, activeFilterTab, true),
-          fetchSummary(teacherId, true),
-        ]);
-      }
+      return;
     }
-    Taro.stopPullDownRefresh();
+    if (!teacherId) return;
+    invalidate(teacherId);
+    await Promise.all([
+      fetchCards(teacherId, activeFilterTab, true),
+      fetchSummary(teacherId, true),
+    ]);
   });
 
   // 关闭所有下拉

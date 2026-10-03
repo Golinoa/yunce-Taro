@@ -2,13 +2,14 @@
  * 考勤异常 — 超上 / 长期未上课 / 长期停课
  */
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import StudentListCard from '@/components/student/StudentListCard';
+import { usePagePullRefresh } from '@/hooks/use-pull-refresh';
 import {
   opsAlertService,
   type AttendanceAnomalyItem,
@@ -88,9 +89,7 @@ const AttendanceAnomalyPage: React.FC = () => {
     void load();
   });
 
-  usePullDownRefresh(() => {
-    void load(true).finally(() => Taro.stopPullDownRefresh());
-  });
+  usePagePullRefresh(() => load(true));
 
   const counts = useMemo(() => {
     const base: Record<TabKey, number> = {
