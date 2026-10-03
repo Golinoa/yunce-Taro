@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveRechargeCounts } from './index';
 
-describe('resolveRechargeCounts（追加/赠送二选一，2026-10-02）', () => {
+describe('resolveRechargeCounts（追加/赠送次数：至少填一项，可同时填写）', () => {
   it('只填追加次数 ⇒ 通过', () => {
     expect(resolveRechargeCounts('10', '')).toEqual({ ok: true, amount: 10, gift: 0 });
   });

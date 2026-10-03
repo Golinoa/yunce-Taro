@@ -18,8 +18,8 @@ export type RechargeCountsResult =
   | { ok: false; message: string };
 
 /**
- * 解析并校验「追加次数 / 赠送次数」——**二选一填即可**（2026-10-02 用户口径）。
- * 都留空或都为 0 ⇒ 至少填一项；填了的必须是非负整数（只送不买、只买不送均合法）。
+ * 解析并校验「追加次数 / 赠送次数」——**至少填一项，可同时填写**。
+ * 都留空或都为 0 ⇒ 报错；填了的必须是非负整数（只送不买、只买不送、两者都填均合法）。
  */
 export const resolveRechargeCounts = (
   amountText: string,
@@ -152,8 +152,8 @@ const MemberCardRechargeForm: React.FC<MemberCardRechargeFormProps> = ({ student
           type="number"
           value={amount}
           onInput={(e) => setAmount(e.detail.value || '')}
-          placeholder="与赠送次数二选一"
-          hint="追加次数与赠送次数二选一填即可"
+          placeholder="选填"
+          hint="追加次数与赠送次数至少填一项，两者可同时填写"
         />
         <FormInput
           label="赠送次数"

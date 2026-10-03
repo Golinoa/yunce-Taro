@@ -106,6 +106,7 @@ const MemberCardIssuePage: React.FC = () => {
         <StudentPickerSheet
           visible={pickerVisible}
           title="选择学员"
+          allowClear={false}
           onClose={() => setPickerVisible(false)}
           onSelect={(picked) => {
             setPickerVisible(false);

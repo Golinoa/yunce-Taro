@@ -36,6 +36,12 @@ export interface StudentPickerSheetProps {
   /** 选中结果；`null` 表示「不设置 / 清除」 */
   onSelect: (student: Student | null) => void;
   onClose: () => void;
+  /**
+   * 是否显示「不设置推荐人」清除项，默认显示。
+   * 推荐人场景必须能回到「无」⇒ 保留；纯「选学员」场景（如课时充值）传 false，
+   * 否则会出现「不设置学员」这种说不通的选项。
+   */
+  allowClear?: boolean;
 }
 
 const StudentPickerSheet: React.FC<StudentPickerSheetProps> = ({
@@ -45,6 +51,7 @@ const StudentPickerSheet: React.FC<StudentPickerSheetProps> = ({
   excludeStudentId,
   onSelect,
   onClose,
+  allowClear = true,
 }) => {
   const [keyword, setKeyword] = useState('');
   const [list, setList] = useState<Student[]>([]);
@@ -142,14 +149,17 @@ const StudentPickerSheet: React.FC<StudentPickerSheetProps> = ({
           </View>
         </View>
 
-        {/* 「不设置推荐人」：显式清除入口 —— 单选字段必须能回到"无"，否则选错就没法改回来 */}
-        <View
-          className="shrink-0 mb-[16rpx] py-[20rpx] flex flex-row items-center justify-between press-scale"
-          onClick={() => handleSelect(null)}
-        >
-          <Text className="text-[28rpx] text-muted-foreground">不设置推荐人</Text>
-          {!selectedId && <Text className="text-primary text-[32rpx] font-semibold">✓</Text>}
-        </View>
+        {/* 「不设置推荐人」：显式清除入口 —— 单选字段必须能回到"无"，否则选错就没法改回来。
+            纯选学员场景（allowClear=false）不渲染。 */}
+        {allowClear && (
+          <View
+            className="shrink-0 mb-[16rpx] py-[20rpx] flex flex-row items-center justify-between press-scale"
+            onClick={() => handleSelect(null)}
+          >
+            <Text className="text-[28rpx] text-muted-foreground">不设置推荐人</Text>
+            {!selectedId && <Text className="text-primary text-[32rpx] font-semibold">✓</Text>}
+          </View>
+        )}
 
         <ScrollView
           scrollY
