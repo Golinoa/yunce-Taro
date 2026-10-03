@@ -28,6 +28,11 @@ function mapRenewalItem(raw: Record<string, unknown>): RenewalReminderItem {
     studentName: String(raw.studentName ?? raw.student_name ?? ''),
     nickname: (raw.nickname as string | undefined) || undefined,
     avatarUrl: (raw.avatarUrl ?? raw.avatar_url ?? raw.avatar) as string | undefined,
+    cardKinds: Array.isArray(raw.cardKinds)
+      ? (raw.cardKinds as string[])
+      : Array.isArray(raw.card_kinds)
+        ? (raw.card_kinds as string[])
+        : [],
     remainingHours: Number(raw.remainingHours ?? raw.remaining_hours ?? 0),
     remainingDays:
       raw.remainingDays === null || raw.remaining_days === null

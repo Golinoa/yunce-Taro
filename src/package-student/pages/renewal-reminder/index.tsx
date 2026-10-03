@@ -24,6 +24,21 @@ import { logError } from '@/utils/logger';
 import { useCardNavigationBar } from '@/utils/navigation-bar';
 import { withRouteGuard } from '@/utils/route-guard';
 
+/**
+ * 剩余情况文案：按卡类型显示 ——
+ * 次卡显示剩余课时、储值卡显示余额；只要卡有到期日就再带上剩余天数。
+ * 后端没给 `cardKinds`（老接口/异常）时退回"课时 + 金额"的原口径。
+ */
+function buildRemainingText(item: RenewalReminderItem): string {
+  const hasCount = item.cardKinds.includes('count');
+  const hasStored = item.cardKinds.includes('stored');
+  const parts: string[] = [];
+  if (hasCount || !hasStored) parts.push(`剩余 ${item.remainingHours} 课时`);
+  if (hasStored) parts.push(`余额 ¥${item.remainingAmount}`);
+  if (item.remainingDays != null) parts.push(`${item.remainingDays} 天`);
+  return parts.join(' · ');
+}
+
 type ListMode = 'active' | 'muted';
 
 const RenewalReminderPage: React.FC = () => {
@@ -311,9 +326,7 @@ const RenewalReminderPage: React.FC = () => {
                 subtitle={
                   <View>
                     <Text className="block text-[24rpx] text-muted-foreground">
-                      剩余 {item.remainingHours} 课时
-                      {item.remainingDays != null ? ` · ${item.remainingDays} 天` : ''}
-                      {` · ¥${item.remainingAmount}`}
+                      {buildRemainingText(item)}
                     </Text>
                     <Text className="mt-[6rpx] block text-[22rpx] text-amber">
                       {item.reasons.join(' / ')}

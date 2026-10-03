@@ -19,6 +19,8 @@ export interface RenewalReminderItem {
   studentName: string;
   nickname?: string;
   avatarUrl?: string;
+  /** 在用卡类别：`count` 次卡 / `stored` 储值卡（决定显示课时还是余额） */
+  cardKinds: string[];
   remainingHours: number;
   remainingDays: number | null;
   remainingAmount: number;
