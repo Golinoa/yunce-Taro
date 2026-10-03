@@ -132,20 +132,19 @@ export const memberCardService = {
     sourceId?: string;
     idempotencyKey: string;
   }): Promise<MemberCardDetail> => {
-    const updated = await post<BackendMemberCard>(
-      `/card-types/member-cards/${data.memberCardId}/recharges`,
-      {
-        amount: data.amount,
-        giftAmount: data.giftAmount ?? 0,
-        purchasePrice: data.purchasePrice ?? 0,
-        paymentMethod: data.paymentMethod,
-        reason: data.reason,
-        sourceId: data.sourceId,
-        idempotencyKey: data.idempotencyKey,
-      },
-    );
+    await post<BackendMemberCard>(`/card-types/member-cards/${data.memberCardId}/recharges`, {
+      amount: data.amount,
+      giftAmount: data.giftAmount ?? 0,
+      purchasePrice: data.purchasePrice ?? 0,
+      paymentMethod: data.paymentMethod,
+      reason: data.reason,
+      sourceId: data.sourceId,
+      idempotencyKey: data.idempotencyKey,
+    });
     invalidateStudentListCache();
-    const detail = await memberCardService.getById(String(updated.id));
+    // 充值接口返回的是「账本调整记录(MemberCardAdjustment)」，其 id 是流水 id 而非会员卡 id；
+    // 会员卡 id 在返回值里是 memberCardId 字段。前端本来就持有 data.memberCardId，直接用它拉详情。
+    const detail = await memberCardService.getById(data.memberCardId);
     if (!detail) throw new Error('追加次数成功但读取会员卡失败');
     return detail;
   },
