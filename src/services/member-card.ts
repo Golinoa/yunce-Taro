@@ -54,6 +54,73 @@ function mapCard(raw: BackendMemberCard): MemberCardDetail {
   };
 }
 
+/** 后端账本流水（`GET /recharge-records` 的一行） */
+interface BackendRechargeRecord {
+  id: string;
+  kind: string;
+  kindLabel: string;
+  amount: number;
+  giftAmount?: number | null;
+  feeAmount?: number | null;
+  feeMethod?: string | null;
+  reason?: string | null;
+  createdAt: string;
+  studentId?: string | null;
+  studentName?: string | null;
+  studentAvatar?: string | null;
+  cardTypeName?: string | null;
+  operatorName?: string | null;
+}
+
+/** 充值记录一行（页面渲染口径：金额已由分转元） */
+export interface RechargeRecordItem {
+  id: string;
+  /** refund = 冲正（会员卡删除冲正），页面按退费样式展示 */
+  type: 'recharge' | 'refund';
+  kindLabel: string;
+  /** 充值课时数；退费行为 null */
+  purchasedHours: number | null;
+  giftHours: number;
+  feeMethod: string;
+  /** 实收 / 冲正金额（元）；0 表示不展示金额 */
+  amount: number;
+  reason: string;
+  createdAt: string;
+  studentId: string;
+  studentName: string;
+  studentAvatar?: string;
+  cardTypeName: string;
+  operatorName?: string;
+}
+
+/**
+ * 账本流水 → 页面口径。
+ * ⚠️ `reversal`（会员卡删除冲正）的 `amount` 存的是**金额（分）**而不是课时，
+ * 必须走退费分支，否则会显示成「撤销 3000 课时」。
+ */
+function mapRechargeRecord(raw: BackendRechargeRecord): RechargeRecordItem {
+  const isRefund = raw.kind === 'reversal';
+  const feeAmountFen = Number(raw.feeAmount ?? 0);
+  const refundAmountFen = isRefund ? Number(raw.amount ?? 0) : 0;
+  const displayFen = isRefund ? refundAmountFen || feeAmountFen : feeAmountFen;
+  return {
+    id: String(raw.id),
+    type: isRefund ? 'refund' : 'recharge',
+    kindLabel: String(raw.kindLabel ?? ''),
+    purchasedHours: isRefund ? null : Number(raw.amount ?? 0),
+    giftHours: Number(raw.giftAmount ?? 0),
+    feeMethod: String(raw.feeMethod ?? 'other'),
+    amount: Math.max(0, Number((displayFen / 100).toFixed(2))),
+    reason: String(raw.reason ?? ''),
+    createdAt: String(raw.createdAt ?? ''),
+    studentId: String(raw.studentId ?? ''),
+    studentName: String(raw.studentName ?? ''),
+    studentAvatar: raw.studentAvatar ? String(raw.studentAvatar) : undefined,
+    cardTypeName: String(raw.cardTypeName ?? ''),
+    operatorName: raw.operatorName ? String(raw.operatorName) : undefined,
+  };
+}
+
 export const memberCardService = {
   recharge: async (data: {
     memberCardId: string;
@@ -154,6 +221,32 @@ export const memberCardService = {
       params?.pageSize ?? 50,
     );
     return { list: page.list.map(mapCard), total: page.pagination?.total ?? page.list.length };
+  },
+
+  /**
+   * 充值记录（机构级账本流水）。
+   * 口径由后端定：开卡 / 期初入账 / 充值追加 / 延期 / 撤销；不含逐课消耗。
+   */
+  getRechargeRecords: async (params: {
+    page?: number;
+    pageSize?: number;
+    subjectId?: string;
+    studentId?: string;
+  }): Promise<PaginatedResponse<RechargeRecordItem>> => {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 30;
+    const data = await get<unknown>('/recharge-records', {
+      page,
+      pageSize,
+      ...(params.subjectId ? { subjectId: params.subjectId } : {}),
+      ...(params.studentId ? { studentId: params.studentId } : {}),
+    });
+    const paged = asPaginatedResponse<BackendRechargeRecord>(
+      data as PaginatedResponse<BackendRechargeRecord> | BackendRechargeRecord[] | null,
+      page,
+      pageSize,
+    );
+    return { list: paged.list.map(mapRechargeRecord), pagination: paged.pagination };
   },
 
   update: async (id: string, data: Partial<MemberCardDetail>): Promise<MemberCardDetail | null> => {

@@ -149,7 +149,7 @@ export const HOME_QUICK_ENTRIES: HomeQuickEntry[] = [
     label: '充值记录',
     icon: 'mdi-history',
     color: 'icon-glass-red',
-    url: '/package-course/pages/card-management/index',
+    url: '/package-course/pages/recharge-records/index',
   },
   {
     label: '考勤异常',

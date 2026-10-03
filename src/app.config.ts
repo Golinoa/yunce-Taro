@@ -92,6 +92,7 @@ export default defineAppConfig({
         'pages/booking-record-detail/index',
         'pages/batch-reschedule-select/index',
         'pages/batch-reschedule-confirm/index',
+        'pages/recharge-records/index',
         'pages/records/index',
         'pages/leave-request/index',
         'pages/parent-lesson-notes/index',
