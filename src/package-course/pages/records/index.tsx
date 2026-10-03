@@ -236,9 +236,16 @@ const RecordsPage: React.FC = () => {
   );
 
   const stats = useMemo(() => {
-    const totalCount = filteredRecords.length;
-    const totalHours = filteredRecords.reduce((sum, r) => sum + (r.hours_used || 0), 0);
-    const uniqueStudents = new Set(filteredRecords.map((r) => r.student_id)).size;
+    /**
+     * 取消的消课不计入统计（2026-10-03 用户要求）。
+     * 取消时后端已把 `hoursUsed` 归零，所以 totalHours 本来就不受影响；
+     * 但 `totalCount` 原来用 `filteredRecords.length`，会把取消的记录数进去
+     * ⇒ 顶部「共 N 条」比实际消课条数多。
+     */
+    const counted = filteredRecords.filter((record) => record.status !== 'cancelled');
+    const totalCount = counted.length;
+    const totalHours = counted.reduce((sum, r) => sum + (r.hours_used || 0), 0);
+    const uniqueStudents = new Set(counted.map((r) => r.student_id)).size;
     return { totalCount, totalHours, uniqueStudents };
   }, [filteredRecords]);
 

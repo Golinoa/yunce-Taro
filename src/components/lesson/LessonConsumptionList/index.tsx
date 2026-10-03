@@ -244,8 +244,27 @@ function isClassRecord(record: LessonRecord): boolean {
   return Boolean(record.class_id || record.class_name);
 }
 
+/**
+ * 取消的消课**整条不参与展示**（2026-10-03 用户要求）。
+ *
+ * 取消时后端已把 `hoursUsed` 归零并回滚卡内课时（DB 实证：CANCELLED 记录 hoursUsed=0），
+ * 所以它本来就不该计入次数；但界面仍会渲染一条带「已取消」标签的记录，
+ * 用户看到的是一条不产生消课的行 ⇒ 直接过滤掉。
+ *
+ * ⚠️ 只过滤 `CANCELLED`（整节课被取消）。`normal` 但 `hoursUsed=0` 的记录是
+ * 「点名了但不计消课」（如试听/挂账），仍要展示，不能一起滤掉。
+ */
+function isCancelledRecord(record: LessonRecord): boolean {
+  return record.status === 'cancelled';
+}
+
+/** 过滤掉取消的记录，并保持倒序（最新在前） */
+function filterOutCancelled(records: LessonRecord[]): LessonRecord[] {
+  return records.filter((record) => !isCancelledRecord(record));
+}
+
 export function pickHomeRecentLessonRecords(records: LessonRecord[]): LessonRecord[] {
-  const sortedRecords = sortRecordsDesc(records);
+  const sortedRecords = sortRecordsDesc(filterOutCancelled(records));
   const today = new Date().toISOString().split('T')[0];
   const todayRecords = sortedRecords.filter((record) => record.lesson_date === today);
 
@@ -261,7 +280,7 @@ export function buildLessonConsumptionSections(
   options: BuildSectionsOptions = {},
 ): LessonConsumptionSection[] {
   const { teacherNameMap = {}, studentHours } = options;
-  const sortedRecords = sortRecordsDesc(records);
+  const sortedRecords = sortRecordsDesc(filterOutCancelled(records));
   const dateMap = new Map<string, LessonRecord[]>();
 
   sortedRecords.forEach((record) => {
@@ -270,55 +289,63 @@ export function buildLessonConsumptionSections(
     dateMap.set(record.lesson_date, currentRecords);
   });
 
-  return Array.from(dateMap.entries()).map(([date, dateRecords]) => {
-    const classCardMap = new Map<string, LessonRecord[]>();
-    const personalItems: LessonConsumptionDetailItem[] = [];
+  return (
+    Array.from(dateMap.entries())
+      .map(([date, dateRecords]) => {
+        const classCardMap = new Map<string, LessonRecord[]>();
+        const personalItems: LessonConsumptionDetailItem[] = [];
 
-    dateRecords.forEach((record) => {
-      if (isClassRecord(record)) {
-        const key = record.class_id
-          ? `class:${record.class_id}`
-          : `class-name:${record.class_name}`;
-        const currentItems = classCardMap.get(key) || [];
-        currentItems.push(record);
-        classCardMap.set(key, currentItems);
-        return;
-      }
+        dateRecords.forEach((record) => {
+          if (isClassRecord(record)) {
+            const key = record.class_id
+              ? `class:${record.class_id}`
+              : `class-name:${record.class_name}`;
+            const currentItems = classCardMap.get(key) || [];
+            currentItems.push(record);
+            classCardMap.set(key, currentItems);
+            return;
+          }
 
-      personalItems.push(mapRecordToDetail(record, teacherNameMap, studentHours));
-    });
+          personalItems.push(mapRecordToDetail(record, teacherNameMap, studentHours));
+        });
 
-    const cards = Array.from(classCardMap.entries()).map(([cardKey, cardRecords]) => {
-      const firstRecord = cardRecords[0];
-      const uniqueStudentIds = new Set(cardRecords.map((item) => item.student_id));
-      const teacherDisplayText = getTeacherDisplayText(firstRecord, teacherNameMap);
-      const title = firstRecord.class_name || firstRecord.member_card_name || '班级消课';
-      const subtitleBase = firstRecord.member_card_name || '班级消课';
-      const subtitle = [teacherDisplayText, subtitleBase].filter(Boolean).join(' · ');
+        const cards = Array.from(classCardMap.entries()).map(([cardKey, cardRecords]) => {
+          const firstRecord = cardRecords[0];
+          const uniqueStudentIds = new Set(cardRecords.map((item) => item.student_id));
+          const teacherDisplayText = getTeacherDisplayText(firstRecord, teacherNameMap);
+          const title = firstRecord.class_name || firstRecord.member_card_name || '班级消课';
+          const subtitleBase = firstRecord.member_card_name || '班级消课';
+          const subtitle = [teacherDisplayText, subtitleBase].filter(Boolean).join(' · ');
 
-      return {
-        id: `${date}-${cardKey}`,
-        title,
-        subtitle,
-        totalHours: cardRecords.reduce((sum, item) => sum + (item.hours_used || 0), 0),
-        studentCount: uniqueStudentIds.size,
-        studentCountText: `${uniqueStudentIds.size}人`,
-        cardKind: 'class' as const,
-        details: cardRecords.map((record) =>
-          mapRecordToDetail(record, teacherNameMap, studentHours),
-        ),
-      };
-    });
+          return {
+            id: `${date}-${cardKey}`,
+            title,
+            subtitle,
+            totalHours: cardRecords.reduce((sum, item) => sum + (item.hours_used || 0), 0),
+            studentCount: uniqueStudentIds.size,
+            studentCountText: `${uniqueStudentIds.size}人`,
+            cardKind: 'class' as const,
+            details: cardRecords.map((record) =>
+              mapRecordToDetail(record, teacherNameMap, studentHours),
+            ),
+          };
+        });
 
-    return {
-      id: date,
-      date,
-      totalHours: dateRecords.reduce((sum, item) => sum + (item.hours_used || 0), 0),
-      studentCount: new Set(dateRecords.map((item) => item.student_id)).size,
-      cards,
-      personalItems,
-    };
-  });
+        return {
+          id: date,
+          date,
+          totalHours: dateRecords.reduce((sum, item) => sum + (item.hours_used || 0), 0),
+          studentCount: new Set(dateRecords.map((item) => item.student_id)).size,
+          cards,
+          personalItems,
+        };
+      })
+      /**
+       * 取消记录已在入口过滤；若某天**只剩**被取消的记录，该日期会产出空分组。
+       * 空分组会渲染成一个只有日期标题、没有内容的块 ⇒ 一并去掉。
+       */
+      .filter((section) => section.cards.length > 0 || section.personalItems.length > 0)
+  );
 }
 
 interface StudentConsumptionRowProps {

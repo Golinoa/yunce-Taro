@@ -10,6 +10,7 @@ import {
   PARENT_HOME_QUICK_ENTRIES,
   TEACHER_HOME_QUICK_ENTRIES,
 } from '@/constants/home-ui';
+import { mapBackendLessonRecordStatus } from '@/services/lesson-record';
 import { scheduleService, studentService } from '@/services/student';
 import type { TodoItem } from '@/types/home-todo';
 import type { StatsPeriod, StatsData, QuickEntry } from '@/types/home-ui';
@@ -488,6 +489,8 @@ interface BackendAggregateRecentRecord {
   hoursUsed?: number;
   content?: string | null;
   performance?: string | null;
+  /** 消课状态（2026-10-03 后端补回；未返回时按 normal 兜底） */
+  status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP' | 'LEAVE' | 'ABSENT' | null;
   student?: { id: string; name: string; avatar?: string | null } | null;
   teacherId?: string | null;
   operatorTeacherId?: string | null;
@@ -527,7 +530,11 @@ function mapAggregateRecentRecord(item: BackendAggregateRecentRecord): LessonRec
     student_id: item.student?.id || '',
     lesson_date: normalizeAggregateLessonDate(item.lessonDate),
     hours_used: Number(item.hoursUsed ?? (item.duration ?? 0) / 60),
-    status: 'normal',
+    /**
+     * 2026-10-03：原来硬编码 `'normal'`，导致首页「最近消课」无法识别取消的消课
+     * （后端现已回传 status）。后端未返回时兜底 normal，保持旧行为。
+     */
+    status: mapBackendLessonRecordStatus(item.status ?? undefined),
     content: item.content || undefined,
     performance: item.performance || undefined,
     revoke_status: 'none',

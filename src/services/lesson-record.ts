@@ -137,7 +137,13 @@ const normalizeLessonDate = (value?: null | string): string => {
   return value.includes('T') ? value.slice(0, 10) : value;
 };
 
-const mapBackendLessonRecordStatus = (
+/**
+ * 后端大写枚举 → 前端小写状态（读方向）。
+ *
+ * 导出供首页聚合 mapper 复用（`services/home.ts` 的 `mapAggregateRecentRecord`），
+ * 避免各处各写一套状态映射导致「取消识别不出来」。
+ */
+export const mapBackendLessonRecordStatus = (
   status?: 'NORMAL' | 'CANCELLED' | 'MAKEUP' | 'LEAVE' | 'ABSENT',
 ): LessonRecord['status'] => {
   if (status === 'CANCELLED') return 'cancelled';
