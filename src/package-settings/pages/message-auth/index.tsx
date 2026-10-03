@@ -1,6 +1,6 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import { SUBSCRIBE_GROUP_LABELS, SUBSCRIBE_TEMPLATE_GROUPS } from '@/constants/subscribe-presets';
@@ -44,6 +44,12 @@ const MessageAuthPage: React.FC = () => {
       loadingRef.current = false;
     }
   }, []);
+
+  // 挂载即取数：守卫放行前页面本体不挂载，Taro 的 useDidShow 挂载后才注册且不补触发
+  // 已过去的 onShow ⇒ 首屏那次通知收不到，只靠它会一直停在「加载中」。
+  useEffect(() => {
+    void load(false);
+  }, [load]);
 
   useDidShow(() => {
     void load(false);

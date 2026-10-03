@@ -218,8 +218,16 @@ const MembershipPage: React.FC = () => {
     [applyQuota, isManagerRole, loadPendingOrder],
   );
 
-  useDidShow(() => {
+  // 挂载即取数：守卫放行前页面本体不挂载，Taro 的 useDidShow 挂载后才注册且不补触发
+  // 已过去的 onShow ⇒ 首屏这次通知收不到；无缓存时会一直转圈，有缓存时永远不刷新。
+  useEffect(() => {
     // 有新鲜缓存：后台静默刷新；无缓存才转圈
+    const soft = hasQuotaRef.current || isMembershipQuotaCacheFresh();
+    void loadQuotaUsage({ soft });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useDidShow(() => {
     const soft = hasQuotaRef.current || isMembershipQuotaCacheFresh();
     void loadQuotaUsage({ soft });
   });

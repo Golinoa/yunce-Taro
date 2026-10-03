@@ -5,7 +5,7 @@
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import {
   MANAGER_TITLE_OPTIONS,
@@ -73,7 +73,7 @@ const RoleTitlesPage: React.FC = () => {
   // 慢变配置守卫：跳过重复请求（store 已含本地保存结果，跳过不影响展示）
   const lastFetchAtRef = useRef<number | null>(null);
 
-  useDidShow(() => {
+  const syncTitles = useCallback(() => {
     // 角色称呼属慢变配置：15min TTL 守卫，避免每次进页无条件重拉；
     // 无对应 REFRESH_SIGNAL 键，仅用 TTL。保存已就地更新 store，不依赖重拉。
     if (!shouldRefetch(lastFetchAtRef.current, TTL.campus)) return;
@@ -81,6 +81,16 @@ const RoleTitlesPage: React.FC = () => {
       markFetched(lastFetchAtRef);
       setDraft(useRoleGlossaryStore.getState().titles);
     });
+  }, [load]);
+
+  // 挂载即取数：守卫放行前页面本体不挂载，Taro 的 useDidShow 挂载后才注册且不补触发
+  // 已过去的 onShow ⇒ 首屏这次通知收不到，新装/无缓存时页面是空的。
+  useEffect(() => {
+    syncTitles();
+  }, [syncTitles]);
+
+  useDidShow(() => {
+    syncTitles();
   });
 
   const presetId = useMemo(() => matchRoleTitlePresetId(draft), [draft]);

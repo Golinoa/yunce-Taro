@@ -6,7 +6,7 @@
  */
 import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import PageContainer from '@/components/PageContainer';
 import { classBookingService, notificationService } from '@/services';
@@ -138,6 +138,15 @@ const BookingRecordDetailPage: React.FC = () => {
       setStatus(mapParentBookingStatusToRecordStatus(nextBooking.status));
     }
   }, [bookingId, profile?.id]);
+
+  // 挂载即取数：守卫放行前页面本体不挂载，Taro 的 useDidShow 挂载后才注册且不补触发
+  // 已过去的 onShow ⇒ 首屏这次通知收不到，只能显示本地缓存（首次进入时为空）。
+  useEffect(() => {
+    void refreshBooking();
+    void fetchBookingRules()
+      .then(setRules)
+      .catch(() => undefined);
+  }, [refreshBooking]);
 
   useDidShow(() => {
     void refreshBooking();

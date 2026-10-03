@@ -4,7 +4,7 @@
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
@@ -75,6 +75,12 @@ const ParentLessonNotesPage: React.FC = () => {
       setLoading(false);
     }
   }, [profile?.id, noteType]);
+
+  // 挂载即取数：守卫放行前页面本体不挂载，Taro 的 useDidShow 挂载后才注册且不补触发
+  // 已过去的 onShow ⇒ 首屏那次通知收不到，只靠它会一直停在「加载中」。
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   useDidShow(() => {
     Taro.setNavigationBarTitle({ title: meta.title });
