@@ -493,9 +493,21 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setAuthorized(false);
   }, [profile, loading]);
 
-  // 冷启动：已提交入驻待审时，home / identity-select 一次 redirect pending
+  /**
+   * 冷启动：已提交入驻待审时，home / identity-select 一次 redirect pending。
+   *
+   * ⚠️ 必须排在下方refreshProfile 完成**之后**（2026-10-04 修复）。
+   * 原因：`profile` 初值来自本地storage 快照。登录时若那一版快照里
+   * `currentContext.organizationId` 为空（还没绑机构），冷启动检查会拿旧快照判定
+   * 「无机构」⇒ 把 OWNER 用户踢进「暂无入驻申请」页。
+   * 下方 refreshProfile 是回源 /auth/me 的，等它落地再判才不会用旧数据。
+   */
+  const [profileRefreshed, setProfileRefreshed] = useState(false);
   useEffect(() => {
-    if (loading || !profile || storeEntryFunnelCheckedRef.current) {
+    if (loading || !profileRefreshed) {
+      return;
+    }
+    if (!profile || storeEntryFunnelCheckedRef.current) {
       return;
     }
     const currentPath = Taro.getCurrentInstance()?.router?.path || '';
@@ -504,7 +516,7 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
     storeEntryFunnelCheckedRef.current = true;
     void maybeRedirectStoreEntryPendingHub(profile);
-  }, [profile, loading]);
+  }, [profile, loading, profileRefreshed]);
 
   // 首次加载时 refreshProfile + checkAuth
   useEffect(() => {
@@ -521,7 +533,11 @@ const RouteGuardInner: React.FC<{ children: React.ReactNode }> = ({ children }) 
       // #endregion
       refreshProfile()
         .then(() => checkAuth())
-        .catch(() => checkAuth());
+        .catch(() => checkAuth())
+        .finally(() => {
+          // 无论成败都要放行冷启动检查：失败时用旧快照判，最差不过不重定向
+          setProfileRefreshed(true);
+        });
     } else {
       checkAuth();
     }
