@@ -84,9 +84,10 @@ const RecordsPage: React.FC = () => {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [datePickerField, setDatePickerField] = useState<'start' | 'end' | null>(null);
-  const [filterStudentId, setFilterStudentId] = useState('all');
   /** 学员搜索关键词（教师名下学员多，用搜索定位而不是一排标签） */
   const [studentKeyword, setStudentKeyword] = useState('');
+  /** 下拉联想是否展开（输入/聚焦时展开，选中或清空时收起） */
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   /**
    * 学员级课时（学员 id → 总/已用/剩余）。
    * 消课记录本身**不带剩余课时**，没有它「共 Y 课时」只能退化成「已用 = 共」（曾显示成 1/1）。
@@ -152,11 +153,6 @@ const RecordsPage: React.FC = () => {
       );
       setRecords(allRecords);
       setStudents(relatedStudents);
-      setFilterStudentId((currentId) =>
-        currentId === 'all' || relatedStudents.some((student) => student.id === currentId)
-          ? currentId
-          : 'all',
-      );
     } catch (err) {
       logError('load records', err);
       setRecords([]);
@@ -211,11 +207,15 @@ const RecordsPage: React.FC = () => {
     result = result.filter(
       (r) => r.lesson_date >= dateRange.start && r.lesson_date <= dateRange.end,
     );
-    if (filterStudentId !== 'all') {
-      result = result.filter((r) => r.student_id === filterStudentId);
+    const kw = studentKeyword.trim();
+    if (kw) {
+      const matchedIds = new Set(
+        students.filter((student) => student.name?.includes(kw)).map((student) => student.id),
+      );
+      result = result.filter((r) => matchedIds.has(r.student_id));
     }
     return result;
-  }, [records, dateRange, filterStudentId]);
+  }, [records, dateRange, studentKeyword, students]);
 
   /** 搜索候选：按姓名模糊匹配；点选其中一个即精确筛选到人（避免同名混在一起） */
   const studentCandidates = useMemo(() => {
@@ -223,11 +223,6 @@ const RecordsPage: React.FC = () => {
     if (!keyword) return [];
     return students.filter((student) => student.name?.includes(keyword));
   }, [students, studentKeyword]);
-
-  const selectedStudentName = useMemo(
-    () => students.find((student) => student.id === filterStudentId)?.name || '',
-    [students, filterStudentId],
-  );
 
   const consumptionSections = useMemo(
     () => buildLessonConsumptionSections(filteredRecords, { studentHours: studentHoursMap }),
@@ -315,14 +310,21 @@ const RecordsPage: React.FC = () => {
                 value={studentKeyword}
                 placeholder="搜索学员"
                 placeholderClass="text-muted-foreground"
-                onInput={(event) => setStudentKeyword(event.detail.value)}
+                onInput={(event) => {
+                  setStudentKeyword(event.detail.value);
+                  setSuggestionsOpen(true);
+                }}
+                onFocus={() => setSuggestionsOpen(true)}
+                onBlur={() => {
+                  setTimeout(() => setSuggestionsOpen(false), 200);
+                }}
               />
-              {(studentKeyword || filterStudentId !== 'all') && (
+              {studentKeyword && (
                 <View
                   className="shrink-0"
                   onClick={() => {
                     setStudentKeyword('');
-                    setFilterStudentId('all');
+                    setSuggestionsOpen(false);
                   }}
                 >
                   <Icon name="mdi-close" size={20} color="mutedForeground" />
@@ -330,35 +332,33 @@ const RecordsPage: React.FC = () => {
               )}
             </View>
 
-            {studentKeyword.trim() ? (
-              <View className="mt-[10rpx] flex flex-row flex-wrap gap-[12rpx]">
+            {/* 下拉联想：一行一行文字，选中即把姓名植入搜索框并直接过滤数据 */}
+            {suggestionsOpen && studentKeyword.trim() && (
+              <View className="mt-[10rpx] rounded-card bg-card shadow-soft overflow-hidden">
                 {studentCandidates.length > 0 ? (
-                  studentCandidates.map((student) => (
+                  studentCandidates.map((student, idx) => (
                     <View
                       key={student.id}
-                      className={cn(filterPillClass(filterStudentId === student.id), 'shrink-0')}
+                      className={cn(
+                        'flex flex-row items-center gap-[16rpx] px-[24rpx] py-[20rpx] active:bg-muted',
+                        idx < studentCandidates.length - 1 && 'border-b border-input',
+                      )}
                       onClick={() => {
-                        setFilterStudentId(student.id);
-                        setStudentKeyword('');
+                        setStudentKeyword(student.name);
+                        setSuggestionsOpen(false);
                       }}
                     >
-                      <Text className={filterPillTextClass(filterStudentId === student.id)}>
-                        {student.name}
-                      </Text>
+                      <Icon name="mdi-magnify" size={18} color="mutedForeground" />
+                      <Text className="text-[26rpx] text-foreground">{student.name}</Text>
                     </View>
                   ))
                 ) : (
-                  <Text className="text-[22rpx] text-muted-foreground">没有匹配的学员</Text>
+                  <View className="px-[24rpx] py-[20rpx]">
+                    <Text className="text-[24rpx] text-muted-foreground">没有匹配的学员</Text>
+                  </View>
                 )}
               </View>
-            ) : filterStudentId !== 'all' ? (
-              <View className="mt-[10rpx] flex flex-row items-center gap-[12rpx]">
-                <Text className="text-[22rpx] text-muted-foreground">当前筛选</Text>
-                <View className={cn(filterPillClass(true), 'shrink-0')}>
-                  <Text className={filterPillTextClass(true)}>{selectedStudentName}</Text>
-                </View>
-              </View>
-            ) : null}
+            )}
           </View>
         )}
       </View>
