@@ -52,6 +52,31 @@ export function filterCancelledRecordsForRestore(
   );
 }
 
+/**
+ * 「计入消课展示」的记录 —— **全站唯一真源**（2026-10-03）。
+ *
+ * 取消一节课会写 `status='cancelled'` 的点名记录；它**不产生消课**
+ * （后端已把 `hoursUsed` 归零并回滚卡内课时），所以任何「消课列表 / 消课统计」
+ * 都必须先过这个函数，否则会把已取消的课算成消课、或在列表里露出「已取消」的行。
+ *
+ * 🔴 此前 `record.status !== 'cancelled'` 这个判断散落在 **10+ 处**
+ * （消课卡片、上课记录页统计、课表点名统计、孩子详情、试听…），各写一遍。
+ * 2026-10-03 实测后果：上课记录页与首页「最近消课」口径不一致 ——
+ * 后者曾把 status 硬编码成 `'normal'`，导致同一条已取消记录在一个页面被过滤、
+ * 在另一个页面照常渲染。**统一走这里，别再各写一份。**
+ *
+ * ⚠️ 只滤 `cancelled`：`status='normal'` 但 `hoursUsed=0` 是「点名了但不计消课」
+ * （试听 / 挂账），**必须保留**，不能一起滤掉。
+ */
+export function isCountedLessonRecord(record: LessonRecord): boolean {
+  return record.status !== 'cancelled';
+}
+
+/** `isCountedLessonRecord` 的数组版：过滤出「计入消课展示」的记录（保持原顺序） */
+export function filterCountedLessonRecords(records: LessonRecord[]): LessonRecord[] {
+  return records.filter(isCountedLessonRecord);
+}
+
 /** 从列表里剔除该节课的取消记录（恢复后同步本地状态用） */
 export function removeCancelledRecordsForDate(
   prev: LessonRecord[],

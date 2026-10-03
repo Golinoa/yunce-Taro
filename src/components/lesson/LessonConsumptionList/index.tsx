@@ -6,6 +6,7 @@ import { TODO_LEVEL_BAR_COLOR } from '@/components/AccentBarCard';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import type { LessonRecord } from '@/types/lesson-record';
+import { filterCountedLessonRecords } from '@/utils/lesson-record-cancel';
 
 export interface LessonConsumptionDetailItem {
   id: string;
@@ -247,24 +248,13 @@ function isClassRecord(record: LessonRecord): boolean {
 /**
  * 取消的消课**整条不参与展示**（2026-10-03 用户要求）。
  *
- * 取消时后端已把 `hoursUsed` 归零并回滚卡内课时（DB 实证：CANCELLED 记录 hoursUsed=0），
- * 所以它本来就不该计入次数；但界面仍会渲染一条带「已取消」标签的记录，
- * 用户看到的是一条不产生消课的行 ⇒ 直接过滤掉。
- *
- * ⚠️ 只过滤 `CANCELLED`（整节课被取消）。`normal` 但 `hoursUsed=0` 的记录是
- * 「点名了但不计消课」（如试听/挂账），仍要展示，不能一起滤掉。
+ * 判定与过滤统一走 `@/utils/lesson-record-cancel` 的 `filterCountedLessonRecords`
+ * （全站唯一真源）—— 此前本组件自建一份、上课记录页统计又写一份，
+ * 而首页 mapper 还把 status 硬编码成 'normal'，导致「上课记录」与「最近消课」
+ * 对同一条已取消记录给出不同结果。现在只有一处定义。
  */
-function isCancelledRecord(record: LessonRecord): boolean {
-  return record.status === 'cancelled';
-}
-
-/** 过滤掉取消的记录，并保持倒序（最新在前） */
-function filterOutCancelled(records: LessonRecord[]): LessonRecord[] {
-  return records.filter((record) => !isCancelledRecord(record));
-}
-
 export function pickHomeRecentLessonRecords(records: LessonRecord[]): LessonRecord[] {
-  const sortedRecords = sortRecordsDesc(filterOutCancelled(records));
+  const sortedRecords = sortRecordsDesc(filterCountedLessonRecords(records));
   const today = new Date().toISOString().split('T')[0];
   const todayRecords = sortedRecords.filter((record) => record.lesson_date === today);
 
@@ -280,7 +270,7 @@ export function buildLessonConsumptionSections(
   options: BuildSectionsOptions = {},
 ): LessonConsumptionSection[] {
   const { teacherNameMap = {}, studentHours } = options;
-  const sortedRecords = sortRecordsDesc(filterOutCancelled(records));
+  const sortedRecords = sortRecordsDesc(filterCountedLessonRecords(records));
   const dateMap = new Map<string, LessonRecord[]>();
 
   sortedRecords.forEach((record) => {

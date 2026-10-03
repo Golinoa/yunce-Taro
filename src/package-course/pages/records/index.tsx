@@ -18,6 +18,7 @@ import { useStudentStore } from '@/stores';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Student } from '@/types/student';
 import { isStaffRole, useAuth } from '@/utils/auth';
+import { filterCountedLessonRecords } from '@/utils/lesson-record-cancel';
 import { logError } from '@/utils/logger';
 import { withRouteGuard } from '@/utils/route-guard';
 
@@ -238,11 +239,10 @@ const RecordsPage: React.FC = () => {
   const stats = useMemo(() => {
     /**
      * 取消的消课不计入统计（2026-10-03 用户要求）。
-     * 取消时后端已把 `hoursUsed` 归零，所以 totalHours 本来就不受影响；
-     * 但 `totalCount` 原来用 `filteredRecords.length`，会把取消的记录数进去
-     * ⇒ 顶部「共 N 条」比实际消课条数多。
+     * 过滤统一走 `@/utils/lesson-record-cancel`，与消课卡片列表同一份口径，
+     * 避免「列表不显示但统计还数着」的不一致。
      */
-    const counted = filteredRecords.filter((record) => record.status !== 'cancelled');
+    const counted = filterCountedLessonRecords(filteredRecords);
     const totalCount = counted.length;
     const totalHours = counted.reduce((sum, r) => sum + (r.hours_used || 0), 0);
     const uniqueStudents = new Set(counted.map((r) => r.student_id)).size;

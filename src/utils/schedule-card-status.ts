@@ -7,6 +7,7 @@ import type { Class } from '@/types/class';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { Schedule } from '@/types/schedule';
 import type { TeacherUIModel } from '@/types/teacher';
+import { filterCountedLessonRecords } from '@/utils/lesson-record-cancel';
 import { parseTimeToMinutes } from '@/utils/schedule-guard';
 import type dayjs from 'dayjs';
 
@@ -104,7 +105,8 @@ export function resolveScheduleStatus(params: {
       .map((record) => record.student_id),
   ).size;
   const recordedCount = new Set(
-    records.filter((record) => record.status !== 'cancelled').map((record) => record.student_id),
+    // 统一口径：已取消的记录不计入「已点名」（2026-10-03，与消课卡片/上课记录同一份判定）
+    filterCountedLessonRecords(records).map((record) => record.student_id),
   ).size;
   const hasCancelled =
     records.length > 0 && records.every((record) => record.status === 'cancelled');
