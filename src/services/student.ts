@@ -394,6 +394,33 @@ export const invalidateStudentListCache = (): void => {
   useStudentStore.setState({ cache: {}, loading: {}, lastFetch: {} });
 };
 
+/**
+ * 分页字段兜底。
+ *
+ * 后端 `paginated()` 始终返回 `pagination`，但这是**契约**而非保证：一旦某次响应
+ * 缺该字段（网关裁剪、接口降级、错误分支误返 200），`pagination` 就会是 undefined，
+ * 页面 `getNextPageParam` 直读 `.page` 会在渲染期抛 TypeError，
+ * useInfiniteQuery 随即把**已成功的响应**判成 isError ⇒ 明明后端 200，
+ * 用户却看到「学员加载失败，请下拉刷新重试」。
+ *
+ * 这里按「请求页」补一个保守值：有数据就当只有这一页（不再上拉），
+ * 没数据就是空页。宁可少翻一页，也不让整个列表崩掉。
+ */
+function resolvePagination(
+  pagination: BackendStudentListResponse['pagination'] | undefined,
+  page: number,
+  pageSize: number,
+  listLength: number,
+): NonNullable<StudentPageResult['pagination']> {
+  const { page: p, pageSize: ps, total, totalPages } = pagination ?? {};
+  return {
+    page: typeof p === 'number' ? p : page,
+    pageSize: typeof ps === 'number' ? ps : pageSize,
+    total: typeof total === 'number' ? total : listLength,
+    totalPages: typeof totalPages === 'number' ? totalPages : 1,
+  };
+}
+
 export const studentService = {
   /** 获取学员分页，页面列表按触底逐页加载，禁止一次性拉全量。 */
   getPageByTeacher: async (
@@ -410,9 +437,10 @@ export const studentService = {
     if (campusId) params.set('campusId', campusId);
     if (keyword?.trim()) params.set('keyword', keyword.trim());
     const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
+    const list = (data.list || []).map(mapBackendStudentListItem);
     return {
-      list: (data.list || []).map(mapBackendStudentListItem),
-      pagination: data.pagination,
+      list,
+      pagination: resolvePagination(data.pagination, page, pageSize, list.length),
     };
   },
 
@@ -429,9 +457,10 @@ export const studentService = {
     });
     if (keyword?.trim()) params.set('keyword', keyword.trim());
     const data = await get<BackendStudentListResponse>(`/students?${params.toString()}`);
+    const list = (data.list || []).map(mapBackendStudentListItem);
     return {
-      list: (data.list || []).map(mapBackendStudentListItem),
-      pagination: data.pagination,
+      list,
+      pagination: resolvePagination(data.pagination, page, pageSize, list.length),
     };
   },
 

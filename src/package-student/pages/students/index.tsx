@@ -226,10 +226,14 @@ const Students: React.FC = () => {
           )
         : studentService.getPageByParent(actorId, pageParam, API_PAGE_SIZE_BATCH, debouncedKeyword);
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.page < lastPage.pagination.totalPages
-        ? lastPage.pagination.page + 1
-        : undefined,
+    // `pagination` 缺失时必须收口成「没有下一页」，不能直读 `.page`：
+    // 缺字段会在渲染期抛 TypeError，useInfiniteQuery 会把**已成功的响应**判成
+    // isError，页面显示「学员加载失败，请下拉刷新重试」而后端日志是 200。
+    getNextPageParam: (lastPage) => {
+      const { page, totalPages } = lastPage.pagination ?? {};
+      if (typeof page !== 'number' || typeof totalPages !== 'number') return undefined;
+      return page < totalPages ? page + 1 : undefined;
+    },
     // 这里刻意不设 `enabled`。
     // `enabled` 依赖推导值（actorId 由 profile/session 推导）会在首帧波动，
     // 而 v5 中 enabled 翻转会让 observer 重新订阅 in-flight query 并使其被 cancel；

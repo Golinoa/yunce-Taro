@@ -47,4 +47,48 @@ describe('studentService 分页列表', () => {
     expect(get).toHaveBeenCalledTimes(1);
     expect(result.pagination.total).toBe(1000);
   });
+
+  /**
+   * 回归：`pagination` 缺失时不能让整个列表崩掉。
+   *
+   * 缺该字段时 `getNextPageParam` 直读 `.page` 会在渲染期抛 TypeError，
+   * useInfiniteQuery 随即把**已成功的响应**判成 isError，
+   * 页面显示「学员加载失败」而后端日志是 200。
+   */
+  it('响应缺 pagination 时补保守值，不把 undefined 透传给页面', async () => {
+    vi.mocked(get).mockResolvedValue({
+      list: [
+        {
+          id: 'student-1',
+          name: '王克明',
+          createdAt: '2026-09-22T00:00:00.000Z',
+        },
+      ],
+    } as never);
+
+    const result = await studentService.getPageByTeacher('teacher-1', 1, 50, 'campus-1');
+
+    expect(result.pagination).toEqual({
+      page: 1,
+      pageSize: 50,
+      total: 1,
+      totalPages: 1,
+    });
+    // totalPages=1 ⇒ 页面判定「没有下一页」，不会继续上拉
+    expect(result.pagination.page < result.pagination.totalPages).toBe(false);
+  });
+
+  it('响应缺 pagination 且列表为空时同样返回可用的分页对象', async () => {
+    vi.mocked(get).mockResolvedValue({ list: [] } as never);
+
+    const result = await studentService.getPageByParent('parent-1', 1, 50);
+
+    expect(result.list).toEqual([]);
+    expect(result.pagination).toEqual({
+      page: 1,
+      pageSize: 50,
+      total: 0,
+      totalPages: 1,
+    });
+  });
 });
