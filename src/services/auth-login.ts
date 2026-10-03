@@ -158,8 +158,12 @@ export async function wechatLogin(
       body.role = options?.role ?? 'PARENT';
     }
 
+    // 后端要调微信 jscode2session 换 openid（本机实测 1.4~2.7s），默认 10s 在隧道抖动时会
+    // 先超时断开、而后端其实已签好会话 ⇒ 前端误报「网络/服务器错误」但账号已登录成功。
+    // 与 sendRegisterEmailCode 同口径放宽到 20s。
     const data = await post<BackendAuthPayload>(AUTH_ENDPOINTS.wechatLogin, body, {
       skipAuth: true,
+      timeout: 20000,
     });
     const mapped = mapBackendAuthPayload(data);
     return {
