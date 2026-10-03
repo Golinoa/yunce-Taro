@@ -470,7 +470,9 @@ const StoreEntry: React.FC = () => {
       } catch (e) {
         logError('audit store.apply', e);
       }
-      const statusQuery = normalizeStoreEntryStatus(result.status);
+      // 提交成功后后端必返回状态；normalize 现在可能给 null（未知值），
+      // 这种情况下按「待审核」传参——用户刚提交完，语义上就是等待审核。
+      const statusQuery = normalizeStoreEntryStatus(result.status) ?? 'pending';
       redirectToPendingAfterSubmit(form.name.trim(), statusQuery);
     } catch (err) {
       const action = resolveStoreEntrySubmitError(err);

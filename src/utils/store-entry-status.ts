@@ -7,14 +7,25 @@
 
 export type StoreEntryUiStatus = 'pending' | 'approved' | 'rejected';
 
-/** 将 API/query 状态规范为 UI 小写三态 */
-export function normalizeStoreEntryStatus(status: string | null | undefined): StoreEntryUiStatus {
+/**
+ * 将 API/query 状态规范为 UI 小写三态。
+ *
+ * ⚠️ **无法识别 / 空状态一律返回 null**（不再兜底成 'pending'）。
+ * 理由：`isStoreEntryPending(null)` 若为 true，会把「压根没有申请记录」误判成
+ * 「已申请待审核」⇒ `shouldRedirectToStoreEntryPending` 把无申请的用户踢进 pending 页，
+ * 落在「暂无入驻申请」空态（该空态本身也证明这条路径是错的）。
+ * 兜底成 pending 等于把「未知」当「待审核」，是资损级误判。
+ */
+export function normalizeStoreEntryStatus(
+  status: string | null | undefined,
+): StoreEntryUiStatus | null {
   const normalized = String(status || '')
     .trim()
     .toUpperCase();
   if (normalized === 'APPROVED') return 'approved';
   if (normalized === 'REJECTED') return 'rejected';
-  return 'pending';
+  if (normalized === 'PENDING') return 'pending';
+  return null;
 }
 
 export function isStoreEntryApproved(status: string | null | undefined): boolean {

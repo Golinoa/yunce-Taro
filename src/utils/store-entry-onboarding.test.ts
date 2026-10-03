@@ -153,6 +153,31 @@ describe('store-entry-onboarding', () => {
     ).toBe(true);
   });
 
+  /**
+   * 回归（2026-10-04 用户报「直接转到没有入驻申请的页面」）：
+   * 无申请记录时后端返回 404 ⇒ latest 为 null。
+   * 原来 normalizeStoreEntryStatus 把 null 兜底成 'pending'，
+   * 于是 isStoreEntryPending(null) 为 true ⇒ 这里 return true
+   * ⇒ 冷启动被踢进 pending 页，落在「暂无入驻申请」空态。
+   */
+  it('shouldRedirectToStoreEntryPending：无申请记录（latest=null）→ false', () => {
+    expect(
+      shouldRedirectToStoreEntryPending({
+        profile: managerNoOrg(),
+        latest: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('shouldRedirectToStoreEntryPending：申请单状态未知 → false（不得当PENDING 踢回）', () => {
+    expect(
+      shouldRedirectToStoreEntryPending({
+        profile: managerNoOrg(),
+        latest: { application: { id: 'a1', status: 'DRAFT' as never } },
+      }),
+    ).toBe(false);
+  });
+
   it('shouldRedirectToStoreEntryPending：已有机构上下文（种子校长/演示）即使 PENDING 也不踢回', () => {
     expect(
       shouldRedirectToStoreEntryPending({

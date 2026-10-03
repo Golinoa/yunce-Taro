@@ -26,6 +26,7 @@ import { navigateAfterLogin, withRouteGuard } from '@/utils/route-guard';
 import {
   invalidateStoreEntryLatestCache,
   resolveStoreEntrySubmitError,
+  STORE_ENTRY_FORM_PATH,
   writeStoreEntryLatestCache,
 } from '@/utils/store-entry-onboarding';
 import { isStoreEntryPending, normalizeStoreEntryStatus } from '@/utils/store-entry-status';
@@ -138,12 +139,6 @@ const StoreEntryPendingPage: React.FC = () => {
     }
   }, [entering, profile?.id, refreshProfile]);
 
-  const handleGoHome = useCallback(() => {
-    invalidateStoreEntryLatestCache(profile?.id);
-    clearIdentitySelectionPending();
-    void Taro.switchTab({ url: '/pages/home/index' });
-  }, [profile?.id]);
-
   const handleResubmit = useCallback(async () => {
     const draft = readStoreEntryDraft();
     if (!draft) {
@@ -167,6 +162,20 @@ const StoreEntryPendingPage: React.FC = () => {
       setResubmitting(false);
     }
   }, [loadLatest]);
+
+  /**
+   * 无申请记录时的落地：给「去申请入驻」而不是「返回首页」。
+   *
+   * 走到这个空态说明账号确实还没有申请单（后端 404），用户此刻最需要的是
+   * **发起申请**，而不是回首页继续用一个没有自己门店的身份。
+   *
+   * ⚠️ 必须定义在所有早返回之前 —— 否则违反 Hooks 调用顺序。
+   */
+  const handleGoApply = useCallback(() => {
+    invalidateStoreEntryLatestCache(profile?.id);
+    clearIdentitySelectionPending();
+    void Taro.redirectTo({ url: STORE_ENTRY_FORM_PATH });
+  }, [profile?.id]);
 
   if (loading) {
     return (
@@ -198,20 +207,24 @@ const StoreEntryPendingPage: React.FC = () => {
     );
   }
 
-  // 无申请记录（如种子校长被错误踢进本页）：勿伪装成「等待审核」
-  if (!hasApplication) {
+  // 无申请记录、或申请单存在但状态无法识别（后端返回了未知枚举）：
+  // 都不能伪装成「等待审核」，也不能把用户丢回首页 —— 给「去申请入驻」。
+  if (!hasApplication || !status) {
+    const isDirtyStatus = hasApplication;
     return (
       <PageContainer safeBottom className="px-[32rpx] py-[32rpx]">
         <View className="flex flex-col items-center justify-center py-[120rpx] gap-[24rpx]">
           <Text className="text-[30rpx] font-semibold text-foreground">暂无入驻申请</Text>
           <Text className="text-[26rpx] text-muted-foreground text-center leading-relaxed px-[24rpx]">
-            当前账号没有待审核的门店入驻记录，可直接返回首页继续使用。
+            {isDirtyStatus
+              ? '申请状态暂时无法读取，请稍后重试或重新提交资料。'
+              : '当前账号没有门店入驻记录，可提交资料申请成为机构管理员，通过审核后开通自有门店。'}
           </Text>
           <View
             className="h-[80rpx] px-[48rpx] rounded-button bg-primary flex items-center justify-center"
-            onClick={handleGoHome}
+            onClick={handleGoApply}
           >
-            <Text className="text-[28rpx] text-white font-semibold">返回首页</Text>
+            <Text className="text-[28rpx] text-white font-semibold">申请入驻</Text>
           </View>
         </View>
       </PageContainer>

@@ -228,6 +228,12 @@ export function shouldRedirectToStoreEntryPending(input: {
     return false;
   }
   const status = getLatestApplicationStatus(input.latest);
+  // 压根没有申请记录（后端 404 ⇒ latest 为 null）⇒ 不该踢去 pending 页。
+  // 漏在这里的原因：normalizeStoreEntryStatus 曾把 null 兜底成 'pending'，
+  // 于是「无申请」被当成「待审核」。根因已修，这里再加一道显式守卫。
+  if (!status) {
+    return false;
+  }
   if (isStoreEntryPending(status) || isStoreEntryRejected(status)) {
     return true;
   }
