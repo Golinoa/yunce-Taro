@@ -7,9 +7,13 @@ import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import MemberCardIssueForm from '@/components/member-card/MemberCardIssueForm';
 import MemberCardRechargeForm from '@/components/member-card/MemberCardRechargeForm';
+import RechargeCommonFields, {
+  type RechargeCommonFieldsValue,
+} from '@/components/member-card/RechargeCommonFields';
 import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
 import StudentPickerSheet from '@/components/student/StudentPickerSheet';
+import { DEFAULT_PAYMENT_METHOD } from '@/constants/payment-method';
 import { studentService } from '@/services';
 import type { Student } from '@/types/student';
 import { logError } from '@/utils/logger';
@@ -44,6 +48,48 @@ const MemberCardIssuePage: React.FC = () => {
   const [loading, setLoading] = useState(Boolean(initialStudentId));
   const [loadError, setLoadError] = useState('');
   const [operation, setOperation] = useState<CardOperation>('issue');
+
+  /**
+   * 共性收款字段（金额 / 收费方式 / 分期 / 备注）。
+   * 2026-10-03 用户要求：放在 Tab 切换区**之外**常驻，切换操作方式不用重复填写，
+   * 也避免漏填收费方式。state 提到页面层，两个子表单通过 props 接收。
+   */
+  const [common, setCommon] = useState<RechargeCommonFieldsValue>({
+    amount: '',
+    paymentMethod: DEFAULT_PAYMENT_METHOD,
+    remark: '',
+    installmentEnabled: false,
+    installmentPeriod: 2,
+    installmentSchedule: [],
+  });
+
+  const handleCommonChange = useCallback((patch: Partial<RechargeCommonFieldsValue>) => {
+    setCommon((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  /**
+   * 底部固定提交栏：点一下自增 submitSignal，子表单监听到变化后各自执行提交。
+   *
+   * ⚠️ 「能否提交 / 是否提交中」一律由**子表单上报**（`onSubmitReadyChange`），
+   * 不要在这里用定时器模拟 submitting：发卡含分期校验可能超过 1.5s，
+   * 定时器提前复位会让按钮变亮，用户可重复点 ⇒ 重复开卡/重复充值（资损）。
+   */
+  const [submitSignal, setSubmitSignal] = useState(0);
+  /** 子表单（发卡 / 追加次数）上报的提交就绪状态 */
+  const [issueReady, setIssueReady] = useState(false);
+  const [rechargeReady, setRechargeReady] = useState(false);
+  const canSubmit = operation === 'issue' ? issueReady : rechargeReady;
+
+  const handleSubmitTap = useCallback(() => {
+    if (!canSubmit) return;
+    setSubmitSignal((n) => n + 1);
+  }, [canSubmit]);
+
+  /** 切换 Tab 时重置就绪状态，避免沿用上一个 Tab 的判断 */
+  useEffect(() => {
+    if (operation === 'issue') setRechargeReady(false);
+    else setIssueReady(false);
+  }, [operation]);
 
   const loadData = useCallback(async () => {
     if (!studentId) {
@@ -136,7 +182,7 @@ const MemberCardIssuePage: React.FC = () => {
 
   return (
     <PageContainer>
-      <View className="min-h-screen bg-background px-[32rpx] pt-[32rpx]">
+      <View className="min-h-screen bg-background px-[32rpx] pt-[32rpx] pb-[180rpx]">
         <View className="bg-white rounded-[24rpx] p-[28rpx] shadow-soft flex items-center gap-[20rpx] mb-[20rpx]">
           <StudentAvatar name={student.name} src={student.avatar_url} size="lg" />
           <View className="flex-1 min-w-0">
@@ -173,10 +219,45 @@ const MemberCardIssuePage: React.FC = () => {
         </View>
 
         {operation === 'issue' ? (
-          <MemberCardIssueForm student={student} />
+          <MemberCardIssueForm
+            student={student}
+            common={common}
+            onCommonChange={handleCommonChange}
+            submitSignal={submitSignal}
+            onSubmitReadyChange={setIssueReady}
+          />
         ) : (
-          <MemberCardRechargeForm student={student} />
+          <MemberCardRechargeForm
+            student={student}
+            common={common}
+            submitSignal={submitSignal}
+            onSubmitReadyChange={setRechargeReady}
+          />
         )}
+
+        {/**
+         * 共性收款字段常驻在 Tab 切换区之外：切换「发会员卡 / 追加次数」不用重复填写
+         * 金额、收费方式、分期、备注（2026-10-03 用户要求）。
+         */}
+        <RechargeCommonFields {...common} onChange={handleCommonChange} />
+
+        {/**
+         * 底部固定提交栏：放在公共收款字段**之后**，两个 Tab 共用一套按钮。
+         * （原先各表单自带按钮，会被固定栏遮住提取出来的收款字段。）
+         */}
+        <View className="fixed left-0 right-0 bottom-0 px-[32rpx] py-[24rpx] bg-white border-t border-border safe-area-bottom">
+          <View
+            className={cn(
+              'rounded-[48rpx] py-[26rpx] center press-scale',
+              canSubmit ? 'bg-gradient-primary' : 'bg-border',
+            )}
+            onClick={canSubmit ? handleSubmitTap : undefined}
+          >
+            <Text className="text-[30rpx] text-white font-semibold">
+              {operation === 'issue' ? '确认开卡' : '确认追加次数'}
+            </Text>
+          </View>
+        </View>
       </View>
     </PageContainer>
   );

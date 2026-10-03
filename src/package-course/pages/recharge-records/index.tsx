@@ -6,21 +6,17 @@ import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import StudentAvatar from '@/components/student/StudentAvatar';
+import { paymentMethodLabel } from '@/constants/payment-method';
 import { usePagedQuery } from '@/hooks/usePagedQuery';
 import { memberCardService, type RechargeRecordItem } from '@/services/member-card';
 import { useCampusStore } from '@/stores/campus';
 import { useAuth } from '@/utils/auth';
 import { withRouteGuard } from '@/utils/route-guard';
 
-/** 支付方式映射 */
-const FEE_METHOD_LABEL: Record<string, string> = {
-  wechat: '微信',
-  alipay: '支付宝',
-  cash: '现金',
-  transfer: '转账',
-  other: '其他',
-};
-
+/**
+ * 支付方式文案统一走 `paymentMethodLabel`，与充值表单的选项**同源**
+ * （2026-10-03：原来这里自带一份映射、没有「银行卡」，且未知值会裸露内部枚举）。
+ */
 const PAGE_SIZE = 30;
 
 /** 格式化日期 */
@@ -286,7 +282,6 @@ const RechargeRecordsPage: React.FC = () => {
         >
           {filteredRecords.map((record) => {
             const amount = resolveAmount(record);
-            const methodKey = record.feeMethod || 'other';
             return (
               <View
                 key={record.id}
@@ -347,21 +342,24 @@ const RechargeRecordsPage: React.FC = () => {
 
                 <View className="flex items-start justify-between gap-[24rpx]">
                   <View className="flex flex-1 flex-wrap items-center gap-[16rpx]">
+                    {/**
+                     * 购买与赠送分开记账（消耗时先耗购买、后耗赠送，退费只算购买部分）。
+                     * ⚠️ 2026-10-03 修复：原来整块被 `purchasedHours > 0` 守卫，
+                     * 导致「只赠不购」的记录什么都不显示。现在两者各自独立判断。
+                     */}
                     {record.type === 'recharge' && (record.purchasedHours || 0) > 0 && (
-                      <>
-                        <View className="py-[6rpx] px-[20rpx] rounded-md bg-primary-15">
-                          <Text className="text-[22rpx] font-semibold text-primary">
-                            {record.kindLabel || '充值'} {record.purchasedHours}课时
-                          </Text>
-                        </View>
-                        {(record.giftHours || 0) > 0 && (
-                          <View className="py-[6rpx] px-[20rpx] rounded-md bg-success-15">
-                            <Text className="text-[22rpx] font-semibold text-success">
-                              +{record.giftHours}赠送
-                            </Text>
-                          </View>
-                        )}
-                      </>
+                      <View className="py-[6rpx] px-[20rpx] rounded-md bg-primary-15">
+                        <Text className="text-[22rpx] font-semibold text-primary">
+                          {record.kindLabel || '充值'} {record.purchasedHours}课时
+                        </Text>
+                      </View>
+                    )}
+                    {record.type === 'recharge' && (record.giftHours || 0) > 0 && (
+                      <View className="py-[6rpx] px-[20rpx] rounded-md bg-success-15">
+                        <Text className="text-[22rpx] font-semibold text-success">
+                          赠送 {record.giftHours}课时
+                        </Text>
+                      </View>
                     )}
                     {record.type === 'refund' && (
                       <Text className="text-[24rpx] text-[#6b7280]">
@@ -371,7 +369,7 @@ const RechargeRecordsPage: React.FC = () => {
                   </View>
                   <View className="flex flex-col items-end gap-[4rpx] flex-shrink-0">
                     <Text className="text-[20rpx] text-muted-foreground">
-                      {FEE_METHOD_LABEL[methodKey] || methodKey}
+                      {paymentMethodLabel(record.feeMethod)}
                     </Text>
                     {amount > 0 && (
                       <Text

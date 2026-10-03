@@ -1,20 +1,15 @@
 /**
  * 发会员卡表单（可嵌入课时充值 Tab，也可独立页面使用）
  */
-import { Text, Textarea, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BottomSheet from '@/components/BottomSheet';
 import Empty from '@/components/Empty';
-import FormInput from '@/components/FormInput';
-import FormRow from '@/components/FormRow';
 import Icon from '@/components/Icon';
-import InstallmentPanel, {
-  buildInstallmentSchedule,
-  type ScheduleItem,
-} from '@/components/InstallmentPanel';
-import Switch from '@/components/Switch';
+import type { RechargeCommonFieldsValue } from '@/components/member-card/RechargeCommonFields';
+import { DEFAULT_PAYMENT_METHOD } from '@/constants/payment-method';
 import { subscribeMessageService } from '@/services';
 import { auditLogService } from '@/services/audit-log';
 import { cardTypeService } from '@/services/card-type';
@@ -36,15 +31,29 @@ const KIND_LABEL_MAP: Record<CardTypeKind, string> = {
 
 export interface MemberCardIssueFormProps {
   student: Student;
-  /** 嵌入模式：不展示底部固定栏时由外层控制；默认 true */
-  showSubmitBar?: boolean;
   onSuccess?: () => void;
+  /**
+   * 共性收款字段（金额 / 收费方式 / 分期 / 备注）由页面层持有并常驻在 Tab 切换区之外，
+   * 2026-10-03 用户要求切换操作方式时不必重复填写。
+   */
+  common?: RechargeCommonFieldsValue;
+  onCommonChange?: (patch: Partial<RechargeCommonFieldsValue>) => void;
+  /**
+   * 提交信号：页面层底部固定栏自增此值，本组件监听到变化后执行提交。
+   * 用于把提交按钮放到公共收款字段**之后**（2026-10-03）。
+   */
+  submitSignal?: number;
+  /** 上报「能否提交 / 是否提交中」，供页面层决定底栏按钮状态 */
+  onSubmitReadyChange?: (ready: boolean) => void;
 }
 
 const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
   student,
-  showSubmitBar = true,
   onSuccess,
+  common,
+  onCommonChange,
+  submitSignal,
+  onSubmitReadyChange,
 }) => {
   const { profile } = useAuth();
   const operatorName = profile?.name || '';
@@ -58,12 +67,40 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
   const [loadingTypes, setLoadingTypes] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCardTypeId, setSelectedCardTypeId] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState('');
-  const [remark, setRemark] = useState('');
   const [showCardTypeSheet, setShowCardTypeSheet] = useState(false);
-  const [installmentEnabled, setInstallmentEnabled] = useState(false);
-  const [installmentPeriod, setInstallmentPeriod] = useState(2);
-  const [installmentSchedule, setInstallmentSchedule] = useState<ScheduleItem[]>([]);
+
+  /**
+   * 收款字段改为**受控于页面层**（父组件传 common / onCommonChange）。
+   * 组件独立使用（无 common）时退回本地 state，两种用法都能跑。
+   */
+  const [localCommon, setLocalCommon] = useState<RechargeCommonFieldsValue>({
+    amount: '',
+    paymentMethod: DEFAULT_PAYMENT_METHOD,
+    remark: '',
+    installmentEnabled: false,
+    installmentPeriod: 2,
+    installmentSchedule: [],
+  });
+  const isControlled = common !== undefined;
+  const form = isControlled ? (common as RechargeCommonFieldsValue) : localCommon;
+  const setForm = useCallback(
+    (patch: Partial<RechargeCommonFieldsValue>) => {
+      if (onCommonChange) onCommonChange(patch);
+      else setLocalCommon((prev) => ({ ...prev, ...patch }));
+    },
+    [onCommonChange],
+  );
+  const purchasePrice = form.amount;
+
+  /**
+   * 实付价格的「卡种联动」控制：卡种带出建议价，但用户手动改过之后就不再覆盖。
+   *
+   * ⚠️ 不能用 state 标记 —— 卡种自动带价与用户输入都走同一个 onChange，
+   * 用 state 会在自动带价时就把自己标成「已改过」，导致切卡种后价格再也不变。
+   * 改用 ref 记录「最近一次自动带出的值」，与当前值不一致即视为用户改过。
+   */
+  const autoFilledPriceRef = useRef<string | null>(null);
+  const userEditedPriceRef = useRef(false);
 
   const selectedCardType = useMemo(
     () => cardTypes.find((item) => item.id === selectedCardTypeId) || null,
@@ -81,7 +118,9 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
         setCardTypes(active);
         if (active.length > 0) {
           setSelectedCardTypeId(active[0].id);
-          setPurchasePrice(String(active[0].price / 100));
+          const suggested = String(active[0].price / 100);
+          autoFilledPriceRef.current = suggested;
+          setForm({ amount: suggested });
         }
       } catch (error) {
         logError('MemberCardIssueForm load types', error);
@@ -92,25 +131,29 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
     return () => {
       cancelled = true;
     };
+    // priceTouched 仅用于「首次带出建议价」判断，不应触发重新拉取
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!selectedCardType) return;
-    setPurchasePrice(String(selectedCardType.price / 100));
+    // 用户手动改过金额 ⇒ 不再跟随卡种联动
+    if (userEditedPriceRef.current) return;
+    const suggested = String(selectedCardType.price / 100);
+    autoFilledPriceRef.current = suggested;
+    setForm({ amount: suggested });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCardType]);
 
-  const handleToggleInstallment = useCallback(
-    (on: boolean) => {
-      setInstallmentEnabled(on);
-      if (on) {
-        const amount = parseFloat(purchasePrice) || 0;
-        setInstallmentSchedule(buildInstallmentSchedule(amount, installmentPeriod || 2));
-      } else {
-        setInstallmentSchedule([]);
-      }
-    },
-    [purchasePrice, installmentPeriod],
-  );
+  /**
+   * 金额输入框在父页面的公共收款区，本组件拿不到 onChange；
+   * 这里监听值变化：与「最近一次自动带出的值」不同 ⇒ 判定为用户手动填写，
+   * 此后切换卡种不再覆盖成交价。
+   */
+  useEffect(() => {
+    if (autoFilledPriceRef.current === null) return;
+    if (purchasePrice !== autoFilledPriceRef.current) userEditedPriceRef.current = true;
+  }, [purchasePrice]);
 
   /**
    * 开卡后处理欠课（F2-a 诚实反馈）：
@@ -178,6 +221,8 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
       Taro.showToast({ title: '请输入有效的购买价格', icon: 'none' });
       return;
     }
+    const { remark, paymentMethod, installmentEnabled, installmentSchedule, installmentPeriod } =
+      form;
     if (installmentEnabled) {
       if (!installmentSchedule.length) {
         Taro.showToast({ title: '请完善分期计划', icon: 'none' });
@@ -207,6 +252,8 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
         studentAvatar: student.avatar_url,
         studentPhone: student.phone,
         purchasePrice: Math.round(Number(purchasePrice) * 100),
+        // 收费方式：后端开卡接口已支持，会同时落 MemberCard.paymentMethod 与账本 feeMethod
+        paymentMethod,
         source: '前台开卡',
         operatorId: operatorId || undefined,
         operatorName: operatorName || undefined,
@@ -307,10 +354,7 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
   }, [
     selectedCardType,
     purchasePrice,
-    installmentEnabled,
-    installmentSchedule,
-    installmentPeriod,
-    remark,
+    form,
     student,
     operatorId,
     operatorName,
@@ -318,6 +362,33 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
     handlePendingDebt,
     onSuccess,
   ]);
+
+  /**
+   * 能否提交：已选卡种 + 金额有效 + 未在提交中。上报页面层控制底栏按钮。
+   */
+  const issueReady =
+    Boolean(selectedCardType) &&
+    purchasePrice !== '' &&
+    !Number.isNaN(Number(purchasePrice)) &&
+    !submitting;
+  useEffect(() => {
+    onSubmitReadyChange?.(issueReady);
+  }, [issueReady, onSubmitReadyChange]);
+
+  /**
+   * 页面层底部固定栏点「确认开卡」⇒ submitSignal 自增 ⇒ 这里执行提交。
+   * 跳过首次渲染（signal 初始 0）。
+   */
+  const firstSignalRef = useRef(true);
+  useEffect(() => {
+    if (firstSignalRef.current) {
+      firstSignalRef.current = false;
+      return;
+    }
+    if (!submitSignal) return;
+    if (!issueReady) return;
+    void handleSubmit();
+  }, [submitSignal, issueReady, handleSubmit]);
 
   if (loadingTypes) {
     return (
@@ -328,7 +399,13 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
   }
 
   return (
-    <View className={cn(showSubmitBar ? 'pb-[180rpx]' : 'pb-[24rpx]')}>
+    /**
+     * ⚠️ 底部**不要**在这里加 `pb-[180rpx]` 之类的提交栏留白：
+     * 收款字段（金额/收费方式/分期/备注）已提取到页面层的 `RechargeCommonFields`，
+     * 渲染在本组件**外面**，留白加在这里盖不住它们，会被固定底栏遮住。
+     * 留白与提交栏统一由页面层负责。
+     */
+    <View>
       <View className="bg-white rounded-[24rpx] p-[28rpx] shadow-soft">
         <Text className="text-[28rpx] font-semibold text-foreground mb-[8rpx] block">
           会员卡信息
@@ -368,16 +445,6 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
               ¥{(selectedCardType.price / 100).toFixed(2)}
             </Text>
           </View>
-          <FormInput
-            label="实付价格"
-            placeholder="请输入实付金额"
-            type="digit"
-            value={purchasePrice}
-            onInput={(e) => setPurchasePrice(e.detail.value || '')}
-            variant="ghost"
-            hint="可按实际成交价修改"
-            required
-          />
           {selectedCardType.kind === 'count' ? (
             <View className="flex items-center justify-between py-[16rpx]">
               <Text className="text-[26rpx] text-muted-foreground">可用次数</Text>
@@ -414,66 +481,10 @@ const MemberCardIssueForm: React.FC<MemberCardIssueFormProps> = ({
         </View>
       ) : null}
 
-      <View className="bg-white rounded-[24rpx] p-[28rpx] shadow-soft mt-[20rpx]">
-        <FormRow label="分期付款" border={installmentEnabled} helperText="选填，开启后按期还款">
-          <Switch checked={installmentEnabled} onChange={handleToggleInstallment} />
-        </FormRow>
-        {installmentEnabled ? (
-          <InstallmentPanel
-            totalAmount={purchasePrice}
-            enabled={installmentEnabled}
-            onToggle={handleToggleInstallment}
-            periodCount={installmentPeriod}
-            onPeriodChange={setInstallmentPeriod}
-            schedule={installmentSchedule}
-            onScheduleChange={setInstallmentSchedule}
-          />
-        ) : null}
-      </View>
-
-      <View className="bg-white rounded-[24rpx] p-[28rpx] shadow-soft mt-[20rpx]">
-        <Text className="text-[26rpx] text-muted-foreground mb-[12rpx] block">备注</Text>
-        <Textarea
-          className="w-full text-[28rpx] text-foreground min-h-[140rpx]"
-          placeholder="选填"
-          placeholderClass="input-placeholder"
-          value={remark}
-          onInput={(e) => setRemark(e.detail.value || '')}
-          maxlength={200}
-          disableDefaultPadding
-          autoHeight
-        />
-      </View>
-
-      {showSubmitBar ? (
-        <View className="fixed left-0 right-0 bottom-0 px-[32rpx] py-[24rpx] bg-white border-t border-border safe-area-bottom">
-          <View
-            className={cn(
-              'rounded-[48rpx] py-[26rpx] center press-scale',
-              selectedCardType && !submitting ? 'bg-gradient-primary' : 'bg-border',
-            )}
-            onClick={selectedCardType && !submitting ? () => void handleSubmit() : undefined}
-          >
-            <Text className="text-[30rpx] text-white font-semibold">
-              {submitting ? '开卡中...' : '确认开卡'}
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View className="mt-[32rpx]">
-          <View
-            className={cn(
-              'rounded-[48rpx] py-[26rpx] center press-scale',
-              selectedCardType && !submitting ? 'bg-gradient-primary' : 'bg-border',
-            )}
-            onClick={selectedCardType && !submitting ? () => void handleSubmit() : undefined}
-          >
-            <Text className="text-[30rpx] text-white font-semibold">
-              {submitting ? '开卡中...' : '确认开卡'}
-            </Text>
-          </View>
-        </View>
-      )}
+      {/**
+       * 提交按钮由页面层底部固定栏统一渲染（位置在公共收款字段之后），
+       * 本组件通过 submitSignal 接收提交指令。
+       */}
 
       <BottomSheet
         visible={showCardTypeSheet}

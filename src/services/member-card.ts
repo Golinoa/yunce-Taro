@@ -264,12 +264,16 @@ export const memberCardService = {
       'id' | 'status' | 'purchaseAt' | 'activatedAt' | 'expiredAt' | 'frozenCount' | 'frozenDays'
     > & {
       cardType: CardType;
+      /** 收费方式（2026-10-03 补：发卡此前无此字段，后端接口已支持） */
+      paymentMethod?: string;
     },
   ): Promise<MemberCardDetail> => {
     const created = await post<BackendMemberCard>('/card-types/member-cards', {
       cardTypeId: data.cardTypeId || data.cardType.id,
       studentId: data.studentId,
       purchasePrice: data.purchasePrice ?? 0,
+      // 收费方式：后端开卡接口已支持（落 MemberCard.paymentMethod + 账本 feeMethod）
+      paymentMethod: data.paymentMethod,
       source: data.source,
       remark: data.remark,
       cardNo: data.cardNo,
