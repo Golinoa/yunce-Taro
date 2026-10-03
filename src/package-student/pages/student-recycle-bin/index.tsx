@@ -17,7 +17,6 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
 import React, { useCallback, useState } from 'react';
 import Empty from '@/components/Empty';
-import Icon from '@/components/Icon';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
 import StudentDeleteSheet from '@/components/student/StudentDeleteSheet';
@@ -39,10 +38,11 @@ const formatDeletedAt = (value: string): string => {
 };
 
 const RecycleBinPage: React.FC = () => {
-  const [statusBarHeight, setStatusBarHeight] = useState(44);
   const [keyword, setKeyword] = useState('');
   const [list, setList] = useState<RecycleBinStudent[]>([]);
   const [loading, setLoading] = useState(true);
+  /** 首次加载失败：给出可见的错误态 + 重试，绝不静默转圈 */
+  const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [actingId, setActingId] = useState<null | string>(null);
@@ -63,7 +63,10 @@ const RecycleBinPage: React.FC = () => {
       setList((prev) => (append ? [...prev, ...result.list] : result.list));
       setPage(result.pagination.page);
       setTotalPages(result.pagination.totalPages || 1);
+      setLoadError(false);
     } catch {
+      // 首次加载失败必须给出页面上的错误态：只 toast 一下的话，列表会一直转圈看不出问题
+      if (!append) setLoadError(true);
       Taro.showToast({ title: '加载失败，请重试', icon: 'none' });
     } finally {
       setLoading(false);
@@ -71,8 +74,8 @@ const RecycleBinPage: React.FC = () => {
   }, []);
 
   useDidShow(() => {
-    const info = Taro.getWindowInfo();
-    setStatusBarHeight(info.statusBarHeight || 44);
+    // 用原生导航栏（自带返回），页面内不自绘；标题在这里设
+    void Taro.setNavigationBarTitle({ title: '回收站' });
     void load(1, '', false);
   });
 
@@ -143,22 +146,10 @@ const RecycleBinPage: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* 子包页面统一走全局标题，这里自绘一行标题 + 返回 */}
-      <View className="bg-background">
-        <View style={{ height: `${statusBarHeight}px` }} />
-        <View className="h-[88rpx] px-[32rpx] flex items-center">
-          <View
-            className="w-[56rpx] h-[56rpx] flex items-center"
-            onClick={() => Taro.navigateBack()}
-          >
-            <Icon name="mdi-chevron-left" size={36} className="text-foreground" />
-          </View>
-          <Text className="text-[34rpx] font-semibold text-foreground">回收站</Text>
-        </View>
-      </View>
+      {/* 标题与返回都用原生导航栏（app.config 里配了「回收站」），页面内不再自绘 */}
 
       {/* 搜索 */}
-      <View className="px-[32rpx] pb-[20rpx]">
+      <View className="px-[32rpx] pt-[24rpx] pb-[20rpx]">
         <Input
           className="h-[76rpx] rounded-[16rpx] bg-muted px-[24rpx] text-[27rpx] text-foreground"
           placeholder="搜索学员姓名 / 手机号"
@@ -173,6 +164,13 @@ const RecycleBinPage: React.FC = () => {
       <View className="px-[32rpx] pb-[40rpx]">
         {loading && list.length === 0 ? (
           <Loading text="加载中..." />
+        ) : loadError && list.length === 0 ? (
+          <Empty
+            icon="mdi-cloud-off-outline"
+            description="加载失败，请检查网络后重试"
+            actionText="重新加载"
+            onAction={() => void load(1, keyword, false)}
+          />
         ) : list.length === 0 ? (
           <Empty icon="mdi-delete-outline" description="回收站是空的" />
         ) : (
