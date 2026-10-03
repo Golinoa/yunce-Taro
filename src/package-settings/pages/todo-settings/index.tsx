@@ -6,7 +6,7 @@
  */
 import { View, Text } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import PageContainer from '@/components/PageContainer';
 import Switch from '@/components/Switch';
 import type { DataModule } from '@/types/permission';
@@ -117,12 +117,6 @@ const TodoSettingsPage: React.FC = () => {
   useCardNavigationBar();
   const { profile } = useAuth();
   const [settings, setSettings] = useState<TodoSettings>(DEFAULT_TODO_SETTINGS);
-
-  // 挂载即读取：守卫放行前页面本体不挂载，Taro 的 useDidShow 挂载后才注册且不补触发
-  // 已过去的 onShow ⇒ 首屏读不到已保存的设置，会显示成默认值。
-  useEffect(() => {
-    setSettings(getTodoSettings());
-  }, []);
 
   useDidShow(() => {
     setSettings(getTodoSettings());
