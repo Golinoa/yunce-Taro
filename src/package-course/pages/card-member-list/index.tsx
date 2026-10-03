@@ -24,6 +24,7 @@ import {
   type MemberCardDetail,
 } from '@/types/member-card';
 import { getMemberCardTotalCount } from '@/utils/member-card-hours';
+import { formatApiDate } from '@/utils/pagination';
 
 /** 页面 URL 参数 */
 interface PageQuery {
@@ -265,19 +266,19 @@ const CardMemberListPage: React.FC = () => {
             <View className="flex-1 flex flex-col items-center gap-[4rpx] border-r border-border">
               <Text className="text-[20rpx] text-muted-foreground">购买时间</Text>
               <Text className="text-[22rpx] font-medium text-foreground">
-                {member.purchaseAt || '-'}
+                {formatApiDate(member.purchaseAt) || '-'}
               </Text>
             </View>
             <View className="flex-1 flex flex-col items-center gap-[4rpx] border-r border-border">
               <Text className="text-[20rpx] text-muted-foreground">开卡时间</Text>
               <Text className="text-[22rpx] font-medium text-foreground">
-                {member.activatedAt || '-'}
+                {formatApiDate(member.activatedAt) || '-'}
               </Text>
             </View>
             <View className="flex-1 flex flex-col items-center gap-[4rpx]">
               <Text className="text-[20rpx] text-muted-foreground">到期时间</Text>
               <Text className="text-[22rpx] font-medium text-foreground">
-                {member.expiredAt || '-'}
+                {formatApiDate(member.expiredAt) || '-'}
               </Text>
             </View>
           </View>

@@ -30,7 +30,7 @@ import {
 import { reportLocalDebug } from '@/utils/local-debug';
 import { logError } from '@/utils/logger';
 import { useThemedNavigationBar } from '@/utils/navigation-bar';
-import { API_PAGE_SIZE_BATCH } from '@/utils/pagination';
+import { API_PAGE_SIZE_BATCH, formatApiDate } from '@/utils/pagination';
 import { consumeRefreshSignal, REFRESH_SIGNAL } from '@/utils/refresh-signal';
 import { withRouteGuard } from '@/utils/route-guard';
 import { filterActiveStudents } from '@/utils/student-visibility';
@@ -903,7 +903,7 @@ const Students: React.FC = () => {
                             </>
                           )}
                           <Text className="text-[24rpx] text-muted-foreground">
-                            {student.birthday || '暂无生日'}
+                            {formatApiDate(student.birthday) || '暂无生日'}
                           </Text>
                         </View>
                       )}
