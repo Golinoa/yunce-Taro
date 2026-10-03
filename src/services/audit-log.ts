@@ -1,5 +1,6 @@
 /** 操作日志 Service 层（审计查询由后端提供；写入由业务写接口事务审计）。 */
 import type { AuditLogEntry, AuditLogPage, AuditLogQuery } from '@/types/audit-log';
+import { AUDIT_ACTION_LABELS } from '@/types/audit-log';
 import { type PaginatedResponse, formatApiDateTime, unwrapPaginatedList } from '@/utils/pagination';
 import { get } from '@/utils/request';
 
@@ -24,16 +25,22 @@ export function isAuditLogManager(role: string | null | undefined): boolean {
 }
 
 function mapBackendAuditLog(raw: Record<string, unknown>): AuditLogEntry {
+  const action = String(raw.action ?? 'lesson.record') as AuditLogEntry['action'];
   return {
     id: String(raw.id ?? ''),
-    action: String(raw.action ?? 'lesson.record') as AuditLogEntry['action'],
-    actionLabel: String(raw.actionLabel ?? raw.action ?? '操作记录'),
+    action,
+    // 后端只存 action 码（如 `RECHARGE`），不返回中文标签；
+    // 页面要显示中文必须在前端映射，查不到才回落原始码而不是显示空白。
+    actionLabel: AUDIT_ACTION_LABELS[action] ?? String(raw.actionLabel ?? raw.action ?? '操作记录'),
     operatorId: String(raw.userId ?? raw.operatorId ?? ''),
+    // 后端已关联 User/Profile 补出真实姓名（2026-10-03）；查不到才回落「未知用户」
     operatorName: String(raw.userName ?? raw.operatorName ?? '未知用户'),
     operatorRole: String(raw.userRole ?? raw.operatorRole ?? ''),
     targetType: String(raw.module ?? raw.targetType ?? ''),
     targetId: raw.targetId ? String(raw.targetId) : undefined,
-    detail: String(raw.detail ?? raw.message ?? ''),
+    // 主显描述：写入时由后端固化的 `description`。历史记录（2026-10-03 迁移前）没有该字段，
+    // 回落旧 `detail`；再没有就显示动作标签，不会出现空白条目。
+    detail: String(raw.description ?? raw.detail ?? raw.message ?? action),
     meta: (raw.meta as Record<string, unknown>) ?? undefined,
     createdAt: formatApiDateTime(raw.createdAt),
   };

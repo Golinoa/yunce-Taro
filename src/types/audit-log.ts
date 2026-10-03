@@ -7,8 +7,29 @@
  * - 高权限操作（如编辑课时）必须记录，操作人/角色/时间/详情齐全
  */
 
-/** 值得记录的操作动作枚举 */
+/**
+ * 操作动作枚举。
+ *
+ * ⚠️ 两套取值并存，**都有效**，不要互相替换（2026-10-03 查库确认）：
+ * - 通用 CRUD：后端 `middleware/audit.ts` 的 `auditLog(action, module, description)`
+ *   写入大写动作（CREATE / UPDATE / RECHARGE…），覆盖卡种/会员卡/学员/跟进等模块。
+ * - 业务细分：`utils/app-audit.ts` 写入点分小写（lesson.* / card.* / lead.* …）。
+ *
+ * ⚠️ 筛选 chips 只能对**实际存在于库中**的值生效；下拉里两套都列，
+ * 选中没数据的动作会返回空列表（属预期，不是 bug）。
+ */
 export type AuditAction =
+  // —— 通用 CRUD（middleware/audit.ts）——
+  | 'CREATE'
+  | 'UPDATE'
+  | 'UPDATE_STATUS'
+  | 'DELETE'
+  | 'FREEZE'
+  | 'UNFREEZE'
+  | 'ADJUST'
+  | 'RECHARGE'
+  | 'DEDUCT_DEBT'
+  // —— 消课域（app-audit.ts）——
   | 'lesson.checkin' // 点名签到（含补录签到 / 单人消课，汇总一条）
   | 'lesson.record' // 单人消课 / 补课登记
   | 'lesson.edit_hours' // 编辑课时（高权限，仅管理角色）
@@ -32,8 +53,17 @@ export type AuditAction =
   | 'staff.resign' // 教师离职
   | 'store.apply'; // 门店入驻申请
 
-/** 动作 → 中文标签（页面展示用） */
+/** 动作 → 中文标签（页面展示 + 筛选 chips 用） */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  CREATE: '新建',
+  UPDATE: '修改',
+  UPDATE_STATUS: '启用/停用',
+  DELETE: '删除',
+  FREEZE: '冻结',
+  UNFREEZE: '解冻',
+  ADJUST: '调整缴费金额',
+  RECHARGE: '追加课时',
+  DEDUCT_DEBT: '扣减欠课时',
   'lesson.checkin': '点名签到',
   'lesson.record': '单人消课/补课',
   'lesson.edit_hours': '编辑课时',
@@ -72,9 +102,20 @@ export interface AuditLogEntry {
   /** 操作对象类型（如 lesson_record / member_card / salary_batch…） */
   targetType: string;
   targetId?: string;
-  /** 人类可读描述（页面语言） */
+  /**
+   * 操作描述（页面主显）。
+   *
+   * 写入时由后端调用点固化（如「新建学员档案」），是给人看的句子。
+   * 2026-10-03 起与原始元数据分离：`detail` 曾经直接存整个 HTTP 请求
+   * （method/path/params/query/body），导致页面渲染 JSON 原文、50/51 条看不懂。
+   */
   detail: string;
-  /** 结构化上下文（如 before/after），便于日后对账 */
+  /**
+   * 结构化上下文。
+   *
+   * ⚠️ **小程序端收不到该字段**：后端仅在 `includeMeta=1` 时下发，
+   * 而该开关只给运营后台用（元数据用于复现问题，日常工作不需要看）。
+   */
   meta?: Record<string, unknown>;
   /** 发生时间（ISO 8601） */
   createdAt: string;
