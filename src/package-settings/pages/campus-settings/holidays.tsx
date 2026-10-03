@@ -17,6 +17,7 @@ import PageContainer from '@/components/PageContainer';
 import { useCampusStore } from '@/stores/campus';
 import type { Holiday } from '@/types/campus';
 import { TTL, markFetched, shouldRefetch } from '@/utils/data-freshness';
+import { REFRESH_SIGNAL, setRefreshSignal } from '@/utils/refresh-signal';
 
 type DateField = 'startDate' | 'endDate' | null;
 type HolidayDisplayRow = Holiday & { ids: string[] };
@@ -148,6 +149,7 @@ const Holidays: React.FC = () => {
         return;
       }
       setShowFormSheet(false);
+      setRefreshSignal(REFRESH_SIGNAL.schedule);
       Taro.showToast({ title: '添加成功', icon: 'success' });
     } finally {
       setSaving(false);
@@ -171,6 +173,7 @@ const Holidays: React.FC = () => {
         }
       }
       setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+      setRefreshSignal(REFRESH_SIGNAL.schedule);
       Taro.showToast({ title: '已删除', icon: 'success' });
     },
     [deleteHoliday],
@@ -207,6 +210,7 @@ const Holidays: React.FC = () => {
         }
       }
       setSelectedIds([]);
+      setRefreshSignal(REFRESH_SIGNAL.schedule);
       Taro.showToast({ title: '已删除', icon: 'success' });
     } finally {
       setBusy(false);
@@ -232,6 +236,7 @@ const Holidays: React.FC = () => {
         title: count > 0 ? `已生成 ${count} 个假期` : '没有新增（可能已存在）',
         icon: 'none',
       });
+      setRefreshSignal(REFRESH_SIGNAL.schedule);
     } finally {
       setBusy(false);
     }
