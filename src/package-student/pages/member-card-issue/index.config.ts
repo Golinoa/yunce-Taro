@@ -1,3 +1,3 @@
 export default definePageConfig({
-  navigationBarTitleText: '发会员卡',
+  navigationBarTitleText: '会员卡操作',
 });
