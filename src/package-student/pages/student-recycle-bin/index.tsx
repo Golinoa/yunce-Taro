@@ -15,7 +15,7 @@
 import { View, Text, Input } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import cn from 'classnames';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Empty from '@/components/Empty';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -73,10 +73,30 @@ const RecycleBinPage: React.FC = () => {
     }
   }, []);
 
-  useDidShow(() => {
+  /** 首挂载去重：挂载时 useEffect 已拉过一次，useDidShow 首次显示不再重复拉 */
+  const isFirstMount = useRef(true);
+
+  /**
+   * 首屏必须在**挂载时**就发起请求，不能只靠 useDidShow。
+   *
+   * 原因：`withRouteGuard` 在拿到 profile 之前渲染的是 Loading 占位（页面本体不挂载），
+   * 而 Taro 的 `useDidShow` 是在挂载时才把回调注册进页面实例、**且不会补触发已过去的
+   * onShow**。守卫放行必然晚于页面 onShow（要等 auth 就绪），于是这次 onShow 永远
+   * 收不到 ⇒ 只靠 useDidShow 取数的页面会一直停在「加载中」。
+   */
+  useEffect(() => {
     // 用原生导航栏（自带返回），页面内不自绘；标题在这里设
     void Taro.setNavigationBarTitle({ title: '回收站' });
     void load(1, '', false);
+  }, [load]);
+
+  /** 再次进入本页时刷新（子页/其它页改过数据）；首挂载跳过，避免重复拉一次 */
+  useDidShow(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    void load(1, keyword, false);
   });
 
   /** 恢复：先问归属（仅当原老师在职），再恢复 */
