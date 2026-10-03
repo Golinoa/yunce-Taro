@@ -16,6 +16,12 @@ export interface LessonConsumptionDetailItem {
   hoursUsed: number;
   remainingHours: number;
   totalHours: number;
+  /**
+   * 课时汇总是否可信（来自 `GET /students/:id/hours`）。
+   * false ⇒ `totalHours` 只是兜底值，**UI 不得展示进度条与「共X」**，
+   * 否则会渲染成「已用1 / 共1」这种自欺欺人的数字。
+   */
+  hoursReliable: boolean;
   attendanceStatusText?: string;
   attendanceStatusClassName?: string;
   hoursTagText?: '即将到期' | '需续费';
@@ -194,9 +200,10 @@ function mapRecordToDetail(
   teacherNameMap: Record<string, string>,
   studentHours?: Record<string, StudentHoursOverride>,
 ): LessonConsumptionDetailItem {
-  // 有学员级课时就用它（准确）；否则退回记录自带口径 —— LessonRecord 没有剩余课时列，
-  // 退回去时只能得到「已用 = 共」。
+  // 有学员级课时汇总就用它（准确）；否则退回记录自带口径 —— LessonRecord 没有剩余课时列，
+  // 退回去时 total 只能盖住 used。此时用 hoursReliable=false 标记，UI 不展示进度条与「共X」。
   const summary = record.student_id ? studentHours?.[record.student_id] : undefined;
+  const hasSummary = Boolean(summary);
   const remainingHours = summary ? summary.remainingHours : (record.remaining_hours ?? 0);
   const totalHours = summary
     ? summary.totalHours
@@ -215,6 +222,7 @@ function mapRecordToDetail(
     hoursUsed,
     remainingHours,
     totalHours,
+    hoursReliable: hasSummary,
     attendanceStatusText: attendanceStatusText || undefined,
     attendanceStatusClassName: attendanceStatusText
       ? getAttendanceStatusClass(recordStatus)
@@ -393,7 +401,8 @@ const StudentConsumptionRow: React.FC<StudentConsumptionRowProps> = ({
         {detail.teacherDisplayText}
       </Text>
 
-      {detail.totalHours > 0 ? (
+      {/* 进度条只在课时汇总可信时画：否则 total 是兜底值，画出来是假进度 */}
+      {detail.hoursReliable && detail.totalHours > 0 ? (
         <View className="mt-[10rpx]">
           <View className="h-[8rpx] rounded-[4rpx] bg-border overflow-hidden">
             <View
@@ -419,10 +428,13 @@ const StudentConsumptionRow: React.FC<StudentConsumptionRowProps> = ({
         <Text className="text-[20rpx] text-muted-foreground truncate">
           {detail.attendanceStatusText === '已取消' && detail.hoursUsed <= 0
             ? '本次取消，课时未扣减'
-            : `已用${detail.hoursUsed} / 共${detail.totalHours || detail.hoursUsed}课时`}
+            : detail.hoursReliable
+              ? `已用${detail.hoursUsed} / 共${detail.totalHours}课时`
+              : /** 汇总拿不到：不编「共X」，只诚实显示本次已用 */
+                `本次已用${detail.hoursUsed}课时`}
         </Text>
         <Text className="text-[20rpx] text-muted-foreground shrink-0">
-          余{detail.remainingHours}课时
+          {detail.hoursReliable ? `余${detail.remainingHours}课时` : ''}
         </Text>
       </View>
     </View>

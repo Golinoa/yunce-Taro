@@ -216,7 +216,6 @@ const SchedulePage: React.FC = () => {
    * ⚠️ 必须放在 useScheduleDerived 之前：卡片构建时要用它打标记。
    */
   const isHolidayDate = useHolidayCheck({ enabled: Boolean(currentRole) });
-
   const {
     tabs,
     activeTab,
@@ -417,6 +416,8 @@ const SchedulePage: React.FC = () => {
       void loadBaseData();
       void loadMonthRecords();
       void loadTemporaryReschedules();
+      // 2026-10-03：新增/删除放假日期后回到课表页也要立刻联动
+      isHolidayDate.reload();
       return;
     }
     if (isWithinRefetchTtl(lastScheduleAuxFetchAtRef.current)) {
@@ -442,6 +443,9 @@ const SchedulePage: React.FC = () => {
         if (activeTab?.mode === 'private') {
           setPrivateReloadToken((token) => token + 1);
         }
+        // 2026-10-03：放假日期改动后课表不联动 —— 假期是独立 hook、原来只拉一次，
+        // 必须显式重拉，否则下拉也刷不出来。
+        isHolidayDate.reload();
         await pullRefresh({ withVenues: activeTab?.type === 'venue' });
       } finally {
         Taro.stopPullDownRefresh();

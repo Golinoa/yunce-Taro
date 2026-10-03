@@ -8,7 +8,7 @@
  * 课表页（含私教视图）与各处的「选择日期」弹层共用本 hook，保证口径一致。
  */
 import dayjs from 'dayjs';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { holidayService } from '@/services/campus';
 import { logError } from '@/utils/logger';
 
@@ -24,9 +24,19 @@ type HolidayRange = { startDate: string; endDate: string };
  *   而本 hook 不会自动重试 ⇒ 整个会话都拿不到假期、日历不显示「休」。
  *   身份就绪后 enabled 变 true 会自动触发拉取。
  */
-export function useHolidayCheck(options?: { enabled?: boolean }): (date: dayjs.Dayjs) => boolean {
+export function useHolidayCheck(options?: {
+  enabled?: boolean;
+}): ((date: dayjs.Dayjs) => boolean) & { reload: () => void; reloadToken: number } {
   const enabled = options?.enabled ?? true;
   const [ranges, setRanges] = useState<HolidayRange[]>([]);
+  /**
+   * 重拉令牌。2026-10-03 用户报「增删放假日期后课表不联动」——
+   * 原来 effect 依赖只有 `[enabled]`，整个会话只拉一次，改完放假毫无反应，
+   * 而且**下拉刷新也刷不到它**（刷的是排课/点名/场地）。
+   * 任何需要「重新读一次假期」的地方（如下拉刷新）自增它即可重拉。
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+  const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -46,14 +56,20 @@ export function useHolidayCheck(options?: { enabled?: boolean }): (date: dayjs.D
     return () => {
       alive = false;
     };
-  }, [enabled]);
+  }, [enabled, reloadToken]);
 
-  return useCallback(
+  const isHoliday = useCallback(
     (date: dayjs.Dayjs) => {
       if (ranges.length === 0) return false;
       const key = date.format('YYYY-MM-DD');
       return ranges.some((range) => key >= range.startDate && key <= range.endDate);
     },
     [ranges],
+  );
+
+  // 返回值上挂 reload / reloadToken，调用方既能直接判断、也能触发重拉
+  return useMemo(
+    () => Object.assign(isHoliday, { reload, reloadToken }),
+    [isHoliday, reload, reloadToken],
   );
 }

@@ -166,7 +166,11 @@ const RecordsPage: React.FC = () => {
   /**
    * 学员课时：按当前记录涉及到的学员去重后取汇总。
    * 口径与后端 `utils/lesson-hours` 一致（卡上快照 totalCount 优先、含赠送）。
-   * 单个学员失败不影响其他学员（该项退回记录自带口径），也不打断页面。
+   *
+   * ⚠️ 2026-10-03：原来失败是 `catch { return null }` **静默吞掉**，
+   * 拿不到汇总时组件会退化成「已用 = 共」（显示成「已用1 / 共1」），用户完全看不出出了错。
+   * 现在：失败只记日志（不打断页面），但**不把失败当成 0**——
+   * 汇总缺失时让组件走「按记录自身口径」的诚实回退，而不是伪造等值。
    */
   useEffect(() => {
     const studentIds = Array.from(
@@ -181,7 +185,9 @@ const RecordsPage: React.FC = () => {
       studentIds.map(async (studentId) => {
         try {
           return [studentId, await studentService.getHours(studentId)] as const;
-        } catch {
+        } catch (error) {
+          // 单个学员失败不影响其他学员，也不打断页面；但必须留痕，便于定位「共1」这类问题
+          logError(`records.loadStudentHours(${studentId})`, error);
           return null;
         }
       }),
