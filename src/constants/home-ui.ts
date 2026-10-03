@@ -122,10 +122,10 @@ export const TEACHER_HOME_QUICK_ENTRIES: HomeQuickEntry[] = [
 /** 校长/管理员首页快捷入口（含教务工具） */
 export const HOME_QUICK_ENTRIES: HomeQuickEntry[] = [
   {
-    label: '课时导入',
+    label: '课时充值',
     icon: 'mdi-cash-plus',
     color: 'icon-glass-red',
-    url: '/package-student/pages/legacy-hours-import/index',
+    url: '/package-student/pages/member-card-issue/index',
   },
   {
     label: '添加学员',
