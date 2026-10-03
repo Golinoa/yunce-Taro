@@ -823,9 +823,8 @@ const LegacyHoursImportPage: React.FC = () => {
         {key === 'done' && (
           <View className="mx-[28rpx] mb-[17rpx] rounded-[21rpx] border border-warning/30 bg-warning/10 px-[23rpx] py-[19rpx]">
             <Text className="text-[22rpx] text-warning leading-[34rpx]">
-              上次已经导进去的，<Text className="font-semibold">这次不能再导</Text>
-              。系统在提交前就核过：这些学员的科目已有期初入账，重导会被后端整批拒绝，
-              连同一批里正常的行一起失败，所以这里不给勾。真要重导，请先删掉该学员该科目的期初卡，再重新上传。
+              <Text className="font-semibold">无法重复导入{'\n'}</Text>
+              每位学员的每个科目只能入账一次。如需修改，请先删除卡包中的期初卡，再重新上传。
             </Text>
           </View>
         )}
