@@ -69,8 +69,20 @@ export function navigateToLessonDetail(recordId: string): void {
   });
 }
 
+/** 学员级课时汇总（按学员 id 覆盖记录自带的剩余课时） */
+export interface StudentHoursOverride {
+  totalHours: number;
+  usedHours: number;
+  remainingHours: number;
+}
+
 interface BuildSectionsOptions {
   teacherNameMap?: Record<string, string>;
+  /**
+   * 学员级课时（可选）。给了就用它显示「已用/共/余」—— 消课记录本身不带剩余课时，
+   * 不传只能退化成「已用 = 共」（上课记录页此前就是这样）。
+   */
+  studentHours?: Record<string, StudentHoursOverride>;
 }
 
 const WEEK_DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -180,9 +192,16 @@ function getTeacherDisplayText(
 function mapRecordToDetail(
   record: LessonRecord,
   teacherNameMap: Record<string, string>,
+  studentHours?: Record<string, StudentHoursOverride>,
 ): LessonConsumptionDetailItem {
-  const remainingHours = record.remaining_hours ?? 0;
-  const totalHours = Math.max((record.hours_used || 0) + remainingHours, remainingHours);
+  // 有学员级课时就用它（准确）；否则退回记录自带口径 —— LessonRecord 没有剩余课时列，
+  // 退回去时只能得到「已用 = 共」。
+  const summary = record.student_id ? studentHours?.[record.student_id] : undefined;
+  const remainingHours = summary ? summary.remainingHours : (record.remaining_hours ?? 0);
+  const totalHours = summary
+    ? summary.totalHours
+    : Math.max((record.hours_used || 0) + remainingHours, remainingHours);
+  const hoursUsed = summary ? summary.usedHours : record.hours_used || 0;
   const recordStatus = record.status as RecordStatus | undefined;
   const attendanceStatusText = getAttendanceStatusLabel(recordStatus);
   const hoursTagText = getHoursTag(remainingHours);
@@ -193,7 +212,7 @@ function mapRecordToDetail(
     name: record.student?.name || '学生',
     avatarUrl: record.student?.avatar_url,
     teacherDisplayText: getTeacherDisplayText(record, teacherNameMap),
-    hoursUsed: record.hours_used || 0,
+    hoursUsed,
     remainingHours,
     totalHours,
     attendanceStatusText: attendanceStatusText || undefined,
@@ -241,7 +260,7 @@ export function buildLessonConsumptionSections(
   records: LessonRecord[],
   options: BuildSectionsOptions = {},
 ): LessonConsumptionSection[] {
-  const { teacherNameMap = {} } = options;
+  const { teacherNameMap = {}, studentHours } = options;
   const sortedRecords = sortRecordsDesc(records);
   const dateMap = new Map<string, LessonRecord[]>();
 
@@ -266,7 +285,7 @@ export function buildLessonConsumptionSections(
         return;
       }
 
-      personalItems.push(mapRecordToDetail(record, teacherNameMap));
+      personalItems.push(mapRecordToDetail(record, teacherNameMap, studentHours));
     });
 
     const cards = Array.from(classCardMap.entries()).map(([cardKey, cardRecords]) => {
@@ -285,7 +304,9 @@ export function buildLessonConsumptionSections(
         studentCount: uniqueStudentIds.size,
         studentCountText: `${uniqueStudentIds.size}人`,
         cardKind: 'class' as const,
-        details: cardRecords.map((record) => mapRecordToDetail(record, teacherNameMap)),
+        details: cardRecords.map((record) =>
+          mapRecordToDetail(record, teacherNameMap, studentHours),
+        ),
       };
     });
 

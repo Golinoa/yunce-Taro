@@ -8,6 +8,7 @@ import Icon from '@/components/Icon';
 import LessonConsumptionList, {
   buildLessonConsumptionSections,
   navigateToLessonDetail,
+  type StudentHoursOverride,
 } from '@/components/lesson/LessonConsumptionList';
 import Loading from '@/components/Loading';
 import PageContainer from '@/components/PageContainer';
@@ -86,6 +87,11 @@ const RecordsPage: React.FC = () => {
   const [filterStudentId, setFilterStudentId] = useState('all');
   /** 学员搜索关键词（教师名下学员多，用搜索定位而不是一排标签） */
   const [studentKeyword, setStudentKeyword] = useState('');
+  /**
+   * 学员级课时（学员 id → 总/已用/剩余）。
+   * 消课记录本身**不带剩余课时**，没有它「共 Y 课时」只能退化成「已用 = 共」（曾显示成 1/1）。
+   */
+  const [studentHoursMap, setStudentHoursMap] = useState<Record<string, StudentHoursOverride>>({});
 
   const dateRange = useMemo<DateRange>(() => {
     if (quickRange === 'week') return getWeekRange();
@@ -161,6 +167,41 @@ const RecordsPage: React.FC = () => {
     }
   }, [profile, isTeacher, routeStudentId, fetchStudentsByTeacher]);
 
+  /**
+   * 学员课时：按当前记录涉及到的学员去重后取汇总。
+   * 口径与后端 `utils/lesson-hours` 一致（卡上快照 totalCount 优先、含赠送）。
+   * 单个学员失败不影响其他学员（该项退回记录自带口径），也不打断页面。
+   */
+  useEffect(() => {
+    const studentIds = Array.from(
+      new Set(records.map((record) => record.student_id).filter((id): id is string => Boolean(id))),
+    );
+    if (studentIds.length === 0) {
+      setStudentHoursMap((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      studentIds.map(async (studentId) => {
+        try {
+          return [studentId, await studentService.getHours(studentId)] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((pairs) => {
+      if (cancelled) return;
+      const next: Record<string, StudentHoursOverride> = {};
+      pairs.forEach((pair) => {
+        if (pair) next[pair[0]] = pair[1];
+      });
+      setStudentHoursMap(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [records]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -189,8 +230,8 @@ const RecordsPage: React.FC = () => {
   );
 
   const consumptionSections = useMemo(
-    () => buildLessonConsumptionSections(filteredRecords),
-    [filteredRecords],
+    () => buildLessonConsumptionSections(filteredRecords, { studentHours: studentHoursMap }),
+    [filteredRecords, studentHoursMap],
   );
 
   const stats = useMemo(() => {

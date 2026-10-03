@@ -108,6 +108,16 @@ export interface StudentPageResult {
   pagination: BackendStudentListResponse['pagination'];
 }
 
+/**
+ * 学员课时汇总（来源 `GET /students/:id/hours`）。
+ * 口径与后端 `utils/lesson-hours` 一致：总量优先取卡上快照 `totalCount`，含赠送课时。
+ */
+export interface StudentHoursSummary {
+  totalHours: number;
+  usedHours: number;
+  remainingHours: number;
+}
+
 export interface ParentStudentSummary {
   students: Student[];
   attendance: number;
@@ -475,6 +485,26 @@ export const studentService = {
     } catch {
       return null;
     }
+  },
+
+  /**
+   * 学员课时汇总（总课时 / 已用 / 剩余）。
+   *
+   * 为什么单独要这个接口：`LessonRecord` 表里**没有「剩余课时」列**，消课记录拿不到
+   * 「共多少课时」；前端原公式 `共 = 已用 + 剩余` 会退化成「已用 1 / 共 1」。
+   * 上课记录页用本接口补齐（每行显示该学员的已用/共/剩余）。
+   */
+  getHours: async (studentId: string): Promise<StudentHoursSummary> => {
+    const data = await get<{
+      totalHours?: number | null;
+      usedHours?: number | null;
+      remainingHours?: number | null;
+    }>(`/students/${studentId}/hours`);
+    return {
+      totalHours: Number(data.totalHours ?? 0),
+      usedHours: Number(data.usedHours ?? 0),
+      remainingHours: Number(data.remainingHours ?? 0),
+    };
   },
 
   /**
