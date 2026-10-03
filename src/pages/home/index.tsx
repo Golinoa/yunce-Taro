@@ -8,7 +8,7 @@ import KingKongSection from '@/components/home/KingKongSection';
 import ParentHoursSection from '@/components/home/ParentHoursSection';
 import ParentScheduleSection from '@/components/home/ParentScheduleSection';
 import type { TodoViewMode } from '@/components/home/TodoToolbar';
-import LessonConsumptionList, {
+import {
   buildLessonConsumptionSections,
   pickHomeRecentLessonRecords,
   type StudentHoursOverride,
@@ -430,10 +430,8 @@ const Home: React.FC = () => {
   }, [isParent, agg]);
 
   useEffect(() => {
-    if (!agg) return;
-    if (!isParent) {
-      setSchedules(agg.schedules);
-    }
+    if (!agg || isParent) return;
+    setSchedules(agg.schedules);
     setRecentRecords(agg.recentRecords);
     setStudentHours(agg.studentHours);
   }, [agg, isParent]);
@@ -1086,11 +1084,6 @@ const Home: React.FC = () => {
                       packages={parentPackages}
                       fallbackStudentId={parentFallbackStudentId}
                     />
-                    {recentSections.length > 0 && (
-                      <View className="mt-[24rpx]">
-                        <LessonConsumptionList sections={recentSections} embedded />
-                      </View>
-                    )}
                   </View>
                 </>
               )}

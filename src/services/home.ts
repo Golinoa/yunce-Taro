@@ -701,10 +701,8 @@ export const homeService = {
           parent,
           unreadCount: data.unreadCount,
           schedules: [],
-          recentRecords: (data.recentRecords as BackendAggregateRecentRecord[]).map(
-            mapAggregateRecentRecord,
-          ),
-          studentHours: (data.studentHours as Record<string, StudentHoursOverride>) ?? {},
+          recentRecords: [],
+          studentHours: {},
           parentSchedules: parent.todaySchedules,
           parentPackages: parent.packages,
           parentFallbackStudentId: parent.students?.[0]?.id || '',
