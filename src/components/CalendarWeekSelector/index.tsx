@@ -14,8 +14,11 @@ export interface CalendarWeekSelectorProps {
   /** 日期下方红点/灰点状态 */
   getDateDotType?: (date: dayjs.Dayjs) => CalendarDotType;
   /**
-   * 该日是否放假：是则在**日期圆圈右上角外侧**标一个橙色「休」字（比数字小 3 档字号）。
-   * 放在圈外是为了不压到选中状态的圆圈（背景 + 描边）上。
+   * 该日是否放假：是则在**日期圆圈右上角**标一个橙色「休」字（比数字小 3 档字号）。
+   * 「休」定位在**格子内部**贴右侧，只压圆圈右上角一点点空白处，不压数字也不伸出格子 ——
+   * 早先按固定负偏移挂到圆圈外侧，周日（最后一格）右侧没有富余空间，会被容器裁掉一半。
+   * 自适应靠两点：格子用 `flex-1` / `w-[14.285%]` 按屏宽均分，尺寸一律用 rpx（rpx 本身随屏宽等比缩放），
+   * 所以同一套数值在所有机型上比例一致，不需要按机型写分支。
    * 数据来自 `/holidays/calendar`（所有角色可读，家长端也能看到）。
    */
   isHoliday?: (date: dayjs.Dayjs) => boolean;
@@ -348,7 +351,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
     return (
       <View
         key={date.format('YYYY-MM-DD')}
-        className={cn('flex w-[90rpx] flex-col items-center', disabled && 'opacity-40')}
+        className={cn('relative flex flex-1 flex-col items-center', disabled && 'opacity-40')}
         onClick={() => {
           if (disabled) return;
           commitDateChange(date);
@@ -362,32 +365,35 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
         >
           {WEEKDAY_LABELS[index]}
         </Text>
-        <View
-          className={cn(
-            'relative mt-[8rpx] flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full',
-            selected
-              ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
-              : today
-                ? 'bg-schedule-calendar-today'
-                : 'bg-transparent',
-          )}
-        >
-          <Text
+        {/* 圆圈与「休」共用一个「整格宽」的定位层：圆圈居中，「休」贴格子右内侧。
+            格子宽度随屏宽自适应，圆圈位置不受是否放假影响，不会出现左右跳动 */}
+        <View className="relative mt-[8rpx] w-full">
+          <View
             className={cn(
-              'text-[28rpx] font-semibold',
+              'mx-auto flex h-[64rpx] w-[64rpx] items-center justify-center rounded-full',
               selected
-                ? 'text-schedule-calendar-selected'
+                ? 'bg-schedule-calendar-selected border-[4rpx] border-white shadow-schedule-selected'
                 : today
-                  ? 'text-schedule-calendar-today'
-                  : 'text-foreground',
+                  ? 'bg-schedule-calendar-today'
+                  : 'bg-transparent',
             )}
           >
-            {date.date()}
-          </Text>
-          {/* 放假「休」：圆圈右上角外侧，橙色，比数字小 3 档字号（28→22）。
-              偏移 30 = 字宽 22 + 选中描边外扩 4 + 留白 4（同上，描边往外撑） */}
+            <Text
+              className={cn(
+                'text-[28rpx] font-semibold',
+                selected
+                  ? 'text-schedule-calendar-selected'
+                  : today
+                    ? 'text-schedule-calendar-today'
+                    : 'text-foreground',
+              )}
+            >
+              {date.date()}
+            </Text>
+          </View>
+          {/* 放假「休」：贴格子右侧、落在圆圈右上角空白处，比数字小 3 档字号（28→22） */}
           {holiday ? (
-            <Text className="absolute right-[-30rpx] top-[4rpx] text-[22rpx] font-medium leading-[22rpx] text-warning">
+            <Text className="absolute right-0 top-[-4rpx] text-[22rpx] font-medium leading-[22rpx] text-warning">
               休
             </Text>
           ) : null}
@@ -419,7 +425,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
       <View
         key={key}
         className={cn(
-          'flex w-[14.285%] items-center justify-center py-[8rpx]',
+          'relative flex w-[14.285%] items-center justify-center py-[8rpx]',
           disabled && 'opacity-40',
         )}
         onClick={() => handleDayPress(date)}
@@ -449,14 +455,6 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             >
               {date.date()}
             </Text>
-            {/* 放假「休」：圆圈右上角外侧，橙色，比数字小 3 档字号（30→24）。
-                偏移 32 = 字宽 24 + 选中描边外扩 4 + 留白 4
-                —— View 默认 content-box，选中态 border-[4rpx] 是往外撑的，收小就会压到圆圈 */}
-            {holiday ? (
-              <Text className="absolute right-[-32rpx] top-[4rpx] text-[24rpx] font-medium leading-[24rpx] text-warning">
-                休
-              </Text>
-            ) : null}
             {dotType !== 'none' ? (
               <View className="mt-[4rpx] h-[8rpx] w-[8rpx] rounded-full">
                 {dotType === 'active' ? (
@@ -478,6 +476,13 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             )}
           </View>
         </View>
+        {/* 放假「休」：贴格子右内侧、落在圆圈右上角空白处，比数字小 3 档字号（30→24）。
+            定位挂在格子上而不是圆圈上，周日列才不会探出容器被裁 */}
+        {holiday ? (
+          <Text className="absolute right-0 top-[4rpx] text-[24rpx] font-medium leading-[24rpx] text-warning">
+            休
+          </Text>
+        ) : null}
       </View>
     );
   };
@@ -551,7 +556,7 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
                 key={weekStart.format('YYYY-MM-DD')}
                 itemId={weekStart.format('YYYY-MM-DD')}
               >
-                <View className="w-full h-full flex items-start justify-between">
+                <View className="flex h-full w-full items-start">
                   {Array.from({ length: 7 }, (_, index) =>
                     renderWeekDayItem(weekStart.add(index, 'day'), index),
                   )}
