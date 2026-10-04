@@ -217,7 +217,14 @@ export function buildScheduleCardsForDate(input: {
           : undefined);
       const recordList = dayRecords.filter((record) =>
         schedule.class_id
-          ? record.class_id === schedule.class_id
+          ? record.class_id === schedule.class_id &&
+            /**
+             * 同班同一天可能有多节课 ⇒ 只算**本节**的记录。
+             * 不按 `schedule_id` 收窄时，同班另一节课的正常记录会混进来，
+             * 让「这节课是不是停了」的判定（所有记录都 cancelled）永远不成立。
+             * 历史记录可能没存 schedule_id ⇒ 仍按班级归入，不丢已点名人数。
+             */
+            (!record.schedule_id || !schedule.id || record.schedule_id === schedule.id)
           : record.student_id === schedule.student_id,
       );
       const totalCount =

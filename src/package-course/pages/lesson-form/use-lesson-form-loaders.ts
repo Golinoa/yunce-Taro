@@ -342,6 +342,9 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       attendanceRecordActorId,
       lessonDate,
       lessonDate,
+      undefined,
+      // 连停课取消记录一起拿：「恢复本节课」要按 cancelled 记录反查，只给正常记录会提示"未找到取消记录"
+      true,
     );
   }, [attendanceRecordActorId, lessonDate]);
 

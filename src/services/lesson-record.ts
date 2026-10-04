@@ -434,18 +434,27 @@ export const lessonRecordService = {
     return data.map(mapBackendLessonRecord);
   },
 
-  /** 按日期范围获取教师的消课记录 */
+  /**
+   * 按日期范围获取消课记录。
+   *
+   * `includeAllStatus` = 连停课取消 / 请假 / 未到 / 补课记录一起返回（后端默认只给「正常」）：
+   * - 课表页要它 —— 手动停课的卡片角标、以及「这节课停过没」都靠 cancelled 记录；
+   * - 点名页要它 —— 「恢复本节课」要按 cancelled 记录反查。
+   * 不传则保持既有行为（只拿正常记录）。
+   */
   getByTeacherAndRange: async (
     _teacherId: string,
     startDate: string,
     endDate: string,
     campusId?: string,
+    includeAllStatus?: boolean,
   ): Promise<LessonRecord[]> => {
     const params = new URLSearchParams({
       startDate,
       endDate,
     });
     if (campusId) params.set('campusId', campusId);
+    if (includeAllStatus) params.set('includeAllStatus', 'true');
     const data = await get<BackendLessonRecordListItem[]>(
       `/lesson-records/by-range?${params.toString()}`,
     );

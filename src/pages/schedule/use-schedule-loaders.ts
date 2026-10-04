@@ -395,6 +395,8 @@ export function useScheduleLoaders(params: UseScheduleLoadersParams) {
         startDate,
         endDate,
         currentCampusId,
+        // 连停课/请假/未到记录一起拿：卡片「停课」角标靠 cancelled 记录判定
+        true,
       );
       setLessonRecords(list);
       lastScheduleAuxFetchAtRef.current = Date.now();
