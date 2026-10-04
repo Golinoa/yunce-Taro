@@ -167,26 +167,21 @@ describe('lesson-attendance-load (Q2-2)', () => {
     ).toBe('view');
   });
 
-  it('buildTrialCheckinMap 无记录默认未到', () => {
+  it('buildTrialCheckinMap 按预约状态映射：已签到 / 请假 / 其余未到', () => {
     const map = buildTrialCheckinMap({
-      classId: 'c1',
-      lessonDate: '2026-09-02',
       bookings: [
-        { id: 'b1', trial_student_id: 't1' },
-        { id: 'b2', trial_student_id: 't2' },
+        { id: 'b1', status: 'completed' },
+        { id: 'b2', status: 'cancelled' },
+        { id: 'b3', status: 'no_show' },
+        { id: 'b4', status: 'confirmed' },
+        { id: 'b5' },
       ],
-      records: [
-        {
-          id: 'r1',
-          student_id: 't1',
-          class_id: 'c1',
-          lesson_date: '2026-09-02',
-          status: 'normal',
-        },
-      ] as never[],
     });
     expect(map.b1).toBe('checked');
-    expect(map.b2).toBe('absent');
+    expect(map.b2).toBe('leave');
+    expect(map.b3).toBe('absent');
+    expect(map.b4).toBe('absent');
+    expect(map.b5).toBe('absent');
   });
 
   it('空学员 / 空记录：出勤状态与试听映射不抛错', () => {
@@ -212,10 +207,7 @@ describe('lesson-attendance-load (Q2-2)', () => {
 
     expect(
       buildTrialCheckinMap({
-        classId: 'c1',
-        lessonDate: '2026-09-02',
         bookings: [],
-        records: [],
       }),
     ).toEqual({});
   });

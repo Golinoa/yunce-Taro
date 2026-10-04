@@ -22,6 +22,7 @@ import type {
   LeadFilterTab,
   LeadStatus,
   LeadSummary,
+  LeadBookingStatus,
   TrialSlotConfig,
   TrialCourseSlot,
 } from '@/types/lead';
@@ -523,6 +524,11 @@ export async function updateLeadBooking(
     difficulty?: LeadBookingDifficulty;
     room?: string;
     trialMode?: LeadBooking['trial_mode'];
+    /**
+     * 预约状态：试听签到 / 未到 / 请假都走这一列 —— 试听学员不是正式学员，
+     * 签到不写消课记录（也写不进去），真相就是预约单自己的状态。
+     */
+    status?: LeadBookingStatus;
   },
 ): Promise<LeadBooking | null> {
   const updated = await put<Record<string, unknown>>(`/leads/bookings/${bookingId}`, {
@@ -536,6 +542,7 @@ export async function updateLeadBooking(
     difficulty: data.difficulty,
     room: data.room,
     trialMode: data.trialMode,
+    status: data.status,
   });
   return mapBackendLeadBooking(updated);
 }

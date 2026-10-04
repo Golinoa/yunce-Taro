@@ -2,7 +2,7 @@
  * 班级点名整节提交（Q2-2）
  */
 import Taro from '@tarojs/taro';
-import { lessonRecordService } from '@/services';
+import { leadService, lessonRecordService } from '@/services';
 import type { Subject } from '@/types/campus';
 import type { Lead, LeadBooking } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
@@ -236,57 +236,33 @@ export async function executeClassSubmit(input: {
         }
       }
 
-      for (const booking of input.presentTrialBookings) {
-        const lead = input.trialLeadMap[booking.lead_id];
-        try {
-          await lessonRecordService.create({
-            ...teacherPayload,
-            student_id: booking.trial_student_id,
-            hours_used: 0,
-            status: 'normal',
-            content: `试听签到${booking.note ? `（${booking.note}）` : ''}`,
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit trial present', err);
-          failList.push({ name: lead?.child_name || '试听学员', reason: '试听签到记录失败' });
+      /**
+       * 试听学员：只改**预约单状态**，不写消课记录。
+       *
+       * 试听的对象是线索，不是正式学员 —— 学员表里没有这个人，写消课记录会被
+       * 「学生不存在」和学员外键双双拦下。产品口径（试听记录页）也是预约台账，
+       * 所以签到的真相就是 `LeadBooking.status` 本身。
+       */
+      const writeTrialBookingStatus = async (
+        bookings: LeadBooking[],
+        status: LeadBooking['status'],
+        failReason: string,
+      ) => {
+        for (const booking of bookings) {
+          const lead = input.trialLeadMap[booking.lead_id];
+          try {
+            await leadService.updateLeadBooking(booking.id, { status });
+            successCount += 1;
+          } catch (err) {
+            logError(`classSubmit trial status=${status}`, err);
+            failList.push({ name: lead?.child_name || '试听学员', reason: failReason });
+          }
         }
-      }
+      };
 
-      for (const booking of input.leaveTrialBookings) {
-        const lead = input.trialLeadMap[booking.lead_id];
-        try {
-          await lessonRecordService.create({
-            ...teacherPayload,
-            student_id: booking.trial_student_id,
-            hours_used: 0,
-            status: 'leave',
-            content: '试听学员请假',
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit trial leave', err);
-          failList.push({ name: lead?.child_name || '试听学员', reason: '试听请假记录失败' });
-        }
-      }
-
-      for (const booking of input.absentTrialBookings) {
-        const lead = input.trialLeadMap[booking.lead_id];
-        try {
-          await lessonRecordService.create({
-            ...teacherPayload,
-            student_id: booking.trial_student_id,
-            hours_used: 0,
-            status: 'absent',
-            create_debt: false,
-            content: '试听预约未到',
-          });
-          successCount += 1;
-        } catch (err) {
-          logError('classSubmit trial absent', err);
-          failList.push({ name: lead?.child_name || '试听学员', reason: '试听未到记录失败' });
-        }
-      }
+      await writeTrialBookingStatus(input.presentTrialBookings, 'completed', '试听签到失败');
+      await writeTrialBookingStatus(input.leaveTrialBookings, 'cancelled', '试听请假失败');
+      await writeTrialBookingStatus(input.absentTrialBookings, 'no_show', '试听未到失败');
 
       if (failList.length === 0) {
         input.invalidateStudents(input.currentUserId);

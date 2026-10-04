@@ -3,6 +3,7 @@
  */
 import { leaveService, memberCardService, subjectService } from '@/services';
 import type { Subject } from '@/types/campus';
+import type { LeadBookingStatus } from '@/types/lead';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
 import type { Student } from '@/types/student';
@@ -116,30 +117,40 @@ export function resolveClassAttendanceMode(input: {
   return input.hasRecords || !canOperate ? 'view' : 'normal';
 }
 
+/**
+ * 试听学员的签到状态 —— 真相是**预约单自己的状态**，不是消课记录。
+ *
+ * 试听的对象是线索（`Lead`），不是正式学员：学员表里没有这个人，
+ * 签到写消课记录会被「学生不存在」+ 学员外键双双拦下（历史缺陷）。
+ * 产品口径也写在试听记录页：那一页是预约台账；签到改的就是预约状态。
+ */
 export function buildTrialCheckinMap(input: {
-  bookings: Array<{ id: string; trial_student_id: string }>;
-  records: LessonRecord[];
-  classId: string;
-  lessonDate: string;
-  /** 本节排课规则 ID；给了才区分「同班同一天的另一节课」 */
-  scheduleId?: string;
+  bookings: Array<{ id: string; status?: string }>;
 }): Record<string, CheckinStatus> {
-  const trialStudentIds = new Set(input.bookings.map((b) => b.trial_student_id));
-  const trialRecords = input.records.filter(
-    (record) =>
-      isRecordOfLesson(record, {
-        classId: input.classId,
-        lessonDate: input.lessonDate,
-        scheduleId: input.scheduleId,
-      }) && trialStudentIds.has(record.student_id),
-  );
-
   const initMap: Record<string, CheckinStatus> = {};
   input.bookings.forEach((booking) => {
-    const matched = trialRecords.find((r) => r.student_id === booking.trial_student_id);
-    initMap[booking.id] = matched ? mapRecordStatusToCheckin(matched.status) : 'absent';
+    initMap[booking.id] = mapTrialBookingStatusToCheckin(booking.status);
   });
   return initMap;
+}
+
+/**
+ * 预约状态 → 点名卡片状态。
+ * - `completed` 已签到
+ * - `cancelled` 请假（人没来、提前说了 ⇒ 归取消）
+ * - 其余（含 `no_show` 未到、pending / confirmed 未处理）一律未到
+ */
+export function mapTrialBookingStatusToCheckin(status?: string): CheckinStatus {
+  if (status === 'completed') return 'checked';
+  if (status === 'cancelled') return 'leave';
+  return 'absent';
+}
+
+/** 点名卡片状态 → 预约状态（提交时写回） */
+export function mapCheckinToTrialBookingStatus(status: CheckinStatus): LeadBookingStatus {
+  if (status === 'checked') return 'completed';
+  if (status === 'leave') return 'cancelled';
+  return 'no_show';
 }
 
 export async function fetchApprovedLeaveStudentIds(input: {

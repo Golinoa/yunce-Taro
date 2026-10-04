@@ -36,7 +36,6 @@ import { canOperateHistoricalLesson } from '@/utils/schedule-guard';
 import {
   autoCheckInMakeupStudent,
   autoCheckInTrialStudent,
-  hasCheckedInLesson,
   type AutoCheckInResult,
 } from './auto-checkin';
 
@@ -384,16 +383,21 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
        * 放在建单之前，是因为后端对「同线索同时段重复预约」会直接 422 拦下，
        * 先判掉能让"再点一次"得到一个说得清的结果而不是一句报错。
        */
-      if (trialStudentId) {
+      if (leadId) {
         try {
-          if (
-            await hasCheckedInLesson({
-              studentId: trialStudentId,
-              classId,
-              lessonDate,
-              scheduleId,
-            })
-          ) {
+          /**
+           * 试听签到不写消课记录（试听学员不是正式学员）⇒ 幂等改看**预约自己的状态**：
+           * 该线索在本节已有「已签到」的预约就收工。
+           */
+          const existing = await leadService.getLeadBookings(leadId);
+          const signed = existing.some(
+            (b) =>
+              b.status === 'completed' &&
+              b.class_id === classId &&
+              (b.lesson_date || '').slice(0, 10) === lessonDate &&
+              (scheduleId ? b.reference_schedule_id === scheduleId : b.start_time === startTime),
+          );
+          if (signed) {
             Taro.showToast({
               title: `${trialStudentName} 已在本节课签到`,
               icon: 'none',
@@ -404,7 +408,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
             return;
           }
         } catch (err) {
-          // 查不到旧记录不能当"没签到"（宁可多一次后端校验，也不能重复写记录）
+          // 查不到旧预约不能当"没签到"（宁可多一次后端校验，也不能重复写状态）
           logError('BookTrialByClassSheet trial checkin precheck', err);
         }
       }
@@ -430,7 +434,7 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
       );
       if (!trialConfirmed) return;
 
-      await leadService.bookTrialByClass({
+      const createdBooking = await leadService.bookTrialByClass({
         leadId: leadId!,
         classId,
         className: bookingClassName,
@@ -463,16 +467,18 @@ const BookTrialByClassSheet: React.FC<BookTrialByClassSheetProps> = ({
       }
 
       // 确定后「添加并且签到」：试听不消课时，只写一条 NORMAL 的试听签到记录
-      const trialCheckin: AutoCheckInResult = trialStudentId
+      const trialCheckin: AutoCheckInResult = createdBooking?.id
         ? await autoCheckInTrialStudent({
             studentId: trialStudentId,
             studentName: trialStudentName,
+            bookingId: createdBooking.id,
+            currentStatus: createdBooking.status,
             classId,
             scheduleId,
             lessonDate,
             currentTeacherId: bookingTeacherId,
           })
-        : { ok: false, reason: '未取到试听学员信息，请进点名页手动签到' };
+        : { ok: false, reason: '未取到试听预约信息，请进点名页手动签到' };
 
       if (trialCheckin.ok) {
         Taro.showToast({

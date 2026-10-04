@@ -13,7 +13,7 @@
  *   自行推导，客户端上报的 teacher_id 后端不采信（`lesson-record.service.ts` 只读 operatorTeacherId）。
  */
 import { executeSingleDeduct } from '@/package-course/pages/lesson-form/lesson-submit-single';
-import { lessonRecordService, memberCardService } from '@/services';
+import { leadService, lessonRecordService, memberCardService } from '@/services';
 import { useStudentStore } from '@/stores';
 import type { LessonRecord } from '@/types/lesson-record';
 import type { MemberCardDetail } from '@/types/member-card';
@@ -161,6 +161,10 @@ export async function autoCheckInMakeupStudent(
 }
 
 export interface AutoCheckInTrialParams extends LessonCheckInScope {
+  /** 试听预约单 id：签到改的就是这条预约的状态 */
+  bookingId: string;
+  /** 预约当前状态（幂等判定用；已是「已签到」就不再重复写） */
+  currentStatus?: string;
   /** 试听线索名（仅用于失败提示） */
   studentName?: string;
   /** 当前老师的身份 id（写记录的兜底值；老师归属后端自己推导） */
@@ -168,47 +172,25 @@ export interface AutoCheckInTrialParams extends LessonCheckInScope {
 }
 
 /**
- * 试听学员签到：**不消课时**。
+ * 试听学员签到：**不消课时、也不写消课记录**。
  *
- * 与班级点名里「试听学员签到」逐字同口径（`lesson-submit-class.ts` 的 `presentTrialBookings`）：
- * 不挑卡、`hoursUsed = 0`、状态 NORMAL、内容「试听签到」。
- * 不做扣减来源挑选、不做家长通知、不写欠课 —— 试听本来就没有课时可扣。
+ * 试听的对象是线索，学员表里没有这个人 ⇒ 写消课记录必然被「学生不存在」拦下（历史缺陷）。
+ * 按产品口径（试听记录页 = 预约台账），签到的真相就是 `LeadBooking.status`：
+ * 这里只把预约置为「已签到」，与私教预约签到（`checkInPrivateLeadBooking`）同一条路。
  */
 export async function autoCheckInTrialStudent(
   params: AutoCheckInTrialParams,
 ): Promise<AutoCheckInResult> {
-  const scope: LessonCheckInScope = {
-    studentId: params.studentId,
-    classId: params.classId,
-    lessonDate: params.lessonDate,
-    scheduleId: params.scheduleId,
-  };
-
-  // ① 幂等：该学员本节已签到就不重复写记录
-  try {
-    if (await hasCheckedInLesson(scope)) {
-      return { ok: true, alreadyCheckedIn: true };
-    }
-  } catch (err) {
-    logError('autoCheckInTrialStudent existing records', err);
-    return { ok: false, reason: '无法确认本节课签到状态，请进点名页手动签到' };
+  // ① 幂等：预约已是「已签到」就收工，不重复写
+  if (params.currentStatus === 'completed') {
+    return { ok: true, alreadyCheckedIn: true };
   }
 
-  // ② 写试听签到记录（不挑卡 / 0 课时）
+  // ② 只改预约状态
   try {
-    await lessonRecordService.create({
-      teacher_id: params.currentTeacherId || '',
-      operator_teacher_id: params.currentTeacherId,
-      student_id: params.studentId,
-      hours_used: 0,
-      status: 'normal',
-      class_id: params.classId,
-      schedule_id: params.scheduleId,
-      lesson_date: params.lessonDate,
-      content: '试听签到',
-    });
+    await leadService.updateLeadBooking(params.bookingId, { status: 'completed' });
   } catch (err) {
-    logError('autoCheckInTrialStudent create', err);
+    logError('autoCheckInTrialStudent update booking', err);
     const message = err instanceof Error && err.message ? err.message : '';
     return { ok: false, reason: message || '签到失败，请进点名页手动签到' };
   }

@@ -389,13 +389,9 @@ export function useLessonFormLoaders(params: UseLessonFormLoadersParams) {
       });
       setTrialLeadMap(nextLeadMap);
       setTrialCheckinMap(
+        // 试听签到状态 = 预约单自己的状态（试听学员不是正式学员，签到不写消课记录）
         buildTrialCheckinMap({
           bookings: classBookings,
-          // 班级初始化已经加载了当天记录，复用它，避免进入点名页重复请求同一日期。
-          records: existingClassRecords,
-          classId: selectedClassId,
-          lessonDate,
-          scheduleId: lessonScheduleId,
         }),
       );
     } catch (err) {
