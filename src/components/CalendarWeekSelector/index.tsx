@@ -41,6 +41,16 @@ export interface CalendarWeekSelectorProps {
 }
 
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
+/**
+ * 月视图行高 = 日期圆圈 68rpx + 格子上下 padding 各 8rpx = 84rpx
+ * ⇒ 4 行 336 / 5 行 420 / 6 行 504。高度按实际行数给（见 `monthRowCount`），
+ * 写死 6 行会让 5 行的月份底部空出一整行，把下方展开/收起按钮推远。
+ */
+const MONTH_GRID_HEIGHT_CLASS: Record<number, string> = {
+  4: 'h-[336rpx]',
+  5: 'h-[420rpx]',
+  6: 'h-[504rpx]',
+};
 const SWIPER_DURATION = 260;
 const WEEK_WINDOW_SIZE = 9;
 const MONTH_WINDOW_SIZE = 9;
@@ -489,6 +499,20 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
 
   const showMonthView = monthOnly || isMonthViewExpanded;
 
+  /**
+   * 月视图实际行数（4~6 行，随月份而变）。
+   * 高度必须跟着行数走：写死 6 行的话，5 行的月份底部会空出一整行（84rpx），
+   * 把下方展开/收起按钮推得离日历很远。
+   */
+  const monthRowCount = useMemo(() => {
+    const month = monthWindow[monthSwiperCurrent];
+    if (!month) return 6;
+    return Math.ceil(buildCalendarDates(month).length / 7);
+  }, [monthSwiperCurrent, monthWindow]);
+
+  const monthGridHeightClass =
+    MONTH_GRID_HEIGHT_CLASS[monthRowCount] ?? MONTH_GRID_HEIGHT_CLASS[6];
+
   return (
     <View className={cn('px-[24rpx] pt-[26rpx]', className)}>
       <View className="grid grid-cols-[1fr_auto_1fr] items-center gap-[12rpx]">
@@ -575,9 +599,9 @@ const CalendarWeekSelector: React.FC<CalendarWeekSelectorProps> = ({
             ))}
           </View>
 
-          {/* 固定 6 行高度，左右滑切换月份 */}
+          {/* 固定行高、左右滑切换月份；高度随该月实际行数（4~6 行）变化 */}
           <Swiper
-            className="h-[504rpx]"
+            className={monthGridHeightClass}
             current={monthSwiperCurrent}
             duration={SWIPER_DURATION}
             easingFunction="easeOutCubic"
