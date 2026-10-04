@@ -459,6 +459,26 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       }
 
       /**
+       * 点名名单加人 = 把学员正式加进这个班（与「移除学员立刻从班级移除」对称）。
+       * 早先只改本地列表、不落库 ⇒ 退出页面人就没了，下次点名也不在名单里。
+       * 补录名单（supplement）是「这节课临时来补」的性质，不改班级归属，保持本地。
+       */
+      const shouldPersistToClass = addStudentSheetPurpose === 'attendance';
+      if (shouldPersistToClass) {
+        if (!selectedClassId) {
+          Taro.showToast({ title: '缺少班级信息', icon: 'none' });
+          return;
+        }
+        try {
+          await classService.addStudents(selectedClassId, ids);
+        } catch (err) {
+          logError('add students to class', err);
+          Taro.showToast({ title: '添加失败，请重试', icon: 'none' });
+          return;
+        }
+      }
+
+      /**
        * 加人时并发取会员卡：取不到卡的学员提交时会被提示
        * 「无可扣课时」，所以取卡失败**不阻断加人**。
        */
@@ -504,12 +524,24 @@ export function useLessonFormActions(params: UseLessonFormActionsParams) {
       if (addStudentSheetPurpose === 'supplement') {
         setSupplementStudentIds(new Set(ids));
         setAttendanceMode('supplement');
+        return;
+      }
+
+      // 写库成功：发刷新信号（返回课表页会重拉），并强制重拉班级名单，
+      // 避免本页还停留在写之前的旧名单快照上。
+      emitScheduleRefreshSignal();
+      Taro.showToast({ title: '已加入班级', icon: 'success' });
+      if (selectedClassId) {
+        await loadClassStudents(selectedClassId, { force: true });
       }
     },
     [
       addStudentSheetPurpose,
       addableStudents,
+      emitScheduleRefreshSignal,
       leaveStudentIds,
+      loadClassStudents,
+      selectedClassId,
       setAttendanceMode,
       setCheckedStudentIds,
       setStudentMemberCards,
