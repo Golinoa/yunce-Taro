@@ -19,9 +19,23 @@ import { isColdStartGracePeriod } from '@/utils/launch-scene';
 import { reportLocalDebug } from '@/utils/local-debug';
 import { isTabBarPage, safeReLaunch } from '@/utils/navigation';
 import {
+  hasOwnOrganizationContext,
   maybeRedirectStoreEntryPendingHub,
   shouldRunStoreEntryColdStartCheck,
 } from '@/utils/store-entry-onboarding';
+
+/**
+ * 是否属于「门店入驻」漏斗路径（填表页 / 进度页）。
+ *
+ * 用途：登录成功后若发现回跳地址指向入驻漏斗，且用户**已有机构**，必须忽略它
+ * （见 `navigateAfterLogin`）—— 否则会直接落进入驻页、跳过首页。
+ */
+function isStoreEntryFunnelPath(path: string): boolean {
+  return String(path || '')
+    .replace(/^\//, '')
+    .toLowerCase()
+    .includes('package-settings/pages/store-entry');
+}
 
 // 无需登录即可访问的页面
 const PUBLIC_PAGES = [
@@ -309,6 +323,8 @@ function redirectToLogin(fromPath: string) {
 /** 登录后跳转逻辑
  * 优先级：
  * 1. 若有 redirectPath，优先回原页面
+ *    ——**例外**：已有机构时忽略指向「门店入驻」漏斗的回跳（否则已入驻用户会被
+ *      直接送进入驻页、跳过首页，见下方实现处说明）
  * 2. 若用户无身份，进入注册流程
  * 3. 若用户单身份，进入首页
  * 4. 若用户多身份，进入角色切换页
@@ -319,12 +335,24 @@ export function navigateAfterLogin(profile?: Profile | null) {
 
   if (redirectPath) {
     const path = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`;
-    if (isTabBarPage(path)) {
-      Taro.switchTab({ url: path });
-    } else {
-      Taro.redirectTo({ url: path });
+    /**
+     * 入驻漏斗的回跳要分人对待（2026-10-04 修复「登录后直接落进入驻页」）：
+     *
+     * - **未入驻用户**（无机构）：回跳是正常设计 —— 表单页在未登录提交时把
+     *   `LOGIN_REDIRECT_KEY` 写成入驻页自身，为的是「登录后回来接着填」。放行。
+     * - **已有机构用户**：该回跳是历史残留（例如曾以未登录身份点过提交、或在登出状态下
+     *   落在入驻页被守卫记下），此时放行会把已入驻用户**直接送进入驻页、跳过首页**，
+     *   表现就是「登录后进不去主页」。忽略它，交给下面的身份/首页决策。
+     */
+    const storeEntryHijack = isStoreEntryFunnelPath(path) && hasOwnOrganizationContext(profile);
+    if (!storeEntryHijack) {
+      if (isTabBarPage(path)) {
+        Taro.switchTab({ url: path });
+      } else {
+        Taro.redirectTo({ url: path });
+      }
+      return;
     }
-    return;
   }
 
   const identities = profile?.identities || [];

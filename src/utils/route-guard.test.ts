@@ -129,4 +129,48 @@ describe('navigateAfterLogin', () => {
       url: '/package-auth/pages/role-switch/index',
     });
   });
+
+  /**
+   * 回归（2026-10-04 用户报「微信登录后直接落进入驻页、进不去主页」）：
+   *
+   * 入驻表单页在「未登录点提交」时会把 LOGIN_REDIRECT_KEY 写成入驻页自身
+   * （`store-entry/index.tsx`，为的是登录后回来接着填）。已入驻用户一旦带上这份
+   * 残留回跳，登录后就会被它直接送进入驻页、跳过首页。
+   * 有机构时必须忽略该回跳。
+   */
+  it('已有机构 + 回跳=入驻页 → 忽略回跳，进首页（防劫持）', () => {
+    Taro.setStorageSync(LOGIN_REDIRECT_KEY, '/package-settings/pages/store-entry/index');
+    navigateAfterLogin(profileWithRoles(['principal']));
+    expect(redirectTo).not.toHaveBeenCalled();
+    expect(switchTab).toHaveBeenCalledWith({ url: '/pages/home/index' });
+    // 无论是否采用，key 都必须被消费掉，避免下次登录继续劫持
+    expect(Taro.getStorageSync(LOGIN_REDIRECT_KEY) || '').toBe('');
+  });
+
+  it('已有机构 + 回跳=入驻进度页 → 同样忽略', () => {
+    Taro.setStorageSync(LOGIN_REDIRECT_KEY, '/package-settings/pages/store-entry/pending/index');
+    navigateAfterLogin(profileWithRoles(['principal']));
+    expect(redirectTo).not.toHaveBeenCalled();
+    expect(switchTab).toHaveBeenCalledWith({ url: '/pages/home/index' });
+  });
+
+  it('无机构 + 回跳=入驻页 → 照旧回入驻页（原有「登录后继续填表」设计不受影响）', () => {
+    const noOrg = profileWithRoles(['principal']);
+    noOrg.currentContext = { ...noOrg.currentContext, organizationId: '' };
+    Taro.setStorageSync(LOGIN_REDIRECT_KEY, '/package-settings/pages/store-entry/index');
+    navigateAfterLogin(noOrg);
+    expect(redirectTo).toHaveBeenCalledWith({
+      url: '/package-settings/pages/store-entry/index',
+    });
+    expect(switchTab).not.toHaveBeenCalled();
+  });
+
+  it('已有机构 + 回跳=其它页 → 回跳优先级不变（只拦入驻漏斗）', () => {
+    Taro.setStorageSync(LOGIN_REDIRECT_KEY, '/package-auth/pages/campus-invite-landing/index');
+    navigateAfterLogin(profileWithRoles(['principal']));
+    expect(redirectTo).toHaveBeenCalledWith({
+      url: '/package-auth/pages/campus-invite-landing/index',
+    });
+    expect(switchTab).not.toHaveBeenCalled();
+  });
 });
