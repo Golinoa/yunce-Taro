@@ -3,6 +3,7 @@ import cn from 'classnames';
 import React from 'react';
 import ClassAvatar from '@/components/class/ClassAvatar';
 import Icon from '@/components/Icon';
+import SuspendBadge, { type SuspendBadgeKind } from '@/components/schedule/SuspendBadge';
 import { BRAND_LOGO } from '@/constants/brand';
 
 /**
@@ -101,6 +102,18 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   const countLabel = item.totalCount > 0 ? `${item.checkedCount}/${item.totalCount}` : '0/0';
   const showTopActions = Boolean(menu) || Boolean(showShare);
 
+  /**
+   * 停课角标：放假优先（按日期推导），否则就是老师手动停的课。
+   *
+   * 手动停课会给全班每个学员写一条 `cancelled` 记录 ⇒ 卡片状态落到 `cancelled`，
+   * 所以这两者在卡片上同构，只有文案不同（见 `SuspendBadge`）。
+   */
+  const suspendBadgeKind: SuspendBadgeKind | null = item.holidaySuspended
+    ? 'holiday'
+    : item.status === 'cancelled'
+      ? 'manual'
+      : null;
+
   return (
     <View
       className={cn(
@@ -109,26 +122,11 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
       )}
       onClick={() => onClick?.(item)}
     >
-      {/* 右上角角标：放假停课（橙，优先）/ 已取消（红）。
-          z-30 盖住分享按钮（z-10）：停课/取消课次的分享无意义，角标必须完整可见（用户口径 2026-09-30） */}
-      {item.holidaySuspended || item.status === 'cancelled' ? (
-        <View className="absolute right-0 top-0 z-30 overflow-hidden rounded-tr-[14rpx]">
-          <View
-            className={cn(
-              'rounded-bl-[16rpx] px-[20rpx] py-[10rpx] shadow-card',
-              item.holidaySuspended ? 'bg-warning' : 'bg-destructive',
-            )}
-          >
-            <Text
-              className={cn(
-                'text-[20rpx] font-semibold tracking-[2rpx]',
-                item.holidaySuspended ? 'text-warning-foreground' : 'text-destructive-foreground',
-              )}
-            >
-              {item.holidaySuspended ? '放假停课' : '取消'}
-            </Text>
-          </View>
-        </View>
+      {/* 右上角停课角标：放假停课 / 主动停课（橙，共用 `SuspendBadge`，只有文案不同）。
+          早先手动停课落到红底「取消」——并没有独立的"取消课次"入口，那张卡片就是手动停课。
+          z-30 盖住分享按钮（z-10）：停课的分享无意义，角标必须完整可见（用户口径 2026-09-30） */}
+      {suspendBadgeKind ? (
+        <SuspendBadge kind={suspendBadgeKind} className="absolute right-0 top-0 z-30 rounded-tr-[14rpx]" />
       ) : null}
 
       {!menu && showTopActions && item.status !== 'cancelled' ? (
